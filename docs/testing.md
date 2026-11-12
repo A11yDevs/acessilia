@@ -37,24 +37,29 @@ uv run pytest -m "not e2e" --durations=25
 | Command | What it runs |
 |---|---|
 | `make test-file F=tests/test_example.py` | One file or one node id (`tests/test_api.py::test_health`), non-E2E |
-| `make test-failed` | The tests recorded as failed by the previous pytest session |
+| `make test-failed` | The failures recorded in the core, docstruct and SDK caches |
 | `make test-all` | The non-E2E core, docstruct and SDK suites, sequentially |
 
 `make` with no target prints the same list.
 
-`test-failed` reads `.pytest_cache/v/cache/lastfailed`. When there is no
-recorded failure it prints a message and exits successfully instead of letting
-`pytest --lf` fall back to the whole suite. A run whose only recorded failures
-are E2E tests is also treated as "nothing to rerun", because this command
-excludes E2E.
+`test-failed` reads the `lastfailed` cache of all three suites (`.pytest_cache`
+at the repository root, `libs/docstruct` and `libs/sdk`) and reruns each
+suite's failures from its own directory, with the same configuration and
+relative node ids as `test-all`. Before running, it collects only the recorded
+files and keeps the ids that still exist. A removed or renamed test is reported
+and skipped instead of making `pytest --lf` fall back to the whole suite; a file
+recorded with a collection error is rerun as a file. When there is no recorded
+failure, or the only recorded failures are E2E tests, it prints a message and
+exits successfully.
 
 `test-all` stops at no suite: it runs all three and returns the last non-zero
 exit status, so a failing library does not hide the core result. It is
 sequential today; PR 2 of #448 adds bounded parallelism (`-n 4 --dist
 worksteal`) after the isolation fixes.
 
-The wrappers pass `-m "not e2e"`; use `uv run pytest -m e2e` directly to reach a
-live environment, as described in [tests/README.md](../tests/README.md).
+The core suite runs with `-m "not e2e"`; use `uv run pytest -m e2e` directly to
+reach a live environment, as described in
+[tests/README.md](../tests/README.md).
 
 ## Timeouts
 
@@ -71,8 +76,11 @@ def test_a_long_but_bounded_operation():
     ...
 ```
 
-To debug without the timeout, disable the plugin for one run with
-`uv run pytest -p no:timeout ...`.
+To debug without the default timeout, pass `--timeout=0`:
+`uv run pytest --timeout=0 ...`. `-p no:timeout` does not work with this
+project's `--strict-config`, because disabling the plugin also removes its
+`timeout` option. An explicit `@pytest.mark.timeout(...)` still takes precedence
+over `--timeout=0`, so remove the marker while debugging that test.
 
 ## CI artifacts
 

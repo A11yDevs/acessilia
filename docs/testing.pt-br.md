@@ -40,24 +40,28 @@ uv run pytest -m "not e2e" --durations=25
 | Comando | O que executa |
 |---|---|
 | `make test-file F=tests/test_example.py` | Um arquivo ou um node id (`tests/test_api.py::test_health`), sem E2E |
-| `make test-failed` | Os testes registrados como falhos na sessão anterior do pytest |
+| `make test-failed` | As falhas registradas nos caches do core, docstruct e SDK |
 | `make test-all` | As suítes do core, docstruct e SDK sem E2E, sequencialmente |
 
 `make` sem alvo imprime a mesma lista.
 
-`test-failed` lê `.pytest_cache/v/cache/lastfailed`. Quando não há falha
-registrada, ele imprime uma mensagem e termina com sucesso, em vez de deixar o
-`pytest --lf` cair para a suíte inteira. Uma execução cujas únicas falhas
-registradas são testes E2E também é tratada como "nada para reexecutar", porque
-este comando exclui E2E.
+`test-failed` lê o cache `lastfailed` das três suítes (`.pytest_cache` na raiz
+do repositório, `libs/docstruct` e `libs/sdk`) e reexecuta as falhas de cada uma
+a partir do diretório do próprio projeto, com a mesma configuração e os mesmos
+node ids relativos do `test-all`. Antes de executar, ele coleta apenas os
+arquivos registrados e mantém os ids que ainda existem. Um teste removido ou
+renomeado é listado e ignorado, em vez de fazer o `pytest --lf` cair para a
+suíte inteira; um arquivo registrado com erro de coleta é reexecutado como
+arquivo. Quando não há falha registrada, ou as únicas falhas são testes E2E, ele
+imprime uma mensagem e termina com sucesso.
 
 `test-all` não para na primeira suíte: executa as três e devolve o último código
 de saída diferente de zero, para que uma biblioteca com falha não esconda o
 resultado do core. Hoje ele é sequencial; a PR 2 da #448 adiciona paralelismo
 limitado (`-n 4 --dist worksteal`) depois das correções de isolamento.
 
-Os wrappers passam `-m "not e2e"`; use `uv run pytest -m e2e` diretamente para
-alcançar um ambiente real, como descrito no
+A suíte do core roda com `-m "not e2e"`; use `uv run pytest -m e2e` diretamente
+para alcançar um ambiente real, como descrito no
 [README dos testes](../tests/README.pt-br.md).
 
 ## Timeouts
@@ -75,8 +79,11 @@ def test_a_long_but_bounded_operation():
     ...
 ```
 
-Para depurar sem o timeout, desative o plugin em uma execução com
-`uv run pytest -p no:timeout ...`.
+Para depurar sem o timeout padrão, passe `--timeout=0`:
+`uv run pytest --timeout=0 ...`. O `-p no:timeout` não funciona com o
+`--strict-config` deste projeto, porque desativar o plugin também remove a opção
+`timeout`. Um `@pytest.mark.timeout(...)` explícito continua tendo precedência
+sobre `--timeout=0`, então remova o marcador ao depurar esse teste.
 
 ## Artefatos da CI
 
