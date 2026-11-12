@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from backend.core.pipeline.handlers import text as text_handlers
 from pathlib import Path
 
 import pytest
@@ -194,7 +195,7 @@ def test_the_unicode_repair_leaves_the_marked_cells_alone(spans):
     table = manifest.elements[1]
     before = _texts(table)
 
-    pddl_orchestrator._repair_table_cells(table, UnicodeRepairContext(
+    text_handlers._repair_table_cells(table, UnicodeRepairContext(
         language="pt-BR", block_type="prose", allow_spacing_diacritics=True,
         allow_standalone_spacing_diacritics=True, allow_legacy_tex_artifacts=True,
     ))
@@ -211,7 +212,7 @@ def test_an_unclaimed_slash_is_not_composed_inside_a_marked_cell(spans):
     slash.metadata.pop("negation_overlay")
     before = _texts(manifest.elements[1])
 
-    outcomes = pddl_orchestrator._reattach_negation_overlays(manifest)
+    outcomes = text_handlers._reattach_negation_overlays(manifest)
 
     assert _texts(manifest.elements[1]) == before
     assert outcomes == {"no-candidate": 1}

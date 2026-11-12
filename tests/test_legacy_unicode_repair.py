@@ -7,6 +7,7 @@ deterministic method that fixes NFD and dotless-i without touching formulas.
 from __future__ import annotations
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.handlers import text as text_handlers
 from backend.core.pipeline import payload as pipeline_payload
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
@@ -92,7 +93,7 @@ class TestManifestEmission:
         assert observations[0].evidence["spacing_word_internal"] == 1
 
         manifest = build_manifest([element], obligations)
-        result = pddl._handle_unicode_repair_method(
+        result = text_handlers._handle_unicode_repair_method(
             manifest, obligations[0].id
         )
         assert result.success is True
@@ -143,7 +144,7 @@ class TestHandler:
         element = _element(BRASILIA)
         manifest = build_manifest([element], [_obligation()])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is True
         assert element.text == "Bras\u00edlia"
@@ -157,7 +158,7 @@ class TestHandler:
         element = _element("Bras\u00b4 \u0131lia, C\u00b4 alculo e Voc\u02c6 e")
         manifest = build_manifest([element], [_obligation()])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is True
         assert element.text == "Bras\u00edlia, C\u00e1lculo e Voc\u00ea"
@@ -167,7 +168,7 @@ class TestHandler:
         element = _element(SPACING_CALCULO, "page_header")
         manifest = build_manifest([element], [_obligation()])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is True
         assert element.text == "C\u00e1lculo"
@@ -192,7 +193,7 @@ class TestHandler:
         )
         manifest = build_manifest([table], [_obligation("element-table")])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is True
         table_ast = table.metadata["table_ast"]
@@ -208,7 +209,7 @@ class TestHandler:
         element = _element(text)
         manifest = build_manifest([element], [_obligation()])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is True
         assert element.text == text
@@ -223,7 +224,7 @@ class TestHandler:
         element = _element(text)
         manifest = build_manifest([element], [_obligation()])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is True
         assert element.text.endswith("posi\u00e7\u00e3o \u00e9")
@@ -242,7 +243,7 @@ class TestHandler:
             [evidence, plain], [_obligation(["element-1", "element-2"])]
         )
 
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert plain.text == "mais precisa à medida que h fica perto"
         assert set(plain.metadata["unicode_repair"]["rules"]) == {"grave-crase", "split-ligature"}
@@ -252,7 +253,7 @@ class TestHandler:
         element = _element(text)
         manifest = build_manifest([element], [_obligation()])
 
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert element.text.startswith("mais precisa ` a medida")
 
@@ -268,7 +269,7 @@ class TestHandler:
             [first, second], [_obligation(["element-1", "element-2"])]
         )
 
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert second.text == "o sinal \u00e9 usado"
 
@@ -288,7 +289,7 @@ class TestHandler:
                 [first, second], [_obligation(["element-1", "element-2"])]
             )
 
-            pddl._handle_unicode_repair_method(manifest, "o-unicode")
+            text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
             assert second.text == expected, count
 
@@ -304,7 +305,7 @@ class TestHandler:
             [first, second], [_obligation(["element-1", "element-2"])]
         )
 
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert second.text == "o sinal \u00b4 e usado"
 
@@ -330,7 +331,7 @@ class TestHandler:
             )
         )
 
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert second.text == "o sinal \u00e9 usado"
 
@@ -338,8 +339,8 @@ class TestHandler:
         element = _element(f"{BRASILIA} e {CALCULO}")
         manifest = build_manifest([element], [_obligation()])
 
-        first = pddl._handle_unicode_repair_method(manifest, "o-unicode")
-        second = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        first = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
+        second = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert first.success is True
         assert second.success is True
@@ -350,7 +351,7 @@ class TestHandler:
         element = _element(CALCULO, "formula")
         manifest = build_manifest([element], [_obligation()])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert result.success is False
         assert element.text == CALCULO
@@ -358,7 +359,7 @@ class TestHandler:
     def test_missing_obligation(self):
         manifest = build_manifest([_element(BRASILIA)], [])
 
-        result = pddl._handle_unicode_repair_method(manifest, "o-ausente")
+        result = text_handlers._handle_unicode_repair_method(manifest, "o-ausente")
 
         assert result.success is False
         assert "o-ausente" in (result.message or "")
@@ -423,7 +424,7 @@ def _slash(x, y, *, slash_id="slash-1", page=1):
 
 def _repair(*elements):
     manifest = build_manifest(list(elements), [_obligation([e.id for e in elements])])
-    pddl._handle_unicode_repair_method(manifest, "o-unicode")
+    text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
     return manifest
 
 
@@ -559,8 +560,8 @@ class TestNegationOverlays:
         slash = _slash(205, 480)
         manifest = build_manifest([host, slash], [_obligation(["element-1", "slash-1"])])
 
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
-        pddl._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
+        text_handlers._handle_unicode_repair_method(manifest, "o-unicode")
 
         assert host.text.count("≠") == 1
         assert host.metadata["negation_overlays"] == 1
@@ -600,7 +601,7 @@ class TestNegationOverlayChain:
         manifest, host, slash = self._composed()
         text_after_first_run = host.text
 
-        assert pddl._reattach_negation_overlays(manifest) == {}
+        assert text_handlers._reattach_negation_overlays(manifest) == {}
         assert host.text == text_after_first_run
         assert host.metadata["negation_overlays"] == 1
         assert slash.metadata["negation_overlay"] == {"outcome": "composed", "host": "element-1"}

@@ -222,8 +222,10 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("tests/test_n05_n09_n10_regressions.py", '"inválido".encode()'),
     ("libs/sdk/tests/clients/test_dataset.py", '"input/álgebra.pdf"'),
     # Legacy Unicode repair — user-facing execution messages and observations
-    ("backend/agents/pddl_orchestrator.py", "Nenhum texto elegível para reparo Unicode"),
-    ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),
+    ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para reparo Unicode"),
+    ("backend/core/pipeline/handlers/text.py", "Reparo Unicode aplicado em"),
+    ("backend/core/pipeline/handlers/text.py", "para revisão"),
+    # The same substring also exempts the human review escalation message.
     ("backend/agents/pddl_orchestrator.py", "para revisão"),
     ("backend/core/pipeline/payload.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
