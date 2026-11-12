@@ -25,12 +25,15 @@ from backend.agents.pddl_orchestrator import (
     DETERMINISTIC_METHOD_HANDLERS,
     PddlAccessibilityOrchestrator,
 )
-from backend.core.pipeline.handlers.review import _handle_human_review_method
+from backend.core.pipeline.handlers import content as content_handlers
+from backend.core.pipeline.handlers import review as review_handlers
+from backend.core.pipeline.handlers import text as text_handlers
 from backend.core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
     _handle_vision_description_method,
 )
+from backend.core.pipeline.handlers.review import _handle_human_review_method
 from backend.core.pipeline.handlers.text import (
     _handle_repetition_guard_method,
     _tailjoin_position,
@@ -125,6 +128,43 @@ class TestRegistryCoverage:
 
         for result in results:
             assert isinstance(result, MethodResult)
+
+
+class TestRegistryWiring:
+    """The registry points at the handlers where they now live (#402, step 6).
+
+    The handler tests call the functions directly, so without this a registry
+    left pointing at another function would go unnoticed.
+    """
+
+    MOVED = {
+        "vision-description": content_handlers._handle_vision_description_method,
+        "pandoc-table": content_handlers._handle_pandoc_table_method,
+        "pandoc-code": content_handlers._handle_pandoc_code_method,
+        "norm-fix": text_handlers._handle_norm_fix_method,
+        "unicode-repair": text_handlers._handle_unicode_repair_method,
+        "rep-guard": text_handlers._handle_repetition_guard_method,
+        "line-number-extractor": text_handlers._handle_extract_line_numbers_method,
+        "verse-chunker": text_handlers._handle_chunk_verse_method,
+        "tailjoin": text_handlers._handle_tailjoin_method,
+        "tailjoin-positioned": text_handlers._handle_tailjoin_method,
+        "deterministic-heading-repair": (
+            text_handlers._handle_deterministic_heading_repair_method
+        ),
+    }
+
+    @pytest.mark.parametrize("method", sorted(MOVED))
+    def test_the_deterministic_table_points_at_the_moved_handler(self, method) -> None:
+        assert DETERMINISTIC_METHOD_HANDLERS[method] is self.MOVED[method]
+
+    @pytest.mark.parametrize("method", sorted(MOVED))
+    def test_the_executor_runs_the_moved_handler(self, method) -> None:
+        registry = PddlAccessibilityOrchestrator._build_executor().registry
+        assert registry.get(method) is self.MOVED[method]
+
+    def test_human_review_is_the_review_handler(self) -> None:
+        registry = PddlAccessibilityOrchestrator._build_executor().registry
+        assert registry.get("human-review") is review_handlers._handle_human_review_method
 
 
 class TestXycutOrder:

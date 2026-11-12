@@ -13,6 +13,7 @@ from docstruct.tables.ast import (
     linearize_table_for_text,
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.text.code_reflow import normalize_code_text
 
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
@@ -24,7 +25,6 @@ from backend.core.pipeline.elements import (
 from backend.core.pipeline.handlers.common import (
     _target_elements,
 )
-from backend.tools.code_tools import normalize_code_text
 
 
 def _handle_vision_description_method(
@@ -102,6 +102,8 @@ def _handle_pandoc_table_method(
                 usable = any(
                     value.strip() for row in _rows_from_table_ast(table_ast) for value in row
                 )
+                # Called only to validate: it raises on an AST the exporters
+                # cannot linearize, which makes the table unusable below.
                 linearize_table_for_text({"table_ast": table_ast})
         except (TypeError, ValueError, AttributeError):
             usable = False
@@ -126,7 +128,7 @@ def _handle_pandoc_table_method(
 def _handle_pandoc_code_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Normalize code targets in place and record the normalized language."""
+    """Normalize code targets in place and flag each one in ``metadata["code_normalized"]``."""
     elements = [
         el for el in _target_elements(manifest, obligation_id) if el.type == "code"
     ]

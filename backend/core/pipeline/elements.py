@@ -1,7 +1,13 @@
-"""Manifest elements as the payload's blocks, and an element's box on the unit page.
+"""Manifest elements as the payload's blocks, their boxes, and the table checks.
 
 Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6). The payload,
-the fusion handlers and the furniture checks read them.
+the handlers, the furniture checks and the enrichment stages read them.
+
+``_table_element_has_structured_content`` and ``_rows_look_like_placeholder``
+tell a real table AST from the placeholder one; the table handler and the table
+enrichment both use them. They live here for now: finding S of the orchestrator
+inventory sends the row rule (``_rows_look_like_placeholder``) to
+``docstruct.tables``.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ from docstruct.blocks.lists import (
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
+from docstruct.text.code_reflow import normalize_code_text
 
 from backend.core.manifest.models import (
     ManifestElement,
@@ -21,7 +28,6 @@ from backend.core.manifest.models import (
     is_bottom_left,
 )
 from backend.i18n import t
-from backend.tools.code_tools import normalize_code_text
 
 if TYPE_CHECKING:
     pass
