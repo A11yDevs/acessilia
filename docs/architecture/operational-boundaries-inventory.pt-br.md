@@ -7,7 +7,7 @@ docstruct o núcleo estrutural portável do ecossistema e permitir que o SDK
 ofereça operações e workflows determinísticos, não só transporte. A fase 1 dela
 pede um diagnóstico antes de qualquer decisão. Esta página registra o que o
 código e as ADRs já resolvem e o que continua em aberto. A medição foi feita na
-develop em 8d7465e4, com uma varredura de AST que inclui os imports dentro de
+develop em 8d7465e4 (a Toolbox nas refs da seção dela, abaixo), com uma varredura de AST que inclui os imports dentro de
 funções. A [ADR-0017](../adr/0017-operational-sdk-and-agentic-core.pt-br.md)
 parte daqui.
 
@@ -20,7 +20,7 @@ que já foi aceita:
 |---|---|
 | P1, portabilidade (só a biblioteca padrão, aceleradores opcionais protegidos) | Tabela e conformidade da ADR-0002; o `libs/docstruct/tests/test_purity.py` confere que o `pyproject.toml` não declara dependência de execução, que todo outro import é um acelerador listado atrás de `except ImportError` e que todo módulo é importado num interpretador que recusa tudo fora da biblioteca padrão. O único acelerador é o `rapidfuzz`, em `evaluation/metrics/text_ed.py`. A alternativa A da #470, portanto, já está em vigor. |
 | P2, contratos estruturais compartilhados | [ADR-0007](../adr/0007-manifest-model-and-mathml-conversion.pt-br.md) e #203: o `docstruct.manifest` é o modelo normativo do documento. Os modelos pydantic do core e da Toolbox ficam só como modelos de transporte 1.1.0, conferidos contra o `docstruct.manifest.field_specs` em testes de contrato. |
-| P3, independência de infraestrutura | A tabela da ADR-0002 para o docstruct, e o `test_purity.py`. |
+| P3, independência de infraestrutura | **Em parte.** A tabela da ADR-0002 enuncia a regra. O `test_purity.py` confere dependências e imports, mas permite toda a biblioteca padrão: um módulo que lê `os.environ` ou um arquivo ao ser importado ainda passa, como a revisão da #471 reproduziu. A parte de rede, ambiente, arquivos e subprocessos ainda não é testada. |
 | Direção das dependências, sem ciclos | A ADR-0002 já permite **SDK → docstruct** e oferece "acesso em processo aos algoritmos puros do docstruct" pelo SDK. O `test_purity.py` do SDK mantém as dependências dele "dentro do `httpx` e do docstruct". |
 | P7, uma implementação por algoritmo estrutural | ADR-0002 e #203; o `tests/test_docstruct_bridges.py` falha com uma nova cópia de um algoritmo já ligado ao docstruct. |
 | A Toolbox não importa o core nem o SDK | O `tests/unit/test_architecture.py` da Toolbox. Fora dele, `acessilia_sdk` e `backend` aparecem só em um teste entre projetos (`tests/cross_project/test_core_storage_outage.py`). |
@@ -32,14 +32,26 @@ que já foi aceita:
   O job `SDK alone` recusa o `docstruct` junto com o `backend`, a Toolbox, o
   Agno e o FastAPI. Se o SDK compuser algoritmos do docstruct (#470, P5), a
   dependência e esse job mudam.
-- **A Toolbox fixa um docstruct mais antigo.** O `pyproject.toml` dela instala
-  o wheel `docstruct-v0.4.0`, enquanto o `libs/docstruct` está na 0.5.0. Nada
-  confere se os dois ainda concordam sobre os modelos compartilhados: é o
-  risco da P8 da #470.
+- **A Toolbox e o core concordam sobre o docstruct só por convenção.** Cada
+  branch da Toolbox fixa o wheel de release do docstruct pelo SHA-256, e as
+  versões fixadas batem com os branches do core:
+
+  | Branch | Core (`libs/docstruct`) | Toolbox (`pyproject.toml`) |
+  |---|---|---|
+  | `main` | 0.4.0 (cac215df) | `docstruct-v0.4.0` (e77869be) |
+  | `develop` | 0.5.0 (b6ca0ecf) | `docstruct-v0.5.0` (77c7df7c), desde o db866c60 da acessilia-toolbox (2026-11-02) |
+
+  Então não há divergência hoje. Mas nada confere se uma release do docstruct
+  e a versão fixada pela Toolbox andam juntas, nem se os dois ainda concordam
+  sobre os modelos compartilhados: é o risco da P8 da #470.
 - **O docstruct não tem job de instalação isolada.** O `test_purity.py` recusa
   imports fora da biblioteca padrão num subprocesso, mas nenhum job de CI
   instala o docstruct sozinho num ambiente limpo, como o `SDK alone` faz com o
   SDK.
+- **A independência de infraestrutura do docstruct não é testada.** Veja a P3
+  acima. Um job de instalação isolada também não a pegaria: é preciso um teste
+  de que nenhum módulo lê o ambiente ou arquivos, abre sockets ou inicia
+  subprocessos.
 
 ## Algoritmos estruturais: core e docstruct
 

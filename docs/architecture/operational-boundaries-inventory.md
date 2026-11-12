@@ -7,7 +7,7 @@ docstruct the portable structural core of the ecosystem, and to let the SDK
 offer deterministic operations and workflows, not only transport. Its phase 1
 asks for a diagnosis before any decision. This page records what the code and
 the ADRs already settle, and what is still open. It was measured on develop at
-8d7465e4, with an AST scan that includes imports inside functions.
+8d7465e4 (the Toolbox at the refs in its section below), with an AST scan that includes imports inside functions.
 [ADR-0017](../adr/0017-operational-sdk-and-agentic-core.md) takes its
 decisions from here.
 
@@ -20,7 +20,7 @@ which is accepted:
 |---|---|
 | P1, portability (standard library only, guarded optional accelerators) | ADR-0002 table and compliance; `libs/docstruct/tests/test_purity.py` checks that `pyproject.toml` declares no runtime dependency, that every other import is a listed accelerator behind `except ImportError`, and that every module imports in an interpreter that refuses anything outside the standard library. The only accelerator is `rapidfuzz`, in `evaluation/metrics/text_ed.py`. #470's alternative A is therefore already in place. |
 | P2, shared structural contracts | [ADR-0007](../adr/0007-manifest-model-and-mathml-conversion.md) and #203: `docstruct.manifest` is the normative document model. The core's and the Toolbox's Pydantic models stay only as the 1.1.0 wire models, checked against `docstruct.manifest.field_specs` in contract tests. |
-| P3, independence from infrastructure | The ADR-0002 table for docstruct, and `test_purity.py`. |
+| P3, independence from infrastructure | **Partly.** The ADR-0002 table states the rule. `test_purity.py` checks dependencies and imports, but it allows the whole standard library: a module that reads `os.environ` or a file when it is imported still passes, as the review of #471 reproduced. The network, environment, file and subprocess part is not tested yet. |
 | Direction of dependencies, no cycles | ADR-0002 already allows **SDK → docstruct**, and offers "in-process access to docstruct's pure algorithms" through the SDK. The SDK's `test_purity.py` keeps its dependencies "within `httpx` and docstruct". |
 | P7, one implementation per structural algorithm | ADR-0002 and #203; `tests/test_docstruct_bridges.py` fails on a new copy of a bridged algorithm. |
 | Toolbox does not import the core or the SDK | The Toolbox's `tests/unit/test_architecture.py`. Outside it, `acessilia_sdk` and `backend` appear only in one cross-project test (`tests/cross_project/test_core_storage_outage.py`). |
@@ -32,12 +32,25 @@ which is accepted:
   `httpx`. The `SDK alone` job refuses `docstruct` together with `backend`,
   the Toolbox, Agno and FastAPI. If the SDK composes docstruct algorithms
   (#470, P5), the dependency and that job change.
-- **The Toolbox pins an older docstruct.** Its `pyproject.toml` installs the
-  `docstruct-v0.4.0` wheel, while `libs/docstruct` is at 0.5.0. Nothing checks
-  that the two still agree on the shared models: this is #470's P8 risk.
+- **The Toolbox and the core agree on docstruct by convention only.** Each
+  branch of the Toolbox pins the docstruct release wheel by SHA-256, and the
+  pins match the core's branches:
+
+  | Branch | Core (`libs/docstruct`) | Toolbox (`pyproject.toml`) |
+  |---|---|---|
+  | `main` | 0.4.0 (cac215df) | `docstruct-v0.4.0` (e77869be) |
+  | `develop` | 0.5.0 (b6ca0ecf) | `docstruct-v0.5.0` (77c7df7c), since acessilia-toolbox db866c60 (2026-11-02) |
+
+  So there is no gap today. But nothing checks that a docstruct release and
+  the Toolbox's pin move together, or that the two still agree on the shared
+  models: this is #470's P8 risk.
 - **docstruct has no isolated install job.** `test_purity.py` refuses
   non-standard imports in a subprocess, but no CI job installs docstruct alone
   in a clean environment, as `SDK alone` does for the SDK.
+- **docstruct's independence from infrastructure is not tested.** See P3
+  above. An isolated install job would not catch it either: it needs a test
+  that a module does not read the environment or files, open sockets or start
+  subprocesses.
 
 ## Structural algorithms: core and docstruct
 

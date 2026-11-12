@@ -33,16 +33,19 @@ mediu a situação:
 - **Boa parte da #470 já está decidida e verificada.**
   - O docstruct usa só a biblioteca padrão, com um acelerador opcional
     protegido, o `rapidfuzz`; o `libs/docstruct/tests/test_purity.py` confere
-    isso.
+    isso. Ele não confere que o docstruct fica longe da rede, do ambiente, de
+    arquivos e de subprocessos: permite toda a biblioteca padrão.
   - O `docstruct.manifest` é o modelo normativo do documento (ADR-0007), e os
     modelos pydantic ficam como modelos de transporte conferidos.
   - A ADR-0002 já permite SDK → docstruct.
   - O teste da Toolbox proíbe imports do SDK e do core.
-- **Restam três lacunas:**
+- **Restam quatro lacunas:**
   - o SDK não depende do docstruct, e o job isolado do CI o recusa;
-  - a Toolbox fixa o docstruct 0.4.0, enquanto o `libs/docstruct` está na
-    0.5.0;
-  - o docstruct não tem job de instalação isolada.
+  - o docstruct não tem job de instalação isolada;
+  - nada testa a independência de infraestrutura do docstruct;
+  - nada confere se a versão do docstruct fixada pela Toolbox acompanha a do
+    core. Os branches concordam hoje (0.4.0 nas duas `main`, 0.5.0 nas duas
+    `develop`), mas só por convenção.
 - **O core guarda seis operações determinísticas ao lado da política que as
   executa:**
   - a cadeia de fórmula;
@@ -101,7 +104,8 @@ Proposta: a opção 2.
     contratos de transporte versionados: os schemas REST e MCP mantêm suas
     próprias versões e testes de contrato;
   - **sem infraestrutura:** nada de rede, ambiente, arquivos, subprocessos nem
-    imports do core, do SDK ou da Toolbox.
+    imports do core, do SDK ou da Toolbox. Hoje só os imports são testados; o
+    resto precisa do teste listado no trabalho seguinte.
 - **Dependências:** as mesmas da ADR-0002.
   - O SDK pode depender do docstruct, e passa a depender quando a primeira
     operação dele compuser um algoritmo do docstruct.
@@ -137,9 +141,12 @@ Proposta: a opção 2.
     docstruct.
 - **Trabalho seguinte**, em pull requests próprios:
   - um job de CI que instala o docstruct sozinho num ambiente limpo;
-  - uma verificação de que a Toolbox e o core concordam sobre a versão do
-    docstruct que usam, ou sobre suas fixtures compartilhadas (a diferença
-    entre 0.4.0 e 0.5.0);
+  - um teste de que nenhum módulo do docstruct lê o ambiente ou arquivos, abre
+    um socket ou inicia um subprocesso (fase 2 da #470). O job de instalação
+    isolada não confere isso;
+  - uma verificação de que a versão do docstruct fixada pela Toolbox acompanha
+    a release do core, ou fixtures compartilhadas contra as quais os dois
+    testam (P8 da #470);
   - a cadeia de fórmula no SDK (a evidência acima);
   - as outras operações do inventário, uma por pull request, cada uma com
     caracterização e comparação dos manifestos antes e depois.
@@ -160,6 +167,7 @@ Proposta: a opção 2.
     (já existem);
   - o teste de arquitetura da Toolbox (já existe);
   - os jobs de instalação isolada do docstruct (novo) e do SDK (ajustado);
+  - o teste de infraestrutura do docstruct (novo);
   - um item de revisão: uma operação do SDK não tem nenhuma decisão que
     pudesse tomar de outro jeito para outro chamador.
 - **Quando for aceita:**

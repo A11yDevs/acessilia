@@ -32,15 +32,20 @@ measured where things stand:
 - **Much of #470 is already decided and enforced.**
   - Docstruct is standard library only, with one guarded optional
     accelerator, `rapidfuzz`; `libs/docstruct/tests/test_purity.py` checks
-    this.
+    this. It does not check that docstruct stays away from the network, the
+    environment, files and subprocesses: it allows the whole standard
+    library.
   - `docstruct.manifest` is the normative document model (ADR-0007), with the
     Pydantic models kept as checked wire models.
   - ADR-0002 already allows SDK → docstruct.
   - The Toolbox test forbids imports of the SDK and the core.
-- **Three gaps remain:**
+- **Four gaps remain:**
   - the SDK does not depend on docstruct, and its isolated CI job refuses it;
-  - the Toolbox pins docstruct 0.4.0 while `libs/docstruct` is at 0.5.0;
-  - docstruct has no isolated install job.
+  - docstruct has no isolated install job;
+  - nothing tests docstruct's independence from infrastructure;
+  - nothing checks that the Toolbox's docstruct pin follows the core's. The
+    branches agree today (0.4.0 on both `main`s, 0.5.0 on both `develop`s),
+    but only by convention.
 - **The core holds six deterministic operations next to the policy that runs
   them:**
   - the formula chain;
@@ -98,7 +103,8 @@ Proposed: option 2.
     wire contracts: REST and MCP schemas keep their own versions and contract
     tests;
   - **no infrastructure:** no network, environment, files, subprocesses or
-    imports of the core, the SDK or the Toolbox.
+    imports of the core, the SDK or the Toolbox. Today only the imports are
+    tested; the rest needs the test listed under follow-up work.
 - **Dependencies:** unchanged from ADR-0002.
   - The SDK may depend on docstruct, and does once its first operation
     composes a docstruct algorithm.
@@ -135,8 +141,11 @@ Proposed: option 2.
     docstruct.
 - **Follow-up work**, in its own pull requests:
   - a CI job that installs docstruct alone in a clean environment;
-  - a check that the Toolbox and the core agree on the docstruct version they
-    use, or on its shared fixtures (the 0.4.0 / 0.5.0 gap);
+  - a test that no docstruct module reads the environment or files, opens a
+    socket or starts a subprocess (phase 2 of #470). The isolated install job
+    does not check this;
+  - a check that the Toolbox's docstruct pin follows the core's release, or
+    shared fixtures both test against (#470's P8);
   - the formula chain in the SDK (the acceptance evidence above);
   - the other operations of the inventory, one per pull request, each with
     characterization and a comparison of the manifests before and after.
@@ -156,6 +165,7 @@ Proposed: option 2.
     (they exist);
   - the Toolbox's architecture test (it exists);
   - the isolated install jobs of docstruct (new) and of the SDK (adjusted);
+  - the infrastructure test of docstruct (new);
   - a review item: an SDK operation has no decision it could take differently
     for another caller.
 - **On acceptance:**
