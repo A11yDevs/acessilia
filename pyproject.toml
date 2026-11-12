@@ -54,6 +54,7 @@ dev = [
     # Builds and renders test PDFs (tests/toolbox_render_fake.py and fixtures);
     # the application renders and extracts only on the Toolbox.
     "pymupdf>=1.24,<2",
+    "pytest-timeout>=2.4,<3",
 ]
 
 [project.scripts]
@@ -73,6 +74,9 @@ include = ["backend*", "frontend*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-config --strict-markers -ra"
+# A hung test fails with its name instead of consuming the CI job timeout.
+# Tests that legitimately need longer override it with @pytest.mark.timeout.
+timeout = 180
 markers = [
     "e2e: requires a running Acessilia Toolbox at TOOLBOX_BASE_URL or Core API at CORE_BASE_URL",
 ]

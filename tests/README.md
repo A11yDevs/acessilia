@@ -10,6 +10,21 @@ Issue #342 regressions cover list continuations across paragraphs and tables wit
 
 ## Running
 
+The supported local loop is described in [docs/testing.md](../docs/testing.md):
+
+```bash
+# Everything CI runs, non-E2E (core, docstruct and SDK)
+make test-all
+
+# One file or one node id
+make test-file F=tests/test_pddl_planning.py
+
+# Rerun the tests that failed last time
+make test-failed
+```
+
+The equivalent pytest commands:
+
 ```bash
 # Native
 uv run pytest
@@ -69,6 +84,7 @@ ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 ```
 
 ## Related documentation
+- [Local test workflow](../docs/testing.md) — `make` commands, baseline timings and timeouts
 - [Architecture](../docs/architecture.md)
 - [PDDL + Agno pipeline](../docs/pmv_agno_pddl.md)
 - [Internationalization (i18n)](../docs/i18n.md) — see the internationalization test suite in [test_i18n.py](test_i18n.py)

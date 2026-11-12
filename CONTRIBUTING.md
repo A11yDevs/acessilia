@@ -92,8 +92,13 @@ git rebase origin/develop
 Before opening the Pull Request, make sure all tests pass:
 
 ```bash
-uv run pytest tests/ -v
+make test-all
 ```
+
+While iterating, `make test-file F=tests/test_example.py` runs one file or node
+id and `make test-failed` reruns the tests that failed last time.
+[docs/testing.md](docs/testing.md) describes the workflow, the baseline timings
+and the timeout rules.
 
 The CI pipeline runs the test suite automatically on GitHub; a PR can only be reviewed once **all tests are green**.
 
@@ -342,7 +347,7 @@ vMAJOR.MINOR.PATCH
 5. **Small, focused PRs** — easier to review and less conflict-prone.
 6. **Atomic commits** — one commit = one complete logical change.
 7. **Tests are mandatory** — every `feat` or `fix` must add or update tests.
-8. **Run `pytest` before pushing** — make sure nothing is broken.
+8. **Run `make test-all` before pushing** — make sure nothing is broken.
 
 ## Rulesets (branch protection)
 
@@ -372,7 +377,7 @@ uv sync --extra dev   # uses the Python 3.11 pinned in .python-version
 cp .env.example .env
 
 # Run the tests to check that everything is OK
-uv run pytest
+make test-all
 ```
 
 ## Issue triage
