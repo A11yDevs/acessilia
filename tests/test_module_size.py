@@ -5,8 +5,8 @@ The limit and the modules that were above it when this test landed live in
 stay at the limit or below. A listed module may not grow; when it shrinks, its
 count is lowered, and its entry is removed once it is at the limit or below, so
 the list only shrinks. ``docs/architecture/pddl-orchestrator-inventory.md``
-records the decision; ADR-0016 adds ``libs/core`` to the scan when the core
-moves there.
+records the decision. The scan covers every module ADR-0016 places in the
+core, wherever it is today; ``libs/core`` joins it when the core moves there.
 
 A module's size is its number of lines (``str.splitlines``).
 """
@@ -21,8 +21,19 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWLIST_PATH = REPO_ROOT / "tests" / "fixtures" / "module_size_allowlist.json"
 
-#: Where the core's modules live today.
-SCANNED_ROOTS = ("backend/agents", "backend/core")
+#: The folders and files that hold the core's modules today (ADR-0016). The
+#: service's few modules inside them are scanned too; they are far below the
+#: limit.
+SCANNED_ROOTS = (
+    "backend/adapters",
+    "backend/agents",
+    "backend/ai",
+    "backend/core",
+    "backend/export",
+    "backend/pipeline",
+    "backend/tools",
+)
+SCANNED_FILES = ("backend/i18n.py", "backend/log_messages.py", "backend/stage_messages.py")
 
 
 def _allowlist() -> tuple[int, dict[str, int]]:
@@ -40,13 +51,20 @@ def module_sizes() -> dict[str, int]:
     for root in SCANNED_ROOTS:
         for path in sorted((REPO_ROOT / root).rglob("*.py")):
             sizes[path.relative_to(REPO_ROOT).as_posix()] = _lines(path)
+    for name in SCANNED_FILES:
+        # A missing file is reported by test_the_scanned_roots_exist.
+        if (REPO_ROOT / name).is_file():
+            sizes[name] = _lines(REPO_ROOT / name)
     return sizes
 
 
 def test_the_scanned_roots_exist() -> None:
     missing = [root for root in SCANNED_ROOTS if not (REPO_ROOT / root).is_dir()]
+    missing += [name for name in SCANNED_FILES if not (REPO_ROOT / name).is_file()]
 
-    assert not missing, f"Scanned roots that no longer exist: {missing}; update SCANNED_ROOTS"
+    assert not missing, (
+        f"Scanned paths that no longer exist: {missing}; update SCANNED_ROOTS or SCANNED_FILES"
+    )
 
 
 def test_no_module_grows_past_the_limit(module_sizes: dict[str, int]) -> None:
@@ -83,6 +101,9 @@ def test_the_allowlist_only_shrinks(module_sizes: dict[str, int]) -> None:
 
 def test_the_listed_modules_are_scanned() -> None:
     _, allowed = _allowlist()
-    outside = [path for path in allowed if not path.startswith(tuple(f"{root}/" for root in SCANNED_ROOTS))]
+    outside = [
+        path for path in allowed
+        if path not in SCANNED_FILES and not path.startswith(tuple(f"{root}/" for root in SCANNED_ROOTS))
+    ]
 
     assert not outside, f"Listed modules outside the scanned roots: {outside}"
