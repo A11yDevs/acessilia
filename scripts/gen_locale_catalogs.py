@@ -283,7 +283,7 @@ from backend.export.pandoc_exporter import (
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
-from backend.agents.pddl_orchestrator import (
+from backend.core.pipeline.payload import (
     MSG_PICTURES_NOT_DESCRIBED,
     MSG_LETTERHEAD_TEXT,
     MSG_TABLES_NOT_READ,

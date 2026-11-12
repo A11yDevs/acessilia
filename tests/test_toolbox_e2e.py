@@ -391,7 +391,7 @@ class TestStructureClientE2E:
         from xml.etree import ElementTree
 
         from acessilia_sdk.toolbox.clients import ToolboxDocxClient
-        from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+        from backend.core.pipeline.payload import _manifest_pages_to_payload
         from backend.core.manifest.builder import build_processing_manifest
         from backend.core.manifest.toolbox_extractor import ToolboxExtraction
         from backend.pipeline.canonical_builder import build_canonical_document

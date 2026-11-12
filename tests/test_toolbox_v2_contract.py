@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+from backend.core.pipeline.payload import _manifest_pages_to_payload
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.schema import validate_manifest
 from backend.export.exporters.docx_exporter import export_docx

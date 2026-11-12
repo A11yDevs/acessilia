@@ -225,7 +225,7 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/agents/pddl_orchestrator.py", "Nenhum texto elegível para reparo Unicode"),
     ("backend/agents/pddl_orchestrator.py", "Reparo Unicode aplicado em"),
     ("backend/agents/pddl_orchestrator.py", "para revisão"),
-    ("backend/agents/pddl_orchestrator.py", "Texto com sinais de Unicode legado"),
+    ("backend/core/pipeline/payload.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
     # Text-layer formula agreement — Portuguese function names (máx, mín) that
     # pt-BR material prints, matched as a detection pattern

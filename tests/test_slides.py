@@ -559,7 +559,7 @@ def test_an_undescribed_picture_gives_its_labels_back_as_paragraphs(source):
     006.pdf v5 listed them as the picture's alt text ("Aquecedor para vaporizar
     a; amostra; ..."); they go back to the slide after the picture instead.
     """
-    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+    from backend.core.pipeline.payload import _manifest_pages_to_payload
     from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 
     manifest = _build_edited(
@@ -588,10 +588,8 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     source, monkeypatch
 ):
     """A failed vision call leaves the extractor's alt in place; it carries no labels."""
-    from backend.agents.pddl_orchestrator import (
-        _enrich_picture_descriptions,
-        _manifest_pages_to_payload,
-    )
+    from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+    from backend.core.pipeline.payload import _manifest_pages_to_payload
 
     class FailingVision:
         def __init__(self, mode: str) -> None:
@@ -627,7 +625,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
 
 def test_an_undescribed_slide_picture_gives_back_the_text_it_replaced(source):
     """A slide read as one picture keeps its text when the picture goes undescribed."""
-    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+    from backend.core.pipeline.payload import _manifest_pages_to_payload
     from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 
     manifest = _build(source)
@@ -918,7 +916,7 @@ def test_text_read_across_two_slides_is_split_back_into_each(source):
 @pytest.mark.parametrize("top", [450, 510], ids=["on-picture", "beside-picture"])
 def test_split_labels_stay_as_text_when_the_picture_is_described(source, top):
     """006.pdf 26/37: a split part can name pictures in separate columns."""
-    from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+    from backend.core.pipeline.payload import _manifest_pages_to_payload
 
     labels = "Molecule macromolecule"
     exercise = "For vitamin C, calculate the following:"

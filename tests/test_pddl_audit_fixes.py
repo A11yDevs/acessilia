@@ -1,6 +1,7 @@
 """Regressions for description provenance, table certification and failed plans."""
 
 from types import SimpleNamespace
+from backend.core.pipeline import payload as pipeline_payload
 
 import pytest
 
@@ -77,7 +78,7 @@ def test_diagnostic_payload_warns_about_failed_or_pending_execution(tmp_path, me
     plan, _ = orchestrator._build_plan(manifest)
     updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
     assert report.status in {"failed", "replan-required"}
-    payload = pddl.build_pddl_structured_payload(
+    payload = pipeline_payload.build_pddl_structured_payload(
         file_path=tmp_path / "doc.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )

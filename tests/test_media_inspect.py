@@ -6,6 +6,7 @@ cache choice and the orchestrator's visible degradation.
 from __future__ import annotations
 
 from pathlib import Path
+from backend.core.pipeline import payload as pipeline_payload
 from types import SimpleNamespace
 
 import pytest
@@ -216,7 +217,6 @@ async def test_orchestrator_does_not_swallow_cancellation(monkeypatch) -> None:
 def test_payload_records_the_status_and_skips_the_cache_on_failure(
     monkeypatch, status, cacheable
 ) -> None:
-    from backend.agents import pddl_orchestrator as pddl
 
     configuration = {} if status is None else {"media_inspection": status}
     if status == "failed":
@@ -228,9 +228,9 @@ def test_payload_records_the_status_and_skips_the_cache_on_failure(
         obligations=[],
     )
     plan = SimpleNamespace(plan_id="p-1", planner="internal", expected_total_cost=0)
-    monkeypatch.setattr(pddl, "_manifest_pages_to_payload", lambda _manifest: [])
+    monkeypatch.setattr(pipeline_payload, "_manifest_pages_to_payload", lambda _manifest: [])
 
-    payload = pddl.build_pddl_structured_payload(
+    payload = pipeline_payload.build_pddl_structured_payload(
         file_path=IMAGE, manifest=manifest, plan=plan,
         planner_backend="internal",
         execution_report=SimpleNamespace(status="completed", execution_id="test"),

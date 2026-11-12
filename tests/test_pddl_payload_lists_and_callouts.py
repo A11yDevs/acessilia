@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+from backend.core.pipeline.payload import build_pddl_structured_payload
 from backend.core.manifest.models import (
     ExtractorRun,
     ManifestElement,

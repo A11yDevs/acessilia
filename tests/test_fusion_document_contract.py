@@ -1,6 +1,7 @@
 """Fused text must reach the output without corrupting references or artifacts."""
 
 import hashlib
+from backend.core.pipeline import payload as pipeline_payload
 from pathlib import Path
 
 import pytest
@@ -37,7 +38,7 @@ def test_fusion_output_contains_recovered_text_and_valid_references(monkeypatch,
     updated, report = orchestrator.executor.execute(plan, source, dry_run=False)
     assert report.status == "completed"
     ProcessingManifest.model_validate(updated.model_dump())
-    result = pddl.build_pddl_structured_payload(
+    result = pipeline_payload.build_pddl_structured_payload(
         file_path=tmp_path / "doc.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
@@ -115,7 +116,7 @@ def test_recovered_pages_and_extra_blocks_reach_output(monkeypatch, tmp_path):
     ProcessingManifest.model_validate(source.model_dump())
     assert len(source.elements) == 3
     assert [element.reading_order for element in source.elements] == [1, 2, 3]
-    pages = pddl._manifest_pages_to_payload(source)
+    pages = pipeline_payload._manifest_pages_to_payload(source)
     assert [page["page_number"] for page in pages] == [1, 2]
     assert "Additional recovered block" in pages[0]["text"]
     assert "Recovered page two" in pages[1]["text"]

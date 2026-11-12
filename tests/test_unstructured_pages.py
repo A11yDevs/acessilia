@@ -10,6 +10,7 @@ accepted and left out of the document, and any failure fails the method.
 from __future__ import annotations
 
 import base64
+from backend.core.pipeline import payload as pipeline_payload
 import hashlib
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -129,7 +130,7 @@ def test_a_page_whose_elements_point_at_it_by_page_number_is_not_empty():
 
     assert manifest.obligations == []
     assert [e.id for e in manifest.elements] == ["el-1"]
-    [page] = pddl._manifest_pages_to_payload(manifest)
+    [page] = pipeline_payload._manifest_pages_to_payload(manifest)
     assert [block["type"] for block in page["blocks"]] == ["image"]
 
 
@@ -216,7 +217,7 @@ def test_a_page_with_content_becomes_a_described_picture(
     assert element.metadata["vision_description_complete"] is True
     assert element.metadata["src"] == "data:image/png;base64," + base64.b64encode(PNG).decode()
     assert {a.kind for a in result.artifacts} == {"page-render", "page-inspection"}
-    page_two = next(p for p in pddl._manifest_pages_to_payload(manifest) if p["page_number"] == 2)
+    page_two = next(p for p in pipeline_payload._manifest_pages_to_payload(manifest) if p["page_number"] == 2)
     assert [block["type"] for block in page_two["blocks"]] == ["image"]
 
 
@@ -235,7 +236,7 @@ def test_a_blank_page_is_accepted_and_left_out_of_the_document(
     assert "1 blank" in result.message
     element = next(e for e in manifest.elements if e.id == target)
     assert element.metadata["blank_page"] is True
-    pages = {p["page_number"]: p for p in pddl._manifest_pages_to_payload(manifest)}
+    pages = {p["page_number"]: p for p in pipeline_payload._manifest_pages_to_payload(manifest)}
     assert pages[2]["blocks"] == [] and pages[2]["text"] == ""
     assert pages[1]["blocks"], "the page with content is kept"
 
@@ -245,11 +246,11 @@ def test_an_uninspected_placeholder_adds_nothing_to_the_document(source_pdf):
     # its raw label must not reach the document as a paragraph.
     manifest, _, _ = _planned_manifest(source_pdf)
 
-    pages = {p["page_number"]: p for p in pddl._manifest_pages_to_payload(manifest)}
+    pages = {p["page_number"]: p for p in pipeline_payload._manifest_pages_to_payload(manifest)}
 
     assert pages[2]["blocks"] == [] and pages[2]["text"] == ""
     manifest.pages = []
-    texts = [b.get("text") for p in pddl._manifest_pages_to_payload(manifest) for b in p["blocks"]]
+    texts = [b.get("text") for p in pipeline_payload._manifest_pages_to_payload(manifest) for b in p["blocks"]]
     assert "unstructured-page" not in texts
 
 
