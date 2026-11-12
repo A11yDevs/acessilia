@@ -221,6 +221,20 @@ Cada passo é um PR sem mudança de comportamento. Os testes de caracterização
 4. **Decompor as funções mistas no core:** o `_extract_picture_bytes` do O, e o `_formula_recognition_crop` e o `_enrich_formula_latex` do P. As chamadas de render continuam passando pelo adaptador do grupo G.
 5. **Dividir as maiores funções** da tabela acima, uma por PR.
 6. **Reorganizar dentro do core** só o que ainda passar do limite de tamanho (decisão D4), por exemplo os handlers de execução em `backend/core/execution/handlers/`.
+   - **Revisado depois do passo 5:** os módulos vão para `backend/core/pipeline/`, com a estrutura que o `acessilia_core.pipeline` teria pela [ADR-0016](../adr/0016-core-package.pt-br.md). Se essa ADR for aceita, levá-los para `libs/core` é uma troca de caminho, e o `backend/core` some com ela. Cada módulo fica abaixo de 900 linhas:
+
+     ```text
+     backend/core/pipeline/
+       orchestrator.py   # a classe: a sequência do execute
+       preflight.py      # inspeção de mídia, limites de página, apresentações (A, M)
+       toolbox.py        # adaptadores: render, artefato de origem, juiz (G, J)
+       payload.py        # build_pddl_structured_payload (V)
+       enrichment/       # figuras (O), fórmulas (P), tabelas (S), matemática inline (Q), regiões (G)
+       handlers/         # registro (K) e um módulo por grupo de handlers
+     ```
+
+   - **Ordem:** primeiro as folhas (payload, adaptadores), depois os handlers grupo a grupo, as etapas de enriquecimento e, por último, a classe. Cada pull request é neutro, com caracterização e teste diferencial. Os testes que substituem um nome em `pddl_orchestrator` (achado 3) passam para o módulo onde o nome agora está.
+   - **O resto do core** (os agentes e seus prompts, a fusão, os adaptadores da Toolbox, os exportadores, as mensagens e seus catálogos) se reúne em `backend/core/` depois deste passo, seguindo o passo 2 do roteiro da [ADR-0016](../adr/0016-core-package.pt-br.md). Ali, um teste de fronteira precisa passar antes que os módulos vão para `libs/core`.
 
 As quase duplicatas do achado 1 são decisões de comportamento, cada uma num PR próprio (P8).
 
@@ -238,3 +252,12 @@ As quase duplicatas do achado 1 são decisões de comportamento, cada uma num PR
 - **D4. Limite de tamanho de módulo.**
   - **A pergunta:** a #365 pediu um limite de tamanho de módulo combinado e conferido por um teste.
   - **Proposta:** 900 linhas para qualquer módulo em `backend/agents/` e `backend/core/`. Dois passam disso hoje: `pddl_orchestrator.py` (6.185) e `backend/core/manifest/builder.py` (1.205). Os dois entram na allowlist do teste com o tamanho atual, que só pode diminuir; o próximo maior é `backend/agents/vision_agent.py` (758).
+  - **Ajustada depois do passo 5** (#402):
+    - **Nenhum teste fazia a D4 valer ainda**, e o passo 5 aumentou o orquestrador de 5.531 para 5.823 linhas (#461–#466). Cada divisão encurtou a sua função, mas acrescentou assinaturas e docstrings. A allowlist começa com os tamanhos do dia em que o teste entrar.
+    - **O teste entra com o passo 6**, antes da primeira movimentação: `tests/test_module_size.py`, com a allowlist em uma fixture.
+    - **O que ele confere:**
+      - um módulo em `backend/agents/` e `backend/core/` (e depois o `acessilia_core`, [ADR-0016](../adr/0016-core-package.pt-br.md)) acima de 900 linhas falha, a menos que esteja na lista;
+      - um módulo da lista que cresce falha;
+      - um módulo da lista que diminui falha até sua entrada ser reduzida, como faz a allowlist de português (`tests/test_no_portuguese.py`), para que o ganho fique registrado;
+      - uma entrada com 900 ou menos é removida.
+    - **O passo 6 leva os dois módulos da lista para baixo de 900.** O `builder.py` é dividido pelas próprias responsabilidades (montagem a partir do documento da Toolbox, ordem de leitura, necessidades de processamento, páginas sem estrutura) em pull requests próprios.
