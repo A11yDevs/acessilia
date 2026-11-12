@@ -1,6 +1,7 @@
 """Execution policy must be part of the cached-document contract."""
 
 import asyncio
+from backend.core.pipeline import payload as pipeline_payload
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -132,10 +133,9 @@ async def test_cached_entry_with_failed_media_inspection_is_ignored(
 
 
 def _payload(manifest):
-    from backend.agents import pddl_orchestrator as pddl
 
     plan = SimpleNamespace(plan_id="p-1", planner="internal", expected_total_cost=0)
-    return pddl.build_pddl_structured_payload(
+    return pipeline_payload.build_pddl_structured_payload(
         file_path=Path("deck.pdf"), manifest=manifest, plan=plan,
         planner_backend="internal",
         execution_report=SimpleNamespace(status="completed", execution_id="test"),
@@ -144,7 +144,10 @@ def _payload(manifest):
 
 
 def _warnings(failures):
-    from backend.agents.pddl_orchestrator import MSG_PICTURES_NOT_DESCRIBED, MSG_TABLES_NOT_READ
+    from backend.core.pipeline.payload import (
+        MSG_PICTURES_NOT_DESCRIBED,
+        MSG_TABLES_NOT_READ,
+    )
     from backend.i18n import n
 
     expected = []
@@ -311,7 +314,7 @@ async def test_cached_degraded_entry_is_ignored(
     ],
 )
 def test_records_visual_failures(failures, recorded):
-    from backend.agents.pddl_orchestrator import records_visual_failures
+    from backend.core.pipeline.payload import records_visual_failures
 
     assert records_visual_failures(failures) is recorded
 
@@ -323,7 +326,7 @@ def test_merged_cache_policy_requires_success_across_all_stages(
     fusion_degraded, visual_failed, execution_status
 ):
     """Visual recovery and fusion/execution recovery must both survive integration."""
-    from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+    from backend.core.pipeline.payload import build_pddl_structured_payload
     from tests.pddl_support import build_element, build_manifest
     from tests.test_pddl_orchestrator import _sample_plan
 

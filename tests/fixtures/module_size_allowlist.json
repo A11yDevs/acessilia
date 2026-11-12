@@ -2,7 +2,7 @@
   "_comment": "Modules above the size limit when tests/test_module_size.py landed (decision D4 of docs/architecture/pddl-orchestrator-inventory.md), with their line counts. A count may only go down: a listed module may not grow, lower its count when it shrinks, and remove the entry once it is at the limit or below. Phase 3, step 6 of #402 brings both under the limit. The scanned paths are listed in the test.",
   "limit": 900,
   "files": {
-    "backend/agents/pddl_orchestrator.py": 5312,
+    "backend/agents/pddl_orchestrator.py": 4781,
     "backend/core/manifest/builder.py": 1205
   }
 }

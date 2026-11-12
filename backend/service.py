@@ -4,8 +4,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
-from backend.agents.pddl_orchestrator import (
-    PddlAccessibilityOrchestrator,
+from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.payload import (
     records_extraction_degradation,
     records_visual_failures,
 )

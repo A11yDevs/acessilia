@@ -121,7 +121,7 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
 
 
 def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tmp_path):
-    from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+    from backend.core.pipeline.payload import build_pddl_structured_payload
     from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
@@ -168,7 +168,7 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
     ],
 )
 def test_pddl_cache_policy(status, open_kind, last_method, expected):
-    from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+    from backend.core.pipeline.payload import build_pddl_structured_payload
     from backend.core.manifest.models import Obligation, ObligationAttempt
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
 
@@ -308,7 +308,7 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
 ):
     """A second submission retries technical failures and reuses final results."""
     from backend import service
-    from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+    from backend.core.pipeline.payload import build_pddl_structured_payload
     from backend.core.manifest.models import Obligation, ObligationAttempt
     from backend.services import cache
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan

@@ -1,11 +1,11 @@
 """Regression coverage for planning and portable accessible exports."""
 import base64
+from backend.core.pipeline import payload as pipeline_payload
 import re
 from pathlib import Path
 
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.export.pandoc_exporter import export_accessible_document
 from backend.pipeline.canonical_builder import build_canonical_document
@@ -35,7 +35,7 @@ def test_complete_plan_repairs_invalid_heading_sequence(tmp_path, levels, findin
     plan, _ = orchestrator._build_plan(manifest)
     updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
     assert report.status == "completed"
-    payload = pddl.build_pddl_structured_payload(
+    payload = pipeline_payload.build_pddl_structured_payload(
         file_path=tmp_path / "headings.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
@@ -52,7 +52,7 @@ def test_region_png_is_embedded_in_exported_html(inspection, tmp_path):
     updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
     assert report.status == "completed"
     assert Path(updated.elements[0].metadata["region_crop"]).is_file()
-    payload = pddl.build_pddl_structured_payload(
+    payload = pipeline_payload.build_pddl_structured_payload(
         file_path=Path(manifest.source.path), manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
@@ -88,7 +88,7 @@ def test_duplicate_top_level_titles_are_repaired(types, tmp_path):
     updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
     assert report.status == "completed"
     assert not _derive_processing_needs(updated.elements)[1]
-    payload = pddl.build_pddl_structured_payload(
+    payload = pipeline_payload.build_pddl_structured_payload(
         file_path=tmp_path / "headings.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )

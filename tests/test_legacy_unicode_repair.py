@@ -7,6 +7,7 @@ deterministic method that fixes NFD and dotless-i without touching formulas.
 from __future__ import annotations
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import payload as pipeline_payload
 from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
 from backend.core.manifest.models import BoundingBox, Observation, Obligation, Provenance
@@ -374,7 +375,7 @@ class TestDetectModeTechnicalWarning:
         manifest.observations = observations
         orchestrator = build_orchestrator()
         plan, _ = orchestrator._build_plan(manifest)
-        return pddl.build_pddl_structured_payload(
+        return pipeline_payload.build_pddl_structured_payload(
             file_path=tmp_path / "legado.pdf", manifest=manifest, plan=plan,
             planner_backend="internal", execution_report=None, comparison=None,
         )
@@ -442,7 +443,7 @@ class TestNegationOverlays:
         assert "t = 2 e" in host.text and "t = 2 + h" in host.text
         assert host.metadata["negation_overlays"] == 1
         assert slash.metadata["negation_overlay"] == {"outcome": "composed", "host": "element-1"}
-        assert pddl._is_left_out_of_payload(slash)
+        assert pipeline_payload._is_left_out_of_payload(slash)
 
     def test_table_header_cell_is_composed(self):
         table = _placed("element-1", "table", (188, 430, 409, 286), metadata={"table_ast": {"body": [
@@ -464,7 +465,7 @@ class TestNegationOverlays:
 
         assert formula.text == r"h \neq 0"
         assert slash.metadata["negation_overlay"]["outcome"] == "host-is-latex"
-        assert pddl._is_left_out_of_payload(slash)
+        assert pipeline_payload._is_left_out_of_payload(slash)
 
     def test_an_ambiguous_slash_changes_nothing(self):
         host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="a = b = c")
@@ -474,7 +475,7 @@ class TestNegationOverlays:
 
         assert host.text == "a = b = c"
         assert slash.metadata["negation_overlay"]["outcome"] == "ambiguous"
-        assert pddl._is_left_out_of_payload(slash)
+        assert pipeline_payload._is_left_out_of_payload(slash)
 
     def test_a_slash_outside_any_element_is_only_left_out(self):
         host = _placed("element-1", "paragraph", (100, 112, 200, 100), text="h = 0")
@@ -607,7 +608,7 @@ class TestNegationOverlayChain:
     def test_the_payload_delivers_the_negated_relation_without_the_slash(self):
         manifest, host, slash = self._composed()
 
-        [page] = pddl._manifest_pages_to_payload(manifest)
+        [page] = pipeline_payload._manifest_pages_to_payload(manifest)
 
         assert [block["id"] for block in page["blocks"]] == ["element-1"]
         assert page["blocks"][0]["text"].startswith("para cada valor h ≠ 0,")

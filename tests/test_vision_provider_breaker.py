@@ -9,6 +9,7 @@ deadlines before it degraded.
 from __future__ import annotations
 
 import asyncio
+from backend.core.pipeline import payload as pipeline_payload
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -262,7 +263,7 @@ async def test_an_unused_answer_on_the_second_pass_is_not_left_as_a_failure(
 
     assert len(data_calls) == 2
     assert "table_read_failure" not in tables.elements[0].metadata
-    assert pddl._visual_failures(tables) is None
+    assert pipeline_payload._visual_failures(tables) is None
 
 
 @pytest.mark.asyncio
@@ -298,7 +299,7 @@ async def test_a_refused_reading_on_the_second_pass_clears_the_failure_and_sums_
         "reason": "collapsed_rows", "outcome": "kept", "attempts": 6,
         "why": "only 0% of its words are in the table it would replace",
     }
-    assert pddl._visual_failures(tables) is None
+    assert pipeline_payload._visual_failures(tables) is None
 
 
 @pytest.mark.asyncio

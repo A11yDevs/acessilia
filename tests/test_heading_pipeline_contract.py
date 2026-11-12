@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.agents.pddl_orchestrator import build_pddl_structured_payload
+from backend.core.pipeline.payload import build_pddl_structured_payload
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html

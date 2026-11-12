@@ -7,7 +7,8 @@ centered in the bottom margin.
 
 from __future__ import annotations
 
-from backend.agents.pddl_orchestrator import _manifest_pages_to_payload
+from backend.core.pipeline.payload import _manifest_pages_to_payload
+from backend.core.pipeline import payload as pipeline_payload
 from backend.core.manifest.models import BoundingBox, Provenance
 from tests.pddl_support import build_element, build_manifest
 
@@ -189,16 +190,15 @@ def test_lowercase_roman_number_in_the_margin_is_left_out():
 def test_only_bare_numbers_have_their_box_looked_up(monkeypatch):
     """Review of #445: finding a box searches the pages, so prose is filtered
     by its text first, as before the move."""
-    from backend.agents import pddl_orchestrator
-
+    # _page_number_ids looks the box up through the payload module's name.
     looked_up: list[str] = []
-    original = pddl_orchestrator._element_bbox
+    original = pipeline_payload._element_bbox
 
     def counting(element, manifest):
         looked_up.append(element.id)
         return original(element, manifest)
 
-    monkeypatch.setattr(pddl_orchestrator, "_element_bbox", counting)
+    monkeypatch.setattr(pipeline_payload, "_element_bbox", counting)
     prose = [
         _placed(f"element-prose-{i}", "paragraph", f"Sentence {i}.", BODY_BOX, reading_order=i)
         for i in range(1, 6)
@@ -207,5 +207,5 @@ def test_only_bare_numbers_have_their_box_looked_up(monkeypatch):
     manifest = build_manifest([*prose, number], [])
     manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
 
-    assert pddl_orchestrator._page_number_ids(manifest) == {"element-number"}
+    assert pipeline_payload._page_number_ids(manifest) == {"element-number"}
     assert looked_up == ["element-number"]

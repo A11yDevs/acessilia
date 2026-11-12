@@ -5,6 +5,7 @@ Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
 """
 
 import hashlib
+from backend.core.pipeline import payload as pipeline_payload
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -95,7 +96,7 @@ def test_real_region_inspection_updates_output_and_records_evidence(inspection, 
     assert evidence["bbox"] == [10, 20, 90, 70]
     assert evidence["result"]["kind"] == kind
     ProcessingManifest.model_validate(updated.model_dump())
-    payload = pddl.build_pddl_structured_payload(
+    payload = pipeline_payload.build_pddl_structured_payload(
         file_path=Path(manifest.source.path), manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
