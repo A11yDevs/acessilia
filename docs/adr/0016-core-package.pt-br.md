@@ -53,6 +53,20 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
     `ExecutorAgent.execute` sempre monta um workflow do Agno
     (`build_workflow`), e o `require_workflow_classes` levanta `RuntimeError`
     quando o Agno falta, mesmo para um plano sem passos.
+- **As outras bibliotecas que o core importa**, contadas com uma varredura de
+  AST que inclui os imports dentro de funções:
+  - pydantic e loguru;
+  - Babel (`backend/i18n.py`);
+  - jsonschema (`backend/core/manifest/schema.py`);
+  - rapidfuzz (`backend/pipeline/fusion.py`);
+  - edge-tts (`backend/export/exporters/audio_exporter.py`). É o executor
+    local que a [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md)
+    registra como desvio conhecido
+    ([acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)).
+- **O core importa o frontend.** O `backend/core/planning/models.py` e o
+  `backend/core/execution/models.py` pegam descrições de schema e mensagens de
+  validação de `frontend.telegram.messages`. Sem o `frontend` instalado, os
+  dois levantam `ImportError`.
 - **O core chega ao serviço em dois pontos.**
   - `backend.config`: 34 imports, e 59 chaves diferentes do `settings` lidas
     em 107 pontos. Só o orquestrador lê 12 chaves, e os exportadores, 3.
@@ -131,9 +145,14 @@ Proposta: a opção 2.
                               └────────────────▶ docstruct
   ```
 
-  - O `acessilia_core` pode importar o SDK, o docstruct, o Agno, o pydantic e o
-    loguru.
-  - Não pode importar o `backend` nem o FastAPI, e não pode ler o ambiente.
+  - O `acessilia_core` pode importar a biblioteca padrão, o SDK, o docstruct, o
+    Agno, o pydantic, o loguru, o Babel, o jsonschema e o rapidfuzz. São as
+    bibliotecas que ele importa hoje.
+  - O edge-tts é permitido só como o desvio que a ADR-0003 registra. Ele sai
+    quando a exportação de áudio virar uma capacidade da Toolbox. A mudança
+    neutra não o substitui, nem a nenhuma outra implementação.
+  - Não pode importar o `backend`, o `frontend` nem o FastAPI, e não pode ler
+    o ambiente.
   - O SDK e o docstruct não podem importá-lo.
 - **A configuração é explícita.** O core recebe um `CoreConfig` montado por
   quem o chama. O serviço o monta a partir do seu ambiente, como já monta o
@@ -167,13 +186,23 @@ Proposta: a opção 2.
      | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
 
      O estado do job (`backend/agents/state_manager.py`) fica no serviço.
+
+     As mensagens que o core pega de `frontend.telegram.messages` (as
+     descrições de schema e as mensagens de validação de `planning/models.py`
+     e `execution/models.py`) vão para as mensagens do core no mesmo passo. Se
+     o frontend ainda as usar, passa a importá-las do core.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
      vez.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
-  5. **Um teste de fronteira** confere o `backend/core/`: ele não importa nada
-     do `backend` fora do `backend/core`, nem nada além do SDK, do docstruct,
-     do Agno, do pydantic, do loguru e da biblioteca padrão; e não lê
-     variáveis de ambiente. Ele precisa passar antes da extração.
+  5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
+     dentro de funções:
+     - ele não importa nada do `backend` fora do `backend/core`, nem nada do
+       `frontend`;
+     - os outros imports são só as bibliotecas permitidas acima, com o
+       edge-tts na allowlist do teste e uma referência à acessilia-toolbox#73;
+     - ele não lê variáveis de ambiente.
+
+     Ele precisa passar antes da extração.
   6. **A extração:**
      - os módulos vão para `libs/core`, e o `backend/core` some;
      - os domínios PDDL, os prompts e os catálogos são declarados como dados
@@ -213,11 +242,14 @@ Proposta: a opção 2.
 - **Desvios que permanecem** até que os passos acima terminem:
   - o core continua lendo o `settings`;
   - os caches continuam em `backend/services`;
-  - os módulos do core continuam dentro do `backend/`.
+  - os módulos do core continuam dentro do `backend/`;
+  - a exportação de áudio continua sintetizando localmente com o edge-tts até
+    a acessilia-toolbox#73 (ADR-0003).
 - **Conformidade:**
   - antes da extração, o teste de fronteira do passo 5;
   - depois dela, um teste de que o `acessilia_core` não importa nada do
-    `backend` e não lê variáveis de ambiente;
+    `backend` nem do `frontend`, importa só as bibliotecas permitidas e não lê
+    variáveis de ambiente;
   - o job de instalação isolada, com o smoke de planejamento e execução
     (passo 6).
 

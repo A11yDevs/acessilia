@@ -52,6 +52,20 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
     always builds an Agno workflow (`build_workflow`), and
     `require_workflow_classes` raises `RuntimeError` when Agno is missing,
     even for a plan with no steps.
+- **The other libraries the core imports**, counted with an AST scan that
+  includes imports inside functions:
+  - pydantic and loguru;
+  - Babel (`backend/i18n.py`);
+  - jsonschema (`backend/core/manifest/schema.py`);
+  - rapidfuzz (`backend/pipeline/fusion.py`);
+  - edge-tts (`backend/export/exporters/audio_exporter.py`). This is the
+    local executor that [ADR-0003](0003-remote-only-operational-capabilities.md)
+    records as a known deviation
+    ([acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)).
+- **The core imports the frontend.** `backend/core/planning/models.py` and
+  `backend/core/execution/models.py` take schema descriptions and validation
+  messages from `frontend.telegram.messages`. Without `frontend` installed,
+  both raise `ImportError`.
 - **The core reaches the service in two places.**
   - `backend.config`: 34 imports, and 59 distinct `settings` keys read at
     107 points. The orchestrator alone reads 12 keys, and the exporters 3.
@@ -130,9 +144,14 @@ Proposed: option 2.
                               └────────────────▶ docstruct
   ```
 
-  - `acessilia_core` may import the SDK, docstruct, Agno, pydantic and loguru.
-  - It must not import `backend` or FastAPI, and it must not read the
-    environment.
+  - `acessilia_core` may import the standard library, the SDK, docstruct,
+    Agno, pydantic, loguru, Babel, jsonschema and rapidfuzz. These are the
+    libraries it imports today.
+  - edge-tts is allowed only as the deviation ADR-0003 records. It leaves when
+    the audio export becomes a Toolbox capability. The neutral move does not
+    replace it, or any other implementation.
+  - It must not import `backend`, `frontend` or FastAPI, and it must not read
+    the environment.
   - The SDK and docstruct must not import it.
 - **Configuration is explicit.** The core receives a `CoreConfig` built by its
   caller. The service builds it from its environment, as it builds the SDK's
@@ -166,12 +185,22 @@ Proposed: option 2.
      | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (the `.po` catalogs) → `backend/core/i18n/locales/` |
 
      The job state (`backend/agents/state_manager.py`) stays in the service.
+
+     The messages the core takes from `frontend.telegram.messages` (the schema
+     descriptions and validation messages of `planning/models.py` and
+     `execution/models.py`) move to the core's messages in the same step. If
+     the frontend still uses them, it imports them from the core.
   3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
   4. The caches and `run_blocking` are injected through `ports`.
-  5. **A boundary test** checks `backend/core/`: it imports nothing from
-     `backend` outside `backend/core`, and nothing besides the SDK,
-     docstruct, Agno, pydantic, loguru and the standard library; and it reads
-     no environment variable. It must pass before the extraction.
+  5. **A boundary test** checks `backend/core/`, imports inside functions
+     included:
+     - it imports nothing from `backend` outside `backend/core`, and nothing
+       from `frontend`;
+     - its other imports are only the allowed libraries above, with edge-tts
+       on the test's allowlist and a reference to acessilia-toolbox#73;
+     - it reads no environment variable.
+
+     It must pass before the extraction.
   6. **The extraction:**
      - the modules move to `libs/core`, and `backend/core` disappears;
      - the PDDL domains, the prompts and the catalogs are declared as package
@@ -209,11 +238,14 @@ Proposed: option 2.
 - **Deviations that remain** until the steps above are done:
   - the core keeps reading `settings`;
   - the caches stay in `backend/services`;
-  - the core's modules stay under `backend/`.
+  - the core's modules stay under `backend/`;
+  - the audio export keeps synthesizing locally with edge-tts until
+    acessilia-toolbox#73 (ADR-0003).
 - **Compliance:**
   - before the extraction, the boundary test of step 5;
-  - after it, a test that `acessilia_core` imports nothing from `backend` and
-    reads no environment variable;
+  - after it, a test that `acessilia_core` imports nothing from `backend` or
+    `frontend`, imports only the allowed libraries, and reads no environment
+    variable;
   - the isolated install job with its planning and execution smoke test
     (step 6).
 
