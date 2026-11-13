@@ -5,9 +5,9 @@ Você também pode ler esta documentação em **inglês**: [English](testing.md)
 Esta página descreve o ciclo local de editar–testar–corrigir. Os comandos são
 wrappers finos em volta do pytest; a CI continua executando as suítes completas
 antes do merge. A issue [#448](https://github.com/A11yDevs/acessilia/issues/448)
-acompanha o trabalho restante: execução paralela limitada (PR 2), o experimento
-opcional de análise de impacto (PR 3), otimização da CI (PR 4) e monitoramento
-(PR 5).
+acompanha o trabalho restante: o experimento opcional de análise de impacto
+(PR 3), otimização da CI (PR 4) e monitoramento (PR 5). A execução paralela
+limitada (PR 2) está disponível no `make test-all`.
 
 ## Linha de base
 
@@ -35,13 +35,33 @@ distância:
 uv run pytest -m "not e2e" --durations=25
 ```
 
+### Linha de base paralela
+
+Depois das correções de isolamento da PR 2, com cerca de 2920 testes do core na
+mesma máquina (2026-11-12):
+
+| Execução | Tempo total |
+|---|---|
+| Core serial | 143s |
+| Core `-n 4 --dist worksteal` | 74s (1,9x) |
+| Core `-n 2 --dist worksteal` | 124s |
+| Core `-n auto --dist worksteal` | 96s |
+| Core `-n 4 --dist load` | 178s |
+
+O `worksteal` ganha porque poucos testes longos dominam a cauda; o `load`
+distribui módulos inteiros e deixa workers ociosos. O `-n auto` (12 workers
+aqui) foi mais lento que quatro: o teste mais lento não pode ser dividido e os
+processos extras disputam os mesmos núcleos. O teste mais lento sozinho leva
+cerca de 20–80s conforme a carga, então ele limita o ganho. Estes números são
+referência, não garantia.
+
 ## Comandos
 
 | Comando | O que executa |
 |---|---|
 | `make test-file F=tests/test_example.py` | Um arquivo ou um node id (`tests/test_api.py::test_health`), sem E2E |
 | `make test-failed` | As falhas registradas nos caches do core, docstruct e SDK |
-| `make test-all` | As suítes do core, docstruct e SDK sem E2E, sequencialmente |
+| `make test-all` | O core sem E2E com quatro workers, depois docstruct e SDK sequencialmente |
 
 `make` sem alvo imprime a mesma lista.
 
@@ -57,19 +77,46 @@ imprime uma mensagem e termina com sucesso.
 
 `test-all` não para na primeira suíte: executa as três e devolve o último código
 de saída diferente de zero, para que uma biblioteca com falha não esconda o
-resultado do core. Hoje ele é sequencial; a PR 2 da #448 adiciona paralelismo
-limitado (`-n 4 --dist worksteal`) depois das correções de isolamento.
+resultado do core. A suíte do core usa `-n 4 --dist worksteal`; docstruct e SDK
+continuam sequenciais.
 
 A suíte do core roda com `-m "not e2e"`; use `uv run pytest -m e2e` diretamente
 para alcançar um ambiente real, como descrito no
 [README dos testes](../tests/README.pt-br.md).
 
+## Execução paralela
+
+O `make test-all` passa `-n 4 --dist worksteal` para a suíte do core. Para
+ajustar o limite ou a distribuição sem editar o Makefile:
+
+```bash
+make test-all CORE_JOBS=2
+make test-all CORE_DIST=load
+```
+
+A suíte é segura em paralelo porque os testes que compartilhavam caminhos de
+execução agora usam caminhos por worker:
+
+- `tests/test_api.py` aponta `settings.temp_dir`, `settings.data_dir` e
+  `settings.logs_dir` para o diretório `tmp_path_factory` do worker antes de o
+  `TestClient` de sessão iniciar a aplicação. Sem isso, o segundo worker falha
+  no `runtime_lease()` com `RuntimeError: Only one API worker may use a data
+  directory`.
+- o teste de exportação opcional grava entrada e saída em `tmp_path`, então um
+  `audio.docx` deixado por uma parametrização não vaza para a seguinte.
+
+O `-n auto` não está habilitado. Ele passou na validação, mas foi mais lento
+(96s) que quatro workers (74s) e usa mais memória. Mantenha-o como opção local
+experimental; a CI e o `make test-all` continuam limitados.
+
 ## Timeouts
 
 O `pytest-timeout` reprova um teste travado com o nome dele, em vez de deixá-lo
 consumir o timeout de 30 minutos do job da CI. A suíte do core usa um limite de
-180 segundos, bem acima do teste mais lento atual (cerca de 11s). Um teste que
-legitimamente precise de mais tempo sobrescreve o limite localmente:
+180 segundos. O teste CPU-heavy do juiz VLM eleva o próprio limite para 300
+segundos porque quatro workers podem esticá-lo para 60–80s em uma máquina
+ocupada. Um teste que legitimamente precise de mais tempo sobrescreve o limite
+localmente:
 
 ```python
 import pytest
@@ -98,6 +145,8 @@ SDK, e `sdk-isolated-report` para o job isolado do SDK.
 - **`uv`** precisa estar instalado ([documentação](https://docs.astral.sh/uv/)).
   Os comandos rodam a partir da raiz do repositório; as bibliotecas são pacotes
   separados e são chamadas com `uv run --extra dev pytest` em seus diretórios.
+  O extra dev inclui o `pytest-xdist`, então `uv sync --extra dev` basta para o
+  `make test-all`.
 
 ## Escopo e trabalhos relacionados
 

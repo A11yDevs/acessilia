@@ -55,6 +55,8 @@ dev = [
     # the application renders and extracts only on the Toolbox.
     "pymupdf>=1.24,<2",
     "pytest-timeout>=2.4,<3",
+    # Runs the core suite in parallel; the isolation fixes are in #448.
+    "pytest-xdist>=3.8,<4",
 ]
 
 [project.scripts]

@@ -755,6 +755,7 @@ class TestVlmPairwiseJudge:
         with pytest.raises(TypeError):
             _handle_vlm_pairwise_judge_method(manifest, "o-1")
 
+    @pytest.mark.timeout(300)  # CPU-heavy: 60-80s under xdist; headroom over 180s
     def test_long_page_is_flagged_as_truncated(self, tmp_path, monkeypatch) -> None:
         from backend.agents.pddl_orchestrator import (
             _JUDGE_MAX_CHARS,
