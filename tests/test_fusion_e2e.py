@@ -29,9 +29,7 @@ import httpx
 import pytest
 from acessilia_sdk.toolbox.transport import auth_headers
 
-from backend.agents.pddl_orchestrator import (
-    _handle_dual_provider_fusion_method,
-)
+from backend.core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.manifest.models import (
     ExtractorRun,

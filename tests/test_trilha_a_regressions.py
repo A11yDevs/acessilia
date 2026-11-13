@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from backend.config.settings import settings
+from backend.core.pipeline.handlers import fusion as fusion_handlers
 from backend.services.cache import options_cache_key, processing_cache_configuration
 from tests.test_pending_fixes import isolated_runtime as isolated_runtime_fixture
 
@@ -224,7 +225,6 @@ def test_pddl_cache_policy(status, open_kind, last_method, expected):
 @pytest.mark.parametrize("corrupt", [False, True, "configuration"])
 def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
     import json
-    from backend.agents import pddl_orchestrator as pddl
     from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
@@ -250,8 +250,8 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
         calls.append(True)
         return payload
 
-    monkeypatch.setattr(pddl, "_run_extract_fused", extract)
-    result = pddl._handle_dual_provider_fusion_method(manifest, "o-fuse")
+    monkeypatch.setattr(fusion_handlers, "_run_extract_fused", extract)
+    result = fusion_handlers._handle_dual_provider_fusion_method(manifest, "o-fuse")
     assert result.success
     assert calls == ([True] if corrupt else [])
 
@@ -384,7 +384,6 @@ def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
 
     from docstruct.policy import FusionPolicy
 
-    from backend.agents import pddl_orchestrator as pddl
     from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
@@ -397,9 +396,9 @@ def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
     payload = _dual_payload()
     manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, policy)
     manifest.extractor.configuration['fusion_policy'] = asdict(policy)
-    assert pddl._reusable_fusion_payload(manifest) == payload
+    assert fusion_handlers._reusable_fusion_payload(manifest) == payload
     manifest.extractor.configuration['fusion_policy'] = asdict(FusionPolicy(align_tau=0.8))
-    assert pddl._reusable_fusion_payload(manifest) is None
+    assert fusion_handlers._reusable_fusion_payload(manifest) is None
 
 
 def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
@@ -407,7 +406,6 @@ def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
 
     from docstruct.policy import FusionPolicy
 
-    from backend.agents import pddl_orchestrator as pddl
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)
@@ -417,9 +415,9 @@ def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
     def extract(path, *, artifact_id=None, policy=None):
         seen.append(policy)
         return _dual_payload()
-    monkeypatch.setattr(pddl, '_run_extract_fused', extract)
+    monkeypatch.setattr(fusion_handlers, '_run_extract_fused', extract)
     monkeypatch.setattr(settings, 'data_dir', tmp_path)
-    assert pddl._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
     assert seen == [policy]
 
 
@@ -428,7 +426,6 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
 
     from docstruct.policy import FusionPolicy
 
-    from backend.agents import pddl_orchestrator as pddl
     from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
@@ -446,9 +443,9 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
     def extract(path, *, artifact_id=None, policy=None):
         calls.append(policy)
         return payload
-    monkeypatch.setattr(pddl, '_run_extract_fused', extract)
-    assert pddl._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    monkeypatch.setattr(fusion_handlers, '_run_extract_fused', extract)
+    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
     assert not calls
     manifest.extractor.configuration['fusion_policy'] = asdict(changed)
-    assert pddl._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
     assert calls == [changed]

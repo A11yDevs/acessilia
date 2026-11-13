@@ -27,6 +27,7 @@ from backend.agents.pddl_orchestrator import (
 )
 from backend.core.pipeline.handlers import content as content_handlers
 from backend.core.pipeline.handlers import fusion as fusion_handlers
+from backend.core.pipeline.handlers import inspection as inspection_handlers
 from backend.core.pipeline.handlers import order as order_handlers
 from backend.core.pipeline.handlers import review as review_handlers
 from backend.core.pipeline.handlers import text as text_handlers
@@ -157,6 +158,10 @@ class TestRegistryWiring:
         "agreement-rule": fusion_handlers._handle_agreement_rule_method,
         "skeleton-order": order_handlers._handle_skeleton_order_method,
         "xycut-order": order_handlers._handle_xycut_order_method,
+        "pymupdf-region": inspection_handlers._handle_pymupdf_region_method,
+        "vision-page-inspection": (
+            inspection_handlers._handle_vision_page_inspection_method
+        ),
     }
 
     @pytest.mark.parametrize("method", sorted(MOVED))
@@ -175,6 +180,13 @@ class TestRegistryWiring:
     def test_single_provider_is_the_fusion_handler(self) -> None:
         registry = PddlAccessibilityOrchestrator._build_executor().registry
         assert registry.get("single-provider") is fusion_handlers._handle_single_provider_method
+
+    def test_dual_provider_fusion_is_the_fusion_handler(self) -> None:
+        registry = PddlAccessibilityOrchestrator._build_executor().registry
+        assert (
+            registry.get("dual-provider-fusion")
+            is fusion_handlers._handle_dual_provider_fusion_method
+        )
 
 
 class TestXycutOrder:

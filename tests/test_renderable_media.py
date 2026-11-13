@@ -14,6 +14,7 @@ import fitz
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.handlers import inspection as inspection_handlers
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
 
@@ -27,7 +28,7 @@ def test_a_jpeg_source_is_rendered(fake_toolbox_render, tmp_path) -> None:
     image = tmp_path / "scan.jpg"
     image.write_bytes(_jpeg())
 
-    assert pddl._render_source_page(image, "image/jpeg", 1).startswith(b"\x89PNG")
+    assert inspection_handlers._render_source_page(image, "image/jpeg", 1).startswith(b"\x89PNG")
     assert fake_toolbox_render.requests[-1]["media_type"] == "image/jpeg"
 
 
@@ -37,7 +38,7 @@ def test_other_rasters_are_refused_before_any_request(fake_toolbox_render, tmp_p
     image.write_bytes(b"raster")
 
     with pytest.raises(ValueError, match=f"renders PDF, PNG and JPEG inputs, not {media_type}"):
-        pddl._render_source_page(image, media_type, 1)
+        inspection_handlers._render_source_page(image, media_type, 1)
     assert not fake_toolbox_render.requests
 
 

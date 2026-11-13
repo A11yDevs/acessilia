@@ -21,6 +21,7 @@ import pytest
 import respx
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.handlers import inspection as inspection_handlers
 from backend.agents.output_schemas import PageInspectionOutput
 from backend.config.settings import settings
 from backend.core.manifest.builder import (
@@ -190,8 +191,8 @@ def _answer(monkeypatch, output=None, error=None):
             raise error
         return output
 
-    monkeypatch.setattr(pddl, "_render_source_page", lambda *args: PNG)
-    monkeypatch.setattr(pddl, "_inspect_page", inspect)
+    monkeypatch.setattr(inspection_handlers, "_render_source_page", lambda *args: PNG)
+    monkeypatch.setattr(inspection_handlers, "_inspect_page", inspect)
     return calls
 
 
@@ -207,7 +208,7 @@ def test_a_page_with_content_becomes_a_described_picture(
         ),
     )
 
-    result = pddl._handle_vision_page_inspection_method(manifest, obligation_id)
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id)
 
     assert result.success and result.validated, result.message
     assert calls == [(PNG, 2, 2)]
@@ -230,7 +231,7 @@ def test_a_blank_page_is_accepted_and_left_out_of_the_document(
         PageInspectionOutput(kind="blank", language="und", confidence=0.95),
     )
 
-    result = pddl._handle_vision_page_inspection_method(manifest, obligation_id)
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id)
 
     assert result.success and result.validated, result.message
     assert "1 blank" in result.message
@@ -265,7 +266,7 @@ def test_any_failure_fails_the_method_and_changes_nothing(
     before = manifest.model_dump()
     _answer(monkeypatch, error=error)
 
-    result = pddl._handle_vision_page_inspection_method(manifest, obligation_id)
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id)
 
     assert not result.success and not result.validated
     assert str(error) in result.message
@@ -277,7 +278,7 @@ def test_a_changed_source_is_refused(monkeypatch, source_pdf, isolated_artifacts
     source_pdf.write_bytes(b"%PDF-1.4 changed")
     _answer(monkeypatch, PageInspectionOutput(kind="blank", language="und", confidence=1))
 
-    result = pddl._handle_vision_page_inspection_method(manifest, obligation_id)
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id)
 
     assert not result.success and "differs" in result.message
 
@@ -374,7 +375,7 @@ def _real_pdf(path: Path, pages: int = 2) -> Path:
 def test_pdf_pages_are_rendered_by_the_toolbox(fake_toolbox_render, tmp_path):
     source = _real_pdf(tmp_path / "doc.pdf")
 
-    image = pddl._render_source_page(source, "application/pdf", 2)
+    image = inspection_handlers._render_source_page(source, "application/pdf", 2)
 
     assert image.startswith(b"\x89PNG")
     [request] = fake_toolbox_render.requests
@@ -387,7 +388,7 @@ def test_the_stored_source_is_referenced_instead_of_uploaded(fake_toolbox_render
     stored = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
     fake_toolbox_render.sources[stored] = (source.read_bytes(), "application/pdf")
 
-    pddl._render_source_page(source, "application/pdf", 1, stored)
+    inspection_handlers._render_source_page(source, "application/pdf", 1, stored)
 
     [request] = fake_toolbox_render.requests
     assert request["artifact_id"] == stored
@@ -396,7 +397,7 @@ def test_the_stored_source_is_referenced_instead_of_uploaded(fake_toolbox_render
 def test_a_source_the_toolbox_lost_is_sent_again(fake_toolbox_render, tmp_path):
     source = _real_pdf(tmp_path / "doc.pdf")
 
-    image = pddl._render_source_page(source, "application/pdf", 1, "sha256:" + "0" * 64)
+    image = inspection_handlers._render_source_page(source, "application/pdf", 1, "sha256:" + "0" * 64)
 
     assert image.startswith(b"\x89PNG")
     [request] = fake_toolbox_render.requests  # the 404 is not recorded as a render
@@ -411,10 +412,10 @@ def test_a_raster_input_is_rendered_by_the_toolbox_as_its_single_page(
     image = tmp_path / "scan.png"
     image.write_bytes(PNG_PAGE)
 
-    assert pddl._render_source_page(image, "image/png", 1).startswith(b"\x89PNG")
+    assert inspection_handlers._render_source_page(image, "image/png", 1).startswith(b"\x89PNG")
     assert fake_toolbox_render.requests[-1]["media_type"] == "image/png"
     with pytest.raises(ToolboxCapabilityError, match="out of range"):
-        pddl._render_source_page(image, "image/png", 2)
+        inspection_handlers._render_source_page(image, "image/png", 2)
 
 
 @pytest.mark.parametrize("suffix, media_type", [(".tif", "image/tiff"), (".webp", "image/webp")])
@@ -426,7 +427,7 @@ def test_raster_formats_the_toolbox_does_not_render_are_refused_before_any_reque
     image.write_bytes(b"raster")
 
     with pytest.raises(ValueError, match=f"not {media_type}"):
-        pddl._render_source_page(image, media_type, 1)
+        inspection_handlers._render_source_page(image, media_type, 1)
     assert not fake_toolbox_render.requests
 
 
@@ -436,7 +437,7 @@ def test_a_source_sent_unlike_its_manifest_media_type_is_refused(
     source = _real_pdf(tmp_path / "doc.pdf")
 
     with pytest.raises(ValueError, match="would be sent as application/pdf"):
-        pddl._render_source_page(source, "image/png", 1)
+        inspection_handlers._render_source_page(source, "image/png", 1)
     assert not fake_toolbox_render.requests
 
 
@@ -452,7 +453,7 @@ def test_a_render_without_an_image_is_a_contract_violation(monkeypatch, tmp_path
             return_value=httpx.Response(200, json={"status": "succeeded", "document": {}})
         )
         with pytest.raises(ToolboxContractViolation, match="no image artifact"):
-            pddl._render_source_page(source, "application/pdf", 1)
+            inspection_handlers._render_source_page(source, "application/pdf", 1)
 
 
 # ── Coexistence with the pre-planning heuristics ────────────────────────
