@@ -75,6 +75,25 @@ def _isolate_paths(api_paths, monkeypatch):
     monkeypatch.setitem(app.dependency_overrides, require_job_access, lambda: None)
 
 
+@pytest.fixture
+def fresh_history_db(tmp_path, monkeypatch):
+    """Give one test its own history database, independent of test order.
+
+    ``_isolate_paths`` shares one database per worker session (via the
+    session-scoped ``api_paths``), so the client can reuse it. Tests that assert
+    an empty history must not run after a test that recorded a conversion, which
+    is exactly what a selective run can do.
+    """
+    import backend.services.history_service as hs
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    hs._connection = None
+    yield
+    if hs._connection is not None:
+        hs._connection.close()
+    hs._connection = None
+
+
 @pytest.fixture(scope="module")
 def client(_worker_runtime_paths):
     with TestClient(app) as c:
@@ -337,7 +356,7 @@ def test_logs_return_empty_list_when_no_files_exist(client, monkeypatch):
     assert response.json() == {"files": []}
 
 
-def test_stats_empty(client, monkeypatch):
+def test_stats_empty(client, monkeypatch, fresh_history_db):
     monkeypatch.setattr(settings, "observability_api_token", "audit-admin")
     resp = client.get("/api/v1/stats", headers={"Authorization": "Bearer audit-admin"})
     assert resp.status_code == 200
@@ -349,7 +368,7 @@ def test_stats_empty(client, monkeypatch):
     }
 
 
-def test_history_empty(client, monkeypatch):
+def test_history_empty(client, monkeypatch, fresh_history_db):
     monkeypatch.setattr(settings, "observability_api_token", "audit-admin")
     resp = client.get("/api/v1/history", headers={"Authorization": "Bearer audit-admin"})
     assert resp.status_code == 200
