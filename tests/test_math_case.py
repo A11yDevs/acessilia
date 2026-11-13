@@ -304,3 +304,76 @@ def test_non_item_content_ends_a_list_run(boundary):
         _block("l2", "list", 2, ordered=True, start=2, items=["B"]),
     ]
     assert [run["items"] for run in math_case._list_runs(blocks, 2)] == [["A"], ["B"]]
+
+
+# ── compare ──
+
+
+def _math(text, *, method="math.recognize", mathml="<math/>", alt="x", page=1):
+    return {
+        "type": "math", "text": text, "alt_text": alt,
+        "source_location": {"page_number": page},
+        "metadata": {"mathml": mathml, "formula_recognition": {"method": method, "text_agreement": 1.0}},
+    }
+
+
+def _doc(*blocks, warnings=()):
+    return {"sections": [{"blocks": list(blocks)}], "technical_warnings": list(warnings)}
+
+
+PARAGRAPH = {"type": "paragraph", "text": "Let $x^2$ be the area.", "source_location": {"page_number": 1}}
+PICTURE = {"type": "image", "alt_text": "A chart.", "source_location": {"page_number": 1}}
+
+
+def test_identical_outputs_agree() -> None:
+    document = _doc(PARAGRAPH, _math("x=1"), PICTURE)
+
+    comparison = math_case.compare_documents(document, json.loads(json.dumps(document)))
+
+    assert (comparison.formulas, comparison.differences, comparison.vision) == (1, [], [])
+
+
+@pytest.mark.parametrize(
+    ("change", "field"),
+    [
+        ({"mathml": "<math><mi>y</mi></math>"}, "mathml"),
+        ({"alt": "y"}, "alt_text"),
+        ({"method": "math.recognize#2"}, "method"),
+    ],
+)
+def test_a_formula_field_that_changed_is_a_difference(change, field) -> None:
+    comparison = math_case.compare_documents(_doc(_math("x=1")), _doc(_math("x=1", **change)))
+
+    assert [(where, name) for where, name, _, _ in comparison.differences] == [("formula 1 (p. 1)", field)]
+
+
+def test_what_a_vision_model_wrote_is_listed_apart() -> None:
+    base = _doc(_math("x=1", method="vision"), PICTURE)
+    candidate = _doc(_math("x = 1", method="vision"), {**PICTURE, "alt_text": "A bar chart."})
+
+    comparison = math_case.compare_documents(base, candidate)
+
+    assert comparison.differences == []
+    assert {name for _, name, _, _ in comparison.vision} == {"text", "alt_text"}
+
+
+def test_structure_inline_math_and_warnings_are_compared() -> None:
+    base = _doc(PARAGRAPH, _math("x=1"), warnings=["w"])
+    candidate = _doc({**PARAGRAPH, "text": "Let $x^3$ be the area."}, warnings=[])
+
+    names = {name for _, name, _, _ in math_case.compare_documents(base, candidate).differences}
+
+    assert {"blocks", "technical_warnings", "inline math", "text"} <= names
+
+
+def test_compare_exits_1_on_a_difference_and_writes_its_report(tmp_path, capsys) -> None:
+    base, same, other = tmp_path / "base.json", tmp_path / "same.json", tmp_path / "other.json"
+    base.write_text(json.dumps(_doc(_math("x=1"))), encoding="utf-8")
+    same.write_text(json.dumps(_doc(_math("x=1"))), encoding="utf-8")
+    other.write_text(json.dumps(_doc(_math("x=1", mathml=""))), encoding="utf-8")
+
+    assert math_case.main(["compare", str(base), str(same)]) == 0
+    assert math_case.main(["compare", str(base), str(other), "--out", str(tmp_path / "out")]) == 1
+    report = json.loads((tmp_path / "out" / "comparison.json").read_text(encoding="utf-8"))
+    assert report["differences"][0]["field"] == "mathml"
+    assert "differences: **1**" in capsys.readouterr().out

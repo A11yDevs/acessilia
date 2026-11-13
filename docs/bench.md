@@ -144,6 +144,40 @@ A PR that changes how math, text repair or structure reach the outputs pastes
 the scorecard before and after in its description. `tests/test_math_case_e2e.py`
 (`-m e2e`) runs the case and locks what already passes.
 
+### Parity of a change that should not alter the output
+
+`compare` checks two outputs of the case field by field, for a refactoring
+that must leave them as they were (ADR-0017's parity of the formula chain):
+
+```bash
+uv run python -m scripts.bench.math_case compare base/canonical.json candidate/canonical.json --out var/bench/math-reference/<compare>
+```
+
+It compares every formula's LaTeX, MathML, spoken form, recognition method,
+text agreement, text layer and equation number, the inline expressions and
+text of each block, the table cells, the block structure and the technical
+warnings, and exits with 1 on a difference. A formula a vision model read, and
+a picture's description, may differ between any two runs: they are listed
+apart and do not fail the comparison. Run the base twice to see how much of
+that happens on its own.
+
+The core and the Toolbox cache results by the source's hash, not by the code
+that produced them, so each run needs a source no run has seen: append a
+comment after `%%EOF` (a PDF reader ignores it). The case lives in
+acessilia-dataset's `main` branch (`input/math-reference/`); point
+`ACESSILIA_TEST_DATASET_DIR` at a checkout of it, since a worktree of this
+repository has no `tests/dataset`.
+
+```bash
+export ACESSILIA_TEST_DATASET_DIR=/path/to/acessilia-dataset   # on its main branch
+for run in base candidate; do
+  cp "$ACESSILIA_TEST_DATASET_DIR/input/math-reference/velocidade-instantanea.pdf" "/tmp/036-$run.pdf"
+  printf '%% %s %s\n' "$run" "$(date +%s)" >> "/tmp/036-$run.pdf"
+done
+# In a checkout of each commit (git worktree add ../base <commit>):
+uv run python -m scripts.bench.math_case run --pdf /tmp/036-base.pdf --out var/bench/math-reference/base
+```
+
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)
