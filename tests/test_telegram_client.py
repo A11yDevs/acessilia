@@ -7,9 +7,10 @@ import respx
 
 from frontend.clients.api_client import ApiClient
 from backend.config.settings import settings
-from backend.i18n import reset_request_locale, set_request_locale, t
+from backend.i18n import get_translations, reset_request_locale, set_request_locale, t
 from backend.log_messages import LOG_PDF_UA_GENERATION_FAILED
 from frontend.telegram import user_context
+from frontend.telegram.messages import MSG_PACKAGE_PDF_UA_MISSING
 from frontend.telegram.handlers import document as doc_module
 from frontend.telegram.handlers import start as start_module
 
@@ -216,10 +217,14 @@ def test_document_flow_sends_the_download_link_in_the_user_locale(
 ):
     """The most important reply must follow the user, not the server locale (#394)."""
     content = _fake_pdf_bytes()
+    status = _done_status()
+    worker_token = set_request_locale("pt_BR")
+    try:
+        status["erros"] = [t(LOG_PDF_UA_GENERATION_FAILED).format(error="pandoc offline")]
+    finally:
+        reset_request_locale(worker_token)
     token = set_request_locale("en_US")
     try:
-        status = _done_status()
-        status["erros"] = [t(LOG_PDF_UA_GENERATION_FAILED).format(error="pandoc offline")]
         _mock_job_api(status)
         user_context.user_emails[(123, None, 456)] = "reader@example.com"
         bot = _FakeBot(content)
@@ -236,6 +241,36 @@ def test_document_flow_sends_the_download_link_in_the_user_locale(
     assert "The PDF/UA could not be generated" in sent
     assert "E-mail configured: reader@example.com" in sent
     assert "Link para download" not in sent
+
+
+@pytest.mark.parametrize(
+    ("worker_locale", "user_locale"),
+    [("pt_BR", "en_US"), ("en_US", "pt_BR")],
+)
+def test_pdf_ua_warning_survives_worker_and_user_locales_differing(
+    doc_module_isolated, worker_locale, user_locale
+):
+    """The warning decision must not depend on the msgid translation (#394 review)."""
+    content = _fake_pdf_bytes()
+    status = _done_status()
+    worker_token = set_request_locale(worker_locale)
+    try:
+        status["erros"] = [t(LOG_PDF_UA_GENERATION_FAILED).format(error="pandoc offline")]
+    finally:
+        reset_request_locale(worker_token)
+    _mock_job_api(status)
+    bot = _FakeBot(content)
+    msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))
+
+    token = set_request_locale(user_locale)
+    try:
+        with respx.mock:
+            asyncio.run(doc_module_isolated.handle_document(msg))
+    finally:
+        reset_request_locale(token)
+
+    expected = get_translations(user_locale).gettext(MSG_PACKAGE_PDF_UA_MISSING)
+    assert expected in "\n".join(bot.sent)
 
 
 def test_document_submits_with_mode_and_source(doc_module_isolated):
