@@ -49,8 +49,14 @@ o workflow `CI` do GitHub Actions:
   docstruct e do SDK, recusa skips inesperados e publica relatórios JUnit.
 - **`SDK alone (Python 3.11)`** instala apenas o SDK e prova que ele funciona
   sem o core ou o docstruct.
-- Os dois jobs são checks obrigatórios nos rulesets vivos de `main` e `develop`.
-- A entrega da imagem espera pelos dois jobs.
+- **`docstruct alone (Python 3.11)`** instala apenas o docstruct, a partir do
+  wheel dele, e o pytest, e roda a suíte só com a biblioteca padrão: o core, o SDK, a
+  Toolbox e o acelerador opcional (`rapidfuzz`) não podem estar importáveis, e
+  nenhum teste pode ser pulado (#470).
+- `tests` e `SDK alone` são checks obrigatórios nos rulesets vivos de `main` e
+  `develop`. O `docstruct alone` ainda não é: torná-lo obrigatório é uma mudança
+  de ruleset, decisão de quem mantém o repositório (CONTRIBUTING.pt-br.md).
+- A entrega da imagem espera pelos três jobs.
 
 O check do core não tem mais uma etapa separada de coleta: a própria execução
 coleta a suíte. O nome do job é mantido como `tests (Python 3.11)` de propósito,
@@ -368,7 +374,8 @@ A execução de testes coleta a suíte sozinha, então a etapa separada de
 
 **Onde estão os relatórios de testes lentos?**
 O `make` e a CI passam `--durations=25`. A CI também publica os relatórios JUnit
-como `test-reports` e `sdk-isolated-report`, com retenção de 7 dias.
+como `test-reports`, `sdk-isolated-report` e `docstruct-isolated-report`, com
+retenção de 7 dias.
 
 **Onde vejo a comparação agendada?**
 Depois que o workflow chega ao branch padrão, abra Actions →
@@ -386,8 +393,8 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 - **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
   `Run complete test suite`. O log mostra `created: 4/4 workers` e
   `--durations=25`.
-- **Artefatos:** `test-reports` (core, docstruct, SDK) e
-  `sdk-isolated-report`.
+- **Artefatos:** `test-reports` (core, docstruct, SDK),
+  `sdk-isolated-report` e `docstruct-isolated-report`.
 - **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
   30 dias e uma issue de acompanhamento em falhas agendadas.
 - **Rulesets:** `main` e `develop` exigem `tests (Python 3.11)` e

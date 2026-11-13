@@ -50,8 +50,14 @@ GitHub Actions workflow `CI`:
   reports.
 - **`SDK alone (Python 3.11)`** installs only the SDK and proves that it works
   without the core or docstruct.
-- Both jobs are required checks in the live rulesets for `main` and `develop`.
-- Image delivery waits for both jobs.
+- **`docstruct alone (Python 3.11)`** installs only docstruct, from its wheel,
+  and pytest, and runs its suite on the standard library alone: no core, SDK, Toolbox or
+  optional accelerator (`rapidfuzz`) is importable, and no test may be skipped
+  (#470).
+- `tests` and `SDK alone` are required checks in the live rulesets for `main`
+  and `develop`. `docstruct alone` is not required yet: making it required is a
+  ruleset change, a maintainer decision (CONTRIBUTING.md).
+- Image delivery waits for all three jobs.
 
 The core check does not have a separate collection step: the test run collects
 the suite itself. The job name is intentionally kept as `tests (Python 3.11)` so
@@ -361,7 +367,8 @@ was redundant.
 
 **Where are the slow-test reports?**
 `make` and CI pass `--durations=25`. CI also uploads JUnit reports as
-`test-reports` and `sdk-isolated-report`, with 7-day retention.
+`test-reports`, `sdk-isolated-report` and `docstruct-isolated-report`, with
+7-day retention.
 
 **Where do I see the scheduled comparison?**
 After the workflow reaches the default branch, open Actions →
@@ -379,8 +386,8 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 - **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
   `Run complete test suite`. The log shows `created: 4/4 workers` and
   `--durations=25`.
-- **Artifacts:** `test-reports` (core, docstruct, SDK) and
-  `sdk-isolated-report`.
+- **Artifacts:** `test-reports` (core, docstruct, SDK),
+  `sdk-isolated-report` and `docstruct-isolated-report`.
 - **Scheduled:** workflow `Scheduled test monitoring`, with artifacts retained
   for 30 days and a tracking issue on scheduled failures.
 - **Rulesets:** both `main` and `develop` require `tests (Python 3.11)` and

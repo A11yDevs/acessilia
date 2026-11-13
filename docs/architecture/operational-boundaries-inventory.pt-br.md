@@ -44,10 +44,12 @@ que já foi aceita:
   Então não há divergência hoje. Mas nada confere se uma release do docstruct
   e a versão fixada pela Toolbox andam juntas, nem se os dois ainda concordam
   sobre os modelos compartilhados: é o risco da P8 da #470.
-- **O docstruct não tem job de instalação isolada.** O `test_purity.py` recusa
-  imports fora da biblioteca padrão num subprocesso, mas nenhum job de CI
-  instala o docstruct sozinho num ambiente limpo, como o `SDK alone` faz com o
-  SDK.
+- **O docstruct não tinha job de instalação isolada.** O `test_purity.py`
+  recusa imports fora da biblioteca padrão num subprocesso, mas nenhum job de
+  CI instalava o docstruct sozinho num ambiente limpo, como o `SDK alone` faz
+  com o SDK. **Fechado pela fase 2 da #470:** o job `docstruct alone` o instala
+  a partir do wheel, com o pytest, e roda a suíte sem o core, o SDK, a Toolbox
+  ou o acelerador opcional (`rapidfuzz`) importáveis.
 - **A independência de infraestrutura do docstruct não é testada.** Veja a P3
   acima. Um job de instalação isolada também não a pegaria: é preciso um teste
   de que nenhum módulo lê o ambiente ou arquivos, abre sockets ou inicia
