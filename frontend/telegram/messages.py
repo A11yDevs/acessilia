@@ -19,7 +19,7 @@ MSG_EMAIL_CONFIGURED: str = (
 MSG_START_TEXT: str = (
     "Hello! Send a PDF, image or scanned document."
     "\n\nYou'll get back an accessible version for screen readers."
-    "\n\nAccepted formats: PDF, PNG, JPG, TIFF, BMP, WEBP"
+    "\n\nAccepted formats:\n{input_formats}"
 )
 #: Full catalog of bot commands emitted on /ajuda and /help; command tokens stay localized-independent per Telegram's locale-agnostic slash-command behavior.
 MSG_HELP_TEXT: str = (
@@ -28,6 +28,7 @@ MSG_HELP_TEXT: str = (
     "\n/start - Start the bot"
     "\n/help - Show this message"
     "\n/formats - List supported input and output formats"
+    "\n/email &lt;address&gt; - Also send the next file's result to that address"
     "\n\n🎨 Description modes:"
     "\n/detailed - Maximum detail: typography, colors, layout, element positions"
     "\n/medium - Full text + clear image descriptions (default)"
@@ -46,19 +47,15 @@ MSG_HELP_TEXT: str = (
 #: /formatos answer listing accepted input containers plus every generated output format.
 MSG_FORMATS_TEXT: str = (
     "Accepted input formats:"
-    "\n• PDF (scanned or digital)"
-    "\n• PNG, JPG, JPEG"
-    "\n• TIFF, TIF"
-    "\n• BMP"
-    "\n• WEBP"
+    "\n{input_formats}"
     "\n\n"
     "Output formats available:"
     "\n• Structured TXT"
     "\n• Accessible DOCX"
+    "\n• PDF/UA"
     "\n• Semantic HTML"
-    "\n• Markdown"
-    "\n• Searchable PDF"
- )
+    "\n• Audio description (MP3)"
+)
 
 # --- File/photo processing lifecycle messages (frontend/telegram/handlers/document.py) ---
 #: Confirmation shown right after the user sends a document file.

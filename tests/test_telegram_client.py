@@ -14,6 +14,7 @@ from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
     MSG_CACHE_CLEAR_FAILED,
+    MSG_HELP_TEXT,
     MSG_CONTACT_SERVER_FAILED,
     MSG_PACKAGE_PDF_UA_MISSING,
 )
@@ -531,6 +532,67 @@ def test_photo_flow(doc_module_isolated):
         asyncio.run(doc_module_isolated.handle_photo(msg))
 
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
+
+
+def test_start_formats_and_help_match_the_validator(monkeypatch):
+    start = _FakeMessage(_FakeBot(b""), user_id=456)
+    formats = _FakeMessage(_FakeBot(b""), user_id=456)
+    help_message = _FakeMessage(_FakeBot(b""), user_id=456)
+
+    token = set_request_locale("en_US")
+    try:
+        asyncio.run(start_module.cmd_start(start))
+        asyncio.run(start_module.cmd_formats(formats))
+        asyncio.run(start_module.cmd_help(help_message))
+    finally:
+        reset_request_locale(token)
+
+    start_text = start.answers[0]
+    formats_text = formats.answers[0]
+    help_text = help_message.answers[0]
+    for label in ("PDF", "PNG", "JPG", "JPEG", "TIFF", "TIF", "DOCX", "HTML"):
+        assert label in start_text
+        assert label in formats_text
+    assert "BMP" not in start_text and "WEBP" not in start_text
+    assert "BMP" not in formats_text and "WEBP" not in formats_text
+    assert "PDF/UA" in formats_text
+    assert "Audio description (MP3)" in formats_text
+    assert "Markdown" not in formats_text
+    assert "Searchable PDF" not in formats_text
+    assert "/email" in help_text
+    assert "&lt;address&gt;" in help_text
+    assert "<" not in help_text and ">" not in help_text
+
+
+@pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
+def test_help_text_is_safe_for_the_html_parse_mode(locale):
+    token = set_request_locale(locale)
+    try:
+        text = t(MSG_HELP_TEXT)
+    finally:
+        reset_request_locale(token)
+
+    # aiogram sends commands with ParseMode.HTML; literal angle brackets in
+    # "/email <address>" would be parsed as an unsupported tag and drop the reply.
+    assert "<" not in text and ">" not in text
+    assert "&lt;" in text and "&gt;" in text
+
+
+def test_formats_follow_a_changed_validator_configuration(monkeypatch):
+    monkeypatch.setattr(settings, "allowed_extensions", {".pdf", ".epub"})
+    message = _FakeMessage(_FakeBot(b""), user_id=456)
+
+    token = set_request_locale("en_US")
+    try:
+        asyncio.run(start_module.cmd_formats(message))
+    finally:
+        reset_request_locale(token)
+
+    answer = message.answers[0]
+    inputs = answer.split("Output formats", 1)[0]
+    assert "PDF" in inputs
+    assert "EPUB" in inputs
+    assert "DOCX" not in inputs and "HTML" not in inputs
 
 
 def test_operator_commands_reject_non_admins(monkeypatch):

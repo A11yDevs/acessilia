@@ -149,7 +149,7 @@ Telegram offers two ways to send an image, and the bot accepts both:
 - **As a photo** (the app's default): Telegram **compresses** the image before delivering it. That is fine for ordinary photos, but on scanned pages with small text or formulas the compression hurts recognition.
 - **As a file**: the image arrives untouched. Prefer this for documents.
 
-Formats accepted as files: PDF, PNG, JPG/JPEG, TIFF/TIF, DOCX and HTML. The bot's `/start` and `/formats` messages still mention BMP and WEBP, but those are rejected (see [section 5](#5-known-limitations)).
+Formats accepted as files: PDF, PNG, JPG/JPEG, TIFF/TIF, DOCX and HTML. The `/start` and `/formats` messages build this list from the same validator setting, so they cannot drift from what the bot accepts.
 
 ### 2.3 Commands
 
@@ -272,7 +272,6 @@ If the file sent in the group **does not appear in the log at all**, it never re
 
 - **Files over 20 MB:** Telegram's public Bot API only lets bots download files up to 20 MB. Even with `MAX_FILE_SIZE_MB=50`, a file between 20 and 50 MB passes validation and then fails to download. Use the web panel for larger files ([#392](https://github.com/A11yDevs/acessilia/issues/392)).
 - **In-memory state:** modes, e-mails, tracked tasks and paused chats live in the process memory. Restarting or recreating the container resets them: paused chats answer again and `/status` no longer finds tasks sent before the restart. The tasks themselves remain in the API ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
-- **Advertised vs accepted formats:** `/start` and `/formats` mention BMP and WEBP, which the validator rejects. They also advertise Markdown and "searchable PDF" outputs, while the current package holds TXT, DOCX, PDF/UA, HTML and MP3. The help (`/help`) does not list `/email` ([#393](https://github.com/A11yDevs/acessilia/issues/393)).
 - **Final message in Portuguese:** the message with the download link is in Portuguese whatever the user's language ([#394](https://github.com/A11yDevs/acessilia/issues/394)).
 
 ## References
