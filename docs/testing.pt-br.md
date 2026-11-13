@@ -5,9 +5,9 @@ Você também pode ler esta documentação em **inglês**: [English](testing.md)
 Esta página descreve o ciclo local de editar–testar–corrigir. Os comandos são
 wrappers finos em volta do pytest; a CI continua executando as suítes completas
 antes do merge. A issue [#448](https://github.com/A11yDevs/acessilia/issues/448)
-acompanha o trabalho restante: otimização da CI (PR 4) e monitoramento (PR 5).
-A execução paralela limitada (PR 2) está disponível no `make test-all`; a
-análise de impacto de testes (PR 3) foi avaliada e não faz parte do fluxo.
+acompanha o fluxo de testes: comandos locais (PR 1), execução paralela limitada
+(PR 2), otimização da CI (PR 4) e monitoramento agendado (PR 5). A análise de
+impacto de testes (PR 3) foi avaliada e não faz parte do fluxo.
 
 ## Linha de base
 
@@ -212,6 +212,38 @@ lentos e publicando os relatórios JUnit mesmo quando uma etapa falha:
 `sdk-isolated-report` para o job isolado do SDK. A entrega da imagem espera por
 `tests` e `sdk-isolated`.
 
+## Monitoramento agendado
+
+O workflow `Scheduled test monitoring` roda toda segunda-feira às 06:00 UTC e
+sob demanda. O cron só começa a disparar depois que o arquivo do workflow chega
+ao branch padrão; o agendamento começa nele, mas a matriz faz checkout e testa
+`main` e `develop`. Cada ref executa a suíte do core serialmente e de novo
+com `-n 4 --dist worksteal`, roda docstruct e SDK e compara os dois relatórios
+JUnit do core. Um teste com resultado diferente entre as execuções é uma
+dependência de ordem ou de worker; o workflow falha e mantém os relatórios por
+30 dias. Ele também falha quando a comparação do core ou os relatórios do
+docstruct/SDK contêm falha, erro ou skip. O resumo registra totais, p50/p95 das
+durações e os testes mais lentos. O tempo do JUnit cobre os testes; a duração do
+job no GitHub Actions é a referência de consumo do runner.
+
+Uma falha em execução agendada abre ou atualiza a issue `Scheduled test
+monitoring failed`, com link para a execução. Falhas de `workflow_dispatch`
+manual apenas aparecem na execução do Actions.
+
+O job de E2E roda quando as variáveis do repositório `TOOLBOX_BASE_URL` ou
+`CORE_BASE_URL` estão configuradas; caso contrário, é pulado. Ele usa o secret
+opcional `TOOLBOX_API_KEY` e a variável `CORE_EXPECT_BUILD_INFO` documentada no
+[README dos testes](../tests/README.pt-br.md#testes-end-to-end). O corpus
+opcional do dataset não é clonado no job agendado, então esses casos são
+pulados. O E2E continua sendo uma validação agendada, não um portão de merge: o
+portão é formado pelos checks non-E2E `tests (Python 3.11)` e `SDK alone`.
+
+O marcador `slow` identifica o teste CPU-heavy conhecido do juiz VLM. Use
+`uv run pytest -m slow` para repeti-lo, ou `-m "not slow"` para um loop local
+mais rápido; o `make test-all` continua executando-o. Nenhum teste precisa de
+execução serial hoje; o marcador `serial` será introduzido com o primeiro teste
+que demonstrar essa necessidade.
+
 ## Ambientes suportados
 
 - **macOS e Linux.** O `make` vem com as ferramentas de linha de comando do
@@ -224,12 +256,11 @@ lentos e publicando os relatórios JUnit mesmo quando uma etapa falha:
 
 ## Escopo e trabalhos relacionados
 
-- A constituição e o [README dos testes](../tests/README.pt-br.md#execução)
-  ainda indicam o container Docker como portão primário, mas a imagem não tem
-  estágio `test`; a [#190](https://github.com/A11yDevs/acessilia/issues/190)
-  acompanha a reescrita dessa regra. Até lá, a CI executa as três suítes
-  nativamente e é o check exigido antes do merge.
+- A constituição ainda indica o container Docker como portão primário; a
+  [#190](https://github.com/A11yDevs/acessilia/issues/190) acompanha a reescrita
+  dessa regra. O [README dos testes](../tests/README.pt-br.md#execução) agora
+  afirma que a CI é o portão aplicado e que a imagem não tem estágio `test`.
+  Até a #190, a CI executa as três suítes nativamente e é o check exigido antes
+  do merge.
 - Instalação e cache de dependências continuam na
   [#405](https://github.com/A11yDevs/acessilia/issues/405).
-- Política de E2E, execuções agendadas e monitoramento de testes intermitentes
-  são a PR 5 da #448.

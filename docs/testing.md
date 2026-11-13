@@ -5,8 +5,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 This page describes the supported local edit–test–fix loop. The commands are
 thin wrappers around pytest; CI keeps running the complete suites before a
 merge. Issue [#448](https://github.com/A11yDevs/acessilia/issues/448) tracks the
-remaining work: CI optimization (PR 4) and monitoring (PR 5). Bounded parallel
-execution (PR 2) is available in `make test-all`; test impact analysis (PR 3)
+testing workflow: local commands (PR 1), bounded parallel execution (PR 2), CI
+optimization (PR 4) and scheduled monitoring (PR 5). Test impact analysis (PR 3)
 was evaluated and is not part of the workflow.
 
 ## Baseline
@@ -203,6 +203,38 @@ reports even when a step fails:
 `test-reports` for the core, docstruct and SDK suites, and `sdk-isolated-report`
 for the SDK-only job. Image delivery waits for both `tests` and `sdk-isolated`.
 
+## Scheduled monitoring
+
+The `Scheduled test monitoring` workflow runs every Monday at 06:00 UTC and on
+demand. The cron only starts firing after the workflow file reaches the default
+branch; the schedule starts there, but the matrix checks out and tests both
+`main` and `develop`. Each ref runs the core suite serially and again
+with `-n 4 --dist worksteal`, runs docstruct and SDK, and compares the two core
+JUnit reports. A test with a different outcome between the runs is an order or
+worker dependency; the workflow fails and keeps the reports for 30 days. It also
+fails when the core comparison or the docstruct/SDK reports contain a failure,
+error or skip. The summary records totals, p50/p95 test durations and the
+slowest tests. JUnit time covers the tests; the job duration in GitHub Actions
+is the runner-consumption reference.
+
+A failure in a scheduled run opens or updates the issue `Scheduled test
+monitoring failed`, with a link to the run. Manual `workflow_dispatch` failures
+only show in the Actions run.
+
+The E2E job runs when the repository variables `TOOLBOX_BASE_URL` or
+`CORE_BASE_URL` are configured; otherwise it is skipped. It uses the optional
+`TOOLBOX_API_KEY` secret and the `CORE_EXPECT_BUILD_INFO` variable documented in
+the [tests README](../tests/README.md#end-to-end-tests). The optional dataset
+corpus is not cloned in the scheduled job, so those cases skip. E2E remains a
+scheduled validation, not a merge gate: the merge gate is the non-E2E
+`tests (Python 3.11)` and `SDK alone` checks.
+
+The `slow` marker identifies the known CPU-heavy VLM judge test. Use
+`uv run pytest -m slow` to repeat it, or `-m "not slow"` for a faster local
+loop; `make test-all` still runs it. No test currently needs serial execution;
+the `serial` marker will be introduced with the first test that demonstrates
+that need.
+
 ## Supported environments
 
 - **macOS and Linux.** `make` ships with the Xcode command line tools on macOS
@@ -215,11 +247,10 @@ for the SDK-only job. Image delivery waits for both `tests` and `sdk-isolated`.
 
 ## Scope and related work
 
-- The constitution and [tests/README.md](../tests/README.md#running) still name
-  the Docker container as the primary gate, but the image has no `test` stage;
+- The constitution still names the Docker container as the primary gate;
   [#190](https://github.com/A11yDevs/acessilia/issues/190) tracks rewording that
-  rule. Until then CI runs the three suites natively and is the check enforced
-  before a merge.
+  rule. The [tests README](../tests/README.md#running) now states that CI is the
+  enforced gate and the image has no `test` stage. Until #190, CI runs the three
+  suites natively and is the check enforced before a merge.
 - Dependency installation and caching stay under
   [#405](https://github.com/A11yDevs/acessilia/issues/405).
-- E2E policy, scheduled runs and flaky-test monitoring are PR 5 of #448.
