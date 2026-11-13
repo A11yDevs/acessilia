@@ -5,9 +5,9 @@ Você também pode ler esta documentação em **inglês**: [English](testing.md)
 Esta página descreve o ciclo local de editar–testar–corrigir. Os comandos são
 wrappers finos em volta do pytest; a CI continua executando as suítes completas
 antes do merge. A issue [#448](https://github.com/A11yDevs/acessilia/issues/448)
-acompanha o trabalho restante: o experimento opcional de análise de impacto
-(PR 3), otimização da CI (PR 4) e monitoramento (PR 5). A execução paralela
-limitada (PR 2) está disponível no `make test-all`.
+acompanha o trabalho restante: otimização da CI (PR 4) e monitoramento (PR 5).
+A execução paralela limitada (PR 2) está disponível no `make test-all`; a
+análise de impacto de testes (PR 3) foi avaliada e não faz parte do fluxo.
 
 ## Linha de base
 
@@ -108,6 +108,66 @@ execução agora usam caminhos por worker:
 O `-n auto` não está habilitado. Ele passou na validação, mas foi mais lento
 (96s) que quatro workers (74s) e usa mais memória. Mantenha-o como opção local
 experimental; a CI e o `make test-all` continuam limitados.
+
+## Análise de impacto de testes (avaliada, não adotada)
+
+A PR 3 da #448 avaliou o `pytest-testmon` como um `make test-fast` opcional. Ele
+não faz parte do fluxo: o experimento encontrou omissões que exigiriam um
+fallback grande e fácil de ficar desatualizado, e o custo da linha de base
+supera o ganho para esta suíte.
+
+Medido em 2026-11-12 com `pytest-testmon 2.3.0` na mesma máquina de 12 núcleos,
+que estava sob carga (a linha de base serial do core é 143s e o `make test-all`
+levou cerca de 75s em uma execução tranquila):
+
+| Cenário | Resultado |
+|---|---|
+| Reconstrução da linha de base (`--testmon-forceselect`, core sem E2E completo) | 603s (221s na medição tranquila anterior) |
+| Sem mudanças | 2,7s (6,5s de parede incluindo a inicialização do interpretador) |
+| Cinco mudanças em folhas | 1–4 testes selecionados; p50 9,1s, p95 16,8s |
+| Mudança central (`backend/config/settings.py`) | 246 testes, 66s |
+| Mudança em README (arquivo estático) | 0 testes selecionados; `test_docstruct_readme_sync` falha quando executado diretamente |
+| Mudança em folha do docstruct | 2 testes do core selecionados; a suíte do docstruct não roda |
+| Mudança em folha do SDK | 1 teste do core selecionado; a suíte do SDK não roda |
+| Arquivos de portões estáticos da raiz | 129 testes, 6,9s |
+
+A amostra de arquivo estático é 1/1 falso negativo; as cinco amostras de folhas
+selecionaram seus testes diretos. A amostra é pequena, mas um portão obrigatório
+omitido já exige um fallback.
+
+Por que foi rejeitado:
+
+- **Arquivos estáticos são invisíveis para o testmon.** Documentação, schemas,
+  fixtures, `pyproject.toml`, `uv.lock`, `.env` e contratos compartilhados
+  precisam de fallback explícito. O repositório tem portões estáticos
+  obrigatórios (`test_no_portuguese`, `test_docstruct_readme_sync`,
+  `test_architecture_layers`, `test_i18n`, `test_compose_config`,
+  `test_docs_pr125`, além dos testes de pureza das bibliotecas), e executá-los
+  em toda mudança levaria a mediana das folhas de 9,1s para cerca de 16s, acima
+  da meta de 10s.
+- **As bibliotecas são suítes separadas.** O comando da raiz não executa
+  `libs/docstruct` nem `libs/sdk`; uma mudança nesses diretórios precisa de
+  fallback para as suítes deles, que o testmon não seleciona.
+- **Custo e invalidação da linha de base.** Reconstruir o `.testmondata` levou
+  603s sob carga (221s tranquilo, +67% sobre a suíte serial), e o banco precisa
+  ser reconstruído após mudanças de dependências ou de ambiente.
+- **Seleção com estado.** A mesma mudança em `runtime_lease.py` selecionou 3
+  testes em uma execução e 4 na coleta seguinte; o banco é mais um artefato com
+  estado para manter sincronizado.
+- O experimento expôs uma dependência de ordem real: `test_history_empty` e
+  `test_stats_empty` agora usam o fixture `fresh_history_db` por teste, então
+  uma execução seletiva não vê linhas gravadas por um teste anterior.
+
+O fluxo suportado continua sendo `make test-file`, `make test-failed` e
+`make test-all` (core com quatro workers). O `pytest-testmon` não é dependência
+do projeto. Apague `.testmondata*` para reconstruir a linha de base após
+mudanças de dependências, interpretador ou plugins. O arquivo está no
+`.gitignore`, então o experimento ainda pode ser reproduzido localmente:
+
+```bash
+rm -f .testmondata*
+uv run --with pytest-testmon pytest --testmon-forceselect -m "not e2e"
+```
 
 ## Timeouts
 

@@ -5,9 +5,9 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 This page describes the supported local edit–test–fix loop. The commands are
 thin wrappers around pytest; CI keeps running the complete suites before a
 merge. Issue [#448](https://github.com/A11yDevs/acessilia/issues/448) tracks the
-remaining work: the optional test-impact experiment (PR 3), CI optimization
-(PR 4) and monitoring (PR 5). Bounded parallel execution (PR 2) is available in
-`make test-all`.
+remaining work: CI optimization (PR 4) and monitoring (PR 5). Bounded parallel
+execution (PR 2) is available in `make test-all`; test impact analysis (PR 3)
+was evaluated and is not part of the workflow.
 
 ## Baseline
 
@@ -104,6 +104,64 @@ use per-worker paths:
 `-n auto` is not enabled. It passed in the validation run but was slower (96s)
 than four workers (74s) and uses more memory. Keep it as an experimental local
 option; CI and `make test-all` stay bounded.
+
+## Test impact analysis (evaluated, not adopted)
+
+PR 3 of #448 evaluated `pytest-testmon` as an optional `make test-fast`. It is
+not part of the workflow: the experiment found misses that would need a large,
+easy-to-stale fallback, and the baseline cost exceeds the gain for this suite.
+
+Measured on 2026-11-12 with `pytest-testmon 2.3.0` on the same 12-core machine,
+which was under load (the serial core baseline is 143s and `make test-all` ran
+in about 75s in a quiet run):
+
+| Scenario | Result |
+|---|---|
+| Baseline reconstruction (`--testmon-forceselect`, whole non-E2E core) | 603s (221s in the earlier quiet measurement) |
+| No changes | 2.7s (6.5s wall including interpreter startup) |
+| Five leaf changes | 1–4 tests selected; p50 9.1s, p95 16.8s |
+| Central change (`backend/config/settings.py`) | 246 tests, 66s |
+| README change (static file) | 0 tests selected; `test_docstruct_readme_sync` fails when run directly |
+| docstruct leaf change | 2 root tests selected; the docstruct suite does not run |
+| SDK leaf change | 1 root test selected; the SDK suite does not run |
+| Root static-gate files | 129 tests, 6.9s |
+
+The static-file sample is a 1/1 false negative; the five leaf samples selected
+their direct tests. This is a small sample, but one mandatory gate missed is
+enough to require a fallback.
+
+Why it was rejected:
+
+- **Static files are invisible to testmon.** Docs, schemas, fixtures,
+  `pyproject.toml`, `uv.lock`, `.env` and shared contracts need an explicit
+  fallback. The repo has mandatory static gates (`test_no_portuguese`,
+  `test_docstruct_readme_sync`, `test_architecture_layers`, `test_i18n`,
+  `test_compose_config`, `test_docs_pr125`, plus the library purity tests), and
+  running them on every change would move the leaf median from 9.1s to about
+  16s, above the 10s target.
+- **Libraries are separate suites.** The root command does not run
+  `libs/docstruct` or `libs/sdk`; a change there needs a fallback to those
+  suites, which testmon does not select.
+- **Baseline cost and invalidation.** Rebuilding `.testmondata` took 603s under
+  load (221s quiet, +67% over the serial suite), and the database must be
+  rebuilt after dependency or environment changes.
+- **Stateful selection.** The same `runtime_lease.py` change selected 3 tests in
+  one run and 4 when collected again; the database is another stateful artifact
+  to keep in sync.
+- The experiment did expose a real order dependency: `test_history_empty` and
+  `test_stats_empty` now use a per-test `fresh_history_db` fixture, so a
+  selective run cannot see rows recorded by an earlier test.
+
+The supported workflow remains `make test-file`, `make test-failed` and
+`make test-all` (core with four workers). `pytest-testmon` is not a project
+dependency. Delete `.testmondata*` to rebuild the baseline after dependency,
+interpreter or plugin changes. The file is ignored, so the experiment can still
+be reproduced locally:
+
+```bash
+rm -f .testmondata*
+uv run --with pytest-testmon pytest --testmon-forceselect -m "not e2e"
+```
 
 ## Timeouts
 
