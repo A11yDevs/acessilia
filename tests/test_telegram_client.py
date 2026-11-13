@@ -533,6 +533,51 @@ def test_photo_flow(doc_module_isolated):
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
 
 
+def test_start_formats_and_help_match_the_validator(monkeypatch):
+    start = _FakeMessage(_FakeBot(b""), user_id=456)
+    formats = _FakeMessage(_FakeBot(b""), user_id=456)
+    help_message = _FakeMessage(_FakeBot(b""), user_id=456)
+
+    token = set_request_locale("en_US")
+    try:
+        asyncio.run(start_module.cmd_start(start))
+        asyncio.run(start_module.cmd_formats(formats))
+        asyncio.run(start_module.cmd_help(help_message))
+    finally:
+        reset_request_locale(token)
+
+    start_text = start.answers[0]
+    formats_text = formats.answers[0]
+    help_text = help_message.answers[0]
+    for label in ("PDF", "PNG", "JPG", "JPEG", "TIFF", "TIF", "DOCX", "HTML"):
+        assert label in start_text
+        assert label in formats_text
+    assert "BMP" not in start_text and "WEBP" not in start_text
+    assert "BMP" not in formats_text and "WEBP" not in formats_text
+    assert "PDF/UA" in formats_text
+    assert "Audio description (MP3)" in formats_text
+    assert "Markdown" not in formats_text
+    assert "Searchable PDF" not in formats_text
+    assert "/email" in help_text
+
+
+def test_formats_follow_a_changed_validator_configuration(monkeypatch):
+    monkeypatch.setattr(settings, "allowed_extensions", {".pdf", ".epub"})
+    message = _FakeMessage(_FakeBot(b""), user_id=456)
+
+    token = set_request_locale("en_US")
+    try:
+        asyncio.run(start_module.cmd_formats(message))
+    finally:
+        reset_request_locale(token)
+
+    answer = message.answers[0]
+    inputs = answer.split("Output formats", 1)[0]
+    assert "PDF" in inputs
+    assert "EPUB" in inputs
+    assert "DOCX" not in inputs and "HTML" not in inputs
+
+
 def test_operator_commands_reject_non_admins(monkeypatch):
     monkeypatch.setattr(settings, "telegram_admin_ids", frozenset({999}))
     message = _FakeMessage(_FakeBot(b""), user_id=456)

@@ -1243,7 +1243,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_START_TEXT: (
             "Olá! Envie um PDF, imagem ou documento escaneado."
             "\n\nEnviarei de volta uma versão acessível para leitores de tela."
-            "\n\nFormatos aceitos: PDF, PNG, JPG, TIFF, BMP, WEBP"
+            "\n\nFormatos aceitos:\n{input_formats}"
         ),
         MSG_HELP_TEXT: (
             "Comandos disponíveis:"
@@ -1251,6 +1251,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "\n/start - Iniciar o bot"
             "\n/ajuda ou /help - Mostrar esta mensagem"
             "\n/formatos - Listar formatos de entrada e saída suportados"
+            "\n/email <endereço> - Também envia o resultado do próximo arquivo para esse e-mail"
             "\n\n🎨 Modos de Descrição:"
             "\n/detalhado - Máximo detalhe: tipografia, cores, layout, posição de elementos"
             "\n/medio - Texto completo + descrição clara de imagens (padrão)"
@@ -1268,17 +1269,13 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         MSG_FORMATS_TEXT: (
             "Formatos de entrada aceitos:"
-            "\n• PDF (escaneado ou digital)"
-            "\n• PNG, JPG, JPEG"
-            "\n• TIFF, TIF"
-            "\n• BMP"
-            "\n• WEBP"
+            "\n{input_formats}"
             "\n\nFormatos de saída disponíveis:"
             "\n• TXT estruturado"
             "\n• DOCX acessível"
+            "\n• PDF/UA"
             "\n• HTML semântico"
-            "\n• Markdown"
-            "\n• PDF pesquisável"
+            "\n• Audiodescrição (MP3)"
         ),
         # Nominal-plan executor diagnostics (backend/core/execution/messages.py): pt-BR mirror preserving the original wording.
         EXE_METHOD_NAME_REQUIRED: "O nome do método não pode ser vazio",

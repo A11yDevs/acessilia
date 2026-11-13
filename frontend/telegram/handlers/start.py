@@ -14,6 +14,7 @@ from backend.tools.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.telegram import user_context
+from frontend.telegram.formats import input_formats_text
 from frontend.telegram.middlewares.pause_middleware import get_paused_chats
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
@@ -84,7 +85,9 @@ async def cmd_start(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /start command; no default (required).
     """
-    await message.answer(t(MSG_START_TEXT))
+    await message.answer(
+        t(MSG_START_TEXT).format(input_formats=input_formats_text())
+    )
 
 
 @router.message(Command("ajuda"))
@@ -106,7 +109,9 @@ async def cmd_formats(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /formatos (or /formats) command; no default (required).
     """
-    await message.answer(t(MSG_FORMATS_TEXT))
+    await message.answer(
+        t(MSG_FORMATS_TEXT).format(input_formats=input_formats_text())
+    )
 
 
 @router.message(Command("ocr"))

@@ -149,7 +149,7 @@ O Telegram oferece dois jeitos de enviar uma imagem, e o bot aceita os dois:
 - **Como foto** (o padrão do aplicativo): o Telegram **comprime** a imagem antes de entregá-la. Para fotos comuns isso é suficiente, mas em páginas digitalizadas com texto pequeno ou fórmulas a compressão piora o reconhecimento.
 - **Como arquivo**: a imagem chega intacta. Prefira esse modo para documentos.
 
-Formatos aceitos como arquivo: PDF, PNG, JPG/JPEG, TIFF/TIF, DOCX e HTML. As mensagens `/start` e `/formats` do bot ainda citam BMP e WEBP, mas esses formatos são recusados (veja a [seção 5](#5-limitações-conhecidas)).
+Formatos aceitos como arquivo: PDF, PNG, JPG/JPEG, TIFF/TIF, DOCX e HTML. As mensagens `/start` e `/formatos` montam essa lista a partir da mesma configuração do validador, então não divergem do que o bot aceita.
 
 ### 2.3 Comandos
 
@@ -272,7 +272,6 @@ Se o arquivo enviado no grupo **não aparece no log de jeito nenhum**, ele não 
 
 - **Arquivos acima de 20 MB:** a Bot API pública do Telegram só permite que bots baixem arquivos de até 20 MB. Mesmo com `MAX_FILE_SIZE_MB=50`, um arquivo entre 20 e 50 MB passa na validação e falha no download. Para arquivos maiores, use o painel web ([#392](https://github.com/A11yDevs/acessilia/issues/392)).
 - **Estado em memória:** modos, e-mails, tarefas acompanhadas e chats pausados ficam na memória do processo. Ao reiniciar ou recriar o container, tudo volta ao padrão: chats pausados voltam a responder e `/status` deixa de encontrar tarefas enviadas antes do reinício. As tarefas em si continuam na API ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
-- **Formatos anunciados x aceitos:** `/start` e `/formats` citam BMP e WEBP, que o validador recusa. Também anunciam Markdown e "PDF pesquisável" como saída, mas o pacote atual tem TXT, DOCX, PDF/UA, HTML e MP3. A ajuda (`/help`) não lista `/email` ([#393](https://github.com/A11yDevs/acessilia/issues/393)).
 - **Mensagem final em português:** o texto com o link de download sai em português, seja qual for o idioma do usuário ([#394](https://github.com/A11yDevs/acessilia/issues/394)).
 
 ## Referências
