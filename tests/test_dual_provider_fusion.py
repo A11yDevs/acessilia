@@ -9,8 +9,11 @@ from pathlib import Path
 import pytest
 
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
-from backend.core.pipeline.handlers.fusion import _handle_single_provider_method
+from backend.core.pipeline.handlers.common import _missing_obligation
+from backend.core.pipeline.handlers.fusion import (
+    _handle_dual_provider_fusion_method,
+    _handle_single_provider_method,
+)
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.manifest.models import (
     ExtractorRun,
@@ -142,6 +145,7 @@ def test_fusion_handler_fails_on_unknown_obligation(tmp_path, monkeypatch):
     assert result.success is False
     assert result.validated is False
     assert result.artifacts == []
+    assert result == _missing_obligation("o-inexistente")
 
 
 def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
