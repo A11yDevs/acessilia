@@ -107,7 +107,7 @@ async def test_api_rejects_inactive_pipeline_options_before_enqueue(isolated):
 @pytest.mark.parametrize("description", ["A map with two connected regions", "Map", "Logo", "A"])
 async def test_ocr_text_is_not_a_visual_description(monkeypatch, description):
     from backend.agents.output_schemas import VisionOutput
-    from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+    from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
     from tests.test_pddl_orchestrator import _sample_manifest
 
     manifest = _sample_manifest()
@@ -130,9 +130,9 @@ async def test_ocr_text_is_not_a_visual_description(monkeypatch, description):
                 confidence=0.8,
             )
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.VisionAgent", Vision)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", Vision)
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *args: (b"image", 1),
     )
     await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal")

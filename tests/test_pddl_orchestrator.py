@@ -8,7 +8,7 @@ import pytest
 
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.agents.pddl_orchestrator import _enrich_table_structures
-from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.pipeline.payload import build_pddl_structured_payload
 from docstruct.tables.text_rows import rows_from_visual_table_text as _rows_from_visual_table_text
 from backend.core.pipeline.elements import (
@@ -27,6 +27,7 @@ from backend.core.manifest.models import (
     SourceDocument,
 )
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
+from backend.core.pipeline.enrichment import pictures as picture_stage
 
 
 def _sample_manifest() -> ProcessingManifest:
@@ -752,9 +753,9 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
                 mentioned_elements=["equação"],
             )
 
-    monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
+    monkeypatch.setattr(picture_stage, "VisionAgent", FakeVisionAgent)
     monkeypatch.setattr(
-        pddl_module,
+        picture_stage,
         "_extract_picture_bytes",
         lambda *_args: (b"image", 1),
     )
@@ -885,9 +886,9 @@ def test_standalone_image_injects_full_page_picture_for_vision(
                 mentioned_elements=["mapa", "oceanos", "Europa"],
             )
 
-    monkeypatch.setattr(pddl_module, "VisionAgent", FakeVisionAgent)
+    monkeypatch.setattr(picture_stage, "VisionAgent", FakeVisionAgent)
     monkeypatch.setattr(
-        pddl_module,
+        picture_stage,
         "_extract_picture_bytes",
         lambda *_args: (b"image", 1),
     )

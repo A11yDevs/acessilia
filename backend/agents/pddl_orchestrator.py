@@ -3,16 +3,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import re
-from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from acessilia_sdk.toolbox.clients.adjudicate import page_judgement_probability
 from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
-from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip, holds_point
-from docstruct.placeholders import has_meaningful_text, is_mostly_visual, is_placeholder_visual
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
     table_ast_column_count,
@@ -48,8 +45,6 @@ from backend.core.execution.executor import ExecutorAgent, MethodRegistry, StepP
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
-    _derive_processing_needs,
-    is_unstructured_page_placeholder,
     reconcile_reclassified_element_processing_needs,
     separate_equation_number,
 )
@@ -62,24 +57,18 @@ from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
-from backend.i18n import n, t
+from backend.i18n import t
 from backend.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
-    LOG_PDDL_ELEMENT_CROP_FAILED,
-    LOG_PDDL_EMPTY_VISION_DESCRIPTION,
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
     LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
     LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
     LOG_PDDL_FORMULAS_RECOGNIZED,
-    LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_PREFERRED_PLAN_MISSING,
     LOG_PDDL_TABLES_ENRICHED,
-    LOG_PDDL_VISION_RETRY_PASS_PICTURES,
-    LOG_PDDL_VISION_RETRY_PASS_TABLES,
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
-    LOG_VISION_ELEMENT_DESCRIPTION,
 )
 from backend.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
@@ -91,7 +80,6 @@ from backend.stage_messages import (
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
-    STAGE_DESCRIBING_IMAGE,
     STAGE_RECOGNIZING_FORMULA,
     STAGE_RECOGNIZING_TABLE,
     STAGE_EXECUTING_PLAN_STEP,
@@ -172,9 +160,13 @@ from backend.core.pipeline.handlers.inspection import (
     _handle_pymupdf_region_method,
     _handle_vision_page_inspection_method,
 )
-
-if TYPE_CHECKING:
-    from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
+from backend.core.pipeline.enrichment.common import (
+    _extract_picture_bytes,
+    _retry_failed,
+)
+from backend.core.pipeline.enrichment.pictures import (
+    _enrich_picture_descriptions,
+)
 
 
 def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
@@ -1087,300 +1079,6 @@ class PddlAccessibilityOrchestrator:
         return sorted(requested - registered)
 
 
-#: Why a picture was left undescribed, recorded in metadata["vision_failure_reason"]
-#: for the operator: the crop could not be rendered, the source has no page to
-#: render and the extraction embedded no image in the picture (a DOCX or HTML
-#: picture, so the model was never asked), the vision call failed (its error
-#: goes to metadata["vision_failure_detail"]), or the answer had no text.
-VisionFailureReason = Literal[
-    "crop_unavailable", "image_unavailable", "model_failed", "empty_description"
-]
-
-
-def _record_vision_failure(
-    element: ManifestElement, reason: VisionFailureReason, detail: str | None = None
-) -> None:
-    """Mark ``element`` as undescribed and say why, so a later pass describes it again."""
-    element.metadata.pop("vision_description_complete", None)
-    element.metadata["vision_failure_reason"] = reason
-    if detail:
-        element.metadata["vision_failure_detail"] = detail
-    else:
-        element.metadata.pop("vision_failure_detail", None)
-
-
-async def _enrich_picture_descriptions(
-    manifest: ProcessingManifest,
-    source_file: Path,
-    *,
-    mode: str,
-    media_inspection: dict[str, Any] | None = None,
-    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
-    breaker: ProviderBreaker | None = None,
-) -> None:
-    from backend.config.settings import settings
-
-    _inject_full_page_picture(manifest, media_inspection)
-
-    pictures = _pictures_to_describe(manifest)
-    if not pictures:
-        return
-
-    vision = VisionAgent(mode=mode)
-    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
-    total_pages = len(manifest.pages)
-
-    # Descriptions are independent, so they run concurrently, bounded by
-    # VISION_CONCURRENCY to stay inside what the model provider accepts (a
-    # rate-limited hosted API, or a local Ollama that queues beyond its own
-    # parallelism). The progress callback is serialized separately: two
-    # admitted tasks would otherwise interleave the state writes behind it
-    # (the API's status persistence, the Telegram progress message), and even
-    # serialized the emission order may vary with completion, so nothing here
-    # promises FIFO delivery.
-    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
-    progress_lock = asyncio.Lock()
-
-    async def describe_one(position: int, element: ManifestElement) -> bool:
-        """Describe one picture and fold the answer into it; True when enriched."""
-        fallback_page_number = element.page_number
-        if fallback_page_number is None and len(manifest.pages) == 1:
-            fallback_page_number = manifest.pages[0].page_number
-
-        async with slots:
-            if status_callback:
-                async with progress_lock:
-                    await status_callback(
-                        t(STAGE_DESCRIBING_IMAGE).format(
-                            current=position,
-                            total=len(pictures),
-                            pages=_pages_label([fallback_page_number], len(manifest.pages)),
-                        )
-                    )
-            if breaker.open:
-                _record_vision_failure(element, "model_failed", breaker.skip_detail())
-                return False
-            image_bytes, page_number = await run_blocking(
-                _extract_picture_bytes,
-                source_file,
-                element,
-                fallback_page_number,
-                _source_artifact_id(manifest),
-                manifest.source.media_type,
-            )
-            if not image_bytes:
-                _record_vision_failure(
-                    element,
-                    "crop_unavailable" if page_number >= 1 else "image_unavailable",
-                )
-                return False
-
-            errors: list[str] = []
-            vision_output = await vision.describe_region(
-                image_bytes=image_bytes,
-                # A whole presentation slide gets the page prompt and budget.
-                classification=(
-                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
-                ),
-                page_num=page_number,
-                total_pages=total_pages,
-                mode=mode,
-                errors=errors,
-            )
-            breaker.record(isinstance(vision_output, VisionOutput))
-
-        if not isinstance(vision_output, VisionOutput):
-            _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
-            return False
-        return _fold_picture_description(manifest, element, vision_output, page_number)
-
-    # The fold above touches only its own element and runs without awaits, so
-    # concurrent folds cannot interleave. The TaskGroup cancels the sibling
-    # descriptions when one of them fails and re-raises as an ExceptionGroup,
-    # matching the sequential stage this replaced — the first failure aborted
-    # the stage — without leaving tasks mutating the manifest after it failed.
-    async with asyncio.TaskGroup() as group:
-        tasks = [
-            group.create_task(describe_one(position, element))
-            for position, element in enumerate(pictures, start=1)
-        ]
-    enriched = sum(task.result() for task in tasks)
-    enriched += await _retry_failed(
-        [
-            (position, element)
-            for position, element in enumerate(pictures, start=1)
-            if element.metadata.get("vision_failure_reason") in _RETRIED_VISION_FAILURES
-        ],
-        describe_one,
-        kind="pictures",
-        breaker=breaker,
-    )
-
-    if enriched:
-        logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
-
-
-def _pictures_to_describe(manifest: ProcessingManifest) -> list[ManifestElement]:
-    """The elements the vision step describes, none already described.
-
-    The pictures; without any, in a mostly visual document, the elements that
-    stand in for visual content (``is_placeholder_visual``); and without
-    those either, in a one-page mostly visual document, its first element
-    that is not an unstructured-page placeholder (a page inspection reads
-    that one).
-    """
-    pictures = [
-        element
-        for element in manifest.elements
-        if element.type == "picture"
-        and not element.metadata.get("vision_description_complete")
-    ]
-    if not pictures and is_mostly_visual(manifest.elements):
-        pictures = [
-            element
-            for element in manifest.elements
-            if is_placeholder_visual(element)
-            and not element.metadata.get("vision_description_complete")
-        ]
-
-    if (
-        not pictures
-        and is_mostly_visual(manifest.elements)
-        and len(manifest.pages) == 1
-        and manifest.elements
-    ):
-        pictures = [element for element in manifest.elements
-                    if not element.metadata.get("vision_description_complete")
-                    and not is_unstructured_page_placeholder(element)][:1]
-    return pictures
-
-
-def _fold_picture_description(
-    manifest: ProcessingManifest,
-    element: ManifestElement,
-    vision_output: VisionOutput,
-    page_number: int,
-) -> bool:
-    """Fold the vision model's answer into ``element``; True when it is now described.
-
-    A formula answer makes the element a formula; a description makes it a
-    picture. The element is marked described when the model answered, or
-    when its extractor text is still meaningful; otherwise its text is
-    cleared and it is recorded as an empty description.
-    """
-    logger.debug(
-        t(LOG_VISION_ELEMENT_DESCRIPTION).format(
-            element_id=element.id,
-            page_num=page_number,
-            chars=len(vision_output.description),
-            description=vision_output.description,
-        )
-    )
-    element.metadata["vision_language"] = vision_output.language
-    element.metadata["vision_confidence"] = vision_output.confidence
-    element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
-    if vision_output.warnings:
-        element.metadata["vision_warnings"] = list(vision_output.warnings)
-
-    if vision_output.kind == "formula":
-        element.text = vision_output.formula_latex or ""
-        answered = bool(element.text.strip())
-        _retype_element(manifest, element, "formula")
-    else:
-        # An empty answer keeps text the extractor already had; whether
-        # that text is worth keeping is decided below.
-        answered = bool(vision_output.description.strip())
-        if answered:
-            element.text = vision_output.description
-        _retype_element(manifest, element, "picture")
-    if element.page_number is None and page_number >= 1:
-        element.page_number = page_number
-    # The model's own text stands however short ("Logo" is a description);
-    # text left over from the extractor after an empty answer must still be
-    # meaningful. Otherwise the picture is reported as undescribed, so the
-    # operator sees the model refused instead of a silent gap, and stays
-    # eligible for a later pass.
-    if answered or has_meaningful_text(element):
-        element.metadata["vision_description_complete"] = True
-        element.metadata.pop("vision_failure_reason", None)
-        element.metadata.pop("vision_failure_detail", None)
-        return True
-    # What is left is an extractor placeholder ("body") or OCR noise, which
-    # must not become the alt text.
-    element.text = ""
-    _record_vision_failure(element, "empty_description")
-    logger.warning(
-        t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
-            element_id=element.id
-        )
-    )
-    return False
-
-
-def _retype_element(
-    manifest: ProcessingManifest, element: ManifestElement, new_type: Literal["formula", "picture"]
-) -> None:
-    """Make ``element`` a ``new_type``, keeping its ``original_type``, and update its needs.
-
-    Nothing changes when it already is one.
-    """
-    if element.type == new_type:
-        return
-    previous_type = element.type
-    element.metadata["original_type"] = element.type
-    element.type = new_type
-    element.raw_label = new_type
-    reconcile_reclassified_element_processing_needs(
-        manifest,
-        element,
-        previous_type=previous_type,
-    )
-
-
-#: Picture failures a second try may fix: the provider gave no answer, or an
-#: empty one (empty answers are never cached, so the try reaches the model). A
-#: crop that could not be rendered will not render the second time either.
-_RETRIED_VISION_FAILURES = frozenset({"model_failed", "empty_description"})
-
-
-async def _retry_failed(
-    failed: list[tuple[int, ManifestElement]],
-    attempt: Callable[[int, ManifestElement], Coroutine[Any, Any, bool]],
-    *,
-    kind: str,
-    breaker: ProviderBreaker,
-) -> int:
-    """Try once more, one at a time, what a vision stage left without a
-    usable answer: the calls the model failed, and the pictures it answered
-    empty.
-
-    A provider that failed for a while (006.pdf v5 lost every picture after
-    slide 10) may be back after a wait. The breaker lets the first try through
-    even when open, and a failure of it opens the breaker again, so a provider
-    that is still down costs one call, not one per object. Returns how many
-    objects the pass enriched.
-    """
-    from backend.config.settings import settings
-
-    if not failed:
-        return 0
-    delay = max(0, settings.vision_retry_pass_delay_seconds)
-    kind_msgids = (
-        LOG_PDDL_VISION_RETRY_PASS_PICTURES
-        if kind == "pictures"
-        else LOG_PDDL_VISION_RETRY_PASS_TABLES
-    )
-    logger.warning(
-        n(*kind_msgids, len(failed)).format(count=len(failed), delay=delay)
-    )
-    await asyncio.sleep(delay)
-    breaker.probe()
-    enriched = 0
-    for position, element in failed:
-        enriched += await attempt(position, element)
-    return enriched
-
-
 def _formula_recognition_crop(
     source_file: Path,
     element: ManifestElement,
@@ -2262,75 +1960,6 @@ def _is_presentation(media_inspection: dict[str, Any] | None) -> bool:
     )
 
 
-def _inject_full_page_picture(
-    manifest: ProcessingManifest,
-    media_inspection: dict[str, Any] | None,
-) -> None:
-    """Injeta um elemento `picture` sintético de página inteira.
-
-    Quando a entrada é uma imagem raster isolada (``media_inspect`` classifica
-    como imagem e sinaliza ``requires_visual_inspection=true``) e o extrator
-    estrutural não produziu nenhum bloco visual (picture/formula), o orquestrador
-    não teria alvo para audiodescrição. Este fallback cria um elemento `picture`
-    que cobre a página inteira para que o VisionAgent descreva a imagem.
-
-    O sinal é consumido apenas como heurística de enriquecimento: não altera o
-    problema PDDL (predicados ``media_inspected``/``media_profile_classified``
-    pertencem ao domínio da Toolbox).
-    """
-    if not isinstance(media_inspection, dict):
-        return
-    if not media_inspection.get("is_image"):
-        return
-    if not media_inspection.get("requires_visual_inspection"):
-        return
-
-    has_visual_element = any(
-        element.type in {"picture", "formula"} for element in manifest.elements
-    )
-    if has_visual_element or any(
-        is_unstructured_page_placeholder(element) for element in manifest.elements
-    ):
-        # An empty page is already planned for visual inspection.
-        return
-
-    max_reading_order = max(
-        (element.reading_order for element in manifest.elements), default=0
-    )
-    page_number = (
-        manifest.pages[0].page_number if manifest.pages else 1
-    )
-
-    element = ManifestElement(
-        id=f"element-injected-picture-{len(manifest.elements) + 1:06d}",
-        type="picture",
-        raw_label="picture",
-        reading_order=max_reading_order + 1,
-        hierarchy_level=1,
-        text=None,
-        page_number=page_number,
-        metadata={
-            "injected_picture": True,
-            "media_inspection": media_inspection,
-        },
-    )
-    manifest.elements.append(element)
-
-    if manifest.pages:
-        manifest.pages[0].element_ids.append(element.id)
-
-    observations, obligations = _derive_processing_needs([element])
-    manifest.observations.extend(observations)
-    manifest.obligations.extend(obligations)
-
-    manifest.summary.element_count = len(manifest.elements)
-    manifest.summary.observation_count = len(manifest.observations)
-    manifest.summary.obligation_count = len(manifest.obligations)
-    manifest.summary.element_types = dict(
-        sorted(Counter(item.type for item in manifest.elements).items())
-    )
-
-
 async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -2665,83 +2294,6 @@ def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     element.metadata["table_has_header"] = bool(rows and len(rows[0]) >= 2)
     element.text = ""
     return True
-
-
-#: Longest side of a picture crop sent to the vision model. The render runs at
-#: 160 dpi and the Toolbox refuses more than 20 MP, so an unbounded crop of a
-#: large standalone image (its page is sized in pixels) is rejected before the
-#: model sees it. Bounding the side keeps every source renderable, and the
-#: vision model's 8192-token slot would downscale it further anyway.
-_PICTURE_MAX_SIDE = 2000
-
-#: Largest image decoded from a picture's embedded ``src``. A DOCX or HTML
-#: image is the author's file, not a bounded render, so an oversized one is
-#: left undescribed instead of being held in memory and sent to the model.
-_EMBEDDED_PICTURE_MAX_BYTES = 20 * 1024 * 1024
-
-#: Embedded image types sent to the vision model as they are: the raster
-#: formats the providers read (and that ``pdf.render`` also accepts as input).
-#: A vector image (SVG) is not something the model can be shown.
-_EMBEDDED_PICTURE_TYPES = frozenset({"image/png", "image/jpeg", "image/jpg"})
-
-
-def _extract_picture_bytes(
-    source_file: Path,
-    element: ManifestElement,
-    fallback_page_number: int | None,
-    artifact_id: str | None = None,
-    media_type: str | None = None,
-) -> tuple[bytes | None, int]:
-    """The picture's box rendered by the Toolbox, or its whole page.
-
-    A box the Toolbox refuses (outside the page) or a sliver of one is not a
-    picture, so the page is described instead. Any other failure, the Toolbox
-    being unavailable included, is not retried with the page: it is logged
-    with its cause and the element is left without an image.
-
-    A picture with no page (a DOCX or HTML source) has nothing to render; its
-    image is the one the extraction embedded in it, if any, returned with
-    page ``0``.
-    """
-    from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxIncompatibleEndpoint
-
-    provenance = element.provenance[0] if element.provenance else None
-    page_number = provenance.page_number if provenance is not None else (fallback_page_number or 0)
-    if page_number < 1:
-        image = decode_data_uri(
-            element.metadata.get("src"),
-            media_types=_EMBEDDED_PICTURE_TYPES,
-            max_bytes=_EMBEDDED_PICTURE_MAX_BYTES,
-        )
-        return image, 0
-
-    def render(clip=None, origin: ClipOrigin = "TOPLEFT") -> RenderedPage:
-        return _toolbox_render(
-            source_file, page_number, media_type=media_type, dpi=160,
-            max_side=_PICTURE_MAX_SIDE, clip=clip,
-            clip_origin=origin, artifact_id=artifact_id,
-        )
-
-    clip, origin = best_effort_clip(provenance.bbox if provenance is not None else None)
-    try:
-        if clip is None:
-            return render().image, page_number
-        try:
-            page = render(clip, origin)
-        except ToolboxIncompatibleEndpoint:
-            raise
-        except ToolboxCapabilityError:
-            # The Toolbox refuses (HTTP 400) a box that does not intersect the page.
-            return render().image, page_number
-        left, top, right, bottom = page.clip
-        if right - left < 4 or bottom - top < 4:
-            return render().image, page_number
-        return page.image, page_number
-    except Exception:
-        logger.exception(
-            t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
-        )
-        return None, page_number
 
 
 def _plan_progress(

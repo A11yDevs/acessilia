@@ -21,6 +21,7 @@ import pytest
 import respx
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.handlers import inspection as inspection_handlers
 from backend.agents.output_schemas import PageInspectionOutput
 from backend.config.settings import settings
@@ -465,7 +466,7 @@ def test_the_heuristics_leave_the_placeholder_to_the_plan(source_pdf):
     obligations_before = len(manifest.obligations)
 
     assert not is_placeholder_visual(placeholder)
-    pddl._inject_full_page_picture(
+    picture_stage._inject_full_page_picture(
         manifest, {"is_image": True, "requires_visual_inspection": True}
     )
 
