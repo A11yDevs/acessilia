@@ -49,9 +49,8 @@ apply_ruleset() {
   local payload
   payload="$(jq '{name, target, enforcement, bypass_actors, conditions, rules}' "$file")"
 
-  # Adiciona bypass automático para administradores do repositório para que o
-  # ruleset não bloqueie os mantenedores. Os templates já o incluem, então a
-  # transformação é idempotente e remove duplicatas.
+  # Adiciona bypass automático para administradores do repositório; os
+  # templates já o incluem, então a transformação é idempotente.
   payload="$(echo "$payload" | jq '
     .bypass_actors = (
       ((.bypass_actors // []) + [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}])
