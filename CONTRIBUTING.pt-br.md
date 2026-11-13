@@ -356,14 +356,21 @@ vMAJOR.MINOR.PATCH
 
 O repositório utiliza **GitHub Rulesets** para proteger a branch `main` contra deleção, force-push e merges sem revisão. Rulesets são configurados **via API REST**, não por arquivos no repositório.
 
-O arquivo `.github/rulesets/main.json.example` contém o modelo da configuração atual. Para aplicar ou atualizar os rulesets, execute:
+Os arquivos `.github/rulesets/main.json.example` e `.github/rulesets/develop.json.example` contêm os modelos. O ruleset vivo da `main` ainda registra o contexto antigo `CI / tests (Python 3.11)`, que não corresponde a nenhum check run do Actions; portanto, ele não aplica o gate de CI hoje. Os modelos usam os nomes reais dos checks, `tests (Python 3.11)` e `SDK alone (Python 3.11)`, fixados no app GitHub Actions (`integration_id` 15368). A `develop` não está protegida; o modelo dela propõe os mesmos dois checks sem a política estrita de "up to date", para que pull requests paralelos não invalidem uns aos outros. Ele intencionalmente não adiciona exigência de revisão; a regra do time de que mudanças chegam à `develop` por pull request continua valendo. Aplicar qualquer um dos modelos é uma decisão do mantenedor; reaplicar o `main.json.example` também corrige a lacuna viva. Para aplicar um modelo, copie-o primeiro para o nome `.json`; o script aplica todos os `.json` do diretório e apenas imprime os `.json.example`:
 
 ```bash
-# Aplica/atualiza os rulesets via GitHub API
-./scripts/setup-rulesets.sh
+cp .github/rulesets/main.json.example .github/rulesets/main.json
+# Opcional: cp .github/rulesets/develop.json.example .github/rulesets/develop.json
 
 # Apenas visualiza o payload sem modificar nada
 DRY_RUN=1 ./scripts/setup-rulesets.sh
+
+# Aplica/atualiza os rulesets via GitHub API
+./scripts/setup-rulesets.sh
+
+# Mantém o repositório apenas com os modelos
+rm .github/rulesets/main.json
+# Opcional: rm .github/rulesets/develop.json
 ```
 
 > **Importante:** O ruleset permite bypass para administradores do repositório (`RepositoryRole`), para que mantenedores possam gerenciar a branch sem bloqueios.

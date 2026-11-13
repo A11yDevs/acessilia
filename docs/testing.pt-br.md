@@ -196,9 +196,21 @@ sobre `--timeout=0`, então remova o marcador ao depurar esse teste.
 
 ## Artefatos da CI
 
-A CI executa as mesmas suítes com `--durations=25` e publica os relatórios JUnit
-mesmo quando uma etapa falha: `test-reports` para as suítes do core, docstruct e
-SDK, e `sdk-isolated-report` para o job isolado do SDK.
+A CI executa a suíte do core com `-n 4 --dist worksteal` dentro do job existente
+`tests (Python 3.11)`; o nome do job não muda, então o check obrigatório
+continua funcionando. A etapa separada de coleta foi removida porque a execução
+já coleta a suíte. O job levou 1m50s antes desta mudança; depois dela, três
+execuções levaram 1m26s, 59s e 1m20s
+([43345582194](https://github.com/A11yDevs/acessilia/actions/runs/43345582194),
+[43345892112](https://github.com/A11yDevs/acessilia/actions/runs/43345892112),
+[43346208871](https://github.com/A11yDevs/acessilia/actions/runs/43346208871)),
+todas abaixo da meta de 90s. A execução do core caiu de 60s para 26–43s e a
+etapa de coleta de 10s desapareceu. O job continua rodando as suítes do
+docstruct e do SDK, recusando skips inesperados, imprimindo os 25 testes mais
+lentos e publicando os relatórios JUnit mesmo quando uma etapa falha:
+`test-reports` para as suítes do core, docstruct e SDK, e
+`sdk-isolated-report` para o job isolado do SDK. A entrega da imagem espera por
+`tests` e `sdk-isolated`.
 
 ## Ambientes suportados
 

@@ -188,9 +188,20 @@ over `--timeout=0`, so remove the marker while debugging that test.
 
 ## CI artifacts
 
-CI runs the same suites with `--durations=25` and uploads the JUnit XML reports
-even when a step fails: `test-reports` for the core, docstruct and SDK suites,
-and `sdk-isolated-report` for the SDK-only job.
+CI runs the core suite with `-n 4 --dist worksteal` inside the existing
+`tests (Python 3.11)` job; the job name is unchanged, so the required check
+keeps working. The standalone collection step is gone because the run collects
+the suite. The job took 1m50s before this change; after it, three runs took
+1m26s, 59s and 1m20s
+([43345582194](https://github.com/A11yDevs/acessilia/actions/runs/43345582194),
+[43345892112](https://github.com/A11yDevs/acessilia/actions/runs/43345892112),
+[43346208871](https://github.com/A11yDevs/acessilia/actions/runs/43346208871)),
+all below the 90s target. The core run dropped from 60s to 26–43s and the 10s
+collection step disappeared. The job still runs the docstruct and SDK suites,
+rejects unexpected skips, prints the 25 slowest tests and uploads the JUnit
+reports even when a step fails:
+`test-reports` for the core, docstruct and SDK suites, and `sdk-isolated-report`
+for the SDK-only job. Image delivery waits for both `tests` and `sdk-isolated`.
 
 ## Supported environments
 
