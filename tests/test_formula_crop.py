@@ -126,6 +126,28 @@ def test_a_formula_without_a_usable_box_is_not_rendered(fake_toolbox_render, pdf
     assert fake_toolbox_render.requests == []
 
 
+@pytest.mark.parametrize("box", [None, (math.nan, 20, 110, 70)])
+@pytest.mark.parametrize(
+    ("name", "media_type"), [("doc.docx", None), ("scan.gif", None), ("doc.pdf", "image/png")]
+)
+def test_an_unusable_box_is_silent_whatever_the_source(
+    fake_toolbox_render, tmp_path, pdf, box, name, media_type
+) -> None:
+    """The box is checked before the source: no request and no warning (as on develop)."""
+    source = tmp_path / name
+    source.write_bytes(pdf.read_bytes())
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="WARNING", format="{message}")
+    try:
+        result = pddl._formula_recognition_crop(source, _formula(box=box), media_type=media_type)
+    finally:
+        logger.remove(sink)
+
+    assert result == (None, 1)
+    assert fake_toolbox_render.requests == []
+    assert messages == []
+
+
 def test_a_sliver_of_a_region_is_not_a_formula_crop(fake_toolbox_render, pdf) -> None:
     assert pddl._formula_recognition_crop(pdf, _formula(box=(10, 20, 12, 70))) == (None, 1)
     assert len(fake_toolbox_render.requests) == 1

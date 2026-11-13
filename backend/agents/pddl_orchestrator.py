@@ -13,7 +13,6 @@ from docstruct.text.implicit_products import (
     implicit_product_variables,
     mark_implicit_products,
 )
-from docstruct.geometry.boxes import best_effort_clip
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.math_spans import block_prose, inline_math_sources
 
@@ -1036,15 +1035,11 @@ def _formula_recognition_crop(
 
     if page_number < 1:
         return None, 0
-    box = provenance.bbox if provenance is not None else None
-    if best_effort_clip(box)[0] is None:
-        # Before the source check: an unusable box is silent for any source.
-        return None, page_number
     try:
         crop = _toolbox_formula_crop(
             source_file,
             page_number,
-            box,
+            provenance.bbox if provenance is not None else None,
             media_type=media_type,
             artifact_id=artifact_id,
         )

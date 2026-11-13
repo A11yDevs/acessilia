@@ -142,6 +142,28 @@ class TestMathTools:
         )
         assert toolbox_recognize_formula(b"png") == formulas
 
+    @respx.mock
+    def test_recognize_returns_the_candidates_ranked_and_bare(self):
+        """The SDK step ranks: best first, delimiters stripped, empty LaTeX left out."""
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.recognize:execute").mock(
+            return_value=httpx.Response(200, json={
+                "status": "succeeded",
+                "capability": "math.recognize@1",
+                "provider": "docling-math",
+                "document": {"formulas": [
+                    {"latex": "$a$", "confidence": 0.4, "page": 1},
+                    {"latex": "  ", "confidence": 1.0},
+                    {"latex": "$$b$$", "confidence": 0.9, "page": 1},
+                    {"latex": "c"},
+                ]},
+            })
+        )
+        assert toolbox_recognize_formula(b"png") == [
+            {"latex": "b", "confidence": 0.9, "page": 1},
+            {"latex": "a", "confidence": 0.4, "page": 1},
+            {"latex": "c", "confidence": None},
+        ]
+
 
 class TestRecognizeUnexpectedErrors:
     """An error that is not a Toolbox error is raised, never "no formula" (P6).

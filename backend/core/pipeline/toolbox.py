@@ -138,14 +138,20 @@ def _toolbox_formula_crop(
 ) -> FormulaCrop:
     """The SDK's ``crop_formula_region`` with the core's settings.
 
-    The source is checked as for ``_toolbox_render`` first (``ValueError``);
-    the operation then decides the crop (200 dpi, the box as the clip, no
-    request for an unusable box, a sliver is no crop) and raises the Toolbox's
-    errors as they are. What to do with a failure is the caller's decision.
+    A box that cannot be used is no crop, silently and for any source, as
+    before the operation existed: it is checked before the source. The source
+    is then checked as for ``_toolbox_render`` (``ValueError``), and the
+    operation decides the crop (200 dpi, the box as the clip, a sliver is no
+    crop) and raises the Toolbox's errors as they are. The client resends a
+    source the Toolbox lost (``_render_client``). What to do with a failure is
+    the caller's decision.
     """
-    from acessilia_sdk.operations.formula import crop_formula_region
+    from acessilia_sdk.operations.formula import FormulaCrop, crop_formula_region
     from acessilia_sdk.runtime import run_sync
+    from docstruct.geometry.boxes import best_effort_clip
 
+    if best_effort_clip(box)[0] is None:
+        return FormulaCrop(None, page_number, reason="no usable box")
     _check_renderable(source, media_type)
 
     async def crop() -> FormulaCrop:

@@ -17,7 +17,6 @@ import pytest
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
 from backend.agents import pddl_orchestrator as pddl
-from docstruct.text.latex import ranked_latex_candidates
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import ManifestElement
 from backend.i18n import t
@@ -455,34 +454,6 @@ async def test_a_vision_description_reclassifies_the_formula(monkeypatch, croppe
     assert "formula_recognition" not in manifest.elements[0].metadata
 
 
-def test_candidates_are_normalized_and_ranked_by_confidence():
-    ranked = ranked_latex_candidates(
-        [
-            {"latex": "$a$", "confidence": 0.4},
-            {"latex": "$$b$$", "confidence": 0.9},
-            {"latex": "   ", "confidence": 1.0},
-        ]
-    )
-
-    assert [c["latex"] for c in ranked] == ["b", "a"]
-    assert ranked_latex_candidates([]) == []
-    assert ranked_latex_candidates([{"latex": ""}]) == []
-
-
-def test_a_confidence_that_is_not_a_finite_number_ranks_as_none():
-    ranked = ranked_latex_candidates(
-        [
-            {"latex": "nan", "confidence": float("nan")},
-            {"latex": "inf", "confidence": float("inf")},
-            {"latex": "bool", "confidence": True},
-            {"latex": "real", "confidence": 0.2},
-        ]
-    )
-
-    assert [c["latex"] for c in ranked] == ["real", "nan", "inf", "bool"]
-    assert [c["confidence"] for c in ranked] == [0.2, None, None, None]
-
-
 @pytest.mark.asyncio
 async def test_formula_progress_reports_the_stage_and_each_formula(monkeypatch, cropped):
     manifest = _formula_manifest(None, None)
@@ -692,13 +663,6 @@ async def test_vision_runs_only_when_no_candidate_agrees(monkeypatch, cropped):
     assert recognition["method"] == "vision"
     assert set(recognition["rejected"]) == {"math.recognize", "math.recognize#2"}
     assert len(FakeVision.calls) == 1
-
-
-def test_candidates_rank_by_confidence_and_keep_ties_in_order():
-    ranked = ranked_latex_candidates([
-        {"latex": "a"}, {"latex": "b", "confidence": 0.7}, {"latex": " "}, {"latex": "c"},
-    ])
-    assert [c["latex"] for c in ranked] == ["b", "a", "c"]
 
 
 @pytest.mark.asyncio

@@ -2,9 +2,10 @@
 
 Characterization of the orchestrator's ``_ranked_formula_candidates``, written
 on develop before it moved to docstruct, as
-``docstruct.text.latex.ranked_latex_candidates``. The
-existing tests in tests/test_formula_recognition.py cover the main ranking;
-these pin the edges.
+``docstruct.text.latex.ranked_latex_candidates``. The SDK's
+``recognize_formula`` applies it (#470, phase 3); the first three tests cover
+the main ranking (moved from tests/test_formula_recognition.py), the others pin
+the edges.
 """
 
 from __future__ import annotations
@@ -12,6 +13,41 @@ from __future__ import annotations
 import copy
 
 from docstruct.text.latex import ranked_latex_candidates as ranked
+
+
+def test_candidates_are_normalized_and_ranked_by_confidence() -> None:
+    result = ranked(
+        [
+            {"latex": "$a$", "confidence": 0.4},
+            {"latex": "$$b$$", "confidence": 0.9},
+            {"latex": "   ", "confidence": 1.0},
+        ]
+    )
+
+    assert [c["latex"] for c in result] == ["b", "a"]
+    assert ranked([]) == []
+    assert ranked([{"latex": ""}]) == []
+
+
+def test_a_confidence_that_is_not_a_finite_number_ranks_as_none() -> None:
+    result = ranked(
+        [
+            {"latex": "nan", "confidence": float("nan")},
+            {"latex": "inf", "confidence": float("inf")},
+            {"latex": "bool", "confidence": True},
+            {"latex": "real", "confidence": 0.2},
+        ]
+    )
+
+    assert [c["latex"] for c in result] == ["real", "nan", "inf", "bool"]
+    assert [c["confidence"] for c in result] == [0.2, None, None, None]
+
+
+def test_candidates_rank_by_confidence_and_keep_ties_in_order() -> None:
+    result = ranked([
+        {"latex": "a"}, {"latex": "b", "confidence": 0.7}, {"latex": " "}, {"latex": "c"},
+    ])
+    assert [c["latex"] for c in result] == ["b", "a", "c"]
 
 
 def test_a_confidence_keeps_its_type_and_other_keys_stay() -> None:
