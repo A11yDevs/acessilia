@@ -2,5 +2,5 @@
 
 ``common`` holds what the picture and table stages share; ``pictures``
 describes pictures with the vision model; ``tables`` reads tables with the data
-agent.
+agent; ``inline_math`` marks the math runs inside text and table cells.
 """
