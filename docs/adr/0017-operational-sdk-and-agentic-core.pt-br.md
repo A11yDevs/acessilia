@@ -152,11 +152,14 @@ Proposta: a opção 2.
     caracterização e comparação dos manifestos antes e depois.
 - **Relação com a ADR-0016.** O passo 6 da fase 3 da #402 não leva para
   `backend/core/` os módulos que guardam essas operações, para que eles não
-  mudem de lugar duas vezes: os adaptadores de render e do juiz, os
-  adaptadores da Toolbox em `backend/tools` e a cadeia de fórmula. Cada um vai
-  para o seu lugar quando a divisão em mecanismo (SDK) e política (core) for
-  decidida. O core continua ligando a sua configuração (`CoreConfig`) aos
-  parâmetros explícitos de cada operação.
+  mudem de lugar duas vezes: o juiz de página, os adaptadores da Toolbox em
+  `backend/tools` e a cadeia de fórmula. Cada um vai para o seu lugar quando a
+  divisão em mecanismo (SDK) e política (core) for decidida. O core continua
+  ligando a sua configuração (`CoreConfig`) aos parâmetros explícitos de cada
+  operação. Por isso, a ligação do core com o render (`_source_artifact_id` e
+  `_toolbox_render`, que ligam as configurações ao `ToolboxPdfClient.render` e
+  decidem se a origem guardada pode ser referenciada) não fica retida: o passo
+  6 a leva para `backend/core/pipeline/toolbox.py`.
 - **Ainda em aberto:**
   - quais operações vêm depois da cadeia de fórmula, e em que ordem;
   - qual é a API pública estável do docstruct. A proposta é: o que cada módulo
