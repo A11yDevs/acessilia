@@ -123,8 +123,9 @@ class TestMathTools:
                 "document": {"latex": r"\frac{1}{2}a t^{2}", "bbox": [0, 0, 438, 78]},
             })
         )
+        # The SDK step ranks the candidates: a missing confidence is None.
         assert toolbox_recognize_formula(b"png", raise_on_unavailable=True) == [
-            {"latex": r"\frac{1}{2}a t^{2}", "bbox": [0, 0, 438, 78]}
+            {"latex": r"\frac{1}{2}a t^{2}", "bbox": [0, 0, 438, 78], "confidence": None}
         ]
 
     @respx.mock
@@ -140,6 +141,28 @@ class TestMathTools:
             })
         )
         assert toolbox_recognize_formula(b"png") == formulas
+
+    @respx.mock
+    def test_recognize_returns_the_candidates_ranked_and_bare(self):
+        """The SDK step ranks: best first, delimiters stripped, empty LaTeX left out."""
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.recognize:execute").mock(
+            return_value=httpx.Response(200, json={
+                "status": "succeeded",
+                "capability": "math.recognize@1",
+                "provider": "docling-math",
+                "document": {"formulas": [
+                    {"latex": "$a$", "confidence": 0.4, "page": 1},
+                    {"latex": "  ", "confidence": 1.0},
+                    {"latex": "$$b$$", "confidence": 0.9, "page": 1},
+                    {"latex": "c"},
+                ]},
+            })
+        )
+        assert toolbox_recognize_formula(b"png") == [
+            {"latex": "b", "confidence": 0.9, "page": 1},
+            {"latex": "a", "confidence": 0.4, "page": 1},
+            {"latex": "c", "confidence": None},
+        ]
 
 
 class TestRecognizeUnexpectedErrors:
@@ -160,31 +183,12 @@ class TestRecognizeUnexpectedErrors:
     def test_a_bug_is_raised(self, monkeypatch, raise_on_unavailable):
         from backend.tools import toolbox_math_tools
 
-        async def broken(file_path):
+        async def broken(image_bytes):
             raise TypeError("a bug in the call")
 
         monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
         with pytest.raises(TypeError, match="a bug in the call"):
             toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable)
-
-    def test_the_temporary_crop_is_removed_when_an_error_is_raised(
-        self, monkeypatch, tmp_path
-    ):
-        import tempfile
-
-        from backend.tools import toolbox_math_tools
-
-        made = tmp_path / "crop"
-        monkeypatch.setattr(tempfile, "mkdtemp", lambda: str(made))
-
-        async def broken(file_path):
-            assert file_path.read_bytes() == b"png"
-            raise TypeError("a bug in the call")
-
-        monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
-        with pytest.raises(TypeError):
-            toolbox_recognize_formula(b"png")
-        assert not made.exists()
 
 
 if __name__ == "__main__":

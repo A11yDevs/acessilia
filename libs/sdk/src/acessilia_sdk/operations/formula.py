@@ -144,7 +144,9 @@ async def crop_formula_region(
     No crop, without a request, for a page below 1 or a box that cannot be
     used (absent, or with a non-finite coordinate). No crop either when the
     Toolbox applied a region thinner than ``min_side``. Errors of the render
-    are raised as they are.
+    are raised as they are. With ``artifact_id``, whether a source the Toolbox
+    no longer stores is sent again is the client's setting
+    (``resend_file_on_missing_artifact``), not the operation's.
     """
     if page_number < 1:
         return FormulaCrop(None, page_number, reason="no page")

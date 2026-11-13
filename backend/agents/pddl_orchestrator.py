@@ -8,13 +8,12 @@ from typing import Any
 
 from acessilia_sdk.toolbox.clients.adjudicate import page_judgement_probability
 from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
-from docstruct.geometry.boxes import best_effort_clip
 from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.implicit_products import (
     implicit_product_variables,
     mark_implicit_products,
 )
-from docstruct.text.latex import has_latex_markup, latex_text_agreement, ranked_latex_candidates
+from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from docstruct.text.math_spans import block_prose, inline_math_sources
 
 from backend.services.blocking import run_blocking
@@ -125,6 +124,7 @@ from backend.core.pipeline.secondary import (
 )
 from backend.core.pipeline.toolbox import (
     _source_artifact_id,
+    _toolbox_formula_crop,
     _toolbox_render,
 )
 from backend.core.pipeline.handlers.inspection import (
@@ -1018,8 +1018,8 @@ def _formula_recognition_crop(
     ``region_crop`` is reused when present, so a restored or resumed manifest
     does not pay another render; in the normal flow region inspection runs
     after planning, so a formula reaches this function without one (unless
-    its text normalizes to empty). Everything else is rendered from the
-    element's provenance box.
+    its text normalizes to empty). Everything else is the SDK's
+    ``crop_formula_region`` on the element's provenance box (ADR-0017).
     """
     provenance = element.provenance[0] if element.provenance else None
     page_number = (
@@ -1035,17 +1035,12 @@ def _formula_recognition_crop(
 
     if page_number < 1:
         return None, 0
-    clip, origin = best_effort_clip(provenance.bbox if provenance is not None else None)
-    if clip is None:
-        return None, page_number
     try:
-        page = _toolbox_render(
+        crop = _toolbox_formula_crop(
             source_file,
             page_number,
+            provenance.bbox if provenance is not None else None,
             media_type=media_type,
-            dpi=200,
-            clip=clip,
-            clip_origin=origin,
             artifact_id=artifact_id,
         )
     except Exception as exc:
@@ -1055,10 +1050,7 @@ def _formula_recognition_crop(
             "Formula crop failed for {} ({}): {}", element.id, type(exc).__name__, exc
         )
         return None, page_number
-    left, top, right, bottom = page.clip
-    if right - left < 4 or bottom - top < 4:
-        return None, page_number
-    return page.image, page_number
+    return crop.image, page_number
 
 
 def _reclassify_formula_picture(
@@ -1389,7 +1381,7 @@ class _FormulaEnrichment:
             gate = _TextLayerGate(normalize_latex(original_text))
 
             method = "math.recognize"
-            candidates = ranked_latex_candidates(await self.recognizer.recognize(image_bytes))
+            candidates = await self.recognizer.recognize(image_bytes)
             if not candidates and self.recognizer.available:
                 # An outage already warned once and skips this. An empty list
                 # is usually an answer without LaTeX, which nothing else
@@ -1466,7 +1458,7 @@ class _MathRecognizer:
             return []
 
     async def recognize(self, image_bytes: bytes) -> list[dict[str, Any]]:
-        """Recognize one crop, unless the document already found the outage."""
+        """One crop's LaTeX candidates, best first, unless the document found the outage."""
         if not self._ready.is_set():
             async with self._probe:
                 if not self._ready.is_set():

@@ -10,17 +10,16 @@ instead of falling back to a local converter.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox import ToolboxError, ToolboxInvalidInput
 from acessilia_sdk.toolbox.clients import ToolboxMathClient
+from acessilia_sdk.operations.formula import recognize_formula
 from acessilia_sdk.toolbox.clients.math import (
     CONVERT_CAPABILITY,
     RECOGNIZE_CAPABILITY,
     VERBALIZE_CAPABILITY,
-    recognized_formulas,
 )
 from acessilia_sdk.runtime import run_sync
 from backend.tools.toolbox_client import make_toolbox_client
@@ -29,7 +28,7 @@ from backend.tools.toolbox_client import make_toolbox_client
 def toolbox_recognize_formula(
     image_bytes: bytes, *, raise_on_unavailable: bool = False
 ) -> list[dict[str, Any]]:
-    """Recognize mathematical formulas in an image via Toolbox.
+    """Recognize mathematical formulas in an image: the SDK's ``recognize_formula``.
 
     Args:
         image_bytes: PNG/JPEG image bytes containing a formula.
@@ -39,10 +38,11 @@ def toolbox_recognize_formula(
             outage instead of paying the timeout once per crop.
 
     Returns:
-        List of formula dicts, each with a non-empty ``latex`` and, when the
-        provider reports them, ``confidence``, ``page`` and ``bbox`` (see
-        ``recognized_formulas``); empty when no formula was recognized or the
-        image was rejected.
+        The LaTeX candidates, best first (``ranked_latex_candidates``): each
+        with a non-empty ``latex`` without delimiters, a ``confidence`` that
+        is a finite number or ``None``, and the ``page`` and ``bbox`` the
+        provider reported; empty when no formula was recognized or the image
+        was rejected.
 
     Raises:
         MathCapabilityUnavailable: the capability could not serve the request
@@ -52,13 +52,8 @@ def toolbox_recognize_formula(
     endpoint configuration or a bug, propagates: turning it into "no formula"
     would hide it (P6).
     """
-    import tempfile
-
-    tmp = Path(tempfile.mkdtemp()) / "formula.png"
-    tmp.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_bytes(image_bytes)
     try:
-        return run_sync(_recognize_formula_async(tmp))
+        return run_sync(_recognize_formula_async(image_bytes))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the image ({})", RECOGNIZE_CAPABILITY, exc)
         return []
@@ -67,17 +62,12 @@ def toolbox_recognize_formula(
             raise MathCapabilityUnavailable(RECOGNIZE_CAPABILITY, exc) from exc
         logger.warning("Toolbox Math recognize failed ({}), returning empty", exc)
         return []
-    finally:
-        tmp.unlink(missing_ok=True)
-        import shutil
-        shutil.rmtree(tmp.parent, ignore_errors=True)
 
 
-async def _recognize_formula_async(file_path: Path) -> list[dict[str, Any]]:
+async def _recognize_formula_async(image_bytes: bytes) -> list[dict[str, Any]]:
     client = make_toolbox_client(ToolboxMathClient)
     try:
-        result = await client.recognize(file_path=file_path)
-        return recognized_formulas(result.get("document"))
+        return (await recognize_formula(client, image_bytes)).candidates
     finally:
         await client.close()
 

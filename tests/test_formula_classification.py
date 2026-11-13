@@ -7,7 +7,12 @@ from backend.agents import pddl_orchestrator as pddl
 from backend.core.pipeline.handlers import review as review_handlers
 from backend.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import _element_to_block
-from tests.pddl_support import build_element, build_manifest, build_obligation
+from tests.pddl_support import (
+    build_element,
+    build_manifest,
+    build_obligation,
+    install_formula_recognizer,
+)
 from backend.core.pipeline.enrichment import pictures as picture_stage
 
 
@@ -48,7 +53,7 @@ async def test_drawing_is_reclassified_and_description_is_not_requested_twice(mo
     def unexpected(*args, **kwargs):
         pytest.fail("A drawing must never reach mathematical recognition")
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    install_formula_recognizer(monkeypatch, unexpected)
     await pddl._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
     await picture_stage._enrich_picture_descriptions(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
     element = manifest.elements[0]
@@ -72,7 +77,7 @@ async def test_mathematical_formula_still_uses_math_recognize(monkeypatch):
         recognized.append(image)
         return [{"latex": r"x=\frac{a}{b}", "confidence": 0.9}]
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
     breaker = pddl.ProviderBreaker(3)
     await pddl._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
     await pddl._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
@@ -93,7 +98,7 @@ async def test_unresolved_classification_keeps_source_and_requires_review(monkey
     def unexpected(*args, **kwargs):
         pytest.fail("An unresolved region must not reach mathematical recognition")
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    install_formula_recognizer(monkeypatch, unexpected)
     breaker = pddl.ProviderBreaker(3)
     await pddl._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
     await pddl._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
@@ -154,7 +159,7 @@ async def test_a_classification_without_an_answer_keeps_the_formula_path(monkeyp
         return [{"latex": r"x=\frac{a}{b}", "confidence": 0.9}]
 
     monkeypatch.setattr(pddl, "_formula_recognition_crop", lambda *a, **k: (b"crop", 1))
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
     await pddl._enrich_formula_latex(
         manifest, Path("source.pdf"), mode="medio", breaker=pddl.ProviderBreaker(3)
     )
@@ -224,7 +229,7 @@ async def test_the_recognition_fallback_records_its_own_reclassification(monkeyp
     await pddl._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
     assert manifest.elements[0].metadata["formula_classification"]["status"] == "math"
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda *a, **k: [])
+    install_formula_recognizer(monkeypatch, lambda *a, **k: [])
     install_vision(monkeypatch, VisionOutput(
         kind="description", description="A benzene ring.", language="en", confidence=0.7,
     ))
