@@ -392,6 +392,14 @@ msgstr "Downloading file..."
 msgid "❌ Error submitting the file for processing ({status_code}): {detail}"
 msgstr "❌ Error submitting the file for processing ({status_code}): {detail}"
 
+#, python-brace-format
+msgid ""
+"❌ Telegram accepts files up to {limit} MB. For larger files, use the web "
+"panel: {web_url}"
+msgstr ""
+"❌ Telegram accepts files up to {limit} MB. For larger files, use the web "
+"panel: {web_url}"
+
 msgid "❌ Could not contact the processing server. Try again."
 msgstr "❌ Could not contact the processing server. Try again."
 

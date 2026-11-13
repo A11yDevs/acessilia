@@ -40,6 +40,7 @@ from frontend.telegram.messages import (
     MSG_PROCESSING_TIMEOUT,
     MSG_QUEUE_POSITION,
     MSG_SUBMIT_FAILED,
+    MSG_TELEGRAM_FILE_TOO_LARGE,
     MSG_TASK_CANCELLED,
     MSG_TASK_ENQUEUED,
     MSG_WAITING_IN_QUEUE,
@@ -50,6 +51,24 @@ router = Router()
 client = default_client
 
 POLL_INTERVAL_SECONDS = 3.0
+
+#: The public Bot API only serves getFile for files up to this size.
+TELEGRAM_MAX_DOWNLOAD_MB = 20
+
+
+def _telegram_size_error(file_size: int) -> str | None:
+    """Localized refusal when a file is above what Telegram lets the bot download.
+
+    The effective limit is the smaller of ``MAX_FILE_SIZE_MB`` and Telegram's
+    own 20 MB cap, so a file never passes validation and then fails in
+    ``getFile``. The reply points at the web panel, which accepts larger files.
+    """
+    limit = min(settings.max_file_size_mb, TELEGRAM_MAX_DOWNLOAD_MB)
+    if file_size <= limit * 1024 * 1024:
+        return None
+    return t(MSG_TELEGRAM_FILE_TOO_LARGE).format(
+        limit=limit, web_url=settings.web_base_url
+    )
 
 
 async def _send_with_retry(
@@ -108,7 +127,14 @@ async def handle_document(message: Message) -> None:
 
     valid, error_msg = validate_file(filename, file_size)
     if not valid:
+        # The web panel/API apply the same general limit and extension list, so
+        # its error is the accurate one for these cases.
         await message.answer(error_msg)
+        return
+    telegram_error = _telegram_size_error(file_size)
+    if telegram_error:
+        # The file is valid for the panel/API but above Telegram's transport cap.
+        await message.answer(telegram_error)
         return
 
     state_key = user_context.get_user_state_key(message)
