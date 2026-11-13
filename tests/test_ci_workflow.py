@@ -220,3 +220,19 @@ def test_develop_template_keeps_parallel_pull_requests_mergeable() -> None:
     )
     assert status_checks["strict_required_status_checks_policy"] is False
     assert not any(rule["type"] == "pull_request" for rule in ruleset["rules"])
+
+
+def test_docstruct_pin_is_reported_in_pull_requests_and_enforced_on_schedule() -> None:
+    """Only the Toolbox can move its docstruct pin (#470, P8): warn, then enforce weekly."""
+    steps = _workflow()["jobs"]["tests"]["steps"]
+    report = next(step for step in steps if step.get("name") == "Report the Toolbox's docstruct pin")
+    assert "scripts/check_docstruct_pin.py" in report["run"]
+    assert "--report-only" in report["run"]
+
+    workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
+    monitor = workflow["jobs"]["monitor"]["steps"]
+    strict = next(step for step in monitor if step.get("name") == "Check the Toolbox's docstruct pin")
+    assert "scripts/check_docstruct_pin.py" in strict["run"]
+    assert "--report-only" not in strict["run"]
+    assert strict["if"] == "always()"
+    assert strict["env"]["TARGET_BRANCH"] == "${{ matrix.ref }}"

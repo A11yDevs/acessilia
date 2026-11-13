@@ -251,6 +251,14 @@ jobs:
           fi
           python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
 
+      # The Toolbox pins a docstruct release by URL and sha256 (#470, P8). Only
+      # the Toolbox can move that pin, so a pull request is not blocked by it:
+      # findings are warnings here, and the scheduled monitoring fails on them.
+      - name: Report the Toolbox's docstruct pin
+        env:
+          TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
+
       # Four workers match the ubuntu-latest four-vCPU runner and keep the
       # slowest test from dominating the tail. The run also collects the suite,
       # so the old standalone `--collect-only` step is redundant.

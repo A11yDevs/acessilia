@@ -115,6 +115,15 @@ jobs:
           raise SystemExit(1 if failed else 0)
           PY
 
+      # Strict here, report-only in pull requests (#470, P8): a Toolbox pin
+      # behind the core's docstruct release fails the run and reaches the
+      # tracking issue, without blocking work that cannot fix it.
+      - name: Check the Toolbox's docstruct pin
+        if: always()
+        env:
+          TARGET_BRANCH: ${{ matrix.ref }}
+        run: python scripts/check_docstruct_pin.py "$TARGET_BRANCH"
+
       - name: Upload scheduled test reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
