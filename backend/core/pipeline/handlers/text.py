@@ -16,7 +16,6 @@ from docstruct.fusion.noise import (
     element_role,
 )
 from docstruct.fusion.tailjoin import page_number_position
-from docstruct.fusion.verse import split_box_rows
 from docstruct.geometry.boxes import downward_edges
 from docstruct.tables.ast import (
     TABLE_SECTIONS,
@@ -40,10 +39,8 @@ from backend.core.manifest.builder import (
     unicode_repair_text,
 )
 from backend.core.manifest.models import (
-    BoundingBox,
     ManifestElement,
     ProcessingManifest,
-    Provenance,
 )
 from backend.tools.logger import logger
 from backend.core.pipeline.elements import (
@@ -55,6 +52,13 @@ from backend.core.pipeline.handlers.common import (
     _fusion_agent,
     _missing_obligation,
     _target_elements,
+)
+from backend.core.pipeline.handlers.structure import (
+    joined_provenance,
+    remap_references,
+    replace_elements,
+    split_provenance,
+    unique_element_id,
 )
 
 
@@ -436,79 +440,6 @@ def _element_blocks(
     return blocks
 
 
-def _replace_elements(
-    manifest: ProcessingManifest,
-    replacements: dict[str, list[ManifestElement]],
-) -> None:
-    """Rebuild the element list after a handler splits, joins or drops elements.
-
-    ``replacements`` maps a source element id to its parts; an empty list drops
-    the element. Reading order and the pages' ``element_ids`` are renumbered so
-    the payload and the collection invariants see the new list, and the summary
-    counts follow it.
-    """
-    ordered = sorted(manifest.elements, key=lambda element: element.reading_order)
-    rebuilt: list[ManifestElement] = []
-    for element in ordered:
-        if element.id in replacements:
-            rebuilt.extend(replacements[element.id])
-        else:
-            rebuilt.append(element)
-    for order, element in enumerate(rebuilt, start=1):
-        element.reading_order = order
-    manifest.elements = rebuilt
-    for page in manifest.pages:
-        page.element_ids = [
-            element.id
-            for element in rebuilt
-            if element.page_number == page.page_number
-        ]
-    manifest.summary.element_count = len(rebuilt)
-    manifest.summary.element_types = dict(
-        Counter(element.type for element in rebuilt)
-    )
-
-
-def _remap_references(
-    manifest: ProcessingManifest,
-    mapping: dict[str, list[str]],
-) -> None:
-    """Point obligation, observation and parent references at the surviving ids.
-
-    A split maps the source id to the source plus its parts; a join maps each
-    dropped id to the element that now carries its text. References are kept in
-    order and deduplicated, so an obligation never points at an element that is
-    no longer in the manifest.
-    """
-    def remapped(ids: list[str]) -> list[str]:
-        out: list[str] = []
-        for element_id in ids:
-            for replacement in mapping.get(element_id, [element_id]):
-                if replacement not in out:
-                    out.append(replacement)
-        return out
-
-    for obligation in manifest.obligations:
-        obligation.target_ids = remapped(obligation.target_ids)
-    for observation in manifest.observations:
-        observation.target_ids = remapped(observation.target_ids)
-    for element in manifest.elements:
-        replacements = mapping.get(element.parent_id or "")
-        if replacements:
-            element.parent_id = replacements[0]
-
-
-def _unique_element_id(base: str, known: set[str]) -> str:
-    """``base``, or ``base-N`` when another element already owns it."""
-    candidate = base
-    suffix = 2
-    while candidate in known:
-        candidate = f"{base}-{suffix}"
-        suffix += 1
-    known.add(candidate)
-    return candidate
-
-
 def _handle_extract_line_numbers_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -564,43 +495,6 @@ def _handle_extract_line_numbers_method(
     )
 
 
-def _chunk_provenance(
-    element: ManifestElement, parts: list[int]
-) -> list[list[Provenance]]:
-    """Provenance of each verse chunk, with the source box split by its lines.
-
-    The first provenance entry carries the box; the others belong to the same
-    source element and stay on the first chunk. Character offsets are dropped
-    because each chunk now covers a different span.
-    """
-    if not element.provenance:
-        return [[] for _ in parts]
-    base = element.provenance[0]
-    if base.bbox is None:
-        boxes: list[Any] = [None] * len(parts)
-    else:
-        boxes = split_box_rows(
-            (base.bbox.left, base.bbox.top, base.bbox.right, base.bbox.bottom),
-            parts,
-        )
-    split: list[list[Provenance]] = []
-    for box in boxes:
-        update: dict[str, Any] = {"char_start": None, "char_end": None}
-        if box is not None and base.bbox is not None:
-            update["bbox"] = BoundingBox(
-                left=box[0],
-                top=box[1],
-                right=box[2],
-                bottom=box[3],
-                coord_origin=base.bbox.coord_origin,
-            )
-        split.append([base.model_copy(deep=True, update=update)])
-    extra = [entry.model_copy(deep=True) for entry in element.provenance[1:]]
-    if split and extra:
-        split[0].extend(extra)
-    return split
-
-
 def _split_verse_element(
     element: ManifestElement,
     manifest: ProcessingManifest,
@@ -620,7 +514,7 @@ def _split_verse_element(
         return None
 
     chunks = [str(block.get("md") or "") for block in blocks]
-    provenance = _chunk_provenance(
+    provenance = split_provenance(
         element, [chunk.count("\n") + 1 for chunk in chunks]
     )
     count = len(chunks)
@@ -642,7 +536,7 @@ def _split_verse_element(
             element.model_copy(
                 deep=True,
                 update={
-                    "id": _unique_element_id(
+                    "id": unique_element_id(
                         f"{element.id}-verse-{index}", known_ids
                     ),
                     "text": chunk,
@@ -691,8 +585,8 @@ def _handle_chunk_verse_method(
             validated=False,
             message="Nenhum bloco de verso elegível para fragmentação",
         )
-    _replace_elements(manifest, replacements)
-    _remap_references(manifest, expansion)
+    replace_elements(manifest, replacements)
+    remap_references(manifest, expansion)
     return MethodResult(
         success=True,
         validated=True,
@@ -823,7 +717,10 @@ def _handle_tailjoin_method(
     # Every page is validated before anything changes, so a mismatch on a later
     # page never leaves an earlier one half-joined.
     for survivor, joined_text, removed in pending:
+        tail = [survivor, *removed]
+        provenance = joined_provenance(tail, joined_text)
         survivor.text = joined_text
+        survivor.provenance = provenance
         survivor.metadata["tailjoined"] = True
         survivor.metadata["tailjoin_sources"] = sorted(
             element.id for element in removed
@@ -832,8 +729,8 @@ def _handle_tailjoin_method(
             replacements[element.id] = []
             dropped[element.id] = [survivor.id]
 
-    _replace_elements(manifest, replacements)
-    _remap_references(manifest, dropped)
+    replace_elements(manifest, replacements)
+    remap_references(manifest, dropped)
     return MethodResult(
         success=True,
         validated=True,

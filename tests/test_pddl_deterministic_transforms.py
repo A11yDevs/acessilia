@@ -123,6 +123,58 @@ class TestLineNumbersReachTheManifest:
         assert "line_numbers" not in element.metadata
 
 
+class TestPageMembershipSurvivesTheTransforms:
+    def test_an_element_owned_by_the_page_without_page_number_stays_in_the_payload(
+        self, tmp_path
+    ) -> None:
+        stable = _element("el-1", "paragraph", text="Texto estavel da pagina.")
+        stable.page_number = None
+        verse = _element("el-2", "paragraph", text=_VERSE_TEXT, reading_order=2)
+        verse.page_number = None
+        manifest = _manifest(
+            [stable, verse],
+            [_obligation("chunk-verse", ["el-2"], ["verse-chunker"])],
+        )
+
+        result = _handle_chunk_verse_method(manifest, "o-1")
+
+        assert result.success is True
+        # The page owned el-1 through element_ids, not through page_number.
+        assert manifest.pages[0].element_ids == ["el-1", "el-2", "el-2-verse-1"]
+        texts = [
+            block["text"]
+            for page in _payload(tmp_path, manifest)["pages"]
+            for block in page["blocks"]
+        ]
+        assert "Texto estavel da pagina." in texts
+        _assert_manifest_is_valid(manifest)
+
+    def test_a_page_member_without_page_number_survives_the_join(
+        self, tmp_path
+    ) -> None:
+        body = _element("el-1", "paragraph", text=_TAIL_BODY, reading_order=1)
+        header = _element("el-2", "paragraph", text="Capitulo 1", reading_order=2)
+        number = _element("el-3", "paragraph", text="42", reading_order=3)
+        for element in (body, header, number):
+            element.page_number = None
+        manifest = _manifest(
+            [body, header, number],
+            [_obligation("join-tail-blocks", ["el-2", "el-3"], ["tailjoin"])],
+        )
+
+        result = _handle_tailjoin_method(manifest, "o-1")
+
+        assert result.success is True
+        assert manifest.pages[0].element_ids == ["el-1", "el-2"]
+        texts = [
+            block["text"]
+            for page in _payload(tmp_path, manifest)["pages"]
+            for block in page["blocks"]
+        ]
+        assert texts == [_TAIL_BODY, "Capitulo 1 42"]
+        _assert_manifest_is_valid(manifest)
+
+
 class TestVerseChunksReachTheManifest:
     def test_the_chunks_replace_the_element_in_the_payload(self, tmp_path) -> None:
         element = _element("el-1", "paragraph", text=_VERSE_TEXT)
@@ -203,6 +255,42 @@ class TestTailJoinReachesTheManifest:
 
         blocks = _payload(tmp_path, manifest)["pages"][0]["blocks"]
         assert [block["text"] for block in blocks] == [_TAIL_BODY, "Capitulo 1 42"]
+
+    def test_the_joined_element_keeps_the_provenance_of_the_dropped_ones(self) -> None:
+        header_box = BoundingBox(
+            left=100, top=10, right=200, bottom=20, coord_origin="TOPLEFT"
+        )
+        number_box = BoundingBox(
+            left=280, top=790, right=310, bottom=800, coord_origin="TOPLEFT"
+        )
+        body = _element("el-1", "paragraph", text=_TAIL_BODY, reading_order=1)
+        header = _element("el-2", "paragraph", text="Header", reading_order=2)
+        header.provenance = [
+            Provenance(page_number=1, bbox=header_box, char_start=0, char_end=6)
+        ]
+        number = _element("el-3", "paragraph", text="42", reading_order=3)
+        number.provenance = [
+            Provenance(page_number=1, bbox=number_box, char_start=0, char_end=2)
+        ]
+        manifest = _manifest(
+            [body, header, number],
+            [_obligation("join-tail-blocks", ["el-2", "el-3"], ["tailjoin"])],
+        )
+
+        result = _handle_tailjoin_method(manifest, "o-1")
+
+        assert result.success is True
+        survivor = manifest.elements[1]
+        assert survivor.text == "Header 42"
+        assert [entry.bbox for entry in survivor.provenance] == [
+            header_box,
+            number_box,
+        ]
+        # The spans move with the text instead of pointing into either source.
+        assert [
+            (entry.char_start, entry.char_end) for entry in survivor.provenance
+        ] == [(0, 6), (7, 9)]
+        _assert_manifest_is_valid(manifest)
 
     def test_it_fails_when_the_targets_are_not_the_page_tail(self) -> None:
         manifest = self._manifest(["el-3"])
