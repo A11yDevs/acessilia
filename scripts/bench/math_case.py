@@ -26,10 +26,13 @@ not an official evaluation.
 for a change that should not alter them (a refactoring, ADR-0017's parity of
 the formula chain): every formula's LaTeX, MathML, spoken form, recognition
 method and text layer, the inline expressions, the block structure and the
-technical warnings. What a vision model wrote (a formula it read, a picture's
-description, a table the data agent read again from its image) may differ
-between any two runs, so those differences are listed apart; the command
-exits with 1 only for the others.
+technical warnings. What a vision model wrote may differ between any two runs,
+so those differences are listed apart: the LaTeX of a formula it read (and
+what the core derives from that LaTeX, when the LaTeX differs), a description
+the picture stage marks as the model's, and a table the data agent read again
+from its image. Everything else is a difference, and the command exits with 1:
+the recognition method, a fallback alt text, the block structure and the
+technical warnings count even when a vision model's answer caused them.
 """
 
 from __future__ import annotations
@@ -618,6 +621,16 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
 
 #: The fields of a formula block that ``compare`` checks.
 FORMULA_FIELDS = ("text", "mathml", "alt_text", "method", "text_agreement", "text_layer", "equation_number")
+#: Fields the core derives from a formula's LaTeX: for a formula a vision model
+#: read, they may differ only when the LaTeX itself differs.
+DERIVED_FORMULA_FIELDS = frozenset({"mathml", "alt_text", "text_agreement", "equation_number"})
+#: Metadata the picture stage records on a description a vision model wrote.
+VISION_DESCRIPTION_KEYS = ("vision_description_complete", "vision_confidence")
+
+
+def _described_by_vision(block: dict[str, Any]) -> bool:
+    metadata = block.get("metadata") or {}
+    return any(key in metadata for key in VISION_DESCRIPTION_KEYS)
 
 
 def _formula_view(block: dict[str, Any]) -> dict[str, Any]:
@@ -696,24 +709,36 @@ def compare_documents(base: dict[str, Any], candidate: dict[str, Any]) -> Compar
         old = _formula_view(base_math[index]) if index < len(base_math) else {}
         new = _formula_view(candidate_math[index]) if index < len(candidate_math) else {}
         where = f"formula {index + 1} (p. {old.get('page', new.get('page'))})"
-        # A formula a vision model read (on either side) may read differently in any run.
+        # What a vision model read (on either side) may differ in any run: its
+        # LaTeX, and what the core derives from that LaTeX when it differs.
+        # The method and the text layer are the core's and the extractor's.
         by_vision = "vision" in (old.get("method"), new.get("method"))
+        read_differently = by_vision and old.get("text") != new.get("text")
         for name in FORMULA_FIELDS:
-            note(where, name, old.get(name), new.get(name), vision=by_vision)
+            vision = by_vision if name == "text" else (
+                read_differently and name in DERIVED_FORMULA_FIELDS
+            )
+            note(where, name, old.get(name), new.get(name), vision=vision)
 
     for index, (old, new) in enumerate(zip(base_blocks, candidate_blocks), start=1):
         where = f"block {index} ({old.get('type')}, p. {_page(old)})"
+        if old.get("type") == "math":
+            continue
         if old.get("type") == "image":
-            note(where, "alt_text", old.get("alt_text"), new.get("alt_text"), vision=True)
-        elif old.get("type") == "table":
+            # A description is the model's only when the picture stage says so;
+            # a fallback alt text is the core's.
+            described = any(_described_by_vision(b) for b in (old, new))
+            note(where, "alt_text", old.get("alt_text"), new.get("alt_text"), vision=described)
+            continue
+        if old.get("type") == "table":
             # A table the data agent read again from its image (table_review)
             # holds what a vision model wrote, on whichever side it was.
             reviewed = any("table_review" in (b.get("metadata") or {}) for b in (old, new))
+            note(where, "shape", _table_shape(old), _table_shape(new), vision=reviewed)
             note(where, "cells", _table_cells(old), _table_cells(new), vision=reviewed)
-        elif old.get("type") != "math":
-            note(where, "inline math", [s for x in _block_texts(old) for s in _inline_spans(x)],
-                 [s for x in _block_texts(new) for s in _inline_spans(x)])
-            note(where, "text", _block_texts(old), _block_texts(new))
+        note(where, "inline math", [s for x in _block_texts(old) for s in _inline_spans(x)],
+             [s for x in _block_texts(new) for s in _inline_spans(x)])
+        note(where, "text", _block_texts(old), _block_texts(new))
     return result
 
 

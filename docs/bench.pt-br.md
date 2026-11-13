@@ -160,13 +160,23 @@ uv run python -m scripts.bench.math_case compare base/canonical.json candidate/c
 
 Ele compara, de cada fórmula, o LaTeX, o MathML, a forma falada, o método de
 reconhecimento, a concordância com a camada de texto, a camada de texto e o
-número da equação; de cada bloco, as expressões inline e o texto; as células
-das tabelas, a estrutura dos blocos e os avisos técnicos. Sai com 1 quando há
-diferença. Uma fórmula lida por um modelo de visão, a descrição de uma imagem
-e uma tabela que o agente de dados releu pela imagem (`table_review`) podem
-diferir entre duas execuções quaisquer: aparecem à parte e não
-reprovam a comparação. Rode a base duas vezes para ver quanto disso acontece
-sozinho.
+número da equação; de cada bloco, tabelas incluídas, o texto e as expressões
+inline; de cada tabela, a forma e as células; a estrutura dos blocos; e os
+avisos técnicos. Sai com 1 quando há diferença.
+
+O que um modelo de visão escreveu pode diferir entre duas execuções
+quaisquer, então aparece à parte e não reprova a comparação:
+- o LaTeX de uma fórmula que ele leu, e o que o core deriva desse LaTeX
+  (MathML, forma falada, concordância, número da equação) só quando o próprio
+  LaTeX difere;
+- a descrição de uma imagem que a etapa de imagens marca como do modelo
+  (`vision_description_complete`, `vision_confidence`);
+- uma tabela que o agente de dados releu pela imagem (`table_review`).
+
+Todo o resto conta, mesmo quando a resposta de um modelo de visão o causou: o
+método de reconhecimento, um texto alternativo de fallback, a estrutura dos
+blocos (uma fórmula que o modelo tomou por imagem) e os avisos técnicos.
+Inspecione esses casos. Rode a base duas vezes para ver quanto varia sozinho.
 
 O core e a Toolbox guardam resultados pelo hash da fonte, não pelo código que
 os produziu, então cada execução precisa de uma fonte que nenhuma execução

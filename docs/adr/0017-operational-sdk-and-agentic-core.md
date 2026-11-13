@@ -144,15 +144,18 @@ The three conditions above held on 2026-11-13:
 
 - **The SDK runs the chain without the core.** `acessilia_sdk.operations.formula`
   (#504) has a step per capability. `python -m acessilia_sdk formula` runs it
-  from the SDK's own wheel, and the `SDK alone` CI job installs only docstruct
-  next to it.
+  from the SDK's own wheel, and the `SDK alone` CI job installs docstruct as
+  its only project dependency (with the SDK's test tools).
 - **The core reuses it and keeps its decisions.** The core's formula crop and
   recognition (#507) and its MathML and speech (#509) call the operation's
   steps. Differential tests of develop's code against the new code found no
-  difference for any answer inside the Toolbox's contract: 2,520 crop and 738
-  recognition cases, and 360–420 conversion and speech cases. The one declared
-  change concerns answers outside the contract, which now report an
-  unavailable capability.
+  difference for any answer inside the Toolbox's contract: 2,520 crop cases;
+  738 recognition cases, compared at the value the enrichment consumes
+  (develop's answer after the ranking its enrichment applied, against the
+  SDK step's ranked answer, since the wrapper now returns it ranked); and
+  420 conversion and speech cases (14 answer shapes). The one declared change
+  concerns answers outside the contract, which now report an unavailable
+  capability.
 - **Case 036 matches before and after.** develop before the change (731a1bfb)
   and after it (dcc8cbfa) processed case 036 against the same Toolbox and
   vision model, each with a fresh source hash (#511). `math_case compare` found
@@ -192,8 +195,9 @@ The three conditions above held on 2026-11-13:
     per capability, so each obligation still fails on its own; an answer
     outside the contract is now an unavailable capability, not a formula
     without that text, so the rest of the document skips that capability,
-    as after an outage (a broken answer is taken for a broken provider). The
-    comparison of case 036's manifests follows;
+    as after an outage (a broken answer is taken for a broken provider).
+    Case 036's manifests were compared on acceptance (#511, see *Acceptance
+    evidence*): done;
   - the other operations of the inventory, one per pull request, each with
     characterization and a comparison of the manifests before and after.
 - **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into
@@ -222,7 +226,7 @@ The three conditions above held on 2026-11-13:
   - the infrastructure test of docstruct (new);
   - a review item: an SDK operation has no decision it could take differently
     for another caller.
-- **On acceptance:**
+- **On acceptance** (done in #511):
   - ADR-0002 gets an "Amended by ADR-0017" line, and its SDK row and its four
     questions point here;
   - ADR-0003 gets a "Clarified by ADR-0017" line.

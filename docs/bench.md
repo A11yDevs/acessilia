@@ -154,13 +154,23 @@ uv run python -m scripts.bench.math_case compare base/canonical.json candidate/c
 ```
 
 It compares every formula's LaTeX, MathML, spoken form, recognition method,
-text agreement, text layer and equation number, the inline expressions and
-text of each block, the table cells, the block structure and the technical
-warnings, and exits with 1 on a difference. A formula a vision model read, a
-picture's description and a table the data agent read again from its image
-(`table_review`) may differ between any two runs: they are listed
-apart and do not fail the comparison. Run the base twice to see how much of
-that happens on its own.
+text agreement, text layer and equation number; the text and inline
+expressions of each block, tables included; each table's shape and cells; the
+block structure; and the technical warnings. It exits with 1 on a difference.
+
+What a vision model wrote may differ between any two runs, so it is listed
+apart and does not fail the comparison:
+- the LaTeX of a formula it read, and what the core derives from that LaTeX
+  (MathML, spoken form, text agreement, equation number) only when the LaTeX
+  itself differs;
+- a picture's description that the picture stage marks as the model's
+  (`vision_description_complete`, `vision_confidence`);
+- a table the data agent read again from its image (`table_review`).
+
+Everything else counts, even when a vision model's answer caused it: the
+recognition method, a fallback alt text, the block structure (a formula the
+model took for a picture) and the technical warnings. Inspect those. Run the
+base twice to see how much varies on its own.
 
 The core and the Toolbox cache results by the source's hash, not by the code
 that produced them, so each run needs a source no run has seen: append a

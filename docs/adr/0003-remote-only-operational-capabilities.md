@@ -6,6 +6,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Date:** 2026-10-18
 - **Components:** core, SDK, Toolbox
 - **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Clarified by:** [ADR-0017](0017-operational-sdk-and-agentic-core.md) (an SDK operation may compose remote capabilities; that does not change the `remote_only` policy, and the SDK still runs no heavy capability locally)
 
 ## Context
 

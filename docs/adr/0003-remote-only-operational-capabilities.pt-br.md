@@ -6,6 +6,7 @@ Também disponível em **inglês (EUA)**: [English version](0003-remote-only-ope
 - **Data:** 2026-10-18
 - **Componentes:** core, SDK, Toolbox
 - **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Esclarecida pela:** [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) (uma operação do SDK pode compor capacidades remotas; isso não muda a política `remote_only`, e o SDK continua sem rodar localmente nenhuma capacidade pesada)
 
 ## Contexto
 
