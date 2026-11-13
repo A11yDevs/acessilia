@@ -16,6 +16,7 @@ from backend.pipeline.validators import validate_canonical_document
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+from backend.core.pipeline.handlers import formula as formula_handlers
 
 FAKE_MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>E</mi></math>'
 
@@ -32,7 +33,6 @@ def _unavailable(capability):
 @pytest.fixture
 def toolbox_math(monkeypatch):
     """Simula math.convert e math.verbalize no builder canônico e no PDDL."""
-    from backend.agents import pddl_orchestrator
     from backend.pipeline import canonical_builder
 
     calls = {"convert": [], "verbalize": []}
@@ -45,7 +45,7 @@ def toolbox_math(monkeypatch):
         calls["verbalize"].append(latex)
         return "maiúscula e é igual a, m c ao quadrado"
 
-    for module in (canonical_builder, pddl_orchestrator):
+    for module in (canonical_builder, formula_handlers):
         monkeypatch.setattr(module, "toolbox_convert_latex", convert)
         monkeypatch.setattr(module, "toolbox_verbalize_latex", verbalize)
     return calls
@@ -219,7 +219,7 @@ def test_an_answer_outside_the_contract_turns_the_capability_off_for_the_documen
 
 
 def test_an_answer_outside_the_contract_fails_the_mathml_handler(respx_mock):
-    from backend.agents.pddl_orchestrator import _handle_mathml_method
+    from backend.core.pipeline.handlers.formula import _handle_mathml_method
 
     convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
     manifest = _manifest_with_formulas("x=1", "y=2")
@@ -343,7 +343,7 @@ def _manifest_with_formula():
 
 
 def test_pddl_mathml_handler_enriches_formula_element(toolbox_math):
-    from backend.agents.pddl_orchestrator import _handle_mathml_method
+    from backend.core.pipeline.handlers.formula import _handle_mathml_method
 
     manifest = _manifest_with_formula()
     result = _handle_mathml_method(manifest, "o-f")
@@ -354,7 +354,7 @@ def test_pddl_mathml_handler_enriches_formula_element(toolbox_math):
 
 
 def test_pddl_latex_verbalizer_handler(toolbox_math):
-    from backend.agents.pddl_orchestrator import _handle_latex_verbalizer_method
+    from backend.core.pipeline.handlers.formula import _handle_latex_verbalizer_method
 
     manifest = _manifest_with_formula()
     result = _handle_latex_verbalizer_method(manifest, "o-f")
@@ -375,11 +375,9 @@ def test_pddl_latex_verbalizer_handler(toolbox_math):
 def test_pddl_handlers_fail_explicitly_when_capability_unavailable(
     monkeypatch, handler, patched, capability
 ):
-    from backend.agents import pddl_orchestrator
-
-    monkeypatch.setattr(pddl_orchestrator, patched, _unavailable(capability))
+    monkeypatch.setattr(formula_handlers, patched, _unavailable(capability))
     manifest = _manifest_with_formula()
-    result = getattr(pddl_orchestrator, handler)(manifest, "o-f")
+    result = getattr(formula_handlers, handler)(manifest, "o-f")
 
     assert not result.success
     assert capability in result.message
@@ -387,17 +385,15 @@ def test_pddl_handlers_fail_explicitly_when_capability_unavailable(
 
 
 def test_pddl_mathml_handler_rejected_formula_is_partial(monkeypatch, toolbox_math):
-    from backend.agents import pddl_orchestrator
-
-    monkeypatch.setattr(pddl_orchestrator, "toolbox_convert_latex", lambda latex: "")
-    result = pddl_orchestrator._handle_mathml_method(_manifest_with_formula(), "o-f")
+    monkeypatch.setattr(formula_handlers, "toolbox_convert_latex", lambda latex: "")
+    result = formula_handlers._handle_mathml_method(_manifest_with_formula(), "o-f")
 
     assert not result.success
     assert "0/1" in result.message
 
 
 def test_pddl_handlers_fail_for_unknown_obligation():
-    from backend.agents.pddl_orchestrator import _handle_mathml_method
+    from backend.core.pipeline.handlers.formula import _handle_mathml_method
 
     manifest = _manifest_with_formula()
     result = _handle_mathml_method(manifest, "o-inexistente")
@@ -495,12 +491,10 @@ def _manifest_with_formulas(*texts):
 def test_pddl_handlers_send_a_variable_product_as_a_product(toolbox_math, handler, capability):
     """h is a variable of the document (h \\neq 0), s a function (s(t)): only
     h( gets U+2062, so MathCAT says "h vezes", not "h de"."""
-    from backend.agents import pddl_orchestrator
-
     texts = (r"h \neq 0", r"\frac{h(12 + 6h + h^2)}{h}", r"s(t) = t^3")
     manifest = _manifest_with_formulas(*texts)
 
-    assert getattr(pddl_orchestrator, handler)(manifest, "o-f").success
+    assert getattr(formula_handlers, handler)(manifest, "o-f").success
 
     assert toolbox_math[capability] == [
         r"h \neq 0", r"\frac{h" + IT + r"(12 + 6h + h^2)}{h}", r"s(t) = t^3"
@@ -539,7 +533,6 @@ def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math)
 ])
 def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, handler, capability):
     from copy import deepcopy
-    from backend.agents import pddl_orchestrator as orchestrator
     from backend.core.manifest.models import ManifestElement
     from backend.core.pipeline.elements import _element_to_block, _text_kept_by_picture
     from docstruct.canonical import _math_sources
@@ -578,7 +571,7 @@ def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, ha
                       for kept in _text_kept_by_picture(element))
     expected = frozenset() if kind in {'described_picture', 'code'} else frozenset({'h'})
     assert implicit_product_variables(_math_sources([{'blocks': blocks}])) == expected
-    assert orchestrator._implicit_product_variables(manifest) == expected
+    assert formula_handlers._implicit_product_variables(manifest) == expected
     assert manifest == before
-    assert getattr(orchestrator, handler)(manifest, 'o-f').success
+    assert getattr(formula_handlers, handler)(manifest, 'o-f').success
     assert toolbox_math[capability] == ['h' + (IT if expected else '') + '(1+h)']
