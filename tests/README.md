@@ -45,13 +45,17 @@ Tests marked with `-m e2e` are excluded from CI and need a live environment:
 # Toolbox only (existing suite)
 TOOLBOX_BASE_URL=https://toolbox.example/toolbox \
 TOOLBOX_API_KEY="$TOOLBOX_API_KEY" \
-uv run pytest -m e2e -v
+uv run pytest -m e2e -v --timeout=900
 
 # Deployed core API as well (tests/test_core_api_e2e.py)
 CORE_BASE_URL=https://core.example/api/v1 \
 CORE_EXPECT_BUILD_INFO=1 \
-uv run pytest -m e2e -v
+uv run pytest -m e2e -v --timeout=900
 ```
+
+`--timeout=900` overrides the suite-wide 180-second limit: E2E operations can
+take up to 300 seconds and a core job wait up to 600. The scheduled E2E job uses
+the same value.
 
 The `Scheduled test monitoring` workflow runs the E2E suite weekly when the
 repository variables `TOOLBOX_BASE_URL` or `CORE_BASE_URL` are configured. It
