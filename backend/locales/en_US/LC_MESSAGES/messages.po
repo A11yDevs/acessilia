@@ -556,6 +556,9 @@ msgstr "✅ Temp dir: ok"
 msgid "⚠️ Temp dir: missing"
 msgstr "⚠️ Temp dir: missing"
 
+msgid "⛔ This command is restricted to operators."
+msgstr "⛔ This command is restricted to operators."
+
 #, python-brace-format
 msgid "🧹 Cache cleared! {count} file(s) removed."
 msgstr "🧹 Cache cleared! {count} file(s) removed."
@@ -636,6 +639,9 @@ msgstr "Log file not found"
 
 msgid "Observability access not configured"
 msgstr "Observability access not configured"
+
+msgid "Operations access not configured"
+msgstr "Operations access not configured"
 
 msgid "Invalid token"
 msgstr "Invalid token"

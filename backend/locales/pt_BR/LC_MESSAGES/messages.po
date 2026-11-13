@@ -572,6 +572,9 @@ msgstr "✅ Pasta temporária: ok"
 msgid "⚠️ Temp dir: missing"
 msgstr "⚠️ Pasta temporária: ausente"
 
+msgid "⛔ This command is restricted to operators."
+msgstr "⛔ Este comando é restrito a operadores."
+
 #, python-brace-format
 msgid "🧹 Cache cleared! {count} file(s) removed."
 msgstr "🧹 Cache limpo! {count} arquivo(s) removido(s)."
@@ -652,6 +655,9 @@ msgstr "Log não encontrado"
 
 msgid "Observability access not configured"
 msgstr "Acesso de observabilidade não configurado"
+
+msgid "Operations access not configured"
+msgstr "Acesso de operações não configurado"
 
 msgid "Invalid token"
 msgstr "Token inválido"

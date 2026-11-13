@@ -146,3 +146,24 @@ async def test_invalid_submission_receipt_does_not_enter_token_cache(tmp_path, r
         await client.submit_job(source, "doc.pdf")
     assert raised.value.status_code == 502
     assert not client._job_tokens
+
+
+@respx.mock
+async def test_clear_cache_sends_the_operations_token():
+    route = respx.post(f"{BASE}/api/v1/cache/clear").mock(
+        return_value=httpx.Response(200, json={"removed": 3})
+    )
+    client = ApiClient(base_url=BASE, operations_token="ops-secret")
+
+    assert await client.clear_cache() == 3
+    assert route.calls[0].request.headers["Authorization"] == "Bearer ops-secret"
+
+
+@respx.mock
+async def test_clear_cache_without_a_token_sends_no_authorization():
+    route = respx.post(f"{BASE}/api/v1/cache/clear").mock(
+        return_value=httpx.Response(200, json={"removed": 0})
+    )
+
+    assert await ApiClient(base_url=BASE).clear_cache() == 0
+    assert "Authorization" not in route.calls[0].request.headers

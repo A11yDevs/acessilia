@@ -29,10 +29,12 @@ class ApiClient:
         timeout: float = 60.0,
         api_key: str | None = None,
         observability_token: str | None = None,
+        operations_token: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._observability_token = observability_token
+        self._operations_token = operations_token
         self._job_tokens: OrderedDict[str, str] = OrderedDict()
         self._headers: dict[str, str] = {}
         if api_key:
@@ -183,17 +185,35 @@ class ApiClient:
         self._raise_for_status(response)
         return self._json_object(response)
 
+    async def clear_cache(self) -> int:
+        """Clear the server's published processing cache; returns entries removed."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                self._url("/cache/clear"), headers=self._operations_headers()
+            )
+        self._raise_for_status(response)
+        return int(self._json_object(response).get("removed", 0))
+
     def _admin_headers(self) -> dict[str, str]:
         headers = dict(self._headers)
         if self._observability_token:
             headers["Authorization"] = f"Bearer {self._observability_token}"
         return headers
 
+    def _operations_headers(self) -> dict[str, str]:
+        headers = dict(self._headers)
+        if self._operations_token:
+            headers["Authorization"] = f"Bearer {self._operations_token}"
+        return headers
+
 
 def get_default_client() -> ApiClient:
     from backend.config.settings import settings
 
-    return ApiClient(base_url=settings.api_base_url)
+    return ApiClient(
+        base_url=settings.api_base_url,
+        operations_token=settings.operations_api_token,
+    )
 
 
 default_client = get_default_client()

@@ -161,6 +161,8 @@ MSG_STATUS_PROCESSING_FAILED: str = ("❌ Error during processing.")
 
 
 
+#: Reply to an operator-only command from a user who is not in TELEGRAM_ADMIN_IDS.
+MSG_ADMIN_ONLY: str = "⛔ This command is restricted to operators."
 #: Cache cleared reply; {count} is the number of files deleted from cache storage.
 MSG_CACHE_CLEARED: str = ("🧹 Cache cleared! {count} file(s) removed.")
 #: Disk free space probe line; {free_gb} is formatted at call time with one decimal.

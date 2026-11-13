@@ -80,6 +80,8 @@ No `.env` do ambiente (copiado de [.env.example](../.env.example)), as variávei
 | `MAX_FILE_SIZE_MB` | Tamanho máximo de arquivo aceito. Veja o limite de 20 MB do Telegram na [seção 5](#5-limitações-conhecidas). | `50` |
 | `REQUEST_TIMEOUT` | Tempo máximo, em segundos, que o bot acompanha uma tarefa antes de avisar que ela demorou demais. | `3600` |
 | `I18N_LOCALES_ACTIVE` | Idiomas em que o bot pode responder. Ele responde no idioma do aplicativo de cada usuário, se estiver nesta lista. | `en_US,pt_BR` |
+| `TELEGRAM_ADMIN_IDS` | Ids do Telegram autorizados a rodar os comandos de operador `/health` e `/limpar`. Vazio nega a todos. | `123456789,987654321` |
+| `OPERATIONS_API_TOKEN` | Token Bearer que o bot envia para `POST /api/v1/cache/clear`. Precisa ser igual ao valor da API. Vazio desabilita a rota. | uma string longa aleatória |
 
 ### 1.4 Iniciar e confirmar que o bot subiu
 
@@ -167,9 +169,11 @@ Cada comando tem um nome em português e um alias em inglês. Os dois funcionam 
 | `/cancelar` | `/cancel` | Cancela a sua última tarefa neste chat. |
 | `/desativar` | `/deactivate` | Pausa o bot **no chat inteiro**: ele passa a responder só que está pausado. |
 | `/ativar` | `/activate` | Tira a pausa. |
-| `/health` | — | Verifica API, modelo e disco. |
+| `/health` | — | Somente operador: verifica API, modelo e disco (o remetente precisa estar em `TELEGRAM_ADMIN_IDS`). |
 | `/feedback` | — | Pede um texto livre de opinião e o registra no servidor. |
-| `/limpar` | `/clear` | Apaga o cache de processamento do **servidor**, para todos os usuários. Uso de operador; hoje qualquer usuário consegue executá-lo ([#395](https://github.com/A11yDevs/acessilia/issues/395)). |
+| `/limpar` | `/clear` | Somente operador: apaga o cache de processamento do **servidor** via `POST /api/v1/cache/clear`. Exige o remetente em `TELEGRAM_ADMIN_IDS` e `OPERATIONS_API_TOKEN` configurado na API e no bot. |
+
+`/health` e `/limpar` são comandos de operador: o bot responde `⛔ Este comando é restrito a operadores.` a qualquer outra pessoa. Configure os ids permitidos em `TELEGRAM_ADMIN_IDS` (separados por vírgula).
 
 Observações:
 

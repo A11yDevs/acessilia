@@ -40,8 +40,11 @@ Definida em [backend/api/app.py](../backend/api/app.py), com as rotas em [backen
 | GET | `/api/v1/health` | Checagem de saúde e conectividade do modelo. | JSON `{status, model_client, model_name, model_reachable, queue_size}`. | 30/min |
 | GET | `/api/v1/logs` | Lista os arquivos de log retidos pela aplicação. Requer `Authorization: Bearer <OBSERVABILITY_API_TOKEN>`. | JSON `{files: [{name, size_bytes}]}`. | 30/min |
 | GET | `/api/v1/logs/{filename}` | Baixa um arquivo de log completo, inclusive arquivos `.zip` de dias anteriores. Requer o mesmo token. | Arquivo para download; `404` se não existir. | 30/min |
+| POST | `/api/v1/cache/clear` | Remove as entradas publicadas do cache de processamento. Requer `Authorization: Bearer <OPERATIONS_API_TOKEN>`. | JSON `{removed}`. | 10/min |
 
 `OBSERVABILITY_API_TOKEN` é uma senha de leitura definida no `.env` para histórico, estatísticas e logs; vazio, elas ficam desabilitadas. Envie-a no cabeçalho, por exemplo: `curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:8000/api/v1/logs`. Use HTTPS ou uma rede privada para não expor a senha e o conteúdo. As rotas de logs servem apenas arquivos `bot_*` em `LOGS_DIR`, dentro da retenção configurada pelo logger (30 dias). Ferramentas de análise podem baixar os arquivos e processá-los sem depender de uma stack específica. Os logs de acesso do Uvicorn continuam disponíveis em `docker compose logs`.
+
+`OPERATIONS_API_TOKEN` é uma senha com permissão de escrita definida no `.env` para operações privilegiadas; vazio, a rota fica desabilitada. Credenciais inválidas ou ausentes retornam 401. O bot do Telegram chama essa rota apenas para os operadores listados em `TELEGRAM_ADMIN_IDS` (veja [telegram.pt-br.md](telegram.pt-br.md#23-comandos)).
 
 Observações:
 

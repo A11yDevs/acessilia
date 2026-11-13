@@ -244,6 +244,60 @@ def test_logs_declare_bearer_auth_in_openapi(client):
     ]
 
 
+def test_cache_clear_requires_configured_operations_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "operations_api_token", "")
+    monkeypatch.setenv("LOCALE", "en_US")
+    resp_en = client.post("/api/v1/cache/clear")
+    assert resp_en.status_code == 503
+    assert resp_en.json()["detail"] == "Operations access not configured"
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    resp_pt = client.post("/api/v1/cache/clear")
+    assert resp_pt.status_code == 503
+    from backend.i18n import t
+    from backend.log_messages import API_OPERATIONS_NOT_CONFIGURED
+
+    assert resp_pt.json()["detail"] == t(API_OPERATIONS_NOT_CONFIGURED)
+
+
+def test_cache_clear_requires_the_bearer_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "operations_api_token", "secret")
+
+    assert client.post("/api/v1/cache/clear").status_code == 401
+    assert (
+        client.post(
+            "/api/v1/cache/clear", headers={"Authorization": "Bearer wrong"}
+        ).status_code
+        == 401
+    )
+
+
+def test_cache_clear_calls_the_service_and_reports_the_count(client, monkeypatch):
+    monkeypatch.setattr(settings, "operations_api_token", "secret")
+    calls: list[bool] = []
+
+    async def clear() -> int:
+        calls.append(True)
+        return 3
+
+    monkeypatch.setattr("backend.api.routes.operations.clear_cache", clear)
+
+    response = client.post(
+        "/api/v1/cache/clear", headers={"Authorization": "Bearer secret"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"removed": 3}
+    assert calls == [True]
+
+
+def test_cache_clear_declares_bearer_auth_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+    assert schema["paths"]["/api/v1/cache/clear"]["post"]["security"] == [
+        {"OperationsToken": []}
+    ]
+
+
 def test_observability_token_cannot_authorize_writes(monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "secret")
     request = Request({"type": "http", "method": "POST"})

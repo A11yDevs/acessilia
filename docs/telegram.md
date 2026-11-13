@@ -80,6 +80,8 @@ In the environment's `.env` (copied from [.env.example](../.env.example)), these
 | `MAX_FILE_SIZE_MB` | Largest file accepted. See Telegram's 20 MB limit in [section 5](#5-known-limitations). | `50` |
 | `REQUEST_TIMEOUT` | How long, in seconds, the bot follows a task before reporting that it took too long. | `3600` |
 | `I18N_LOCALES_ACTIVE` | Languages the bot may answer in. It answers in each user's app language when that language is listed here. | `en_US,pt_BR` |
+| `TELEGRAM_ADMIN_IDS` | Telegram ids allowed to run the operator commands `/health` and `/limpar`. Empty denies everyone. | `123456789,987654321` |
+| `OPERATIONS_API_TOKEN` | Bearer token the bot sends to `POST /api/v1/cache/clear`. It must match the API's value. Empty disables the route. | a long random string |
 
 ### 1.4 Start the bot and confirm it is up
 
@@ -167,9 +169,11 @@ Each command has a Portuguese name and an English alias. Both work in any langua
 | `/cancelar` | `/cancel` | Cancels your last task in this chat. |
 | `/desativar` | `/deactivate` | Pauses the bot **in the whole chat**: it only answers that it is paused. |
 | `/ativar` | `/activate` | Lifts the pause. |
-| `/health` | — | Checks the API, model and disk. |
+| `/health` | — | Operator-only: checks the API, model and disk (sender must be in `TELEGRAM_ADMIN_IDS`). |
 | `/feedback` | — | Asks for free-text feedback and records it on the server. |
-| `/limpar` | `/clear` | Clears the **server's** processing cache, for every user. Operator use; any user can run it today ([#395](https://github.com/A11yDevs/acessilia/issues/395)). |
+| `/limpar` | `/clear` | Operator-only: clears the **server's** processing cache through `POST /api/v1/cache/clear`. Requires the sender in `TELEGRAM_ADMIN_IDS` and `OPERATIONS_API_TOKEN` configured in the API and bot. |
+
+`/health` and `/limpar` are operator commands: the bot answers `⛔ This command is restricted to operators.` to anyone else. Configure the allowed ids in `TELEGRAM_ADMIN_IDS` (comma-separated).
 
 Notes:
 
