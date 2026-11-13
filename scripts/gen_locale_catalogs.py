@@ -236,7 +236,11 @@ from backend.core.manifest.models import (
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_ELEMENT_UNKNOWN_PAGE,
+    MSG_PAGE_DUPLICATE_ELEMENT_IDS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_PARENT_REF_MISMATCH,
+    MSG_PROVENANCE_UNKNOWN_PAGE,
     MSG_PARENT_CYCLE,
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
@@ -974,7 +978,11 @@ MESSAGES: tuple[str, ...] = (
     MSG_SELF_PARENT,
     MSG_PARENT_CYCLE,
     MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_ELEMENT_UNKNOWN_PAGE,
+    MSG_PAGE_DUPLICATE_ELEMENT_IDS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_PARENT_REF_MISMATCH,
+    MSG_PROVENANCE_UNKNOWN_PAGE,
     MSG_CHAR_RANGE_REVERSED,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
     # Method results of the deterministic handlers and the VLM judge (#410).
@@ -2098,6 +2106,19 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_PARENT_CYCLE: "Ciclo detectado na hierarquia de elementos",
         MSG_DUPLICATE_PAGE_NUMBERS: "Números de página duplicados",
         MSG_PAGE_UNKNOWN_ELEMENTS: "Página {page_number} referencia elementos inexistentes: {element_ids}",
+        MSG_PAGE_DUPLICATE_ELEMENT_IDS: (
+            "Página {page_number} lista elementos repetidos: {element_ids}"
+        ),
+        MSG_ELEMENT_UNKNOWN_PAGE: (
+            "Elemento {element_id} referencia página inexistente {page_number}"
+        ),
+        MSG_PROVENANCE_UNKNOWN_PAGE: (
+            "{path} referencia página inexistente {page_number}"
+        ),
+        MSG_PARENT_REF_MISMATCH: (
+            "Elemento {element_id} tem parent_ref {parent_ref!r} divergente do "
+            "source_ref {source_ref!r} do pai {parent_id}"
+        ),
         MSG_CHAR_RANGE_REVERSED: "{path} termina em {char_end}, antes do início {char_start}",
     },
 }

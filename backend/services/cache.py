@@ -23,6 +23,11 @@ CACHE_DIR = Path("var/temp/cache")
 # Match the periodic sweep's retention; fresh temporaries may belong to
 # another process. Track this process's writers regardless of file age.
 CACHE_TEMP_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+
+#: Bump when ``document_invariant_findings`` starts rejecting manifests that
+#: were accepted and cached under the previous rules. It is part of the
+#: processing-cache identity, so old entries are not reopened and rejected.
+MANIFEST_INVARIANT_REVISION = "2026-11-14"
 _active_cache_writes: set[Path] = set()
 
 
@@ -75,6 +80,7 @@ def processing_cache_configuration() -> dict[str, Any]:
         "pddl_fast_downward_search",
     )
     configuration = {name: getattr(settings, name) for name in fields}
+    configuration["manifest_invariant_revision"] = MANIFEST_INVARIANT_REVISION
     from backend.core.planning.domain_bundle import DomainBundle
 
     domain = DomainBundle.load()

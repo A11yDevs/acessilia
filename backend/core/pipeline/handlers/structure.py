@@ -77,6 +77,12 @@ def remap_references(
     dropped id to the element that now carries its text. References are kept in
     order and deduplicated, so an obligation never points at an element that is
     no longer in the manifest.
+
+    When a join changes an element's parent, its ``parent_ref`` follows the new
+    parent's ``source_ref``: the child now belongs to the surviving element,
+    and keeping the removed parent's source reference would make the document
+    fail the ``parent_ref``/``parent_id`` invariant. The previous value is kept
+    in ``metadata["original_parent_ref"]`` for traceability.
     """
     def remapped(ids: list[str]) -> list[str]:
         out: list[str] = []
@@ -90,10 +96,21 @@ def remap_references(
         obligation.target_ids = remapped(obligation.target_ids)
     for observation in manifest.observations:
         observation.target_ids = remapped(observation.target_ids)
+    by_id = {element.id: element for element in manifest.elements}
     for element in manifest.elements:
         replacements = mapping.get(element.parent_id or "")
-        if replacements:
-            element.parent_id = replacements[0]
+        if not replacements:
+            continue
+        element.parent_id = replacements[0]
+        parent = by_id.get(element.parent_id)
+        if (
+            element.parent_ref is not None
+            and parent is not None
+            and parent.source_ref is not None
+            and parent.source_ref != element.parent_ref
+        ):
+            element.metadata["original_parent_ref"] = element.parent_ref
+            element.parent_ref = parent.source_ref
 
 
 def unique_element_id(base: str, known: set[str]) -> str:

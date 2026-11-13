@@ -2066,8 +2066,28 @@ msgid "Duplicate page numbers"
 msgstr "Números de página duplicados"
 
 #, python-brace-format
+msgid "Element {element_id} references missing page {page_number}"
+msgstr "Elemento {element_id} referencia página inexistente {page_number}"
+
+#, python-brace-format
+msgid "Page {page_number} lists duplicate elements: {element_ids}"
+msgstr "Página {page_number} lista elementos repetidos: {element_ids}"
+
+#, python-brace-format
 msgid "Page {page_number} references unknown elements: {element_ids}"
 msgstr "Página {page_number} referencia elementos inexistentes: {element_ids}"
+
+#, python-brace-format
+msgid ""
+"Element {element_id} parent_ref {parent_ref!r} does not match parent "
+"{parent_id} source_ref {source_ref!r}"
+msgstr ""
+"Elemento {element_id} tem parent_ref {parent_ref!r} divergente do "
+"source_ref {source_ref!r} do pai {parent_id}"
+
+#, python-brace-format
+msgid "{path} references missing page {page_number}"
+msgstr "{path} referencia página inexistente {page_number}"
 
 #, python-brace-format
 msgid "{path} ends at {char_end}, before its start {char_start}"
