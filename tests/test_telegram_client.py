@@ -8,6 +8,7 @@ import respx
 from frontend.clients.api_client import ApiClient, ApiError
 from backend.config.settings import settings
 from backend.i18n import get_translations, reset_request_locale, set_request_locale, t
+from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from backend.log_messages import LOG_PDF_UA_GENERATION_FAILED
 from frontend.telegram import user_context
 from frontend.telegram.messages import (
@@ -330,7 +331,10 @@ def test_document_at_the_telegram_limit_is_processed(
     assert message.answers == [t(MSG_FILE_RECEIVED)]
 
 
-def test_the_telegram_limit_follows_a_lower_configured_max(monkeypatch, doc_module_isolated):
+def test_a_file_over_the_general_limit_keeps_the_common_error(
+    monkeypatch, doc_module_isolated
+):
+    """The panel applies the same limit, so recommending it here would be false."""
     monkeypatch.setattr(settings, "max_file_size_mb", 5)
     monkeypatch.setattr(settings, "web_base_url", "https://panel.test")
     message = _FakeMessage(
@@ -340,11 +344,38 @@ def test_the_telegram_limit_follows_a_lower_configured_max(monkeypatch, doc_modu
 
     asyncio.run(doc_module_isolated.handle_document(message))
 
-    assert message.answers == [
-        t(MSG_TELEGRAM_FILE_TOO_LARGE).format(
-            limit=5, web_url="https://panel.test"
-        )
-    ]
+    assert message.answers == [t(MSG_FILE_TOO_LARGE).format(limit=5)]
+    assert not any("panel" in answer for answer in message.answers)
+
+
+def test_a_file_over_the_general_limit_keeps_the_common_error_at_default(
+    monkeypatch, doc_module_isolated
+):
+    monkeypatch.setattr(settings, "max_file_size_mb", 50)
+    message = _FakeMessage(
+        _FakeBot(b""),
+        document=_FakeDocument("big.pdf", 60 * 1024 * 1024, "file1"),
+    )
+
+    asyncio.run(doc_module_isolated.handle_document(message))
+
+    assert message.answers == [t(MSG_FILE_TOO_LARGE).format(limit=50)]
+    assert not any("panel" in answer for answer in message.answers)
+
+
+def test_an_oversized_invalid_type_keeps_the_extension_error(
+    monkeypatch, doc_module_isolated
+):
+    monkeypatch.setattr(settings, "web_base_url", "https://panel.test")
+    message = _FakeMessage(
+        _FakeBot(b""),
+        document=_FakeDocument("program.exe", 21 * 1024 * 1024, "file1"),
+    )
+
+    asyncio.run(doc_module_isolated.handle_document(message))
+
+    assert message.answers == [t(MSG_UNSUPPORTED_FORMAT)]
+    assert not any("panel" in answer for answer in message.answers)
 
 
 def test_document_submits_with_mode_and_source(doc_module_isolated):

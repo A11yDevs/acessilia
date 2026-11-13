@@ -126,13 +126,14 @@ async def handle_document(message: Message) -> None:
     file_size = document.file_size or 0
 
     valid, error_msg = validate_file(filename, file_size)
-    telegram_error = _telegram_size_error(file_size)
     if not valid:
-        # The extension may be wrong while the size is also above Telegram's
-        # cap; the actionable reply is the size one, naming the web panel.
-        await message.answer(telegram_error or error_msg)
+        # The web panel/API apply the same general limit and extension list, so
+        # its error is the accurate one for these cases.
+        await message.answer(error_msg)
         return
+    telegram_error = _telegram_size_error(file_size)
     if telegram_error:
+        # The file is valid for the panel/API but above Telegram's transport cap.
         await message.answer(telegram_error)
         return
 
