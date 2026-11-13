@@ -10,6 +10,7 @@ import pytest
 
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers.common import _missing_obligation
+from backend.i18n import reset_request_locale, set_request_locale
 from backend.core.pipeline.handlers.fusion import (
     _handle_dual_provider_fusion_method,
     _handle_single_provider_method,
@@ -148,7 +149,7 @@ def test_fusion_handler_fails_on_unknown_obligation(tmp_path, monkeypatch):
 
 
 def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
-    """A ação planejada é dual-provider: um único provider deve falhar."""
+    """The planned action is dual-provider: a single provider must fail."""
     manifest = _make_manifest(tmp_path)
 
     async def _fake_extract_fused(*args, **kwargs):
@@ -161,11 +162,15 @@ def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "backend.pipeline.fusion.extract_fused", _fake_extract_fused
     )
-    result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    token = set_request_locale("en_US")
+    try:
+        result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    finally:
+        reset_request_locale(token)
 
     assert result.success is False
     assert result.validated is False
-    assert "único provider" in (result.message or "")
+    assert "single provider" in (result.message or "")
     assert result.artifacts == []
 
 

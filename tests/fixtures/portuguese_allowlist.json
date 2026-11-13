@@ -139,7 +139,7 @@
     "tests/test_docs_pr125.py": 7,
     "tests/test_docstruct_readme_sync.py": 9,
     "tests/test_docx_export.py": 4,
-    "tests/test_dual_provider_fusion.py": 5,
+    "tests/test_dual_provider_fusion.py": 3,
     "tests/test_event_loop_responsiveness.py": 2,
     "tests/test_formula_enrichment.py": 21,
     "tests/test_fusion_agent.py": 10,
