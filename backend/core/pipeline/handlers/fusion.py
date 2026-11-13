@@ -356,11 +356,7 @@ def _handle_dual_provider_fusion_method(
         (o for o in manifest.obligations if o.id == obligation_id), None
     )
     if obligation is None:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=f"Obrigação não encontrada: {obligation_id}",
-        )
+        return _missing_obligation(obligation_id)
     source_path = Path(manifest.source.path)
     # Reuse the document the structure extractor already stored in the Toolbox.
     artifact_id = _source_artifact_id(manifest)
