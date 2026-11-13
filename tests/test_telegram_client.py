@@ -7,13 +7,23 @@ import respx
 
 from frontend.clients.api_client import ApiClient
 from backend.config.settings import settings
-from backend.i18n import t
+from backend.i18n import reset_request_locale, set_request_locale, t
 from backend.log_messages import LOG_PDF_UA_GENERATION_FAILED
 from frontend.telegram import user_context
 from frontend.telegram.handlers import document as doc_module
 from frontend.telegram.handlers import start as start_module
 
 BASE = "http://localhost:8000"
+
+
+@pytest.fixture(autouse=True)
+def _messages_in_pt_br():
+    """These tests pin the pt-BR bot replies; the locale switch covers the rest."""
+    token = set_request_locale("pt_BR")
+    try:
+        yield
+    finally:
+        reset_request_locale(token)
 
 
 def _fake_pdf_bytes() -> bytes:
@@ -199,6 +209,33 @@ def test_document_flow_sends_download_link(doc_module_isolated, pdf_ua_failed):
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
     assert any("Não foi possível gerar o PDF/UA" in s for s in bot.sent) == pdf_ua_failed
     assert user_context.user_task_ids[(123, None, 456)] == "tg12345"
+
+
+def test_document_flow_sends_the_download_link_in_the_user_locale(
+    doc_module_isolated,
+):
+    """The most important reply must follow the user, not the server locale (#394)."""
+    content = _fake_pdf_bytes()
+    token = set_request_locale("en_US")
+    try:
+        status = _done_status()
+        status["erros"] = [t(LOG_PDF_UA_GENERATION_FAILED).format(error="pandoc offline")]
+        _mock_job_api(status)
+        user_context.user_emails[(123, None, 456)] = "reader@example.com"
+        bot = _FakeBot(content)
+        msg = _FakeMessage(bot, document=_FakeDocument("doc.pdf", len(content), "file1"))
+
+        with respx.mock:
+            asyncio.run(doc_module_isolated.handle_document(msg))
+    finally:
+        reset_request_locale(token)
+
+    sent = "\n".join(bot.sent)
+    assert "✅ Accessible package generated!" in sent
+    assert "📥 Download link (valid for 7 days):" in sent
+    assert "The PDF/UA could not be generated" in sent
+    assert "E-mail configured: reader@example.com" in sent
+    assert "Link para download" not in sent
 
 
 def test_document_submits_with_mode_and_source(doc_module_isolated):
@@ -485,3 +522,48 @@ def test_health_reports_api_error(monkeypatch, tmp_path):
         asyncio.run(start_module.cmd_health(message))
 
     assert "❌ API: erro 503 (indisponível)" in message.answers[0]
+
+
+def test_health_labels_follow_the_user_locale(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
+    message = _FakeMessage(_FakeBot(b""))
+    health = {
+        "status": "ok",
+        "model_client": "openrouter",
+        "model_name": "openai/gpt-4.1-mini",
+        "model_reachable": True,
+        "queue_size": 0,
+    }
+    token = set_request_locale("en_US")
+    try:
+        with respx.mock:
+            respx.get(f"{BASE}/api/v1/health").mock(
+                return_value=httpx.Response(200, json=health)
+            )
+            asyncio.run(start_module.cmd_health(message))
+    finally:
+        reset_request_locale(token)
+
+    answer = message.answers[0]
+    assert "✅ API: ok" in answer
+    assert "✅ Provider: openrouter" in answer
+    assert "🤖 Model: openai/gpt-4.1-mini" in answer
+    assert "Provedor" not in answer and "Modelo" not in answer
+
+
+def test_health_error_labels_follow_the_user_locale(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
+    message = _FakeMessage(_FakeBot(b""))
+    token = set_request_locale("en_US")
+    try:
+        with respx.mock:
+            respx.get(f"{BASE}/api/v1/health").mock(
+                return_value=httpx.Response(503, json={"detail": "unavailable"})
+            )
+            asyncio.run(start_module.cmd_health(message))
+    finally:
+        reset_request_locale(token)
+
+    assert "❌ API: error 503 (unavailable)" in message.answers[0]

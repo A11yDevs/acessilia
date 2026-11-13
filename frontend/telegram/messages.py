@@ -85,6 +85,13 @@ MSG_DOWNLOAD_LINK_EMAILED: str = "✅ Download link sent to {email}!"
 MSG_ACCESSIBLE_PACKAGE_READY: str = (
     "✅ Accessible package generated!\n\n📥 Download link (valid for 7 days):\n{url}"
 )
+#: Warning appended to the completion reply when the package has no PDF because PDF/UA failed.
+MSG_PACKAGE_PDF_UA_MISSING: str = (
+    "⚠️ The PDF/UA could not be generated, the package's only PDF: "
+    "the package continues without a PDF."
+)
+#: Line appended to the completion reply naming the address the package was e-mailed to; {email} substituted at call time.
+MSG_PACKAGE_EMAIL_CONFIGURED: str = "E-mail configured: {email}"
 #: Generic error reply returned when an unexpected exception interrupts file processing mid-flight.
 MSG_PROCESSING_ERROR_GENERIC: str = "❌ Error processing the file. Try again."
 #: Base text used for API-reported job failures; localized failure detail lines are appended by the caller after lookup so each language keeps its own wording around them.
@@ -132,6 +139,16 @@ MSG_OLLAMA_UNEXPECTED: str = "⚠️ Ollama: unexpected answer ({code})"
 MSG_OLLAMA_OFFLINE: str = "❌ Ollama: offline ({error})"
 #: Health check line stating which llm model is active; {model} substituted at call time.
 MSG_HEALTH_ACTIVE_MODEL: str = "🤖 Model: {model}"
+#: Health check line for the API status; {icon} is the state emoji and {status} the reported status.
+MSG_HEALTH_API: str = "{icon} API: {status}"
+#: Health check line naming the configured provider; {icon} is the state emoji and {provider} the client name.
+MSG_HEALTH_PROVIDER: str = "{icon} Provider: {provider}"
+#: Health check line when the API answers with an HTTP error; {status_code}/{detail} substituted at call time.
+MSG_HEALTH_API_ERROR: str = "❌ API: error {status_code} ({detail})"
+#: Health check line when the API is unreachable; {error} is the probe exception text.
+MSG_HEALTH_API_OFFLINE: str = "❌ API: offline ({error})"
+#: Fallback shown in /health when the API omits a status or model field.
+MSG_HEALTH_UNKNOWN: str = "unknown"
 #: Temp directory health probe result when the settings.temp_dir path exists.
 MSG_HEALTH_TEMP_OK: str = "✅ Temp dir: ok"
 #: Temp directory health probe notice when the settings.temp_dir path does not exist.

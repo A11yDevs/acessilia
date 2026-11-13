@@ -28,9 +28,12 @@ from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
 from frontend.telegram.messages import (
+    MSG_ACCESSIBLE_PACKAGE_READY,
     MSG_CONTACT_SERVER_FAILED,
     MSG_DOWNLOADING_FILE,
     MSG_FILE_RECEIVED,
+    MSG_PACKAGE_EMAIL_CONFIGURED,
+    MSG_PACKAGE_PDF_UA_MISSING,
     MSG_PHOTO_RECEIVED,
     MSG_PROCESS_FAILED_BASE,
     MSG_PROCESSING_ERROR_GENERIC,
@@ -248,13 +251,15 @@ async def _poll_job(
             await tracker.finish(success=True)
             url = status.get("download_url")
             if url:
-                msg = f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}"
+                msg = t(MSG_ACCESSIBLE_PACKAGE_READY).format(url=url)
                 # The worker records the failure in the server locale.
                 pdf_ua_failed = t(LOG_PDF_UA_GENERATION_FAILED).split("{error}")[0]
                 if any(erro.startswith(pdf_ua_failed) for erro in status.get("erros", [])):
-                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA, o único PDF do pacote: o pacote segue sem PDF."
+                    msg += "\n\n" + t(MSG_PACKAGE_PDF_UA_MISSING)
                 if email:
-                    msg += f"\n\nE-mail configurado: {email}"
+                    msg += "\n\n" + t(MSG_PACKAGE_EMAIL_CONFIGURED).format(
+                        email=email
+                    )
                 await _send_with_retry(
                     message.bot,
                     message.chat.id,

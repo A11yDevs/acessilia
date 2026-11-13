@@ -27,9 +27,15 @@ from frontend.telegram.messages import (
     MSG_FEEDBACK_THANKS,
     MSG_FORMATS_TEXT,
     MSG_HELP_TEXT,
+    MSG_HEALTH_API,
+    MSG_HEALTH_API_ERROR,
+    MSG_HEALTH_API_OFFLINE,
+    MSG_HEALTH_ACTIVE_MODEL,
     MSG_HEALTH_DISK_FREE,
+    MSG_HEALTH_PROVIDER,
     MSG_HEALTH_TEMP_MISSING,
     MSG_HEALTH_TEMP_OK,
+    MSG_HEALTH_UNKNOWN,
     MSG_MODE_BAIXO_ON,
     MSG_MODE_DETAILED_ON,
     MSG_MODE_MEDIO_ON,
@@ -202,15 +208,30 @@ async def cmd_health(message: Message) -> None:
         health = await client.health()
         api_icon = "✅" if health.get("status") == "ok" else "⚠️"
         model_icon = "✅" if health.get("model_reachable") else "❌"
-        checks.append(f"{api_icon} API: {health.get('status', 'desconhecido')}")
+        unknown = t(MSG_HEALTH_UNKNOWN)
         checks.append(
-            f"{model_icon} Provedor: {health.get('model_client', 'desconhecido')}"
+            t(MSG_HEALTH_API).format(
+                icon=api_icon, status=health.get("status", unknown)
+            )
         )
-        checks.append(f"🤖 Modelo: {health.get('model_name', 'desconhecido')}")
+        checks.append(
+            t(MSG_HEALTH_PROVIDER).format(
+                icon=model_icon, provider=health.get("model_client", unknown)
+            )
+        )
+        checks.append(
+            t(MSG_HEALTH_ACTIVE_MODEL).format(
+                model=health.get("model_name", unknown)
+            )
+        )
     except ApiError as e:
-        checks.append(f"❌ API: erro {e.status_code} ({e.detail})")
+        checks.append(
+            t(MSG_HEALTH_API_ERROR).format(
+                status_code=e.status_code, detail=e.detail
+            )
+        )
     except Exception as e:
-        checks.append(f"❌ API: offline ({e})")
+        checks.append(t(MSG_HEALTH_API_OFFLINE).format(error=e))
 
     temp_dir = settings.temp_dir
     if temp_dir.exists():
