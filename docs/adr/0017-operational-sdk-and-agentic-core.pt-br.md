@@ -2,11 +2,11 @@
 
 Também disponível em **inglês (EUA)**: [English version](0017-operational-sdk-and-agentic-core.md)
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-13, evidência abaixo)
 - **Data:** 2026-11-12
 - **Componentes:** core, SDK, docstruct, Toolbox
 - **Issues:** [#470](https://github.com/A11yDevs/acessilia/issues/470), [#402](https://github.com/A11yDevs/acessilia/issues/402)
-- **Emenda, quando aceita:** [ADR-0002](0002-component-responsibilities.pt-br.md) (a linha do SDK e as perguntas de "onde fica o código novo?"); esclarece a [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) e complementa a [ADR-0016](0016-core-package.pt-br.md)
+- **Emenda:** [ADR-0002](0002-component-responsibilities.pt-br.md) (a linha do SDK e as perguntas de "onde fica o código novo?"); esclarece a [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) e complementa a [ADR-0016](0016-core-package.pt-br.md)
 
 ## Contexto
 
@@ -73,7 +73,7 @@ Opções consideradas:
 
 ## Decisão
 
-Proposta: a opção 2.
+A opção 2.
 
 - **O critério é a autoridade para decidir, não a presença de IA nem de
   condicionais.**
@@ -139,6 +139,32 @@ Proposta: a opção 2.
   - o SDK a executa a partir de um script, sem o core nem o serviço;
   - o enriquecimento de fórmulas do core a reutiliza, mantendo suas decisões;
   - os manifestos do caso 036 são iguais antes e depois.
+
+## Evidência de aceitação
+
+As três condições acima valeram em 2026-11-13:
+
+- **O SDK roda a cadeia sem o core.** O `acessilia_sdk.operations.formula`
+  (#504) tem um passo por capacidade. O `python -m acessilia_sdk formula` o
+  roda a partir do wheel do próprio SDK, e o job de CI `SDK alone` instala só
+  o docstruct ao lado dele.
+- **O core a reutiliza e mantém as decisões dele.** O recorte e o
+  reconhecimento de fórmulas do core (#507), e o MathML e a fala (#509),
+  chamam os passos da operação. Testes diferenciais do código da develop
+  contra o código novo não acharam diferença em nenhuma resposta dentro do
+  contrato da Toolbox: 2.520 casos de recorte e 738 de reconhecimento, e de
+  360 a 420 casos de conversão e fala. A única mudança declarada vale para
+  respostas fora do contrato, que agora indicam uma capacidade indisponível.
+- **O caso 036 é igual antes e depois.** A develop antes da mudança
+  (731a1bfb) e depois dela (dcc8cbfa) processou o caso 036 com a mesma
+  Toolbox e o mesmo modelo de visão, cada execução com um hash de fonte novo
+  (#511). O `math_case compare` achou **0 diferenças** nas 16 fórmulas (LaTeX,
+  MathML, forma falada, método, camada de texto), no texto, nas tabelas, na
+  estrutura e nos avisos. Isso valeu nos dois pares antes-e-depois e entre duas
+  execuções da base. O caso 006 (42 slides) também foi igual fora do que o
+  modelo de visão escreveu: as 6 fórmulas dele são idênticas, e o único slide
+  que difere (o 5) traz uma tabela que o agente de dados releu pela imagem de
+  um jeito diferente em cada execução.
 
 ## Consequências
 

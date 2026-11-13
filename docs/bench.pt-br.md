@@ -162,8 +162,9 @@ Ele compara, de cada fórmula, o LaTeX, o MathML, a forma falada, o método de
 reconhecimento, a concordância com a camada de texto, a camada de texto e o
 número da equação; de cada bloco, as expressões inline e o texto; as células
 das tabelas, a estrutura dos blocos e os avisos técnicos. Sai com 1 quando há
-diferença. Uma fórmula lida por um modelo de visão, e a descrição de uma
-imagem, podem diferir entre duas execuções quaisquer: aparecem à parte e não
+diferença. Uma fórmula lida por um modelo de visão, a descrição de uma imagem
+e uma tabela que o agente de dados releu pela imagem (`table_review`) podem
+diferir entre duas execuções quaisquer: aparecem à parte e não
 reprovam a comparação. Rode a base duas vezes para ver quanto disso acontece
 sozinho.
 

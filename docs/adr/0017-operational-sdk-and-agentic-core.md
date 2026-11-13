@@ -2,11 +2,11 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0017-operational-sdk-and-agentic-core.pt-br.md)
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-13, evidence below)
 - **Date:** 2026-11-12
 - **Components:** core, SDK, docstruct, Toolbox
 - **Issues:** [#470](https://github.com/A11yDevs/acessilia/issues/470), [#402](https://github.com/A11yDevs/acessilia/issues/402)
-- **Amends, once accepted:** [ADR-0002](0002-component-responsibilities.md) (the SDK's row and the "where does new code go?" questions); it clarifies [ADR-0003](0003-remote-only-operational-capabilities.md) and complements [ADR-0016](0016-core-package.md)
+- **Amends:** [ADR-0002](0002-component-responsibilities.md) (the SDK's row and the "where does new code go?" questions); it clarifies [ADR-0003](0003-remote-only-operational-capabilities.md) and complements [ADR-0016](0016-core-package.md)
 
 ## Context
 
@@ -73,7 +73,7 @@ Options considered:
 
 ## Decision
 
-Proposed: option 2.
+Option 2.
 
 - **The criterion is the authority to decide, not the presence of AI or of
   conditionals.**
@@ -137,6 +137,31 @@ Proposed: option 2.
   - the SDK runs it from a script without the core or the service;
   - the core's formula enrichment reuses it, keeping its decisions;
   - the manifests of case 036 match before and after.
+
+## Acceptance evidence
+
+The three conditions above held on 2026-11-13:
+
+- **The SDK runs the chain without the core.** `acessilia_sdk.operations.formula`
+  (#504) has a step per capability. `python -m acessilia_sdk formula` runs it
+  from the SDK's own wheel, and the `SDK alone` CI job installs only docstruct
+  next to it.
+- **The core reuses it and keeps its decisions.** The core's formula crop and
+  recognition (#507) and its MathML and speech (#509) call the operation's
+  steps. Differential tests of develop's code against the new code found no
+  difference for any answer inside the Toolbox's contract: 2,520 crop and 738
+  recognition cases, and 360–420 conversion and speech cases. The one declared
+  change concerns answers outside the contract, which now report an
+  unavailable capability.
+- **Case 036 matches before and after.** develop before the change (731a1bfb)
+  and after it (dcc8cbfa) processed case 036 against the same Toolbox and
+  vision model, each with a fresh source hash (#511). `math_case compare` found
+  **0 differences** in the 16 formulas (LaTeX, MathML, spoken form, method,
+  text layer), the text, the tables, the structure and the warnings. That held
+  in both before-and-after pairs, and between two runs of the base. Case 006
+  (42 slides) also matched outside what the vision model wrote: its 6 formulas
+  are identical, and the one slide that differs (slide 5) holds a table that
+  the data agent re-read from its image differently in each run.
 
 ## Consequences
 

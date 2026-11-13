@@ -357,6 +357,20 @@ def test_what_a_vision_model_wrote_is_listed_apart() -> None:
     assert {name for _, name, _, _ in comparison.vision} == {"text", "alt_text"}
 
 
+def test_a_table_read_again_from_its_image_is_vision_written() -> None:
+    def table(cells, review=None):
+        metadata = {"table_review": review} if review else {}
+        return {"type": "table", "rows": [cells], "metadata": metadata, "source_location": {"page_number": 5}}
+
+    reviewed = math_case.compare_documents(
+        _doc(table(["a", "b"], {"outcome": "replaced"})), _doc(table(["a b"], {"outcome": "kept"}))
+    )
+    extracted = math_case.compare_documents(_doc(table(["a", "b"])), _doc(table(["a b"])))
+
+    assert (reviewed.differences, [name for _, name, _, _ in reviewed.vision]) == ([], ["cells"])
+    assert [name for _, name, _, _ in extracted.differences] == ["cells"]
+
+
 def test_structure_inline_math_and_warnings_are_compared() -> None:
     base = _doc(PARAGRAPH, _math("x=1"), warnings=["w"])
     candidate = _doc({**PARAGRAPH, "text": "Let $x^3$ be the area."}, warnings=[])

@@ -6,6 +6,7 @@ Também disponível em **inglês (EUA)**: [English version](0002-component-respo
 - **Data:** 2026-10-18
 - **Componentes:** core, SDK, docstruct, Toolbox
 - **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Emendada por:** [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) (a linha do SDK e as perguntas de "onde fica o código novo?")
 
 ## Contexto
 
@@ -51,7 +52,7 @@ Toolbox. Os bindings MCP e REST são gerados a partir dos mesmos metadados de
 capacidade na Toolbox (constituição da Toolbox, princípio 7). A docstruct é
 chamada como biblioteca Python.
 
-**Onde fica o código novo?** Pergunte nesta ordem:
+**Onde fica o código novo?** Pergunte nesta ordem (emendado pela [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md): o SDK também guarda operações reutilizáveis com parâmetros explícitos, e a tabela dela substitui estas perguntas):
 
 1. Ele decide *o que* fazer ou *quando*: planejamento, política, estratégia,
    fluxo do usuário? Então vai para o **core**.

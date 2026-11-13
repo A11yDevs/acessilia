@@ -32,7 +32,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0014](0014-artifact-download-not-found-failover.pt-br.md) | Buscar downloads ausentes em outros endpoints | Aceito |
 | [0015](0015-artifact-reference-v1.pt-br.md) | O contrato de referência de artefato, `artifact/reference@1`, em fases | Aceito |
 | [0016](0016-core-package.pt-br.md) | O core como um pacote próprio, `acessilia_core` | Proposto |
-| [0017](0017-operational-sdk-and-agentic-core.pt-br.md) | Fronteiras entre o SDK operacional e o core agêntico | Proposto |
+| [0017](0017-operational-sdk-and-agentic-core.pt-br.md) | Fronteiras entre o SDK operacional e o core agêntico | Aceito |
 | [0018](0018-core-uses-sdk-public-api.pt-br.md) | O core usa só a API pública do SDK | Proposto |
 
 ## Processo

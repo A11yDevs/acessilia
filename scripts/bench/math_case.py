@@ -27,8 +27,9 @@ for a change that should not alter them (a refactoring, ADR-0017's parity of
 the formula chain): every formula's LaTeX, MathML, spoken form, recognition
 method and text layer, the inline expressions, the block structure and the
 technical warnings. What a vision model wrote (a formula it read, a picture's
-description) may differ between any two runs, so those differences are listed
-apart; the command exits with 1 only for the others.
+description, a table the data agent read again from its image) may differ
+between any two runs, so those differences are listed apart; the command
+exits with 1 only for the others.
 """
 
 from __future__ import annotations
@@ -705,7 +706,10 @@ def compare_documents(base: dict[str, Any], candidate: dict[str, Any]) -> Compar
         if old.get("type") == "image":
             note(where, "alt_text", old.get("alt_text"), new.get("alt_text"), vision=True)
         elif old.get("type") == "table":
-            note(where, "cells", _table_cells(old), _table_cells(new))
+            # A table the data agent read again from its image (table_review)
+            # holds what a vision model wrote, on whichever side it was.
+            reviewed = any("table_review" in (b.get("metadata") or {}) for b in (old, new))
+            note(where, "cells", _table_cells(old), _table_cells(new), vision=reviewed)
         elif old.get("type") != "math":
             note(where, "inline math", [s for x in _block_texts(old) for s in _inline_spans(x)],
                  [s for x in _block_texts(new) for s in _inline_spans(x)])

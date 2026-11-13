@@ -6,6 +6,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Date:** 2026-10-18
 - **Components:** core, SDK, docstruct, Toolbox
 - **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Amended by:** [ADR-0017](0017-operational-sdk-and-agentic-core.md) (the SDK's row and the "where does new code go?" questions)
 
 ## Context
 
@@ -51,7 +52,7 @@ Toolbox's REST contract. MCP and REST bindings are generated from the same
 capability metadata in the Toolbox (Toolbox constitution, principle 7).
 docstruct is called as a Python library.
 
-**Where does new code go?** Ask in order:
+**Where does new code go?** Ask in order (amended by [ADR-0017](0017-operational-sdk-and-agentic-core.md): the SDK also holds reusable operations with explicit parameters, and its table replaces these questions):
 
 1. Does it decide *what* to do or *when*: planning, policy, strategy, user
    flow? Then it goes in the **core**.

@@ -156,8 +156,9 @@ uv run python -m scripts.bench.math_case compare base/canonical.json candidate/c
 It compares every formula's LaTeX, MathML, spoken form, recognition method,
 text agreement, text layer and equation number, the inline expressions and
 text of each block, the table cells, the block structure and the technical
-warnings, and exits with 1 on a difference. A formula a vision model read, and
-a picture's description, may differ between any two runs: they are listed
+warnings, and exits with 1 on a difference. A formula a vision model read, a
+picture's description and a table the data agent read again from its image
+(`table_review`) may differ between any two runs: they are listed
 apart and do not fail the comparison. Run the base twice to see how much of
 that happens on its own.
 
