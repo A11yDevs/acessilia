@@ -6,6 +6,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Date:** 2026-10-18
 - **Components:** core, SDK, docstruct, Toolbox
 - **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Amended by:** [ADR-0017](0017-operational-sdk-and-agentic-core.md) (the SDK's row and the "where does new code go?" questions)
 
 ## Context
 
@@ -26,7 +27,7 @@ Toolbox executes operational capabilities.
 | Component | Owns | Must not |
 |---|---|---|
 | **Core** (`backend/`) | Agents, PDDL planning, strategies, policies, workflows; when to call a capability, which profile, whether to degrade | Implement generic document algorithms or operational executors; import the Toolbox package; redefine contracts |
-| **SDK** (`libs/sdk`) | Contracts as consumed by clients, Toolbox clients and transport, artifact references, availability and failover rules, in-process access to docstruct's pure algorithms | Hold planning policy or agent logic; require heavy operational dependencies; read settings or environment; import the core or the Toolbox package |
+| **SDK** (`libs/sdk`) | Contracts as consumed by clients, Toolbox clients and transport, artifact references, availability and failover rules, in-process access to docstruct's pure algorithms | Hold planning policy or agent logic; require heavy operational dependencies; read settings or environment; import the core or the Toolbox package. Amended by [ADR-0017](0017-operational-sdk-and-agentic-core.md): the SDK also holds reusable operations, fixed sequences of capabilities and docstruct algorithms with explicit parameters |
 | **docstruct** (`libs/docstruct`) | Canonical document models and schemas, normalization, comparison, matching, fusion, structural validation: deterministic and infrastructure-free | Depend on the core, the SDK, the Toolbox, Docker, REST, MCP, the network, files, subprocesses or remote storage |
 | **Toolbox** (separate repository) | Providers, conversion, rendering, OCR, validation, specialized processing; artifacts, jobs, sidecars; REST and MCP interfaces; the published operational contracts | Re-implement docstruct algorithms; depend on the SDK or on the core's agent logic; make semantic choices that belong to the core |
 
@@ -51,7 +52,7 @@ Toolbox's REST contract. MCP and REST bindings are generated from the same
 capability metadata in the Toolbox (Toolbox constitution, principle 7).
 docstruct is called as a Python library.
 
-**Where does new code go?** Ask in order:
+**Where does new code go?** Ask in order (amended by [ADR-0017](0017-operational-sdk-and-agentic-core.md): the SDK also holds reusable operations with explicit parameters, and its table replaces these questions):
 
 1. Does it decide *what* to do or *when*: planning, policy, strategy, user
    flow? Then it goes in the **core**.

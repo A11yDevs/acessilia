@@ -1,7 +1,8 @@
 """Scorecard of a whole-document math case (acessilia-dataset ``math-reference``).
 
-    python -m scripts.bench.math_case score --canonical doc.json --txt doc.txt [--pdf-ua doc.pdf_ua.pdf]
-    python -m scripts.bench.math_case run   [--pdf input.pdf] [--out var/bench/math-reference/<run>]
+    python -m scripts.bench.math_case score   --canonical doc.json --txt doc.txt [--pdf-ua doc.pdf_ua.pdf]
+    python -m scripts.bench.math_case run     [--pdf input.pdf] [--out var/bench/math-reference/<run>]
+    python -m scripts.bench.math_case compare base/canonical.json candidate/canonical.json [--out DIR]
 
 ``score`` reads a job's canonical document and plain-text output; ``run``
 processes the reference PDF through the core first (it needs a running
@@ -20,6 +21,18 @@ The scorecard measures what a reader of the accessible output gets:
 
 Like the rest of the harness, the numbers track deltas between runs; they are
 not an official evaluation.
+
+``compare`` checks that two outputs of the same document agree, field by field,
+for a change that should not alter them (a refactoring, ADR-0017's parity of
+the formula chain): every formula's LaTeX, MathML, spoken form, recognition
+method and text layer, the inline expressions, the block structure and the
+technical warnings. What a vision model wrote may differ between any two runs,
+so those differences are listed apart: the LaTeX of a formula it read (and
+what the core derives from that LaTeX, when the LaTeX differs), a description
+the picture stage marks as the model's, and a table the data agent read again
+from its image. Everything else is a difference, and the command exits with 1:
+the recognition method, a fallback alt text, the block structure and the
+technical warnings count even when a vision model's answer caused them.
 """
 
 from __future__ import annotations
@@ -604,6 +617,131 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
     return canonical_path, txt_path, pdf_ua_path
 
 
+# ── Comparing two outputs ───────────────────────────────────────────
+
+#: The fields of a formula block that ``compare`` checks.
+FORMULA_FIELDS = ("text", "mathml", "alt_text", "method", "text_agreement", "text_layer", "equation_number")
+#: Fields the core derives from a formula's LaTeX: for a formula a vision model
+#: read, they may differ only when the LaTeX itself differs.
+DERIVED_FORMULA_FIELDS = frozenset({"mathml", "alt_text", "text_agreement", "equation_number"})
+#: Metadata the picture stage records on a description a vision model wrote.
+VISION_DESCRIPTION_KEYS = ("vision_description_complete", "vision_confidence")
+
+
+def _described_by_vision(block: dict[str, Any]) -> bool:
+    metadata = block.get("metadata") or {}
+    return any(key in metadata for key in VISION_DESCRIPTION_KEYS)
+
+
+def _formula_view(block: dict[str, Any]) -> dict[str, Any]:
+    metadata = block.get("metadata") or {}
+    recognition = metadata.get("formula_recognition") or {}
+    return {
+        "page": _page(block),
+        "text": block.get("text"),
+        "mathml": metadata.get("mathml"),
+        "alt_text": block.get("alt_text"),
+        "method": recognition.get("method"),
+        "text_agreement": recognition.get("text_agreement"),
+        "text_layer": metadata.get("formula_text_layer"),
+        "equation_number": metadata.get("equation_number"),
+    }
+
+
+@dataclass
+class Comparison:
+    """How a candidate output differs from a base output of the same document."""
+
+    formulas: int = 0
+    #: Differences that must not happen, as ``(where, field, base, candidate)``.
+    differences: list[tuple[str, str, Any, Any]] = field(default_factory=list)
+    #: Differences in what a vision model wrote, which any two runs may show.
+    vision: list[tuple[str, str, Any, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        def rows(items):
+            return [dict(zip(("where", "field", "base", "candidate"), item)) for item in items]
+
+        return {"formulas": self.formulas, "differences": rows(self.differences), "vision": rows(self.vision)}
+
+    def to_markdown(self) -> str:
+        lines = [
+            "# Math case: base vs candidate",
+            "",
+            f"- formulas compared: {self.formulas}",
+            f"- differences: **{len(self.differences)}**",
+            f"- vision-written differences (may vary between runs): {len(self.vision)}",
+        ]
+        for title, items in (("Differences", self.differences), ("Vision-written differences", self.vision)):
+            if items:
+                lines += ["", f"## {title}", "", "| Where | Field | Base | Candidate |", "|---|---|---|---|"]
+                lines += [
+                    f"| {where} | {name} | {_cell(base)} | {_cell(candidate)} |"
+                    for where, name, base, candidate in items
+                ]
+        return "\n".join(lines) + "\n"
+
+
+def _cell(value: Any) -> str:
+    text = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
+    text = text.replace("|", "\\|").replace("\n", " ")
+    return f"`{text[:120]}`" + ("…" if len(text) > 120 else "")
+
+
+def compare_documents(base: dict[str, Any], candidate: dict[str, Any]) -> Comparison:
+    """Field-by-field agreement of two canonical documents of the same source."""
+    result = Comparison()
+    base_blocks, candidate_blocks = list(iter_blocks(base)), list(iter_blocks(candidate))
+
+    def note(where: str, name: str, old: Any, new: Any, *, vision: bool = False) -> None:
+        if old != new:
+            (result.vision if vision else result.differences).append((where, name, old, new))
+
+    note("document", "blocks", [(b.get("type"), _page(b)) for b in base_blocks],
+         [(b.get("type"), _page(b)) for b in candidate_blocks])
+    note("document", "technical_warnings", base.get("technical_warnings") or [],
+         candidate.get("technical_warnings") or [])
+
+    base_math = [b for b in base_blocks if b.get("type") == "math"]
+    candidate_math = [b for b in candidate_blocks if b.get("type") == "math"]
+    result.formulas = max(len(base_math), len(candidate_math))
+    for index in range(result.formulas):
+        old = _formula_view(base_math[index]) if index < len(base_math) else {}
+        new = _formula_view(candidate_math[index]) if index < len(candidate_math) else {}
+        where = f"formula {index + 1} (p. {old.get('page', new.get('page'))})"
+        # What a vision model read (on either side) may differ in any run: its
+        # LaTeX, and what the core derives from that LaTeX when it differs.
+        # The method and the text layer are the core's and the extractor's.
+        by_vision = "vision" in (old.get("method"), new.get("method"))
+        read_differently = by_vision and old.get("text") != new.get("text")
+        for name in FORMULA_FIELDS:
+            vision = by_vision if name == "text" else (
+                read_differently and name in DERIVED_FORMULA_FIELDS
+            )
+            note(where, name, old.get(name), new.get(name), vision=vision)
+
+    for index, (old, new) in enumerate(zip(base_blocks, candidate_blocks), start=1):
+        where = f"block {index} ({old.get('type')}, p. {_page(old)})"
+        if old.get("type") == "math":
+            continue
+        if old.get("type") == "image":
+            # A description is the model's only when the picture stage says so;
+            # a fallback alt text is the core's.
+            described = any(_described_by_vision(b) for b in (old, new))
+            note(where, "alt_text", old.get("alt_text"), new.get("alt_text"), vision=described)
+            continue
+        if old.get("type") == "table":
+            # A table the data agent read again from its image (table_review)
+            # holds what a vision model wrote, on whichever side it was.
+            reviewed = any("table_review" in (b.get("metadata") or {}) for b in (old, new))
+            note(where, "shape", _table_shape(old), _table_shape(new), vision=reviewed)
+            note(where, "cells", _table_cells(old), _table_cells(new), vision=reviewed)
+        note(where, "inline math", [s for x in _block_texts(old) for s in _inline_spans(x)],
+             [s for x in _block_texts(new) for s in _inline_spans(x)])
+        note(where, "text", _block_texts(old), _block_texts(new))
+    return result
+
+
 def _write(card: Scorecard, out: Path | None) -> None:
     print(card.to_markdown(), end="")
     if out is not None:
@@ -630,7 +768,25 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--pdf", type=Path, help="input PDF (default: the dataset's copy)")
     p.add_argument("--out", type=Path, default=REPO / "var" / "bench" / "math-reference" / "latest")
     p.add_argument("--no-pdf-ua", action="store_true", help="skip the PDF/UA export")
+    p = sub.add_parser("compare", help="field-by-field agreement of two outputs; exit 1 on a difference")
+    p.add_argument("base", type=Path, help="canonical document JSON of the base run")
+    p.add_argument("candidate", type=Path, help="canonical document JSON of the candidate run")
+    p.add_argument("--out", type=Path, help="also write comparison.json and comparison.md here")
     args = parser.parse_args(argv)
+
+    if args.command == "compare":
+        comparison = compare_documents(
+            json.loads(args.base.read_text(encoding="utf-8")),
+            json.loads(args.candidate.read_text(encoding="utf-8")),
+        )
+        print(comparison.to_markdown(), end="")
+        if args.out is not None:
+            args.out.mkdir(parents=True, exist_ok=True)
+            (args.out / "comparison.json").write_text(
+                json.dumps(comparison.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            (args.out / "comparison.md").write_text(comparison.to_markdown(), encoding="utf-8")
+        return 1 if comparison.differences else 0
 
     root = args.dataset or dataset_dir()
     rows, expectations = load_case(root)

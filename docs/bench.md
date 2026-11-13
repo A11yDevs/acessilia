@@ -144,6 +144,51 @@ A PR that changes how math, text repair or structure reach the outputs pastes
 the scorecard before and after in its description. `tests/test_math_case_e2e.py`
 (`-m e2e`) runs the case and locks what already passes.
 
+### Parity of a change that should not alter the output
+
+`compare` checks two outputs of the case field by field, for a refactoring
+that must leave them as they were (ADR-0017's parity of the formula chain):
+
+```bash
+uv run python -m scripts.bench.math_case compare base/canonical.json candidate/canonical.json --out var/bench/math-reference/<compare>
+```
+
+It compares every formula's LaTeX, MathML, spoken form, recognition method,
+text agreement, text layer and equation number; the text and inline
+expressions of each block, tables included; each table's shape and cells; the
+block structure; and the technical warnings. It exits with 1 on a difference.
+
+What a vision model wrote may differ between any two runs, so it is listed
+apart and does not fail the comparison:
+- the LaTeX of a formula it read, and what the core derives from that LaTeX
+  (MathML, spoken form, text agreement, equation number) only when the LaTeX
+  itself differs;
+- a picture's description that the picture stage marks as the model's
+  (`vision_description_complete`, `vision_confidence`);
+- a table the data agent read again from its image (`table_review`).
+
+Everything else counts, even when a vision model's answer caused it: the
+recognition method, a fallback alt text, the block structure (a formula the
+model took for a picture) and the technical warnings. Inspect those. Run the
+base twice to see how much varies on its own.
+
+The core and the Toolbox cache results by the source's hash, not by the code
+that produced them, so each run needs a source no run has seen: append a
+comment after `%%EOF` (a PDF reader ignores it). The case lives in
+acessilia-dataset's `main` branch (`input/math-reference/`); point
+`ACESSILIA_TEST_DATASET_DIR` at a checkout of it, since a worktree of this
+repository has no `tests/dataset`.
+
+```bash
+export ACESSILIA_TEST_DATASET_DIR=/path/to/acessilia-dataset   # on its main branch
+for run in base candidate; do
+  cp "$ACESSILIA_TEST_DATASET_DIR/input/math-reference/velocidade-instantanea.pdf" "/tmp/036-$run.pdf"
+  printf '%% %s %s\n' "$run" "$(date +%s)" >> "/tmp/036-$run.pdf"
+done
+# In a checkout of each commit (git worktree add ../base <commit>):
+uv run python -m scripts.bench.math_case run --pdf /tmp/036-base.pdf --out var/bench/math-reference/base
+```
+
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)

@@ -148,6 +148,53 @@ Uma PR que muda como matemática, reparo de texto ou estrutura chegam às saída
 cola o placar antes e depois na descrição. `tests/test_math_case_e2e.py`
 (`-m e2e`) roda o caso e trava o que já passa.
 
+### Paridade de uma mudança que não deve alterar a saída
+
+O `compare` confere duas saídas do caso campo a campo, para uma refatoração
+que precisa deixá-las como estavam (a paridade da cadeia de fórmula da
+ADR-0017):
+
+```bash
+uv run python -m scripts.bench.math_case compare base/canonical.json candidate/canonical.json --out var/bench/math-reference/<comparacao>
+```
+
+Ele compara, de cada fórmula, o LaTeX, o MathML, a forma falada, o método de
+reconhecimento, a concordância com a camada de texto, a camada de texto e o
+número da equação; de cada bloco, tabelas incluídas, o texto e as expressões
+inline; de cada tabela, a forma e as células; a estrutura dos blocos; e os
+avisos técnicos. Sai com 1 quando há diferença.
+
+O que um modelo de visão escreveu pode diferir entre duas execuções
+quaisquer, então aparece à parte e não reprova a comparação:
+- o LaTeX de uma fórmula que ele leu, e o que o core deriva desse LaTeX
+  (MathML, forma falada, concordância, número da equação) só quando o próprio
+  LaTeX difere;
+- a descrição de uma imagem que a etapa de imagens marca como do modelo
+  (`vision_description_complete`, `vision_confidence`);
+- uma tabela que o agente de dados releu pela imagem (`table_review`).
+
+Todo o resto conta, mesmo quando a resposta de um modelo de visão o causou: o
+método de reconhecimento, um texto alternativo de fallback, a estrutura dos
+blocos (uma fórmula que o modelo tomou por imagem) e os avisos técnicos.
+Inspecione esses casos. Rode a base duas vezes para ver quanto varia sozinho.
+
+O core e a Toolbox guardam resultados pelo hash da fonte, não pelo código que
+os produziu, então cada execução precisa de uma fonte que nenhuma execução
+viu: acrescente um comentário depois do `%%EOF` (um leitor de PDF o ignora). O
+caso fica no branch `main` do acessilia-dataset (`input/math-reference/`);
+aponte o `ACESSILIA_TEST_DATASET_DIR` para um checkout dele, porque um worktree
+deste repositório não tem `tests/dataset`.
+
+```bash
+export ACESSILIA_TEST_DATASET_DIR=/caminho/do/acessilia-dataset   # no branch main
+for run in base candidate; do
+  cp "$ACESSILIA_TEST_DATASET_DIR/input/math-reference/velocidade-instantanea.pdf" "/tmp/036-$run.pdf"
+  printf '%% %s %s\n' "$run" "$(date +%s)" >> "/tmp/036-$run.pdf"
+done
+# Num checkout de cada commit (git worktree add ../base <commit>):
+uv run python -m scripts.bench.math_case run --pdf /tmp/036-base.pdf --out var/bench/math-reference/base
+```
+
 ## Snapshot dos experimentos do Dr.DocBench
 
 O código dos experimentos da shared task (variantes de fusão, jobs Slurm,
