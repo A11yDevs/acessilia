@@ -59,15 +59,17 @@ MSG_REPETITION_REMOVED = (
 
 MSG_LINE_NUMBERS_NONE = "No marginal line number found"
 MSG_LINE_NUMBERS_EXTRACTED = (
-    "{count} marginal line number extracted from {blocks} block",
-    "{count} marginal line numbers extracted from {blocks} blocks",
+    "{count} marginal line number extracted from {blocks}",
+    "{count} marginal line numbers extracted from {blocks}",
 )
 
 MSG_VERSE_NONE = "No verse block eligible for splitting"
 MSG_VERSE_SPLIT = (
-    "Verse split into {count} chunk from {blocks} block",
-    "Verse split into {count} chunks from {blocks} blocks",
+    "Verse split into {count} chunk from {blocks}",
+    "Verse split into {count} chunks from {blocks}",
 )
+
+MSG_BLOCK_COUNT = ("{count} block", "{count} blocks")
 
 MSG_TAILJOIN_NONE = "No tail block eligible for joining"
 MSG_TAILJOIN_MISMATCH = (
@@ -173,6 +175,7 @@ MSG_TABLES: tuple[tuple[str, str], ...] = (
     MSG_REPETITION_REMOVED,
     MSG_LINE_NUMBERS_EXTRACTED,
     MSG_VERSE_SPLIT,
+    MSG_BLOCK_COUNT,
     MSG_TAILJOIN_JOINED,
     MSG_HEADING_REPAIRED,
     MSG_MATHML_GENERATED,

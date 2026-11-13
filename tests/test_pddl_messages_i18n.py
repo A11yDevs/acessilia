@@ -18,9 +18,14 @@ from backend.core.pipeline.handlers.content import (
     _handle_vision_description_method,
 )
 from backend.core.pipeline.handlers.messages import (
+    MSG_BLOCK_COUNT,
     MSG_CODE_NORMALIZED,
     MSG_TABLE_VALIDATED,
     MSG_VISION_VALIDATED,
+)
+from backend.core.pipeline.handlers.text import (
+    _handle_chunk_verse_method,
+    _handle_extract_line_numbers_method,
 )
 from backend.core.pipeline.obligations import _unsatisfied_obligations
 from backend.i18n import n, reset_request_locale, set_request_locale
@@ -34,6 +39,24 @@ from tests.pddl_support import (
 )
 
 LOCALES = ("en_US", "pt_BR")
+
+#: Three marginal numbers (step 5) in a single source block.
+_LONG_VERSE_TEXT = (
+    "Primeira linha do poema com bastante texto para passar do limite minimo "
+    "de deteccao 3964 e continuar.\n"
+    "Segunda linha do poema, tambem longa o suficiente para o detector de "
+    "numeros de linha marginais considerar o bloco 3969 como candidato.\n"
+    "Terceira linha do poema, mantendo o comprimento necessario para que a "
+    "progressao aritmetica seja reconhecida 3974 pelo detector.\n"
+)
+
+#: One record block split into two stanzas by its blank line.
+_VERSE_TEXT = (
+    "Capitulo 1 .......... 10\n"
+    "Capitulo 2 .......... 25\n"
+    "\n"
+    "Capitulo 3 .......... 40\n"
+)
 
 
 @pytest.fixture(params=LOCALES)
@@ -126,6 +149,11 @@ class TestPluralForms:
                     "Código normalizado em {count} bloco",
                     "Código normalizado em {count} blocos",
                 ),
+            ),
+            (
+                MSG_BLOCK_COUNT,
+                ("{count} block", "{count} blocks"),
+                ("{count} bloco", "{count} blocos"),
             ),
         ],
     )
@@ -280,6 +308,42 @@ class TestHandlerMessagesFollowTheLocale:
             "Code normalized in 1/2 blocks"
             if locale == "en_US"
             else "Código normalizado em 1/2 blocos"
+        )
+        assert result.message == expected
+
+    def test_line_numbers_flex_numbers_and_source_blocks_independently(
+        self, locale
+    ) -> None:
+        manifest = _manifest(
+            [_element("el-1", "paragraph", text=_LONG_VERSE_TEXT)],
+            [
+                _obligation(
+                    "extract-line-numbers", ["el-1"], ["line-number-extractor"]
+                )
+            ],
+        )
+
+        result = _handle_extract_line_numbers_method(manifest, "o-1")
+
+        expected = (
+            "3 marginal line numbers extracted from 1 block"
+            if locale == "en_US"
+            else "3 números de linha marginais extraídos de 1 bloco"
+        )
+        assert result.message == expected
+
+    def test_verse_flexes_chunks_and_source_blocks_independently(self, locale) -> None:
+        manifest = _manifest(
+            [_element("el-1", "paragraph", text=_VERSE_TEXT)],
+            [_obligation("chunk-verse", ["el-1"], ["verse-chunker"])],
+        )
+
+        result = _handle_chunk_verse_method(manifest, "o-1")
+
+        expected = (
+            "Verse split into 2 chunks from 1 block"
+            if locale == "en_US"
+            else "Verso fragmentado em 2 pedaços de 1 bloco"
         )
         assert result.message == expected
 

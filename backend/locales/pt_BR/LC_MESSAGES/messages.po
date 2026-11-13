@@ -2299,16 +2299,22 @@ msgstr[0] "Guarda de repetição removeu {count} token"
 msgstr[1] "Guarda de repetição removeu {count} tokens"
 
 #, python-brace-format
-msgid "{count} marginal line number extracted from {blocks} block"
-msgid_plural "{count} marginal line numbers extracted from {blocks} blocks"
-msgstr[0] "{count} número de linha marginal extraído de {blocks} bloco"
-msgstr[1] "{count} números de linha marginais extraídos de {blocks} blocos"
+msgid "{count} marginal line number extracted from {blocks}"
+msgid_plural "{count} marginal line numbers extracted from {blocks}"
+msgstr[0] "{count} número de linha marginal extraído de {blocks}"
+msgstr[1] "{count} números de linha marginais extraídos de {blocks}"
 
 #, python-brace-format
-msgid "Verse split into {count} chunk from {blocks} block"
-msgid_plural "Verse split into {count} chunks from {blocks} blocks"
-msgstr[0] "Verso fragmentado em {count} pedaço de {blocks} bloco"
-msgstr[1] "Verso fragmentado em {count} pedaços de {blocks} blocos"
+msgid "Verse split into {count} chunk from {blocks}"
+msgid_plural "Verse split into {count} chunks from {blocks}"
+msgstr[0] "Verso fragmentado em {count} pedaço de {blocks}"
+msgstr[1] "Verso fragmentado em {count} pedaços de {blocks}"
+
+#, python-brace-format
+msgid "{count} block"
+msgid_plural "{count} blocks"
+msgstr[0] "{count} bloco"
+msgstr[1] "{count} blocos"
 
 #, python-brace-format
 msgid "Tail blocks joined: {before} -> {after} block on {pages} page(s)"

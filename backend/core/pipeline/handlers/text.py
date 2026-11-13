@@ -54,6 +54,7 @@ from backend.core.pipeline.handlers.common import (
     _target_elements,
 )
 from backend.core.pipeline.handlers.messages import (
+    MSG_BLOCK_COUNT,
     MSG_HEADING_NONE,
     MSG_HEADING_REPAIRED,
     MSG_LINE_NUMBERS_EXTRACTED,
@@ -509,7 +510,8 @@ def _handle_extract_line_numbers_method(
         success=True,
         validated=True,
         message=n(*MSG_LINE_NUMBERS_EXTRACTED, extracted).format(
-            count=extracted, blocks=changed
+            count=extracted,
+            blocks=n(*MSG_BLOCK_COUNT, changed).format(count=changed),
         ),
     )
 
@@ -610,7 +612,8 @@ def _handle_chunk_verse_method(
         success=True,
         validated=True,
         message=n(*MSG_VERSE_SPLIT, chunks).format(
-            count=chunks, blocks=split_blocks
+            count=chunks,
+            blocks=n(*MSG_BLOCK_COUNT, split_blocks).format(count=split_blocks),
         ),
     )
 

@@ -1068,12 +1068,16 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
         "Guarda de repetição removeu {count} tokens",
     ),
     handler_messages.MSG_LINE_NUMBERS_EXTRACTED: (
-        "{count} número de linha marginal extraído de {blocks} bloco",
-        "{count} números de linha marginais extraídos de {blocks} blocos",
+        "{count} número de linha marginal extraído de {blocks}",
+        "{count} números de linha marginais extraídos de {blocks}",
     ),
     handler_messages.MSG_VERSE_SPLIT: (
-        "Verso fragmentado em {count} pedaço de {blocks} bloco",
-        "Verso fragmentado em {count} pedaços de {blocks} blocos",
+        "Verso fragmentado em {count} pedaço de {blocks}",
+        "Verso fragmentado em {count} pedaços de {blocks}",
+    ),
+    handler_messages.MSG_BLOCK_COUNT: (
+        "{count} bloco",
+        "{count} blocos",
     ),
     handler_messages.MSG_TAILJOIN_JOINED: (
         "Blocos de cauda unidos: {before} -> {after} bloco em {pages} página(s)",
