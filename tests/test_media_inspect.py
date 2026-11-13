@@ -198,7 +198,6 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
 async def test_orchestrator_does_not_swallow_cancellation(monkeypatch) -> None:
     import asyncio
 
-
     async def cancelled(_path):
         raise asyncio.CancelledError
 
