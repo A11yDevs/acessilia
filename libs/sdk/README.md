@@ -42,8 +42,9 @@ Each module's `__all__` is the SDK's public API ([ADR-0018](../../docs/adr/0018-
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `read_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — the published catalogue, checks against it (it only restricts) and the last-good cache |
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — the Toolbox VLM gateway, an OpenAI-compatible chat route that is not a capability, and its provider health ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` and its subclasses, including `ToolboxUnavailable` (every endpoint failed; `causes` lists each one) |
+| `acessilia_sdk.operations.formula` | `formula_chain` — crop a formula's box (`pdf.render`, never the whole page), recognize it (`math.recognize`, candidates ranked by docstruct), convert and verbalize the chosen candidate; each step is a function of its own (`crop_formula_region`, `recognize_formula`, `speak_formula`) that reports a `Step` (capability, provider, parameters) and raises the typed errors unchanged; `FormulaCrop`, `FormulaCandidates`, `FormulaSpeech`, `FormulaChain`, `FORMULA_CROP_DPI`, `FORMULA_CROP_MIN_SIDE` ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |
-| `acessilia_sdk.cli` | `main` — the command line, `python -m acessilia_sdk` (see [Command line](#command-line)) |
+| `acessilia_sdk.cli` | `main` — the command line, `python -m acessilia_sdk` (see [Command line](#command-line)); `formula_document`, the JSON its formula command prints |
 
 ## Configuring a client
 
@@ -182,7 +183,20 @@ python -m acessilia_sdk $TB download sha256:<64 hex> out.pdf
 python -m acessilia_sdk $TB dataset list
 python -m acessilia_sdk $TB dataset items dr-docbench dev --all --limit 50
 python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_1.jpg page_1.jpg
+
+# The formula chain on one box of page 3: crop, recognize, convert, verbalize
+python -m acessilia_sdk $TB formula --file doc.pdf --page 3 --box 72,410,310,438 --crop-output crop.png
 ```
+
+**`formula` runs `acessilia_sdk.operations.formula.formula_chain`**
+([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) and
+prints every step as JSON: the crop (page, clip applied, size, or why there is
+none), the ranked candidates, the chosen LaTeX (`--candidate`, 1-based), its
+MathML and spoken text, and each step's capability, provider and parameters.
+`--box` is `LEFT,TOP,RIGHT,BOTTOM` in page units, with `--origin` or an origin
+inferred from the edges. A box that cannot be used is no crop and no request,
+never the whole page. `--recognize-provider` and `--transform-provider`
+override the registry's providers.
 
 **`run` dispatches by transport.** It calls the registry's `execute`
 capabilities through `POST /v1/capabilities/{id}:execute`, with the

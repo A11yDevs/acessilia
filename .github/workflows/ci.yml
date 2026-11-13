@@ -65,6 +65,9 @@ jobs:
       - name: Install the SDK alone
         run: |
           python -m pip install --upgrade pip
+          # The SDK's only project dependency (ADR-0017): its operations
+          # compose Toolbox capabilities with docstruct's algorithms.
+          python -m pip install ./libs/docstruct --no-cache-dir
           python -m pip install "./libs/sdk[dev]" --no-cache-dir
 
       - name: Check that the core is not importable
@@ -75,7 +78,7 @@ jobs:
 
           present = [
               name
-              for name in ("backend", "docstruct", "acessilia_toolbox", "agno", "fastapi")
+              for name in ("backend", "acessilia_toolbox", "agno", "fastapi")
               if importlib.util.find_spec(name) is not None
           ]
           if present:

@@ -39,9 +39,11 @@ mediu a situação:
     modelos pydantic ficam como modelos de transporte conferidos.
   - A ADR-0002 já permite SDK → docstruct.
   - O teste da Toolbox proíbe imports do SDK e do core.
-- **Restam quatro lacunas** (como medidas; a fase 2 da #470 fechou três
-  depois, marcadas abaixo):
-  - o SDK não depende do docstruct, e o job isolado do CI o recusa;
+- **Restam quatro lacunas** (como medidas; as fases 2 e 3 da #470 fecharam
+  as quatro depois, marcadas abaixo):
+  - o SDK não depende do docstruct, e o job isolado do CI o recusa
+    (**fechada na fase 3**: a operação de fórmula compõe o docstruct, e o job
+    `SDK alone` o instala);
   - o docstruct não tem job de instalação isolada (**fechada pela #495**, o
     job `docstruct alone`);
   - nada testa a independência de infraestrutura do docstruct (**fechada pela

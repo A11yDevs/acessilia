@@ -42,8 +42,9 @@ O `__all__` de cada módulo é a API pública do SDK ([ADR-0018](../../docs/adr/
 | `acessilia_sdk.toolbox.catalog` | `fetch_catalog`, `read_catalog`, `CatalogSnapshot`, `Requirement`, `missing_requirements`, `CatalogCache` — o catálogo publicado, as verificações contra ele (que só restringem) e o cache do último snapshot válido |
 | `acessilia_sdk.toolbox.vlm` | `vlm_gateway_base_url`, `vlm_provider_healthy`, `VLM_GATEWAY_PATH` — o gateway VLM da Toolbox, uma rota de chat compatível com OpenAI que não é capacidade, e a saúde do seu provider ([ADR-0012](../../docs/adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) |
 | `acessilia_sdk.toolbox.errors` | `ToolboxError` e subclasses, incluindo `ToolboxUnavailable` (todos os endpoints falharam; `causes` lista cada falha) |
+| `acessilia_sdk.operations.formula` | `formula_chain` — recorta a caixa de uma fórmula (`pdf.render`, nunca a página inteira), reconhece (`math.recognize`, candidatos ordenados pelo docstruct), converte e verbaliza o candidato escolhido; cada passo é uma função própria (`crop_formula_region`, `recognize_formula`, `speak_formula`) que informa um `Step` (capacidade, provider, parâmetros) e levanta os erros tipados sem alteração; `FormulaCrop`, `FormulaCandidates`, `FormulaSpeech`, `FormulaChain`, `FORMULA_CROP_DPI`, `FORMULA_CROP_MIN_SIDE` ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)) |
 | `acessilia_sdk.runtime` | `run_sync` — executa uma coroutine a partir de código síncrono, dentro ou fora de um event loop |
-| `acessilia_sdk.cli` | `main` — a linha de comando, `python -m acessilia_sdk` (veja [Linha de comando](#linha-de-comando)) |
+| `acessilia_sdk.cli` | `main` — a linha de comando, `python -m acessilia_sdk` (veja [Linha de comando](#linha-de-comando)); `formula_document`, o JSON que o comando formula imprime |
 
 ## Configurar um cliente
 
@@ -185,7 +186,21 @@ python -m acessilia_sdk $TB download sha256:<64 hex> out.pdf
 python -m acessilia_sdk $TB dataset list
 python -m acessilia_sdk $TB dataset items dr-docbench dev --all --limit 50
 python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_1.jpg page_1.jpg
+
+# A cadeia de fórmula numa caixa da página 3: recorte, reconhecimento, conversão, verbalização
+python -m acessilia_sdk $TB formula --file doc.pdf --page 3 --box 72,410,310,438 --crop-output crop.png
 ```
+
+**O `formula` roda o `acessilia_sdk.operations.formula.formula_chain`**
+([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)) e
+imprime cada passo em JSON: o recorte (página, recorte aplicado, tamanho, ou
+por que não há recorte), os candidatos ordenados, o LaTeX escolhido
+(`--candidate`, a partir de 1), o MathML e o texto falado dele, e a
+capacidade, o provider e os parâmetros de cada passo. O `--box` é
+`ESQUERDA,TOPO,DIREITA,BASE` em unidades da página, com `--origin` ou uma
+origem inferida das bordas. Uma caixa inutilizável não gera recorte nem
+requisição, e nunca vira a página inteira. `--recognize-provider` e
+`--transform-provider` substituem os providers do registro.
 
 **`run` despacha pelo transporte.** Chama as capacidades `execute` do registro
 por `POST /v1/capabilities/{id}:execute`, com o provider e a versão de contrato

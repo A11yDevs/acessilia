@@ -39,9 +39,11 @@ measured where things stand:
     Pydantic models kept as checked wire models.
   - ADR-0002 already allows SDK → docstruct.
   - The Toolbox test forbids imports of the SDK and the core.
-- **Four gaps remain** (as measured; phase 2 of #470 has closed three since,
-  marked below):
-  - the SDK does not depend on docstruct, and its isolated CI job refuses it;
+- **Four gaps remain** (as measured; phases 2 and 3 of #470 have closed all
+  four since, marked below):
+  - the SDK does not depend on docstruct, and its isolated CI job refuses it
+    (**closed in phase 3**: the formula operation composes docstruct, and the
+    `SDK alone` job installs it);
   - docstruct has no isolated install job (**closed by #495**, the
     `docstruct alone` job);
   - nothing tests docstruct's independence from infrastructure (**closed by

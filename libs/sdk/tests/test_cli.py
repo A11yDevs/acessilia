@@ -771,3 +771,125 @@ def test_an_invalid_port_is_a_usage_error_from_the_command_line_too() -> None:
         "error: Toolbox base_url must have a port between 0 and 65535"
     )
     assert "Traceback" not in result.stderr
+
+
+# formula
+
+
+CROP = b"\x89PNG\r\n\x1a\nformula-crop"
+CROP_ID = "sha256:" + hashlib.sha256(CROP).hexdigest()
+RENDERED = {
+    "status": "succeeded",
+    "capability": "pdf.render@2",
+    "provider": "pymupdf-pdf",
+    "document": {
+        "artifact_id": CROP_ID,
+        "media_type": "image/png",
+        "size_bytes": len(CROP),
+        "page_number": 2,
+        "page_count": 2,
+        "page_width": 595,
+        "page_height": 842,
+        "clip": {"left": 100, "top": 200, "right": 300, "bottom": 240},
+        "scale": 2.78,
+        "dpi": 200.0,
+        "width_px": 556,
+        "height_px": 111,
+        "source_media_type": "application/pdf",
+        "source_filename": "source.pdf",
+    },
+}
+
+
+def _serve_formula_chain(router: respx.MockRouter) -> dict[str, respx.Route]:
+    def answer(capability: str, document: dict) -> httpx.Response:
+        return httpx.Response(
+            200, json={"status": "succeeded", "capability": capability, "document": document}
+        )
+
+    router.get(f"{A}/v1/artifacts/{CROP_ID}").mock(return_value=httpx.Response(200, content=CROP))
+    return {
+        "render": router.post(f"{A}/v1/capabilities/pdf.render:execute").mock(
+            return_value=httpx.Response(200, json=RENDERED)
+        ),
+        "recognize": router.post(f"{A}/v1/capabilities/math.recognize:execute").mock(
+            return_value=answer("math.recognize", {"formulas": [{"latex": "x^2", "confidence": 0.9}]})
+        ),
+        "convert": router.post(f"{A}/v1/capabilities/math.convert:execute").mock(
+            return_value=answer("math.convert", {"mathml": "<math><msup/></math>"})
+        ),
+        "verbalize": router.post(f"{A}/v1/capabilities/math.verbalize:execute").mock(
+            return_value=answer("math.verbalize", {"verbalized": "x ao quadrado"})
+        ),
+    }
+
+
+def test_formula_runs_the_chain_and_prints_every_step(pdf, tmp_path) -> None:
+    crop = tmp_path / "crop.png"
+    with respx.mock() as router:
+        routes = _serve_formula_chain(router)
+        status, out, err = _run(
+            "--endpoint", A, "formula", "--file", str(pdf), "--page", "2",
+            "--box", "100,200,300,240", "--origin", "TOPLEFT",
+            "--recognize-provider", "rapid-latex-ocr", "--crop-output", str(crop),
+        )
+
+    assert (status, err) == (0, "")
+    document = json.loads(out)
+    assert document["crop"] == {
+        "page_number": 2, "clip": [100, 200, 300, 240], "size_bytes": len(CROP), "reason": None
+    }
+    assert document["latex"] == "x^2"
+    assert document["mathml"] == "<math><msup/></math>"
+    assert document["verbalization"] == "x ao quadrado"
+    assert [step["capability"] for step in document["steps"]] == [
+        "pdf.render", "math.recognize", "math.convert", "math.verbalize"
+    ]
+    assert document["steps"][1]["provider"] == "rapid-latex-ocr"
+    assert crop.read_bytes() == CROP
+    assert 'filename="source.pdf"' in _form(routes["render"].calls.last.request)
+
+
+def test_formula_without_a_usable_box_prints_no_crop_and_sends_nothing(pdf) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        routes = _serve_formula_chain(router)
+        status, out, _ = _run(
+            "--endpoint", A, "formula", "--file", str(pdf), "--page", "2", "--box", "nan,1,2,3",
+        )
+
+    assert status == 0
+    document = json.loads(out)
+    assert document["crop"]["reason"] == "no usable box"
+    assert (document["latex"], document["steps"]) == ("", [])
+    assert not any(route.called for route in routes.values())
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (("--box", "1,2,3"), "--box takes four numbers"),
+        (("--box", "1,2,3,4", "--page", "0"), "--page is 1-based"),
+        (("--box", "1,2,3,4", "--candidate", "0"), "--candidate is 1-based"),
+    ],
+)
+def test_formula_checks_its_arguments_before_any_request(pdf, arguments, message) -> None:
+    arguments = (*arguments, "--page", "1") if "--page" not in arguments else arguments
+    with respx.mock() as router:
+        status, _, err = _run("--endpoint", A, "formula", "--file", str(pdf), *arguments)
+        assert not router.calls
+
+    assert status == 2
+    assert err.startswith(f"error: {message}")
+
+
+def test_a_failed_recognition_is_reported_typed_with_status_1(pdf) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        routes = _serve_formula_chain(router)
+        routes["recognize"].mock(return_value=httpx.Response(503, json={"detail": "down"}))
+        status, out, err = _run(
+            "--endpoint", A, "formula", "--file", str(pdf), "--page", "2", "--box", "1,2,30,40",
+        )
+
+    assert (status, out) == (1, "")
+    assert err.startswith("error: ToolboxProviderUnavailable: ")
+    assert not routes["convert"].called

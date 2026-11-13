@@ -3,10 +3,20 @@ revision = 3
 requires-python = ">=3.11"
 
 [[package]]
+name = "acessilia-docstruct"
+version = "0.5.0"
+source = { editable = "../docstruct" }
+
+[package.metadata]
+requires-dist = [{ name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" }]
+provides-extras = ["dev"]
+
+[[package]]
 name = "acessilia-sdk"
 version = "0.3.0"
 source = { editable = "." }
 dependencies = [
+    { name = "acessilia-docstruct" },
     { name = "httpx" },
 ]
 
@@ -19,6 +29,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "acessilia-docstruct", editable = "../docstruct" },
     { name = "httpx", specifier = ">=0.27,<0.28" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },
