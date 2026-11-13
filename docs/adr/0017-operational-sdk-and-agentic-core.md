@@ -103,8 +103,9 @@ Proposed: option 2.
     wire contracts: REST and MCP schemas keep their own versions and contract
     tests;
   - **no infrastructure:** no network, environment, files, subprocesses or
-    imports of the core, the SDK or the Toolbox. Today only the imports are
-    tested; the rest needs the test listed under follow-up work.
+    imports of the core, the SDK or the Toolbox. `test_purity.py` tests the
+    imports, and `test_infrastructure.py` (#470, phase 2) the rest, for the
+    modules, built-ins and `sys` attributes it lists.
 - **Dependencies:** unchanged from ADR-0002.
   - The SDK may depend on docstruct, and does once its first operation
     composes a docstruct algorithm.
@@ -163,7 +164,10 @@ Proposed: option 2.
   - which operations follow the formula chain, and in which order;
   - what docstruct's stable public API is. The proposal is: what each module
     lists in `__all__` and the README tables;
-  - an operational plan contract, deferred.
+  - an operational plan contract, deferred;
+  - whether docstruct must also be deterministic: no clock, randomness or
+    threads. `test_infrastructure.py` leaves them out, since they are not
+    infrastructure; docstruct uses none of them today.
 - **Compliance:**
   - `libs/docstruct/tests/test_purity.py` and `libs/sdk/tests/test_purity.py`
     (they exist);
