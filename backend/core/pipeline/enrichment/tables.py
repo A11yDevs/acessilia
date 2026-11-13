@@ -2,7 +2,7 @@
 
 Runs before planning. It chooses the tables to read (no structure, or a
 structure that looks misread), backfills a structure from the text when it
-can, asks the data agent for the rest with bounded concurrency, keeps a new
+can, asks the data agent for the rest one table at a time, keeps a new
 reading only when it shares enough words with the old one, records why a table
 was left unread, and retries the failures a second try may fix. Moved verbatim
 from the PDDL orchestrator (#402, phase 3, step 6).
