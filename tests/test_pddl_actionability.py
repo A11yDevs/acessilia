@@ -375,7 +375,6 @@ class TestPandocCodeNormalizes:
         result = _handle_pandoc_code_method(manifest, "o-1")
 
         assert result.success is True
-        assert element.metadata.get("code_normalized") is True
         assert element.text != "def  f( ):\n  return 1"
 
     def test_fails_when_the_target_is_not_code(self) -> None:

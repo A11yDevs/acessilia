@@ -128,7 +128,12 @@ def _handle_pandoc_table_method(
 def _handle_pandoc_code_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Normalize code targets in place and flag each one in ``metadata["code_normalized"]``."""
+    """Normalize code targets in place and report how many blocks were changed.
+
+    The normalized text is the evidence: ``MethodResult`` carries the count and
+    nothing needs a per-element marker, since the manifest records the method
+    attempt that satisfied the obligation.
+    """
     elements = [
         el for el in _target_elements(manifest, obligation_id) if el.type == "code"
     ]
@@ -145,7 +150,6 @@ def _handle_pandoc_code_method(
         if not text:
             continue
         element.text = text
-        element.metadata["code_normalized"] = True
         normalized += 1
 
     if normalized != len(elements):
