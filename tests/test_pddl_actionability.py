@@ -746,7 +746,8 @@ class TestEveryHandlerIsCallable:
         if method == "deterministic-heading-repair":
             elements[1].hierarchy_level = 3
         manifest = _manifest(
-            elements, [_obligation(kind, [elements[0].id], [method])]
+            elements,
+            [_obligation(kind, [element.id for element in elements], [method])],
         )
         if method == "single-provider":
             manifest.extractor.configuration["toolbox_provider"] = "docling"

@@ -233,6 +233,7 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de verso elegível para fragmentação"),
     ("backend/core/pipeline/handlers/text.py", "Verso fragmentado em"),
     ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de cauda elegível para união"),
+    ("backend/core/pipeline/handlers/text.py", "não corresponde aos alvos da obrigação"),
     ("backend/core/pipeline/handlers/text.py", "Nenhum título encontrado para a obrigação"),
     ("backend/core/pipeline/handlers/text.py", "Hierarquia de títulos verificada"),
     ("backend/core/pipeline/handlers/content.py", "Nenhuma imagem encontrada para a obrigação"),
