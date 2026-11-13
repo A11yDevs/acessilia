@@ -14,6 +14,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   indisponível, em vez de surgir depois como `httpx.InvalidURL`; a checagem de
   porta própria da linha de comando saiu, porque `parse_endpoints` já a cobre
   (#438).
+- **Documentada** a API pública: o que cada módulo lista em `__all__`
+  (ADR-0018). Um nome fora dele é interno e pode mudar em qualquer release. A
+  tabela do README a resume, agora incluindo o `ToolboxPdfValidateClient`, e o
+  `tests/test_public_api.py` a confere contra o `__all__`. Nenhum código mudou.
 - **Adicionado** `page_judgement_probability(document)` em
   `acessilia_sdk.toolbox.clients.adjudicate`: o `pB` de uma resposta do
   `document.adjudicate.page` como float em [0, 1], ou `None` quando ausente,

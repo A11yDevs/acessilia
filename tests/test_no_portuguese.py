@@ -221,6 +221,8 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     # Non-ASCII fixtures exercise HTTP header rejection and Unicode URL encoding.
     ("tests/test_n05_n09_n10_regressions.py", '"inválido".encode()'),
     ("libs/sdk/tests/clients/test_dataset.py", '"input/álgebra.pdf"'),
+    # The heading of the Brazilian Portuguese README whose table it reads (ADR-0018).
+    ("libs/sdk/tests/test_public_api.py", "## API pública"),
     # Method results of the deterministic handlers — user-facing execution
     # messages, moved with their handlers (#402, step 6); #410 translates them.
     ("backend/core/pipeline/handlers/common.py", "Obrigação não encontrada"),

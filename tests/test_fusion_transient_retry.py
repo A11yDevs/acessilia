@@ -21,12 +21,9 @@ EXECUTE = f"{BASE_URL}/v1/capabilities/document.structure.extract:execute"
 
 @pytest.fixture(autouse=True)
 def toolbox_settings(monkeypatch):
-    from acessilia_sdk.toolbox import client as client_module
-
-    async def no_wait(_delay):
-        return None
-
-    monkeypatch.setattr(client_module, "_sleep", no_wait)
+    # No wait between retries, through the public setting rather than the
+    # SDK's internal sleep (ADR-0018).
+    monkeypatch.setattr(settings, "toolbox_retry_backoff_seconds", 0)
     monkeypatch.setattr(settings, "toolbox_base_url", BASE_URL)
     monkeypatch.setattr(settings, "toolbox_base_urls", "")
     monkeypatch.setattr(settings, "toolbox_api_key", "")

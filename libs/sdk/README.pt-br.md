@@ -25,13 +25,15 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
 
 ## API pública
 
+O `__all__` de cada módulo é a API pública do SDK ([ADR-0018](../../docs/adr/0018-core-uses-sdk-public-api.pt-br.md)); um nome fora dele é interno e pode mudar em qualquer release. Esta tabela o resume, e o `tests/test_public_api.py` a confere contra o `__all__` e confere que as tabelas em inglês e em português coincidem.
+
 | Módulo | Símbolos |
 |---|---|
 | `acessilia_sdk.toolbox.capabilities` | `TOOLBOX_CAPABILITIES`, `ToolboxCapability`, `PROVIDER_DEFAULTS`, `ROUTE_PROVIDER_DEFAULTS`, `provider_default` — allowlist dos contratos da Toolbox e os providers padrão (só dados) |
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — único caminho para `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base dos clientes por capacidade (conexões, header Bearer, provider, failover, `health`, `close`); `FailoverHook` |
 | `acessilia_sdk.toolbox.config` | `ToolboxClientConfig`, `make_client` — toda a configuração de um cliente como valores explícitos (endpoints, chave de API, timeouts, retries, providers por `provider_key`, timeouts de exportação por `timeout_key`, hook de failover) e a factory que monta um cliente a partir dela |
-| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxStructureClient`, `ToolboxTableClient` — um cliente por família de capacidades; sem settings e sem logs |
+| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxPdfValidateClient`, `ToolboxStructureClient`, `ToolboxTableClient` — um cliente por família de capacidades; sem settings e sem logs |
 | `acessilia_sdk.toolbox.clients.adjudicate` | `page_judgement_probability` — o `pB` de uma resposta do `document.adjudicate.page`, ou `None` quando ausente ou fora de [0, 1] |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — as instâncias da Toolbox que um cliente tenta, em ordem |
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (o PNG de `ToolboxPdfClient.render`, o recorte aplicado e o resultado `image@2`), `ClipOrigin`, `RENDER_MEDIA_TYPES` (as entradas que o `pdf.render@2` abre: PDF, PNG, JPEG); `ToolboxPdfClient.text_spans_by_page` lê as páginas `text-spans@1` de qualquer número de páginas, em chamadas de no máximo `TEXT_SPANS_MAX_PAGES` |

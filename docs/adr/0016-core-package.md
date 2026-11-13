@@ -237,8 +237,10 @@ Proposed: option 2.
   - the resources the core loads (PDDL domains, prompts, catalogs) live with
     the code that loads them;
   - the ADRs' word "core" names one package. "The core depends only on the
-    SDK's public API" (ADR B of #402) becomes checkable at the package
-    boundary.
+    SDK's public API" (ADR B of #402, now
+    [ADR-0018](0018-core-uses-sdk-public-api.md)) is checked over `backend/`,
+    `scripts/` and `tests/` today, and holds at the package boundary after the
+    extraction.
 - **Harder:**
   - every stage that reads `settings` changes its signature (107 reads);
   - the paths of the modules the service and the tests import change twice:

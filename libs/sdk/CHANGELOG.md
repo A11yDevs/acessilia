@@ -13,6 +13,10 @@ can see are recorded here, newest first.
   availability gate as an unavailable Toolbox instead of surfacing later as
   `httpx.InvalidURL`; the command line's own port check is gone because
   `parse_endpoints` now covers it (#438).
+- **Documented** the public API: what each module lists in `__all__`
+  (ADR-0018). A name outside it is internal and may change in any release. The
+  README's table summarizes it, now including `ToolboxPdfValidateClient`, and
+  `tests/test_public_api.py` checks it against `__all__`. No code changed.
 - **Added** `page_judgement_probability(document)` in
   `acessilia_sdk.toolbox.clients.adjudicate`: the `pB` of a
   `document.adjudicate.page` answer as a float in [0, 1], or `None` when it is
