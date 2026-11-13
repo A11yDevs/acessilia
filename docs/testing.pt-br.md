@@ -45,8 +45,10 @@ Todo pull request e push para `develop`, `main` ou uma branch de release executa
 o workflow `CI` do GitHub Actions:
 
 - **`tests (Python 3.11)`** instala o projeto, confere o contrato de capacidades
-  da Toolbox, roda o core non-E2E com **quatro workers**, roda as suítes do
-  docstruct e do SDK, recusa skips inesperados e publica relatórios JUnit.
+  da Toolbox, informa se a versão do docstruct fixada pela Toolbox acompanha o
+  core (só avisos; veja abaixo), roda o core non-E2E com **quatro workers**,
+  roda as suítes do docstruct e do SDK, recusa skips inesperados e publica
+  relatórios JUnit.
 - **`SDK alone (Python 3.11)`** instala apenas o SDK e prova que ele funciona
   sem o core ou o docstruct.
 - **`docstruct alone (Python 3.11)`** instala apenas o docstruct, a partir do
@@ -175,8 +177,12 @@ teste deixou para trás. O workflow `Scheduled test monitoring` roda semanalment
 (e sob demanda) para `main` e `develop`. Para cada branch, ele roda o core
 serialmente e de novo com quatro workers, compara os resultados JUnit, falha em
 diferença, falha, erro ou skip inesperado, e escreve um resumo com p50/p95 das
-durações e os testes mais lentos. Uma falha agendada abre ou atualiza a issue
-`Scheduled test monitoring failed`.
+durações e os testes mais lentos. Ele também confere, de forma estrita, a
+versão do docstruct fixada pela Toolbox (`scripts/check_docstruct_pin.py`): um
+pin atrás da release que o docstruct do branch pede, ou que não bate com o
+wheel publicado, faz a execução falhar. Os pull requests só recebem isso como
+aviso, porque só a Toolbox pode mudar o pin (#470). Uma falha agendada abre ou
+atualiza a issue `Scheduled test monitoring failed`.
 
 O workflow só começa a disparar depois que o arquivo chega ao branch padrão. O
 E2E é um job separado e condicional: roda apenas quando `TOOLBOX_BASE_URL` ou

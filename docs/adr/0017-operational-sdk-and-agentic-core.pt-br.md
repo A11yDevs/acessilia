@@ -39,13 +39,17 @@ mediu a situação:
     modelos pydantic ficam como modelos de transporte conferidos.
   - A ADR-0002 já permite SDK → docstruct.
   - O teste da Toolbox proíbe imports do SDK e do core.
-- **Restam quatro lacunas:**
+- **Restam quatro lacunas** (como medidas; a fase 2 da #470 fechou três
+  depois, marcadas abaixo):
   - o SDK não depende do docstruct, e o job isolado do CI o recusa;
-  - o docstruct não tem job de instalação isolada;
-  - nada testa a independência de infraestrutura do docstruct;
+  - o docstruct não tem job de instalação isolada (**fechada pela #495**, o
+    job `docstruct alone`);
+  - nada testa a independência de infraestrutura do docstruct (**fechada pela
+    #497**, `test_infrastructure.py`);
   - nada confere se a versão do docstruct fixada pela Toolbox acompanha a do
     core. Os branches concordam hoje (0.4.0 nas duas `main`, 0.5.0 nas duas
-    `develop`), mas só por convenção.
+    `develop`), mas só por convenção (**fechada pela #498** quanto ao pin,
+    `scripts/check_docstruct_pin.py`).
 - **O core guarda seis operações determinísticas ao lado da política que as
   executa:**
   - a cadeia de fórmula;
@@ -141,13 +145,15 @@ Proposta: a opção 2.
   - o job isolado do SDK no CI muda quando o SDK passar a depender do
     docstruct.
 - **Trabalho seguinte**, em pull requests próprios:
-  - um job de CI que instala o docstruct sozinho num ambiente limpo;
+  - um job de CI que instala o docstruct sozinho num ambiente limpo (feito,
+    #495);
   - um teste de que nenhum módulo do docstruct lê o ambiente ou arquivos, abre
     um socket ou inicia um subprocesso (fase 2 da #470). O job de instalação
-    isolada não confere isso;
+    isolada não confere isso (feito, #497);
   - uma verificação de que a versão do docstruct fixada pela Toolbox acompanha
     a release do core, ou fixtures compartilhadas contra as quais os dois
-    testam (P8 da #470);
+    testam (P8 da #470). A verificação do pin está feita (#498); as fixtures
+    compartilhadas continuam em aberto;
   - a cadeia de fórmula no SDK (a evidência acima);
   - as outras operações do inventário, uma por pull request, cada uma com
     caracterização e comparação dos manifestos antes e depois.

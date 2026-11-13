@@ -41,9 +41,15 @@ que já foi aceita:
   | `main` | 0.4.0 (cac215df) | `docstruct-v0.4.0` (e77869be) |
   | `develop` | 0.5.0 (b6ca0ecf) | `docstruct-v0.5.0` (77c7df7c), desde o db866c60 da acessilia-toolbox (2026-11-02) |
 
-  Então não há divergência hoje. Mas nada confere se uma release do docstruct
+  Então não há divergência hoje. Mas nada conferia se uma release do docstruct
   e a versão fixada pela Toolbox andam juntas, nem se os dois ainda concordam
-  sobre os modelos compartilhados: é o risco da P8 da #470.
+  sobre os modelos compartilhados: é o risco da P8 da #470. **A metade do pin é
+  conferida desde a fase 2 da #470:** o `scripts/check_docstruct_pin.py` lê a
+  versão fixada no branch pareado da Toolbox, confere com a release publicada e
+  com o SHA-256 do wheel dela, e acusa uma Toolbox atrás da release mais nova
+  para a versão do core. Ele avisa nos pull requests e faz falhar o
+  monitoramento agendado. Se os dois ainda concordam sobre os modelos
+  compartilhados (fixtures compartilhadas) continua em aberto.
 - **O docstruct não tinha job de instalação isolada.** O `test_purity.py`
   recusa imports fora da biblioteca padrão num subprocesso, mas nenhum job de
   CI instalava o docstruct sozinho num ambiente limpo, como o `SDK alone` faz

@@ -41,9 +41,14 @@ which is accepted:
   | `main` | 0.4.0 (cac215df) | `docstruct-v0.4.0` (e77869be) |
   | `develop` | 0.5.0 (b6ca0ecf) | `docstruct-v0.5.0` (77c7df7c), since acessilia-toolbox db866c60 (2026-11-02) |
 
-  So there is no gap today. But nothing checks that a docstruct release and
+  So there is no gap today. But nothing checked that a docstruct release and
   the Toolbox's pin move together, or that the two still agree on the shared
-  models: this is #470's P8 risk.
+  models: this is #470's P8 risk. **The pin half is checked since phase 2 of
+  #470:** `scripts/check_docstruct_pin.py` reads the pin on the paired Toolbox
+  branch, checks it against the published release and its wheel's SHA-256,
+  and reports a Toolbox behind the newest release for the core's version. It
+  warns in pull requests and fails the scheduled monitoring. Whether the two
+  still agree on the shared models (shared fixtures) is still open.
 - **docstruct had no isolated install job.** `test_purity.py` refuses
   non-standard imports in a subprocess, but no CI job installed docstruct alone
   in a clean environment, as `SDK alone` does for the SDK. **Closed by phase 2

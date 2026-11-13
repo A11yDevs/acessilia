@@ -45,9 +45,10 @@ Every pull request and push to `develop`, `main` or a release branch runs the
 GitHub Actions workflow `CI`:
 
 - **`tests (Python 3.11)`** installs the project, checks the Toolbox capability
-  contract, runs the non-E2E core suite with **four workers**, runs the
-  docstruct and SDK suites, rejects unexpected skipped tests and uploads JUnit
-  reports.
+  contract, reports whether the Toolbox's docstruct pin follows the core
+  (warnings only; see below), runs the non-E2E core suite with **four
+  workers**, runs the docstruct and SDK suites, rejects unexpected skipped
+  tests and uploads JUnit reports.
 - **`SDK alone (Python 3.11)`** installs only the SDK and proves that it works
   without the core or docstruct.
 - **`docstruct alone (Python 3.11)`** installs only docstruct, from its wheel,
@@ -173,8 +174,12 @@ test's leftovers. The `Scheduled test monitoring` workflow runs weekly (and on
 demand) for `main` and `develop`. For each branch it runs the core suite
 serially and again with four workers, compares the JUnit outcomes, fails on a
 difference, failure, error or unexpected skip, and writes a summary with p50/p95
-test durations and the slowest tests. A scheduled failure opens or updates the
-issue `Scheduled test monitoring failed`.
+test durations and the slowest tests. It also checks the Toolbox's docstruct
+pin strictly (`scripts/check_docstruct_pin.py`): a pin behind the release the
+branch's docstruct calls for, or not matching the published wheel, fails the
+run. Pull requests only get it as warnings, since only the Toolbox can move the
+pin (#470). A scheduled failure opens or updates the issue
+`Scheduled test monitoring failed`.
 
 The workflow only starts firing after its file reaches the default branch. E2E
 is a separate, conditional job: it runs only when `TOOLBOX_BASE_URL` or

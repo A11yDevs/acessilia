@@ -39,13 +39,17 @@ measured where things stand:
     Pydantic models kept as checked wire models.
   - ADR-0002 already allows SDK → docstruct.
   - The Toolbox test forbids imports of the SDK and the core.
-- **Four gaps remain:**
+- **Four gaps remain** (as measured; phase 2 of #470 has closed three since,
+  marked below):
   - the SDK does not depend on docstruct, and its isolated CI job refuses it;
-  - docstruct has no isolated install job;
-  - nothing tests docstruct's independence from infrastructure;
+  - docstruct has no isolated install job (**closed by #495**, the
+    `docstruct alone` job);
+  - nothing tests docstruct's independence from infrastructure (**closed by
+    #497**, `test_infrastructure.py`);
   - nothing checks that the Toolbox's docstruct pin follows the core's. The
     branches agree today (0.4.0 on both `main`s, 0.5.0 on both `develop`s),
-    but only by convention.
+    but only by convention (**closed by #498** for the pin,
+    `scripts/check_docstruct_pin.py`).
 - **The core holds six deterministic operations next to the policy that runs
   them:**
   - the formula chain;
@@ -141,12 +145,14 @@ Proposed: option 2.
   - the SDK's isolated CI job changes when the SDK starts depending on
     docstruct.
 - **Follow-up work**, in its own pull requests:
-  - a CI job that installs docstruct alone in a clean environment;
+  - a CI job that installs docstruct alone in a clean environment (done,
+    #495);
   - a test that no docstruct module reads the environment or files, opens a
     socket or starts a subprocess (phase 2 of #470). The isolated install job
-    does not check this;
+    does not check this (done, #497);
   - a check that the Toolbox's docstruct pin follows the core's release, or
-    shared fixtures both test against (#470's P8);
+    shared fixtures both test against (#470's P8). The pin check is done
+    (#498); shared fixtures are still open;
   - the formula chain in the SDK (the acceptance evidence above);
   - the other operations of the inventory, one per pull request, each with
     characterization and a comparison of the manifests before and after.
