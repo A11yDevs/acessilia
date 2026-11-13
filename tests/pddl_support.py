@@ -121,9 +121,9 @@ def install_formula_recognizer(monkeypatch, answer) -> None:
     """
     from docstruct.text.latex import ranked_latex_candidates
 
-    from backend.agents import pddl_orchestrator
+    from backend.core.pipeline.enrichment import formulas as formula_stage
 
     def recognize(image, **kwargs):
         return ranked_latex_candidates(answer(image, **kwargs))
 
-    monkeypatch.setattr(pddl_orchestrator, "toolbox_recognize_formula", recognize)
+    monkeypatch.setattr(formula_stage, "toolbox_recognize_formula", recognize)
