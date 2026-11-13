@@ -356,7 +356,7 @@ vMAJOR.MINOR.PATCH
 
 O repositório utiliza **GitHub Rulesets** para proteger a branch `main` contra deleção, force-push e merges sem revisão. Rulesets são configurados **via API REST**, não por arquivos no repositório.
 
-O arquivo `.github/rulesets/main.json.example` contém o modelo da configuração atual. Para aplicar ou atualizar os rulesets, execute:
+Os arquivos `.github/rulesets/main.json.example` e `.github/rulesets/develop.json.example` contêm os modelos. A `main` está protegida hoje com `CI / tests (Python 3.11)`; o modelo dela também registra o check recomendado `CI / SDK alone (Python 3.11)`. A `develop` não está protegida; o modelo dela propõe os mesmos dois checks obrigatórios. Aplicar qualquer um dos modelos é uma decisão do mantenedor. Para aplicar ou atualizar os rulesets, execute:
 
 ```bash
 # Aplica/atualiza os rulesets via GitHub API

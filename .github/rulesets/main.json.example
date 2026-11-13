@@ -47,6 +47,9 @@
         "required_status_checks": [
           {
             "context": "CI / tests (Python 3.11)"
+          },
+          {
+            "context": "CI / SDK alone (Python 3.11)"
           }
         ]
       }

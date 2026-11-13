@@ -188,9 +188,14 @@ over `--timeout=0`, so remove the marker while debugging that test.
 
 ## CI artifacts
 
-CI runs the same suites with `--durations=25` and uploads the JUnit XML reports
-even when a step fails: `test-reports` for the core, docstruct and SDK suites,
-and `sdk-isolated-report` for the SDK-only job.
+CI runs the core suite with `-n 4 --dist worksteal` inside the existing
+`tests (Python 3.11)` job; the job name is unchanged, so the required check
+keeps working. The standalone collection step is gone because the run collects
+the suite. The job still runs the docstruct and SDK suites, rejects unexpected
+skips and uploads the JUnit reports with `--durations=25` even when a step
+fails: `test-reports` for the core, docstruct and SDK suites, and
+`sdk-isolated-report` for the SDK-only job. Image delivery waits for both
+`tests` and `sdk-isolated`.
 
 ## Supported environments
 

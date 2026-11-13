@@ -353,7 +353,7 @@ vMAJOR.MINOR.PATCH
 
 The repository uses **GitHub Rulesets** to protect the `main` branch from deletion, force pushes, and unreviewed merges. Rulesets are configured **via the REST API**, not through files in the repo itself.
 
-The file `.github/rulesets/main.json.example` holds a template of the current configuration. To apply or refresh the rulesets, run:
+The files `.github/rulesets/main.json.example` and `.github/rulesets/develop.json.example` hold the templates. `main` is protected today with `CI / tests (Python 3.11)`; its template also records the recommended `CI / SDK alone (Python 3.11)` gate. `develop` is not protected; its template proposes the same two required checks. Applying either template is a maintainer decision. To apply or refresh the rulesets, run:
 
 ```bash
 # Apply/update the rulesets via the GitHub API

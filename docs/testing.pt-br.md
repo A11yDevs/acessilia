@@ -196,9 +196,14 @@ sobre `--timeout=0`, então remova o marcador ao depurar esse teste.
 
 ## Artefatos da CI
 
-A CI executa as mesmas suítes com `--durations=25` e publica os relatórios JUnit
-mesmo quando uma etapa falha: `test-reports` para as suítes do core, docstruct e
-SDK, e `sdk-isolated-report` para o job isolado do SDK.
+A CI executa a suíte do core com `-n 4 --dist worksteal` dentro do job existente
+`tests (Python 3.11)`; o nome do job não muda, então o check obrigatório
+continua funcionando. A etapa separada de coleta foi removida porque a execução
+já coleta a suíte. O job continua rodando as suítes do docstruct e do SDK,
+recusando skips inesperados e publicando os relatórios JUnit com
+`--durations=25` mesmo quando uma etapa falha: `test-reports` para as suítes do
+core, docstruct e SDK, e `sdk-isolated-report` para o job isolado do SDK. A
+entrega da imagem espera por `tests` e `sdk-isolated`.
 
 ## Ambientes suportados
 
