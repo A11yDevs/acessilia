@@ -4,7 +4,7 @@ Também disponível em **inglês (EUA)**: [English version](README.md)
 
 A suíte de testes unitários do projeto cobre o pipeline canônico, o motor PDDL, a API e os exportadores. Tudo é rápido e isolado: arquivos vão para diretórios temporários; chamadas de rede e de LLM são simuladas (mock), e os fluxos assíncronos rodam com `pytest-asyncio`.
 
-Por constituição, o portão é o container: os testes devem passar dentro do Docker (equivalente à produção) antes de um merge. A execução nativa é a verificação secundária.
+O portão de merge é a CI, que executa nativamente as suítes non-E2E do core, docstruct e SDK. A constituição ainda cita o container como portão; a [#190](https://github.com/A11yDevs/acessilia/issues/190) acompanha essa redação, e a imagem não tem estágio `test` hoje.
 
 As regressões da issue #342 cobrem continuações de listas após parágrafos e tabelas com numeração explicitamente consecutiva. O scorecard separa sequências quando o grupo de origem muda sem numeração de continuação correspondente, a numeração reinicia explicitamente, muda de estilo, pula um número, cruza títulos ou páginas ou encontra blocos diferentes de parágrafos, tabelas ou fórmulas. Blocos adjacentes antigos sem metadados de grupo mantêm seu agrupamento. TXT/MP3 continuam usando a fala enriquecida conforme o ADR-0011; use as expectativas atuais do dataset, que aceitam o sinal negativo falado.
 
@@ -31,11 +31,10 @@ uv run pytest
 
 # Apenas um arquivo
 uv run pytest tests/test_pddl_planning.py
-
-# Container (o portão — o estágio `test` de infra/Dockerfile)
-docker build -f infra/Dockerfile --target test -t acessilia:test-docling .
-docker run --rm -v "$PWD:/app" -w /app acessilia:test-docling pytest tests/
 ```
+
+Revisões antigas mostravam um comando de container que apontava para um estágio
+`test` que não existe; a #190 acompanha a redação da validação em container.
 
 ## Fixtures
 
@@ -56,6 +55,12 @@ CORE_BASE_URL=https://core.example/api/v1 \
 CORE_EXPECT_BUILD_INFO=1 \
 uv run pytest -m e2e -v
 ```
+
+O workflow `Scheduled test monitoring` roda a suíte E2E semanalmente quando as
+variáveis do repositório `TOOLBOX_BASE_URL` ou `CORE_BASE_URL` estão
+configuradas. Ele usa o secret opcional `TOOLBOX_API_KEY` e a variável
+`CORE_EXPECT_BUILD_INFO`; o corpus opcional do dataset não é clonado ali, então
+esses casos são pulados. O E2E é uma validação agendada, não um portão de merge.
 
 O `tests/test_core_api_e2e.py` só é pulado enquanto `CORE_BASE_URL` não estiver
 definido. Depois de definido, um core inalcançável ou um `/health` doente

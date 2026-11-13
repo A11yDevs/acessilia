@@ -4,7 +4,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 The project's unit test suite covers the canonical pipeline, PDDL engine, API and exporters. Everything is fast and isolated: files go to temporary directories; network and LLM calls are mocked, and async flows run with `pytest-asyncio`.
 
-By constitution, the gate is the container: tests must pass inside Docker (production equivalent) before a merge. The native run is secondary verification.
+The merge gate is CI, which runs the non-E2E core, docstruct and SDK suites natively. The constitution still names a container gate; [#190](https://github.com/A11yDevs/acessilia/issues/190) tracks that wording, and the image has no `test` stage today.
 
 Issue #342 regressions cover list continuations across paragraphs and tables with explicit consecutive numbering. The math scorecard separates runs at changes of source parent without matching continuation numbering, explicit restarts, style changes, numbering gaps, headings, page boundaries, and blocks other than paragraphs, tables or formulas. Legacy adjacent blocks without parent metadata retain their grouping. TXT/MP3 continue to use enriched speech under ADR-0011; use the current dataset expectations, which accept the spoken negative sign.
 
@@ -31,11 +31,10 @@ uv run pytest
 
 # A single file only
 uv run pytest tests/test_pddl_planning.py
-
-# Container (the gate — the `test` stage of infra/Dockerfile)
-docker build -f infra/Dockerfile --target test -t acessilia:test-docling .
-docker run --rm -v "$PWD:/app" -w /app acessilia:test-docling pytest tests/
 ```
+
+Older revisions showed a container command that targeted a `test` stage that
+does not exist; #190 tracks the container-validation wording.
 
 ## Fixtures
 
@@ -56,6 +55,12 @@ CORE_BASE_URL=https://core.example/api/v1 \
 CORE_EXPECT_BUILD_INFO=1 \
 uv run pytest -m e2e -v
 ```
+
+The `Scheduled test monitoring` workflow runs the E2E suite weekly when the
+repository variables `TOOLBOX_BASE_URL` or `CORE_BASE_URL` are configured. It
+uses the optional `TOOLBOX_API_KEY` secret and the `CORE_EXPECT_BUILD_INFO`
+variable; the optional dataset corpus is not cloned there, so those cases skip.
+E2E is a scheduled validation, not a merge gate.
 
 `tests/test_core_api_e2e.py` skips only while `CORE_BASE_URL` is unset. Once it
 is set, an unreachable core or an unhealthy `/health` fails the run: a skipped
