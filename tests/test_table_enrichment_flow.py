@@ -17,6 +17,7 @@ from backend.agents.output_schemas import DataOutput
 from backend.config.settings import settings
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest
+from backend.core.pipeline.enrichment import tables as table_stage
 
 
 def _reading(rows, *, warnings=()):
@@ -45,13 +46,13 @@ def run(monkeypatch):
         async def run_inline(function, *args):
             return function(*args)
 
-        monkeypatch.setattr(pddl, "DataAgent", Agent)
-        monkeypatch.setattr(pddl, "_extract_picture_bytes",
+        monkeypatch.setattr(table_stage, "DataAgent", Agent)
+        monkeypatch.setattr(table_stage, "_extract_picture_bytes",
                             lambda source, element, fallback, *rest: (crops or {}).get(element.id, (b"img", fallback or 1)))
         monkeypatch.setattr(pddl.asyncio, "to_thread", run_inline)
         manifest = build_manifest(elements, [])
         manifest.pages = [PageDescriptor(page_number=n, width=600.0, height=800.0, element_ids=[]) for n in range(1, pages + 1)]
-        asyncio.run(pddl._enrich_table_structures(manifest, Path("/tmp/doc.pdf"), breaker=breaker))
+        asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/doc.pdf"), breaker=breaker))
         return manifest, calls
 
     return go

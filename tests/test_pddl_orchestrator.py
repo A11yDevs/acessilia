@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from backend.agents.output_schemas import DataOutput, VisionOutput
-from backend.agents.pddl_orchestrator import _enrich_table_structures
+from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.pipeline.payload import build_pddl_structured_payload
 from docstruct.tables.text_rows import rows_from_visual_table_text as _rows_from_visual_table_text
@@ -28,6 +28,7 @@ from backend.core.manifest.models import (
 )
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
 from backend.core.pipeline.enrichment import pictures as picture_stage
+from backend.core.pipeline.enrichment import tables as table_stage
 
 
 def _sample_manifest() -> ProcessingManifest:
@@ -687,9 +688,9 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
                 confidence=0.95,
             )
 
-    monkeypatch.setattr(pddl_module, "DataAgent", FakeDataAgent)
+    monkeypatch.setattr(table_stage, "DataAgent", FakeDataAgent)
     monkeypatch.setattr(
-        pddl_module,
+        table_stage,
         "_extract_picture_bytes",
         lambda *_args: (b"image", 1),
     )

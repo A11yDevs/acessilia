@@ -14,10 +14,11 @@ from pathlib import Path
 import pytest
 
 from backend.agents.output_schemas import DataOutput
-from backend.agents.pddl_orchestrator import _enrich_table_structures
+from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.config.settings import settings
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
+from backend.core.pipeline.enrichment import tables as table_stage
 
 
 @pytest.fixture(autouse=True)
@@ -84,8 +85,8 @@ def _run(monkeypatch, rows, reading, image=b"image"):
     async def run_inline(function, *args):
         return function(*args)
 
-    monkeypatch.setattr(pddl_module, "DataAgent", FakeDataAgent)
-    monkeypatch.setattr(pddl_module, "_extract_picture_bytes", lambda *_args: (image, 1))
+    monkeypatch.setattr(table_stage, "DataAgent", FakeDataAgent)
+    monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args: (image, 1))
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
     asyncio.run(_enrich_table_structures(manifest, Path("/tmp/deck.pdf")))
     return table, calls

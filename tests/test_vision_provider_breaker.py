@@ -17,10 +17,8 @@ import pytest
 
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.pipeline.enrichment import common as enrichment_common
-from backend.agents.pddl_orchestrator import (
-    _enrich_formula_latex,
-    _enrich_table_structures,
-)
+from backend.agents.pddl_orchestrator import _enrich_formula_latex
+from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.agents.provider_breaker import ProviderBreaker
 from backend.config.settings import settings
@@ -84,7 +82,7 @@ def _vision(monkeypatch, answers, failure: str = "TimeoutError: no answer"):
     # Pictures and tables crop through two modules now; the tests that run both
     # stages, or the formula fallback, need the fakes in both.
     for crop_user in (
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
         "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
     ):
         monkeypatch.setattr(crop_user, lambda *_args, **_kwargs: (b"image-bytes", 1))
@@ -100,7 +98,7 @@ def _data(monkeypatch, answers):
             calls.append(kwargs)
             return answers[len(calls) - 1]
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.DataAgent", FakeDataAgent)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.tables.DataAgent", FakeDataAgent)
     return calls
 
 
@@ -207,7 +205,7 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_tables(monkeypatch, tm
 @pytest.mark.asyncio
 async def test_a_table_the_provider_failed_is_read_on_the_second_pass(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
     )
     data_calls = _data(monkeypatch, [None, _TABLE])
@@ -258,7 +256,7 @@ async def test_an_unused_answer_on_the_second_pass_is_not_left_as_a_failure(
     unusable = DataOutput(kind="formula", latex="E=mc^2", language="pt-BR", confidence=0.9)
     data_calls = _data(monkeypatch, [None, unusable])
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
     )
     tables = _manifest([_element("t-1", "table", text="")], [])
@@ -287,7 +285,7 @@ async def test_a_refused_reading_on_the_second_pass_clears_the_failure_and_sums_
         monkeypatch, [None, None, None, not_the_table, not_the_table, not_the_table]
     )
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
     )
     tables = _manifest(
@@ -315,7 +313,7 @@ async def test_a_table_skipped_by_the_breaker_is_not_cropped(monkeypatch, tmp_pa
         crops.append(True)
         return (b"image-bytes", 1)
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator._extract_picture_bytes", fake_crop)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.tables._extract_picture_bytes", fake_crop)
     _data(monkeypatch, [None] * 10)
     tables = _manifest(
         [_element(f"t-{n}", "table", text="") for n in range(1, 4)], []
