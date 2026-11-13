@@ -1,4 +1,6 @@
-"""Deterministic method handlers of the PDDL pipeline, one module per group.
+"""Method handlers of the PDDL pipeline, one module per group.
+
+All are deterministic except ``inspection``, whose handlers ask the vision model.
 
 ``common`` holds what every handler shares; ``text`` repairs text in place;
 ``content`` checks or finishes an element's content; ``review`` escalates an

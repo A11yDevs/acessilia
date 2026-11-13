@@ -617,10 +617,10 @@ def _judgement_result(
 DETERMINISTIC_METHOD_HANDLERS: dict[
     str, Callable[[ProcessingManifest, str], MethodResult]
 ] = {
-    #: Method name -> handler for every method whose work is already done before
-    #: planning (or can be done without a model call). A method the manifest can
-    #: require but that is absent from here is reported to the planner as
-    #: unavailable, so the plan never contains a step that can only fail.
+    #: Method name -> handler for every method run directly: work done before
+    #: planning, deterministic work, or one vision model call (pymupdf-region,
+    #: vision-page-inspection). A method the manifest can require but that is
+    #: absent here is reported to the planner as unavailable: no step only fails.
     "vision-description": _handle_vision_description_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,

@@ -1,14 +1,14 @@
 """Fused text must reach the output without corrupting references or artifacts."""
 
 import hashlib
-from backend.core.pipeline import payload as pipeline_payload
 from pathlib import Path
 
 import pytest
 
-from backend.core.pipeline.handlers import fusion as fusion_handlers
 from backend.config.settings import settings
 from backend.core.manifest.models import PageDescriptor, ProcessingManifest
+from backend.core.pipeline import payload as pipeline_payload
+from backend.core.pipeline.handlers import fusion as fusion_handlers
 from tests.pddl_support import (
     build_element as _element,
     build_manifest as _manifest,

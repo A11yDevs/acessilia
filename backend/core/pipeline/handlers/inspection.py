@@ -1,10 +1,15 @@
-"""Deterministic handlers that inspect the source with the vision agent.
+"""Method handlers that inspect the source with the vision agent.
 
 ``pymupdf-region`` renders each target's region, and ``vision-page-inspection``
 each target's page, through the core's render binding
 (``backend.core.pipeline.toolbox``); the vision agent reads the image, and the
 handler records what it found as evidence. Moved verbatim from the PDDL
 orchestrator (#402, phase 3, step 6).
+
+This is the one module of ``backend/core`` that imports ``backend.agents`` (the
+vision agent and its outputs). The dependency is transient: step 2 of ADR-0016's
+roadmap gathers the agents into the core before its boundary test (step 5)
+refuses imports of ``backend`` from outside the core.
 """
 
 from __future__ import annotations

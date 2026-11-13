@@ -11,9 +11,9 @@ import httpx
 import pytest
 
 from backend.config.settings import settings
+from backend.core.pipeline.handlers import fusion as fusion_handlers
 from backend.services.cache import options_cache_key, processing_cache_configuration
 from tests.test_pending_fixes import isolated_runtime as isolated_runtime_fixture
-from backend.core.pipeline.handlers import fusion as fusion_handlers
 
 isolated_runtime = isolated_runtime_fixture
 

@@ -13,7 +13,8 @@ read the secondary provider's extraction (``backend.core.pipeline.secondary``).
 The rules were calibrated on the docling + mineru pair, so any other pair fails
 explicitly.
 
-Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6).
+Moved from the PDDL orchestrator (#402, phase 3, step 6): the code verbatim,
+with the two docstrings of the dual-provider fusion translated from Portuguese.
 """
 
 from __future__ import annotations
