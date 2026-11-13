@@ -86,7 +86,9 @@ para alcançar um ambiente real, como descrito no
 
 ## Execução paralela
 
-O `make test-all` passa `-n 4 --dist worksteal` para a suíte do core. Para
+O `make test-all` passa `-n 4 --dist worksteal` para a suíte do core. Rodar
+`uv run pytest` sem `-n` continua serial; use `make test-all` ou passe
+`-n 4 --dist worksteal` diretamente para rodar o core em paralelo. Para
 ajustar o limite ou a distribuição sem editar o Makefile:
 
 ```bash
