@@ -157,7 +157,8 @@ Proposed: option 2.
   each operation's explicit parameters. So the core's binding to the render
   (`_source_artifact_id` and `_toolbox_render`, which bind the settings to
   `ToolboxPdfClient.render` and decide whether the stored source can be
-  referenced) is not held: step 6 moves it to `backend/core/pipeline/toolbox.py`.
+  referenced) stays in the core and is not part of that hold: step 6 moves it
+  to `backend/core/pipeline/toolbox.py`.
 - **Still open:**
   - which operations follow the formula chain, and in which order;
   - what docstruct's stable public API is. The proposal is: what each module

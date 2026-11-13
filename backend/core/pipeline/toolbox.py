@@ -6,9 +6,9 @@ to ``ToolboxPdfClient.render``. The pipeline also accepts TIFF, BMP, GIF and
 WebP, which ``pdf.render@2`` does not open (``RENDER_MEDIA_TYPES``), and there
 is no local fallback (ADR-0003).
 
-ADR-0017 keeps this binding in the core. The compositions built on it, the page
-judge and the formula chain, stay in the orchestrator until ADR-0017 decides
-their split. Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6).
+ADR-0017 keeps this binding in the core. Of the code built on it, the two SDK
+candidates, the page judge and the formula chain, stay in the orchestrator
+until ADR-0017 decides their split; the other callers move with step 6. Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6).
 """
 
 from __future__ import annotations
