@@ -14,37 +14,49 @@ import pytest
 import backend.i18n as i8n
 import scripts.gen_locale_catalogs as gen_locales
 
-#: Test-only catalog root under ./var/temp (project convention avoids /tmp) so generated test artifacts stay outside the checked-in tree.
-TEST_LOCALES_ROOT = Path("./var/temp") / "i18n_catalogs_test"
 DEFAULT_REPOS_CATALOGS_DIR: Path = Path("backend/locales")
 
 
-def _build_and_repoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Generate fresh locale catalogs into ./tmp and point backend.i18n at that root before invoking lookup helpers."""
-    gen_locales.build_locales(TEST_LOCALES_ROOT)
-    monkeypatch.setattr(i8n, "LOCALE_CATALOGS_DIR", TEST_LOCALES_ROOT)
+@pytest.fixture
+def catalogs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Build fresh locale catalogs in a per-test directory and point backend.i18n at that root.
+
+    The root comes from ``tmp_path`` so each test owns its catalog tree: under
+    pytest-xdist a single shared root let one worker rewrite ``messages.mo``
+    while another read it, which surfaced as ``struct.error`` inside
+    ``gettext`` on a truncated file. It also keeps the generated artifacts
+    outside the checked-in tree.
+
+    Args:
+        tmp_path (Path): Per-test temporary directory supplied by pytest.
+        monkeypatch (pytest.MonkeyPatch): Instance used to repoint the runtime catalog directory.
+
+    Returns:
+        Path: Root of the catalog tree built for this test.
+    """
+    root = tmp_path / "locales"
+    gen_locales.build_locales(root)
+    monkeypatch.setattr(i8n, "LOCALE_CATALOGS_DIR", root)
     i8n._catalog_for.cache_clear()
+    return root
 
 
-def test_en_us_identity_lookup(monkeypatch) -> None:
+def test_en_us_identity_lookup(monkeypatch, catalogs) -> None:
     """en_US is the runtime default: t() should return canonical English msgids because en strings mirror their ids."""
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "en_US")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Processing your document…") == "Processing your document…"
 
 
-def test_pt_br_translation_lookup(monkeypatch) -> None:
+def test_pt_br_translation_lookup(monkeypatch, catalogs) -> None:
     """pt_BR should select the translated message from its locale strings file instead of falling back to English text."""
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "pt_BR")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Processing your document…") == "Processando seu documento…"
 
 
-def test_default_locale_used_when_env_missing(monkeypatch) -> None:
+def test_default_locale_used_when_env_missing(monkeypatch, catalogs) -> None:
     """When neither LOCALE nor LANGUAGE is present, t() should behave as en_US identity lookup for msgids."""
-    _build_and_repoint(monkeypatch)
     monkeypatch.delenv("LOCALE", raising=False)
     monkeypatch.delenv("LANGUAGE", raising=False)
     monkeypatch.delenv("LC_ALL", raising=False)
@@ -53,9 +65,8 @@ def test_default_locale_used_when_env_missing(monkeypatch) -> None:
     assert i8n.t("Processing your document…") == "Processing your document…"
 
 
-def test_untranslated_msgid_falls_back_to_english(monkeypatch) -> None:
+def test_untranslated_msgid_falls_back_to_english(monkeypatch, catalogs) -> None:
     """Unknown/untranslatable msgids should pass through unchanged in pt_BR as per fallback-by-identity t() contract."""
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "pt_BR")
     i8n._catalog_for.cache_clear()
     assert (
@@ -64,9 +75,8 @@ def test_untranslated_msgid_falls_back_to_english(monkeypatch) -> None:
     )
 
 
-def test_ngettext_selection_by_count(monkeypatch) -> None:
+def test_ngettext_selection_by_count(monkeypatch, catalogs) -> None:
     """n() should pick the grammatical-correct plural form for a given count under each locale's Babel N-plurals rule."""
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "en_US")
     i8n._catalog_for.cache_clear()
     assert i8n.n("document", "documents", 1) == "document"
@@ -77,13 +87,12 @@ def test_ngettext_selection_by_count(monkeypatch) -> None:
     assert i8n.n("document", "documents", 2) == "documentos"
 
 
-def test_pt_br_telegram_command_messages_resolve_from_catalog(monkeypatch) -> None:
+def test_pt_br_telegram_command_messages_resolve_from_catalog(monkeypatch, catalogs) -> None:
     """
     Every Telegram bot command message id consumed by frontend.telegram.messages should resolve to its pt_BR
     translation from the generated catalog (instead of the English msgid), proving that scripts/gen_locale_catalogs
     keeps the telegram ids in both checked-in locale strings files and that placeholder-free substitution works end-to-end.
     """
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "pt_BR")
     i8n._catalog_for.cache_clear()
     import frontend.telegram.messages as bot_messages
@@ -96,12 +105,11 @@ def test_pt_br_telegram_command_messages_resolve_from_catalog(monkeypatch) -> No
     assert "Formatos de entrada aceitos:" in i8n.t(bot_messages.MSG_FORMATS_TEXT)
 
 
-def test_pt_br_email_configured_placeholder_substitutes(monkeypatch) -> None:
+def test_pt_br_email_configured_placeholder_substitutes(monkeypatch, catalogs) -> None:
     """
     The e-mail-confirmation msgid keeps an {email} placeholder for callers; t() must hand it back untouched so the
     Telegram handler can .format(...) the address in after lookup, with the localized pt_BR wording around it.
     """
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "pt_BR")
     i8n._catalog_for.cache_clear()
     import frontend.telegram.messages as bot_messages
@@ -238,12 +246,11 @@ def test_locale_for_user_matches_offered_locale(monkeypatch: pytest.MonkeyPatch)
     assert i8n.locale_for_user(None) == "en_US"
 
 
-def test_set_request_locale_overrides_server_locale(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_set_request_locale_overrides_server_locale(monkeypatch: pytest.MonkeyPatch, catalogs: Path) -> None:
     """
     Within a task, set_request_locale should redirect t() to the user locale even when the server locale differs, and
     reset_request_locale should restore the server-side locale afterwards.
     """
-    _build_and_repoint(monkeypatch)
     monkeypatch.setenv("LOCALE", "en_US")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Downloading file...") == "Downloading file..."
