@@ -11,7 +11,6 @@ from the PDDL orchestrator once ADR-0017 was accepted (#402, phase 3, step 6).
 
 from __future__ import annotations
 
-
 from docstruct.text.implicit_products import (
     implicit_product_variables,
     mark_implicit_products,
@@ -21,6 +20,17 @@ from docstruct.text.math_spans import block_prose, inline_math_sources
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
     ProcessingManifest,
+)
+from backend.core.pipeline.elements import (
+    _element_to_block,
+    _text_kept_by_picture,
+)
+from backend.core.pipeline.handlers import messages as step_messages
+from backend.core.pipeline.handlers.common import (
+    _target_elements,
+)
+from backend.core.pipeline.obligations import (
+    _formula_elements_for_obligation,
 )
 from backend.i18n import n, t
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
@@ -32,17 +42,6 @@ from backend.tools.toolbox_math_tools import (
     toolbox_convert_latex,
     toolbox_verbalize_latex,
 )
-from backend.core.pipeline.obligations import (
-    _formula_elements_for_obligation,
-)
-from backend.core.pipeline.elements import (
-    _element_to_block,
-    _text_kept_by_picture,
-)
-from backend.core.pipeline.handlers.common import (
-    _target_elements,
-)
-from backend.core.pipeline.handlers import messages as step_messages
 
 
 def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
