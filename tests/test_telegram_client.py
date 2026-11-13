@@ -14,9 +14,11 @@ from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
     MSG_CACHE_CLEAR_FAILED,
+    MSG_FILE_RECEIVED,
     MSG_HELP_TEXT,
     MSG_CONTACT_SERVER_FAILED,
     MSG_PACKAGE_PDF_UA_MISSING,
+    MSG_TELEGRAM_FILE_TOO_LARGE,
 )
 from frontend.telegram.handlers import document as doc_module
 from frontend.telegram.handlers import start as start_module
@@ -284,6 +286,65 @@ def test_pdf_ua_warning_survives_worker_and_user_locales_differing(
 
     expected = get_translations(user_locale).gettext(MSG_PACKAGE_PDF_UA_MISSING)
     assert expected in "\n".join(bot.sent)
+
+
+def test_document_over_the_telegram_limit_is_refused_with_the_web_panel(
+    monkeypatch, doc_module_isolated
+):
+    monkeypatch.setattr(settings, "max_file_size_mb", 50)
+    monkeypatch.setattr(settings, "web_base_url", "https://panel.test")
+    bot = _FakeBot(b"")
+    message = _FakeMessage(
+        bot,
+        document=_FakeDocument("big.pdf", 21 * 1024 * 1024, "file1"),
+    )
+
+    asyncio.run(doc_module_isolated.handle_document(message))
+
+    assert message.answers == [
+        t(MSG_TELEGRAM_FILE_TOO_LARGE).format(
+            limit=20, web_url="https://panel.test"
+        )
+    ]
+    assert "File received" not in message.answers
+
+
+def test_document_at_the_telegram_limit_is_processed(
+    monkeypatch, doc_module_isolated
+):
+    calls: list[tuple[str, str, str]] = []
+
+    async def fake_process(message, file_id, filename, mode="normal"):
+        calls.append((file_id, filename, mode))
+
+    monkeypatch.setattr(settings, "max_file_size_mb", 50)
+    monkeypatch.setattr(doc_module_isolated, "process_file", fake_process)
+    message = _FakeMessage(
+        _FakeBot(b""),
+        document=_FakeDocument("limit.pdf", 20 * 1024 * 1024, "file1"),
+    )
+
+    asyncio.run(doc_module_isolated.handle_document(message))
+
+    assert calls == [("file1", "limit.pdf", "normal")]
+    assert message.answers == [t(MSG_FILE_RECEIVED)]
+
+
+def test_the_telegram_limit_follows_a_lower_configured_max(monkeypatch, doc_module_isolated):
+    monkeypatch.setattr(settings, "max_file_size_mb", 5)
+    monkeypatch.setattr(settings, "web_base_url", "https://panel.test")
+    message = _FakeMessage(
+        _FakeBot(b""),
+        document=_FakeDocument("big.pdf", 6 * 1024 * 1024, "file1"),
+    )
+
+    asyncio.run(doc_module_isolated.handle_document(message))
+
+    assert message.answers == [
+        t(MSG_TELEGRAM_FILE_TOO_LARGE).format(
+            limit=5, web_url="https://panel.test"
+        )
+    ]
 
 
 def test_document_submits_with_mode_and_source(doc_module_isolated):

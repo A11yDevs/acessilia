@@ -77,7 +77,7 @@ No `.env` do ambiente (copiado de [.env.example](../.env.example)), as variávei
 | `ENABLED_INTERFACES` | Interfaces iniciadas por `frontend.run`. Precisa conter `telegram`. | `api,telegram,web` |
 | `API_BASE_URL` | Endereço da API que o bot chama. | `http://localhost:8000` |
 | `WEB_BASE_URL` | Endereço público do painel web, usado no link de download enviado no chat. Em servidor, use o endereço que o usuário consegue abrir, não `localhost`. | `https://www.acessilia3.inf.ufg.br` |
-| `MAX_FILE_SIZE_MB` | Tamanho máximo de arquivo aceito. Veja o limite de 20 MB do Telegram na [seção 5](#5-limitações-conhecidas). | `50` |
+| `MAX_FILE_SIZE_MB` | Tamanho máximo aceito pela API/web. O bot do Telegram usa o menor valor entre este e o limite de 20 MB de download do Telegram, recusando arquivos maiores com um link para o painel web. | `50` |
 | `REQUEST_TIMEOUT` | Tempo máximo, em segundos, que o bot acompanha uma tarefa antes de avisar que ela demorou demais. | `3600` |
 | `I18N_LOCALES_ACTIVE` | Idiomas em que o bot pode responder. Ele responde no idioma do aplicativo de cada usuário, se estiver nesta lista. | `en_US,pt_BR` |
 | `TELEGRAM_ADMIN_IDS` | Ids do Telegram autorizados a rodar os comandos de operador `/health` e `/limpar`. Vazio nega a todos. | `123456789,987654321` |
@@ -254,7 +254,7 @@ Se o bot não responde no grupo, confira nesta ordem:
 | Funciona em privado, mas ignora arquivos no grupo | Modo de privacidade ligado, ou mudança feita com o bot já no grupo | [Seção 3.1](#31-entenda-o-modo-de-privacidade): desligar a privacidade e readicionar o bot. |
 | Responde a comandos no grupo, mas não a arquivos | Mesmo caso acima: comandos chegam com privacidade ligada, arquivos não | Mesma solução. |
 | Confirma o recebimento e depois avisa que não conseguiu contatar o servidor | A API está fora do ar ou `API_BASE_URL` está errado | `/health`; confira `API_BASE_URL` e se a API está rodando. |
-| Recusa um arquivo grande ou falha ao baixá-lo | Arquivo acima de `MAX_FILE_SIZE_MB` ou acima de 20 MB | Veja a [seção 5](#5-limitações-conhecidas). |
+| Recusa um arquivo grande | Arquivo acima de 20 MB ou de `MAX_FILE_SIZE_MB`, o que for menor | Envie pelo painel web; a recusa do bot indica o painel. |
 | O link de download aponta para `localhost` | `WEB_BASE_URL` não configurado no servidor | Ajuste `WEB_BASE_URL` para o endereço público. |
 | Processa, mas a resposta não aparece no tópico | Tópico fechado ou bot sem permissão de enviar mensagens | [Seção 3.3](#33-grupos-com-tópicos-fóruns); confira o log. |
 
@@ -270,7 +270,6 @@ Se o arquivo enviado no grupo **não aparece no log de jeito nenhum**, ele não 
 
 ## 5. Limitações conhecidas
 
-- **Arquivos acima de 20 MB:** a Bot API pública do Telegram só permite que bots baixem arquivos de até 20 MB. Mesmo com `MAX_FILE_SIZE_MB=50`, um arquivo entre 20 e 50 MB passa na validação e falha no download. Para arquivos maiores, use o painel web ([#392](https://github.com/A11yDevs/acessilia/issues/392)).
 - **Estado em memória:** modos, e-mails, tarefas acompanhadas e chats pausados ficam na memória do processo. Ao reiniciar ou recriar o container, tudo volta ao padrão: chats pausados voltam a responder e `/status` deixa de encontrar tarefas enviadas antes do reinício. As tarefas em si continuam na API ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
 - **Mensagem final em português:** o texto com o link de download sai em português, seja qual for o idioma do usuário ([#394](https://github.com/A11yDevs/acessilia/issues/394)).
 

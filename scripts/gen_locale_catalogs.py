@@ -476,6 +476,7 @@ from frontend.telegram.messages import (
     MSG_STATUS_PROCESSING_FAILED,
     MSG_STATUS_SUMMARY,
     MSG_STATUS_TASK_NOT_FOUND,
+    MSG_TELEGRAM_FILE_TOO_LARGE,
     MSG_SUBMIT_FAILED,
     MSG_TASK_CANCELLED,
     MSG_TASK_CANCEL_DONE,
@@ -591,6 +592,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_PHOTO_RECEIVED,
     MSG_DOWNLOADING_FILE,
     MSG_SUBMIT_FAILED,
+    MSG_TELEGRAM_FILE_TOO_LARGE,
     MSG_CONTACT_SERVER_FAILED,
     MSG_TASK_ENQUEUED,
     MSG_QUEUE_POSITION,
@@ -1326,6 +1328,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_DOWNLOADING_FILE: "Baixando arquivo...",
         MSG_SUBMIT_FAILED: (
             "❌ Erro ao enviar o arquivo para processamento ({status_code}): {detail}"
+        ),
+        MSG_TELEGRAM_FILE_TOO_LARGE: (
+            "❌ O Telegram aceita arquivos de até {limit} MB. Para arquivos maiores, "
+            "use o painel web: {web_url}"
         ),
         MSG_CONTACT_SERVER_FAILED: (
             "❌ Não foi possível contatar o servidor de processamento. Tente novamente."

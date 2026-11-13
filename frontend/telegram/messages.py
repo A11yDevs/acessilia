@@ -64,6 +64,10 @@ MSG_FILE_RECEIVED: str = "📄 File received!"
 MSG_PHOTO_RECEIVED: str = "📷 Photo received!"
 #: Progress line emitted while the bot downloads the attachment from Telegram servers into local storage.
 MSG_DOWNLOADING_FILE: str = "Downloading file..."
+#: Error reply when a file exceeds Telegram's own download limit; {limit}/{web_url} substituted at call time.
+MSG_TELEGRAM_FILE_TOO_LARGE: str = (
+    "❌ Telegram accepts files up to {limit} MB. For larger files, use the web panel: {web_url}"
+)
 #: Error reply returned when the processing API rejects the submitted job; {status_code}/{detail} substituted at call time.
 MSG_SUBMIT_FAILED: str = (
     "❌ Error submitting the file for processing ({status_code}): {detail}"
