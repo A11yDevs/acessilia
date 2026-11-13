@@ -155,12 +155,6 @@ from backend.core.pipeline.handlers.content import (
 from backend.core.pipeline.handlers.review import (
     _handle_human_review_method,
 )
-from backend.core.pipeline.secondary import (
-    _CALIBRATED_PAIR,
-    _SecondaryExtraction,
-    _page_markdown,
-    _secondary_or_failure,
-)
 from backend.core.pipeline.handlers.fusion import (
     _handle_agreement_rule_method,
     _handle_single_provider_method,
@@ -169,6 +163,12 @@ from backend.core.pipeline.handlers.fusion import (
 from backend.core.pipeline.handlers.order import (
     _handle_skeleton_order_method,
     _handle_xycut_order_method,
+)
+from backend.core.pipeline.secondary import (
+    _CALIBRATED_PAIR,
+    _SecondaryExtraction,
+    _page_markdown,
+    _secondary_or_failure,
 )
 
 if TYPE_CHECKING:

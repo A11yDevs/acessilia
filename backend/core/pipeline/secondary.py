@@ -1,12 +1,15 @@
 """The secondary provider's extraction in ``FUSION_MODE=dual``, and pairing with it.
 
 The structure extractor keeps the secondary provider's extraction as a manifest
-artifact. The fusion and order handlers, and the page judge, read it through
+artifact. The handlers that compare the providers (``table-smart-fusion``,
+``agreement-rule``, ``skeleton-order``) and the page judge read it through
 ``_secondary_or_failure``: a missing, replaced or unreadable artifact, or a
 provider pair other than the calibrated one, fails the method explicitly
 instead of applying a preference nobody measured. ``_pair_block`` pairs a
-manifest element with a secondary block by position or text. Moved verbatim
-from the PDDL orchestrator (#402, phase 3, step 6).
+manifest element with a secondary block by position or text, and
+``_page_markdown`` writes a page's text with the markers the page router
+compares; ``agreement-rule`` and the judge both use it. Moved verbatim from the
+PDDL orchestrator (#402, phase 3, step 6).
 """
 
 from __future__ import annotations

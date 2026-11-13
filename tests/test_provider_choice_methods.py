@@ -15,11 +15,6 @@ from pathlib import Path
 import pytest
 
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.handlers.fusion import (
-    _handle_agreement_rule_method,
-    _handle_table_smart_fusion_method,
-)
-from backend.core.pipeline.handlers.order import _handle_skeleton_order_method
 from backend.core.manifest.builder import (
     DEFAULT_METHOD_COSTS,
     SECONDARY_EXTRACTION_ARTIFACT_ID,
@@ -37,8 +32,13 @@ from backend.core.manifest.models import (
     Provenance,
     SourceDocument,
 )
-from backend.core.planning.planner_agent import PlannerAgent
 from backend.core.pipeline import secondary as pipeline_secondary
+from backend.core.pipeline.handlers.fusion import (
+    _handle_agreement_rule_method,
+    _handle_table_smart_fusion_method,
+)
+from backend.core.pipeline.handlers.order import _handle_skeleton_order_method
+from backend.core.planning.planner_agent import PlannerAgent
 
 NOW = datetime(2026, 10, 16, tzinfo=timezone.utc)
 W, H = 600.0, 800.0

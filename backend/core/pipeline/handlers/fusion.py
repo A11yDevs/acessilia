@@ -1,12 +1,13 @@
-"""Deterministic handlers that choose between the two providers of ``FUSION_MODE=dual``.
+"""Deterministic handlers for the providers' extraction: choosing or confirming it.
 
-``table-smart-fusion`` and ``agreement-rule`` port Dr.DocBench rules
+``table-smart-fusion`` and ``agreement-rule`` choose between the two providers
+of ``FUSION_MODE=dual``; they port Dr.DocBench rules
 (tree_differ_v2.py of the drbench-2026-snapshot tag and
 docstruct.fusion.adjudication.decide_v1). They read the secondary provider's
 extraction (``backend.core.pipeline.secondary``). The rules were calibrated on
 the docling + mineru pair, so any other pair fails explicitly.
-``single-provider`` satisfies ``fuse-providers`` with the extraction the
-manifest already carries. Moved verbatim from the PDDL orchestrator (#402,
+``single-provider`` chooses nothing: it satisfies ``fuse-providers`` by checking
+that the manifest already carries the configured provider's extraction. Moved verbatim from the PDDL orchestrator (#402,
 phase 3, step 6).
 """
 
