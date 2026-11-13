@@ -47,8 +47,9 @@ which is accepted:
 - **docstruct had no isolated install job.** `test_purity.py` refuses
   non-standard imports in a subprocess, but no CI job installed docstruct alone
   in a clean environment, as `SDK alone` does for the SDK. **Closed by phase 2
-  of #470:** the `docstruct alone` job installs it from its wheel and runs its
-  suite with nothing else importable, not even `rapidfuzz`.
+  of #470:** the `docstruct alone` job installs it from its wheel, with pytest,
+  and runs its suite with no core, SDK, Toolbox or optional accelerator
+  (`rapidfuzz`) importable.
 - **docstruct's independence from infrastructure is not tested.** See P3
   above. An isolated install job would not catch it either: it needs a test
   that a module does not read the environment or files, open sockets or start

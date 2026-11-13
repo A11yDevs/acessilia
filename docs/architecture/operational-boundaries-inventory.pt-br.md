@@ -48,7 +48,8 @@ que já foi aceita:
   recusa imports fora da biblioteca padrão num subprocesso, mas nenhum job de
   CI instalava o docstruct sozinho num ambiente limpo, como o `SDK alone` faz
   com o SDK. **Fechado pela fase 2 da #470:** o job `docstruct alone` o instala
-  a partir do wheel e roda a suíte sem mais nada importável, nem o `rapidfuzz`.
+  a partir do wheel, com o pytest, e roda a suíte sem o core, o SDK, a Toolbox
+  ou o acelerador opcional (`rapidfuzz`) importáveis.
 - **A independência de infraestrutura do docstruct não é testada.** Veja a P3
   acima. Um job de instalação isolada também não a pegaria: é preciso um teste
   de que nenhum módulo lê o ambiente ou arquivos, abre sockets ou inicia

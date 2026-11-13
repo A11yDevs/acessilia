@@ -50,7 +50,7 @@ o workflow `CI` do GitHub Actions:
 - **`SDK alone (Python 3.11)`** instala apenas o SDK e prova que ele funciona
   sem o core ou o docstruct.
 - **`docstruct alone (Python 3.11)`** instala apenas o docstruct, a partir do
-  wheel dele, e roda a suíte só com a biblioteca padrão: o core, o SDK, a
+  wheel dele, e o pytest, e roda a suíte só com a biblioteca padrão: o core, o SDK, a
   Toolbox e o acelerador opcional (`rapidfuzz`) não podem estar importáveis, e
   nenhum teste pode ser pulado (#470).
 - `tests` e `SDK alone` são checks obrigatórios nos rulesets vivos de `main` e

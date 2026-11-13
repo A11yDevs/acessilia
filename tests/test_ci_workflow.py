@@ -52,7 +52,8 @@ def test_core_suite_runs_with_bounded_parallelism() -> None:
     assert "Collect complete test suite" not in names
 
 
-def test_delivery_waits_for_tests_and_sdk_isolation() -> None:
+def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
+    """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
     assert set(jobs["delivery"]["needs"]) >= {"tests", "sdk-isolated", "docstruct-isolated"}
     assert "sdk-isolated" in jobs
@@ -68,7 +69,7 @@ def test_docstruct_runs_alone_from_its_wheel() -> None:
     install = steps["Install docstruct alone"]["run"]
     assert '"./libs/docstruct[dev]"' in install
     assert "libs/sdk" not in install and '".[dev]"' not in install
-    check = steps["Check that nothing else is importable"]
+    check = steps["Check that no other project package or accelerator is importable"]
     assert check["working-directory"] == "libs/docstruct"
     for name in ("backend", "acessilia_sdk", "acessilia_toolbox", "rapidfuzz"):
         assert f'"{name}"' in check["run"]

@@ -51,7 +51,7 @@ GitHub Actions workflow `CI`:
 - **`SDK alone (Python 3.11)`** installs only the SDK and proves that it works
   without the core or docstruct.
 - **`docstruct alone (Python 3.11)`** installs only docstruct, from its wheel,
-  and runs its suite on the standard library alone: no core, SDK, Toolbox or
+  and pytest, and runs its suite on the standard library alone: no core, SDK, Toolbox or
   optional accelerator (`rapidfuzz`) is importable, and no test may be skipped
   (#470).
 - `tests` and `SDK alone` are required checks in the live rulesets for `main`
