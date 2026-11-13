@@ -11,7 +11,7 @@ import asyncio
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _handle_latex_normalizer_method
+from backend.core.pipeline.handlers.formula import _handle_latex_normalizer_method
 from backend.core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
@@ -395,7 +395,7 @@ class TestHandlerMessagesFollowTheLocale:
 
 
     def test_math_controlled_error_is_localized(self, locale, monkeypatch) -> None:
-        from backend.agents.pddl_orchestrator import _handle_mathml_method
+        from backend.core.pipeline.handlers.formula import _handle_mathml_method
         from backend.tools.toolbox_client import ToolboxProviderUnavailable
         from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
 
@@ -405,7 +405,7 @@ class TestHandlerMessagesFollowTheLocale:
             )
 
         monkeypatch.setattr(
-            "backend.agents.pddl_orchestrator.toolbox_convert_latex", unavailable
+            "backend.core.pipeline.handlers.formula.toolbox_convert_latex", unavailable
         )
         elements, obligation = _formula_success(1)
         manifest = _manifest(elements, [obligation])
