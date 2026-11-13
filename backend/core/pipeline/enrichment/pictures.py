@@ -3,7 +3,16 @@
 Runs before planning. It chooses the pictures to describe, asks the vision
 model with bounded concurrency, folds each description into the manifest or
 records why a picture was left undescribed, and retries the failures a second
-try may fix. Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6).
+try may fix.
+
+Moved from the PDDL orchestrator (#402, phase 3, step 6): the code verbatim,
+with the docstring of ``_inject_full_page_picture`` translated from Portuguese.
+
+With ``handlers/inspection.py``, this is one of the two modules of
+``backend/core`` that import ``backend.agents``: they ask the vision agent. The
+dependency is transient: step 2 of ADR-0016's roadmap gathers the agents into
+the core before its boundary test (step 5) refuses imports of ``backend`` from
+outside the core.
 """
 
 from __future__ import annotations
@@ -314,7 +323,7 @@ def _inject_full_page_picture(
     When the input is a standalone raster image (``media_inspect`` classifies it
     as an image and flags ``requires_visual_inspection=true``) and the
     structural extractor produced no visual block (picture/formula), the
-    orchestrator would have nothing to describe. This fallback creates a
+    stage would have nothing to describe. This fallback creates a
     `picture` element covering the whole page so the VisionAgent describes the
     image.
 
