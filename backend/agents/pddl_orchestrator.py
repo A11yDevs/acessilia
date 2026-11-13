@@ -38,7 +38,7 @@ from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
-from backend.i18n import t
+from backend.i18n import n, t
 from backend.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
@@ -89,6 +89,7 @@ from backend.core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
 )
+from backend.core.pipeline.handlers import messages as step_messages
 from backend.core.pipeline.handlers.text import (
     _handle_chunk_verse_method,
     _handle_deterministic_heading_repair_method,
@@ -173,18 +174,14 @@ def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
 def _handle_mathml_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Converte o LaTeX das fórmulas alvo em MathML (metadata.mathml) via math.convert.
+    """Convert the target formulas' LaTeX to MathML (metadata.mathml) via math.convert.
 
-    Uma math.convert indisponível falha o método explicitamente (sem conversão
-    local, ADR-0007), para o executor tentar outro método ou replanejar.
+    An unavailable math.convert fails the method explicitly (no local
+    conversion, ADR-0007), so the executor can try another method or replan.
     """
     elements = _formula_elements_for_obligation(manifest, obligation_id)
     if not elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhuma fórmula encontrada para a obrigação",
-        )
+        return MethodResult(success=False, validated=False, message=t(step_messages.MSG_MATH_NO_FORMULA))
     converted = 0
     variables = _implicit_product_variables(manifest)
     for element in elements:
@@ -205,30 +202,28 @@ def _handle_mathml_method(
         return MethodResult(
             success=True,
             validated=True,
-            message=f"MathML gerado para {converted} fórmula(s)",
+            message=n(*step_messages.MSG_MATHML_GENERATED, converted).format(count=converted),
         )
     return MethodResult(
         success=False,
         validated=False,
-        message=f"MathML gerado para {converted}/{len(elements)} fórmula(s)",
+        message=n(*step_messages.MSG_MATHML_GENERATED_PARTIAL, len(elements)).format(
+            done=converted, total=len(elements)
+        ),
     )
 
 
 def _handle_latex_verbalizer_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
-    """Gera a verbalização pt-BR das fórmulas (metadata.verbalization) via math.verbalize.
+    """Generate the pt-BR verbalization of the formulas (metadata.verbalization) via math.verbalize.
 
-    Uma math.verbalize indisponível falha o método explicitamente (sem
-    verbalizador local, ADR-0007).
+    An unavailable math.verbalize fails the method explicitly (no local
+    verbalizer, ADR-0007).
     """
     elements = _formula_elements_for_obligation(manifest, obligation_id)
     if not elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhuma fórmula encontrada para a obrigação",
-        )
+        return MethodResult(success=False, validated=False, message=t(step_messages.MSG_MATH_NO_FORMULA))
     verbalized = 0
     variables = _implicit_product_variables(manifest)
     for element in elements:
@@ -249,12 +244,16 @@ def _handle_latex_verbalizer_method(
         return MethodResult(
             success=True,
             validated=True,
-            message=f"Verbalização gerada para {verbalized} fórmula(s)",
+            message=n(*step_messages.MSG_VERBALIZATION_GENERATED, verbalized).format(
+                count=verbalized
+            ),
         )
     return MethodResult(
         success=False,
         validated=False,
-        message=f"Verbalização gerada para {verbalized}/{len(elements)} fórmula(s)",
+        message=n(*step_messages.MSG_VERBALIZATION_GENERATED_PARTIAL, len(elements)).format(
+            done=verbalized, total=len(elements)
+        ),
     )
 
 
@@ -268,11 +267,7 @@ def _handle_latex_normalizer_method(
         if el.type == "formula"
     ]
     if not elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Nenhuma fórmula encontrada para a obrigação",
-        )
+        return MethodResult(success=False, validated=False, message=t(step_messages.MSG_MATH_NO_FORMULA))
 
     normalized = 0
     for element in elements:
@@ -286,14 +281,16 @@ def _handle_latex_normalizer_method(
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                f"LaTeX normalizado em {normalized}/{len(elements)} fórmula(s)"
+            message=n(*step_messages.MSG_LATEX_NORMALIZED_PARTIAL, len(elements)).format(
+                done=normalized, total=len(elements)
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"LaTeX normalizado em {normalized} fórmula(s)",
+        message=n(*step_messages.MSG_LATEX_NORMALIZED, normalized).format(
+            count=normalized
+        ),
     )
 
 
@@ -450,7 +447,8 @@ def _judge_texts(
     )
     if not primary_md.strip() or not secondary_md.strip():
         logger.info(
-            "vlm-pairwise-judge: página {} sem as duas transcrições; ignorada", page_number
+            "vlm-pairwise-judge: page {} has no two transcriptions; skipped",
+            page_number,
         )
         return None
     return content, other, primary_md, secondary_md
@@ -490,30 +488,33 @@ def _judge_one_page(
         return None, MethodResult(
             success=False,
             validated=False,
-            message=f"Página {page_number} não pôde ser renderizada: {exc}",
+            message=t(step_messages.MSG_JUDGE_RENDER_FAILED).format(
+                page_number=page_number, error=exc),
         )
     truncated = max(len(primary_md), len(secondary_md)) > _JUDGE_MAX_CHARS
     if truncated:
         logger.warning(
-            "vlm-pairwise-judge: página {} passa de {} caracteres; "
-            "o juiz lê a transcrição truncada",
+            "vlm-pairwise-judge: page {} exceeds {} characters; "
+            "the judge reads the truncated transcription",
             page_number,
             _JUDGE_MAX_CHARS,
         )
-    logger.info("vlm-pairwise-judge: julgando a página {}", page_number)
+    logger.info("vlm-pairwise-judge: judging page {}", page_number)
     try:
         result = _judge_page(image, primary_md, secondary_md)
     except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
         return None, MethodResult(
             success=False,
             validated=False,
-            message=f"Juiz VLM recusou a chamada: {type(exc).__name__}: {exc}",
+            message=t(step_messages.MSG_JUDGE_REFUSED).format(
+                error_type=type(exc).__name__, error=exc),
         )
     except ToolboxError as exc:
         return None, MethodResult(
             success=False,
             validated=False,
-            message=f"Juiz VLM indisponível: {type(exc).__name__}: {exc}",
+            message=t(step_messages.MSG_JUDGE_UNAVAILABLE).format(
+                error_type=type(exc).__name__, error=exc),
         )
     document = result.get("document") or {}
     p_b = page_judgement_probability(document)
@@ -521,10 +522,8 @@ def _judge_one_page(
         return None, MethodResult(
             success=False,
             validated=False,
-            message=(
-                f"Juiz VLM não devolveu pB válido para a página {page_number}: "
-                f"{document.get('pB')!r}"
-            ),
+            message=t(step_messages.MSG_JUDGE_INVALID_PB).format(
+                page_number=page_number, p_b=repr(document.get("pB"))),
         )
     return {
         "content": content,
@@ -546,11 +545,7 @@ def _judgement_result(
     is recorded, not applied. Otherwise the pages are confirmed.
     """
     if not judgements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Sem páginas com as duas transcrições para o juiz VLM",
-        )
+        return MethodResult(success=False, validated=False, message=t(step_messages.MSG_JUDGE_NO_PAGES))
     for element in elements:
         if element.page_number in judgements:
             element.metadata["page_judgement"] = judgements[element.page_number]
@@ -564,24 +559,23 @@ def _judgement_result(
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                "Juiz VLM prefere o outro provider ("
-                + ", ".join(
+            message=t(step_messages.MSG_JUDGE_PREFERS_OTHER).format(
+                routes=", ".join(
                     f"p{page}: {j['choice']} pB={j['pB']:.2f}"
                     for page, j in sorted(preferred.items())
                 )
-                + "); a troca de página não é aplicada automaticamente"
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message="Juiz VLM confirma a página aplicada: "
-        + ", ".join(
-            f"{page} ({j['content']}, pB={j['pB']:.2f})"
-            if j["pB"] is not None
-            else f"{page} ({j['content']}, concordam)"
-            for page, j in sorted(judgements.items())
+        message=t(step_messages.MSG_JUDGE_CONFIRMS).format(
+            pages=", ".join(
+                f"{page} ({j['content']}, pB={j['pB']:.2f})"
+                if j["pB"] is not None
+                else f"{page} ({j['content']}, {t(step_messages.MSG_JUDGE_AGREES)})"
+                for page, j in sorted(judgements.items())
+            )
         ),
     )
 
@@ -660,14 +654,14 @@ class PddlAccessibilityOrchestrator:
 
         if self.extractor_backend in ("toolbox", "toolbox-layout", "toolbox_layout"):
             logger.info(
-                "PDDL extractor_backend={}: usando ToolboxManifestExtractor",
+                "PDDL extractor_backend={}: using ToolboxManifestExtractor",
                 self.extractor_backend,
             )
             extractor = ToolboxManifestExtractor(enable_ocr=enable_ocr)
         else:
             raise ValueError(
-                f"Extractor local '{self.extractor_backend}' desativado. "
-                f"Use extractor_backend='toolbox' para o pipeline PDDL+Toolbox."
+                f"Local extractor '{self.extractor_backend}' is disabled. "
+                f"Use extractor_backend='toolbox' for the PDDL+Toolbox pipeline."
             )
 
         self.information_structural = InformationalStructuralAgent(
@@ -900,7 +894,7 @@ class PddlAccessibilityOrchestrator:
                 break
             replans += 1
             logger.info(
-                "PDDL: replanejando ({}/{}) após {}",
+                "PDDL: replanning ({}/{}) after {}",
                 replans,
                 self.max_replans,
                 execution_report.status,
@@ -946,7 +940,7 @@ class PddlAccessibilityOrchestrator:
             # Only refinements are left open; the extracted content is still
             # complete, so the document is delivered with a technical warning.
             logger.warning(
-                "PDDL: concluindo com obrigações não críticas pendentes: {}",
+                "PDDL: finishing with non-critical obligations open: {}",
                 ", ".join(obligation.id for obligation in unsatisfied),
             )
 
@@ -1672,13 +1666,13 @@ def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
     )
     if availability.enforced:
         logger.warning(
-            "Gate da Toolbox (catálogo {}): métodos fora do plano — {}",
-            availability.catalog_revision or "indisponível",
+            "Toolbox gate (catalogue {}): methods out of the plan — {}",
+            availability.catalog_revision or "unavailable",
             blocked,
         )
     else:
         logger.warning(
-            "Gate da Toolbox em observação (catálogo {}): removeria — {}",
-            availability.catalog_revision or "indisponível",
+            "Toolbox gate observing (catalogue {}): would remove — {}",
+            availability.catalog_revision or "unavailable",
             blocked,
         )

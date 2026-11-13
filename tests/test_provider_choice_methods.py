@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from backend.i18n import reset_request_locale, set_request_locale
+
 from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
 from backend.core.manifest.builder import (
     DEFAULT_METHOD_COSTS,
@@ -176,6 +178,16 @@ SIMPLE_AST = {"body": [{"cells": [{"text": "a"}, {"text": "b"}]}]}
 SPAN_AST = {"body": [{"cells": [{"text": "a", "colspan": 2}]}]}
 MINERU_AST = {"body": [{"cells": [{"text": "A"}, {"text": "B"}]}]}
 
+
+
+@pytest.fixture(autouse=True)
+def _step_messages_in_pt_br():
+    """These tests pin the pt-BR user-facing step messages (#410)."""
+    token = set_request_locale("pt_BR")
+    try:
+        yield
+    finally:
+        reset_request_locale(token)
 
 class TestTableSmartFusion:
     def _run(self, tmp_path, primary_ast, secondary, **kwargs):

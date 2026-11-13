@@ -37,6 +37,7 @@ from backend.core.pipeline.handlers.content import (
     _handle_vision_description_method,
 )
 from backend.core.pipeline.handlers.review import _handle_human_review_method
+from backend.i18n import reset_request_locale, set_request_locale
 from backend.core.pipeline.handlers.text import (
     _handle_repetition_guard_method,
     _tailjoin_position,
@@ -394,19 +395,27 @@ class TestHumanReviewIsTerminalEscalation:
             [_obligation("describe-image", ["el-1"], ["human-review"])],
         )
 
-        result = _handle_human_review_method(manifest, "o-1")
+        token = set_request_locale("en_US")
+        try:
+            result = _handle_human_review_method(manifest, "o-1")
+        finally:
+            reset_request_locale(token)
 
         assert result.success is False
         assert result.validated is False
-        assert "revisão humana" in (result.message or "").lower()
+        assert "human review" in (result.message or "").lower()
 
     def test_reports_a_missing_obligation(self) -> None:
         manifest = _manifest([_element("el-1", "picture")], [])
 
-        result = _handle_human_review_method(manifest, "o-inexistente")
+        token = set_request_locale("en_US")
+        try:
+            result = _handle_human_review_method(manifest, "o-inexistente")
+        finally:
+            reset_request_locale(token)
 
         assert result.success is False
-        assert "não encontrada" in (result.message or "")
+        assert "not found" in (result.message or "").lower()
 
 #: Long text with a regular integer progression, which is what
 #: `extract_line_numbers` looks for in marginal verse numbering.

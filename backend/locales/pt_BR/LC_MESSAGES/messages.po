@@ -2035,6 +2035,182 @@ msgstr ""
 "falhou. O documento exige revisão; a comparação entre dois provedores não"
 " estava disponível."
 
+#, python-brace-format
+msgid "Obligation not found: {obligation_id}"
+msgstr "Obrigação não encontrada: {obligation_id}"
+
+msgid "No picture found for the obligation"
+msgstr "Nenhuma imagem encontrada para a obrigação"
+
+#, python-brace-format
+msgid "Picture without a textual description: {ids}"
+msgstr "Imagem sem descrição textual: {ids}"
+
+msgid "No table found for the obligation"
+msgstr "Nenhuma tabela encontrada para a obrigação"
+
+#, python-brace-format
+msgid "Table without tabular structure: {ids}"
+msgstr "Tabela sem estrutura tabular: {ids}"
+
+msgid "No code block found for the obligation"
+msgstr "Nenhum bloco de código encontrado para a obrigação"
+
+msgid "No text eligible for normalization"
+msgstr "Nenhum texto elegível para normalização"
+
+msgid "No text eligible for Unicode repair"
+msgstr "Nenhum texto elegível para reparo Unicode"
+
+msgid "No degenerate repetition found in the targets"
+msgstr "Nenhuma repetição degenerada encontrada nos alvos"
+
+msgid "No marginal line number found"
+msgstr "Nenhum número de linha marginal encontrado"
+
+msgid "No verse block eligible for splitting"
+msgstr "Nenhum bloco de verso elegível para fragmentação"
+
+msgid "No tail block eligible for joining"
+msgstr "Nenhum bloco de cauda elegível para união"
+
+#, python-brace-format
+msgid ""
+"The join does not match the obligation targets: survivor {survivor}, "
+"removed {removed}"
+msgstr ""
+"A união não corresponde aos alvos da obrigação: sobrevivente {survivor}, "
+"removidos {removed}"
+
+msgid "No heading found for the obligation"
+msgstr "Nenhum título encontrado para a obrigação"
+
+#, python-brace-format
+msgid ""
+"Escalated to human review: no automated method satisfied {kind} "
+"({obligation_id})"
+msgstr ""
+"Escalonado para revisão humana: nenhum método automático satisfez {kind} "
+"({obligation_id})"
+
+msgid "The secondary provider's skeleton did not match the page"
+msgstr "Esqueleto do provider secundário não casou com a página"
+
+#, python-brace-format
+msgid "Skeleton order applied on pages {pages}"
+msgstr "Ordem do esqueleto aplicada nas páginas {pages}"
+
+#, python-brace-format
+msgid "Skeleton order confirmed on pages {pages}"
+msgstr "Ordem do esqueleto confirmada nas páginas {pages}"
+
+msgid "XY-cut found no reading-order change"
+msgstr "XY-cut não identificou uma mudança de ordem de leitura"
+
+#, python-brace-format
+msgid "XY-cut reading order applied on pages {pages}"
+msgstr "Ordem de leitura XY-cut aplicada nas páginas {pages}"
+
+msgid "Secondary provider extraction missing from the manifest"
+msgstr "Extração do provider secundário ausente do manifesto"
+
+#, python-brace-format
+msgid "Rule calibrated for {expected}; current pair: {primary}+{secondary}"
+msgstr "Regra calibrada para {expected}; par atual: {primary}+{secondary}"
+
+#, python-brace-format
+msgid "Secondary provider extraction unavailable: {path}"
+msgstr "Extração do provider secundário indisponível: {path}"
+
+#, python-brace-format
+msgid ""
+"Secondary provider extraction changed: sha256 differs from the artifact "
+"recorded in the manifest ({path})"
+msgstr ""
+"Extração do provider secundário alterada: sha256 diverge do registrado no"
+" manifesto ({path})"
+
+#, python-brace-format
+msgid "Secondary provider extraction unreadable: {path}"
+msgstr "Extração do provider secundário ilegível: {path}"
+
+#, python-brace-format
+msgid "Table source chosen: {reasons}"
+msgstr "Fonte de tabela escolhida: {reasons}"
+
+msgid "Obligation has no page for the router"
+msgstr "Obrigação sem página identificada para o roteador"
+
+#, python-brace-format
+msgid ""
+"Page router chose the secondary provider ({routes}); the page swap is not"
+" applied automatically"
+msgstr ""
+"Roteador por página escolhe o provider secundário ({routes}); a troca de "
+"página não é aplicada automaticamente"
+
+#, python-brace-format
+msgid "Page router keeps the primary provider on pages {pages}"
+msgstr "Roteador por página mantém o provider primário nas páginas {pages}"
+
+msgid "single-provider is only valid for fuse-providers"
+msgstr "single-provider só é válido para fuse-providers"
+
+#, python-brace-format
+msgid "Dual-provider fusion failed: {error_type}: {error}"
+msgstr "Fusão dual-provider falhou: {error_type}: {error}"
+
+msgid "Dual-provider fusion did not complete successfully"
+msgstr "Fusão dual-provider não concluiu com sucesso"
+
+#, python-brace-format
+msgid ""
+"Dual-provider fusion ran with a single provider ({provider}); replanning "
+"required"
+msgstr ""
+"Fusão dual-provider executou com um único provider ({provider}); "
+"replanning necessário"
+
+msgid "Dual-provider fusion completed successfully"
+msgstr "Fusão dual-provider concluída com sucesso"
+
+msgid "No formula found for the obligation"
+msgstr "Nenhuma fórmula encontrada para a obrigação"
+
+#, python-brace-format
+msgid "Page {page_number} could not be rendered: {error}"
+msgstr "Página {page_number} não pôde ser renderizada: {error}"
+
+#, python-brace-format
+msgid "VLM judge refused the call: {error_type}: {error}"
+msgstr "Juiz VLM recusou a chamada: {error_type}: {error}"
+
+#, python-brace-format
+msgid "VLM judge unavailable: {error_type}: {error}"
+msgstr "Juiz VLM indisponível: {error_type}: {error}"
+
+#, python-brace-format
+msgid "VLM judge returned no valid pB for page {page_number}: {p_b}"
+msgstr "Juiz VLM não devolveu pB válido para a página {page_number}: {p_b}"
+
+msgid "No page has both transcriptions for the VLM judge"
+msgstr "Sem páginas com as duas transcrições para o juiz VLM"
+
+#, python-brace-format
+msgid ""
+"VLM judge prefers the other provider ({routes}); the page swap is not "
+"applied automatically"
+msgstr ""
+"Juiz VLM prefere o outro provider ({routes}); a troca de página não é "
+"aplicada automaticamente"
+
+msgid "agree"
+msgstr "concordam"
+
+#, python-brace-format
+msgid "VLM judge confirms the applied page: {pages}"
+msgstr "Juiz VLM confirma a página aplicada: {pages}"
+
 msgid "document"
 msgid_plural "documents"
 msgstr[0] "documento"
@@ -2079,4 +2255,112 @@ msgstr[0] ""
 msgstr[1] ""
 "{count} tabelas sem leitura utilizável do modelo; nova tentativa em "
 "{delay}s"
+
+#, python-brace-format
+msgid "Picture description validated for {count} picture"
+msgid_plural "Picture descriptions validated for {count} pictures"
+msgstr[0] "Descrição validada para {count} imagem"
+msgstr[1] "Descrições validadas para {count} imagens"
+
+#, python-brace-format
+msgid "Table structure validated for {count} table"
+msgid_plural "Table structures validated for {count} tables"
+msgstr[0] "Estrutura tabular validada para {count} tabela"
+msgstr[1] "Estruturas tabulares validadas para {count} tabelas"
+
+#, python-brace-format
+msgid "Code normalized in {count} block"
+msgid_plural "Code normalized in {count} blocks"
+msgstr[0] "Código normalizado em {count} bloco"
+msgstr[1] "Código normalizado em {count} blocos"
+
+#, python-brace-format
+msgid "Code normalized in {done}/{total} block"
+msgid_plural "Code normalized in {done}/{total} blocks"
+msgstr[0] "Código normalizado em {done}/{total} bloco"
+msgstr[1] "Código normalizado em {done}/{total} blocos"
+
+#, python-brace-format
+msgid "Deterministic normalization applied to {count} element"
+msgid_plural "Deterministic normalization applied to {count} elements"
+msgstr[0] "Normalização determinística aplicada em {count} elemento"
+msgstr[1] "Normalização determinística aplicada em {count} elementos"
+
+#, python-brace-format
+msgid "Unicode repair applied to {done}/{total} element; {review} for review"
+msgid_plural "Unicode repair applied to {done}/{total} elements; {review} for review"
+msgstr[0] "Reparo Unicode aplicado em {done}/{total} elemento; {review} para revisão"
+msgstr[1] "Reparo Unicode aplicado em {done}/{total} elementos; {review} para revisão"
+
+#, python-brace-format
+msgid "Repetition guard removed {count} token"
+msgid_plural "Repetition guard removed {count} tokens"
+msgstr[0] "Guarda de repetição removeu {count} token"
+msgstr[1] "Guarda de repetição removeu {count} tokens"
+
+#, python-brace-format
+msgid "{count} marginal line number extracted from {blocks}"
+msgid_plural "{count} marginal line numbers extracted from {blocks}"
+msgstr[0] "{count} número de linha marginal extraído de {blocks}"
+msgstr[1] "{count} números de linha marginais extraídos de {blocks}"
+
+#, python-brace-format
+msgid "Verse split into {count} chunk from {blocks}"
+msgid_plural "Verse split into {count} chunks from {blocks}"
+msgstr[0] "Verso fragmentado em {count} pedaço de {blocks}"
+msgstr[1] "Verso fragmentado em {count} pedaços de {blocks}"
+
+#, python-brace-format
+msgid "{count} block"
+msgid_plural "{count} blocks"
+msgstr[0] "{count} bloco"
+msgstr[1] "{count} blocos"
+
+#, python-brace-format
+msgid "Tail blocks joined: {before} -> {after} block on {pages} page(s)"
+msgid_plural "Tail blocks joined: {before} -> {after} blocks on {pages} page(s)"
+msgstr[0] "Blocos de cauda unidos: {before} -> {after} bloco em {pages} página(s)"
+msgstr[1] "Blocos de cauda unidos: {before} -> {after} blocos em {pages} página(s)"
+
+#, python-brace-format
+msgid "Heading hierarchy checked; {count} heading repaired"
+msgid_plural "Heading hierarchy checked; {count} headings repaired"
+msgstr[0] "Hierarquia de títulos verificada; {count} título reparado"
+msgstr[1] "Hierarquia de títulos verificada; {count} títulos reparados"
+
+#, python-brace-format
+msgid "MathML generated for {count} formula"
+msgid_plural "MathML generated for {count} formulas"
+msgstr[0] "MathML gerado para {count} fórmula"
+msgstr[1] "MathML gerado para {count} fórmulas"
+
+#, python-brace-format
+msgid "MathML generated for {done}/{total} formula"
+msgid_plural "MathML generated for {done}/{total} formulas"
+msgstr[0] "MathML gerado para {done}/{total} fórmula"
+msgstr[1] "MathML gerado para {done}/{total} fórmulas"
+
+#, python-brace-format
+msgid "Verbalization generated for {count} formula"
+msgid_plural "Verbalization generated for {count} formulas"
+msgstr[0] "Verbalização gerada para {count} fórmula"
+msgstr[1] "Verbalização gerada para {count} fórmulas"
+
+#, python-brace-format
+msgid "Verbalization generated for {done}/{total} formula"
+msgid_plural "Verbalization generated for {done}/{total} formulas"
+msgstr[0] "Verbalização gerada para {done}/{total} fórmula"
+msgstr[1] "Verbalização gerada para {done}/{total} fórmulas"
+
+#, python-brace-format
+msgid "LaTeX normalized in {count} formula"
+msgid_plural "LaTeX normalized in {count} formulas"
+msgstr[0] "LaTeX normalizado em {count} fórmula"
+msgstr[1] "LaTeX normalizado em {count} fórmulas"
+
+#, python-brace-format
+msgid "LaTeX normalized in {done}/{total} formula"
+msgid_plural "LaTeX normalized in {done}/{total} formulas"
+msgstr[0] "LaTeX normalizado em {done}/{total} fórmula"
+msgstr[1] "LaTeX normalizado em {done}/{total} fórmulas"
 

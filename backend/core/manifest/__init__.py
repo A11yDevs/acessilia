@@ -1,4 +1,4 @@
-"""Contrato e construção do manifesto de processamento."""
+"""Processing manifest contract and construction."""
 
 from backend.core.manifest.models import ProcessingManifest
 

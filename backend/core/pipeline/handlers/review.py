@@ -12,6 +12,8 @@ from backend.core.manifest.models import (
 from backend.core.pipeline.handlers.common import (
     _missing_obligation,
 )
+from backend.core.pipeline.handlers.messages import MSG_HUMAN_REVIEW
+from backend.i18n import t
 
 
 def _handle_human_review_method(
@@ -34,8 +36,7 @@ def _handle_human_review_method(
     return MethodResult(
         success=False,
         validated=False,
-        message=(
-            "Escalonado para revisão humana: nenhum método automático satisfez "
-            f"{obligation.kind} ({obligation_id})"
+        message=t(MSG_HUMAN_REVIEW).format(
+            kind=obligation.kind, obligation_id=obligation_id
         ),
     )

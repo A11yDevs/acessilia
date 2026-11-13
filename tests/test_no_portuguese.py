@@ -48,6 +48,9 @@ EXEMPT_FILES: set[str] = {
     "scripts/gen_locale_catalogs.py",
     # This guard — it lists the exempt Portuguese strings.
     "tests/test_no_portuguese.py",
+    # The #410 tests assert the pt-BR step messages verbatim; the text is the
+    # expected user-facing output, not source prose.
+    "tests/test_pddl_messages_i18n.py",
 }
 
 # Local clone of the separate acessilia-dataset repository (git-ignored):
@@ -223,48 +226,7 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("libs/sdk/tests/clients/test_dataset.py", '"input/álgebra.pdf"'),
     # The heading of the Brazilian Portuguese README whose table it reads (ADR-0018).
     ("libs/sdk/tests/test_public_api.py", "## API pública"),
-    # Method results of the deterministic handlers — user-facing execution
-    # messages, moved with their handlers (#402, step 6); #410 translates them.
-    ("backend/core/pipeline/handlers/common.py", "Obrigação não encontrada"),
-    ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para normalização"),
-    ("backend/core/pipeline/handlers/text.py", "Normalização determinística aplicada em"),
-    ("backend/core/pipeline/handlers/text.py", "Nenhuma repetição degenerada encontrada nos alvos"),
-    ("backend/core/pipeline/handlers/text.py", "Guarda de repetição removeu"),
-    ("backend/core/pipeline/handlers/text.py", "Nenhum número de linha marginal encontrado"),
-    ("backend/core/pipeline/handlers/text.py", "número(s) de linha extraído(s)"),
-    ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de verso elegível para fragmentação"),
-    ("backend/core/pipeline/handlers/text.py", "Verso fragmentado em"),
-    ("backend/core/pipeline/handlers/text.py", "Nenhum bloco de cauda elegível para união"),
-    ("backend/core/pipeline/handlers/text.py", "não corresponde aos alvos da obrigação"),
-    ("backend/core/pipeline/handlers/text.py", "Nenhum título encontrado para a obrigação"),
-    ("backend/core/pipeline/handlers/text.py", "Hierarquia de títulos verificada"),
-    ("backend/core/pipeline/handlers/content.py", "Nenhuma imagem encontrada para a obrigação"),
-    ("backend/core/pipeline/handlers/content.py", "Imagem sem descrição textual"),
-    ("backend/core/pipeline/handlers/content.py", "Descrição validada para"),
-    ("backend/core/pipeline/handlers/content.py", "Nenhuma tabela encontrada para a obrigação"),
-    ("backend/core/pipeline/handlers/content.py", "Nenhum bloco de código encontrado para a obrigação"),
-    ("backend/core/pipeline/handlers/content.py", "Código normalizado em"),
-    ("backend/core/pipeline/handlers/review.py", "Escalonado para revisão humana"),
-    ("backend/core/pipeline/handlers/fusion.py", "Obrigação sem página identificada para o roteador"),
-    ("backend/core/pipeline/handlers/fusion.py", "Roteador por página escolhe o provider secundário"),
-    ("backend/core/pipeline/handlers/fusion.py", "a troca de página não é aplicada automaticamente"),
-    ("backend/core/pipeline/handlers/fusion.py", "Roteador por página mantém o provider primário"),
-    ("backend/core/pipeline/handlers/fusion.py", "single-provider só é válido para fuse-providers"),
-    # The dual-provider fusion's four results, and the end of the single-provider one.
-    ("backend/core/pipeline/handlers/fusion.py", "Fusão dual-provider"),
-    ("backend/core/pipeline/handlers/fusion.py", "replanning necessário"),
-    ("backend/core/pipeline/handlers/order.py", "Esqueleto do provider secundário não casou com a página"),
-    ("backend/core/pipeline/handlers/order.py", "aplicada nas páginas"),
-    ("backend/core/pipeline/handlers/order.py", "confirmada nas páginas"),
-    ("backend/core/pipeline/handlers/order.py", "XY-cut não identificou uma mudança de ordem de leitura"),
-    # The four results that say why the secondary extraction cannot be used.
-    ("backend/core/pipeline/secondary.py", "Extração do provider secundário"),
-    # An operator log line, not a result; #410 moves it to backend/log_messages.py.
-    ("backend/core/pipeline/secondary.py", "Extração secundária {} não confere com o sha256 registrado"),
     # Legacy Unicode repair — user-facing execution messages and observations
-    ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para reparo Unicode"),
-    ("backend/core/pipeline/handlers/text.py", "Reparo Unicode aplicado em"),
-    ("backend/core/pipeline/handlers/text.py", "para revisão"),
     ("backend/core/pipeline/payload.py", "Texto com sinais de Unicode legado"),
     ("backend/core/manifest/builder.py", "Texto extraído de PDF legado contém Unicode"),
     # Text-layer formula agreement — Portuguese function names (máx, mín) that

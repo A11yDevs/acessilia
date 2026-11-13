@@ -31,6 +31,14 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     is_bottom_left,
 )
+from backend.i18n import t
+from backend.core.pipeline.handlers.messages import (
+    MSG_PROVIDER_PAIR_UNCALIBRATED,
+    MSG_SECONDARY_CHANGED,
+    MSG_SECONDARY_MISSING,
+    MSG_SECONDARY_UNAVAILABLE,
+    MSG_SECONDARY_UNREADABLE,
+)
 from backend.core.pipeline.elements import (
     _element_bbox,
 )
@@ -105,21 +113,18 @@ def _load_secondary_extraction(
         (a for a in manifest.artifacts if a.kind == SECONDARY_EXTRACTION_KIND), None
     )
     if artifact is None:
-        return None, "Extração do provider secundário ausente do manifesto"
+        return None, t(MSG_SECONDARY_MISSING)
     try:
         raw = Path(artifact.path).read_bytes()
     except OSError:
-        return None, f"Extração do provider secundário indisponível: {artifact.path}"
+        return None, t(MSG_SECONDARY_UNAVAILABLE).format(path=artifact.path)
     if artifact.sha256 and hashlib.sha256(raw).hexdigest() != artifact.sha256:
         logger.warning(
-            "Extração secundária {} não confere com o sha256 registrado",
+            "Secondary extraction {} does not match the recorded sha256",
             artifact.path,
         )
-        return None, (
-            "Extração do provider secundário alterada: sha256 diverge do "
-            f"registrado no manifesto ({artifact.path})"
-        )
-    unreadable = f"Extração do provider secundário ilegível: {artifact.path}"
+        return None, t(MSG_SECONDARY_CHANGED).format(path=artifact.path)
+    unreadable = t(MSG_SECONDARY_UNREADABLE).format(path=artifact.path)
     try:
         data = json.loads(raw)
     except ValueError:
@@ -165,9 +170,10 @@ def _provider_pair_problem(
     primary = str((manifest.extractor.configuration or {}).get("toolbox_provider") or "")
     if (primary, secondary.provider) == _CALIBRATED_PAIR:
         return None
-    return (
-        f"Regra calibrada para {'+'.join(_CALIBRATED_PAIR)}; "
-        f"par atual: {primary or '?'}+{secondary.provider or '?'}"
+    return t(MSG_PROVIDER_PAIR_UNCALIBRATED).format(
+        expected="+".join(_CALIBRATED_PAIR),
+        primary=primary or "?",
+        secondary=secondary.provider or "?",
     )
 
 

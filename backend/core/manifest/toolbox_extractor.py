@@ -34,10 +34,10 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ToolboxExtraction:
-    """Resultado da extração via Toolbox.
+    """Toolbox extraction result.
 
-    Carrega o JSON completo da resposta da Toolbox, de onde o builder lê
-    elements e pages diretamente.
+    Carries the Toolbox response's full JSON, from which the builder reads
+    elements and pages directly.
     """
     document: dict[str, Any]
     started_at: datetime
@@ -50,12 +50,11 @@ class ToolboxExtraction:
 
 
 class ToolboxManifestExtractor:
-    """Extrator que consome a Acessilia Toolbox via REST.
+    """Manifest extractor that consumes the Acessilia Toolbox over REST.
 
-    É o único extrator de manifesto do core: a extração roda na Toolbox
-    (docs/adr/0003).
-    O método extract() é síncrono para compatibilidade com
-    InformationalStructuralAgent.process() que roda dentro de asyncio.to_thread.
+    It is the core's only manifest extractor: extraction runs on the Toolbox
+    (docs/adr/0003). The extract() method is synchronous for compatibility with
+    InformationalStructuralAgent.process(), which runs inside asyncio.to_thread.
     """
 
     def __init__(
@@ -88,10 +87,10 @@ class ToolboxManifestExtractor:
         )
 
     def extract(self, source_path: Path, *, dual_fusion: bool = True) -> ToolboxExtraction:
-        """Extrai a estrutura de um documento usando a Toolbox (síncrono).
+        """Extract a document's structure using the Toolbox (synchronous).
 
-        Executa chamadas HTTP assíncronas via asyncio.run() em thread separada,
-        compatível com o fluxo existente que chama extract() dentro de
+        Runs the asynchronous HTTP calls via asyncio.run() on a separate thread,
+        compatible with the existing flow that calls extract() inside
         asyncio.to_thread(). With ``dual_fusion=False`` the secondary provider
         is not called even in FUSION_MODE=dual (a presentation).
         """
@@ -138,7 +137,7 @@ class ToolboxManifestExtractor:
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
         if not source_path.is_file():
-            raise FileNotFoundError(f"Documento não encontrado: {source_path}")
+            raise FileNotFoundError(f"Document not found: {source_path}")
 
         started_at = datetime.now(timezone.utc)
         started_clock = perf_counter()
@@ -410,7 +409,7 @@ def _persist_secondary_extraction(
         path.write_bytes(content)
     except OSError as exc:
         logger.warning(
-            "Extração secundária de {} não foi gravada ({}): {}",
+            "Secondary extraction of {} was not written ({}): {}",
             provider,
             type(exc).__name__,
             exc,

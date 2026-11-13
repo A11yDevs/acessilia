@@ -230,6 +230,7 @@ from backend.log_messages import (
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
 )
+from backend.core.pipeline.handlers import messages as handler_messages
 from backend.core.manifest.models import (
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
@@ -954,11 +955,168 @@ MESSAGES: tuple[str, ...] = (
     MSG_PAGE_UNKNOWN_ELEMENTS,
     MSG_CHAR_RANGE_REVERSED,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
+    # Method results of the deterministic handlers and the VLM judge (#410).
+    *handler_messages.SINGLE_MESSAGES,
 )
+
+#: Step messages of the deterministic handlers and the VLM judge (#410). The
+#: English msgids live in ``backend.core.pipeline.handlers.messages``; these are
+#: their pt-BR translations. Every one is user-facing: the executor persists the
+#: message in the obligation attempts and the orchestrator publishes it as
+#: ``last_message``.
+HANDLER_SINGLE_TRANSLATIONS: dict[str, str] = {
+    handler_messages.MSG_HANDLER_OBLIGATION_NOT_FOUND: "Obrigação não encontrada: {obligation_id}",
+    handler_messages.MSG_VISION_NO_PICTURE: "Nenhuma imagem encontrada para a obrigação",
+    handler_messages.MSG_VISION_UNDESCRIBED: "Imagem sem descrição textual: {ids}",
+    handler_messages.MSG_TABLE_NO_TABLE: "Nenhuma tabela encontrada para a obrigação",
+    handler_messages.MSG_TABLE_NO_STRUCTURE: "Tabela sem estrutura tabular: {ids}",
+    handler_messages.MSG_CODE_NO_CODE: "Nenhum bloco de código encontrado para a obrigação",
+    handler_messages.MSG_NORMALIZE_NO_TEXT: "Nenhum texto elegível para normalização",
+    handler_messages.MSG_UNICODE_REPAIR_NO_TEXT: "Nenhum texto elegível para reparo Unicode",
+    handler_messages.MSG_REPETITION_NONE: "Nenhuma repetição degenerada encontrada nos alvos",
+    handler_messages.MSG_LINE_NUMBERS_NONE: "Nenhum número de linha marginal encontrado",
+    handler_messages.MSG_VERSE_NONE: "Nenhum bloco de verso elegível para fragmentação",
+    handler_messages.MSG_TAILJOIN_NONE: "Nenhum bloco de cauda elegível para união",
+    handler_messages.MSG_TAILJOIN_MISMATCH: (
+        "A união não corresponde aos alvos da obrigação: sobrevivente {survivor}, "
+        "removidos {removed}"
+    ),
+    handler_messages.MSG_HEADING_NONE: "Nenhum título encontrado para a obrigação",
+    handler_messages.MSG_HUMAN_REVIEW: (
+        "Escalonado para revisão humana: nenhum método automático satisfez "
+        "{kind} ({obligation_id})"
+    ),
+    handler_messages.MSG_SKELETON_NO_MATCH: "Esqueleto do provider secundário não casou com a página",
+    handler_messages.MSG_SKELETON_APPLIED: "Ordem do esqueleto aplicada nas páginas {pages}",
+    handler_messages.MSG_SKELETON_CONFIRMED: "Ordem do esqueleto confirmada nas páginas {pages}",
+    handler_messages.MSG_XYCUT_NONE: "XY-cut não identificou uma mudança de ordem de leitura",
+    handler_messages.MSG_XYCUT_APPLIED: "Ordem de leitura XY-cut aplicada nas páginas {pages}",
+    handler_messages.MSG_SECONDARY_MISSING: (
+        "Extração do provider secundário ausente do manifesto"
+    ),
+    handler_messages.MSG_PROVIDER_PAIR_UNCALIBRATED: (
+        "Regra calibrada para {expected}; par atual: {primary}+{secondary}"
+    ),
+    handler_messages.MSG_SECONDARY_UNAVAILABLE: (
+        "Extração do provider secundário indisponível: {path}"
+    ),
+    handler_messages.MSG_SECONDARY_CHANGED: (
+        "Extração do provider secundário alterada: sha256 diverge do registrado "
+        "no manifesto ({path})"
+    ),
+    handler_messages.MSG_SECONDARY_UNREADABLE: (
+        "Extração do provider secundário ilegível: {path}"
+    ),
+    handler_messages.MSG_TABLE_SOURCE: "Fonte de tabela escolhida: {reasons}",
+    handler_messages.MSG_ROUTER_NO_PAGE: "Obrigação sem página identificada para o roteador",
+    handler_messages.MSG_ROUTER_SECONDARY: (
+        "Roteador por página escolhe o provider secundário ({routes}); a troca de "
+        "página não é aplicada automaticamente"
+    ),
+    handler_messages.MSG_ROUTER_PRIMARY: "Roteador por página mantém o provider primário nas páginas {pages}",
+    handler_messages.MSG_SINGLE_PROVIDER_ONLY: "single-provider só é válido para fuse-providers",
+    handler_messages.MSG_DUAL_FUSION_FAILED: "Fusão dual-provider falhou: {error_type}: {error}",
+    handler_messages.MSG_DUAL_FUSION_UNSUCCESSFUL: "Fusão dual-provider não concluiu com sucesso",
+    handler_messages.MSG_DUAL_FUSION_SINGLE_PROVIDER: (
+        "Fusão dual-provider executou com um único provider ({provider}); "
+        "replanning necessário"
+    ),
+    handler_messages.MSG_DUAL_FUSION_DONE: "Fusão dual-provider concluída com sucesso",
+    handler_messages.MSG_MATH_NO_FORMULA: "Nenhuma fórmula encontrada para a obrigação",
+    handler_messages.MSG_JUDGE_RENDER_FAILED: "Página {page_number} não pôde ser renderizada: {error}",
+    handler_messages.MSG_JUDGE_REFUSED: "Juiz VLM recusou a chamada: {error_type}: {error}",
+    handler_messages.MSG_JUDGE_UNAVAILABLE: "Juiz VLM indisponível: {error_type}: {error}",
+    handler_messages.MSG_JUDGE_INVALID_PB: (
+        "Juiz VLM não devolveu pB válido para a página {page_number}: {p_b}"
+    ),
+    handler_messages.MSG_JUDGE_NO_PAGES: "Sem páginas com as duas transcrições para o juiz VLM",
+    handler_messages.MSG_JUDGE_PREFERS_OTHER: (
+        "Juiz VLM prefere o outro provider ({routes}); a troca de página não é "
+        "aplicada automaticamente"
+    ),
+    handler_messages.MSG_JUDGE_AGREES: "concordam",
+    handler_messages.MSG_JUDGE_CONFIRMS: "Juiz VLM confirma a página aplicada: {pages}",
+}
+
+HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
+    handler_messages.MSG_VISION_VALIDATED: (
+        "Descrição validada para {count} imagem",
+        "Descrições validadas para {count} imagens",
+    ),
+    handler_messages.MSG_TABLE_VALIDATED: (
+        "Estrutura tabular validada para {count} tabela",
+        "Estruturas tabulares validadas para {count} tabelas",
+    ),
+    handler_messages.MSG_CODE_NORMALIZED: (
+        "Código normalizado em {count} bloco",
+        "Código normalizado em {count} blocos",
+    ),
+    handler_messages.MSG_CODE_NORMALIZED_PARTIAL: (
+        "Código normalizado em {done}/{total} bloco",
+        "Código normalizado em {done}/{total} blocos",
+    ),
+    handler_messages.MSG_NORMALIZE_APPLIED: (
+        "Normalização determinística aplicada em {count} elemento",
+        "Normalização determinística aplicada em {count} elementos",
+    ),
+    handler_messages.MSG_UNICODE_REPAIR_APPLIED: (
+        "Reparo Unicode aplicado em {done}/{total} elemento; {review} para revisão",
+        "Reparo Unicode aplicado em {done}/{total} elementos; {review} para revisão",
+    ),
+    handler_messages.MSG_REPETITION_REMOVED: (
+        "Guarda de repetição removeu {count} token",
+        "Guarda de repetição removeu {count} tokens",
+    ),
+    handler_messages.MSG_LINE_NUMBERS_EXTRACTED: (
+        "{count} número de linha marginal extraído de {blocks}",
+        "{count} números de linha marginais extraídos de {blocks}",
+    ),
+    handler_messages.MSG_VERSE_SPLIT: (
+        "Verso fragmentado em {count} pedaço de {blocks}",
+        "Verso fragmentado em {count} pedaços de {blocks}",
+    ),
+    handler_messages.MSG_BLOCK_COUNT: (
+        "{count} bloco",
+        "{count} blocos",
+    ),
+    handler_messages.MSG_TAILJOIN_JOINED: (
+        "Blocos de cauda unidos: {before} -> {after} bloco em {pages} página(s)",
+        "Blocos de cauda unidos: {before} -> {after} blocos em {pages} página(s)",
+    ),
+    handler_messages.MSG_HEADING_REPAIRED: (
+        "Hierarquia de títulos verificada; {count} título reparado",
+        "Hierarquia de títulos verificada; {count} títulos reparados",
+    ),
+    handler_messages.MSG_MATHML_GENERATED: (
+        "MathML gerado para {count} fórmula",
+        "MathML gerado para {count} fórmulas",
+    ),
+    handler_messages.MSG_MATHML_GENERATED_PARTIAL: (
+        "MathML gerado para {done}/{total} fórmula",
+        "MathML gerado para {done}/{total} fórmulas",
+    ),
+    handler_messages.MSG_VERBALIZATION_GENERATED: (
+        "Verbalização gerada para {count} fórmula",
+        "Verbalização gerada para {count} fórmulas",
+    ),
+    handler_messages.MSG_VERBALIZATION_GENERATED_PARTIAL: (
+        "Verbalização gerada para {done}/{total} fórmula",
+        "Verbalização gerada para {done}/{total} fórmulas",
+    ),
+    handler_messages.MSG_LATEX_NORMALIZED: (
+        "LaTeX normalizado em {count} fórmula",
+        "LaTeX normalizado em {count} fórmulas",
+    ),
+    handler_messages.MSG_LATEX_NORMALIZED_PARTIAL: (
+        "LaTeX normalizado em {done}/{total} fórmula",
+        "LaTeX normalizado em {done}/{total} fórmulas",
+    ),
+}
 
 #: msgid -> localized text mappings per non-default locale; every id in MESSAGES must appear for each such locale.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pt_BR": {
+        **HANDLER_SINGLE_TRANSLATIONS,
         MSG_MATHML_UNAVAILABLE: 'math.convert indisponível ({reason}): fórmulas mantidas sem MathML',
         MSG_SPEECH_UNAVAILABLE: 'math.verbalize indisponível ({reason}): fórmulas mantidas sem texto falado',
         MSG_MATHML_REJECTED: 'math.convert rejeitou o LaTeX de {count} fórmula(s): mantidas sem MathML',
@@ -1935,18 +2093,30 @@ PLURAL_MESSAGES: tuple[tuple[tuple[str, str], dict[str, tuple[str, str]]], ...] 
             )
         },
     ),
+    *(
+        (pair, {"pt_BR": HANDLER_PLURAL_TRANSLATIONS[pair]})
+        for pair in handler_messages.MSG_TABLES
+    ),
 )
 
 
-def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...]) -> list[str]:
+def _validate(
+    translations: dict[str, dict[str, str]],
+    locales: tuple[str, ...],
+    *,
+    plural_messages: tuple[
+        tuple[tuple[str, str], dict[str, tuple[str, str]]], ...
+    ] = PLURAL_MESSAGES,
+) -> list[str]:
     """Cross-check translation tables for completeness before any file is written.
 
     Args:
         translations (dict): msgid-to-localized-text mapping per locale as passed via :data:`TRANSLATIONS` at call time.
         locales (tuple): Every supported locale identifier under validation, e.g. the default :data:`SUPPORTED_LOCALES` or an alternate tuple injected by tests.
+        plural_messages (tuple): Singular/plural msgid pairs with their per-locale forms; defaults to :data:`PLURAL_MESSAGES`, and tests may pass a smaller tuple to isolate a case.
 
     Returns:
-        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids with non-blank values that keep the msgid's ``{name}`` placeholders.
+        list: Problem descriptions, empty when every non-default locale covers all MESSAGES ids and plural pairs with non-blank values that keep the msgid's ``{name}`` placeholders.
     """
     problems: list[str] = []
     for locale in locales:
@@ -1966,6 +2136,21 @@ def _validate(translations: dict[str, dict[str, str]], locales: tuple[str, ...])
                 if str(table.get(msgid) or "").strip()
                 and _placeholders(table[msgid]) != _placeholders(msgid)
             )
+        for pair, localized in plural_messages:
+            forms = localized.get(locale)
+            if (
+                not isinstance(forms, (tuple, list))
+                or len(forms) != 2
+                or any(not str(form).strip() for form in forms)
+            ):
+                problems.append(f"missing or blank plural entry: {pair[0]!r}")
+                continue
+            for msgid, form in zip(pair, forms, strict=True):
+                if _placeholders(form) != _placeholders(msgid):
+                    problems.append(
+                        f"plural placeholders differ from the msgid: {pair[0]!r}"
+                    )
+                    break
     return problems
 
 

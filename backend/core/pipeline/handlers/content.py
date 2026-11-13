@@ -25,6 +25,18 @@ from backend.core.pipeline.elements import (
 from backend.core.pipeline.handlers.common import (
     _target_elements,
 )
+from backend.core.pipeline.handlers.messages import (
+    MSG_CODE_NO_CODE,
+    MSG_CODE_NORMALIZED,
+    MSG_CODE_NORMALIZED_PARTIAL,
+    MSG_TABLE_NO_STRUCTURE,
+    MSG_TABLE_NO_TABLE,
+    MSG_TABLE_VALIDATED,
+    MSG_VISION_NO_PICTURE,
+    MSG_VISION_UNDESCRIBED,
+    MSG_VISION_VALIDATED,
+)
+from backend.i18n import n, t
 
 
 def _handle_vision_description_method(
@@ -47,7 +59,7 @@ def _handle_vision_description_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhuma imagem encontrada para a obrigação",
+            message=t(MSG_VISION_NO_PICTURE),
         )
 
     undescribed = [
@@ -62,9 +74,8 @@ def _handle_vision_description_method(
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                "Imagem sem descrição textual: "
-                + ", ".join(
+            message=t(MSG_VISION_UNDESCRIBED).format(
+                ids=", ".join(
                     f"{el.id} ({reason})"
                     if (reason := el.metadata.get("vision_failure_reason"))
                     else el.id
@@ -75,7 +86,9 @@ def _handle_vision_description_method(
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Descrição validada para {len(elements)} imagem(ns)",
+        message=n(*MSG_VISION_VALIDATED, len(elements)).format(
+            count=len(elements)
+        ),
     )
 
 
@@ -90,7 +103,7 @@ def _handle_pandoc_table_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhuma tabela encontrada para a obrigação",
+            message=t(MSG_TABLE_NO_TABLE),
         )
 
     missing = []
@@ -113,15 +126,16 @@ def _handle_pandoc_table_method(
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                "Tabela sem estrutura tabular: "
-                + ", ".join(el.id for el in missing)
+            message=t(MSG_TABLE_NO_STRUCTURE).format(
+                ids=", ".join(el.id for el in missing)
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Estrutura tabular validada para {len(elements)} tabela(s)",
+        message=n(*MSG_TABLE_VALIDATED, len(elements)).format(
+            count=len(elements)
+        ),
     )
 
 
@@ -141,7 +155,7 @@ def _handle_pandoc_code_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum bloco de código encontrado para a obrigação",
+            message=t(MSG_CODE_NO_CODE),
         )
 
     normalized = 0
@@ -156,12 +170,12 @@ def _handle_pandoc_code_method(
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                f"Código normalizado em {normalized}/{len(elements)} bloco(s)"
-            ),
+            message=n(
+                *MSG_CODE_NORMALIZED_PARTIAL, len(elements)
+            ).format(done=normalized, total=len(elements)),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Código normalizado em {normalized} bloco(s)",
+        message=n(*MSG_CODE_NORMALIZED, normalized).format(count=normalized),
     )
