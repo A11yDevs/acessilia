@@ -9,6 +9,7 @@ step 6); the orchestrator's ``DETERMINISTIC_METHOD_HANDLERS`` registers them.
 from __future__ import annotations
 
 from collections import Counter
+from copy import deepcopy
 from typing import Any
 
 from docstruct.fusion.noise import (
@@ -51,6 +52,13 @@ from backend.core.pipeline.handlers.common import (
     _fusion_agent,
     _missing_obligation,
     _target_elements,
+)
+from backend.core.pipeline.handlers.structure import (
+    joined_provenance,
+    remap_references,
+    replace_elements,
+    split_provenance,
+    unique_element_id,
 )
 
 
@@ -412,7 +420,9 @@ def _element_blocks(
 
     The deterministic primitives in `docstruct` operate on classified blocks, not
     on bare strings, so the elements are adapted once here instead of each handler
-    guessing at a signature.
+    guessing at a signature. The builder sends every target of these handlers as
+    ``kind="text"`` (it derives them from text elements), so the adapter does the
+    same instead of narrowing headings and list items out of the algorithm.
     """
     blocks: list[dict[str, Any]] = []
     for element in elements:
@@ -421,24 +431,13 @@ def _element_blocks(
             {
                 "md": element.text or "",
                 "text": element.text or "",
-                "kind": _block_kind(element),
+                "kind": "text",
                 "type": element.type,
                 "role": element_role(element),
                 "box": list(bbox) if bbox else None,
             }
         )
     return blocks
-
-
-def _block_kind(element: ManifestElement) -> str:
-    """Fusion block kind for an element type (`DiffBlock.kind` vocabulary)."""
-    if element.type == "heading":
-        return "heading"
-    if element.type == "table":
-        return "table"
-    if element.type == "formula":
-        return "formula"
-    return "text"
 
 
 def _handle_extract_line_numbers_method(
@@ -450,28 +449,103 @@ def _handle_extract_line_numbers_method(
     point: `docstruct.fusion.line_numbers.extract_line_numbers` needs a block list
     plus a stats counter and a provenance tag, so calling it with a plain string
     raised `TypeError` on every step.
+
+    The numbers leave the element text and stay in ``metadata["line_numbers"]``,
+    where the structured payload exposes them; every target keeps its id and
+    provenance, so obligations and observations that point at it stay valid.
     """
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
-    result = _fusion_agent().process_extract_line_numbers(
-        _element_blocks(elements, manifest)
-    )
-    extracted = int(result.get("stats", {}).get("line-numbers-agent-count", 0))
+    agent = _fusion_agent()
+    extracted = 0
+    changed = 0
+    for element in elements:
+        result = agent.process_extract_line_numbers(
+            _element_blocks([element], manifest)
+        )
+        blocks = result.get("blocks") or []
+        source = blocks[0] if blocks else None
+        numbers = [
+            str(block.get("text") or "")
+            for block in blocks
+            if block.get("type") == "line_number"
+        ]
+        if not numbers or not isinstance(source, dict) or not source.get("verse_nums"):
+            continue
+        element.text = str(source.get("md") or "")
+        element.metadata["line_numbers"] = numbers
+        element.metadata["verse_nums"] = True
+        extracted += len(numbers)
+        changed += 1
+
     if not extracted:
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum número de linha marginal encontrado",
         )
-    for element in elements:
-        element.metadata["line_numbers_extracted"] = extracted
     return MethodResult(
         success=True,
         validated=True,
-        message=f"{extracted} número(s) de linha extraído(s)",
+        message=(
+            f"{extracted} número(s) de linha extraído(s) de {changed} bloco(s)"
+        ),
     )
+
+
+def _split_verse_element(
+    element: ManifestElement,
+    manifest: ProcessingManifest,
+    known_ids: set[str],
+) -> list[ManifestElement] | None:
+    """``element`` as one manifest element per verse chunk, or ``None``.
+
+    The first chunk keeps the source id, so obligations and observations that
+    point at the element keep working; the other chunks get suffixed ids and
+    carry ``split_from``, ``verse`` and their position in the split.
+    """
+    result = _fusion_agent().process_chunk_verse(
+        _element_blocks([element], manifest)
+    )
+    blocks = result.get("blocks") or []
+    if len(blocks) <= 1:
+        return None
+
+    chunks = [str(block.get("md") or "") for block in blocks]
+    provenance = split_provenance(
+        element, [chunk.count("\n") + 1 for chunk in chunks]
+    )
+    count = len(chunks)
+    parts: list[ManifestElement] = []
+    for index, chunk in enumerate(chunks):
+        metadata = deepcopy(element.metadata)
+        metadata.update(
+            {"verse": True, "chunk_index": index, "chunk_count": count}
+        )
+        source_provenance = provenance[index] if index < len(provenance) else []
+        if index == 0:
+            element.text = chunk
+            element.metadata = metadata
+            element.provenance = source_provenance
+            parts.append(element)
+            continue
+        metadata["split_from"] = element.id
+        parts.append(
+            element.model_copy(
+                deep=True,
+                update={
+                    "id": unique_element_id(
+                        f"{element.id}-verse-{index}", known_ids
+                    ),
+                    "text": chunk,
+                    "provenance": source_provenance,
+                    "metadata": metadata,
+                },
+            )
+        )
+    return parts
 
 
 def _handle_chunk_verse_method(
@@ -482,27 +556,43 @@ def _handle_chunk_verse_method(
     `docstruct.fusion.verse.chunk_verse` takes already-split lines plus a character
     budget, so the handler goes through `FusionAgent.process_chunk_verse`, which
     detects the verse lines itself.
+
+    The chunks replace the target in the manifest instead of only being counted:
+    the first keeps the source id and the others become new elements, so the
+    payload and the reading order show the split.
     """
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
-    result = _fusion_agent().process_chunk_verse(_element_blocks(elements, manifest))
-    # `verse_blocks` reports `verse-{tag}-{whole,kept,split,chunks}`; only the
-    # blocks it actually split are evidence that the method did anything.
-    chunks = result.get("stats", {}).get("verse-agent-split", 0)
-    if not chunks:
+    known_ids = {element.id for element in manifest.elements}
+    replacements: dict[str, list[ManifestElement]] = {}
+    expansion: dict[str, list[str]] = {}
+    split_blocks = 0
+    chunks = 0
+    for element in elements:
+        parts = _split_verse_element(element, manifest, known_ids)
+        if parts is None:
+            continue
+        replacements[element.id] = parts
+        expansion[element.id] = [part.id for part in parts]
+        split_blocks += 1
+        chunks += len(parts)
+
+    if not split_blocks:
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum bloco de verso elegível para fragmentação",
         )
-    for element in elements:
-        element.metadata["verse_chunks"] = chunks
+    replace_elements(manifest, replacements)
+    remap_references(manifest, expansion)
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Verso fragmentado em {chunks} pedaço(s)",
+        message=(
+            f"Verso fragmentado em {chunks} pedaço(s) de {split_blocks} bloco(s)"
+        ),
     )
 
 
@@ -530,14 +620,25 @@ class _FurnitureView:
         return _element_bbox(self._element, self._manifest)
 
 
-def _tailjoin_position(manifest: ProcessingManifest) -> str | None:
-    """Vertical position ("top"/"bot") of the page number in the manifest.
+def _tailjoin_position(
+    manifest: ProcessingManifest,
+    elements: list[ManifestElement] | None = None,
+) -> str | None:
+    """Vertical position ("top"/"bot") of the page number in ``elements``.
 
     `join_tail` only applies the position-conditioned `tj3` rule when it knows
     where the page number sits, which is the distinction between `tailjoin` and
-    `tailjoin-positioned`.
+    `tailjoin-positioned`. Pagination is a page property, so the handler passes
+    one page's elements and callers that omit them read the whole manifest.
     """
-    return page_number_position(_FurnitureView(element, manifest) for element in manifest.elements)
+    return page_number_position(
+        _FurnitureView(element, manifest)
+        for element in (manifest.elements if elements is None else elements)
+    )
+
+
+#: Element types the tail join leaves out, matching what the builder sends it.
+_TAILJOIN_EXCLUDED_TYPES = frozenset({"formula", "table", "picture"})
 
 
 def _handle_tailjoin_method(
@@ -548,28 +649,94 @@ def _handle_tailjoin_method(
     `docstruct.fusion.tailjoin.join_tail` requires the tail mode, a maximum short
     block length and the number of blocks to consider, so it cannot be called with
     the text alone. `FusionAgent.process_join_tail` supplies those defaults.
+
+    The join runs over the whole page, not only over the obligation targets: the
+    primitive needs the block before the tail to recognize it. The joined text
+    lands on the first tail element, the others leave the manifest and the
+    payload, and every reference to a dropped id moves to the survivor.
     """
     elements = _target_elements(manifest, obligation_id)
     if not elements:
         return _missing_obligation(obligation_id)
 
-    texts = [(element.text or "") for element in elements]
-    merged = _fusion_agent().process_join_tail(
-        texts, position=_tailjoin_position(manifest)
-    )
-    if len(merged) >= len(texts):
+    target_ids = {element.id for element in elements}
+    agent = _fusion_agent()
+    pages: dict[int | None, list[ManifestElement]] = {}
+    for element in elements:
+        pages.setdefault(element.page_number, []).append(element)
+
+    replacements: dict[str, list[ManifestElement]] = {}
+    dropped: dict[str, list[str]] = {}
+    pending: list[tuple[ManifestElement, str, list[ManifestElement]]] = []
+    before_count = 0
+    after_count = 0
+    for page_number in pages:
+        page_elements = sorted(
+            (
+                element
+                for element in manifest.elements
+                if element.page_number == page_number
+                and element.text
+                and element.type not in _TAILJOIN_EXCLUDED_TYPES
+            ),
+            key=lambda element: element.reading_order,
+        )
+        texts = [element.text or "" for element in page_elements]
+        if len(texts) < 2:
+            continue
+        merged = agent.process_join_tail(
+            texts,
+            position=_tailjoin_position(manifest, page_elements),
+        )
+        if len(merged) >= len(texts):
+            continue
+        # `join_tail` only merges the trailing blocks, so the survivor is the
+        # first one of the merged tail and everything after it is gone.
+        survivor = page_elements[len(merged) - 1]
+        removed = page_elements[len(merged):]
+        removed_ids = {element.id for element in removed}
+        if survivor.id not in target_ids or not removed_ids <= target_ids:
+            return MethodResult(
+                success=False,
+                validated=False,
+                message=(
+                    "A união não corresponde aos alvos da obrigação: "
+                    f"sobrevivente {survivor.id}, removidos {sorted(removed_ids)}"
+                ),
+            )
+        pending.append((survivor, merged[-1], removed))
+        before_count += len(texts)
+        after_count += len(merged)
+
+    if not pending:
         return MethodResult(
             success=False,
             validated=False,
             message="Nenhum bloco de cauda elegível para união",
         )
-    for element in elements:
-        element.metadata["tailjoined"] = True
+    # Every page is validated before anything changes, so a mismatch on a later
+    # page never leaves an earlier one half-joined.
+    for survivor, joined_text, removed in pending:
+        tail = [survivor, *removed]
+        provenance = joined_provenance(tail, joined_text)
+        survivor.text = joined_text
+        survivor.provenance = provenance
+        survivor.metadata["tailjoined"] = True
+        survivor.metadata["tailjoin_sources"] = sorted(
+            element.id for element in removed
+        )
+        for element in removed:
+            replacements[element.id] = []
+            dropped[element.id] = [survivor.id]
+
+    replace_elements(manifest, replacements)
+    remap_references(manifest, dropped)
     return MethodResult(
         success=True,
         validated=True,
         message=(
-            f"Blocos de cauda unidos: {len(texts)} -> {len(merged)} bloco(s)"
+            f"Blocos de cauda unidos: {before_count} -> {after_count} bloco(s) "
+            f"em {len(pending)} pagina(s)"
         ),
     )
 
