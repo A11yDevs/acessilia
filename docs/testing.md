@@ -82,8 +82,10 @@ reach a live environment, as described in
 
 ## Parallel execution
 
-`make test-all` passes `-n 4 --dist worksteal` to the core suite. Override the
-bound or the distribution without editing the Makefile:
+`make test-all` passes `-n 4 --dist worksteal` to the core suite. Running
+`uv run pytest` without `-n` remains serial; use `make test-all` or pass
+`-n 4 --dist worksteal` directly to run the core suite in parallel. Override
+the bound or the distribution without editing the Makefile:
 
 ```bash
 make test-all CORE_JOBS=2
