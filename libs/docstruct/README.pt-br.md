@@ -157,7 +157,7 @@ pip install -e "libs/docstruct[dev]"
 pytest libs/docstruct/tests
 ```
 
-`tests/test_purity.py` importa todos os módulos num interpretador que recusa `backend`, `acessilia_toolbox` e `acessilia_sdk`, então uma mudança que os importe falha mesmo quando eles estão instalados (como no CI do core). O `tests/test_infrastructure.py` mantém o docstruct longe da rede, do ambiente, de arquivos e de processos: ele recusa esses módulos e built-ins da biblioteca padrão, e faz falhar uma importação que os use (ADR-0017).
+`tests/test_purity.py` importa todos os módulos num interpretador que recusa `backend`, `acessilia_toolbox` e `acessilia_sdk`, então uma mudança que os importe falha mesmo quando eles estão instalados (como no CI do core). O `tests/test_infrastructure.py` mantém o docstruct longe da rede, do ambiente, de arquivos e de processos (ADR-0017): ele recusa os módulos da biblioteca padrão, os built-ins e os atributos de `sys` que lista, e faz falhar uma importação que os use. O relógio, a aleatoriedade e as threads ficam fora dessa regra.
 
 ## Releases
 

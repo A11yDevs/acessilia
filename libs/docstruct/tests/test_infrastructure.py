@@ -1,20 +1,31 @@
 """docstruct does not touch infrastructure: network, environment, files, processes.
 
 ADR-0017 states it as a rule: docstruct holds pure structural algorithms, so no
-module may open a socket, read the environment or a file, or start a
-subprocess. ``test_purity.py`` keeps docstruct on the standard library, but the
-standard library has all of those, so it cannot catch them (the review of #471
-reproduced it with a module reading ``os.environ`` at import). Two checks do:
+module may open a socket, read the environment or a file, write to the
+process's streams, or start a subprocess. ``test_purity.py`` keeps docstruct on
+the standard library, but the standard library has all of those, so it cannot
+catch them (the review of #471 reproduced it with a module reading
+``os.environ`` at import). Two checks do:
 
 - statically, no module imports a standard library module whose job is
-  infrastructure (``INFRASTRUCTURE_MODULES``) or calls a built-in that reads
-  input, opens a file or runs code (``INFRASTRUCTURE_BUILTINS``);
+  infrastructure (``INFRASTRUCTURE_MODULES``), refers to a built-in that reads
+  input, writes output, opens a file or runs code (``INFRASTRUCTURE_BUILTINS``,
+  called or not), reaches the built-ins through ``builtins`` or
+  ``__builtins__``, or reads a ``sys`` attribute that is the process's
+  environment or streams (``SYS_ATTRIBUTES``);
 - at import, in a fresh interpreter, opening a file, reading the environment,
-  creating a socket or starting a process from a docstruct module fails.
+  creating a socket, starting a process, calling those built-ins, printing or
+  configuring logging from a docstruct module fails.
 
 The static check also covers code that only runs when called. The import check
-catches what the static one cannot see by name (``getattr``, aliases). A real
-need for one of these goes in ``ALLOWED`` with its reason, so it stays visible.
+catches what the static one cannot see by name (``getattr`` on a module
+object, aliases). A real need for one of these goes in ``ALLOWED`` with its
+reason, so it stays visible.
+
+**Scope.** The rule is ADR-0017's: network, environment, files and processes.
+The clock (``time``, ``datetime``), randomness (``random``, ``secrets``,
+``uuid``) and threads are not in it: they are about determinism, which would
+be a rule of its own. docstruct uses none of them today.
 """
 
 from __future__ import annotations
@@ -32,26 +43,39 @@ PACKAGE = SRC / "docstruct"
 INFRASTRUCTURE_MODULES = {
     # network
     "socket": "network", "ssl": "network", "http": "network", "urllib": "network",
-    "ftplib": "network", "smtplib": "network", "poplib": "network", "imaplib": "network",
-    "xmlrpc": "network", "socketserver": "network", "select": "network",
-    "selectors": "network", "asyncio": "network", "webbrowser": "network",
+    "ftplib": "network", "smtplib": "network", "poplib": "network",
+    "imaplib": "network", "xmlrpc": "network", "socketserver": "network",
+    "select": "network", "selectors": "network", "asyncio": "network",
+    "webbrowser": "network",
     # environment
     "os": "environment", "platform": "environment", "getpass": "environment",
     "locale": "environment", "sysconfig": "environment", "site": "environment",
     # files
     "io": "files", "pathlib": "files", "shutil": "files", "tempfile": "files",
-    "glob": "files", "fileinput": "files", "filecmp": "files", "linecache": "files",
-    "zipfile": "files", "tarfile": "files", "gzip": "files", "bz2": "files",
-    "lzma": "files", "sqlite3": "files", "dbm": "files", "shelve": "files",
-    "mmap": "files", "importlib": "files", "pkgutil": "files",
+    "glob": "files", "fileinput": "files", "filecmp": "files",
+    "linecache": "files", "zipfile": "files", "tarfile": "files", "gzip": "files",
+    "bz2": "files", "lzma": "files", "sqlite3": "files", "dbm": "files",
+    "shelve": "files", "mmap": "files", "importlib": "files", "pkgutil": "files",
+    "logging": "files",
     # processes
-    "subprocess": "processes", "multiprocessing": "processes", "concurrent": "processes",
-    "pty": "processes", "signal": "processes",
+    "subprocess": "processes", "multiprocessing": "processes",
+    "concurrent": "processes", "pty": "processes", "signal": "processes",
+    # the built-ins themselves, a way around INFRASTRUCTURE_BUILTINS
+    "builtins": "code",
 }
-#: Built-ins that read input, open a file or run code given as data.
+#: Built-ins that read input, write output, open a file or run code given as
+#: data. Referring to one is refused, not only calling it (``f = eval``).
 INFRASTRUCTURE_BUILTINS = {
-    "open": "files", "input": "environment", "breakpoint": "environment",
-    "exec": "code", "eval": "code", "compile": "code", "__import__": "code",
+    "open": "files", "print": "files", "input": "environment",
+    "breakpoint": "environment", "exec": "code", "eval": "code",
+    "compile": "code", "__import__": "code", "__builtins__": "code",
+}
+#: ``sys`` attributes that are the process's environment or streams.
+SYS_ATTRIBUTES = {
+    "argv": "environment", "orig_argv": "environment", "path": "environment",
+    "executable": "environment", "exit": "processes",
+    "stdin": "files", "stdout": "files", "stderr": "files",
+    "__stdin__": "files", "__stdout__": "files", "__stderr__": "files",
 }
 #: ``"module.py:name": "reason"`` for a reviewed exception. Empty: none is needed.
 ALLOWED: dict[str, str] = {}
@@ -64,10 +88,23 @@ def infrastructure_uses(source: str) -> list[tuple[int, str, str]]:
         if isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            if node.module == "sys":
+                uses.extend(
+                    (node.lineno, f"sys.{alias.name}", SYS_ATTRIBUTES[alias.name])
+                    for alias in node.names
+                    if alias.name in SYS_ATTRIBUTES
+                )
             names = [node.module]
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id in INFRASTRUCTURE_BUILTINS:
-                uses.append((node.lineno, node.func.id, INFRASTRUCTURE_BUILTINS[node.func.id]))
+        elif isinstance(node, ast.Name) and node.id in INFRASTRUCTURE_BUILTINS:
+            uses.append((node.lineno, node.id, INFRASTRUCTURE_BUILTINS[node.id]))
+            continue
+        elif (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "sys"
+            and node.attr in SYS_ATTRIBUTES
+        ):
+            uses.append((node.lineno, f"sys.{node.attr}", SYS_ATTRIBUTES[node.attr]))
             continue
         else:
             continue
@@ -110,16 +147,33 @@ def test_the_static_check_recognizes_each_kind_of_use() -> None:
         "data = open('table.json').read()": ("open", "files"),
         "module = __import__('socket')": ("__import__", "code"),
         "def later():\n    import socket\n    return socket.socket()": ("socket", "network"),
+        # The built-ins reached another way (review of #497).
+        "import builtins\nvalue = builtins.eval('1 + 1')": ("builtins", "code"),
+        "import builtins\nf = getattr(builtins, 'ev' + 'al')": ("builtins", "code"),
+        "value = __builtins__['eval']('1')": ("__builtins__", "code"),
+        "run = eval\nvalue = run('1')": ("eval", "code"),
+        "answer = input()": ("input", "environment"),
+        "breakpoint()": ("breakpoint", "environment"),
+        "print('progress')": ("print", "files"),
+        # sys and logging (review of #497).
+        "import sys\nvalue = sys.argv": ("sys.argv", "environment"),
+        "from sys import stdin": ("sys.stdin", "files"),
+        "import sys\nsys.stdout.write('x')": ("sys.stdout", "files"),
+        "import logging\nlogging.basicConfig(filename='x.log')": ("logging", "files"),
     }
     for source, (name, reach) in cases.items():
         assert any(use[1:] == (name, reach) for use in infrastructure_uses(source)), source
     assert infrastructure_uses("import re, json, math\nfrom collections import Counter") == []
+    # sys is fine for what is not the process's environment or streams.
+    assert infrastructure_uses("import sys\nlimit = sys.maxsize") == []
+    # A method or attribute that shares a name is not the built-in.
+    assert infrastructure_uses("import re\npattern = re.compile('a')\nitem.open = 1") == []
     # A relative import is docstruct's own, whatever its name.
     assert infrastructure_uses("from .io import read") == []
 
 
 _PROBE = f"""
-import builtins, os, socket, subprocess, sys
+import builtins, logging, os, socket, subprocess, sys
 
 PACKAGE = {str(PACKAGE)!r}
 caught = []
@@ -139,10 +193,15 @@ def _guard(name, original):
     return guarded
 
 
-builtins.open = _guard("open", builtins.open)
+# __import__ is not guarded here: every import statement calls it. The static
+# check refuses explicit uses of it.
+for _name in ("open", "print", "input", "breakpoint", "exec", "eval", "compile"):
+    setattr(builtins, _name, _guard(_name, getattr(builtins, _name)))
 os.getenv = _guard("os.getenv", os.getenv)
 socket.socket = _guard("socket.socket", socket.socket)
 subprocess.Popen = _guard("subprocess.Popen", subprocess.Popen)
+logging.basicConfig = _guard("logging.basicConfig", logging.basicConfig)
+logging.FileHandler = _guard("logging.FileHandler", logging.FileHandler)
 
 
 def _environ_guard(name):
@@ -178,14 +237,21 @@ for module in pkgutil.walk_packages(docstruct.__path__, "docstruct."):
         importlib.import_module(module.name)
     except PermissionError:
         pass
-print("\\n".join(caught))
+sys.__stdout__.write("\\n".join(caught))
 sys.exit(1 if caught else 0)
 """
 
 
 def test_importing_every_module_touches_no_infrastructure() -> None:
+    # No standard input and a timeout: an unguarded read must fail the test,
+    # not hang it.
     result = subprocess.run(
-        [sys.executable, "-c", _PROBE], capture_output=True, text=True, check=False
+        [sys.executable, "-c", _PROBE],
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        timeout=120,
+        check=False,
     )
     assert result.returncode == 0, (
         "infrastructure used at import:\n" + result.stdout + result.stderr

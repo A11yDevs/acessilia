@@ -20,7 +20,7 @@ que já foi aceita:
 |---|---|
 | P1, portabilidade (só a biblioteca padrão, aceleradores opcionais protegidos) | Tabela e conformidade da ADR-0002; o `libs/docstruct/tests/test_purity.py` confere que o `pyproject.toml` não declara dependência de execução, que todo outro import é um acelerador listado atrás de `except ImportError` e que todo módulo é importado num interpretador que recusa tudo fora da biblioteca padrão. O único acelerador é o `rapidfuzz`, em `evaluation/metrics/text_ed.py`. A alternativa A da #470, portanto, já está em vigor. |
 | P2, contratos estruturais compartilhados | [ADR-0007](../adr/0007-manifest-model-and-mathml-conversion.pt-br.md) e #203: o `docstruct.manifest` é o modelo normativo do documento. Os modelos pydantic do core e da Toolbox ficam só como modelos de transporte 1.1.0, conferidos contra o `docstruct.manifest.field_specs` em testes de contrato. |
-| P3, independência de infraestrutura | **Em parte.** A tabela da ADR-0002 enuncia a regra. O `test_purity.py` confere dependências e imports, mas permite toda a biblioteca padrão: um módulo que lê `os.environ` ou um arquivo ao ser importado ainda passa, como a revisão da #471 reproduziu. **Coberto pela fase 2 da #470:** o `test_infrastructure.py` recusa, de forma estática, módulos e built-ins de infraestrutura, e faz falhar uma importação que abre um arquivo, lê o ambiente, cria um socket ou inicia um processo. |
+| P3, independência de infraestrutura | **Em parte.** A tabela da ADR-0002 enuncia a regra. O `test_purity.py` confere dependências e imports, mas permite toda a biblioteca padrão: um módulo que lê `os.environ` ou um arquivo ao ser importado ainda passa, como a revisão da #471 reproduziu. **Coberto pela fase 2 da #470, para os quatro da ADR-0017 (rede, ambiente, arquivos, processos):** o `test_infrastructure.py` recusa, de forma estática, os módulos da biblioteca padrão, os built-ins e os atributos de `sys` que lista, e faz falhar uma importação que abre um arquivo, lê o ambiente, cria um socket, inicia um processo, imprime ou configura o logging. O relógio, a aleatoriedade e as threads não fazem parte da regra. |
 | Direção das dependências, sem ciclos | A ADR-0002 já permite **SDK → docstruct** e oferece "acesso em processo aos algoritmos puros do docstruct" pelo SDK. O `test_purity.py` do SDK mantém as dependências dele "dentro do `httpx` e do docstruct". |
 | P7, uma implementação por algoritmo estrutural | ADR-0002 e #203; o `tests/test_docstruct_bridges.py` falha com uma nova cópia de um algoritmo já ligado ao docstruct. |
 | A Toolbox não importa o core nem o SDK | O `tests/unit/test_architecture.py` da Toolbox. Fora dele, `acessilia_sdk` e `backend` aparecem só em um teste entre projetos (`tests/cross_project/test_core_storage_outage.py`). |
@@ -53,7 +53,7 @@ que já foi aceita:
 - **A independência de infraestrutura do docstruct não era testada.** Veja a
   P3 acima. Um job de instalação isolada também não a pegaria: é preciso um
   teste de que nenhum módulo lê o ambiente ou arquivos, abre sockets ou inicia
-  subprocessos. **Fechado pela fase 2 da #470:** `libs/docstruct/tests/test_infrastructure.py`.
+  subprocessos. **Fechado pela fase 2 da #470**, para o que o `libs/docstruct/tests/test_infrastructure.py` lista (veja a P3).
 
 ## Algoritmos estruturais: core e docstruct
 

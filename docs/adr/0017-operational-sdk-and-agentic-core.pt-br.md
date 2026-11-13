@@ -105,7 +105,8 @@ Proposta: a opção 2.
     próprias versões e testes de contrato;
   - **sem infraestrutura:** nada de rede, ambiente, arquivos, subprocessos nem
     imports do core, do SDK ou da Toolbox. O `test_purity.py` testa os
-    imports, e o `test_infrastructure.py` (#470, fase 2), o resto.
+    imports, e o `test_infrastructure.py` (#470, fase 2), o resto, para os
+    módulos, built-ins e atributos de `sys` que lista.
 - **Dependências:** as mesmas da ADR-0002.
   - O SDK pode depender do docstruct, e passa a depender quando a primeira
     operação dele compuser um algoritmo do docstruct.
@@ -164,7 +165,10 @@ Proposta: a opção 2.
   - quais operações vêm depois da cadeia de fórmula, e em que ordem;
   - qual é a API pública estável do docstruct. A proposta é: o que cada módulo
     lista em `__all__` e nas tabelas do README;
-  - um contrato de plano operacional, adiado.
+  - um contrato de plano operacional, adiado;
+  - se o docstruct também precisa ser determinístico: sem relógio,
+    aleatoriedade ou threads. O `test_infrastructure.py` os deixa de fora,
+    porque não são infraestrutura; o docstruct não usa nenhum deles hoje.
 - **Conformidade:**
   - o `libs/docstruct/tests/test_purity.py` e o `libs/sdk/tests/test_purity.py`
     (já existem);
