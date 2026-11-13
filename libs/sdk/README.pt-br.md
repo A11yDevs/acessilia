@@ -23,6 +23,21 @@ core (backend)  →  acessilia-sdk  →  contrato HTTP da Toolbox
   Toolbox ([ADR-0003](../../docs/adr/0003-remote-only-operational-capabilities.pt-br.md)).
   Ele pode chamar os algoritmos puros da docstruct no próprio processo.
 
+## Instalação
+
+O SDK depende do `httpx` e do `acessilia-docstruct`, os algoritmos puros do
+repositório ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)).
+Nenhum dos dois projetos está publicado num índice de pacotes: instale os dois
+a partir deste repositório, ou dos wheels de release, **o docstruct primeiro**,
+porque o pip não consegue resolvê-lo sozinho. Dentro do repositório, o uv o
+resolve pelo caminho.
+
+```bash
+pip install ./libs/docstruct ./libs/sdk
+```
+
+Publicar o SDK num índice exigiria publicar o docstruct nele antes.
+
 ## API pública
 
 O `__all__` de cada módulo é a API pública do SDK ([ADR-0018](../../docs/adr/0018-core-uses-sdk-public-api.pt-br.md)); um nome fora dele é interno e pode mudar em qualquer release. Esta tabela o resume, e o `tests/test_public_api.py` a confere contra o `__all__` e confere que as tabelas em inglês e em português coincidem.

@@ -115,7 +115,12 @@ Proposta: a opção 2.
     módulos, built-ins e atributos de `sys` que lista.
 - **Dependências:** as mesmas da ADR-0002.
   - O SDK pode depender do docstruct, e passa a depender quando a primeira
-    operação dele compuser um algoritmo do docstruct.
+    operação dele compuser um algoritmo do docstruct (fase 3 da #470: uma
+    dependência obrigatória, não um extra opcional, porque a operação não
+    roda sem ele).
+  - Nenhum dos dois pacotes está num índice de pacotes: ambos se instalam a
+    partir do repositório ou dos wheels de release, o docstruct primeiro.
+    Publicar o SDK num índice exige publicar o docstruct nele antes.
   - A instalação-base do SDK continua leve: sem framework de agentes e sem
     biblioteca operacional pesada.
 - **Onde fica o código novo**, substituindo as quatro perguntas da ADR-0002:
