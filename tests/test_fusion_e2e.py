@@ -27,6 +27,8 @@ from pathlib import Path
 
 import httpx
 import pytest
+
+from backend.i18n import reset_request_locale, set_request_locale
 from acessilia_sdk.toolbox.transport import auth_headers
 
 from backend.core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
@@ -46,6 +48,16 @@ from backend.core.planning.planner_agent import PlannerAgent
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
+
+
+@pytest.fixture(autouse=True)
+def _step_messages_in_pt_br():
+    """These tests pin the pt-BR user-facing step messages (#410)."""
+    token = set_request_locale("pt_BR")
+    try:
+        yield
+    finally:
+        reset_request_locale(token)
 
 def _make_manifest(tmp_path: Path, *, source_path: Path | None = None) -> ProcessingManifest:
     now = datetime(2026, 7, 28, tzinfo=timezone.utc)

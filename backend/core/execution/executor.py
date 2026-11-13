@@ -421,7 +421,7 @@ class ExecutorAgent:
             # The report only reaches the caller as obligation ids, so the cause
             # of each failed step is logged here.
             logger.warning(
-                "PDDL: passo {} ({}) falhou; obrigação={} método={}: {}",
+                "PDDL: step {} ({}) failed; obligation={} method={}: {}",
                 step.index,
                 step.action,
                 step.obligation_id,

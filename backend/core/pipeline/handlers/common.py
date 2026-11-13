@@ -13,6 +13,8 @@ from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
 )
+from backend.core.pipeline.handlers.messages import MSG_HANDLER_OBLIGATION_NOT_FOUND
+from backend.i18n import t
 
 
 def _fusion_agent() -> FusionAgent:
@@ -46,5 +48,7 @@ def _missing_obligation(obligation_id: str) -> MethodResult:
     return MethodResult(
         success=False,
         validated=False,
-        message=f"Obrigação não encontrada: {obligation_id}",
+        message=t(MSG_HANDLER_OBLIGATION_NOT_FOUND).format(
+            obligation_id=obligation_id
+        ),
     )

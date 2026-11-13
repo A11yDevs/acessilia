@@ -21,10 +21,18 @@ from backend.core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
 )
+from backend.core.pipeline.handlers.messages import (
+    MSG_SKELETON_APPLIED,
+    MSG_SKELETON_CONFIRMED,
+    MSG_SKELETON_NO_MATCH,
+    MSG_XYCUT_APPLIED,
+    MSG_XYCUT_NONE,
+)
 from backend.core.pipeline.secondary import (
     _pair_block,
     _secondary_or_failure,
 )
+from backend.i18n import t
 
 
 #: Share of a page's elements that must be paired to follow the skeleton order.
@@ -85,18 +93,26 @@ def _handle_skeleton_order_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Esqueleto do provider secundário não casou com a página",
+            message=t(MSG_SKELETON_NO_MATCH),
         )
     _refresh_page_element_ids(manifest, reordered)
     parts = []
     if reordered:
-        parts.append("aplicada nas páginas " + ", ".join(map(str, sorted(reordered))))
+        parts.append(
+            t(MSG_SKELETON_APPLIED).format(
+                pages=", ".join(map(str, sorted(reordered)))
+            )
+        )
     if confirmed:
-        parts.append("confirmada nas páginas " + ", ".join(map(str, sorted(confirmed))))
+        parts.append(
+            t(MSG_SKELETON_CONFIRMED).format(
+                pages=", ".join(map(str, sorted(confirmed)))
+            )
+        )
     return MethodResult(
         success=True,
         validated=True,
-        message="Ordem do esqueleto " + "; ".join(parts),
+        message="; ".join(parts),
     )
 
 
@@ -161,15 +177,14 @@ def _handle_xycut_order_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="XY-cut não identificou uma mudança de ordem de leitura",
+            message=t(MSG_XYCUT_NONE),
         )
 
     _refresh_page_element_ids(manifest, reordered_pages)
     return MethodResult(
         success=True,
         validated=True,
-        message=(
-            "Ordem de leitura XY-cut aplicada nas páginas "
-            + ", ".join(map(str, sorted(reordered_pages)))
+        message=t(MSG_XYCUT_APPLIED).format(
+            pages=", ".join(map(str, sorted(reordered_pages)))
         ),
     )

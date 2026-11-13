@@ -63,7 +63,7 @@ class TestLegacyPipelineDisabled:
 class TestLocalExtractorsDisabled:
     def test_pymupdf_extractor_raises(self):
         """PyMuPDF extractor must raise ValueError."""
-        with pytest.raises(ValueError, match="desativado"):
+        with pytest.raises(ValueError, match="disabled"):
             PddlAccessibilityOrchestrator(
                 extractor_backend="pymupdf",
                 execute_dry_run=True,
@@ -71,7 +71,7 @@ class TestLocalExtractorsDisabled:
 
     def test_docling_extractor_raises(self):
         """Docling extractor must raise ValueError."""
-        with pytest.raises(ValueError, match="desativado"):
+        with pytest.raises(ValueError, match="disabled"):
             PddlAccessibilityOrchestrator(
                 extractor_backend="docling",
                 execute_dry_run=True,
@@ -79,7 +79,7 @@ class TestLocalExtractorsDisabled:
 
     def test_docling_serve_extractor_raises(self):
         """Docling-serve extractor must raise ValueError."""
-        with pytest.raises(ValueError, match="desativado"):
+        with pytest.raises(ValueError, match="disabled"):
             PddlAccessibilityOrchestrator(
                 extractor_backend="docling-serve",
                 execute_dry_run=True,

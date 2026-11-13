@@ -42,6 +42,17 @@ from backend.core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
 )
+from backend.core.pipeline.handlers.messages import (
+    MSG_DUAL_FUSION_DONE,
+    MSG_DUAL_FUSION_FAILED,
+    MSG_DUAL_FUSION_SINGLE_PROVIDER,
+    MSG_DUAL_FUSION_UNSUCCESSFUL,
+    MSG_ROUTER_NO_PAGE,
+    MSG_ROUTER_PRIMARY,
+    MSG_ROUTER_SECONDARY,
+    MSG_SINGLE_PROVIDER_ONLY,
+    MSG_TABLE_SOURCE,
+)
 from backend.core.pipeline.secondary import (
     _CALIBRATED_PAIR,
     _page_markdown,
@@ -51,6 +62,7 @@ from backend.core.pipeline.secondary import (
 from backend.core.pipeline.toolbox import (
     _source_artifact_id,
 )
+from backend.i18n import t
 
 
 #: Accepted Dr.DocBench table preference (TEDS): MinerU's table, unless Docling's
@@ -141,8 +153,11 @@ def _handle_table_smart_fusion_method(
     return MethodResult(
         success=True,
         validated=True,
-        message="Fonte de tabela escolhida: "
-        + ", ".join(f"{reason}={count}" for reason, count in sorted(reasons.items())),
+        message=t(MSG_TABLE_SOURCE).format(
+            reasons=", ".join(
+                f"{reason}={count}" for reason, count in sorted(reasons.items())
+            )
+        ),
     )
 
 
@@ -191,23 +206,25 @@ def _handle_agreement_rule_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Obrigação sem página identificada para o roteador",
+            message=t(MSG_ROUTER_NO_PAGE),
         )
     if rerouted:
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                "Roteador por página escolhe o provider secundário ("
-                + ", ".join(f"p{page}: {reason}" for page, (_, reason) in sorted(rerouted.items()))
-                + "); a troca de página não é aplicada automaticamente"
+            message=t(MSG_ROUTER_SECONDARY).format(
+                routes=", ".join(
+                    f"p{page}: {reason}"
+                    for page, (_, reason) in sorted(rerouted.items())
+                )
             ),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message="Roteador por página mantém o provider primário nas páginas "
-        + ", ".join(map(str, sorted(routes))),
+        message=t(MSG_ROUTER_PRIMARY).format(
+            pages=", ".join(map(str, sorted(routes)))
+        ),
     )
 
 
@@ -236,7 +253,7 @@ def _handle_single_provider_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="single-provider só é válido para fuse-providers",
+            message=t(MSG_SINGLE_PROVIDER_ONLY),
         )
 
     provider = str(manifest.extractor.configuration.get("toolbox_provider") or "")
@@ -375,13 +392,15 @@ def _handle_dual_provider_fusion_method(
         return MethodResult(
             success=False,
             validated=False,
-            message=f"Fusão dual-provider falhou: {type(exc).__name__}: {exc}",
+            message=t(MSG_DUAL_FUSION_FAILED).format(
+                error_type=type(exc).__name__, error=exc
+            ),
         )
     if payload.get("status") != "succeeded":
         return MethodResult(
             success=False,
             validated=False,
-            message="Fusão dual-provider não concluiu com sucesso",
+            message=t(MSG_DUAL_FUSION_UNSUCCESSFUL),
         )
 
     # The planned action is dual-provider: if only one provider took part, the
@@ -392,9 +411,8 @@ def _handle_dual_provider_fusion_method(
         return MethodResult(
             success=False,
             validated=False,
-            message=(
-                "Fusão dual-provider executou com um único provider "
-                f"({provider or 'desconhecido'}); replanning necessário"
+            message=t(MSG_DUAL_FUSION_SINGLE_PROVIDER).format(
+                provider=provider or "unknown"
             ),
         )
 
@@ -428,7 +446,7 @@ def _handle_dual_provider_fusion_method(
     return MethodResult(
         success=True,
         validated=True,
-        message="Fusão dual-provider concluída com sucesso",
+        message=t(MSG_DUAL_FUSION_DONE),
         artifacts=[artifact],
     )
 

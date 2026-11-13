@@ -126,6 +126,8 @@ def test_catalog_validator_flags_missing_translations() -> None:
     empty_table = {loc: {} for loc in gen_locales.SUPPORTED_LOCALES if loc != gen_locales.DEFAULT_LOCALE}
     problems_empty = gen_locales._validate(empty_table, gen_locales.SUPPORTED_LOCALES)
     expected_missing = [f"missing or blank entry: {msgid!r}" for msgid in gen_locales.MESSAGES]
+    # PLURAL_MESSAGES carries its own per-locale forms, so an empty
+    # translations table only exercises the single-form entries.
     assert sorted(problems_empty) == sorted(expected_missing)
     partially_blank_table = {
         loc: {gen_locales.MESSAGES[0]: "", } for loc in empty_table
@@ -133,6 +135,34 @@ def test_catalog_validator_flags_missing_translations() -> None:
     }
     problems_partial = gen_locales._validate(partially_blank_table, gen_locales.SUPPORTED_LOCALES)
     assert sorted(problems_partial) == sorted(expected_missing)
+
+
+def test_catalog_validator_flags_plural_placeholder_mismatch() -> None:
+    """A plural pair with a renamed placeholder must fail before the catalog is written."""
+    table = {
+        locale: {msgid: msgid for msgid in gen_locales.MESSAGES}
+        for locale in ("pt_BR",)
+    }
+    pair = ("{count} item", "{count} items")
+    plural = ((pair, {"pt_BR": ("{count} item", "{wrong} items")}),)
+
+    problems = gen_locales._validate(table, ("pt_BR",), plural_messages=plural)
+
+    assert problems == [f"plural placeholders differ from the msgid: {pair[0]!r}"]
+
+
+def test_catalog_validator_flags_missing_plural_form() -> None:
+    """Both forms must be present and non-empty, not only the pair's key."""
+    table = {
+        locale: {msgid: msgid for msgid in gen_locales.MESSAGES}
+        for locale in ("pt_BR",)
+    }
+    pair = ("{count} item", "{count} items")
+    plural = ((pair, {"pt_BR": ("{count} item", "  ")}),)
+
+    problems = gen_locales._validate(table, ("pt_BR",), plural_messages=plural)
+
+    assert problems == [f"missing or blank plural entry: {pair[0]!r}"]
 
 
 def test_every_web_message_constant_has_a_pt_br_translation() -> None:

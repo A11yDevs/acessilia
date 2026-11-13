@@ -53,6 +53,23 @@ from backend.core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
 )
+from backend.core.pipeline.handlers.messages import (
+    MSG_HEADING_NONE,
+    MSG_HEADING_REPAIRED,
+    MSG_LINE_NUMBERS_EXTRACTED,
+    MSG_LINE_NUMBERS_NONE,
+    MSG_NORMALIZE_APPLIED,
+    MSG_NORMALIZE_NO_TEXT,
+    MSG_REPETITION_NONE,
+    MSG_REPETITION_REMOVED,
+    MSG_TAILJOIN_JOINED,
+    MSG_TAILJOIN_MISMATCH,
+    MSG_TAILJOIN_NONE,
+    MSG_UNICODE_REPAIR_APPLIED,
+    MSG_UNICODE_REPAIR_NO_TEXT,
+    MSG_VERSE_NONE,
+    MSG_VERSE_SPLIT,
+)
 from backend.core.pipeline.handlers.structure import (
     joined_provenance,
     remap_references,
@@ -60,6 +77,7 @@ from backend.core.pipeline.handlers.structure import (
     split_provenance,
     unique_element_id,
 )
+from backend.i18n import n, t
 
 
 def _handle_norm_fix_method(
@@ -85,12 +103,12 @@ def _handle_norm_fix_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum texto elegível para normalização",
+            message=t(MSG_NORMALIZE_NO_TEXT),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Normalização determinística aplicada em {fixed} elemento(s)",
+        message=n(*MSG_NORMALIZE_APPLIED, fixed).format(count=fixed),
     )
 
 
@@ -299,7 +317,7 @@ def _handle_unicode_repair_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum texto elegível para reparo Unicode",
+            message=t(MSG_UNICODE_REPAIR_NO_TEXT),
         )
 
     # The threshold is document-level. The builder emits one obligation for all
@@ -373,9 +391,8 @@ def _handle_unicode_repair_method(
     return MethodResult(
         success=True,
         validated=True,
-        message=(
-            f"Reparo Unicode aplicado em {repaired}/{inspected} elemento(s); "
-            f"{review} para revisão"
+        message=n(*MSG_UNICODE_REPAIR_APPLIED, inspected).format(
+            done=repaired, total=inspected, review=review
         ),
     )
 
@@ -403,12 +420,14 @@ def _handle_repetition_guard_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhuma repetição degenerada encontrada nos alvos",
+            message=t(MSG_REPETITION_NONE),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Guarda de repetição removeu {cut_total} token(s)",
+        message=n(*MSG_REPETITION_REMOVED, cut_total).format(
+            count=cut_total
+        ),
     )
 
 
@@ -484,13 +503,13 @@ def _handle_extract_line_numbers_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum número de linha marginal encontrado",
+            message=t(MSG_LINE_NUMBERS_NONE),
         )
     return MethodResult(
         success=True,
         validated=True,
-        message=(
-            f"{extracted} número(s) de linha extraído(s) de {changed} bloco(s)"
+        message=n(*MSG_LINE_NUMBERS_EXTRACTED, extracted).format(
+            count=extracted, blocks=changed
         ),
     )
 
@@ -583,15 +602,15 @@ def _handle_chunk_verse_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum bloco de verso elegível para fragmentação",
+            message=t(MSG_VERSE_NONE),
         )
     replace_elements(manifest, replacements)
     remap_references(manifest, expansion)
     return MethodResult(
         success=True,
         validated=True,
-        message=(
-            f"Verso fragmentado em {chunks} pedaço(s) de {split_blocks} bloco(s)"
+        message=n(*MSG_VERSE_SPLIT, chunks).format(
+            count=chunks, blocks=split_blocks
         ),
     )
 
@@ -699,9 +718,8 @@ def _handle_tailjoin_method(
             return MethodResult(
                 success=False,
                 validated=False,
-                message=(
-                    "A união não corresponde aos alvos da obrigação: "
-                    f"sobrevivente {survivor.id}, removidos {sorted(removed_ids)}"
+                message=t(MSG_TAILJOIN_MISMATCH).format(
+                    survivor=survivor.id, removed=sorted(removed_ids)
                 ),
             )
         pending.append((survivor, merged[-1], removed))
@@ -712,7 +730,7 @@ def _handle_tailjoin_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum bloco de cauda elegível para união",
+            message=t(MSG_TAILJOIN_NONE),
         )
     # Every page is validated before anything changes, so a mismatch on a later
     # page never leaves an earlier one half-joined.
@@ -734,9 +752,8 @@ def _handle_tailjoin_method(
     return MethodResult(
         success=True,
         validated=True,
-        message=(
-            f"Blocos de cauda unidos: {before_count} -> {after_count} bloco(s) "
-            f"em {len(pending)} pagina(s)"
+        message=n(*MSG_TAILJOIN_JOINED, after_count).format(
+            before=before_count, after=after_count, pages=len(pending)
         ),
     )
 
@@ -756,7 +773,7 @@ def _handle_deterministic_heading_repair_method(
         return MethodResult(
             success=False,
             validated=False,
-            message="Nenhum título encontrado para a obrigação",
+            message=t(MSG_HEADING_NONE),
         )
     previous = 0
     repaired = 0
@@ -777,5 +794,5 @@ def _handle_deterministic_heading_repair_method(
     return MethodResult(
         success=True,
         validated=True,
-        message=f"Hierarquia de títulos verificada; {repaired} título(s) reparado(s)",
+        message=n(*MSG_HEADING_REPAIRED, repaired).format(count=repaired),
     )
