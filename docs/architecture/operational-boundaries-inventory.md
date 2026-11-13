@@ -20,7 +20,7 @@ which is accepted:
 |---|---|
 | P1, portability (standard library only, guarded optional accelerators) | ADR-0002 table and compliance; `libs/docstruct/tests/test_purity.py` checks that `pyproject.toml` declares no runtime dependency, that every other import is a listed accelerator behind `except ImportError`, and that every module imports in an interpreter that refuses anything outside the standard library. The only accelerator is `rapidfuzz`, in `evaluation/metrics/text_ed.py`. #470's alternative A is therefore already in place. |
 | P2, shared structural contracts | [ADR-0007](../adr/0007-manifest-model-and-mathml-conversion.md) and #203: `docstruct.manifest` is the normative document model. The core's and the Toolbox's Pydantic models stay only as the 1.1.0 wire models, checked against `docstruct.manifest.field_specs` in contract tests. |
-| P3, independence from infrastructure | **Partly.** The ADR-0002 table states the rule. `test_purity.py` checks dependencies and imports, but it allows the whole standard library: a module that reads `os.environ` or a file when it is imported still passes, as the review of #471 reproduced. The network, environment, file and subprocess part is not tested yet. |
+| P3, independence from infrastructure | **Partly.** The ADR-0002 table states the rule. `test_purity.py` checks dependencies and imports, but it allows the whole standard library: a module that reads `os.environ` or a file when it is imported still passes, as the review of #471 reproduced. **Covered by phase 2 of #470:** `test_infrastructure.py` refuses infrastructure modules and built-ins statically, and fails an import that opens a file, reads the environment, creates a socket or starts a process. |
 | Direction of dependencies, no cycles | ADR-0002 already allows **SDK → docstruct**, and offers "in-process access to docstruct's pure algorithms" through the SDK. The SDK's `test_purity.py` keeps its dependencies "within `httpx` and docstruct". |
 | P7, one implementation per structural algorithm | ADR-0002 and #203; `tests/test_docstruct_bridges.py` fails on a new copy of a bridged algorithm. |
 | Toolbox does not import the core or the SDK | The Toolbox's `tests/unit/test_architecture.py`. Outside it, `acessilia_sdk` and `backend` appear only in one cross-project test (`tests/cross_project/test_core_storage_outage.py`). |
@@ -50,10 +50,10 @@ which is accepted:
   of #470:** the `docstruct alone` job installs it from its wheel, with pytest,
   and runs its suite with no core, SDK, Toolbox or optional accelerator
   (`rapidfuzz`) importable.
-- **docstruct's independence from infrastructure is not tested.** See P3
+- **docstruct's independence from infrastructure was not tested.** See P3
   above. An isolated install job would not catch it either: it needs a test
   that a module does not read the environment or files, open sockets or start
-  subprocesses.
+  subprocesses. **Closed by phase 2 of #470:** `libs/docstruct/tests/test_infrastructure.py`.
 
 ## Structural algorithms: core and docstruct
 

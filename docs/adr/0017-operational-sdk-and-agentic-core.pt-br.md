@@ -104,8 +104,8 @@ Proposta: a opção 2.
     contratos de transporte versionados: os schemas REST e MCP mantêm suas
     próprias versões e testes de contrato;
   - **sem infraestrutura:** nada de rede, ambiente, arquivos, subprocessos nem
-    imports do core, do SDK ou da Toolbox. Hoje só os imports são testados; o
-    resto precisa do teste listado no trabalho seguinte.
+    imports do core, do SDK ou da Toolbox. O `test_purity.py` testa os
+    imports, e o `test_infrastructure.py` (#470, fase 2), o resto.
 - **Dependências:** as mesmas da ADR-0002.
   - O SDK pode depender do docstruct, e passa a depender quando a primeira
     operação dele compuser um algoritmo do docstruct.

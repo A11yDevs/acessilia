@@ -103,8 +103,8 @@ Proposed: option 2.
     wire contracts: REST and MCP schemas keep their own versions and contract
     tests;
   - **no infrastructure:** no network, environment, files, subprocesses or
-    imports of the core, the SDK or the Toolbox. Today only the imports are
-    tested; the rest needs the test listed under follow-up work.
+    imports of the core, the SDK or the Toolbox. `test_purity.py` tests the
+    imports, and `test_infrastructure.py` (#470, phase 2) the rest.
 - **Dependencies:** unchanged from ADR-0002.
   - The SDK may depend on docstruct, and does once its first operation
     composes a docstruct algorithm.
