@@ -18,11 +18,11 @@ import pytest
 from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxIncompatibleEndpoint
 from acessilia_sdk.toolbox.clients.pdf import RenderedPage
 
-from backend.agents import pddl_orchestrator as pddl
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip
 from backend.core.manifest.models import BoundingBox, Provenance
 from tests.pddl_support import build_element
+from backend.core.pipeline.enrichment import common as enrichment_common
 
 
 def _picture(box=None, origin="TOPLEFT", page=2, src=None):
@@ -42,7 +42,7 @@ class _Renders:
         self._clip_result = clip_result
         self._clip_error = clip_error
         self._page_error = page_error
-        monkeypatch.setattr(pddl, "_toolbox_render", self)
+        monkeypatch.setattr(enrichment_common, "_toolbox_render", self)
 
     def __call__(self, source, page_number, **kwargs):
         self.calls.append((page_number, kwargs["clip"], kwargs["clip_origin"]))
@@ -56,7 +56,7 @@ class _Renders:
 
 
 def _extract(element, **kwargs):
-    return pddl._extract_picture_bytes(Path("doc.pdf"), element, kwargs.pop("fallback", None), **kwargs)
+    return enrichment_common._extract_picture_bytes(Path("doc.pdf"), element, kwargs.pop("fallback", None), **kwargs)
 
 
 def test_a_boxed_picture_is_its_crop(monkeypatch) -> None:
@@ -156,6 +156,6 @@ def test_no_clip_without_a_usable_box() -> None:
     ],
 )
 def test_the_embedded_image(src, expected) -> None:
-    decoded = decode_data_uri(src, media_types=pddl._EMBEDDED_PICTURE_TYPES,
-                              max_bytes=pddl._EMBEDDED_PICTURE_MAX_BYTES)
+    decoded = decode_data_uri(src, media_types=enrichment_common._EMBEDDED_PICTURE_TYPES,
+                              max_bytes=enrichment_common._EMBEDDED_PICTURE_MAX_BYTES)
     assert decoded == expected

@@ -23,14 +23,13 @@ from PIL import Image
 from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
-from backend.agents.pddl_orchestrator import (
-    _enrich_picture_descriptions,
-    _extract_picture_bytes,
-)
+from backend.core.pipeline.enrichment.common import _extract_picture_bytes
+from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.pipeline.handlers.content import _handle_vision_description_method
 from backend.core.manifest.models import Obligation
 from backend.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
+from backend.core.pipeline.enrichment import common as enrichment_common
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -82,7 +81,7 @@ def _fake_vision(monkeypatch, answer=_DESCRIPTION):
             calls.append(kwargs)
             return answer
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.VisionAgent", FakeVision)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FakeVision)
     return calls
 
 
@@ -143,7 +142,7 @@ def test_only_an_embedded_raster_image_is_decoded(fake_toolbox_render, tmp_path,
 def test_an_embedded_image_above_the_size_bound_is_not_decoded(
     monkeypatch, fake_toolbox_render, tmp_path
 ):
-    monkeypatch.setattr(pddl, "_EMBEDDED_PICTURE_MAX_BYTES", 16)
+    monkeypatch.setattr(enrichment_common, "_EMBEDDED_PICTURE_MAX_BYTES", 16)
 
     image, _ = _extract_picture_bytes(
         tmp_path / "qa_word.docx", _pageless_picture(src=_data_uri(b"x" * 64)), None,
@@ -158,7 +157,7 @@ def test_the_size_bound_applies_to_the_decoded_bytes(
     monkeypatch, fake_toolbox_render, tmp_path, size, accepted
 ):
     """17 and 18 bytes share the base64 length of 16, so the encoded length alone is not enough."""
-    monkeypatch.setattr(pddl, "_EMBEDDED_PICTURE_MAX_BYTES", 16)
+    monkeypatch.setattr(enrichment_common, "_EMBEDDED_PICTURE_MAX_BYTES", 16)
 
     image, _ = _extract_picture_bytes(
         tmp_path / "qa_word.docx", _pageless_picture(src=_data_uri(b"x" * size)), None,
@@ -242,7 +241,7 @@ async def test_a_paged_picture_whose_crop_failed_is_still_a_crop_failure(
     """A PDF page the Toolbox could not render keeps its retryable reason."""
     _fake_vision(monkeypatch)
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *_args, **_kwargs: (None, 3),
     )
     manifest = build_manifest([build_element("pic-1", "picture")], [])

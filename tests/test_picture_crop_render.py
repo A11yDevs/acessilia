@@ -13,7 +13,10 @@ import io
 
 from PIL import Image
 
-from backend.agents.pddl_orchestrator import _PICTURE_MAX_SIDE, _extract_picture_bytes
+from backend.core.pipeline.enrichment.common import (
+    _PICTURE_MAX_SIDE,
+    _extract_picture_bytes,
+)
 from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
 
 

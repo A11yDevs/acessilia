@@ -13,7 +13,7 @@ import asyncio
 import pytest
 
 from backend.agents.output_schemas import VisionOutput
-from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.config.settings import settings
 from tests.pddl_support import (
     build_element as _element,
@@ -63,10 +63,10 @@ async def test_picture_descriptions_run_bounded_and_concurrently(
         return b"image-bytes", 1
 
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator.VisionAgent", FakeVision
+        "backend.core.pipeline.enrichment.pictures.VisionAgent", FakeVision
     )
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes", fake_extract
+        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes", fake_extract
     )
 
     await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")

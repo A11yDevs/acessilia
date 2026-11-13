@@ -11,7 +11,7 @@ import pytest
 
 from backend.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
-from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.pipeline.handlers.content import _handle_vision_description_method
 from backend.i18n import t
 from tests.pddl_support import (
@@ -58,9 +58,9 @@ def _patch(monkeypatch, answer, *, image=b"image-bytes", error=None):
                 errors.append(error)
             return answer
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.VisionAgent", FakeVision)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FakeVision)
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *_args, **_kwargs: (image, 1),
     )
     return calls

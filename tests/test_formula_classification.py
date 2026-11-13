@@ -8,6 +8,7 @@ from backend.core.pipeline.handlers import review as review_handlers
 from backend.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import _element_to_block
 from tests.pddl_support import build_element, build_manifest, build_obligation
+from backend.core.pipeline.enrichment import pictures as picture_stage
 
 
 def manifest_for(text=None):
@@ -30,6 +31,7 @@ def install_vision(monkeypatch, output):
             return output
 
     monkeypatch.setattr(pddl, "VisionAgent", Vision)
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
     monkeypatch.setattr(pddl, "_formula_recognition_crop", lambda *a, **k: (b"crop", 1))
     return calls
 
@@ -48,7 +50,7 @@ async def test_drawing_is_reclassified_and_description_is_not_requested_twice(mo
 
     monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
     await pddl._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
-    await pddl._enrich_picture_descriptions(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
+    await picture_stage._enrich_picture_descriptions(manifest, Path("source.pdf"), mode="medio", breaker=breaker)
     element = manifest.elements[0]
     assert element.type == "picture"
     assert element.text == "A ring with labelled oxygen atoms."

@@ -16,12 +16,12 @@ from types import SimpleNamespace
 import pytest
 
 from backend.agents.output_schemas import DataOutput, VisionOutput
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.agents.pddl_orchestrator import (
     _enrich_formula_latex,
-    _enrich_picture_descriptions,
     _enrich_table_structures,
 )
+from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.agents.provider_breaker import ProviderBreaker
 from backend.config.settings import settings
 from tests.pddl_support import build_element as _element
@@ -80,10 +80,14 @@ def _vision(monkeypatch, answers, failure: str = "TimeoutError: no answer"):
             return answer
 
     monkeypatch.setattr("backend.agents.pddl_orchestrator.VisionAgent", FakeVision)
-    monkeypatch.setattr(
+    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FakeVision)
+    # Pictures and tables crop through two modules now; the tests that run both
+    # stages, or the formula fallback, need the fakes in both.
+    for crop_user in (
         "backend.agents.pddl_orchestrator._extract_picture_bytes",
-        lambda *_args, **_kwargs: (b"image-bytes", 1),
-    )
+        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
+    ):
+        monkeypatch.setattr(crop_user, lambda *_args, **_kwargs: (b"image-bytes", 1))
     return calls
 
 
@@ -374,7 +378,7 @@ async def test_the_second_pass_waits_the_configured_delay(monkeypatch, tmp_path)
 
     # Keep other tasks' sleeps intact while recording the retry's delay.
     monkeypatch.setattr(
-        pddl, "asyncio", SimpleNamespace(**(vars(asyncio) | {"sleep": record_sleep}))
+        enrichment_common, "asyncio", SimpleNamespace(**(vars(asyncio) | {"sleep": record_sleep}))
     )
     monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 5)
     calls = _vision(monkeypatch, [_DESCRIPTION, None, _DESCRIPTION])

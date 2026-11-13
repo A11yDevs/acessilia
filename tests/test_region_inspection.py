@@ -23,6 +23,7 @@ from tests.pddl_support import (
     build_obligation as _obligation,
     build_orchestrator as _orchestrator,
 )
+from backend.core.pipeline.enrichment import common as enrichment_common
 
 
 @pytest.fixture
@@ -333,7 +334,7 @@ def test_rotated_picture_provenance_renders_only_source_region(
     assert number == 1
     assert rectangle == pytest.approx(list(expected))
     assert _pixels(rendered) == _pixels(expected_png)
-    enriched, number = pddl._extract_picture_bytes(source, element, 1)
+    enriched, number = enrichment_common._extract_picture_bytes(source, element, 1)
     assert _pixels(enriched) == _pixels(expected_png)
     assert max(fitz.Pixmap(rendered).samples) == 0  # black picture, no white page margin
 
@@ -365,7 +366,7 @@ def test_a_picture_box_that_is_not_a_picture_falls_back_to_the_page(
 ):
     source = _one_page_pdf(tmp_path / "doc.pdf")
 
-    image, number = pddl._extract_picture_bytes(source, _picture(*box), 1)
+    image, number = enrichment_common._extract_picture_bytes(source, _picture(*box), 1)
 
     assert number == 1
     assert fitz.Pixmap(image).width >= 200 * 160 / 72  # the whole page
@@ -376,7 +377,7 @@ def test_a_picture_box_that_is_not_a_picture_falls_back_to_the_page(
 def test_a_non_finite_picture_box_renders_the_page_once(tmp_path, fake_toolbox_render):
     source = _one_page_pdf(tmp_path / "doc.pdf")
 
-    image, _ = pddl._extract_picture_bytes(source, _picture(10, float("nan"), 90, 60), 1)
+    image, _ = enrichment_common._extract_picture_bytes(source, _picture(10, float("nan"), 90, 60), 1)
 
     assert image is not None
     [parameters] = fake_toolbox_render.parameters
@@ -392,8 +393,8 @@ def test_an_unavailable_toolbox_is_not_retried_as_a_page(tmp_path, monkeypatch):
         attempts.append(kwargs.get("clip"))
         raise ToolboxProviderUnavailable("down")
 
-    monkeypatch.setattr(pddl, "_toolbox_render", unavailable)
+    monkeypatch.setattr(enrichment_common, "_toolbox_render", unavailable)
     source = _one_page_pdf(tmp_path / "doc.pdf")
 
-    assert pddl._extract_picture_bytes(source, _picture(10, 10, 90, 60), 1) == (None, 1)
+    assert enrichment_common._extract_picture_bytes(source, _picture(10, 10, 90, 60), 1) == (None, 1)
     assert attempts == [(10.0, 10.0, 90.0, 60.0)]

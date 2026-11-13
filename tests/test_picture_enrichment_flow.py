@@ -16,6 +16,7 @@ from backend.agents import pddl_orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest, build_obligation
+from backend.core.pipeline.enrichment import pictures as picture_stage
 
 
 class Vision:
@@ -36,13 +37,13 @@ class Vision:
 @pytest.fixture(autouse=True)
 def fakes(monkeypatch):
     Vision.calls, Vision.answers = [], {}
-    monkeypatch.setattr(pddl, "VisionAgent", Vision)
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
     crops: dict = {}
 
     def crop(source, element, fallback, artifact_id, media_type):
         return crops.get(element.id, (element.id.encode(), element.page_number or fallback or 1))
 
-    monkeypatch.setattr(pddl, "_extract_picture_bytes", crop)
+    monkeypatch.setattr(picture_stage, "_extract_picture_bytes", crop)
     from backend.config.settings import settings
     monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 0)
     return crops
@@ -59,7 +60,7 @@ def _manifest(elements, pages=2):
 
 
 async def _run(manifest, **kwargs):
-    await pddl._enrich_picture_descriptions(manifest, Path("doc.pdf"), mode="medio", **kwargs)
+    await picture_stage._enrich_picture_descriptions(manifest, Path("doc.pdf"), mode="medio", **kwargs)
 
 
 @pytest.mark.asyncio

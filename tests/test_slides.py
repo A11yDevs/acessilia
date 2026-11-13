@@ -17,6 +17,7 @@ from backend.core.manifest.slides import is_slide_heading
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
+from backend.core.pipeline.enrichment import pictures as picture_stage
 
 NOW = datetime(2026, 10, 23, tzinfo=UTC)
 WIDTH, HEIGHT = 960, 540
@@ -348,7 +349,6 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypatch):
-    from backend.agents import pddl_orchestrator as pddl
     from backend.agents.output_schemas import VisionOutput
 
     manifest = _build(source)
@@ -365,10 +365,10 @@ async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypat
                 language="pt-BR", confidence=0.9,
             )
 
-    monkeypatch.setattr(pddl, "VisionAgent", Vision)
-    monkeypatch.setattr(pddl, "_extract_picture_bytes", lambda _s, element, page, *_a: (b"png", page))
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda _s, element, page, *_a: (b"png", page))
 
-    await pddl._enrich_picture_descriptions(manifest, source, mode="medio")
+    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio")
 
     # Slide 3 is one picture of the whole slide; slide 2 keeps an embedded one.
     assert classifications == {3: "full_page_image", 2: "embedded_image"}
@@ -588,7 +588,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     source, monkeypatch
 ):
     """A failed vision call leaves the extractor's alt in place; it carries no labels."""
-    from backend.agents.pddl_orchestrator import _enrich_picture_descriptions
+    from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
     from backend.core.pipeline.payload import _manifest_pages_to_payload
 
     class FailingVision:
@@ -598,9 +598,9 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
         async def describe_region(self, *, errors=None, **kwargs):
             return None
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.VisionAgent", FailingVision)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FailingVision)
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._extract_picture_bytes",
+        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 2),
     )
     extraction = _with_labels(
