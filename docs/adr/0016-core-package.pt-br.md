@@ -198,8 +198,9 @@ Proposta: a opção 2.
      **As operações que podem ir para o SDK ficam onde estão** até que a
      [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) decida a
      divisão delas em mecanismo (SDK) e política (core), para que não mudem
-     de lugar duas vezes. São os adaptadores de render e do juiz, os
-     adaptadores da Toolbox em `backend/tools` e a cadeia de fórmula; o
+     de lugar duas vezes. São o juiz de página, os adaptadores da Toolbox em
+     `backend/tools` e a cadeia de fórmula (a ligação do core com o render não
+     fica retida; veja a ADR-0017); o
      [inventário da #470](../architecture/operational-boundaries-inventory.pt-br.md)
      os lista. O que ficar no core depois da divisão (a política, e a ligação
      do `CoreConfig` aos parâmetros de cada operação) se reúne aqui em

@@ -151,10 +151,14 @@ Proposed: option 2.
     characterization and a comparison of the manifests before and after.
 - **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into
   `backend/core/` the modules that hold these operations, so they do not move
-  twice: the render and judge adapters, `backend/tools`' Toolbox adapters, and
-  the formula chain. Each moves once its split into mechanism (SDK) and
-  policy (core) is decided. The core keeps the binding of its configuration
-  (`CoreConfig`) to each operation's explicit parameters.
+  twice: the page judge, `backend/tools`' Toolbox adapters, and the formula
+  chain. Each moves once its split into mechanism (SDK) and policy (core) is
+  decided. The core keeps the binding of its configuration (`CoreConfig`) to
+  each operation's explicit parameters. So the core's binding to the render
+  (`_source_artifact_id` and `_toolbox_render`, which bind the settings to
+  `ToolboxPdfClient.render` and decide whether the stored source can be
+  referenced) stays in the core and is not part of that hold: step 6 moves it
+  to `backend/core/pipeline/toolbox.py`.
 - **Still open:**
   - which operations follow the formula chain, and in which order;
   - what docstruct's stable public API is. The proposal is: what each module

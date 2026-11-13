@@ -196,8 +196,9 @@ Proposed: option 2.
      **Operations that may go to the SDK stay where they are** until
      [ADR-0017](0017-operational-sdk-and-agentic-core.md) decides their
      split into mechanism (SDK) and policy (core), so they do not move twice.
-     These are the render and judge adapters, `backend/tools`' Toolbox
-     adapters, and the formula chain; the
+     These are the page judge, `backend/tools`' Toolbox adapters, and the
+     formula chain (the core's binding to the render stays in the core and is
+     not part of that hold; see ADR-0017); the
      [inventory of #470](../architecture/operational-boundaries-inventory.md)
      lists them. What stays in the core after the split (the policy, and the
      binding of `CoreConfig` to each operation's parameters) then gathers
