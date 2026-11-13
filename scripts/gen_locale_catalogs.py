@@ -410,6 +410,8 @@ from frontend.web.messages import (
 )
 from frontend.telegram.messages import (
     MSG_ACCESSIBLE_PACKAGE_READY,
+    MSG_PACKAGE_PDF_UA_MISSING,
+    MSG_PACKAGE_EMAIL_CONFIGURED,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_BOT_PAUSED,
     MSG_BOT_RESUMED,
@@ -430,7 +432,12 @@ from frontend.telegram.messages import (
     MSG_FILE_RECEIVED,
     MSG_FORMATS_TEXT,
     MSG_HEALTH_ACTIVE_MODEL,
+    MSG_HEALTH_API,
+    MSG_HEALTH_API_ERROR,
+    MSG_HEALTH_API_OFFLINE,
     MSG_HEALTH_DISK_FREE,
+    MSG_HEALTH_PROVIDER,
+    MSG_HEALTH_UNKNOWN,
     MSG_HEALTH_TEMP_MISSING,
     MSG_HEALTH_TEMP_OK,
     MSG_HELP_TEXT,
@@ -587,6 +594,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_WAITING_IN_QUEUE,
     MSG_DOWNLOAD_LINK_EMAILED,
     MSG_ACCESSIBLE_PACKAGE_READY,
+    MSG_PACKAGE_PDF_UA_MISSING,
+    MSG_PACKAGE_EMAIL_CONFIGURED,
     MSG_PROCESSING_ERROR_GENERIC,
     MSG_PROCESS_FAILED_BASE,
     MSG_TASK_CANCELLED,
@@ -605,6 +614,11 @@ MESSAGES: tuple[str, ...] = (
     MSG_OLLAMA_UNEXPECTED,
     MSG_OLLAMA_OFFLINE,
     MSG_HEALTH_ACTIVE_MODEL,
+    MSG_HEALTH_API,
+    MSG_HEALTH_API_ERROR,
+    MSG_HEALTH_API_OFFLINE,
+    MSG_HEALTH_PROVIDER,
+    MSG_HEALTH_UNKNOWN,
     MSG_HEALTH_TEMP_OK,
     MSG_HEALTH_TEMP_MISSING,
     MSG_CACHE_CLEARED,
@@ -1320,6 +1334,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_ACCESSIBLE_PACKAGE_READY: (
             "✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}"
         ),
+        MSG_PACKAGE_PDF_UA_MISSING: (
+            "⚠️ Não foi possível gerar o PDF/UA, o único PDF do pacote: "
+            "o pacote segue sem PDF."
+        ),
+        MSG_PACKAGE_EMAIL_CONFIGURED: "E-mail configurado: {email}",
         MSG_PROCESSING_ERROR_GENERIC: "❌ Erro ao processar o arquivo. Tente novamente.",
         MSG_PROCESS_FAILED_BASE: "❌ Erro no processamento.",
         MSG_TASK_CANCELLED: "🚫 Tarefa cancelada.",
@@ -1363,6 +1382,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_OLLAMA_OFFLINE: "❌ Ollama: offline ({error})",
         # Active LLM model line from /health; {model} named in config injected at call time.
         MSG_HEALTH_ACTIVE_MODEL: "🤖 Modelo: {model}",
+        MSG_HEALTH_API: "{icon} API: {status}",
+        MSG_HEALTH_PROVIDER: "{icon} Provedor: {provider}",
+        MSG_HEALTH_API_ERROR: "❌ API: erro {status_code} ({detail})",
+        MSG_HEALTH_API_OFFLINE: "❌ API: offline ({error})",
+        MSG_HEALTH_UNKNOWN: "desconhecido",
         # Temp-directory check passes (settings.temp_dir exists).
         MSG_HEALTH_TEMP_OK: "✅ Pasta temporária: ok",
         # Missing temp directory reported as a warning; operator should recreate settings.temp_dir.

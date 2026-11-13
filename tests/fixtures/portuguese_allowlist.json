@@ -43,7 +43,6 @@
     "docs/toolbox_capability_matrix.md": 2,
     "docs/toolbox_integration_plan.md": 120,
     "frontend/telegram/adapters/status_tracker.py": 3,
-    "frontend/telegram/handlers/document.py": 2,
     "frontend/web/app.py": 4,
     "libs/docstruct/pyproject.toml": 1,
     "libs/docstruct/src/docstruct/__init__.py": 3,

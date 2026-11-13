@@ -14,7 +14,7 @@ from frontend.clients import default_client
 from frontend.telegram import user_context
 
 from backend.tools.logger import logger
-from backend.i18n import t
+from backend.i18n import SUPPORTED_LOCALES, get_translations, t
 from backend.log_messages import (
     LOG_TELEGRAM_API_JOB_REJECTED,
     LOG_TELEGRAM_API_CONTACT_FAILED,
@@ -28,9 +28,12 @@ from backend.tools.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
 from frontend.telegram.messages import (
+    MSG_ACCESSIBLE_PACKAGE_READY,
     MSG_CONTACT_SERVER_FAILED,
     MSG_DOWNLOADING_FILE,
     MSG_FILE_RECEIVED,
+    MSG_PACKAGE_EMAIL_CONFIGURED,
+    MSG_PACKAGE_PDF_UA_MISSING,
     MSG_PHOTO_RECEIVED,
     MSG_PROCESS_FAILED_BASE,
     MSG_PROCESSING_ERROR_GENERIC,
@@ -203,6 +206,28 @@ async def process_file(
         await message.answer(t(MSG_PROCESSING_ERROR_GENERIC))
 
 
+def _pdf_ua_failure_prefixes() -> tuple[str, ...]:
+    """Prefixes of the PDF/UA failure message in every supported locale.
+
+    The worker records the failure in the server locale, while this consumer
+    runs under the user's locale. Resolving the msgid with ``t()`` here would
+    only recognize a failure recorded in the same language, so the comparison
+    uses the catalogs' rendering for every supported locale instead.
+    """
+    prefixes: list[str] = []
+    for locale in SUPPORTED_LOCALES:
+        translations = get_translations(locale)
+        message = (
+            translations.gettext(LOG_PDF_UA_GENERATION_FAILED)
+            if translations is not None
+            else LOG_PDF_UA_GENERATION_FAILED
+        )
+        prefix = message.split("{error}")[0]
+        if prefix not in prefixes:
+            prefixes.append(prefix)
+    return tuple(prefixes)
+
+
 async def _poll_job(
     message: Message,
     tracker: StatusTracker,
@@ -248,13 +273,18 @@ async def _poll_job(
             await tracker.finish(success=True)
             url = status.get("download_url")
             if url:
-                msg = f"✅ Pacote acessível gerado!\n\n📥 Link para download (válido por 7 dias):\n{url}"
-                # The worker records the failure in the server locale.
-                pdf_ua_failed = t(LOG_PDF_UA_GENERATION_FAILED).split("{error}")[0]
-                if any(erro.startswith(pdf_ua_failed) for erro in status.get("erros", [])):
-                    msg += "\n\n⚠️ Não foi possível gerar o PDF/UA, o único PDF do pacote: o pacote segue sem PDF."
+                msg = t(MSG_ACCESSIBLE_PACKAGE_READY).format(url=url)
+                pdf_ua_failed = any(
+                    erro.startswith(prefix)
+                    for erro in status.get("erros", [])
+                    for prefix in _pdf_ua_failure_prefixes()
+                )
+                if pdf_ua_failed:
+                    msg += "\n\n" + t(MSG_PACKAGE_PDF_UA_MISSING)
                 if email:
-                    msg += f"\n\nE-mail configurado: {email}"
+                    msg += "\n\n" + t(MSG_PACKAGE_EMAIL_CONFIGURED).format(
+                        email=email
+                    )
                 await _send_with_retry(
                     message.bot,
                     message.chat.id,

@@ -436,6 +436,17 @@ msgstr ""
 "📥 Link para download (válido por 7 dias):\n"
 "{url}"
 
+msgid ""
+"⚠️ The PDF/UA could not be generated, the package's only PDF: the package"
+" continues without a PDF."
+msgstr ""
+"⚠️ Não foi possível gerar o PDF/UA, o único PDF do pacote: o pacote segue"
+" sem PDF."
+
+#, python-brace-format
+msgid "E-mail configured: {email}"
+msgstr "E-mail configurado: {email}"
+
 msgid "❌ Error processing the file. Try again."
 msgstr "❌ Erro ao processar o arquivo. Tente novamente."
 
@@ -535,6 +546,25 @@ msgstr "❌ Ollama: offline ({error})"
 #, python-brace-format
 msgid "🤖 Model: {model}"
 msgstr "🤖 Modelo: {model}"
+
+#, python-brace-format
+msgid "{icon} API: {status}"
+msgstr "{icon} API: {status}"
+
+#, python-brace-format
+msgid "❌ API: error {status_code} ({detail})"
+msgstr "❌ API: erro {status_code} ({detail})"
+
+#, python-brace-format
+msgid "❌ API: offline ({error})"
+msgstr "❌ API: offline ({error})"
+
+#, python-brace-format
+msgid "{icon} Provider: {provider}"
+msgstr "{icon} Provedor: {provider}"
+
+msgid "unknown"
+msgstr "desconhecido"
 
 msgid "✅ Temp dir: ok"
 msgstr "✅ Pasta temporária: ok"
