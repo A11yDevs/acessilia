@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
+from backend.core.pipeline.enrichment import tables as table_stage
 
 isolated_runtime = runtime_fixture
 
@@ -204,11 +205,11 @@ def _enrich_tables(monkeypatch, table, *, image, reading):
         return function(*args)
 
     monkeypatch.setattr(settings, "table_visual_review", True)
-    monkeypatch.setattr(pddl, "DataAgent", FakeDataAgent)
-    monkeypatch.setattr(pddl, "_extract_picture_bytes", lambda *_args: (image, 1))
+    monkeypatch.setattr(table_stage, "DataAgent", FakeDataAgent)
+    monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args: (image, 1))
     monkeypatch.setattr(pddl.asyncio, "to_thread", run_inline)
     manifest = build_manifest([table], [])
-    asyncio.run(pddl._enrich_table_structures(manifest, Path("/tmp/deck.pdf")))
+    asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/deck.pdf")))
     return _payload(manifest)
 
 
