@@ -142,9 +142,8 @@ def test_fusion_handler_fails_on_unknown_obligation(tmp_path, monkeypatch):
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-inexistente")
 
-    assert result.success is False
-    assert result.validated is False
-    assert result.artifacts == []
+    # The contract: the same failed, unvalidated result without artifacts that
+    # every handler returns for an unknown obligation.
     assert result == _missing_obligation("o-inexistente")
 
 
