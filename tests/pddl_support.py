@@ -27,6 +27,14 @@ def build_manifest(
     elements: list[ManifestElement],
     obligations: list[Obligation],
 ) -> ProcessingManifest:
+    page_numbers = sorted(
+        {element.page_number for element in elements if element.page_number is not None}
+        | {
+            provenance.page_number
+            for element in elements
+            for provenance in element.provenance
+        }
+    ) or [1]
     return ProcessingManifest(
         manifest_id="manifest-actionability",
         created_at=NOW,
@@ -47,11 +55,21 @@ def build_manifest(
         ),
         title="Actionability",
         language="pt-BR",
-        pages=[PageDescriptor(page_number=1, element_ids=[e.id for e in elements])],
+        pages=[
+            PageDescriptor(
+                page_number=page_number,
+                element_ids=[
+                    element.id
+                    for element in elements
+                    if (element.page_number or 1) == page_number
+                ],
+            )
+            for page_number in page_numbers
+        ],
         elements=elements,
         obligations=obligations,
         summary=ManifestSummary(
-            page_count=1,
+            page_count=len(page_numbers),
             element_count=len(elements),
             observation_count=0,
             obligation_count=len(obligations),

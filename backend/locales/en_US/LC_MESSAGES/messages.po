@@ -2038,8 +2038,28 @@ msgid "Duplicate page numbers"
 msgstr "Duplicate page numbers"
 
 #, python-brace-format
+msgid "Element {element_id} references missing page {page_number}"
+msgstr "Element {element_id} references missing page {page_number}"
+
+#, python-brace-format
+msgid "Page {page_number} lists duplicate elements: {element_ids}"
+msgstr "Page {page_number} lists duplicate elements: {element_ids}"
+
+#, python-brace-format
 msgid "Page {page_number} references unknown elements: {element_ids}"
 msgstr "Page {page_number} references unknown elements: {element_ids}"
+
+#, python-brace-format
+msgid ""
+"Element {element_id} parent_ref {parent_ref!r} does not match parent "
+"{parent_id} source_ref {source_ref!r}"
+msgstr ""
+"Element {element_id} parent_ref {parent_ref!r} does not match parent "
+"{parent_id} source_ref {source_ref!r}"
+
+#, python-brace-format
+msgid "{path} references missing page {page_number}"
+msgstr "{path} references missing page {page_number}"
 
 #, python-brace-format
 msgid "{path} ends at {char_end}, before its start {char_start}"

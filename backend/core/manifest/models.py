@@ -12,7 +12,11 @@ from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the cata
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_ELEMENT_UNKNOWN_PAGE,
+    MSG_PAGE_DUPLICATE_ELEMENT_IDS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_PARENT_REF_MISMATCH,
+    MSG_PROVENANCE_UNKNOWN_PAGE,
     MSG_PARENT_CYCLE,
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
@@ -214,10 +218,11 @@ class ProcessingManifest(StrictModel):
         if self.extractor.completed_at < self.extractor.started_at:
             raise ValueError("A extração terminou antes de começar")
 
-        # Document invariants are docstruct's (#203): unique element ids,
+        # Document invariants are docstruct's (#203, #404): unique element ids,
         # existing non-self parents, an acyclic hierarchy, unique page numbers,
-        # pages that list known elements and provenance character ranges that
-        # do not end before they start.
+        # pages that list known elements without repeating one, existing page
+        # references when pages are described, parent_ref/source_ref agreement
+        # and provenance character ranges that do not end before they start.
         if findings := document_invariant_findings(self.pages, self.elements):
             msgid, kwargs = findings[0]
             raise ValueError(t(msgid).format(**kwargs))

@@ -246,6 +246,17 @@ MSG_SELF_PARENT: str = "Element {element_id} is its own parent"
 MSG_PARENT_CYCLE: str = "Cycle detected in the element hierarchy"
 MSG_DUPLICATE_PAGE_NUMBERS: str = "Duplicate page numbers"
 MSG_PAGE_UNKNOWN_ELEMENTS: str = "Page {page_number} references unknown elements: {element_ids}"
+MSG_PAGE_DUPLICATE_ELEMENT_IDS: str = (
+    "Page {page_number} lists duplicate elements: {element_ids}"
+)
+MSG_ELEMENT_UNKNOWN_PAGE: str = (
+    "Element {element_id} references missing page {page_number}"
+)
+MSG_PROVENANCE_UNKNOWN_PAGE: str = "{path} references missing page {page_number}"
+MSG_PARENT_REF_MISMATCH: str = (
+    "Element {element_id} parent_ref {parent_ref!r} does not match parent "
+    "{parent_id} source_ref {source_ref!r}"
+)
 MSG_CHAR_RANGE_REVERSED: str = "{path} ends at {char_end}, before its start {char_start}"
 
 _RULES = {
@@ -282,11 +293,27 @@ def document_invariant_findings(
 
     In this order: unique element ids, existing parents that are not the
     element itself, an acyclic hierarchy, unique page numbers, pages that
-    list known elements only, and provenance character ranges that do not end
-    before they start. Pages need ``page_number`` and ``element_ids``;
-    elements need ``id``, ``parent_id`` and ``provenance`` (with
-    ``char_start`` and ``char_end``). Wire models can therefore be checked
-    without conversion.
+    list known elements only, repeated ids inside a page, element/provenance
+    page references that exist when the document describes pages,
+    ``parent_ref``/``parent_id`` agreement, and provenance character ranges
+    that do not end before they start. Pages need ``page_number`` and
+    ``element_ids``; elements need ``id``, ``parent_id``, ``parent_ref``,
+    ``source_ref``, ``page_number`` and ``provenance`` (with ``char_start``
+    and ``char_end``). Wire models can therefore be checked without
+    conversion.
+
+    Decisions for the four open invariants (#404):
+
+    - Page references are enforced only when ``pages`` is non-empty. An empty
+      page list means the document carries no page descriptors (a fragment or
+      an element-only document); its page numbers are trusted because there is
+      nothing to check them against. This keeps both shapes accepted.
+    - A page may not repeat an element id in ``element_ids``; each page gets
+      one finding naming the repeated ids.
+    - An element may appear on no page: groups and elements read across slides
+      are legitimate, and page membership is not made an invariant.
+    - ``parent_ref`` and ``parent_id`` are compared only when both are set and
+      the parent has a ``source_ref``; the source reference must then agree.
     """
     findings: list[tuple[str, dict[str, Any]]] = []
     element_ids = [element.id for element in elements]
@@ -321,6 +348,60 @@ def document_invariant_findings(
                     MSG_PAGE_UNKNOWN_ELEMENTS,
                     page_number=page.page_number,
                     element_ids=sorted(unknown),
+                )
+            )
+        repeated = sorted(
+            id_ for id_, count in Counter(page.element_ids).items() if count > 1
+        )
+        if repeated:
+            findings.append(
+                Finding(
+                    MSG_PAGE_DUPLICATE_ELEMENT_IDS,
+                    page_number=page.page_number,
+                    element_ids=repeated,
+                )
+            )
+
+    # Page references are checkable only when the document describes pages.
+    # pages=[] is an element-only fragment whose page numbers are accepted as
+    # given; a document with neither pages nor references stays valid too.
+    if page_numbers:
+        known_pages = set(page_numbers)
+        for index, element in enumerate(elements):
+            if (
+                element.page_number is not None
+                and element.page_number not in known_pages
+            ):
+                findings.append(
+                    Finding(
+                        MSG_ELEMENT_UNKNOWN_PAGE,
+                        element_id=element.id,
+                        page_number=element.page_number,
+                    )
+                )
+            for position, provenance in enumerate(element.provenance):
+                if provenance.page_number not in known_pages:
+                    findings.append(
+                        Finding(
+                            MSG_PROVENANCE_UNKNOWN_PAGE,
+                            path=f"elements[{index}].provenance[{position}]",
+                            page_number=provenance.page_number,
+                        )
+                    )
+
+    source_refs = {element.id: element.source_ref for element in elements}
+    for element in elements:
+        if element.parent_id is None or element.parent_ref is None:
+            continue
+        parent_source_ref = source_refs.get(element.parent_id)
+        if parent_source_ref is not None and parent_source_ref != element.parent_ref:
+            findings.append(
+                Finding(
+                    MSG_PARENT_REF_MISMATCH,
+                    element_id=element.id,
+                    parent_id=element.parent_id,
+                    parent_ref=element.parent_ref,
+                    source_ref=parent_source_ref,
                 )
             )
 
@@ -441,11 +522,15 @@ __all__ = [
     "MSG_CHAR_RANGE_REVERSED",
     "MSG_DUPLICATE_ELEMENT_IDS",
     "MSG_DUPLICATE_PAGE_NUMBERS",
+    "MSG_ELEMENT_UNKNOWN_PAGE",
     "MSG_FIELD_NOT_ALLOWED",
     "MSG_FIELD_OUT_OF_RANGE",
     "MSG_FIELD_WRONG_TYPE",
+    "MSG_PAGE_DUPLICATE_ELEMENT_IDS",
     "MSG_PAGE_UNKNOWN_ELEMENTS",
     "MSG_PARENT_CYCLE",
+    "MSG_PARENT_REF_MISMATCH",
+    "MSG_PROVENANCE_UNKNOWN_PAGE",
     "MSG_SELF_PARENT",
     "MSG_UNKNOWN_PARENT",
     "PageDescriptor",

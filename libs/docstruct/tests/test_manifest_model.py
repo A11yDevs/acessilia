@@ -6,11 +6,15 @@ from docstruct.manifest import (
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_DUPLICATE_PAGE_NUMBERS,
+    MSG_ELEMENT_UNKNOWN_PAGE,
     MSG_FIELD_NOT_ALLOWED,
     MSG_FIELD_OUT_OF_RANGE,
     MSG_FIELD_WRONG_TYPE,
+    MSG_PAGE_DUPLICATE_ELEMENT_IDS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
     MSG_PARENT_CYCLE,
+    MSG_PARENT_REF_MISMATCH,
+    MSG_PROVENANCE_UNKNOWN_PAGE,
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
     BoundingBox,
@@ -116,8 +120,34 @@ def test_document_invariants():
     assert findings_for(lambda p: p["elements"][0].update(parent_id="b")) == [MSG_PARENT_CYCLE]
     assert findings_for(lambda p: p["pages"].append(dict(p["pages"][0]))) == [MSG_DUPLICATE_PAGE_NUMBERS]
     assert findings_for(lambda p: p["pages"][0]["element_ids"].append("z")) == [MSG_PAGE_UNKNOWN_ELEMENTS]
+    assert findings_for(lambda p: p["pages"][0]["element_ids"].append("a")) == [
+        MSG_PAGE_DUPLICATE_ELEMENT_IDS
+    ]
+    assert findings_for(lambda p: p["elements"][0].update(page_number=2)) == [
+        MSG_ELEMENT_UNKNOWN_PAGE
+    ]
+    assert findings_for(
+        lambda p: p["elements"][0]["provenance"][0].update(page_number=2)
+    ) == [MSG_PROVENANCE_UNKNOWN_PAGE]
+    mismatched_parent_ref = lambda p: p["elements"][1].update(parent_ref="#/texts/1")
+    assert findings_for(mismatched_parent_ref) == [MSG_PARENT_REF_MISMATCH]
     reversed_range = lambda p: p["elements"][0]["provenance"][0].update(char_start=10, char_end=5)
     assert findings_for(reversed_range) == [MSG_CHAR_RANGE_REVERSED]
+
+
+def test_page_membership_and_empty_pages_are_accepted():
+    """Groups and cross-page elements are not page-membership violations."""
+    assert findings_for(lambda p: p["pages"][0]["element_ids"].remove("a")) == []
+    assert findings_for(lambda p: p["elements"][1].update(parent_ref="#/texts/0")) == []
+
+
+def test_an_element_only_document_is_accepted():
+    """With no page descriptors, the page numbers are trusted rather than checked."""
+    data = payload()
+    data["pages"] = []
+    document = structured_document_from_payload(data)
+
+    assert validate_structured_document(document) == []
 
 
 def test_long_parent_chains_are_acyclic():
