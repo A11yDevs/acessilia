@@ -43,9 +43,6 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
-from urllib.parse import urlsplit
-
-import httpx
 
 from acessilia_sdk.toolbox.artifacts import ARTIFACT_ID_RE
 from acessilia_sdk.toolbox.capabilities import (
@@ -190,24 +187,6 @@ def _dataset_parser(commands) -> None:
     sample.add_argument("--n", type=_count(1), default=5, help="sample size (default 5)")
     sync = route("sync", "re-mirror a dataset's artifacts in the Toolbox")
     sync.add_argument("--split", help="only this split")
-
-
-def _endpoints(urls: Sequence[str]) -> tuple[ToolboxEndpoint, ...]:
-    """The endpoints, each also accepted by the HTTP client, or ``ValueError``.
-
-    ``ToolboxEndpoint`` checks the scheme and the host. A port that is not a
-    number makes httpx fail only when a client is built, and one out of range
-    (``:99999``) only when it connects. Checking both here keeps every unusable
-    URL an invalid argument, reported before any request.
-    """
-    endpoints = parse_endpoints(urls)
-    for endpoint in endpoints:
-        try:
-            httpx.URL(endpoint.base_url)
-            urlsplit(endpoint.base_url).port
-        except (httpx.InvalidURL, ValueError) as exc:
-            raise ValueError(f"unusable endpoint {endpoint.base_url!r}: {exc}") from exc
-    return endpoints
 
 
 def _read_api_key(path: str | None, stdin: TextIO) -> str:
@@ -447,7 +426,7 @@ def main(
         if args.timeout is not None and args.timeout <= 0:
             raise ValueError("--timeout must be positive")
         ctx = _Context(
-            _endpoints(args.endpoint),
+            parse_endpoints(args.endpoint),
             _read_api_key(args.api_key_file, stdin),
             args.timeout,
             stdout,

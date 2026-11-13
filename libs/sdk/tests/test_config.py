@@ -50,6 +50,38 @@ def test_a_malformed_url_fails_loudly():
         ToolboxClientConfig(endpoints="localhost:8002")
 
 
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://toolbox.test:bad",
+        "http://toolbox.test:bad/",
+        "http://toolbox.test:99999",
+        "http://toolbox.test:99999/",
+    ],
+)
+def test_a_port_httpx_cannot_use_fails_loudly(base_url):
+    with pytest.raises(ValueError, match="port between 0 and 65535"):
+        ToolboxEndpoint(base_url)
+
+
+@pytest.mark.parametrize(
+    ("base_url", "normalized"),
+    [
+        ("http://toolbox.test:0", "http://toolbox.test:0"),
+        ("http://toolbox.test:0/", "http://toolbox.test:0"),
+        ("http://toolbox.test:65535", "http://toolbox.test:65535"),
+        ("http://toolbox.test:65535/", "http://toolbox.test:65535"),
+    ],
+)
+def test_the_port_range_boundaries_are_accepted(base_url, normalized):
+    assert ToolboxEndpoint(base_url).base_url == normalized
+
+
+def test_a_config_rejects_an_invalid_port_before_any_client():
+    with pytest.raises(ValueError, match="port between 0 and 65535"):
+        ToolboxClientConfig(endpoints="http://toolbox.test:99999")
+
+
 def test_the_config_is_read_only():
     providers = {"toolbox_ocr_provider": "mineru-ocr"}
     config = ToolboxClientConfig(endpoints=PRIMARY, providers=providers)

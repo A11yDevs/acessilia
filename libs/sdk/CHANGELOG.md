@@ -7,6 +7,12 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Changed** `ToolboxEndpoint` now rejects, at construction, a base URL whose
+  port is not a number or is outside 0–65535, and any URL `httpx` cannot parse,
+  with `ValueError`. A misconfigured `TOOLBOX_BASE_URL` is then reported by the
+  availability gate as an unavailable Toolbox instead of surfacing later as
+  `httpx.InvalidURL`; the command line's own port check is gone because
+  `parse_endpoints` now covers it (#438).
 - **Added** `page_judgement_probability(document)` in
   `acessilia_sdk.toolbox.clients.adjudicate`: the `pB` of a
   `document.adjudicate.page` answer as a float in [0, 1], or `None` when it is

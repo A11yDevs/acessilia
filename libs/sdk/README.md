@@ -86,8 +86,9 @@ The primary way to stay available is **one** `base_url` pointing at a load
 balancer in front of stateless Toolbox replicas that share the artifact store
 (MinIO) and cache (Valkey): artifact ids stay valid whichever replica answers.
 Operations never fall back to running locally. A `base_url` must be an absolute
-`http(s)` URL; anything else raises `ValueError` when the client is built,
-instead of looking like an outage later.
+`http(s)` URL that `httpx` can parse, with a port between 0 and 65535 when one
+is given; anything else raises `ValueError` when the endpoint or the client is
+built, instead of looking like an outage later.
 
 On top of that, the client offers:
 

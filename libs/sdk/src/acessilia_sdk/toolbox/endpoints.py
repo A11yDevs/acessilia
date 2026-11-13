@@ -15,6 +15,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+import httpx
+
 from acessilia_sdk.toolbox.errors import (
     ToolboxError,
     ToolboxProviderUnavailable,
@@ -49,6 +51,19 @@ class ToolboxEndpoint:
             raise ValueError(
                 f"Toolbox base_url must be an absolute http(s) URL, got {self.base_url!r}"
             )
+        try:
+            parts.port
+        except ValueError as exc:
+            raise ValueError(
+                "Toolbox base_url must have a port between 0 and 65535, "
+                f"got {self.base_url!r}"
+            ) from exc
+        try:
+            httpx.URL(normalized)
+        except httpx.InvalidURL as exc:
+            raise ValueError(
+                f"Toolbox base_url must be a URL httpx accepts, got {self.base_url!r}"
+            ) from exc
         object.__setattr__(self, "base_url", normalized)
 
 

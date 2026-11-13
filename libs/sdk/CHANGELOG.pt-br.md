@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Alterado** `ToolboxEndpoint` agora recusa, na construção, um `base_url` cuja
+  porta não é numérica ou está fora de 0–65535, e qualquer URL que o `httpx`
+  não consiga interpretar, com `ValueError`. Um `TOOLBOX_BASE_URL` mal
+  configurado passa a ser reportado pelo gate de disponibilidade como Toolbox
+  indisponível, em vez de surgir depois como `httpx.InvalidURL`; a checagem de
+  porta própria da linha de comando saiu, porque `parse_endpoints` já a cobre
+  (#438).
 - **Adicionado** `page_judgement_probability(document)` em
   `acessilia_sdk.toolbox.clients.adjudicate`: o `pB` de uma resposta do
   `document.adjudicate.page` como float em [0, 1], ou `None` quando ausente,

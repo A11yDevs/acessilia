@@ -58,6 +58,16 @@ def test_a_blank_list_falls_back_to_base_url(monkeypatch, blank):
     assert toolbox_endpoints() == (ToolboxEndpoint(PRIMARY),)
 
 
+@pytest.mark.parametrize(
+    "base_url", ["http://toolbox.test:bad", "http://toolbox.test:99999"]
+)
+def test_a_port_httpx_cannot_use_is_a_value_error(monkeypatch, base_url):
+    monkeypatch.setattr(settings, "toolbox_base_url", base_url)
+
+    with pytest.raises(ValueError, match="port between 0 and 65535"):
+        toolbox_endpoints()
+
+
 def test_a_malformed_entry_in_the_list_fails_loudly(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},localhost:8002")
 

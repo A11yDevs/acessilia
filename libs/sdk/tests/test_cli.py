@@ -759,7 +759,7 @@ def test_an_unreachable_toolbox_is_typed_in_a_fresh_interpreter() -> None:
 
 
 def test_an_invalid_port_is_a_usage_error_from_the_command_line_too() -> None:
-    """Before #437's review this ended in an httpx.InvalidURL traceback, exit 1."""
+    """The endpoint check rejects it before any request, with no traceback."""
     result = subprocess.run(
         [sys.executable, "-c", _BLOCKED % str(SRC), "--endpoint", "http://toolbox.test:bad", "catalog"],
         capture_output=True,
@@ -767,5 +767,7 @@ def test_an_invalid_port_is_a_usage_error_from_the_command_line_too() -> None:
         timeout=60,
     )
     assert result.returncode == 2
-    assert result.stderr.startswith("error: unusable endpoint 'http://toolbox.test:bad'")
+    assert result.stderr.startswith(
+        "error: Toolbox base_url must have a port between 0 and 65535"
+    )
     assert "Traceback" not in result.stderr
