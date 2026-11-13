@@ -26,6 +26,8 @@ from backend.agents.pddl_orchestrator import (
     PddlAccessibilityOrchestrator,
 )
 from backend.core.pipeline.handlers import content as content_handlers
+from backend.core.pipeline.handlers import fusion as fusion_handlers
+from backend.core.pipeline.handlers import order as order_handlers
 from backend.core.pipeline.handlers import review as review_handlers
 from backend.core.pipeline.handlers import text as text_handlers
 from backend.core.pipeline.handlers.content import (
@@ -151,6 +153,10 @@ class TestRegistryWiring:
         "deterministic-heading-repair": (
             text_handlers._handle_deterministic_heading_repair_method
         ),
+        "table-smart-fusion": fusion_handlers._handle_table_smart_fusion_method,
+        "agreement-rule": fusion_handlers._handle_agreement_rule_method,
+        "skeleton-order": order_handlers._handle_skeleton_order_method,
+        "xycut-order": order_handlers._handle_xycut_order_method,
     }
 
     @pytest.mark.parametrize("method", sorted(MOVED))
@@ -165,6 +171,10 @@ class TestRegistryWiring:
     def test_human_review_is_the_review_handler(self) -> None:
         registry = PddlAccessibilityOrchestrator._build_executor().registry
         assert registry.get("human-review") is review_handlers._handle_human_review_method
+
+    def test_single_provider_is_the_fusion_handler(self) -> None:
+        registry = PddlAccessibilityOrchestrator._build_executor().registry
+        assert registry.get("single-provider") is fusion_handlers._handle_single_provider_method
 
 
 class TestXycutOrder:

@@ -242,6 +242,19 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/core/pipeline/handlers/content.py", "Nenhum bloco de código encontrado para a obrigação"),
     ("backend/core/pipeline/handlers/content.py", "Código normalizado em"),
     ("backend/core/pipeline/handlers/review.py", "Escalonado para revisão humana"),
+    ("backend/core/pipeline/handlers/fusion.py", "Obrigação sem página identificada para o roteador"),
+    ("backend/core/pipeline/handlers/fusion.py", "Roteador por página escolhe o provider secundário"),
+    ("backend/core/pipeline/handlers/fusion.py", "a troca de página não é aplicada automaticamente"),
+    ("backend/core/pipeline/handlers/fusion.py", "Roteador por página mantém o provider primário"),
+    ("backend/core/pipeline/handlers/fusion.py", "single-provider só é válido para fuse-providers"),
+    ("backend/core/pipeline/handlers/order.py", "Esqueleto do provider secundário não casou com a página"),
+    ("backend/core/pipeline/handlers/order.py", "aplicada nas páginas"),
+    ("backend/core/pipeline/handlers/order.py", "confirmada nas páginas"),
+    ("backend/core/pipeline/handlers/order.py", "XY-cut não identificou uma mudança de ordem de leitura"),
+    # The four results that say why the secondary extraction cannot be used.
+    ("backend/core/pipeline/secondary.py", "Extração do provider secundário"),
+    # An operator log line, not a result; #410 moves it to backend/log_messages.py.
+    ("backend/core/pipeline/secondary.py", "Extração secundária {} não confere com o sha256 registrado"),
     # Legacy Unicode repair — user-facing execution messages and observations
     ("backend/core/pipeline/handlers/text.py", "Nenhum texto elegível para reparo Unicode"),
     ("backend/core/pipeline/handlers/text.py", "Reparo Unicode aplicado em"),

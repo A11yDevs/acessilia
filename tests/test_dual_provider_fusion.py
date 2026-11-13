@@ -11,8 +11,8 @@ import pytest
 from backend.agents.pddl_orchestrator import (
     PddlAccessibilityOrchestrator,
     _handle_dual_provider_fusion_method,
-    _handle_single_provider_method,
 )
+from backend.core.pipeline.handlers.fusion import _handle_single_provider_method
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.manifest.models import (
     ExtractorRun,

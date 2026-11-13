@@ -1,7 +1,8 @@
 """Pairing a manifest element with a secondary provider's block (#402).
 
-Characterization of the orchestrator's ``_pair_block``, written on develop
-before its matching rule moved to docstruct. The skeleton order and the table
+Characterization of ``_pair_block`` (now in ``backend/core/pipeline/secondary.py``),
+written on develop, when it was the orchestrator's, before its matching rule
+moved to docstruct. The skeleton order and the table
 fusion call it; tests/test_provider_choice_methods.py covers them end to end.
 """
 
@@ -9,7 +10,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _SecondaryExtraction, _pair_block
+from backend.core.pipeline.secondary import (
+    _SecondaryExtraction,
+    _pair_block,
+)
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
 

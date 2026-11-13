@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _SecondaryExtraction
+from backend.core.pipeline.secondary import _SecondaryExtraction
 from backend.core.pipeline.elements import _element_bbox as orchestrator_bbox
 from docstruct.geometry.boxes import best_effort_clip
 from backend.core.manifest.builder import (
