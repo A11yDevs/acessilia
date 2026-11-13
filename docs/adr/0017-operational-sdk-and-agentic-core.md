@@ -159,7 +159,11 @@ Proposed: option 2.
   - a check that the Toolbox's docstruct pin follows the core's release, or
     shared fixtures both test against (#470's P8). The pin check is done
     (#498); shared fixtures are still open;
-  - the formula chain in the SDK (the acceptance evidence above);
+  - the formula chain in the SDK (the acceptance evidence above). The
+    operation is `acessilia_sdk.operations.formula` (#504); the core's formula
+    crop and recognition call its steps, keeping the saved crop, the source
+    check, the failure handling and the outage flag (phase 3 of #470). MathML
+    and speech follow, then the comparison of case 036's manifests;
   - the other operations of the inventory, one per pull request, each with
     characterization and a comparison of the manifests before and after.
 - **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into

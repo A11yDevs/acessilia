@@ -161,7 +161,12 @@ Proposta: a opção 2.
     a release do core, ou fixtures compartilhadas contra as quais os dois
     testam (P8 da #470). A verificação do pin está feita (#498); as fixtures
     compartilhadas continuam em aberto;
-  - a cadeia de fórmula no SDK (a evidência acima);
+  - a cadeia de fórmula no SDK (a evidência acima). A operação é o
+    `acessilia_sdk.operations.formula` (#504); o recorte e o reconhecimento de
+    fórmulas do core chamam os passos dela, mantendo o recorte salvo, a
+    checagem da fonte, o tratamento de falhas e a marca de indisponibilidade
+    (fase 3 da #470). O MathML e a fala vêm em seguida, e depois a comparação
+    dos manifestos do caso 036;
   - as outras operações do inventário, uma por pull request, cada uma com
     caracterização e comparação dos manifestos antes e depois.
 - **Relação com a ADR-0016.** O passo 6 da fase 3 da #402 não leva para

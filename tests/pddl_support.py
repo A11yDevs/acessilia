@@ -110,3 +110,20 @@ def build_orchestrator(*, max_replans: int = 0) -> PddlAccessibilityOrchestrator
     orchestrator.max_replans = max_replans
     orchestrator.planner = PlannerAgent()
     return orchestrator
+
+
+def install_formula_recognizer(monkeypatch, answer) -> None:
+    """Stand in for ``toolbox_recognize_formula`` with a provider ``answer(image, **kwargs)``.
+
+    The real function returns the SDK's ``recognize_formula`` candidates: the
+    provider's formulas ranked by ``ranked_latex_candidates``. The stand-in
+    applies the same ranking, so a test states what the provider said.
+    """
+    from docstruct.text.latex import ranked_latex_candidates
+
+    from backend.agents import pddl_orchestrator
+
+    def recognize(image, **kwargs):
+        return ranked_latex_candidates(answer(image, **kwargs))
+
+    monkeypatch.setattr(pddl_orchestrator, "toolbox_recognize_formula", recognize)

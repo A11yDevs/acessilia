@@ -249,6 +249,22 @@ async def test_a_refused_crop_raises_invalid_input(respx_mock, math) -> None:
         await recognize_formula(math, PNG)
 
 
+@pytest.mark.asyncio
+async def test_the_temporary_crop_is_removed_even_when_recognition_fails(
+    respx_mock, math, monkeypatch, tmp_path
+) -> None:
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    respx_mock.post(f"{BASE}/v1/capabilities/math.recognize:execute").mock(
+        return_value=httpx.Response(503, json={"detail": "down"})
+    )
+
+    with pytest.raises(ToolboxProviderUnavailable):
+        await recognize_formula(math, PNG)
+    assert list(tmp_path.iterdir()) == []
+
+
 # --- speak -----------------------------------------------------------------
 
 

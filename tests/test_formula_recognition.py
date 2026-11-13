@@ -11,7 +11,6 @@ leaving the formula without content.
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 from typing import ClassVar
 
 import pytest
@@ -20,7 +19,7 @@ from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from backend.agents import pddl_orchestrator as pddl
 from docstruct.text.latex import ranked_latex_candidates
 from backend.agents.output_schemas import VisionOutput
-from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from backend.core.manifest.models import ManifestElement
 from backend.i18n import t
 from backend.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
@@ -34,6 +33,7 @@ from backend.stage_messages import (
 )
 from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
 from tests.pddl_support import (
+    install_formula_recognizer,
     build_element,
     build_manifest,
     build_obligation,
@@ -110,7 +110,7 @@ async def test_formula_crop_is_recognized_by_math_recognize(monkeypatch, cropped
         calls.append((image, raise_on_unavailable))
         return [{"latex": "$E=mc^2$", "confidence": 0.97}]
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -136,7 +136,7 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
             "math.recognize", ToolboxProviderUnavailable("offline")
         )
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -165,8 +165,8 @@ def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
 @pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
 async def test_recognition_separates_equation_number(monkeypatch, cropped, suffix):
     manifest = _formula_manifest()
-    monkeypatch.setattr(
-        pddl, "toolbox_recognize_formula",
+    install_formula_recognizer(
+        monkeypatch,
         lambda image, **kwargs: [{"latex": r"x=\frac{a}{b}" + suffix}],
     )
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
@@ -178,8 +178,8 @@ async def test_recognition_separates_equation_number(monkeypatch, cropped, suffi
 @pytest.mark.asyncio
 async def test_source_equation_number_survives_unlabelled_recognition(monkeypatch, cropped):
     manifest = _formula_manifest("x = a / b (7)")
-    monkeypatch.setattr(
-        pddl, "toolbox_recognize_formula",
+    install_formula_recognizer(
+        monkeypatch,
         lambda image, **kwargs: [{"latex": r"x=\frac{a}{b}"}],
     )
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
@@ -192,7 +192,7 @@ async def test_source_equation_number_survives_unlabelled_recognition(monkeypatc
 @pytest.mark.asyncio
 async def test_vision_equation_number_is_preserved(monkeypatch, cropped):
     manifest = _formula_manifest()
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+    install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
     FakeVision.output = VisionOutput(
         kind="formula", formula_latex=r"x=\frac{a}{b}\tag{2}",
         language="und", confidence=0.8,
@@ -211,7 +211,7 @@ async def test_existing_latex_separates_label_without_recognition(monkeypatch):
     def unexpected(*args, **kwargs):
         pytest.fail("Existing LaTeX must not invoke recognition")
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    install_formula_recognizer(monkeypatch, unexpected)
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     assert manifest.elements[0].text == r"x=\frac{a}{b}"
     assert manifest.elements[0].metadata["equation_number"] == "3"
@@ -236,7 +236,7 @@ async def test_a_latex_label_alone_still_marks_the_formula_as_latex(monkeypatch)
     def unexpected(*args, **kwargs):
         pytest.fail("Existing LaTeX must not invoke recognition")
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    install_formula_recognizer(monkeypatch, unexpected)
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     assert manifest.elements[0].text == "x=y"
     assert manifest.elements[0].metadata["equation_number"] == "1"
@@ -328,7 +328,7 @@ async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
             "math.recognize", ToolboxProviderUnavailable("offline")
         )
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
     records, sink = _capture_logs("DEBUG")
     try:
         await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
@@ -357,7 +357,7 @@ async def test_an_outage_is_paid_once_per_document(monkeypatch, cropped):
             "math.recognize", ToolboxProviderUnavailable("offline")
         )
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -385,7 +385,7 @@ async def test_an_outage_after_the_first_formula_falls_back_to_vision(monkeypatc
             "math.recognize", ToolboxProviderUnavailable("offline")
         )
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -406,7 +406,7 @@ async def test_formulas_that_already_have_latex_are_left_alone(monkeypatch, crop
         calls.append(image)
         return []
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -426,7 +426,7 @@ async def test_a_formula_without_a_crop_is_skipped(monkeypatch):
     def unexpected(*args, **kwargs):
         pytest.fail("recognition must not run without a crop")
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", unexpected)
+    install_formula_recognizer(monkeypatch, unexpected)
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -441,9 +441,8 @@ async def test_a_vision_description_reclassifies_the_formula(monkeypatch, croppe
         kind="description", description="A chart", language="en", confidence=0.9
     )
 
-    monkeypatch.setattr(
-        pddl,
-        "toolbox_recognize_formula",
+    install_formula_recognizer(
+        monkeypatch,
         lambda image, **kwargs: [{"latex": "", "confidence": 0.1}],
     )
 
@@ -487,9 +486,8 @@ def test_a_confidence_that_is_not_a_finite_number_ranks_as_none():
 @pytest.mark.asyncio
 async def test_formula_progress_reports_the_stage_and_each_formula(monkeypatch, cropped):
     manifest = _formula_manifest(None, None)
-    monkeypatch.setattr(
-        pddl,
-        "toolbox_recognize_formula",
+    install_formula_recognizer(
+        monkeypatch,
         lambda image, **kwargs: [{"latex": "x", "confidence": 1.0}],
     )
     messages: list[str] = []
@@ -517,140 +515,6 @@ async def test_formula_progress_reports_the_stage_and_each_formula(monkeypatch, 
     assert sorted(messages[1:]) == sorted(expected)
 
 
-def _formula_with_bbox(*, page_number: int = 1) -> ManifestElement:
-    element = build_element("formula-0", "formula")
-    element.provenance = [
-        Provenance(
-            page_number=page_number,
-            bbox=BoundingBox(
-                left=10,
-                top=20,
-                right=110,
-                bottom=70,
-                coord_origin="TOPLEFT",
-            ),
-        )
-    ]
-    return element
-
-
-def _rendered_page(*, image: bytes = b"rendered", clip=(10, 20, 110, 70)):
-    return SimpleNamespace(image=image, clip=clip)
-
-
-def test_a_saved_region_crop_is_reused_without_render(tmp_path, monkeypatch):
-    crop = tmp_path / "crop.png"
-    crop.write_bytes(b"saved-crop")
-    element = _formula_with_bbox()
-    element.metadata["region_crop"] = str(crop)
-
-    def unexpected(*args, **kwargs):
-        pytest.fail("a saved crop must not be rendered again")
-
-    monkeypatch.setattr(pddl, "_toolbox_render", unexpected)
-
-    assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (
-        b"saved-crop",
-        1,
-    )
-
-
-def test_an_unreadable_saved_crop_falls_back_to_the_render(tmp_path, monkeypatch):
-    element = _formula_with_bbox()
-    element.metadata["region_crop"] = str(tmp_path / "missing.png")
-    calls = []
-
-    def render(*args, **kwargs):
-        calls.append((args, kwargs))
-        return _rendered_page()
-
-    monkeypatch.setattr(pddl, "_toolbox_render", render)
-
-    assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (
-        b"rendered",
-        1,
-    )
-    assert len(calls) == 1
-
-
-def test_a_formula_without_a_page_is_not_rendered(monkeypatch):
-    element = build_element("formula-0", "formula")
-    element.page_number = None
-
-    def unexpected(*args, **kwargs):
-        pytest.fail("a formula without a page has nothing to render")
-
-    monkeypatch.setattr(pddl, "_toolbox_render", unexpected)
-
-    assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (None, 0)
-
-
-def test_a_formula_without_a_box_is_not_rendered(monkeypatch):
-    element = build_element("formula-0", "formula")
-    element.provenance = [Provenance(page_number=1, bbox=None)]
-
-    def unexpected(*args, **kwargs):
-        pytest.fail("a formula without a box must not fall back to the whole page")
-
-    monkeypatch.setattr(pddl, "_toolbox_render", unexpected)
-
-    assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (None, 1)
-
-
-def test_the_page_region_is_rendered_with_the_expected_arguments(monkeypatch):
-    element = _formula_with_bbox()
-    calls = []
-
-    def render(*args, **kwargs):
-        calls.append((args, kwargs))
-        return _rendered_page()
-
-    monkeypatch.setattr(pddl, "_toolbox_render", render)
-
-    image, page_number = pddl._formula_recognition_crop(
-        Path("/tmp/doc.pdf"),
-        element,
-        artifact_id="artifact-source",
-        media_type="application/pdf",
-    )
-
-    assert (image, page_number) == (b"rendered", 1)
-    assert calls == [
-        (
-            (Path("/tmp/doc.pdf"), 1),
-            {
-                "media_type": "application/pdf",
-                "dpi": 200,
-                "clip": (10.0, 20.0, 110.0, 70.0),
-                "clip_origin": "TOPLEFT",
-                "artifact_id": "artifact-source",
-            },
-        )
-    ]
-
-
-def test_a_sliver_of_a_region_is_not_a_formula_crop(monkeypatch):
-    element = _formula_with_bbox()
-    monkeypatch.setattr(
-        pddl,
-        "_toolbox_render",
-        lambda *args, **kwargs: _rendered_page(clip=(10, 20, 12, 70)),
-    )
-
-    assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (None, 1)
-
-
-def test_a_failed_render_leaves_the_formula_without_a_crop(monkeypatch):
-    element = _formula_with_bbox()
-
-    def failed(*args, **kwargs):
-        raise ValueError("pdf.render refused the box")
-
-    monkeypatch.setattr(pddl, "_toolbox_render", failed)
-
-    assert pddl._formula_recognition_crop(Path("/tmp/doc.pdf"), element) == (None, 1)
-
-
 TEXT_LAYER = "s(t) = s0 + v0t + 1\n2\nat2, t > 0,"
 FAITHFUL = r"s(t) = s_0 + v_0 t + \frac{1}{2} a t^2, \quad t > 0,"
 MISREAD = r"x^2 + y^2 = 1"
@@ -663,7 +527,7 @@ def _recognizer(monkeypatch, latex):
         calls.append(image)
         return [{"latex": latex}]
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
     return calls
 
 
@@ -786,7 +650,7 @@ def _recognizer_answers(monkeypatch, candidates):
         calls.append(image)
         return candidates
 
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
     return calls
 
 
@@ -897,7 +761,7 @@ async def test_a_misconfigured_recognizer_fails_the_enrichment_visibly(monkeypat
 async def test_a_failed_vision_fallback_leaves_the_formula_and_records_nothing(monkeypatch, cropped):
     manifest = _formula_manifest()
     FakeVision.output = None
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+    install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -912,7 +776,7 @@ async def test_an_uncertain_description_does_not_reclassify(monkeypatch, cropped
     manifest = _formula_manifest()
     FakeVision.output = VisionOutput(kind="description", description="A chart", language="en",
                                      confidence=0.4, classification_uncertain=True)
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+    install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
@@ -926,7 +790,7 @@ async def test_an_uncertain_description_does_not_reclassify(monkeypatch, cropped
 async def test_a_vision_reading_records_its_method_and_confidence(monkeypatch, cropped):
     manifest = _formula_manifest()
     FakeVision.output = VisionOutput(kind="formula", formula_latex="$$x+1$$", language="en", confidence=0.6)
-    monkeypatch.setattr(pddl, "toolbox_recognize_formula", lambda image, **kwargs: [])
+    install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
 
     await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 

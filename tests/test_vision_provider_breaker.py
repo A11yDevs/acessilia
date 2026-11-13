@@ -24,6 +24,7 @@ from backend.agents.provider_breaker import ProviderBreaker
 from backend.config.settings import settings
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
+from tests.pddl_support import install_formula_recognizer
 
 _DESCRIPTION = VisionOutput(
     kind="description",
@@ -345,7 +346,7 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
         recognize_calls.append(image)
         return []
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.toolbox_recognize_formula", recognize)
+    install_formula_recognizer(monkeypatch, recognize)
     monkeypatch.setattr(
         "backend.agents.pddl_orchestrator._formula_recognition_crop",
         lambda *_args, **_kwargs: (b"png", 1),
