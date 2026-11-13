@@ -110,8 +110,11 @@ finally:
 canonical = payload_to_canonical(result)
 ```
 
-Notebook completo com a experimentação:
-[notebooks/drdocbench/comparativo_docling_mineru.ipynb](notebooks/drdocbench/comparativo_docling_mineru.ipynb)
+The full experiment is reproduced with the benchmark harness:
+[Benchmark harness](bench.md) (`python -m scripts.bench download|run|score`).
+The old onboarding and comparison notebooks were retired together with the
+`scripts/drbench` pipeline and `ToolboxClient` they imported; `docs/bench.md` is
+the maintained entry point.
 
 ## Integração do MinerU na Toolbox
 
@@ -161,7 +164,7 @@ benchmark preset is a default. Both results are frozen in
 
 ## Relacionados
 
-- [Notebook de onboarding Dr.DocBench](notebooks/drdocbench/initial.ipynb)
+- [Benchmark harness](bench.md) — download, run and score Dr.DocBench
 - [Architecture](architecture.md) — pipeline canônico
 - [PMV Agno + PDDL](pmv_agno_pddl.md) — orquestração
 - [Runbook de reprodução](drbench/experiments/RUNBOOK.md) — retomar os testes de performance
