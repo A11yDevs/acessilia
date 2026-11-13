@@ -7,6 +7,7 @@ explícita, sem conversão local.
 
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 
 from backend.export.renderers.html_renderer import _render_block as render_html_block
@@ -175,6 +176,60 @@ def test_unavailable_capabilities_are_reported_once(monkeypatch):
     assert len(warnings) == 2
     assert any("math.convert" in w and "ToolboxProviderUnavailable" in w for w in warnings)
     assert any("math.verbalize" in w for w in warnings)
+
+
+def _broken_then_good(respx_mock, capability: str, key: str, good: str):
+    """``math.{capability}`` answers ``{key: null}`` (outside the contract), then ``good``."""
+    from backend.config.settings import settings
+
+    answers = iter([{key: None}, {key: good}, {key: good}])
+    return respx_mock.post(
+        f"{settings.toolbox_base_url.rstrip('/')}/v1/capabilities/math.{capability}:execute"
+    ).mock(side_effect=lambda request: httpx.Response(
+        200, json={"status": "succeeded", "document": next(answers)}
+    ))
+
+
+def test_an_answer_outside_the_contract_turns_the_capability_off_for_the_document(respx_mock):
+    """A broken answer is a broken provider: the rest of the document skips it, and says why.
+
+    Declared in #470 phase 3 (PR 3): on develop, ``mathml: null`` left only that
+    formula without MathML and the next one was converted.
+    """
+    from backend.pipeline import canonical_builder
+
+    convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
+    verbalize = _broken_then_good(respx_mock, "verbalize", "verbalized", "x igual a 1")
+    verbalize.mock(return_value=httpx.Response(
+        200, json={"status": "succeeded", "document": {"verbalized": "x igual a 1"}}
+    ))
+
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$")
+
+    blocks = [b for s in document["sections"] for b in s.get("blocks", []) if b.get("type") == "math"]
+    assert convert.call_count == 1
+    assert all("mathml" not in b.get("metadata", {}) for b in blocks)
+    # The other capability is not affected.
+    assert verbalize.call_count == 2
+    assert all(b.get("alt_text") for b in blocks)
+    assert any(
+        "math.convert" in w and "ToolboxContractViolation" in w
+        for w in document["technical_warnings"]
+    )
+
+
+def test_an_answer_outside_the_contract_fails_the_mathml_handler(respx_mock):
+    from backend.agents.pddl_orchestrator import _handle_mathml_method
+
+    convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
+    manifest = _manifest_with_formulas("x=1", "y=2")
+
+    result = _handle_mathml_method(manifest, "o-f")
+
+    assert not result.success
+    assert "ToolboxContractViolation" in result.message
+    assert convert.call_count == 1
+    assert all("mathml" not in element.metadata for element in manifest.elements)
 
 
 # ── renderers ──

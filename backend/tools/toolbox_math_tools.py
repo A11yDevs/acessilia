@@ -75,7 +75,9 @@ async def _recognize_formula_async(image_bytes: bytes) -> list[dict[str, Any]]:
 class MathCapabilityUnavailable(RuntimeError):
     """``math.convert`` or ``math.verbalize`` could not serve a request.
 
-    Raised for an unreachable, failing or misconfigured Toolbox, never for an
+    Raised for an unreachable, failing or misconfigured Toolbox, or for an
+    answer outside the contract (``reason`` ``ToolboxContractViolation``: a
+    broken provider, not a formula without that text), never for an
     expression the Toolbox rejected. ADR-0007 forbids a silent local fallback:
     the caller decides between failing, replanning and a documented
     degradation. ``reason`` is the SDK error class, safe to show; the message

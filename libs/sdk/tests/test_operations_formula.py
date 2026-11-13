@@ -337,6 +337,30 @@ async def test_an_answer_outside_the_contract_raises(respx_mock, math, capabilit
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("document", [None, {"mathml": None}])
+async def test_speak_raises_an_answer_outside_the_contract_and_stops(
+    respx_mock, math, document
+) -> None:
+    routes = _mock_math(respx_mock)
+    routes["convert"].mock(
+        return_value=httpx.Response(200, json=_succeeded("math.convert", document))
+    )
+
+    with pytest.raises(ToolboxContractViolation):
+        await speak_formula(math, "x")
+    assert not routes["verbalize"].called
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_direction_is_refused_before_any_request(respx_mock, math) -> None:
+    route = respx_mock.post(f"{BASE}/v1/capabilities/math.convert:execute")
+
+    with pytest.raises(ValueError, match="direction"):
+        await convert_formula(math, "x", direction="latex-to-speech")
+    assert not route.called
+
+
+@pytest.mark.asyncio
 async def test_an_envelope_without_a_document_raises(respx_mock, math) -> None:
     respx_mock.post(f"{BASE}/v1/capabilities/math.convert:execute").mock(
         return_value=httpx.Response(200, json={"status": "succeeded", "capability": "math.convert"})

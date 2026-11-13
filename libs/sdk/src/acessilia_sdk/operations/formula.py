@@ -109,8 +109,8 @@ class FormulaText:
 class FormulaSpeech:
     """A formula as MathML and as spoken text.
 
-    An empty string is a formula the Toolbox could not convert or verbalize
-    (``ToolboxInvalidInput`` is raised instead when it refused the input).
+    An empty string is an answer without that text (see :class:`FormulaText`
+    for the refusals and the answers outside the contract, which raise).
     """
 
     mathml: str
@@ -210,6 +210,10 @@ async def recognize_formula(
     )
 
 
+#: The key of ``math.convert``'s answer that holds each direction's result.
+_DIRECTION_KEYS = {"latex-to-mathml": "mathml", "mathml-to-latex": "latex"}
+
+
 def _answer_text(envelope: dict[str, Any], key: str, capability: str) -> str:
     """The ``key`` of the answer's document; ``""`` when absent.
 
@@ -239,15 +243,19 @@ async def convert_formula(
     """``expression`` converted by ``math.convert``: LaTeX to MathML, or back.
 
     ``direction`` is ``latex-to-mathml`` (the answer's ``mathml``) or
-    ``mathml-to-latex`` (its ``latex``). See :class:`FormulaText` for what an
-    answer without that key, a refusal and an answer outside the contract give.
+    ``mathml-to-latex`` (its ``latex``); any other value is a ``ValueError``,
+    before any request. See :class:`FormulaText` for what an answer without
+    that key, a refusal and an answer outside the contract give.
     """
+    if direction not in _DIRECTION_KEYS:
+        raise ValueError(
+            f"direction must be one of {sorted(_DIRECTION_KEYS)}, not {direction!r}"
+        )
     envelope = await math.convert(
         expression, direction=direction, use_remote_cache=use_remote_cache
     )
-    key = "mathml" if direction == "latex-to-mathml" else "latex"
     return FormulaText(
-        _answer_text(envelope, key, CONVERT_CAPABILITY),
+        _answer_text(envelope, _DIRECTION_KEYS[direction], CONVERT_CAPABILITY),
         Step(CONVERT_CAPABILITY, math.transform_provider, {"direction": direction}),
     )
 
@@ -276,7 +284,9 @@ async def speak_formula(
 ) -> FormulaSpeech:
     """``latex`` as MathML and as spoken text: :func:`convert_formula`, then :func:`verbalize_formula`.
 
-    A refusal of either raises; a caller that wants the other one anyway
+    Either step's ``ToolboxInvalidInput`` (a refusal) or
+    ``ToolboxContractViolation`` (an answer outside the contract) is raised,
+    and the other step does not run; a caller that wants the other one anyway
     calls the two steps itself.
     """
     mathml = await convert_formula(math, latex, use_remote_cache=use_remote_cache)

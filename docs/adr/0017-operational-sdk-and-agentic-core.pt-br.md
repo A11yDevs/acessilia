@@ -168,8 +168,10 @@ Proposta: a opção 2.
     (fase 3 da #470). O MathML e a fala chamam os passos `convert_formula` e
     `verbalize_formula`, um por capacidade, e assim cada obrigação continua
     falhando sozinha; uma resposta fora do contrato passa a ser uma
-    capacidade indisponível, e não uma fórmula sem esse texto. Em seguida vem
-    a comparação dos manifestos do caso 036;
+    capacidade indisponível, e não uma fórmula sem esse texto; assim, o resto
+    do documento deixa de chamar essa capacidade, como depois de uma
+    indisponibilidade (uma resposta quebrada é tomada por um provider
+    quebrado). Em seguida vem a comparação dos manifestos do caso 036;
   - as outras operações do inventário, uma por pull request, cada uma com
     caracterização e comparação dos manifestos antes e depois.
 - **Relação com a ADR-0016.** O passo 6 da fase 3 da #402 não leva para

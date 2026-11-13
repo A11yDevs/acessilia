@@ -66,14 +66,30 @@ class TestMathTools:
         assert b"mathml-to-latex" in route.calls.last.request.content
 
     @respx.mock
-    @pytest.mark.parametrize("document", [None, {"mathml": None}, {"mathml": 5}])
-    def test_an_answer_outside_the_contract_is_an_unavailable_capability(self, document):
-        """Not a formula without MathML: the handler fails explicitly (P6, #470 phase 3)."""
-        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.convert:execute").mock(
-            return_value=httpx.Response(200, json={"status": "succeeded", "document": document})
+    @pytest.mark.parametrize(
+        ("capability", "envelope"),
+        [
+            ("convert", {"document": None}),
+            ("convert", {"document": []}),
+            ("convert", {}),
+            ("convert", {"document": {"mathml": None}}),
+            ("convert", {"document": {"mathml": 5}}),
+            ("verbalize", {"document": None}),
+            ("verbalize", {"document": []}),
+            ("verbalize", {}),
+            ("verbalize", {"document": {"verbalized": None}}),
+            ("verbalize", {"document": {"verbalized": ["x"]}}),
+        ],
+    )
+    def test_an_answer_outside_the_contract_is_an_unavailable_capability(self, capability, envelope):
+        """Not a formula without that text: the caller sees a broken provider (P6, #470 phase 3)."""
+        respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.{capability}:execute").mock(
+            return_value=httpx.Response(200, json={"status": "succeeded", **envelope})
         )
+        call = toolbox_convert_latex if capability == "convert" else toolbox_verbalize_latex
         with pytest.raises(MathCapabilityUnavailable) as excinfo:
-            toolbox_convert_latex("x")
+            call("x")
+        assert excinfo.value.capability == f"math.{capability}"
         assert excinfo.value.reason == "ToolboxContractViolation"
 
     @respx.mock

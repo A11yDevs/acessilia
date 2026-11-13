@@ -166,7 +166,9 @@ Proposed: option 2.
     and speech call its `convert_formula` and `verbalize_formula` steps, one
     per capability, so each obligation still fails on its own; an answer
     outside the contract is now an unavailable capability, not a formula
-    without that text. The comparison of case 036's manifests follows;
+    without that text, so the rest of the document skips that capability,
+    as after an outage (a broken answer is taken for a broken provider). The
+    comparison of case 036's manifests follows;
   - the other operations of the inventory, one per pull request, each with
     characterization and a comparison of the manifests before and after.
 - **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into

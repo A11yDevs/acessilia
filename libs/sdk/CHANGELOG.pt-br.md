@@ -11,14 +11,17 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   `acessilia_sdk.operations.formula`, um passo por capacidade (`math.convert`,
   nas duas direções, e `math.verbalize`), cada um devolvendo um `FormulaText`
   (o texto, `""` quando a resposta não traz nenhum, e o `Step` dele). O
-  `speak_formula` passa a rodar os dois; o resultado dele não muda. Quem trata
+  `speak_formula` passa a rodar os dois; o resultado dele não muda para
+  respostas dentro do contrato. Quem trata
   as duas capacidades separadamente, como o core, chama os passos (fase 3 da
   #470).
 - **Alterado** uma resposta do `math.convert` ou do `math.verbalize` fora do
   contrato (sem objeto `document`, ou com um valor que não é texto, `null`
   incluído) levanta `ToolboxContractViolation` nesses passos e no
   `speak_formula`, em vez de passar por uma fórmula sem esse texto. Uma
-  resposta cujo documento não traz a chave continua sendo `""`.
+  resposta cujo documento não traz a chave continua sendo `""`. O
+  `convert_formula` recusa uma `direction` diferente de `latex-to-mathml` e
+  `mathml-to-latex` com `ValueError`.
 
 - **Adicionado** `acessilia_sdk.operations.formula`, a primeira operação do SDK
   (ADR-0017, fase 3 da #470): `crop_formula_region` renderiza a caixa de uma

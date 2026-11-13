@@ -11,13 +11,15 @@ can see are recorded here, newest first.
   `acessilia_sdk.operations.formula`, one step per capability (`math.convert`,
   in either direction, and `math.verbalize`), each returning a `FormulaText`
   (the text, `""` when the answer has none, and its `Step`). `speak_formula`
-  now runs the two; its result is unchanged. A caller that handles the two
+  now runs the two; its result is unchanged for answers inside the contract. A caller that handles the two
   capabilities apart, like the core, calls the steps (#470, phase 3).
 - **Changed** an answer of `math.convert` or `math.verbalize` outside the
   contract (no document object, or a value that is not a string, `null`
   included) raises `ToolboxContractViolation` in these steps and in
   `speak_formula`, instead of passing for a formula without that text. An
-  answer whose document lacks the key is still `""`.
+  answer whose document lacks the key is still `""`. `convert_formula` refuses
+  a `direction` other than `latex-to-mathml` and `mathml-to-latex` with
+  `ValueError`.
 
 - **Added** `acessilia_sdk.operations.formula`, the SDK's first operation
   (ADR-0017, #470 phase 3): `crop_formula_region` renders a formula's box at
