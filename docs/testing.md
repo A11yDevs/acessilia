@@ -267,7 +267,9 @@ loop.
 
 `pytest-timeout` gives the core suite a 180-second per-test limit. The CPU-heavy
 VLM judge test raises its own limit to 300 seconds because four workers can
-stretch it on a busy machine. To debug a hang:
+stretch it on a busy machine. E2E is the other exception: its operations and job
+waits can legitimately exceed that limit, so the [E2E recipe](#i-need-e2e)
+passes `--timeout=900`. To debug a hang:
 
 ```bash
 uv run pytest --timeout=0 ...
@@ -325,8 +327,13 @@ E2E tests need a live environment and are excluded from the normal loop:
 ```bash
 TOOLBOX_BASE_URL=https://toolbox.example/toolbox \
 TOOLBOX_API_KEY="$TOOLBOX_API_KEY" \
-uv run pytest -m e2e -v
+uv run pytest -m e2e -v --timeout=900
 ```
+
+Pass `--timeout=900`. The E2E clients allow single operations of up to 300
+seconds, and `CORE_JOB_TIMEOUT` defaults to 600 seconds per processing wait, so
+the suite-wide 180-second limit would abort a valid test before its own timeout.
+The scheduled E2E job uses the same value.
 
 See [tests/README.md](../tests/README.md#end-to-end-tests) for the Core API
 variables and the optional dataset corpus. E2E is also a scheduled validation,

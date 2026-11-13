@@ -270,7 +270,10 @@ você passe `-m "not e2e"`; use os alvos do Makefile no ciclo normal.
 
 O `pytest-timeout` dá à suíte do core um limite de 180 segundos por teste. O
 teste CPU-heavy do juiz VLM eleva o próprio limite para 300 segundos porque
-quatro workers podem esticá-lo em uma máquina ocupada. Para depurar um travamento:
+quatro workers podem esticá-lo em uma máquina ocupada. O E2E é a outra exceção:
+suas operações e esperas de job podem exceder esse limite legitimamente, então a
+[receita de E2E](#preciso-de-e2e) passa `--timeout=900`. Para depurar um
+travamento:
 
 ```bash
 uv run pytest --timeout=0 ...
@@ -329,8 +332,14 @@ Testes E2E precisam de um ambiente real e ficam fora do ciclo normal:
 ```bash
 TOOLBOX_BASE_URL=https://toolbox.example/toolbox \
 TOOLBOX_API_KEY="$TOOLBOX_API_KEY" \
-uv run pytest -m e2e -v
+uv run pytest -m e2e -v --timeout=900
 ```
+
+Passe `--timeout=900`. Os clientes E2E admitem operações isoladas de até 300
+segundos, e o `CORE_JOB_TIMEOUT` tem padrão de 600 segundos por espera de
+processamento; o limite global de 180 segundos da suíte interromperia um teste
+válido antes do limite previsto pelo próprio teste. O job agendado de E2E usa o
+mesmo valor.
 
 Veja o [README dos testes](../tests/README.pt-br.md#testes-end-to-end) para as
 variáveis da API do Core e o corpus opcional. O E2E também é uma validação
