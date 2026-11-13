@@ -14,6 +14,7 @@ import fitz
 import pytest
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.handlers import inspection as inspection_handlers
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
@@ -57,7 +58,7 @@ def _record_crops(monkeypatch) -> list:
         crops.append(args)
         return None, 0
 
-    monkeypatch.setattr(pddl, "_formula_recognition_crop", crop)
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", crop)
     return crops
 
 
@@ -71,8 +72,8 @@ async def test_the_formula_steps_skip_a_source_the_toolbox_cannot_render(monkeyp
     manifest = _formula_manifest(media_type)
     breaker = pddl.ProviderBreaker(3)
 
-    await pddl._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker)
-    await pddl._enrich_formula_latex(manifest, Path("source.x"), mode="medio", breaker=breaker)
+    await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker)
+    await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", breaker=breaker)
 
     assert crops == []
     assert manifest.elements[0].text == "placeholder"
@@ -84,7 +85,7 @@ async def test_the_formula_classification_asks_for_a_crop_of_a_renderable_source
     crops = _record_crops(monkeypatch)
     manifest = _formula_manifest(media_type)
 
-    await pddl._classify_formula_regions(manifest, Path("source.x"), mode="medio",
-                                         breaker=pddl.ProviderBreaker(3))
+    await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio",
+                                                  breaker=pddl.ProviderBreaker(3))
 
     assert len(crops) == 1

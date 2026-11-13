@@ -17,7 +17,7 @@ import pytest
 
 from backend.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.pipeline.enrichment import common as enrichment_common
-from backend.agents.pddl_orchestrator import _enrich_formula_latex
+from backend.core.pipeline.enrichment.formulas import _enrich_formula_latex
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.agents.provider_breaker import ProviderBreaker
@@ -78,7 +78,7 @@ def _vision(monkeypatch, answers, failure: str = "TimeoutError: no answer"):
                 errors.append(failure)
             return answer
 
-    monkeypatch.setattr("backend.agents.pddl_orchestrator.VisionAgent", FakeVision)
+    monkeypatch.setattr("backend.core.pipeline.enrichment.formulas.VisionAgent", FakeVision)
     monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FakeVision)
     # Pictures and tables crop through two modules now; the tests that run both
     # stages, or the formula fallback, need the fakes in both.
@@ -348,7 +348,7 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
 
     install_formula_recognizer(monkeypatch, recognize)
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._formula_recognition_crop",
+        "backend.core.pipeline.enrichment.formulas._formula_recognition_crop",
         lambda *_args, **_kwargs: (b"png", 1),
     )
     pictures = _manifest([_element("pic-1", "picture"), _element("pic-2", "picture")], [])

@@ -17,6 +17,7 @@ import pytest
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
 from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import ManifestElement
 from backend.i18n import t
@@ -89,14 +90,14 @@ def reset_vision():
 
 @pytest.fixture(autouse=True)
 def fake_vision(monkeypatch):
-    monkeypatch.setattr(pddl, "VisionAgent", FakeVision)
+    monkeypatch.setattr(formula_stage, "VisionAgent", FakeVision)
 
 
 @pytest.fixture
 def cropped(monkeypatch):
     """A crop for every formula, so no test needs a real PDF render."""
     monkeypatch.setattr(
-        pddl, "_formula_recognition_crop", lambda *args, **kwargs: (b"png", 1)
+        formula_stage, "_formula_recognition_crop", lambda *args, **kwargs: (b"png", 1)
     )
 
 
@@ -111,7 +112,7 @@ async def test_formula_crop_is_recognized_by_math_recognize(monkeypatch, cropped
 
     install_formula_recognizer(monkeypatch, recognize)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.text == "E=mc^2"
@@ -137,7 +138,7 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
 
     install_formula_recognizer(monkeypatch, recognize)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.text == r"\frac{a}{b}"
@@ -168,7 +169,7 @@ async def test_recognition_separates_equation_number(monkeypatch, cropped, suffi
         monkeypatch,
         lambda image, **kwargs: [{"latex": r"x=\frac{a}{b}" + suffix}],
     )
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     element = manifest.elements[0]
     assert element.text == r"x=\frac{a}{b}"
     assert element.metadata["equation_number"] == "1"
@@ -181,7 +182,7 @@ async def test_source_equation_number_survives_unlabelled_recognition(monkeypatc
         monkeypatch,
         lambda image, **kwargs: [{"latex": r"x=\frac{a}{b}"}],
     )
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     element = manifest.elements[0]
     assert element.text == r"x=\frac{a}{b}"
     assert element.metadata["equation_number"] == "7"
@@ -196,7 +197,7 @@ async def test_vision_equation_number_is_preserved(monkeypatch, cropped):
         kind="formula", formula_latex=r"x=\frac{a}{b}\tag{2}",
         language="und", confidence=0.8,
     )
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     element = manifest.elements[0]
     assert element.text == r"x=\frac{a}{b}"
     assert element.metadata["equation_number"] == "2"
@@ -211,7 +212,7 @@ async def test_existing_latex_separates_label_without_recognition(monkeypatch):
         pytest.fail("Existing LaTeX must not invoke recognition")
 
     install_formula_recognizer(monkeypatch, unexpected)
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     assert manifest.elements[0].text == r"x=\frac{a}{b}"
     assert manifest.elements[0].metadata["equation_number"] == "3"
 
@@ -236,7 +237,7 @@ async def test_a_latex_label_alone_still_marks_the_formula_as_latex(monkeypatch)
         pytest.fail("Existing LaTeX must not invoke recognition")
 
     install_formula_recognizer(monkeypatch, unexpected)
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     assert manifest.elements[0].text == "x=y"
     assert manifest.elements[0].metadata["equation_number"] == "1"
 
@@ -268,7 +269,7 @@ async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropp
     monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "docling-math")
     records, sink = _capture_logs("DEBUG")
     try:
-        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+        await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     finally:
         logger.remove(sink)
 
@@ -304,7 +305,7 @@ async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, 
     monkeypatch.setattr(settings, "toolbox_math_recognize_provider", "")
     records, sink = _capture_logs("INFO")
     try:
-        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+        await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     finally:
         logger.remove(sink)
 
@@ -330,7 +331,7 @@ async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
     install_formula_recognizer(monkeypatch, recognize)
     records, sink = _capture_logs("DEBUG")
     try:
-        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+        await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
     finally:
         logger.remove(sink)
 
@@ -358,7 +359,7 @@ async def test_an_outage_is_paid_once_per_document(monkeypatch, cropped):
 
     install_formula_recognizer(monkeypatch, recognize)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert calls == [b"png"]
     assert [element.text for element in manifest.elements] == ["x^2", "x^2"]
@@ -386,7 +387,7 @@ async def test_an_outage_after_the_first_formula_falls_back_to_vision(monkeypatc
 
     install_formula_recognizer(monkeypatch, recognize)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert len(calls) == 2
     assert [
@@ -407,7 +408,7 @@ async def test_formulas_that_already_have_latex_are_left_alone(monkeypatch, crop
 
     install_formula_recognizer(monkeypatch, recognize)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert calls == []
     assert FakeVision.calls == []
@@ -419,7 +420,7 @@ async def test_formulas_that_already_have_latex_are_left_alone(monkeypatch, crop
 async def test_a_formula_without_a_crop_is_skipped(monkeypatch):
     manifest = _formula_manifest()
     monkeypatch.setattr(
-        pddl, "_formula_recognition_crop", lambda *args, **kwargs: (None, 1)
+        formula_stage, "_formula_recognition_crop", lambda *args, **kwargs: (None, 1)
     )
 
     def unexpected(*args, **kwargs):
@@ -427,7 +428,7 @@ async def test_a_formula_without_a_crop_is_skipped(monkeypatch):
 
     install_formula_recognizer(monkeypatch, unexpected)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert manifest.elements[0].text is None
     assert FakeVision.calls == []
@@ -445,7 +446,7 @@ async def test_a_vision_description_reclassifies_the_formula(monkeypatch, croppe
         lambda image, **kwargs: [{"latex": "", "confidence": 0.1}],
     )
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert manifest.elements[0].text == "A chart"
     assert manifest.elements[0].type == "picture"
@@ -466,7 +467,7 @@ async def test_formula_progress_reports_the_stage_and_each_formula(monkeypatch, 
     async def status_callback(message: str) -> None:
         messages.append(message)
 
-    await pddl._enrich_formula_latex(
+    await formula_stage._enrich_formula_latex(
         manifest,
         Path("/tmp/doc.pdf"),
         mode="medio",
@@ -507,7 +508,7 @@ async def test_a_text_layer_formula_is_replaced_by_its_recognition(monkeypatch, 
     manifest = _formula_manifest(TEXT_LAYER)
     calls = _recognizer(monkeypatch, FAITHFUL)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert calls == [b"png"]
@@ -530,7 +531,7 @@ async def test_a_misread_falls_back_to_vision(monkeypatch, cropped):
         kind="formula", formula_latex=FAITHFUL, language="und", confidence=0.8
     )
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     recognition = element.metadata["formula_recognition"]
@@ -548,7 +549,7 @@ async def test_without_an_agreeing_recognition_the_text_layer_stays(monkeypatch,
         kind="formula", formula_latex=r"\int_0^1 f", language="und", confidence=0.8
     )
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.text == TEXT_LAYER
@@ -566,7 +567,7 @@ async def test_the_agreement_floor_is_configurable(monkeypatch, cropped):
     manifest = _formula_manifest(TEXT_LAYER)
     _recognizer(monkeypatch, MISREAD)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert manifest.elements[0].text == MISREAD
     assert FakeVision.calls == []
@@ -577,7 +578,7 @@ async def test_a_formula_without_text_has_nothing_to_agree_with(monkeypatch, cro
     manifest = _formula_manifest()
     _recognizer(monkeypatch, MISREAD)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.text == MISREAD
@@ -591,7 +592,7 @@ async def test_unicode_scripts_in_the_text_layer_agree(monkeypatch, cropped):
     manifest = _formula_manifest("s(t) = s₀ + v₀t + ½at², t > 0")
     _recognizer(monkeypatch, r"s(t) = s_0 + v_0 t + \frac{1}{2} a t^2, \quad t > 0")
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     recognition = manifest.elements[0].metadata["formula_recognition"]
     assert recognition["method"] == "math.recognize"
@@ -604,7 +605,7 @@ async def test_a_recognition_without_evidence_is_refused(monkeypatch, cropped):
     manifest = _formula_manifest("( )")
     _recognizer(monkeypatch, "()")
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.text == "( )"
@@ -634,7 +635,7 @@ async def test_a_lower_ranked_candidate_that_agrees_is_used(monkeypatch, cropped
         {"latex": FAITHFUL, "confidence": 0.6},
     ])
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     recognition = element.metadata["formula_recognition"]
@@ -657,7 +658,7 @@ async def test_vision_runs_only_when_no_candidate_agrees(monkeypatch, cropped):
         kind="formula", formula_latex=FAITHFUL, language="und", confidence=0.8
     )
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     recognition = manifest.elements[0].metadata["formula_recognition"]
     assert recognition["method"] == "vision"
@@ -673,7 +674,7 @@ async def test_bare_scripts_in_the_text_layer_are_recognized(monkeypatch, croppe
     manifest = _formula_manifest(text_layer)
     calls = _recognizer(monkeypatch, recognized)
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert calls == [b"png"]
@@ -688,7 +689,7 @@ async def test_latex_with_grouped_scripts_is_left_alone(monkeypatch, cropped):
     manifest = _formula_manifest("x^{2} + y_{1}")
     calls = _recognizer(monkeypatch, "anything")
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert calls == []
     assert manifest.elements[0].text == "x^{2} + y_{1}"
@@ -710,7 +711,7 @@ async def test_a_misconfigured_recognizer_fails_the_enrichment_visibly(monkeypat
     manifest = _formula_manifest()
 
     with pytest.raises(ExceptionGroup) as raised:
-        await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+        await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     assert [type(error) for error in raised.value.exceptions] == [ValueError]
     assert FakeVision.calls == []
@@ -727,7 +728,7 @@ async def test_a_failed_vision_fallback_leaves_the_formula_and_records_nothing(m
     FakeVision.output = None
     install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.type == "formula" and element.text is None
@@ -742,7 +743,7 @@ async def test_an_uncertain_description_does_not_reclassify(monkeypatch, cropped
                                      confidence=0.4, classification_uncertain=True)
     install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.type == "formula" and element.text is None
@@ -756,7 +757,7 @@ async def test_a_vision_reading_records_its_method_and_confidence(monkeypatch, c
     FakeVision.output = VisionOutput(kind="formula", formula_latex="$$x+1$$", language="en", confidence=0.6)
     install_formula_recognizer(monkeypatch, lambda image, **kwargs: [])
 
-    await pddl._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
+    await formula_stage._enrich_formula_latex(manifest, Path("/tmp/doc.pdf"), mode="medio")
 
     element = manifest.elements[0]
     assert element.text == "x+1"
