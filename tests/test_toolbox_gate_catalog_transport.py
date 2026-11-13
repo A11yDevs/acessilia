@@ -218,6 +218,26 @@ async def _extract(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "base_url", ["http://toolbox.test:bad", "http://toolbox.test:99999"]
+)
+async def test_a_bad_port_is_a_catalogue_error_not_a_traceback(
+    monkeypatch, base_url
+) -> None:
+    """A port the client cannot use degrades planning, like any other bad URL."""
+    monkeypatch.setattr(settings, "toolbox_base_url", base_url)
+    monkeypatch.setattr(settings, "toolbox_availability_gate", "enforce")
+    monkeypatch.setattr(settings, "toolbox_provider", "docling")
+
+    decision = await toolbox_gate.decide(_single_provider_manifest())
+
+    assert decision.catalog_error is not None
+    assert decision.catalog_error.startswith("ToolboxProviderUnavailable: ")
+    assert "port between 0 and 65535" in decision.catalog_error
+    assert "single-provider" in decision.blocked
+
+
+@pytest.mark.asyncio
 async def test_an_unreadable_primary_catalogue_blocks_what_would_run_there(
     enforce_with_two_endpoints, tmp_path
 ) -> None:

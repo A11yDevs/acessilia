@@ -88,8 +88,9 @@ para um balanceador na frente de réplicas stateless da Toolbox que compartilham
 o armazenamento de artefatos (MinIO) e o cache (Valkey): os ids de artefato
 continuam válidos qualquer que seja a réplica que responda. As operações nunca
 caem para execução local. Um `base_url` precisa ser uma URL `http(s)`
-absoluta; qualquer outra coisa levanta `ValueError` na criação do cliente, em
-vez de parecer uma indisponibilidade depois.
+absoluta que o `httpx` consiga interpretar, com porta entre 0 e 65535 quando ela
+for informada; qualquer outra coisa levanta `ValueError` na criação do endpoint
+ou do cliente, em vez de parecer uma indisponibilidade depois.
 
 Além disso, o cliente oferece:
 
