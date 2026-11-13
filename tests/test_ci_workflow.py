@@ -40,7 +40,8 @@ def test_delivery_waits_for_tests_and_sdk_isolation() -> None:
 
 
 def test_ruleset_templates_require_the_full_gate() -> None:
-    expected = {"CI / tests (Python 3.11)", "CI / SDK alone (Python 3.11)"}
+    jobs = _workflow()["jobs"]
+    expected = {jobs["tests"]["name"], jobs["sdk-isolated"]["name"]}
     for template in ("main.json.example", "develop.json.example"):
         ruleset = json.loads((RULESETS / template).read_text(encoding="utf-8"))
         checks = next(
@@ -48,4 +49,18 @@ def test_ruleset_templates_require_the_full_gate() -> None:
             for rule in ruleset["rules"]
             if rule["type"] == "required_status_checks"
         )
-        assert {check["context"] for check in checks} >= expected
+        assert {check["context"] for check in checks} == expected
+        assert {check.get("integration_id") for check in checks} == {15368}
+
+
+def test_develop_template_keeps_parallel_pull_requests_mergeable() -> None:
+    ruleset = json.loads(
+        (RULESETS / "develop.json.example").read_text(encoding="utf-8")
+    )
+    status_checks = next(
+        rule["parameters"]
+        for rule in ruleset["rules"]
+        if rule["type"] == "required_status_checks"
+    )
+    assert status_checks["strict_required_status_checks_policy"] is False
+    assert not any(rule["type"] == "pull_request" for rule in ruleset["rules"])

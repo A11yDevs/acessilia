@@ -198,8 +198,8 @@ the suite. The job took 1m50s before this change; after it, three runs took
 [43346208871](https://github.com/A11yDevs/acessilia/actions/runs/43346208871)),
 all below the 90s target. The core run dropped from 60s to 26–43s and the 10s
 collection step disappeared. The job still runs the docstruct and SDK suites,
-rejects unexpected skips and uploads the JUnit reports with `--durations=25`
-even when a step fails:
+rejects unexpected skips, prints the 25 slowest tests and uploads the JUnit
+reports even when a step fails:
 `test-reports` for the core, docstruct and SDK suites, and `sdk-isolated-report`
 for the SDK-only job. Image delivery waits for both `tests` and `sdk-isolated`.
 

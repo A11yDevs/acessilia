@@ -353,14 +353,21 @@ vMAJOR.MINOR.PATCH
 
 The repository uses **GitHub Rulesets** to protect the `main` branch from deletion, force pushes, and unreviewed merges. Rulesets are configured **via the REST API**, not through files in the repo itself.
 
-The files `.github/rulesets/main.json.example` and `.github/rulesets/develop.json.example` hold the templates. `main` is protected today with `CI / tests (Python 3.11)`; its template also records the recommended `CI / SDK alone (Python 3.11)` gate. `develop` is not protected; its template proposes the same two required checks. Applying either template is a maintainer decision. To apply or refresh the rulesets, run:
+The files `.github/rulesets/main.json.example` and `.github/rulesets/develop.json.example` hold the templates. The live `main` ruleset still records the old `CI / tests (Python 3.11)` context, which matches no Actions check run; it therefore does not enforce the CI gate today. The templates use the real check-run names, `tests (Python 3.11)` and `SDK alone (Python 3.11)`, pinned to the GitHub Actions app (`integration_id` 15368). `develop` is not protected; its template proposes the same two checks without the strict "up to date" policy, so parallel pull requests do not invalidate each other. It intentionally does not add a review requirement; the team rule that changes reach `develop` through pull requests remains in force. Applying either template is a maintainer decision; re-applying `main.json.example` also fixes the live gap. To apply a template, copy it to its `.json` name first; the script applies every `.json` in the directory and only prints `.json.example` files:
 
 ```bash
-# Apply/update the rulesets via the GitHub API
-./scripts/setup-rulesets.sh
+cp .github/rulesets/main.json.example .github/rulesets/main.json
+# Optional: cp .github/rulesets/develop.json.example .github/rulesets/develop.json
 
 # Only prints the payload without changing anything
 DRY_RUN=1 ./scripts/setup-rulesets.sh
+
+# Apply/update the rulesets via the GitHub API
+./scripts/setup-rulesets.sh
+
+# Keep the repository with templates only
+rm .github/rulesets/main.json
+# Optional: rm .github/rulesets/develop.json
 ```
 
 > **Important:** the ruleset allows bypasses by repository administrators (`RepositoryRole`), so maintainers can manage the branch without being blocked.

@@ -206,9 +206,9 @@ execuções levaram 1m26s, 59s e 1m20s
 [43346208871](https://github.com/A11yDevs/acessilia/actions/runs/43346208871)),
 todas abaixo da meta de 90s. A execução do core caiu de 60s para 26–43s e a
 etapa de coleta de 10s desapareceu. O job continua rodando as suítes do
-docstruct e do SDK, recusando skips inesperados e publicando os relatórios JUnit
-com `--durations=25` mesmo quando uma etapa falha: `test-reports` para as suítes
-do core, docstruct e SDK, e
+docstruct e do SDK, recusando skips inesperados, imprimindo os 25 testes mais
+lentos e publicando os relatórios JUnit mesmo quando uma etapa falha:
+`test-reports` para as suítes do core, docstruct e SDK, e
 `sdk-isolated-report` para o job isolado do SDK. A entrega da imagem espera por
 `tests` e `sdk-isolated`.
 
