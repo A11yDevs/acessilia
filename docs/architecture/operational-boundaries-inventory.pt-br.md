@@ -31,7 +31,9 @@ que já foi aceita:
   permite a dependência, mas o `libs/sdk/pyproject.toml` declara só o `httpx`.
   O job `SDK alone` recusa o `docstruct` junto com o `backend`, a Toolbox, o
   Agno e o FastAPI. Se o SDK compuser algoritmos do docstruct (#470, P5), a
-  dependência e esse job mudam.
+  dependência e esse job mudam. **Fechada pela fase 3 da #470:** a operação de
+  fórmula compõe o `best_effort_clip` e o `ranked_latex_candidates`, o SDK
+  declara o docstruct e o `SDK alone` o instala.
 - **A Toolbox e o core concordam sobre o docstruct só por convenção.** Cada
   branch da Toolbox fixa o wheel de release do docstruct pelo SHA-256, e as
   versões fixadas batem com os branches do core:

@@ -8,6 +8,9 @@
                                  call an ``execute`` capability; prints its envelope
     upload FILE                  store a file; prints its artifact id
     download ID OUTPUT           a stored artifact, checked against its digest
+    formula (--file PATH | --artifact ID) --page N --box L,T,R,B [--origin ...]
+                                 the formula chain: crop, recognize, convert,
+                                 verbalize; prints every step as JSON
     dataset list | describe | splits | items | item | artifact | sample | sync
                                  the dataset routes; JSON, or the artifact's bytes
 
@@ -28,6 +31,11 @@ capabilities have routes and arguments of their own, so each has a command
 subcommands, through the SDK's ``ToolboxDatasetClient``. ``run`` points to
 them. A capability outside the registry is refused before any request.
 
+``formula`` runs ``acessilia_sdk.operations.formula.formula_chain`` on one box
+of a page (ADR-0017): the proof that the chain needs neither the core nor its
+settings. Providers are the registry's unless ``--recognize-provider`` or
+``--transform-provider`` say otherwise; ``--crop-output`` keeps the crop.
+
 Exit status: 0 on success, 1 when the Toolbox or the file system fails
 (the typed error is printed on standard error), 2 for invalid arguments.
 """
@@ -41,9 +49,11 @@ import os
 import sys
 import tempfile
 from collections.abc import Sequence
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
+from acessilia_sdk.operations.formula import FORMULA_CROP_DPI, FormulaChain, formula_chain
 from acessilia_sdk.toolbox.artifacts import ARTIFACT_ID_RE
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
@@ -54,6 +64,8 @@ from acessilia_sdk.toolbox.catalog import CatalogSnapshot, read_catalog
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.clients.artifact import ToolboxArtifactClient
 from acessilia_sdk.toolbox.clients.dataset import MAX_PAGE_SIZE, ToolboxDatasetClient
+from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
+from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
 from acessilia_sdk.toolbox.endpoints import ToolboxEndpoint, parse_endpoints
 from acessilia_sdk.toolbox.errors import ToolboxError
 
@@ -137,7 +149,40 @@ def _parser() -> argparse.ArgumentParser:
     download.add_argument("artifact_id", help="sha256:<64 hex> or <64 hex>")
     download.add_argument("output", type=Path, help="file to write; its directory must exist")
     _dataset_parser(commands)
+    _formula_parser(commands)
     return parser
+
+
+def _formula_parser(commands) -> None:
+    formula = commands.add_parser(
+        "formula",
+        help="crop a formula's box, recognize it, convert and verbalize it; prints each step",
+    )
+    source = formula.add_mutually_exclusive_group(required=True)
+    source.add_argument("--file", type=Path, metavar="PATH", help="PDF, PNG or JPEG to upload")
+    source.add_argument(
+        "--artifact", metavar="ID", help="source already stored in the Toolbox (see 'upload')"
+    )
+    formula.add_argument("--page", type=int, required=True, metavar="N", help="1-based page")
+    formula.add_argument(
+        "--box", required=True, metavar="L,T,R,B", help="the formula's box, in page units"
+    )
+    formula.add_argument(
+        "--origin",
+        choices=("TOPLEFT", "BOTTOMLEFT"),
+        help="origin of --box (default: inferred from its edges)",
+    )
+    formula.add_argument(
+        "--candidate", type=int, default=1, metavar="N", help="candidate to speak (1-based)"
+    )
+    formula.add_argument("--language", default="pt-BR", help="recognition and speech language")
+    formula.add_argument("--dpi", type=int, default=FORMULA_CROP_DPI, help="crop resolution")
+    formula.add_argument("--recognize-provider", help="math.recognize provider")
+    formula.add_argument("--transform-provider", help="math.convert and math.verbalize provider")
+    formula.add_argument("--crop-output", type=Path, metavar="PATH", help="also write the crop")
+    formula.add_argument(
+        "--no-cache", action="store_true", help="do not reuse cached Toolbox results"
+    )
 
 
 def _count(minimum: int):
@@ -222,6 +267,45 @@ def executable_capability(capability_id: str) -> ToolboxCapability:
             f"use the '{REST_COMMANDS[capability_id]}' command"
         )
     return spec
+
+
+@dataclass(frozen=True)
+class _Box:
+    """A ``--box`` with its ``--origin``: what ``best_effort_clip`` reads."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+    coord_origin: str | None
+
+
+def _box(text: str, origin: str | None) -> _Box:
+    try:
+        edges = [float(value) for value in text.split(",")]
+    except ValueError:
+        edges = []
+    if len(edges) != 4:
+        raise ValueError(f"--box takes four numbers, LEFT,TOP,RIGHT,BOTTOM: {text!r}")
+    return _Box(*edges, coord_origin=origin)
+
+
+def formula_document(chain: FormulaChain) -> dict[str, Any]:
+    """The JSON the ``formula`` command prints: every step and its result."""
+    crop = chain.crop
+    return {
+        "crop": {
+            "page_number": crop.page_number,
+            "clip": list(crop.clip) if crop.clip is not None else None,
+            "size_bytes": len(crop.image) if crop.image is not None else None,
+            "reason": crop.reason,
+        },
+        "candidates": chain.candidates.candidates if chain.candidates is not None else None,
+        "latex": chain.latex,
+        "mathml": chain.speech.mathml if chain.speech is not None else None,
+        "verbalization": chain.speech.verbalization if chain.speech is not None else None,
+        "steps": [asdict(step) for step in chain.steps],
+    }
 
 
 def _parameters(text: str | None) -> dict[str, Any] | None:
@@ -400,6 +484,34 @@ async def _dataset(ctx: _Context, args: argparse.Namespace) -> None:
     ctx.stdout.write("\n")
 
 
+async def _formula(ctx: _Context, args: argparse.Namespace, box: _Box) -> None:
+    pdf = ctx.client(ToolboxPdfClient)
+    recognize = {"provider": args.recognize_provider} if args.recognize_provider else {}
+    math = ctx.client(
+        ToolboxMathClient, transform_provider=args.transform_provider, **recognize
+    )
+    try:
+        chain = await formula_chain(
+            pdf,
+            math,
+            args.file,
+            artifact_id=args.artifact,
+            page_number=args.page,
+            box=box,
+            candidate=args.candidate,
+            dpi=args.dpi,
+            language=args.language,
+            use_remote_cache=False if args.no_cache else None,
+        )
+    finally:
+        await pdf.close()
+        await math.close()
+    if args.crop_output is not None and chain.crop.image is not None:
+        _write_atomically(args.crop_output, chain.crop.image)
+    json.dump(formula_document(chain), ctx.stdout, indent=2, ensure_ascii=False)
+    ctx.stdout.write("\n")
+
+
 async def _download(ctx: _Context, artifact_id: str, output: Path) -> None:
     client = ctx.client(ToolboxArtifactClient)
     try:
@@ -454,6 +566,18 @@ def main(
             if args.route == "items" and args.all and args.offset:
                 raise ValueError("--offset does not apply with --all")
             asyncio.run(_dataset(ctx, args))
+        elif args.command == "formula":
+            if args.file:
+                _input_file(args.file)
+            if args.artifact:
+                _artifact_id(args.artifact)
+            if args.page < 1:
+                raise ValueError("--page is 1-based")
+            if args.candidate < 1:
+                raise ValueError("--candidate is 1-based")
+            if args.dpi <= 0:
+                raise ValueError("--dpi must be positive")
+            asyncio.run(_formula(ctx, args, _box(args.box, args.origin)))
         else:
             asyncio.run(_download(ctx, _artifact_id(args.artifact_id), args.output))
     except ToolboxError as exc:
@@ -473,5 +597,6 @@ __all__ = [
     "REST_COMMANDS",
     "catalog_document",
     "executable_capability",
+    "formula_document",
     "main",
 ]

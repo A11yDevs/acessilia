@@ -9,10 +9,15 @@ description = "Acesso uniforme às capacidades do Acessilia: registro de contrat
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-dependencies = ["httpx>=0.27,<0.28"]
+# docstruct is not on an index: install ./libs/docstruct (or its release wheel)
+# first; uv resolves it from the path below (ADR-0017).
+dependencies = ["httpx>=0.27,<0.28", "acessilia-docstruct>=0.5,<0.6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=1.4.0,<2", "respx>=0.23.1,<0.24"]
+
+[tool.uv.sources]
+acessilia-docstruct = { path = "../docstruct", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/acessilia_sdk"]

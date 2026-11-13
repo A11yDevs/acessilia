@@ -7,6 +7,20 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `acessilia_sdk.operations.formula`, the SDK's first operation
+  (ADR-0017, #470 phase 3): `crop_formula_region` renders a formula's box at
+  200 dpi with `pdf.render` (a box that cannot be used, or a crop thinner than
+  4 units, is no crop, never the whole page); `recognize_formula` sends the
+  crop to `math.recognize` and ranks the LaTeX candidates; `speak_formula`
+  converts LaTeX to MathML and verbalizes it; `formula_chain` runs the three
+  for one formula. Each step reports its capability, provider and parameters,
+  and raises the typed errors unchanged. The command line gains `formula`,
+  which runs the chain and prints every step as JSON.
+- **Changed** the SDK now depends on `acessilia-docstruct` (`>=0.5,<0.6`), for
+  `best_effort_clip` and `ranked_latex_candidates`. docstruct is not on a
+  package index: install `./libs/docstruct`, or its release wheel, before the
+  SDK. Inside the repository, uv resolves it from its path.
+
 - **Changed** `ToolboxEndpoint` now rejects, at construction, a base URL whose
   port is not a number or is outside 0–65535, and any URL `httpx` cannot parse,
   with `ValueError`. A misconfigured `TOOLBOX_BASE_URL` is then reported by the

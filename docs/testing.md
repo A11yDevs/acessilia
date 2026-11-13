@@ -49,8 +49,9 @@ GitHub Actions workflow `CI`:
   (warnings only; see below), runs the non-E2E core suite with **four
   workers**, runs the docstruct and SDK suites, rejects unexpected skipped
   tests and uploads JUnit reports.
-- **`SDK alone (Python 3.11)`** installs only the SDK and proves that it works
-  without the core or docstruct.
+- **`SDK alone (Python 3.11)`** installs only the SDK, docstruct (its one
+  project dependency, ADR-0017) and the SDK's test tools (pytest,
+  pytest-asyncio, respx), and proves that it works without the core.
 - **`docstruct alone (Python 3.11)`** installs only docstruct, from its wheel,
   and pytest, and runs its suite on the standard library alone: no core, SDK, Toolbox or
   optional accelerator (`rapidfuzz`) is importable, and no test may be skipped

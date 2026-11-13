@@ -49,8 +49,9 @@ o workflow `CI` do GitHub Actions:
   core (só avisos; veja abaixo), roda o core non-E2E com **quatro workers**,
   roda as suítes do docstruct e do SDK, recusa skips inesperados e publica
   relatórios JUnit.
-- **`SDK alone (Python 3.11)`** instala apenas o SDK e prova que ele funciona
-  sem o core ou o docstruct.
+- **`SDK alone (Python 3.11)`** instala apenas o SDK, o docstruct (a única
+  dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
+  (pytest, pytest-asyncio, respx), e prova que ele funciona sem o core.
 - **`docstruct alone (Python 3.11)`** instala apenas o docstruct, a partir do
   wheel dele, e o pytest, e roda a suíte só com a biblioteca padrão: o core, o SDK, a
   Toolbox e o acelerador opcional (`rapidfuzz`) não podem estar importáveis, e

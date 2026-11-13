@@ -39,9 +39,11 @@ measured where things stand:
     Pydantic models kept as checked wire models.
   - ADR-0002 already allows SDK → docstruct.
   - The Toolbox test forbids imports of the SDK and the core.
-- **Four gaps remain** (as measured; phase 2 of #470 has closed three since,
-  marked below):
-  - the SDK does not depend on docstruct, and its isolated CI job refuses it;
+- **Four gaps remain** (as measured; phases 2 and 3 of #470 have closed all
+  four since, marked below):
+  - the SDK does not depend on docstruct, and its isolated CI job refuses it
+    (**closed in phase 3**: the formula operation composes docstruct, and the
+    `SDK alone` job installs it);
   - docstruct has no isolated install job (**closed by #495**, the
     `docstruct alone` job);
   - nothing tests docstruct's independence from infrastructure (**closed by
@@ -112,7 +114,11 @@ Proposed: option 2.
     modules, built-ins and `sys` attributes it lists.
 - **Dependencies:** unchanged from ADR-0002.
   - The SDK may depend on docstruct, and does once its first operation
-    composes a docstruct algorithm.
+    composes a docstruct algorithm (#470, phase 3: a required dependency,
+    not an optional extra, since the operation cannot run without it).
+  - Neither package is on a package index: both install from the repository
+    or their release wheels, docstruct first. Publishing the SDK on an index
+    requires publishing docstruct there first.
   - The SDK's base installation stays light: no agent framework and no heavy
     operational library.
 - **Where new code goes**, replacing ADR-0002's four questions:

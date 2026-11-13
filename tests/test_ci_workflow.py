@@ -80,6 +80,21 @@ def test_docstruct_runs_alone_from_its_wheel() -> None:
     assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
 
 
+def test_sdk_runs_alone_with_docstruct_only() -> None:
+    """The SDK installs with docstruct, its one project dependency (ADR-0017), and nothing else."""
+    job = _workflow()["jobs"]["sdk-isolated"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    install = steps["Install the SDK alone"]["run"]
+    assert install.index("./libs/docstruct ") < install.index('"./libs/sdk[dev]"')
+    assert '".[dev]"' not in install
+    check = steps["Check that the core is not importable"]["run"]
+    for name in ("backend", "acessilia_toolbox", "agno", "fastapi"):
+        assert f'"{name}"' in check
+    assert '"docstruct"' not in check
+    assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
+
+
 def test_ruleset_templates_require_the_full_gate() -> None:
     jobs = _workflow()["jobs"]
     expected = {jobs["tests"]["name"], jobs["sdk-isolated"]["name"]}

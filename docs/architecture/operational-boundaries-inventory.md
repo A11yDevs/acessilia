@@ -31,7 +31,10 @@ which is accepted:
   ADR-0002 allows the dependency, but `libs/sdk/pyproject.toml` declares only
   `httpx`. The `SDK alone` job refuses `docstruct` together with `backend`,
   the Toolbox, Agno and FastAPI. If the SDK composes docstruct algorithms
-  (#470, P5), the dependency and that job change.
+  (#470, P5), the dependency and that job change. **Closed by phase 3 of
+  #470:** the formula operation composes `best_effort_clip` and
+  `ranked_latex_candidates`, the SDK declares docstruct, and `SDK alone`
+  installs it.
 - **The Toolbox and the core agree on docstruct by convention only.** Each
   branch of the Toolbox pins the docstruct release wheel by SHA-256, and the
   pins match the core's branches:

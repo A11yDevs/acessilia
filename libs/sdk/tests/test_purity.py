@@ -93,6 +93,18 @@ def test_runtime_dependencies_stay_within_httpx_and_docstruct() -> None:
     assert declared <= set(ALLOWED_DEPENDENCIES), declared - set(ALLOWED_DEPENDENCIES)
 
 
+def test_docstruct_is_a_declared_dependency() -> None:
+    """The formula operation needs docstruct (ADR-0017): required, not merely allowed."""
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    names = {
+        re.sub(r"[-_.]+", "-", re.split(r"[\s<>=!~;\[@]", requirement, maxsplit=1)[0]).lower()
+        for requirement in project.get("dependencies", [])
+    }
+    assert "acessilia-docstruct" in names
+    sources = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["uv"]["sources"]
+    assert sources["acessilia-docstruct"] == {"path": "../docstruct", "editable": True}
+
+
 def test_imports_stay_within_the_standard_library_httpx_and_docstruct() -> None:
     allowed = set(sys.stdlib_module_names) | set(ALLOWED_DEPENDENCIES.values()) | {
         "acessilia_sdk"
