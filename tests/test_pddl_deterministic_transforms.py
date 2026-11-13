@@ -292,6 +292,30 @@ class TestTailJoinReachesTheManifest:
         ] == [(0, 6), (7, 9)]
         _assert_manifest_is_valid(manifest)
 
+    def test_a_child_reparented_by_the_join_updates_its_parent_ref(self) -> None:
+        body = _element("el-1", "paragraph", text=_TAIL_BODY, reading_order=1)
+        header = _element("el-2", "paragraph", text="Capitulo 1", reading_order=2)
+        header.source_ref = "#/texts/0"
+        number = _element("el-3", "paragraph", text="42", reading_order=3)
+        number.source_ref = "#/texts/1"
+        child = _element("el-4", "picture", reading_order=4)
+        child.parent_id = "el-3"
+        child.parent_ref = "#/texts/1"
+        manifest = _manifest(
+            [body, header, number, child],
+            [_obligation("join-tail-blocks", ["el-2", "el-3"], ["tailjoin"])],
+        )
+
+        result = _handle_tailjoin_method(manifest, "o-1")
+
+        assert result.success is True
+        survivor = next(item for item in manifest.elements if item.id == "el-2")
+        reparented = next(item for item in manifest.elements if item.id == "el-4")
+        assert reparented.parent_id == survivor.id
+        assert reparented.parent_ref == survivor.source_ref == "#/texts/0"
+        assert reparented.metadata["original_parent_ref"] == "#/texts/1"
+        _assert_manifest_is_valid(manifest)
+
     def test_it_fails_when_the_targets_are_not_the_page_tail(self) -> None:
         manifest = self._manifest(["el-3"])
 
