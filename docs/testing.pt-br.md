@@ -1,268 +1,409 @@
-# Fluxo local de testes
+# Fluxo de testes: feedback rápido e o gate completo
 
 Você também pode ler esta documentação em **inglês**: [English](testing.md).
 
-Esta página descreve o ciclo local de editar–testar–corrigir. Os comandos são
-wrappers finos em volta do pytest; a CI continua executando as suítes completas
-antes do merge. A issue [#448](https://github.com/A11yDevs/acessilia/issues/448)
-acompanha o fluxo de testes: comandos locais (PR 1), execução paralela limitada
-(PR 2), otimização da CI (PR 4) e monitoramento agendado (PR 5). A análise de
-impacto de testes (PR 3) foi avaliada e não faz parte do fluxo.
+O projeto tem cerca de 4.700 testes: aproximadamente 3.000 non-E2E no core,
+1.272 em `libs/docstruct` e 450 em `libs/sdk`. Rodar tudo depois de cada pequena
+edição é caro, tanto localmente quanto na CI. Este guia explica como a suíte está
+organizada, quais comandos usar em cada etapa do ciclo editar–testar–corrigir e
+quais técnicas tornam o ciclo mais rápido sem enfraquecer o gate de regressão. As
+mudanças vieram da issue
+[#448](https://github.com/A11yDevs/acessilia/issues/448).
 
-## Linha de base
+## O problema: suíte grande, ciclo curto
 
-Medida em 2026-11-11 no commit `c3ea6d5d`, antes da inclusão dos comandos
-locais:
+Uma execução serial completa do core leva cerca de 2m23s na máquina de
+referência; o job `tests` da CI levava 1m59s. A maior parte desse tempo não tem
+relação com uma edição de uma linha. Esperar minutos a cada mudança quebra a
+concentração e incentiva pular testes.
 
-| Suíte | Testes | Coleta | Execução completa |
-|---|---|---|---|
-| Core (`-m "not e2e"`) | 2800 coletados, 2740 selecionados | 10,2s | 132,0s |
-| `libs/docstruct` | 1194 | 1,05s | — |
-| `libs/sdk` | 427 | 0,46s | — |
+A resposta não é rodar menos testes no gate de merge. É rodar os testes *certos*
+durante o desenvolvimento, rodar a suíte completa antes da integração e tornar a
+própria suíte completa mais rápida.
 
-Ambiente: macOS, 12 núcleos lógicos, 16 GB de RAM, Python 3.11.15, pytest 9.1.1.
-O job `tests` da CI levou 1m59s na
-[execução 43038402225](https://github.com/A11yDevs/acessilia/actions/runs/43038402225):
-26s para instalar dependências, 12s para coletar, 65s para a suíte do core e 5s
-para cada biblioteca.
+## Qual comando devo usar?
 
-Esses números são referência, não garantia: variam com a máquina, o sistema
-operacional e o cache de dependências. `--durations=25` imprime os testes mais
-lentos em cada execução, então uma nova linha de base está a um comando de
-distância:
+| Situação | Comando | O que acontece |
+|---|---|---|
+| Mudei um arquivo ou um teste | `make test-file F=tests/test_example.py` | Roda apenas esse caminho, sem E2E |
+| Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches do core, docstruct e SDK |
+| Quero a confiança local completa | `make test-all` | Core com quatro workers, depois docstruct e SDK |
+| Quero só o core, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda o core non-E2E com quatro workers |
+| Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
+
+`make` sem alvo imprime a lista curta de comandos.
+
+> **Importante:** `uv run pytest` sem `-n` é **serial**. Ele também não executa
+> as suítes `libs/docstruct` e `libs/sdk`. O ganho vem do `make test-all` ou de
+> passar `-n 4 --dist worksteal` explicitamente.
+
+## O que roda por padrão
+
+### Na CI
+
+Todo pull request e push para `develop`, `main` ou uma branch de release executa
+o workflow `CI` do GitHub Actions:
+
+- **`tests (Python 3.11)`** instala o projeto, confere o contrato de capacidades
+  da Toolbox, roda o core non-E2E com **quatro workers**, roda as suítes do
+  docstruct e do SDK, recusa skips inesperados e publica relatórios JUnit.
+- **`SDK alone (Python 3.11)`** instala apenas o SDK e prova que ele funciona
+  sem o core ou o docstruct.
+- Os dois jobs são checks obrigatórios nos rulesets vivos de `main` e `develop`.
+- A entrega da imagem espera pelos dois jobs.
+
+O check do core não tem mais uma etapa separada de coleta: a própria execução
+coleta a suíte. O nome do job é mantido como `tests (Python 3.11)` de propósito,
+para a proteção de branch e os links existentes continuarem funcionando.
+
+### Localmente
+
+O comando local suportado para a suíte completa é:
 
 ```bash
-uv run pytest -m "not e2e" --durations=25
+make test-all
 ```
 
-### Linha de base paralela
+Ele roda o core non-E2E com quatro workers e depois as suítes do docstruct e do
+SDK, sequencialmente. As bibliotecas são rápidas e têm ambientes de pacote
+separados, então permanecem simples. O `make test-all` executa as três suítes
+mesmo se uma falhar e retorna status não zero se alguma falhou.
 
-Depois das correções de isolamento da PR 2, com cerca de 2920 testes do core na
-mesma máquina (2026-11-12):
+Rodar `uv run pytest` puro na raiz é outra coisa: usa os padrões do pytest,
+inclui testes E2E que precisam de um ambiente real e roda serialmente.
 
-| Execução | Tempo total |
-|---|---|
-| Core serial | 143s |
-| Core `-n 4 --dist worksteal` | 74s (1,9x) |
-| Core `-n 2 --dist worksteal` | 124s |
-| Core `-n auto --dist worksteal` | 96s |
-| Core `-n 4 --dist load` | 178s |
+## As técnicas, em linguagem simples
 
-O `worksteal` ganha porque poucos testes longos dominam a cauda; o `load`
-distribui módulos inteiros e deixa workers ociosos. O `-n auto` (12 workers
-aqui) foi mais lento que quatro: o teste mais lento não pode ser dividido e os
-processos extras disputam os mesmos núcleos. O teste mais lento sozinho leva
-cerca de 20–80s conforme a carga, então ele limita o ganho. Estes números são
-referência, não garantia.
+### 1. Rode só o que você está mudando
 
-## Comandos
+Um **node id** do pytest identifica um teste, por exemplo
+`tests/test_api.py::test_health`. Rodar um arquivo ou um node é muito mais
+rápido do que rodar a suíte inteira, e é o primeiro passo natural do ciclo local.
 
-| Comando | O que executa |
-|---|---|
-| `make test-file F=tests/test_example.py` | Um arquivo ou um node id (`tests/test_api.py::test_health`), sem E2E |
-| `make test-failed` | As falhas registradas nos caches do core, docstruct e SDK |
-| `make test-all` | O core sem E2E com quatro workers, depois docstruct e SDK sequencialmente |
+```bash
+make test-file F=tests/test_api.py::test_health
+make test-file F=tests/test_pddl_planning.py
+```
 
-`make` sem alvo imprime a mesma lista.
+O `make test-file` adiciona `-m "not e2e"` e `--durations=25`, então testes E2E
+ficam de fora e os testes mais lentos daquele arquivo aparecem. Para um arquivo
+único, iniciar quatro workers geralmente custa mais do que economiza; execuções
+direcionadas continuam seriais.
 
-`test-failed` lê o cache `lastfailed` das três suítes (`.pytest_cache` na raiz
-do repositório, `libs/docstruct` e `libs/sdk`) e reexecuta as falhas de cada uma
-a partir do diretório do próprio projeto, com a mesma configuração e os mesmos
-node ids relativos do `test-all`. Antes de executar, ele coleta apenas os
-arquivos registrados e mantém os ids que ainda existem. Um teste removido ou
-renomeado é listado e ignorado, em vez de fazer o `pytest --lf` cair para a
-suíte inteira; um arquivo registrado com erro de coleta é reexecutado como
-arquivo. Quando não há falha registrada, ou as únicas falhas são testes E2E, ele
-imprime uma mensagem e termina com sucesso.
+### 2. Reexecute apenas as falhas
 
-`test-all` não para na primeira suíte: executa as três e devolve o último código
-de saída diferente de zero, para que uma biblioteca com falha não esconda o
-resultado do core. A suíte do core usa `-n 4 --dist worksteal`; docstruct e SDK
-continuam sequenciais.
+Depois de uma execução com falha, `pytest --lf` seria o próximo comando óbvio,
+mas ele tem duas armadilhas neste repositório: pode cair para a suíte inteira
+quando o cache está vazio e não conhece os caches separados das bibliotecas.
 
-A suíte do core roda com `-m "not e2e"`; use `uv run pytest -m e2e` diretamente
-para alcançar um ambiente real, como descrito no
-[README dos testes](../tests/README.pt-br.md).
+O `make test-failed` é o wrapper suportado. Ele:
 
-## Execução paralela
+- lê o cache `lastfailed` do core, do docstruct e do SDK;
+- confere se os arquivos registrados ainda existem e coleta apenas esses
+  arquivos;
+- reexecuta os node ids explícitos que ainda existem;
+- lista testes removidos ou renomeados em vez de cair para uma execução
+  completa;
+- reexecuta como arquivo um arquivo registrado com erro de coleta;
+- termina com sucesso e uma mensagem quando não há nada para reexecutar.
 
-O `make test-all` passa `-n 4 --dist worksteal` para a suíte do core. Rodar
-`uv run pytest` sem `-n` continua serial; use `make test-all` ou passe
-`-n 4 --dist worksteal` diretamente para rodar o core em paralelo. Para
-ajustar o limite ou a distribuição sem editar o Makefile:
+Isso torna o ciclo “corrige uma falha, confirma, segue adiante” rápido e
+previsível.
+
+### 3. Rode o core em paralelo
+
+A suíte do core é a grande. O `pytest-xdist` inicia vários processos workers e
+distribui os testes entre eles. O Makefile e a CI usam
+`-n 4 --dist worksteal`:
+
+- **`-n 4`** inicia quatro workers, acompanhando o runner de quatro vCPUs do
+  GitHub e mantendo o uso de memória limitado.
+- **`--dist worksteal`** entrega um novo teste ao worker assim que ele termina
+  um. Isso importa porque poucos testes são muito mais lentos que o resto; uma
+  distribuição fixa por módulo deixa workers ociosos enquanto um termina a
+  cauda longa.
+
+O resultado é aproximadamente **1,9x** para o core na máquina de referência de
+12 núcleos: **143s serial → 74s com quatro workers** em uma execução tranquila.
+`-n 2` é mais lento (124s), `--dist load` é mais lento (178s) e `-n auto` (12
+workers) foi mais lento (96s) porque o teste longo não pode ser dividido e os
+processos extras disputam os mesmos núcleos. Quatro é o limite suportado, não um
+ótimo universal.
+
+### 4. O isolamento é o que torna o paralelismo seguro
+
+Paralelismo só funciona se os testes não disputam os mesmos arquivos, bancos ou
+locks. A suíte tinha dois conflitos reais:
+
+- `tests/test_api.py` começava todos os workers no diretório compartilhado
+  `var/data`. O segundo worker falhava em `runtime_lease()` porque só um worker
+  de API pode ser dono daquele diretório. O cliente de sessão agora recebe a
+  árvore `tmp_path_factory` do worker (`temp_dir`, `data_dir`, `logs_dir`) antes
+  de a aplicação iniciar.
+- O teste de exportação opcional usava um diretório de saída compartilhado, então
+  um `audio.docx` de uma parametrização podia vazar para a seguinte. Ele agora
+  grava entrada e saída em `tmp_path`.
+
+O experimento com testmon também expôs uma dependência de ordem no banco de
+histórico. `test_history_empty` e `test_stats_empty` agora usam um
+`fresh_history_db` por teste, então a asserção de histórico vazio não depende do
+que rodou antes.
+
+Nenhum teste precisa ser marcado como serial hoje. Se um precisar, o marcador
+`serial` será introduzido junto com o mecanismo que o faz rodar sozinho.
+
+### 5. Leve os mesmos ganhos para a CI
+
+A CI usa a mesma execução paralela limitada do core que o `make test-all`.
+Remover a etapa separada de `--collect-only` e paralelizar o core levou o job
+`tests` de **1m59s** para **59s–1m26s** nas execuções de validação; uma execução de
+validação na develop levou **1m11s**, com o core em **32s**. Os outros jobs
+continuam iguais: docstruct e SDK ainda são testados, skips ainda são recusados,
+o contrato ainda é conferido e os artefatos JUnit ainda são publicados mesmo em
+falha.
+
+### 6. Monitore dependências de ordem e testes intermitentes
+
+Paralelismo e ordens diferentes podem revelar um teste que depende do que outro
+teste deixou para trás. O workflow `Scheduled test monitoring` roda semanalmente
+(e sob demanda) para `main` e `develop`. Para cada branch, ele roda o core
+serialmente e de novo com quatro workers, compara os resultados JUnit, falha em
+diferença, falha, erro ou skip inesperado, e escreve um resumo com p50/p95 das
+durações e os testes mais lentos. Uma falha agendada abre ou atualiza a issue
+`Scheduled test monitoring failed`.
+
+O workflow só começa a disparar depois que o arquivo chega ao branch padrão. O
+E2E é um job separado e condicional: roda apenas quando `TOOLBOX_BASE_URL` ou
+`CORE_BASE_URL` está configurado, e não é um gate de merge.
+
+### 7. A seleção automática de testes foi avaliada e rejeitada
+
+O `pytest-testmon` seleciona testes afetados por uma mudança rastreando
+cobertura. O experimento mostrou que ele não vê arquivos estáticos como
+documentação, schemas e fixtures, e que o comando da raiz não executa as suítes
+das bibliotecas. Uma mudança de README selecionou zero testes mesmo com um gate
+estático obrigatório falhando; uma mudança central selecionou 246 testes;
+reconstruir o banco de dependências levou 221s na medição tranquila (+55% sobre
+a linha de base serial do core). Ele também adicionou um banco `.testmondata`
+com estado e mostrou seleção instável entre execuções. Os detalhes e as medições
+estão no registro do experimento da
+[#448](https://github.com/A11yDevs/acessilia/issues/448).
+
+O `pytest-testmon` **não** é dependência do projeto e o `make test-fast` não faz
+parte do fluxo. Os atalhos suportados continuam sendo `test-file`, `test-failed`
+e o `test-all` paralelo.
+
+## Ganhos medidos
+
+Máquina de referência: macOS, 12 núcleos lógicos, 16 GB de RAM, Python 3.11.15,
+pytest 9.1.1. Estes números variam com a máquina, a carga e o cache de
+dependências.
+
+| Cenário | Antes | Depois |
+|---|---:|---:|
+| Core, serial vs quatro workers | 143s | 74s (~1,9x) |
+| Etapa do core na CI | 60s + 10s de coleta | 26–43s |
+| Job `tests` da CI | 1m59s | 59s–1m26s (uma execução: 1m11s) |
+
+`--durations=25` imprime os testes mais lentos de qualquer execução, então você
+pode atualizar a linha de base na sua máquina com:
+
+```bash
+make test-all
+# ou apenas o core:
+time uv run pytest -m "not e2e" --durations=25
+time uv run pytest -m "not e2e" -n 4 --dist worksteal --durations=25
+```
+
+## Referência de comandos
+
+### Alvos do Makefile
+
+```bash
+make help
+make test-file F=tests/test_example.py
+make test-file F=tests/test_api.py::test_health
+make test-failed
+make test-all
+```
+
+`make -n test-all` imprime os comandos exatos sem executar.
+
+Variáveis úteis:
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `CORE_JOBS` | `4` | Número de workers xdist para o core |
+| `CORE_DIST` | `worksteal` | Estratégia de distribuição do xdist |
+| `DURATIONS` | `25` | Quantidade de testes lentos impressos |
+| `PYTEST` | `uv run pytest` | Comando pytest usado pelo Makefile |
+| `PYTEST_FLAGS` | `-m "not e2e"` | Flags de seleção do core |
+
+Exemplos:
 
 ```bash
 make test-all CORE_JOBS=2
 make test-all CORE_DIST=load
 ```
 
-A suíte é segura em paralelo porque os testes que compartilhavam caminhos de
-execução agora usam caminhos por worker:
-
-- `tests/test_api.py` aponta `settings.temp_dir`, `settings.data_dir` e
-  `settings.logs_dir` para o diretório `tmp_path_factory` do worker antes de o
-  `TestClient` de sessão iniciar a aplicação. Sem isso, o segundo worker falha
-  no `runtime_lease()` com `RuntimeError: Only one API worker may use a data
-  directory`.
-- o teste de exportação opcional grava entrada e saída em `tmp_path`, então um
-  `audio.docx` deixado por uma parametrização não vaza para a seguinte.
-
-O `-n auto` não está habilitado. Ele passou na validação, mas foi mais lento
-(96s) que quatro workers (74s) e usa mais memória. Mantenha-o como opção local
-experimental; a CI e o `make test-all` continuam limitados.
-
-## Análise de impacto de testes (avaliada, não adotada)
-
-A PR 3 da #448 avaliou o `pytest-testmon` como um `make test-fast` opcional. Ele
-não faz parte do fluxo: o experimento encontrou omissões que exigiriam um
-fallback grande e fácil de ficar desatualizado, e o custo da linha de base
-supera o ganho para esta suíte.
-
-Medido em 2026-11-12 com `pytest-testmon 2.3.0` na mesma máquina de 12 núcleos,
-que estava sob carga (a linha de base serial do core é 143s e o `make test-all`
-levou cerca de 75s em uma execução tranquila):
-
-| Cenário | Resultado |
-|---|---|
-| Reconstrução da linha de base (`--testmon-forceselect`, core sem E2E completo) | 603s (221s na medição tranquila anterior) |
-| Sem mudanças | 2,7s (6,5s de parede incluindo a inicialização do interpretador) |
-| Cinco mudanças em folhas | 1–4 testes selecionados; mediana 9,1s, máximo 16,8s (cinco amostras) |
-| Mudança central (`backend/config/settings.py`) | 246 testes, 66s |
-| Mudança em README (arquivo estático) | 0 testes selecionados; `test_docstruct_readme_sync` falha quando executado diretamente |
-| Mudança em folha do docstruct | 2 testes do core selecionados; a suíte do docstruct não roda |
-| Mudança em folha do SDK | 1 teste do core selecionado; a suíte do SDK não roda |
-| Arquivos de portões estáticos da raiz | 129 testes, 6,9s |
-
-A amostra de arquivo estático é 1/1 falso negativo; as cinco amostras de folhas
-selecionaram seus testes diretos. A amostra é pequena, mas um portão obrigatório
-omitido já exige um fallback.
-
-Por que foi rejeitado:
-
-- **Arquivos estáticos são invisíveis para o testmon.** Documentação, schemas,
-  fixtures, `pyproject.toml`, `uv.lock`, `.env` e contratos compartilhados
-  precisam de fallback explícito. O repositório tem portões estáticos
-  obrigatórios (`test_no_portuguese`, `test_docstruct_readme_sync`,
-  `test_architecture_layers`, `test_i18n`, `test_compose_config`,
-  `test_docs_pr125`, além dos testes de pureza das bibliotecas), e executá-los
-  em toda mudança levaria a mediana das folhas de 9,1s para cerca de 16s, acima
-  da meta de 10s.
-- **As bibliotecas são suítes separadas.** O comando da raiz não executa
-  `libs/docstruct` nem `libs/sdk`; uma mudança nesses diretórios precisa de
-  fallback para as suítes deles, que o testmon não seleciona.
-- **Custo e invalidação da linha de base.** Reconstruir o `.testmondata` levou
-  603s sob carga. A execução tranquila anterior foi 221s, +55% sobre a linha de
-  base serial atual de 143s (era +67% sobre a linha de base de 132s registrada
-  no commit anterior), e o banco precisa ser reconstruído após mudanças de
-  dependências ou de ambiente.
-- **Seleção com estado.** A mesma mudança em `runtime_lease.py` selecionou 3
-  testes em uma execução e 4 na coleta seguinte; o banco é mais um artefato com
-  estado para manter sincronizado.
-- O experimento expôs uma dependência de ordem real: `test_history_empty` e
-  `test_stats_empty` agora usam o fixture `fresh_history_db` por teste, então
-  uma execução seletiva não vê linhas gravadas por um teste anterior.
-
-O fluxo suportado continua sendo `make test-file`, `make test-failed` e
-`make test-all` (core com quatro workers). O `pytest-testmon` não é dependência
-do projeto. Apague `.testmondata*` para reconstruir a linha de base após
-mudanças de dependências, interpretador ou plugins. O arquivo está no
-`.gitignore`, então o experimento ainda pode ser reproduzido localmente:
+### Pytest direto
 
 ```bash
-rm -f .testmondata*
-uv run --with pytest-testmon pytest --testmon-forceselect -m "not e2e"
+# Um node id
+uv run pytest -m "not e2e" tests/test_api.py::test_health
+
+# Um arquivo, serial
+uv run pytest -m "not e2e" tests/test_pddl_planning.py
+
+# Core com quatro workers
+uv run pytest -m "not e2e" -n 4 --dist worksteal --durations=25
+
+# Apenas as suítes das bibliotecas
+(cd libs/docstruct && uv run --extra dev pytest)
+(cd libs/sdk && uv run --extra dev pytest)
 ```
 
-## Timeouts
+`uv run pytest` sem `-n` é serial. Ele também inclui a seleção E2E a menos que
+você passe `-m "not e2e"`; use os alvos do Makefile no ciclo normal.
 
-O `pytest-timeout` reprova um teste travado com o nome dele, em vez de deixá-lo
-consumir o timeout de 30 minutos do job da CI. A suíte do core usa um limite de
-180 segundos. O teste CPU-heavy do juiz VLM eleva o próprio limite para 300
-segundos porque quatro workers podem esticá-lo para 60–80s em uma máquina
-ocupada. Um teste que legitimamente precise de mais tempo sobrescreve o limite
-localmente:
+### Timeouts e marcadores
 
-```python
-import pytest
+O `pytest-timeout` dá à suíte do core um limite de 180 segundos por teste. O
+teste CPU-heavy do juiz VLM eleva o próprio limite para 300 segundos porque
+quatro workers podem esticá-lo em uma máquina ocupada. Para depurar um travamento:
 
-@pytest.mark.timeout(300)
-def test_a_long_but_bounded_operation():
-    ...
+```bash
+uv run pytest --timeout=0 ...
 ```
 
-Para depurar sem o timeout padrão, passe `--timeout=0`:
-`uv run pytest --timeout=0 ...`. O `-p no:timeout` não funciona com o
-`--strict-config` deste projeto, porque desativar o plugin também remove a opção
-`timeout`. Um `@pytest.mark.timeout(...)` explícito continua tendo precedência
-sobre `--timeout=0`, então remova o marcador ao depurar esse teste.
+`-p no:timeout` **não** funciona com o `--strict-config` deste projeto, porque
+desativar o plugin também remove a opção `timeout`. Um
+`@pytest.mark.timeout(...)` explícito continua tendo precedência sobre
+`--timeout=0`, então remova o marcador ao depurar esse teste.
 
-## Artefatos da CI
+O marcador `slow` identifica o teste caro conhecido do VLM. `-m slow` repete só
+ele; `-m "not slow"` é um loop local mais rápido. O `make test-all` continua
+executando-o, porque o gate completo não pode pular testes. Nenhum teste precisa
+de execução serial hoje.
 
-A CI executa a suíte do core com `-n 4 --dist worksteal` dentro do job existente
-`tests (Python 3.11)`; o nome do job não muda, então o check obrigatório
-continua funcionando. A etapa separada de coleta foi removida porque a execução
-já coleta a suíte. O job levou 1m50s antes desta mudança; depois dela, três
-execuções levaram 1m26s, 59s e 1m20s
-([43345582194](https://github.com/A11yDevs/acessilia/actions/runs/43345582194),
-[43345892112](https://github.com/A11yDevs/acessilia/actions/runs/43345892112),
-[43346208871](https://github.com/A11yDevs/acessilia/actions/runs/43346208871)),
-todas abaixo da meta de 90s. A execução do core caiu de 60s para 26–43s e a
-etapa de coleta de 10s desapareceu. O job continua rodando as suítes do
-docstruct e do SDK, recusando skips inesperados, imprimindo os 25 testes mais
-lentos e publicando os relatórios JUnit mesmo quando uma etapa falha:
-`test-reports` para as suítes do core, docstruct e SDK, e
-`sdk-isolated-report` para o job isolado do SDK. A entrega da imagem espera por
-`tests` e `sdk-isolated`.
+## Receitas
 
-## Monitoramento agendado
+### Mudei um arquivo
 
-O workflow `Scheduled test monitoring` roda toda segunda-feira às 06:00 UTC e
-sob demanda. O cron só começa a disparar depois que o arquivo do workflow chega
-ao branch padrão; o agendamento começa nele, mas a matriz faz checkout e testa
-`main` e `develop`. Cada ref executa a suíte do core serialmente e de novo
-com `-n 4 --dist worksteal`, roda docstruct e SDK e compara os dois relatórios
-JUnit do core. Um teste com resultado diferente entre as execuções é uma
-dependência de ordem ou de worker; o workflow falha e mantém os relatórios por
-30 dias. Ele também falha quando a comparação do core ou os relatórios do
-docstruct/SDK contêm falha, erro ou skip. O resumo registra totais, p50/p95 das
-durações e os testes mais lentos. O tempo do JUnit cobre os testes; a duração do
-job no GitHub Actions é a referência de consumo do runner.
+```bash
+make test-file F=tests/test_the_file.py
+```
 
-Uma falha em execução agendada abre ou atualiza a issue `Scheduled test
-monitoring failed`, com link para a execução. Falhas de `workflow_dispatch`
-manual apenas aparecem na execução do Actions.
+### Um teste falhou e eu corrigi
 
-O job de E2E roda quando as variáveis do repositório `TOOLBOX_BASE_URL` ou
-`CORE_BASE_URL` estão configuradas; caso contrário, é pulado. Ele usa o secret
-opcional `TOOLBOX_API_KEY` e a variável `CORE_EXPECT_BUILD_INFO` documentada no
-[README dos testes](../tests/README.pt-br.md#testes-end-to-end). O corpus
-opcional do dataset não é clonado no job agendado, então esses casos são
-pulados. O E2E continua sendo uma validação agendada, não um portão de merge: o
-portão é formado pelos checks non-E2E `tests (Python 3.11)` e `SDK alone`.
+```bash
+make test-failed
+```
 
-O marcador `slow` identifica o teste CPU-heavy conhecido do juiz VLM. Use
-`uv run pytest -m slow` para repeti-lo, ou `-m "not slow"` para um loop local
-mais rápido; o `make test-all` continua executando-o. Nenhum teste precisa de
-execução serial hoje; o marcador `serial` será introduzido com o primeiro teste
-que demonstrar essa necessidade.
+Se o cache não tiver falha real, o comando termina com sucesso e uma mensagem;
+ele não roda a suíte inteira silenciosamente.
+
+### Quero confiança local completa antes do push
+
+```bash
+make test-all
+```
+
+É o equivalente local do gate da CI: core com quatro workers, depois docstruct e
+SDK.
+
+### Preciso investigar um teste lento ou travado
+
+```bash
+# make test-file já adiciona --durations=25
+make test-file F=tests/test_the_file.py
+
+# Desative o timeout apenas enquanto depura um node id
+uv run pytest -m "not e2e" tests/test_the_file.py::test_name --timeout=0 -s
+```
+
+### Preciso de E2E
+
+Testes E2E precisam de um ambiente real e ficam fora do ciclo normal:
+
+```bash
+TOOLBOX_BASE_URL=https://toolbox.example/toolbox \
+TOOLBOX_API_KEY="$TOOLBOX_API_KEY" \
+uv run pytest -m e2e -v
+```
+
+Veja o [README dos testes](../tests/README.pt-br.md#testes-end-to-end) para as
+variáveis da API do Core e o corpus opcional. O E2E também é uma validação
+agendada, não um gate de merge.
+
+## Solução de problemas
+
+**Por que `uv run pytest` continua lento?**
+Porque ele é serial por padrão. Use `make test-all` ou adicione
+`-n 4 --dist worksteal` ao comando do core.
+
+**Por que quatro workers e não `-n auto`?**
+Quatro acompanha o runner da CI e foi mais rápido aqui: o teste mais lento não
+pode ser dividido e processos extras disputam os mesmos núcleos. Use
+`CORE_JOBS` se sua máquina tiver outro formato.
+
+**Por que não adotamos o `pytest-testmon`?**
+Ele não rastreia arquivos estáticos (docs, schemas, fixtures), não roda as
+suítes das bibliotecas, tem uma linha de base cara e mostrou falsos negativos. As
+evidências estão no experimento da
+[#448](https://github.com/A11yDevs/acessilia/issues/448).
+
+**O que aconteceu com a etapa de coleta da CI?**
+A execução de testes coleta a suíte sozinha, então a etapa separada de
+`--collect-only` era redundante.
+
+**Onde estão os relatórios de testes lentos?**
+O `make` e a CI passam `--durations=25`. A CI também publica os relatórios JUnit
+como `test-reports` e `sdk-isolated-report`, com retenção de 7 dias.
+
+**Onde vejo a comparação agendada?**
+Depois que o workflow chega ao branch padrão, abra Actions →
+`Scheduled test monitoring`. Cada execução de `main`/`develop` publica
+`scheduled-test-reports-<ref>` e escreve p50/p95 e os testes mais lentos no
+resumo do job.
+
+**Por que minha execução paralela falha com erro de diretório de dados?**
+A suíte agora é isolada por worker; se isso aparecer de novo, um novo teste está
+compartilhando um caminho de execução. Confira os caminhos por worker em
+`tests/test_api.py` e use `tmp_path`/`tmp_path_factory` para estado mutável novo.
+
+## Onde ver os resultados
+
+- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
+  `Run complete test suite`. O log mostra `created: 4/4 workers` e
+  `--durations=25`.
+- **Artefatos:** `test-reports` (core, docstruct, SDK) e
+  `sdk-isolated-report`.
+- **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
+  30 dias e uma issue de acompanhamento em falhas agendadas.
+- **Rulesets:** `main` e `develop` exigem `tests (Python 3.11)` e
+  `SDK alone (Python 3.11)`.
+- **Localmente:** rode `time make test-all` e compare com o comando serial do
+  core acima na mesma máquina ociosa.
 
 ## Ambientes suportados
 
 - **macOS e Linux.** O `make` vem com as ferramentas de linha de comando do
   Xcode no macOS e está presente nas distribuições Linux comuns.
-- **`uv`** precisa estar instalado ([documentação](https://docs.astral.sh/uv/)).
-  Os comandos rodam a partir da raiz do repositório; as bibliotecas são pacotes
-  separados e são chamadas com `uv run --extra dev pytest` em seus diretórios.
-  O extra dev inclui o `pytest-xdist`, então `uv sync --extra dev` basta para o
-  `make test-all`.
+- **`uv`** é necessário ([documentação](https://docs.astral.sh/uv/)). Rode os
+  comandos a partir da raiz do repositório. As bibliotecas são pacotes separados
+  e são chamadas com `uv run --extra dev pytest` em seus diretórios.
+- `uv sync --extra dev` instala o `pytest-xdist` e as dependências usadas pelos
+  alvos do Makefile e pela CI.
 
 ## Escopo e trabalhos relacionados
 
 - A constituição ainda indica o container Docker como portão primário; a
   [#190](https://github.com/A11yDevs/acessilia/issues/190) acompanha a reescrita
-  dessa regra. O [README dos testes](../tests/README.pt-br.md#execução) agora
-  afirma que a CI é o portão aplicado e que a imagem não tem estágio `test`.
-  Até a #190, a CI executa as três suítes nativamente e é o check exigido antes
-  do merge.
+  dessa regra. O [README dos testes](../tests/README.pt-br.md#execução) afirma
+  que a CI é o portão aplicado e que a imagem não tem estágio `test`.
 - Instalação e cache de dependências continuam na
   [#405](https://github.com/A11yDevs/acessilia/issues/405).
+- Os comandos locais, as correções de isolamento, a paralelização da CI, a
+  decisão sobre o testmon e o monitoramento agendado foram entregues pelos cinco
+  PRs da [#448](https://github.com/A11yDevs/acessilia/issues/448).

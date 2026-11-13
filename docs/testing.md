@@ -1,258 +1,404 @@
-# Local test workflow
+# Testing workflow: fast feedback and the full gate
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](testing.pt-br.md).
 
-This page describes the supported local edit–test–fix loop. The commands are
-thin wrappers around pytest; CI keeps running the complete suites before a
-merge. Issue [#448](https://github.com/A11yDevs/acessilia/issues/448) tracks the
-testing workflow: local commands (PR 1), bounded parallel execution (PR 2), CI
-optimization (PR 4) and scheduled monitoring (PR 5). Test impact analysis (PR 3)
-was evaluated and is not part of the workflow.
+The project has about 4,700 tests: roughly 3,000 non-E2E tests in the core,
+1,272 in `libs/docstruct` and 450 in `libs/sdk`. Running all of them after every
+small edit is expensive, both locally and in CI. This guide explains how the
+suite is organized, which commands to use in each part of the edit–test–fix
+loop, and which techniques make the loop faster without weakening the full
+regression gate. The changes came from issue
+[#448](https://github.com/A11yDevs/acessilia/issues/448).
 
-## Baseline
+## The problem: a large suite, a short loop
 
-Measured on 2026-11-11 at `c3ea6d5d`, before the local commands were added:
+A full serial run of the core takes about 2m23s on the reference machine; the
+CI `tests` job used to take 1m59s. Most of that time is unrelated to a one-line
+edit. Waiting minutes for every change breaks concentration and encourages
+skipping tests.
 
-| Suite | Tests | Collection | Full run |
-|---|---|---|---|
-| Core (`-m "not e2e"`) | 2800 collected, 2740 selected | 10.2s | 132.0s |
-| `libs/docstruct` | 1194 | 1.05s | — |
-| `libs/sdk` | 427 | 0.46s | — |
+The answer is not to run fewer tests in the merge gate. It is to run the
+*right* tests during development, run the full suite before integration, and
+make the full suite itself faster.
 
-Environment: macOS, 12 logical cores, 16 GB RAM, Python 3.11.15, pytest 9.1.1.
-The CI `tests` job took 1m59s in
-[run 43038402225](https://github.com/A11yDevs/acessilia/actions/runs/43038402225):
-26s to install dependencies, 12s to collect, 65s for the core suite and 5s for
-each library suite.
+## Which command should I use?
 
-These numbers are a reference, not a guarantee: they vary with the machine, the
-operating system and the dependency cache. `--durations=25` prints the slowest
-tests on every run, so a fresh baseline is one command away:
+| Situation | Command | What happens |
+|---|---|---|
+| I changed one file or one test | `make test-file F=tests/test_example.py` | Runs only that path, non-E2E |
+| I fixed a failure and want to confirm it | `make test-failed` | Reruns the failures recorded in the core, docstruct and SDK caches |
+| I want the full local confidence check | `make test-all` | Core with four workers, then docstruct and SDK |
+| I want the core only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E core with four workers |
+| I need the exact commands `make` uses | `make -n test-all` | Prints the commands without running them |
+
+`make` with no target prints the short command list.
+
+> **Important:** `uv run pytest` without `-n` is **serial**. It also does not run
+> the `libs/docstruct` and `libs/sdk` suites. The speed-up comes from
+> `make test-all` or from passing `-n 4 --dist worksteal` explicitly.
+
+## What runs by default
+
+### In CI
+
+Every pull request and push to `develop`, `main` or a release branch runs the
+GitHub Actions workflow `CI`:
+
+- **`tests (Python 3.11)`** installs the project, checks the Toolbox capability
+  contract, runs the non-E2E core suite with **four workers**, runs the
+  docstruct and SDK suites, rejects unexpected skipped tests and uploads JUnit
+  reports.
+- **`SDK alone (Python 3.11)`** installs only the SDK and proves that it works
+  without the core or docstruct.
+- Both jobs are required checks in the live rulesets for `main` and `develop`.
+- Image delivery waits for both jobs.
+
+The core check does not have a separate collection step: the test run collects
+the suite itself. The job name is intentionally kept as `tests (Python 3.11)` so
+branch protection and existing links keep working.
+
+### Locally
+
+The supported full local command is:
 
 ```bash
-uv run pytest -m "not e2e" --durations=25
+make test-all
 ```
 
-### Parallel baseline
+It runs the non-E2E core with four workers, then the docstruct and SDK suites
+sequentially. The libraries are fast and have separate package environments, so
+they stay simple. `make test-all` executes all three suites even if one fails,
+and returns a non-zero status if any of them failed.
 
-After the isolation fixes in PR 2, with about 2920 core tests on the same
-machine (2026-11-12):
+Running plain `uv run pytest` from the repository root is a different thing: it
+uses pytest's defaults, includes E2E tests that need a live environment, and
+runs serially.
 
-| Run | Wall time |
-|---|---|
-| Core serial | 143s |
-| Core `-n 4 --dist worksteal` | 74s (1.9x) |
-| Core `-n 2 --dist worksteal` | 124s |
-| Core `-n auto --dist worksteal` | 96s |
-| Core `-n 4 --dist load` | 178s |
+## The techniques, in plain language
 
-`worksteal` wins because a few long tests dominate the tail; `load` assigns
-whole modules and leaves workers idle. `-n auto` (12 workers here) was slower
-than four: the slowest test cannot be split, and the extra processes contend
-for the same cores. The slowest test alone takes roughly 20–80s depending on
-load, so it caps the gain. These numbers are a reference, not a guarantee.
+### 1. Run only what you are changing
 
-## Commands
+A pytest **node id** identifies one test, for example
+`tests/test_api.py::test_health`. Running one file or one node is much faster
+than running the whole suite, and it is the normal first step of the local loop.
 
-| Command | What it runs |
-|---|---|
-| `make test-file F=tests/test_example.py` | One file or one node id (`tests/test_api.py::test_health`), non-E2E |
-| `make test-failed` | The failures recorded in the core, docstruct and SDK caches |
-| `make test-all` | The non-E2E core suite with four workers, then docstruct and SDK sequentially |
+```bash
+make test-file F=tests/test_api.py::test_health
+make test-file F=tests/test_pddl_planning.py
+```
 
-`make` with no target prints the same list.
+`make test-file` adds `-m "not e2e"` and `--durations=25`, so E2E tests are
+excluded and the slowest tests in that file are printed. For a single file,
+starting four workers usually adds more overhead than it saves; targeted runs
+stay serial.
 
-`test-failed` reads the `lastfailed` cache of all three suites (`.pytest_cache`
-at the repository root, `libs/docstruct` and `libs/sdk`) and reruns each
-suite's failures from its own directory, with the same configuration and
-relative node ids as `test-all`. Before running, it collects only the recorded
-files and keeps the ids that still exist. A removed or renamed test is reported
-and skipped instead of making `pytest --lf` fall back to the whole suite; a file
-recorded with a collection error is rerun as a file. When there is no recorded
-failure, or the only recorded failures are E2E tests, it prints a message and
-exits successfully.
+### 2. Rerun only the failures
 
-`test-all` stops at no suite: it runs all three and returns the last non-zero
-exit status, so a failing library does not hide the core result. The core suite
-uses `-n 4 --dist worksteal`; docstruct and SDK stay sequential.
+After a failed run, `pytest --lf` would be the obvious next command, but it has
+two traps in this repository: it can fall back to the whole suite when the cache
+is empty, and it knows nothing about the separate library caches.
 
-The core suite runs with `-m "not e2e"`; use `uv run pytest -m e2e` directly to
-reach a live environment, as described in
-[tests/README.md](../tests/README.md).
+`make test-failed` is the supported wrapper. It:
 
-## Parallel execution
+- reads the `lastfailed` cache for the core, docstruct and SDK;
+- checks that the recorded files still exist and collects only those files;
+- reruns the explicit node ids that still exist;
+- reports removed or renamed tests instead of falling back to a full run;
+- reruns a file recorded with a collection error as a file;
+- exits successfully with a message when there is nothing to rerun.
 
-`make test-all` passes `-n 4 --dist worksteal` to the core suite. Running
-`uv run pytest` without `-n` remains serial; use `make test-all` or pass
-`-n 4 --dist worksteal` directly to run the core suite in parallel. Override
-the bound or the distribution without editing the Makefile:
+That makes the "fix one failure, confirm it, move on" loop fast and predictable.
+
+### 3. Run the core suite in parallel
+
+The core suite is the large one. `pytest-xdist` starts several worker processes
+and distributes tests across them. The Makefile and CI use
+`-n 4 --dist worksteal`:
+
+- **`-n 4`** starts four workers, matching the four-vCPU GitHub runner and
+  keeping memory use bounded.
+- **`--dist worksteal`** gives a worker a new test as soon as it finishes one.
+  This matters because a few tests are much slower than the rest; a fixed
+  module-based distribution leaves workers idle while one worker finishes a
+  long tail.
+
+The result is roughly **1.9x** for the core suite on the reference 12-core
+machine: **143s serial → 74s with four workers** in a quiet run. `-n 2` is
+slower (124s), `--dist load` is slower (178s), and `-n auto` (12 workers) was
+slower (96s) because the long test cannot be split and the extra processes
+compete for the same cores. Four is the supported bound, not a universal
+optimum.
+
+### 4. Isolation is what makes parallelism safe
+
+Parallelism only works if tests do not fight over the same files, databases or
+locks. The suite had two real conflicts:
+
+- `tests/test_api.py` used to start every worker against the shared `var/data`
+  directory. The second worker failed in `runtime_lease()` because only one API
+  worker may own that directory. The session client now receives the worker's
+  `tmp_path_factory` tree (`temp_dir`, `data_dir`, `logs_dir`) before the app
+  starts.
+- The optional-export test used a shared output directory, so an `audio.docx`
+  from one parametrization could leak into the next. It now writes input and
+  output under `tmp_path`.
+
+The testmon experiment also exposed an order dependency in the history
+database. `test_history_empty` and `test_stats_empty` now use a per-test
+`fresh_history_db`, so an empty-history assertion does not depend on what ran
+before it.
+
+No test currently needs to be marked as serial. If one does, the `serial`
+marker will be introduced together with the mechanism that makes it run alone.
+
+### 5. Put the same wins in CI
+
+CI uses the same bounded parallel core run as `make test-all`. Removing the
+standalone `--collect-only` step and parallelizing the core took the `tests` job
+from **1m59s** to **59s–1m26s** in the validation runs; one validation run on
+develop took **1m11s**, with the core step at **32s**. The other jobs stay unchanged:
+docstruct and SDK are still tested, skips are still rejected, the contract
+check still runs and the JUnit artifacts are still uploaded even on failure.
+
+### 6. Monitor order-dependent and flaky behaviour
+
+Parallelism and different orders can reveal a test that depends on another
+test's leftovers. The `Scheduled test monitoring` workflow runs weekly (and on
+demand) for `main` and `develop`. For each branch it runs the core suite
+serially and again with four workers, compares the JUnit outcomes, fails on a
+difference, failure, error or unexpected skip, and writes a summary with p50/p95
+test durations and the slowest tests. A scheduled failure opens or updates the
+issue `Scheduled test monitoring failed`.
+
+The workflow only starts firing after its file reaches the default branch. E2E
+is a separate, conditional job: it runs only when `TOOLBOX_BASE_URL` or
+`CORE_BASE_URL` is configured, and it is not a merge gate.
+
+### 7. Automatic test selection was evaluated and rejected
+
+`pytest-testmon` selects tests affected by a change by tracking coverage. The
+experiment found that it cannot see static files such as docs, schemas and
+fixtures, and that the root command does not run the library suites. A README
+change selected zero tests even though a mandatory static gate failed; a
+central change selected 246 tests; rebuilding the dependency database took
+221s in the quiet measurement (+55% over the serial core baseline). It also
+added a stateful `.testmondata` database and showed unstable selection between
+runs. The full details and measurements are in the experiment record from
+[#448](https://github.com/A11yDevs/acessilia/issues/448).
+
+`pytest-testmon` is **not** a project dependency and `make test-fast` is not
+part of the workflow. The supported shortcuts remain `test-file`, `test-failed`
+and parallel `test-all`.
+
+## Measured gains
+
+Reference machine: macOS, 12 logical cores, 16 GB RAM, Python 3.11.15, pytest
+9.1.1. These numbers vary with the machine, load and dependency cache.
+
+| Scenario | Before | After |
+|---|---:|---:|
+| Core suite, serial vs four workers | 143s | 74s (~1.9x) |
+| CI core step | 60s + 10s collection | 26–43s |
+| CI `tests` job | 1m59s | 59s–1m26s (one run: 1m11s) |
+
+`--durations=25` prints the slowest tests of any run, so you can refresh the
+baseline on your own machine with:
+
+```bash
+make test-all
+# or only the core:
+time uv run pytest -m "not e2e" --durations=25
+time uv run pytest -m "not e2e" -n 4 --dist worksteal --durations=25
+```
+
+## Command reference
+
+### Make targets
+
+```bash
+make help
+make test-file F=tests/test_example.py
+make test-file F=tests/test_api.py::test_health
+make test-failed
+make test-all
+```
+
+`make -n test-all` prints the exact commands without running them.
+
+Useful variables:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CORE_JOBS` | `4` | Number of xdist workers for the core |
+| `CORE_DIST` | `worksteal` | xdist distribution strategy |
+| `DURATIONS` | `25` | Number of slow tests printed |
+| `PYTEST` | `uv run pytest` | Pytest command used by the Makefile |
+| `PYTEST_FLAGS` | `-m "not e2e"` | Selection flags for the core |
+
+Examples:
 
 ```bash
 make test-all CORE_JOBS=2
 make test-all CORE_DIST=load
 ```
 
-The suite is parallel-safe because tests that used to share runtime paths now
-use per-worker paths:
-
-- `tests/test_api.py` points `settings.temp_dir`, `settings.data_dir` and
-  `settings.logs_dir` at the worker's `tmp_path_factory` directory before the
-  session `TestClient` starts the app. Without that, the second worker fails
-  `runtime_lease()` with `RuntimeError: Only one API worker may use a data
-  directory`.
-- the optional-export test writes its input and output under `tmp_path`, so an
-  `audio.docx` left by one parametrization cannot leak into the next.
-
-`-n auto` is not enabled. It passed in the validation run but was slower (96s)
-than four workers (74s) and uses more memory. Keep it as an experimental local
-option; CI and `make test-all` stay bounded.
-
-## Test impact analysis (evaluated, not adopted)
-
-PR 3 of #448 evaluated `pytest-testmon` as an optional `make test-fast`. It is
-not part of the workflow: the experiment found misses that would need a large,
-easy-to-stale fallback, and the baseline cost exceeds the gain for this suite.
-
-Measured on 2026-11-12 with `pytest-testmon 2.3.0` on the same 12-core machine,
-which was under load (the serial core baseline is 143s and `make test-all` ran
-in about 75s in a quiet run):
-
-| Scenario | Result |
-|---|---|
-| Baseline reconstruction (`--testmon-forceselect`, whole non-E2E core) | 603s (221s in the earlier quiet measurement) |
-| No changes | 2.7s (6.5s wall including interpreter startup) |
-| Five leaf changes | 1–4 tests selected; median 9.1s, max 16.8s (five samples) |
-| Central change (`backend/config/settings.py`) | 246 tests, 66s |
-| README change (static file) | 0 tests selected; `test_docstruct_readme_sync` fails when run directly |
-| docstruct leaf change | 2 root tests selected; the docstruct suite does not run |
-| SDK leaf change | 1 root test selected; the SDK suite does not run |
-| Root static-gate files | 129 tests, 6.9s |
-
-The static-file sample is a 1/1 false negative; the five leaf samples selected
-their direct tests. This is a small sample, but one mandatory gate missed is
-enough to require a fallback.
-
-Why it was rejected:
-
-- **Static files are invisible to testmon.** Docs, schemas, fixtures,
-  `pyproject.toml`, `uv.lock`, `.env` and shared contracts need an explicit
-  fallback. The repo has mandatory static gates (`test_no_portuguese`,
-  `test_docstruct_readme_sync`, `test_architecture_layers`, `test_i18n`,
-  `test_compose_config`, `test_docs_pr125`, plus the library purity tests), and
-  running them on every change would move the leaf median from 9.1s to about
-  16s, above the 10s target.
-- **Libraries are separate suites.** The root command does not run
-  `libs/docstruct` or `libs/sdk`; a change there needs a fallback to those
-  suites, which testmon does not select.
-- **Baseline cost and invalidation.** Rebuilding `.testmondata` took 603s under
-  load. The earlier quiet run was 221s, +55% over the current 143s serial
-  baseline (it was +67% over the 132s baseline recorded at the earlier commit),
-  and the database must be rebuilt after dependency or environment changes.
-- **Stateful selection.** The same `runtime_lease.py` change selected 3 tests in
-  one run and 4 when collected again; the database is another stateful artifact
-  to keep in sync.
-- The experiment did expose a real order dependency: `test_history_empty` and
-  `test_stats_empty` now use a per-test `fresh_history_db` fixture, so a
-  selective run cannot see rows recorded by an earlier test.
-
-The supported workflow remains `make test-file`, `make test-failed` and
-`make test-all` (core with four workers). `pytest-testmon` is not a project
-dependency. Delete `.testmondata*` to rebuild the baseline after dependency,
-interpreter or plugin changes. The file is ignored, so the experiment can still
-be reproduced locally:
+### Direct pytest
 
 ```bash
-rm -f .testmondata*
-uv run --with pytest-testmon pytest --testmon-forceselect -m "not e2e"
+# One node id
+uv run pytest -m "not e2e" tests/test_api.py::test_health
+
+# One file, serial
+uv run pytest -m "not e2e" tests/test_pddl_planning.py
+
+# Core, four workers
+uv run pytest -m "not e2e" -n 4 --dist worksteal --durations=25
+
+# Only the library suites
+(cd libs/docstruct && uv run --extra dev pytest)
+(cd libs/sdk && uv run --extra dev pytest)
 ```
 
-## Timeouts
+`uv run pytest` without `-n` is serial. `uv run pytest` also includes E2E
+selection unless you pass `-m "not e2e"`; use the make targets for the normal
+loop.
 
-`pytest-timeout` fails a hung test with its name instead of letting it consume
-the 30-minute CI job timeout. The core suite uses a 180-second limit. The
-CPU-heavy VLM judge test raises its own limit to 300 seconds because four
-workers can stretch it to 60–80s on a busy machine. A test that legitimately
-needs longer overrides the limit locally:
+### Timeouts and markers
 
-```python
-import pytest
+`pytest-timeout` gives the core suite a 180-second per-test limit. The CPU-heavy
+VLM judge test raises its own limit to 300 seconds because four workers can
+stretch it on a busy machine. To debug a hang:
 
-@pytest.mark.timeout(300)
-def test_a_long_but_bounded_operation():
-    ...
+```bash
+uv run pytest --timeout=0 ...
 ```
 
-To debug without the default timeout, pass `--timeout=0`:
-`uv run pytest --timeout=0 ...`. `-p no:timeout` does not work with this
-project's `--strict-config`, because disabling the plugin also removes its
-`timeout` option. An explicit `@pytest.mark.timeout(...)` still takes precedence
-over `--timeout=0`, so remove the marker while debugging that test.
+`-p no:timeout` does **not** work with this project's `--strict-config`, because
+disabling the plugin also removes its `timeout` option. An explicit
+`@pytest.mark.timeout(...)` still takes precedence over `--timeout=0`, so remove
+the marker while debugging that test.
 
-## CI artifacts
+The `slow` marker identifies the known expensive VLM test. `-m slow` repeats it;
+`-m "not slow"` is a faster local loop. `make test-all` still runs it, because
+the full gate must not skip tests. No test currently needs serial execution.
 
-CI runs the core suite with `-n 4 --dist worksteal` inside the existing
-`tests (Python 3.11)` job; the job name is unchanged, so the required check
-keeps working. The standalone collection step is gone because the run collects
-the suite. The job took 1m50s before this change; after it, three runs took
-1m26s, 59s and 1m20s
-([43345582194](https://github.com/A11yDevs/acessilia/actions/runs/43345582194),
-[43345892112](https://github.com/A11yDevs/acessilia/actions/runs/43345892112),
-[43346208871](https://github.com/A11yDevs/acessilia/actions/runs/43346208871)),
-all below the 90s target. The core run dropped from 60s to 26–43s and the 10s
-collection step disappeared. The job still runs the docstruct and SDK suites,
-rejects unexpected skips, prints the 25 slowest tests and uploads the JUnit
-reports even when a step fails:
-`test-reports` for the core, docstruct and SDK suites, and `sdk-isolated-report`
-for the SDK-only job. Image delivery waits for both `tests` and `sdk-isolated`.
+## Recipes
 
-## Scheduled monitoring
+### I changed one file
 
-The `Scheduled test monitoring` workflow runs every Monday at 06:00 UTC and on
-demand. The cron only starts firing after the workflow file reaches the default
-branch; the schedule starts there, but the matrix checks out and tests both
-`main` and `develop`. Each ref runs the core suite serially and again
-with `-n 4 --dist worksteal`, runs docstruct and SDK, and compares the two core
-JUnit reports. A test with a different outcome between the runs is an order or
-worker dependency; the workflow fails and keeps the reports for 30 days. It also
-fails when the core comparison or the docstruct/SDK reports contain a failure,
-error or skip. The summary records totals, p50/p95 test durations and the
-slowest tests. JUnit time covers the tests; the job duration in GitHub Actions
-is the runner-consumption reference.
+```bash
+make test-file F=tests/test_the_file.py
+```
 
-A failure in a scheduled run opens or updates the issue `Scheduled test
-monitoring failed`, with a link to the run. Manual `workflow_dispatch` failures
-only show in the Actions run.
+### A test failed and I fixed it
 
-The E2E job runs when the repository variables `TOOLBOX_BASE_URL` or
-`CORE_BASE_URL` are configured; otherwise it is skipped. It uses the optional
-`TOOLBOX_API_KEY` secret and the `CORE_EXPECT_BUILD_INFO` variable documented in
-the [tests README](../tests/README.md#end-to-end-tests). The optional dataset
-corpus is not cloned in the scheduled job, so those cases skip. E2E remains a
-scheduled validation, not a merge gate: the merge gate is the non-E2E
-`tests (Python 3.11)` and `SDK alone` checks.
+```bash
+make test-failed
+```
 
-The `slow` marker identifies the known CPU-heavy VLM judge test. Use
-`uv run pytest -m slow` to repeat it, or `-m "not slow"` for a faster local
-loop; `make test-all` still runs it. No test currently needs serial execution;
-the `serial` marker will be introduced with the first test that demonstrates
-that need.
+If the cache has no real failure, the command exits successfully with a message;
+it does not silently run the whole suite.
+
+### I want full local confidence before pushing
+
+```bash
+make test-all
+```
+
+This is the local equivalent of the CI gate: core with four workers, then
+docstruct and SDK.
+
+### I need to investigate a slow or hanging test
+
+```bash
+# make test-file already adds --durations=25
+make test-file F=tests/test_the_file.py
+
+# Disable the timeout only while debugging one node id
+uv run pytest -m "not e2e" tests/test_the_file.py::test_name --timeout=0 -s
+```
+
+### I need E2E
+
+E2E tests need a live environment and are excluded from the normal loop:
+
+```bash
+TOOLBOX_BASE_URL=https://toolbox.example/toolbox \
+TOOLBOX_API_KEY="$TOOLBOX_API_KEY" \
+uv run pytest -m e2e -v
+```
+
+See [tests/README.md](../tests/README.md#end-to-end-tests) for the Core API
+variables and the optional dataset corpus. E2E is also a scheduled validation,
+not a merge gate.
+
+## Troubleshooting
+
+**Why is `uv run pytest` still slow?**
+Because it is serial by default. Use `make test-all` or add
+`-n 4 --dist worksteal` to the core command.
+
+**Why four workers and not `-n auto`?**
+Four matches the CI runner and was faster here: the slowest test cannot be
+split, and extra processes compete for the same cores. Use `CORE_JOBS` if your
+machine has a different shape.
+
+**Why did we not adopt `pytest-testmon`?**
+It does not track static files (docs, schemas, fixtures), does not run the
+library suites, has a costly baseline and showed false negatives. The evidence
+is in the [#448](https://github.com/A11yDevs/acessilia/issues/448) experiment.
+
+**What happened to the collection step in CI?**
+The test run collects the suite itself, so the separate `--collect-only` step
+was redundant.
+
+**Where are the slow-test reports?**
+`make` and CI pass `--durations=25`. CI also uploads JUnit reports as
+`test-reports` and `sdk-isolated-report`, with 7-day retention.
+
+**Where do I see the scheduled comparison?**
+After the workflow reaches the default branch, open Actions →
+`Scheduled test monitoring`. Each `main`/`develop` run uploads
+`scheduled-test-reports-<ref>` and writes p50/p95 and the slowest tests to the
+job summary.
+
+**Why is my parallel run failing with a data-directory error?**
+The suite is now isolated per worker; if this appears again, it means a new test
+is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
+`tmp_path`/`tmp_path_factory` for new mutable state.
+
+## Where to see the results
+
+- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
+  `Run complete test suite`. The log shows `created: 4/4 workers` and
+  `--durations=25`.
+- **Artifacts:** `test-reports` (core, docstruct, SDK) and
+  `sdk-isolated-report`.
+- **Scheduled:** workflow `Scheduled test monitoring`, with artifacts retained
+  for 30 days and a tracking issue on scheduled failures.
+- **Rulesets:** both `main` and `develop` require `tests (Python 3.11)` and
+  `SDK alone (Python 3.11)`.
+- **Locally:** run `time make test-all` and compare it with the serial core
+  command above on the same idle machine.
 
 ## Supported environments
 
-- **macOS and Linux.** `make` ships with the Xcode command line tools on macOS
+- **macOS and Linux.** `make` ships with the Xcode command-line tools on macOS
   and is present on common Linux distributions.
-- **`uv`** must be installed ([docs](https://docs.astral.sh/uv/)). The commands
-  run from the repository root; the libraries are separate packages and are
-  invoked with `uv run --extra dev pytest` from their own directories. The dev
-  extra includes `pytest-xdist`, so `uv sync --extra dev` is enough for
-  `make test-all`.
+- **`uv`** is required ([docs](https://docs.astral.sh/uv/)). Run the commands
+  from the repository root. The libraries are separate packages and are invoked
+  with `uv run --extra dev pytest` from their own directories.
+- `uv sync --extra dev` installs `pytest-xdist` and the dependencies used by
+  the Make targets and CI.
 
 ## Scope and related work
 
 - The constitution still names the Docker container as the primary gate;
   [#190](https://github.com/A11yDevs/acessilia/issues/190) tracks rewording that
-  rule. The [tests README](../tests/README.md#running) now states that CI is the
-  enforced gate and the image has no `test` stage. Until #190, CI runs the three
-  suites natively and is the check enforced before a merge.
-- Dependency installation and caching stay under
+  rule. The [tests README](../tests/README.md#running) states that CI is the
+  enforced gate and the image has no `test` stage.
+- Dependency installation and caching remain under
   [#405](https://github.com/A11yDevs/acessilia/issues/405).
+- The local commands, isolation fixes, CI parallelization, testmon decision and
+  scheduled monitoring were delivered through the five PRs of
+  [#448](https://github.com/A11yDevs/acessilia/issues/448).
