@@ -50,6 +50,7 @@ from backend.log_messages import (
     API_LINK_INVALID,
     API_LOG_FILE_NOT_FOUND,
     API_OBSERVABILITY_NOT_CONFIGURED,
+    API_OPERATIONS_NOT_CONFIGURED,
     API_OPTIONS_UNAVAILABLE,
     API_PROMPT_TOO_LONG,
     API_RATE_LIMIT_DETAIL,
@@ -415,7 +416,9 @@ from frontend.telegram.messages import (
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_BOT_PAUSED,
     MSG_BOT_RESUMED,
+    MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
     MSG_CANCEL_NO_TASK,
     MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
     MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
@@ -621,7 +624,9 @@ MESSAGES: tuple[str, ...] = (
     MSG_HEALTH_UNKNOWN,
     MSG_HEALTH_TEMP_OK,
     MSG_HEALTH_TEMP_MISSING,
+    MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
     MSG_HEALTH_DISK_FREE,
     # Telegram start.py command response ids: task cancel/result receipts, bot pause/resume confirmations, feedback prompt+thanks.
     MSG_CANCEL_NO_TASK,
@@ -641,6 +646,7 @@ MESSAGES: tuple[str, ...] = (
     API_FILE_NOT_FOUND,
     API_LOG_FILE_NOT_FOUND,
     API_OBSERVABILITY_NOT_CONFIGURED,
+    API_OPERATIONS_NOT_CONFIGURED,
     API_TOKEN_INVALID,
     API_TOKEN_READ_ONLY,
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
@@ -1391,8 +1397,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HEALTH_TEMP_OK: "✅ Pasta temporária: ok",
         # Missing temp directory reported as a warning; operator should recreate settings.temp_dir.
         MSG_HEALTH_TEMP_MISSING: "⚠️ Pasta temporária: ausente",
+        MSG_ADMIN_ONLY: "⛔ Este comando é restrito a operadores.",
         # Cache clearing receipt; {count} is how many files were removed from the cache store.
         MSG_CACHE_CLEARED: "🧹 Cache limpo! {count} arquivo(s) removido(s).",
+        MSG_CACHE_CLEAR_FAILED: (
+            "❌ Não foi possível limpar o cache do servidor ({status_code}): {detail}"
+        ),
         # Free disk space reported with one decimal in GB units (see /health disk probe).
         MSG_HEALTH_DISK_FREE: "💾 Disco livre: {free_gb:.1f} GB",
         # Confirmation receipt after successful cancellation of the user's task; {task_id} of the cancelled job.
@@ -1432,6 +1442,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         API_LOG_FILE_NOT_FOUND: "Log não encontrado",
         # 503 API detail body when observability access is not configured.
         API_OBSERVABILITY_NOT_CONFIGURED: "Acesso de observabilidade não configurado",
+        API_OPERATIONS_NOT_CONFIGURED: "Acesso de operações não configurado",
         # 401 API detail body when an invalid observability token is supplied.
         API_TOKEN_INVALID: "Token inválido",
         # 403 API detail body when write access is attempted with an observability token.

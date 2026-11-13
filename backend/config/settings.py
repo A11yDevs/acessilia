@@ -42,6 +42,14 @@ class Settings:
     observability_api_token: str = field(
         default_factory=lambda: os.getenv("OBSERVABILITY_API_TOKEN", "")
     )
+    #: Bearer token for privileged operations on the API. Empty disables them.
+    operations_api_token: str = field(
+        default_factory=lambda: os.getenv("OPERATIONS_API_TOKEN", "")
+    )
+    #: Telegram user ids allowed to run the operator commands. Empty denies all.
+    telegram_admin_ids: frozenset[int] = field(
+        default_factory=lambda: _int_set_from_env("TELEGRAM_ADMIN_IDS")
+    )
     allowed_extensions: set[str] = field(default_factory=lambda: _default_extensions())
     pdf_split_dpi: int = field(
         default_factory=lambda: int(os.getenv("PDF_SPLIT_DPI", "150"))
@@ -606,6 +614,25 @@ def _str_from_env_alias(env_vars: tuple[str, ...], default: str) -> str:
         if raw_value is not None:
             return raw_value
     return default
+
+
+def _int_set_from_env(env_var: str) -> frozenset[int]:
+    """Parse a comma-separated list of numeric ids, ignoring malformed entries.
+
+    A malformed entry is never allowed to become an operator: the result only
+    holds the values that parsed, so a typo locks that id out instead of
+    matching it or opening the command to everyone.
+    """
+    values: set[int] = set()
+    for entry in os.getenv(env_var, "").split(","):
+        value = entry.strip()
+        if not value:
+            continue
+        try:
+            values.add(int(value))
+        except ValueError:
+            continue
+    return frozenset(values)
 
 
 def _locales_from_env(raw_value: str) -> tuple[str, ...]:

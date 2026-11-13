@@ -10,16 +10,18 @@ from aiogram.types import Message
 from backend.config.settings import settings
 from backend.i18n import t
 from backend.log_messages import LOG_TELEGRAM_FEEDBACK_RECEIVED
-from backend.services.cache import clear_cache
 from backend.tools.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.telegram import user_context
 from frontend.telegram.middlewares.pause_middleware import get_paused_chats
 from frontend.telegram.messages import (
+    MSG_ADMIN_ONLY,
     MSG_BOT_PAUSED,
     MSG_BOT_RESUMED,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
+    MSG_CONTACT_SERVER_FAILED,
     MSG_CANCEL_NO_TASK,
     MSG_EMAIL_CONFIGURED,
     MSG_EMAIL_HINT,
@@ -200,8 +202,18 @@ async def cmd_status(message: Message) -> None:
     )
 
 
+def _is_operator(message: Message) -> bool:
+    """Whether the sender is listed in TELEGRAM_ADMIN_IDS (empty denies all)."""
+    user = message.from_user
+    return bool(user and user.id in settings.telegram_admin_ids)
+
+
 @router.message(Command("health"))
 async def cmd_health(message: Message) -> None:
+    """Report API, model and disk health to an operator."""
+    if not _is_operator(message):
+        await message.answer(t(MSG_ADMIN_ONLY))
+        return
     checks = []
 
     try:
@@ -252,13 +264,28 @@ async def cmd_health(message: Message) -> None:
 @router.message(Command("limpar"))
 @router.message(Command("clear"))
 async def cmd_limpar(message: Message) -> None:
-    """
-    Clear the local cache directory of processed-file artifacts and confirm how many entries were removed.
+    """Clear the server's processing cache through the operations API.
 
     Args:
-        message (Message): Incoming aiogram /limpar (or its English alias /clear) command; no default (required).
+        message (Message): Incoming aiogram /limpar (or its English alias /clear)
+            command; only senders in TELEGRAM_ADMIN_IDS may run it.
     """
-    count = await clear_cache()
+    if not _is_operator(message):
+        await message.answer(t(MSG_ADMIN_ONLY))
+        return
+    try:
+        count = await client.clear_cache()
+    except ApiError as e:
+        await message.answer(
+            t(MSG_CACHE_CLEAR_FAILED).format(
+                status_code=e.status_code, detail=e.detail
+            )
+        )
+        return
+    except Exception:
+        logger.exception("Telegram /limpar could not reach the operations API")
+        await message.answer(t(MSG_CONTACT_SERVER_FAILED))
+        return
     await message.answer(t(MSG_CACHE_CLEARED).format(count=count))
 
 

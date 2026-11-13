@@ -293,6 +293,8 @@ API_CANCEL_STATE_INVALID: str = "Task cannot be cancelled in its current state: 
 API_LOG_FILE_NOT_FOUND: str = "Log file not found"
 #: HTTP 503 detail body returned when observability access is not configured.
 API_OBSERVABILITY_NOT_CONFIGURED: str = "Observability access not configured"
+#: HTTP 503 detail body returned when privileged operations access is not configured.
+API_OPERATIONS_NOT_CONFIGURED: str = "Operations access not configured"
 #: HTTP 401 detail body returned by observability endpoints when the bearer token is missing or invalid.
 API_TOKEN_INVALID: str = "Invalid token"
 #: HTTP 403 detail body returned by observability endpoints when write access is attempted with a read-only token.
