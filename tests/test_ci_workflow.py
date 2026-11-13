@@ -228,6 +228,7 @@ def test_docstruct_pin_is_reported_in_pull_requests_and_enforced_on_schedule() -
     report = next(step for step in steps if step.get("name") == "Report the Toolbox's docstruct pin")
     assert "scripts/check_docstruct_pin.py" in report["run"]
     assert "--report-only" in report["run"]
+    assert report["env"]["TARGET_BRANCH"] == "${{ github.base_ref || github.ref_name }}"
 
     workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
     monitor = workflow["jobs"]["monitor"]["steps"]

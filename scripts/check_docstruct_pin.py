@@ -17,6 +17,11 @@ must:
    but not released yet asks nothing; a release the Toolbox did not adopt is
    reported as the Toolbox being behind.
 
+A ``docstruct-vX.Y.Z`` tag counts as a release only once its wheel can be
+downloaded: the tag is pushed before the release workflow publishes the wheel,
+and a draft release has no public asset, so a tag alone never makes the
+Toolbox "behind" (review of #498).
+
 Only the Toolbox can fix any of these, so a pull request's CI runs this with
 ``--report-only`` (findings become warnings and the step passes), and the
 scheduled monitoring runs it strictly, so a finding fails that run and reaches
@@ -33,6 +38,7 @@ import hashlib
 import re
 import sys
 import tomllib
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,7 +87,14 @@ def parse_pin(pyproject: str) -> Pin | None:
     return None
 
 
-def released_versions(tags: set[str]) -> list[str]:
+def wheel_url(version: str) -> str:
+    """Where the release of ``version`` publishes its wheel."""
+    return (
+        f"{RELEASE_PREFIX}docstruct-v{version}/acessilia_docstruct-{version}-py3-none-any.whl"
+    )
+
+
+def tagged_versions(tags: set[str]) -> list[str]:
     """Versions with a ``docstruct-vX.Y.Z`` tag, oldest first."""
     versions = [
         tag.removeprefix("docstruct-v")
@@ -97,7 +110,12 @@ def evaluate(
     releases: list[str],
     published_sha256: str | None,
 ) -> list[str]:
-    """Findings for a Toolbox pin against the core's docstruct version; empty when it agrees."""
+    """Findings for a Toolbox pin against the core's docstruct version; empty when it agrees.
+
+    ``releases`` are the versions whose wheel was found published (see
+    ``published_releases``), and ``published_sha256`` is the pinned version's
+    wheel hash when it is one of them.
+    """
     if pin is None:
         return ["the Toolbox does not pin acessilia-docstruct"]
     findings = []
@@ -136,6 +154,50 @@ def _fetch(url: str) -> bytes:
         return response.read()
 
 
+def _published_sha256(version: str) -> str | None:
+    """The SHA-256 of the wheel ``version``'s release published, ``None`` when it has none.
+
+    Only a missing asset (404) means "not published"; any other failure is
+    raised, so the check reports that it could not run instead of a verdict.
+    """
+    try:
+        return hashlib.sha256(_fetch(wheel_url(version))).hexdigest()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        raise
+
+
+def published_releases(
+    tags: list[str], core_version: str, pinned: str | None
+) -> tuple[dict[str, str], list[str]]:
+    """Published wheels to judge the pin by, and the tags found without one.
+
+    Returns ``{version: sha256}`` for the pinned version and for the newest
+    tagged version not newer than ``core_version`` that has a wheel, walking
+    the tags down from the newest, and the tags passed over for lacking one.
+    """
+    published: dict[str, str] = {}
+    unpublished: list[str] = []
+    if pinned is not None and pinned in tags:
+        sha = _published_sha256(pinned)
+        if sha is not None:
+            published[pinned] = sha
+        else:
+            unpublished.append(pinned)
+    for version in reversed([v for v in tags if version_key(v) <= version_key(core_version)]):
+        if version in published:
+            break
+        if version in unpublished:
+            continue
+        sha = _published_sha256(version)
+        if sha is not None:
+            published[version] = sha
+            break
+        unpublished.append(version)
+    return published, unpublished
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("target_branch", help="core branch being tested or merged into")
@@ -161,19 +223,27 @@ def main(argv: list[str] | None = None) -> int:
         )["project"]["version"]
         pin = parse_pin(_fetch(TOOLBOX_PYPROJECT.format(ref=toolbox_ref)).decode("utf-8"))
         _, core_tags = _remote_refs(CORE_REPOSITORY)
-        releases = released_versions(core_tags)
-        published = None
-        if pin is not None and pin.tag_version in releases and pin.url.startswith(RELEASE_PREFIX):
-            published = hashlib.sha256(_fetch(pin.url)).hexdigest()
-        findings = evaluate(core_version, pin, releases, published)
+        tags = tagged_versions(core_tags)
+        # Another repository's URL is never fetched; the pin is reported instead.
+        ours = pin is not None and pin.url == wheel_url(pin.tag_version)
+        published, unpublished = published_releases(
+            tags, core_version, pin.tag_version if ours else None
+        )
+        releases = sorted(published, key=version_key)
+        findings = evaluate(
+            core_version, pin, releases, published.get(pin.tag_version) if pin else None
+        )
     except Exception as exc:  # noqa: BLE001 - reported with its level, never swallowed
         print(f"::{level}::cannot check the Toolbox's docstruct pin: {type(exc).__name__}: {exc}")
         return 0 if args.report_only else 1
     pinned = pin.tag_version if pin else "nothing"
     print(
         f"core {args.target_branch}: docstruct {core_version}; "
-        f"Toolbox {toolbox_ref}: pins {pinned}; releases: {', '.join(releases)}"
+        f"Toolbox {toolbox_ref}: pins {pinned}; tags: {', '.join(tags)}; "
+        f"published wheels checked: {', '.join(releases) or 'none'}"
     )
+    if unpublished:
+        print(f"tags without a published wheel yet: {', '.join(unpublished)}")
     for finding in findings:
         print(f"::{level}::{finding}")
     if not findings:
