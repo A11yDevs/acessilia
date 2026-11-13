@@ -21,6 +21,7 @@ from backend.i18n import t
 from backend.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.tools.logger import logger
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
+from backend.core.pipeline import preflight as pipeline_preflight
 
 
 def _failing(_manifest, _obligation_id):
@@ -96,7 +97,7 @@ async def _run(orchestrator, manifest, monkeypatch, tmp_path):
     async def noop(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(pddl, "inspect_source_media", noop)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     return await orchestrator.execute(

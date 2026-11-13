@@ -19,6 +19,7 @@ from backend import i18n
 from backend.agents import pddl_orchestrator as pddl
 from backend.config.settings import settings
 from tests.pddl_support import build_orchestrator
+from backend.core.pipeline import preflight as pipeline_preflight
 
 # The Toolbox's ``media.inspect`` document (``artifact/media-inspection@1``,
 # pure-media-inspect 1.1.0) for tests/fixtures/tutorials/java-oo-3pgs.pdf.
@@ -49,7 +50,7 @@ def _record_steps(monkeypatch) -> list[str]:
     async def describe(*_args, **_kwargs):
         calls.append("describe")
 
-    monkeypatch.setattr(pddl, "inspect_source_media", inspect)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", describe)
     monkeypatch.setattr(pddl, "_enrich_table_structures", describe)
     return calls
@@ -64,7 +65,7 @@ async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatc
     # Pinned, so the expected English message holds on a pt_BR machine too.
     token = i18n.set_request_locale("en_US")
     try:
-        with pytest.raises(pddl.DocumentTooLargeError) as info:
+        with pytest.raises(pipeline_preflight.DocumentTooLargeError) as info:
             await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
     finally:
         i18n.reset_request_locale(token)
@@ -76,7 +77,7 @@ async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatc
 @pytest.mark.parametrize("count", [1, 2])
 def test_documents_up_to_the_limit_pass(monkeypatch, count):
     monkeypatch.setattr(settings, "max_pages", 2)
-    pddl._check_page_limit(SimpleNamespace(pages=[object()] * count))
+    pipeline_preflight._check_page_limit(SimpleNamespace(pages=[object()] * count))
 
 
 def test_max_pages_is_read_from_the_environment(monkeypatch):
@@ -103,7 +104,7 @@ async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path
 
     token = i18n.set_request_locale("pt_BR")
     try:
-        with pytest.raises(pddl.DocumentTooLargeError) as info:
+        with pytest.raises(pipeline_preflight.DocumentTooLargeError) as info:
             await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
     finally:
         i18n.reset_request_locale(token)
@@ -118,11 +119,11 @@ async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(
     monkeypatch.setattr(settings, "max_pages", 2)
     async def inspect(*args, **kwargs):
         return {"is_pdf": True, "page_count": 3, "page_count_source": "pymupdf"}
-    monkeypatch.setattr(pddl, "inspect_source_media", inspect)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     orchestrator = build_orchestrator()
     process = Mock(side_effect=AssertionError("expensive extraction was called"))
     orchestrator.information_structural = SimpleNamespace(process=process)
-    with pytest.raises(pddl.DocumentTooLargeError):
+    with pytest.raises(pipeline_preflight.DocumentTooLargeError):
         await orchestrator.execute(tmp_path / "large.pdf", tmp_path)
     process.assert_not_called()
 
@@ -135,19 +136,19 @@ async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(
 ])
 def test_unreliable_preflight_does_not_reject(monkeypatch, inspection):
     monkeypatch.setattr(settings, "max_pages", 2)
-    pddl._check_page_limit_before_extraction(inspection)
+    pipeline_preflight._check_page_limit_before_extraction(inspection)
 
 
 def test_verified_pdf_at_limit_passes_preflight(monkeypatch):
     monkeypatch.setattr(settings, "max_pages", 2)
-    pddl._check_page_limit_before_extraction({"is_pdf": True, "page_count": 2, "page_count_source": "pymupdf"})
+    pipeline_preflight._check_page_limit_before_extraction({"is_pdf": True, "page_count": 2, "page_count_source": "pymupdf"})
 
 
 @pytest.mark.parametrize("max_pages,rejected", [(2, True), (3, False)])
 def test_preflight_reads_the_toolbox_inspection_document(monkeypatch, max_pages, rejected):
     monkeypatch.setattr(settings, "max_pages", max_pages)
     if rejected:
-        with pytest.raises(pddl.DocumentTooLargeError):
-            pddl._check_page_limit_before_extraction(TOOLBOX_INSPECTION)
+        with pytest.raises(pipeline_preflight.DocumentTooLargeError):
+            pipeline_preflight._check_page_limit_before_extraction(TOOLBOX_INSPECTION)
     else:
-        pddl._check_page_limit_before_extraction(TOOLBOX_INSPECTION)
+        pipeline_preflight._check_page_limit_before_extraction(TOOLBOX_INSPECTION)

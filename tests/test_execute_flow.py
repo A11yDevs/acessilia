@@ -14,6 +14,7 @@ import pytest
 
 from backend.agents import pddl_orchestrator as pddl
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
+from backend.core.pipeline import preflight as pipeline_preflight
 
 
 def _recorders(monkeypatch):
@@ -31,7 +32,7 @@ def _recorders(monkeypatch):
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
                  "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"):
         monkeypatch.setattr(pddl, name, record(name))
-    monkeypatch.setattr(pddl, "inspect_source_media", inspect)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     return calls
 
 

@@ -17,6 +17,7 @@ from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
 from backend import i18n
 from backend.agents import pddl_orchestrator as pddl
 from tests.pddl_support import build_orchestrator
+from backend.core.pipeline import preflight as pipeline_preflight
 
 
 def _failing_process(error):
@@ -44,7 +45,7 @@ async def test_toolbox_failure_becomes_an_explicit_job_error(monkeypatch, tmp_pa
     async def must_not_run(*args, **kwargs):
         raise AssertionError("the pipeline continued after a failed extraction")
 
-    monkeypatch.setattr(pddl, "inspect_source_media", must_not_run)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", must_not_run)
 
     with pytest.raises(pddl.StructuralExtractionError) as info:
         await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)

@@ -18,6 +18,7 @@ from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 from backend.i18n import t
 from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 from backend.core.pipeline.enrichment import pictures as picture_stage
+from backend.core.pipeline import preflight as pipeline_preflight
 
 NOW = datetime(2026, 10, 23, tzinfo=UTC)
 WIDTH, HEIGHT = 960, 540
@@ -406,7 +407,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
 
     orchestrator = build_orchestrator(max_replans=0)
     orchestrator.information_structural = SimpleNamespace(process=process)
-    monkeypatch.setattr(pddl, "inspect_source_media", inspect)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
 
