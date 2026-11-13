@@ -124,7 +124,7 @@ levou cerca de 75s em uma execução tranquila):
 |---|---|
 | Reconstrução da linha de base (`--testmon-forceselect`, core sem E2E completo) | 603s (221s na medição tranquila anterior) |
 | Sem mudanças | 2,7s (6,5s de parede incluindo a inicialização do interpretador) |
-| Cinco mudanças em folhas | 1–4 testes selecionados; p50 9,1s, p95 16,8s |
+| Cinco mudanças em folhas | 1–4 testes selecionados; mediana 9,1s, máximo 16,8s (cinco amostras) |
 | Mudança central (`backend/config/settings.py`) | 246 testes, 66s |
 | Mudança em README (arquivo estático) | 0 testes selecionados; `test_docstruct_readme_sync` falha quando executado diretamente |
 | Mudança em folha do docstruct | 2 testes do core selecionados; a suíte do docstruct não roda |
@@ -149,8 +149,10 @@ Por que foi rejeitado:
   `libs/docstruct` nem `libs/sdk`; uma mudança nesses diretórios precisa de
   fallback para as suítes deles, que o testmon não seleciona.
 - **Custo e invalidação da linha de base.** Reconstruir o `.testmondata` levou
-  603s sob carga (221s tranquilo, +67% sobre a suíte serial), e o banco precisa
-  ser reconstruído após mudanças de dependências ou de ambiente.
+  603s sob carga. A execução tranquila anterior foi 221s, +55% sobre a linha de
+  base serial atual de 143s (era +67% sobre a linha de base de 132s registrada
+  no commit anterior), e o banco precisa ser reconstruído após mudanças de
+  dependências ou de ambiente.
 - **Seleção com estado.** A mesma mudança em `runtime_lease.py` selecionou 3
   testes em uma execução e 4 na coleta seguinte; o banco é mais um artefato com
   estado para manter sincronizado.

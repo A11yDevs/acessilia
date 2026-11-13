@@ -119,7 +119,7 @@ in about 75s in a quiet run):
 |---|---|
 | Baseline reconstruction (`--testmon-forceselect`, whole non-E2E core) | 603s (221s in the earlier quiet measurement) |
 | No changes | 2.7s (6.5s wall including interpreter startup) |
-| Five leaf changes | 1–4 tests selected; p50 9.1s, p95 16.8s |
+| Five leaf changes | 1–4 tests selected; median 9.1s, max 16.8s (five samples) |
 | Central change (`backend/config/settings.py`) | 246 tests, 66s |
 | README change (static file) | 0 tests selected; `test_docstruct_readme_sync` fails when run directly |
 | docstruct leaf change | 2 root tests selected; the docstruct suite does not run |
@@ -143,8 +143,9 @@ Why it was rejected:
   `libs/docstruct` or `libs/sdk`; a change there needs a fallback to those
   suites, which testmon does not select.
 - **Baseline cost and invalidation.** Rebuilding `.testmondata` took 603s under
-  load (221s quiet, +67% over the serial suite), and the database must be
-  rebuilt after dependency or environment changes.
+  load. The earlier quiet run was 221s, +55% over the current 143s serial
+  baseline (it was +67% over the 132s baseline recorded at the earlier commit),
+  and the database must be rebuilt after dependency or environment changes.
 - **Stateful selection.** The same `runtime_lease.py` change selected 3 tests in
   one run and 4 when collected again; the database is another stateful artifact
   to keep in sync.

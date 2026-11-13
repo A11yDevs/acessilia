@@ -79,9 +79,10 @@ def _isolate_paths(api_paths, monkeypatch):
 def fresh_history_db(tmp_path, monkeypatch):
     """Give one test its own history database, independent of test order.
 
-    ``_isolate_paths`` keeps one database per module so the client can reuse it.
-    Tests that assert an empty history must not run after a test that recorded a
-    conversion, which is exactly what a selective run can do.
+    ``_isolate_paths`` shares one database per worker session (via the
+    session-scoped ``api_paths``), so the client can reuse it. Tests that assert
+    an empty history must not run after a test that recorded a conversion, which
+    is exactly what a selective run can do.
     """
     import backend.services.history_service as hs
 
