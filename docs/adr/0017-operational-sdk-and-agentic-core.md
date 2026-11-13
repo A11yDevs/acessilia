@@ -163,7 +163,10 @@ Proposed: option 2.
     operation is `acessilia_sdk.operations.formula` (#504); the core's formula
     crop and recognition call its steps, keeping the saved crop, the source
     check, the failure handling and the outage flag (phase 3 of #470). MathML
-    and speech follow, then the comparison of case 036's manifests;
+    and speech call its `convert_formula` and `verbalize_formula` steps, one
+    per capability, so each obligation still fails on its own; an answer
+    outside the contract is now an unavailable capability, not a formula
+    without that text. The comparison of case 036's manifests follows;
   - the other operations of the inventory, one per pull request, each with
     characterization and a comparison of the manifests before and after.
 - **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into

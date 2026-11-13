@@ -16,13 +16,20 @@ import pytest
 
 from acessilia_sdk.operations.formula import (
     FormulaChain,
+    FormulaText,
     Step,
+    convert_formula,
     crop_formula_region,
     formula_chain,
     recognize_formula,
     speak_formula,
+    verbalize_formula,
 )
-from acessilia_sdk.toolbox import ToolboxInvalidInput, ToolboxProviderUnavailable
+from acessilia_sdk.toolbox import (
+    ToolboxContractViolation,
+    ToolboxInvalidInput,
+    ToolboxProviderUnavailable,
+)
 from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
 from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
 
@@ -280,6 +287,85 @@ async def test_speak_converts_and_verbalizes_with_the_transform_provider(respx_m
     assert b'name="language"\r\n\r\nen\r\n' in routes["verbalize"].calls.last.request.content
     assert [s.capability for s in speech.steps] == ["math.convert", "math.verbalize"]
     assert {s.provider for s in speech.steps} == {"math-speech"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("direction", "document", "expected"),
+    [
+        ("latex-to-mathml", {"latex": "x", "mathml": "<math/>"}, "<math/>"),
+        ("mathml-to-latex", {"latex": "x^2", "mathml": "<math/>"}, "x^2"),
+        ("latex-to-mathml", {"latex": "x"}, ""),
+    ],
+)
+async def test_convert_reads_the_side_of_its_direction(
+    respx_mock, math, direction, document, expected
+) -> None:
+    route = respx_mock.post(f"{BASE}/v1/capabilities/math.convert:execute").mock(
+        return_value=httpx.Response(200, json=_succeeded("math.convert", document))
+    )
+
+    converted = await convert_formula(math, "x", direction=direction)
+
+    assert converted == FormulaText(
+        expected, Step("math.convert", "math-speech", {"direction": direction})
+    )
+    assert _parameters(route.calls.last.request)["direction"] == direction
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("capability", "document"),
+    [
+        ("convert", None),
+        ("convert", []),
+        ("convert", {"mathml": None}),
+        ("convert", {"mathml": 5}),
+        ("verbalize", None),
+        ("verbalize", {"verbalized": ["a"]}),
+    ],
+)
+async def test_an_answer_outside_the_contract_raises(respx_mock, math, capability, document) -> None:
+    """Never a silent "": the caller decides what a broken answer means (P6)."""
+    respx_mock.post(f"{BASE}/v1/capabilities/math.{capability}:execute").mock(
+        return_value=httpx.Response(200, json=_succeeded(f"math.{capability}", document))
+    )
+    step = convert_formula if capability == "convert" else verbalize_formula
+
+    with pytest.raises(ToolboxContractViolation, match=f"math.{capability}"):
+        await step(math, "x")
+
+
+@pytest.mark.asyncio
+async def test_an_envelope_without_a_document_raises(respx_mock, math) -> None:
+    respx_mock.post(f"{BASE}/v1/capabilities/math.convert:execute").mock(
+        return_value=httpx.Response(200, json={"status": "succeeded", "capability": "math.convert"})
+    )
+
+    with pytest.raises(ToolboxContractViolation):
+        await convert_formula(math, "x")
+
+
+@pytest.mark.asyncio
+async def test_verbalize_reads_the_spoken_text(respx_mock, math) -> None:
+    routes = _mock_math(respx_mock)
+
+    spoken = await verbalize_formula(math, "E = mc^2")
+
+    assert spoken == FormulaText(
+        "E igual a m c ao quadrado", Step("math.verbalize", "math-speech", {"language": "pt-BR"})
+    )
+    assert not routes["convert"].called
+
+
+@pytest.mark.asyncio
+async def test_each_step_raises_a_refusal(respx_mock, math) -> None:
+    for capability, step in (("convert", convert_formula), ("verbalize", verbalize_formula)):
+        respx_mock.post(f"{BASE}/v1/capabilities/math.{capability}:execute").mock(
+            return_value=httpx.Response(400, json={"code": "invalid_input", "message": "bad"})
+        )
+        with pytest.raises(ToolboxInvalidInput):
+            await step(math, r"\frac{a}{")
 
 
 # --- chain -----------------------------------------------------------------

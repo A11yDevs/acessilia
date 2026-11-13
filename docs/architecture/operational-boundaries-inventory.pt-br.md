@@ -94,7 +94,7 @@ candidatos a operações do SDK, com a parte da decisão ficando no core:
 
 | Operação | Hoje | Mecanismo (candidato ao SDK) | Decisão (fica no core) |
 |---|---|---|---|
-| Cadeia de fórmula | `_formula_recognition_crop`, `toolbox_math_tools`, o enriquecimento de fórmulas (o recorte e o reconhecimento agora chamam o `acessilia_sdk.operations.formula`, fase 3 da #470) | renderizar uma região e depois `math.recognize`, `math.convert` e `math.verbalize` em sequência | quais fórmulas, o portão de concordância com a camada de texto, o fallback da visão, o disjuntor |
+| Cadeia de fórmula | `_formula_recognition_crop`, `toolbox_math_tools`, o enriquecimento de fórmulas (o recorte, o reconhecimento, o MathML e a fala agora chamam o `acessilia_sdk.operations.formula`, fase 3 da #470) | renderizar uma região e depois `math.recognize`, `math.convert` e `math.verbalize` em sequência | quais fórmulas, o portão de concordância com a camada de texto, o fallback da visão, o disjuntor |
 | Juiz de página | `_render_page_png`, `_judge_page`, `_judge_one_page` | renderizar uma página e depois `document.adjudicate.page`, lendo o `pB` | quais páginas, o limiar, se troca |
 | Inspeção de mídia | `backend/tools/media_inspect.py` | `media.inspect` | o que uma apresentação ou um limite de páginas significa para o job |
 | Auditoria PDF/UA | `backend/tools/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | o que uma auditoria reprovada faz com o job |
