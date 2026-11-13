@@ -49,25 +49,9 @@ apply_ruleset() {
   local payload
   payload="$(jq '{name, target, enforcement, bypass_actors, conditions, rules}' "$file")"
 
-  # Adiciona bypass automático para administradores do repositório; os
-  # templates já o incluem, então a transformação é idempotente.
-  payload="$(echo "$payload" | jq '
-    .bypass_actors = (
-      ((.bypass_actors // []) + [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}])
-      | unique_by([.actor_id, .actor_type])
-    )
-  ')"
-
-  # Ajusta required_status_checks para usar o formato que a API espera
-  # A API do GitHub espera o objeto direto, não array
-  local has_status_checks
-  has_status_checks="$(echo "$payload" | jq '.rules | map(select(.type == "required_status_checks")) | length')"
-  if [[ "$has_status_checks" -gt 0 ]]; then
-    # A API atual usa o formato de parâmetros com 'parameters.check_ids' ou
-    # o formato com 'parameters.required_status_checks[]'
-    # Vamos ajustar o payload para manter compatibilidade
-    :
-  fi
+  # O unique_by mantém a primeira entrada: o bypass do template, e seu
+  # bypass_mode, prevalece; o bypass admin só é adicionado quando falta.
+  payload="$(echo "$payload" | jq -f scripts/rulesets-bypass.jq)"
 
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "    [DRY RUN] Payload para $( [[ -n "$existing_id" ]] && echo 'UPDATE' || echo 'CREATE' ):"
