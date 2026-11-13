@@ -8,10 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents.pddl_orchestrator import (
-    PddlAccessibilityOrchestrator,
-    _handle_dual_provider_fusion_method,
-)
+from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
 from backend.core.pipeline.handlers.fusion import _handle_single_provider_method
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.manifest.models import (
@@ -225,7 +223,7 @@ def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
     obligation.method_costs["single-provider"] = 20
     monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._run_extract_fused",
+        "backend.core.pipeline.handlers.fusion._run_extract_fused",
         lambda path, **_kwargs: {
             "status": "succeeded",
             "provider": "docling",
@@ -319,7 +317,7 @@ def test_dual_fusion_reuses_the_extractor_artifact_of_this_source(
         return {"status": "failed"}
 
     monkeypatch.setattr(
-        "backend.agents.pddl_orchestrator._run_extract_fused", fake_run
+        "backend.core.pipeline.handlers.fusion._run_extract_fused", fake_run
     )
 
     _handle_dual_provider_fusion_method(manifest, "o-fuse")

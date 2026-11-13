@@ -1,22 +1,37 @@
-"""Deterministic handlers for the providers' extraction: choosing or confirming it.
+"""Deterministic handlers for the providers' extraction: fusing, choosing or confirming it.
+
+``dual-provider-fusion`` runs both providers and fuses their extraction
+(``backend.pipeline.fusion.extract_fused``), reusing a fusion already recorded
+for the same source. ``single-provider`` is the other method for
+``fuse-providers``; it chooses nothing, and only checks that the manifest
+already carries the configured provider's extraction.
 
 ``table-smart-fusion`` and ``agreement-rule`` choose between the two providers
-of ``FUSION_MODE=dual``; they port Dr.DocBench rules
-(tree_differ_v2.py of the drbench-2026-snapshot tag and
-docstruct.fusion.adjudication.decide_v1). They read the secondary provider's
-extraction (``backend.core.pipeline.secondary``). The rules were calibrated on
-the docling + mineru pair, so any other pair fails explicitly.
-``single-provider`` chooses nothing: it satisfies ``fuse-providers`` by checking
-that the manifest already carries the configured provider's extraction. Moved verbatim from the PDDL orchestrator (#402,
-phase 3, step 6).
+of ``FUSION_MODE=dual``; they port Dr.DocBench rules (tree_differ_v2.py of the
+drbench-2026-snapshot tag and docstruct.fusion.adjudication.decide_v1). They
+read the secondary provider's extraction (``backend.core.pipeline.secondary``).
+The rules were calibrated on the docling + mineru pair, so any other pair fails
+explicitly.
+
+Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6).
 """
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
+import os
+import tempfile
 from collections import Counter
+from pathlib import Path
+from typing import Any
 
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
+    Artifact,
+    ManifestElement,
+    PageDescriptor,
     ProcessingManifest,
 )
 from backend.core.pipeline.elements import (
@@ -31,6 +46,9 @@ from backend.core.pipeline.secondary import (
     _page_markdown,
     _pair_block,
     _secondary_or_failure,
+)
+from backend.core.pipeline.toolbox import (
+    _source_artifact_id,
 )
 
 
@@ -249,4 +267,264 @@ def _handle_single_provider_method(
             f"The manifest already carries the extraction ({provider}); "
             "nothing to re-extract"
         ),
+    )
+
+
+def _run_extract_fused(
+    source_path: Path, *, artifact_id: str | None = None, policy=None
+) -> dict:
+    """Run ``extract_fused`` in a way that suits the current event loop.
+
+    Checks for a running event loop **before** creating the coroutine, so no
+    coroutine object is left without an ``await`` (which would raise
+    ``RuntimeWarning: coroutine ... was never awaited``).
+
+    Architecture note: when called from a thread with a running event loop
+    (Agno Workflow, API), ``.result()`` still blocks the calling loop until the
+    fusion ends. The handlers' contract stays synchronous; code that calls the
+    executor from async code must run the whole executor with
+    ``await run_blocking(...)`` so as not to block the main event loop.
+    """
+    import concurrent.futures
+
+    from backend.pipeline.fusion import extract_fused
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # Synchronous context (deterministic executor, CLI, tests): no event
+        # loop is running in this thread.
+        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id, policy=policy))
+
+    # An event loop is already running in this thread; since the handler is
+    # synchronous, the coroutine runs in a dedicated thread with its own loop.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(
+            lambda: asyncio.run(
+                extract_fused(source_path, artifact_id=artifact_id, policy=policy)
+            )
+        ).result()
+
+
+def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    from backend.services.cache import processing_cache_configuration
+
+    ref = manifest.extractor.configuration.get("fusion_reuse") or {}
+    try:
+        content = Path(ref["path"]).read_bytes()
+        if hashlib.sha256(content).hexdigest() != ref["sha256"]:
+            return None
+        record = json.loads(content)
+        if record["source_sha256"] != manifest.source.sha256:
+            return None
+        expected_policy = manifest.extractor.configuration.get("fusion_policy")
+        if expected_policy is None:
+            expected_policy = asdict(FusionPolicy())
+        if record.get("policy") != expected_policy:
+            return None
+        if json.dumps(record["configuration"], sort_keys=True) != json.dumps(processing_cache_configuration(), sort_keys=True):
+            return None
+        payload = record["payload"]
+        return payload if isinstance(payload, dict) else None
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _handle_dual_provider_fusion_method(
+    manifest: ProcessingManifest, obligation_id: str
+) -> MethodResult:
+    """Fuse two providers (docling+mineru) for the target obligation.
+
+    Reuses ``backend.pipeline.fusion.extract_fused`` (phase 4) to produce the
+    fused payload, writes the JSON to ``data_dir/artifacts/fusion/`` and returns
+    it in ``MethodResult.artifacts``, leaving the ``ExecutorAgent`` to fold it
+    into the manifest and record the provenance on the attempt.
+
+    In single mode (FUSION_MODE=single) the method is not admissible and the
+    compiler must not select it.
+
+    Reuses the initial fusion when the hash, the document and the configuration
+    match. Missing, corrupt or incompatible evidence triggers a new dual
+    extraction.
+    """
+    obligation = next(
+        (o for o in manifest.obligations if o.id == obligation_id), None
+    )
+    if obligation is None:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Obrigação não encontrada: {obligation_id}",
+        )
+    source_path = Path(manifest.source.path)
+    # Reuse the document the structure extractor already stored in the Toolbox.
+    artifact_id = _source_artifact_id(manifest)
+    try:
+        payload = _reusable_fusion_payload(manifest)
+        if payload is None:
+            from docstruct.policy import FusionPolicy
+
+            policy_config = manifest.extractor.configuration.get("fusion_policy")
+            policy = FusionPolicy.from_dict(policy_config) if policy_config else None
+            if policy is None:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+            else:
+                payload = _run_extract_fused(source_path, artifact_id=artifact_id, policy=policy)
+    except Exception as exc:  # noqa: BLE001
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=f"Fusão dual-provider falhou: {type(exc).__name__}: {exc}",
+        )
+    if payload.get("status") != "succeeded":
+        return MethodResult(
+            success=False,
+            validated=False,
+            message="Fusão dual-provider não concluiu com sucesso",
+        )
+
+    # The planned action is dual-provider: if only one provider took part, the
+    # planned semantics did not run, so the method fails to allow replanning
+    # to a single-provider method.
+    provider = str(payload.get("provider") or "")
+    if "+" not in provider:
+        return MethodResult(
+            success=False,
+            validated=False,
+            message=(
+                "Fusão dual-provider executou com um único provider "
+                f"({provider or 'desconhecido'}); replanning necessário"
+            ),
+        )
+
+    try:
+        elements = _fused_text_elements(manifest, obligation.target_ids, payload)
+    except (TypeError, ValueError) as exc:
+        return MethodResult(success=False, validated=False, message=str(exc))
+
+    artifact = _persist_fusion_payload(
+        manifest,
+        payload,
+        obligation_id,
+        kind="fusion-payload",
+    )
+
+    manifest.elements = elements
+    page_ids = {element.page_number or 1 for element in elements}
+    existing_pages = {page.page_number: page for page in manifest.pages}
+    manifest.pages = [
+        PageDescriptor(
+            page_number=number,
+            width=existing_pages[number].width if number in existing_pages else None,
+            height=existing_pages[number].height if number in existing_pages else None,
+            element_ids=[element.id for element in elements if (element.page_number or 1) == number],
+        )
+        for number in sorted(page_ids)
+    ]
+    manifest.summary.page_count = len(manifest.pages)
+    manifest.summary.element_count = len(elements)
+    manifest.summary.element_types = dict(Counter(element.type for element in elements))
+    return MethodResult(
+        success=True,
+        validated=True,
+        message="Fusão dual-provider concluída com sucesso",
+        artifacts=[artifact],
+    )
+
+
+def _fused_text_elements(
+    manifest: ProcessingManifest, target_ids: list[str], payload: dict[str, Any]
+) -> list[ManifestElement]:
+    # The fusion adapter currently emits text-only blocks. It cannot safely
+    # replace a structured document or a subset with a whole-document result.
+    if any(element.type != "paragraph" for element in manifest.elements) or set(target_ids) != {
+        element.id for element in manifest.elements
+    }:
+        raise ValueError("Text fusion requires all paragraphs of a text-only manifest")
+    raw_elements = payload.get("document", {}).get("elements")
+    if not isinstance(raw_elements, list) or not raw_elements:
+        raise ValueError("Fusion returned no usable document elements")
+    originals = sorted(manifest.elements, key=lambda element: element.reading_order)
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for raw in raw_elements:
+        if not isinstance(raw, dict) or raw.get("type") != "paragraph":
+            raise ValueError("Fusion returned unsupported structured content")
+        text = raw.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Fusion returned an empty text block")
+        page = raw.get("page_number", raw.get("page"))
+        if page is None:
+            if len(manifest.pages) > 1:
+                raise ValueError("Fusion omitted page identity for a multipage document")
+            page = manifest.pages[0].page_number if manifest.pages else 1
+        if type(page) is not int or page < 1:
+            raise ValueError("Fusion returned an invalid page number")
+        by_page.setdefault(page, []).append(raw)
+    original_pages = {element.page_number or 1 for element in originals}
+    if not original_pages.issubset(by_page):
+        raise ValueError("Fusion omitted a source page")
+
+    result = []
+    for number, rows in sorted(by_page.items()):
+        old = [element for element in originals if (element.page_number or 1) == number]
+        # Keep every existing ID and reference; ambiguous mappings fail closed.
+        if len(rows) < len(old):
+            raise ValueError("Fusion cannot safely map fewer blocks to existing element references")
+        for index, raw in enumerate(rows):
+            if index < len(old):
+                element = old[index].model_copy(deep=True)
+                element.text = raw["text"]
+                element.page_number = number
+            else:
+                identifier = hashlib.sha256(json.dumps([
+                    manifest.manifest_id, number, index, raw["text"],
+                ]).encode()).hexdigest()[:24]
+                element = ManifestElement(
+                    id=f"element-fusion-{identifier}", type="paragraph", raw_label="paragraph",
+                    reading_order=len(result) + 1, hierarchy_level=0,
+                    page_number=number, text=raw["text"],
+                )
+            element.metadata["fusion_provider"] = payload["provider"]
+            element.reading_order = len(result) + 1
+            result.append(element)
+    return result
+
+
+def _persist_fusion_payload(
+    manifest: ProcessingManifest,
+    payload: dict[str, Any],
+    obligation_id: str,
+    *,
+    kind: str,
+) -> Artifact:
+    """Write the payload atomically, addressed by its manifest scope and content."""
+    from backend.config.settings import settings
+
+    content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    scope = hashlib.sha256(json.dumps([
+        manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
+        manifest.revision, obligation_id,
+    ]).encode()).hexdigest()
+    output_path = settings.data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output_path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, output_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return Artifact(
+        id=f"artifact-{kind.removesuffix('-payload')}-{scope[:16]}-{digest[:16]}",
+        kind=kind,
+        path=str(output_path),
+        media_type="application/json",
+        sha256=digest,
     )

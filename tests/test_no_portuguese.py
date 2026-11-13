@@ -247,6 +247,10 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("backend/core/pipeline/handlers/fusion.py", "a troca de página não é aplicada automaticamente"),
     ("backend/core/pipeline/handlers/fusion.py", "Roteador por página mantém o provider primário"),
     ("backend/core/pipeline/handlers/fusion.py", "single-provider só é válido para fuse-providers"),
+    ("backend/core/pipeline/handlers/fusion.py", "Obrigação não encontrada"),
+    # The dual-provider fusion's four results, and the end of the single-provider one.
+    ("backend/core/pipeline/handlers/fusion.py", "Fusão dual-provider"),
+    ("backend/core/pipeline/handlers/fusion.py", "replanning necessário"),
     ("backend/core/pipeline/handlers/order.py", "Esqueleto do provider secundário não casou com a página"),
     ("backend/core/pipeline/handlers/order.py", "aplicada nas páginas"),
     ("backend/core/pipeline/handlers/order.py", "confirmada nas páginas"),
