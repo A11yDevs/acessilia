@@ -1,18 +1,36 @@
 """The CI gate keeps its required name and runs the core suite in parallel (#448)."""
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
 SCHEDULED = ROOT / ".github/workflows/scheduled-tests.yml"
 RULESETS = ROOT / ".github/rulesets"
+BYPASS_FILTER = ROOT / "scripts/rulesets-bypass.jq"
 
 
 def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+
+
+def _apply_bypass(payload: dict) -> dict:
+    jq = shutil.which("jq")
+    if jq is None:
+        pytest.skip("jq is required by scripts/setup-rulesets.sh")
+    completed = subprocess.run(
+        [jq, "-f", str(BYPASS_FILTER)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(completed.stdout)
 
 
 def test_required_check_names_are_unchanged() -> None:
@@ -116,6 +134,57 @@ def test_scheduled_workflow_runs_e2e_only_when_configured() -> None:
     assert step["env"]["TOOLBOX_API_KEY"] == "${{ secrets.TOOLBOX_API_KEY }}"
     assert step["env"]["CORE_BASE_URL"] == "${{ vars.CORE_BASE_URL }}"
     assert "--timeout=900" in step["run"]
+
+
+def test_ruleset_templates_keep_live_review_settings() -> None:
+    ruleset = json.loads((RULESETS / "main.json.example").read_text(encoding="utf-8"))
+    pull_request = next(
+        rule for rule in ruleset["rules"] if rule["type"] == "pull_request"
+    )
+
+    assert pull_request["parameters"] == {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": True,
+        "required_reviewers": [],
+        "require_code_owner_review": False,
+        "dismissal_restriction": {"enabled": False, "allowed_actors": []},
+        "require_last_push_approval": True,
+        "required_review_thread_resolution": True,
+        "require_extra_approval_for_unattributed_changes": True,
+        "allowed_merge_methods": ["merge", "squash", "rebase"],
+    }
+
+
+def test_ruleset_bypass_filter_is_idempotent_and_keeps_template_mode() -> None:
+    for template in ("main.json.example", "develop.json.example"):
+        transformed = _apply_bypass(
+            json.loads((RULESETS / template).read_text(encoding="utf-8"))
+        )
+        admins = [
+            actor
+            for actor in transformed["bypass_actors"]
+            if actor["actor_id"] == 5 and actor["actor_type"] == "RepositoryRole"
+        ]
+        assert len(admins) == 1
+        assert admins[0]["bypass_mode"] == "always"
+
+    added = _apply_bypass({"bypass_actors": []})
+    assert added["bypass_actors"] == [
+        {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always",
+        }
+    ]
+
+    preferred = [
+        {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "pull_request",
+        }
+    ]
+    assert _apply_bypass({"bypass_actors": preferred})["bypass_actors"] == preferred
 
 
 def test_develop_template_keeps_parallel_pull_requests_mergeable() -> None:
