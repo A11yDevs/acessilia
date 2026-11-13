@@ -54,8 +54,29 @@ def test_core_suite_runs_with_bounded_parallelism() -> None:
 
 def test_delivery_waits_for_tests_and_sdk_isolation() -> None:
     jobs = _workflow()["jobs"]
-    assert set(jobs["delivery"]["needs"]) >= {"tests", "sdk-isolated"}
+    assert set(jobs["delivery"]["needs"]) >= {"tests", "sdk-isolated", "docstruct-isolated"}
     assert "sdk-isolated" in jobs
+    assert "docstruct-isolated" in jobs
+
+
+def test_docstruct_runs_alone_from_its_wheel() -> None:
+    """docstruct installs and passes on the standard library alone (#470, phase 2)."""
+    job = _workflow()["jobs"]["docstruct-isolated"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    assert job["name"] == "docstruct alone (Python 3.11)"
+    install = steps["Install docstruct alone"]["run"]
+    assert '"./libs/docstruct[dev]"' in install
+    assert "libs/sdk" not in install and '".[dev]"' not in install
+    check = steps["Check that nothing else is importable"]
+    assert check["working-directory"] == "libs/docstruct"
+    for name in ("backend", "acessilia_sdk", "acessilia_toolbox", "rapidfuzz"):
+        assert f'"{name}"' in check["run"]
+    assert "site-packages" in check["run"]
+    suite = steps["Run the docstruct test suite"]
+    assert suite["working-directory"] == "libs/docstruct"
+    assert "--junitxml=docstruct-isolated-results.xml" in suite["run"]
+    assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
 
 
 def test_ruleset_templates_require_the_full_gate() -> None:

@@ -44,9 +44,11 @@ which is accepted:
   So there is no gap today. But nothing checks that a docstruct release and
   the Toolbox's pin move together, or that the two still agree on the shared
   models: this is #470's P8 risk.
-- **docstruct has no isolated install job.** `test_purity.py` refuses
-  non-standard imports in a subprocess, but no CI job installs docstruct alone
-  in a clean environment, as `SDK alone` does for the SDK.
+- **docstruct had no isolated install job.** `test_purity.py` refuses
+  non-standard imports in a subprocess, but no CI job installed docstruct alone
+  in a clean environment, as `SDK alone` does for the SDK. **Closed by phase 2
+  of #470:** the `docstruct alone` job installs it from its wheel and runs its
+  suite with nothing else importable, not even `rapidfuzz`.
 - **docstruct's independence from infrastructure is not tested.** See P3
   above. An isolated install job would not catch it either: it needs a test
   that a module does not read the environment or files, open sockets or start

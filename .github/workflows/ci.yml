@@ -121,6 +121,82 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # docstruct is the pure structural core under the core, the SDK and the
+  # Toolbox (ADR-0002, ADR-0017): it must install from its wheel and pass its
+  # suite on the standard library alone, without its optional accelerator.
+  docstruct-isolated:
+    name: docstruct alone (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.11"
+
+      - name: Install docstruct alone
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "./libs/docstruct[dev]" --no-cache-dir
+
+      - name: Check that nothing else is importable
+        working-directory: libs/docstruct
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          import docstruct
+
+          present = [
+              name
+              for name in (
+                  "backend", "acessilia_sdk", "acessilia_toolbox", "agno",
+                  "fastapi", "pydantic", "httpx", "rapidfuzz",
+              )
+              if importlib.util.find_spec(name) is not None
+          ]
+          if present:
+              raise SystemExit(f"importable next to docstruct: {present}")
+          # The suite must test the installed wheel, not the source tree.
+          location = Path(docstruct.__file__).resolve()
+          if "site-packages" not in location.parts:
+              raise SystemExit(f"docstruct imported from {location}, not from the wheel")
+          print(f"docstruct is installed alone: {location.parent}")
+          PY
+
+      - name: Run the docstruct test suite
+        working-directory: libs/docstruct
+        run: python -m pytest -rs --junitxml=docstruct-isolated-results.xml
+
+      - name: Reject unexpected skipped tests
+        working-directory: libs/docstruct
+        run: |
+          python - <<'PY'
+          from xml.etree import ElementTree
+
+          root = ElementTree.parse("docstruct-isolated-results.xml").getroot()
+          skipped = sum(int(s.attrib.get("skipped", "0")) for s in root.iter("testsuite"))
+          if skipped:
+              raise SystemExit(f"{skipped} docstruct test(s) skipped on the standard library alone.")
+          print("No docstruct test was skipped.")
+          PY
+
+      - name: Upload docstruct isolation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: docstruct-isolated-report
+          path: libs/docstruct/docstruct-isolated-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
   tests:
     name: tests (Python 3.11)
     runs-on: ubuntu-latest
@@ -239,6 +315,7 @@ jobs:
     needs:
       - tests
       - sdk-isolated
+      - docstruct-isolated
     uses: ./.github/workflows/delivery.yml
     with:
       ref: ${{ github.sha }}
