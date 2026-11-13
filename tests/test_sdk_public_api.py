@@ -7,6 +7,10 @@ tests take from ``acessilia_sdk`` must be a name the module exports in
 
 - ``from acessilia_sdk.x import name`` and ``import acessilia_sdk.x``;
 - ``module.name`` read through an imported SDK module;
+- ``getattr``, ``setattr``, ``hasattr`` and ``delattr`` on an SDK module, and
+  ``monkeypatch.setattr``, ``monkeypatch.delattr`` and ``patch.object`` with
+  one, when the name is a literal string (a name computed at runtime cannot be
+  checked statically);
 - dotted string paths, such as a ``monkeypatch.setattr`` target, judged by the
   first segment after the module (``Client.method`` is judged by ``Client``).
 
@@ -29,6 +33,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SCANNED = ("backend", "scripts", "tests")
 #: ``"acessilia_sdk.module.name": "reason"`` for a reviewed exception. Empty.
 ALLOWED: dict[str, str] = {}
+#: Calls that read or replace ``getattr(module, "name")``-style attributes.
+_NAME_FUNCTIONS = frozenset({"getattr", "setattr", "hasattr", "delattr"})
+_NAME_METHODS = frozenset({"setattr", "delattr", "object"})
 _STRING_PATH = re.compile(r"""["'](acessilia_sdk(?:\.\w+)+)["']""")
 
 
@@ -89,6 +96,20 @@ def sdk_uses(source: str) -> list[tuple[int, str]]:
                 path = ".".join([aliases[current.id], *reversed(chain)])
                 # Only the outermost attribute of a chain is recorded.
                 uses.append((node.lineno, path))
+        if isinstance(node, ast.Call) and len(node.args) >= 2:
+            function = node.func
+            named = (isinstance(function, ast.Name) and function.id in _NAME_FUNCTIONS) or (
+                isinstance(function, ast.Attribute) and function.attr in _NAME_METHODS
+            )
+            target, name = node.args[0], node.args[1]
+            if (
+                named
+                and isinstance(target, ast.Name)
+                and target.id in aliases
+                and isinstance(name, ast.Constant)
+                and isinstance(name.value, str)
+            ):
+                uses.append((node.lineno, f"{aliases[target.id]}.{name.value}"))
     for match in _STRING_PATH.finditer(source):
         uses.append((source[: match.start()].count("\n") + 1, match.group(1)))
     return uses
@@ -127,15 +148,16 @@ def test_every_exception_is_still_needed() -> None:
 def test_every_sdk_module_declares_its_public_names() -> None:
     """Without ``__all__``, a module would have no public name at all.
 
-    The package itself (``__version__``) and entry points such as
-    ``acessilia_sdk.__main__`` are not API modules.
+    ``__all__ = []`` is a valid declaration (no public name). The package
+    itself (``__version__``), entry points such as ``acessilia_sdk.__main__``
+    and private modules (a segment starting with ``_``) are not API modules.
     """
     undeclared = sorted(
         name
-        for name, exported in MODULES.items()
+        for name in MODULES
         if name != "acessilia_sdk"
-        and not any(part.startswith("__") for part in name.split("."))
-        and not exported
+        and not any(part.startswith("_") for part in name.split("."))
+        and not hasattr(importlib.import_module(name), "__all__")
     )
     assert not undeclared, f"SDK modules without __all__: {undeclared}"
 
@@ -157,6 +179,11 @@ def test_the_guard_recognizes_each_kind_of_use() -> None:
         f"from acessilia_sdk.toolbox import artifacts\nartifacts.{internal}()": f"{module}.{internal}",
         f"import {module} as t\nt.{internal}": f"{module}.{internal}",
         f"monkeypatch.setattr('{module}.{internal}', fake)": f"{module}.{internal}",
+        # Literal names through a module object (review of #501).
+        f"from acessilia_sdk.toolbox import artifacts\ngetattr(artifacts, '{internal}')": f"{module}.{internal}",
+        f"from acessilia_sdk.toolbox import artifacts\nmonkeypatch.setattr(artifacts, '{internal}', fake)": f"{module}.{internal}",
+        f"from acessilia_sdk.toolbox import artifacts\npatch.object(artifacts, '{internal}')": f"{module}.{internal}",
+        f"import {module} as a\nhasattr(a, '{internal}')": f"{module}.{internal}",
     }
     for source, path in cases.items():
         assert path in {used for _, used in sdk_uses(source)}, source

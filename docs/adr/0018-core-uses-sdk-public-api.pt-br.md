@@ -27,11 +27,15 @@ O que o código diz hoje, medido na develop em cfa45001:
 - **A tabela "API pública" do README as resume.** Todo nome que ela lista está
   no `__all__` do módulo, mas ela não lista todo nome exportado (por exemplo, o
   `ToolboxPdfValidateClient` é exportado e faltava na linha dos clientes).
-- **O core já usa só nomes exportados.** Uma varredura de `backend/`,
-  `scripts/` e `tests/` encontrou 181 usos de nomes do SDK em 52 arquivos. Ela
-  cobriu imports, atributos lidos por um módulo do SDK importado e caminhos em
-  string, como os alvos de `monkeypatch.setattr`, e nenhum está fora do
-  `__all__` de um módulo. Ficar na API pública não custa nada hoje.
+- **O core usava um nome interno.** Uma varredura de `backend/`, `scripts/` e
+  `tests/` confere 180 usos de nomes do SDK em 51 arquivos. Ela cobre imports,
+  atributos lidos por um módulo do SDK importado, chamadas como
+  `getattr`/`setattr` com nome literal e caminhos em string, como os alvos de
+  `monkeypatch.setattr`. Um teste fazia patch do `_sleep` interno do cliente
+  para pular o backoff entre tentativas; agora ele zera o
+  `TOOLBOX_RETRY_BACKOFF_SECONDS`, que é público. Uma primeira varredura, sem
+  as chamadas, não o tinha visto. Todos os outros usos estão no `__all__` de um
+  módulo, então ficar na API pública quase não custa nada.
 
 Opções consideradas:
 
@@ -53,15 +57,20 @@ Proposta: a opção 3.
 - **Todo módulo de API do SDK declara `__all__`.** O pacote (`acessilia_sdk`)
   e os pontos de entrada (`__main__`) não são módulos de API.
 - **O core, os scripts e os testes dele usam só nomes públicos**: nos imports,
-  nos atributos lidos por um módulo do SDK e nos caminhos em string, como um
-  alvo de patch. Um método ou atributo de uma classe pública é público junto
-  com a classe.
+  nos atributos lidos por um módulo do SDK, em `getattr`, `setattr`,
+  `hasattr`, `delattr`, `monkeypatch.setattr` e `patch.object` com nome
+  literal, e nos caminhos em string, como um alvo de patch. Um nome calculado
+  em tempo de execução não pode ser conferido de forma estática, e não deve
+  ser usado para chegar a um nome interno. Um método ou atributo de uma classe
+  pública é público junto com a classe.
 - **Uma exceção revisada** só é permitida no mapa `ALLOWED` do guarda, com o
   motivo; uma exceção que nada usa mais faz o guarda falhar. Hoje não há
   nenhuma.
-- **A tabela "API pública" do README é um resumo**: todo nome que ela lista
-  precisa estar no `__all__` do módulo, para que ela nunca prometa algo que o
-  código não exporta.
+- **A tabela "API pública" do README é um resumo**, igual em inglês e em
+  português. Um nome do módulo que ela lista precisa estar no `__all__` dele;
+  qualquer outra palavra entre crases é atributo de uma classe exportada ou uma
+  palavra de prosa listada com o motivo. Assim ela nunca promete algo que o
+  código não exporta, e um erro de digitação falha.
 - **Acrescentar um nome ao `__all__` o torna público** e entra no changelog do
   SDK. Quando o core precisa de um nome interno, a correção é exportá-lo (com
   entrada no changelog), e não acrescentar uma exceção.
@@ -81,8 +90,11 @@ Proposta: a opção 3.
     `scripts/` e `tests/` é público; nenhum módulo de API do SDK fica sem
     `__all__`; nenhuma exceção está obsoleta. Um autoteste confere o guarda em
     cada tipo de uso;
-  - `libs/sdk/tests/test_public_api.py` (SDK): todo nome que a tabela do README
-    lista está no `__all__` do módulo. Ele roda também no job `SDK alone`.
+  - `libs/sdk/tests/test_public_api.py` (SDK): todo nome de módulo que a
+    tabela do README lista está no `__all__` dele, as outras palavras entre
+    crases são atributos de classe ou prosa listada, e as tabelas em inglês e
+    em português coincidem. Ele roda também no job `SDK alone`.
 - **Trabalho seguinte:** nenhum obrigatório. O guarda bloqueia desde o início,
-  porque o custo medido é zero (decisão de 2026-11-13). Se esta ADR for
-  rejeitada, os dois testes saem.
+  porque o custo medido foi um teste, mudado no mesmo pull request para usar a
+  configuração pública (decisão de 2026-11-13). Se esta ADR for rejeitada, os
+  dois testes saem.

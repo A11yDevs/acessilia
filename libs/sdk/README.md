@@ -25,7 +25,7 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 
 ## Public API
 
-Each module's `__all__` is the SDK's public API ([ADR-0018](../../docs/adr/0018-core-uses-sdk-public-api.md)); a name outside it is internal and may change in any release. This table summarizes it, and `tests/test_public_api.py` checks that every name it lists is exported.
+Each module's `__all__` is the SDK's public API ([ADR-0018](../../docs/adr/0018-core-uses-sdk-public-api.md)); a name outside it is internal and may change in any release. This table summarizes it, and `tests/test_public_api.py` checks it against `__all__` and checks that the English and Portuguese tables match.
 
 | Module | Symbols |
 |---|---|
