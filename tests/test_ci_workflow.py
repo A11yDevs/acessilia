@@ -72,6 +72,37 @@ def test_scheduled_workflow_runs_serial_and_parallel() -> None:
     assert "schedule:" in SCHEDULED.read_text(encoding="utf-8")
 
 
+def test_scheduled_workflow_covers_both_branches_and_library_results() -> None:
+    workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
+    monitor = workflow["jobs"]["monitor"]
+
+    assert monitor["strategy"]["fail-fast"] is False
+    assert monitor["strategy"]["matrix"]["ref"] == ["main", "develop"]
+    steps = monitor["steps"]
+    checkout = next(
+        step for step in steps if step.get("name", "").startswith("Check out")
+    )
+    assert checkout["with"]["ref"] == "${{ matrix.ref }}"
+    assert any(step.get("name") == "Check docstruct and SDK reports" for step in steps)
+    for name in ("Run docstruct library test suite", "Run SDK library test suite"):
+        step = next(step for step in steps if step.get("name") == name)
+        assert step.get("continue-on-error") is True
+
+
+def test_scheduled_workflow_notifies_scheduled_failures() -> None:
+    workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
+    notify = workflow["jobs"]["notify"]
+
+    assert "always()" in notify["if"]
+    assert "failure()" in notify["if"]
+    assert "github.event_name == 'schedule'" in notify["if"]
+    assert set(notify["needs"]) >= {"monitor", "e2e"}
+    assert notify["permissions"]["issues"] == "write"
+    run = next(step["run"] for step in notify["steps"] if step.get("run"))
+    assert "gh issue create" in run
+    assert "gh issue comment" in run
+
+
 def test_scheduled_workflow_runs_e2e_only_when_configured() -> None:
     workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
     e2e = workflow["jobs"]["e2e"]

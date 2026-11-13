@@ -48,8 +48,24 @@ def test_parse_report_summarizes_outcomes_and_percentiles(tmp_path: Path) -> Non
     suite = test_report.parse_report(report, "serial")
 
     assert (suite.tests, suite.passed, suite.failed, suite.skipped) == (3, 3, 0, 0)
+    assert suite.percentile(0.5) == 2.0
     assert suite.percentile(0.95) == 3.0
-    assert suite.slowest(1)[0].nodeid == "tests.test_a::test_three"
+    assert suite.slowest(1)[0].nodeid == "tests/test_a.py::test_three"
+
+
+def test_parse_report_turns_a_dotted_classname_into_a_runnable_nodeid(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_a.py").write_text("", encoding="utf-8")
+    report = _write_report(
+        tmp_path / "report.xml",
+        [("tests.test_a.TestFoo", "test_one", "passed", 1.0)],
+    )
+
+    suite = test_report.parse_report(report, "serial", root=tmp_path)
+
+    assert set(suite.cases) == {"tests/test_a.py::TestFoo::test_one"}
 
 
 def test_compare_reports_detects_outcome_and_missing_tests(tmp_path: Path) -> None:
@@ -79,12 +95,12 @@ def test_compare_reports_detects_outcome_and_missing_tests(tmp_path: Path) -> No
 
     assert differences == [
         {
-            "nodeid": "tests.test_a::test_one",
+            "nodeid": "tests/test_a.py::test_one",
             "serial": "passed",
             "parallel": "failed",
         },
         {
-            "nodeid": "tests.test_a::test_three",
+            "nodeid": "tests/test_a.py::test_three",
             "serial": "missing",
             "parallel": "passed",
         },
@@ -109,7 +125,7 @@ def test_main_writes_summary_and_fails_on_a_difference(tmp_path: Path, capsys) -
 
     assert exit_code == 1
     assert "Outcome differences" in summary.read_text(encoding="utf-8")
-    assert "tests.test_a::test_one" in payload.read_text(encoding="utf-8")
+    assert "tests/test_a.py::test_one" in payload.read_text(encoding="utf-8")
     assert "No outcome differences" not in capsys.readouterr().out
 
 

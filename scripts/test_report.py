@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import statistics
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -75,9 +74,7 @@ class SuiteResult:
             "errors": self.errors,
             "skipped": self.skipped,
             "seconds": round(self.seconds, 3),
-            "p50_seconds": round(statistics.median(self.durations), 3)
-            if self.durations
-            else 0.0,
+            "p50_seconds": round(self.percentile(0.5), 3),
             "p95_seconds": round(self.percentile(0.95), 3),
             "slowest": [
                 {
@@ -90,10 +87,24 @@ class SuiteResult:
         }
 
 
-def _nodeid(case: ElementTree.Element) -> str:
+def _nodeid(case: ElementTree.Element, root: Path) -> str:
     classname = case.get("classname", "")
     name = case.get("name", "")
-    return f"{classname}::{name}" if classname else name
+    if not classname:
+        return name
+
+    parts = classname.split(".")
+    for index in range(len(parts), 0, -1):
+        candidate = root.joinpath(*parts[:index]).with_suffix(".py")
+        if not candidate.is_file():
+            continue
+        try:
+            module = candidate.relative_to(root).as_posix()
+        except ValueError:
+            module = candidate.as_posix()
+        return "::".join([module, *parts[index:], name])
+
+    return f"{classname.replace('.', '/')}.py::{name}"
 
 
 def _outcome(case: ElementTree.Element) -> str:
@@ -106,16 +117,17 @@ def _outcome(case: ElementTree.Element) -> str:
     return "passed"
 
 
-def parse_report(path: Path, label: str) -> SuiteResult:
-    root = ElementTree.parse(path).getroot()
-    suite_nodes = list(root.iter("testsuite"))
+def parse_report(path: Path, label: str, *, root: Path | None = None) -> SuiteResult:
+    xml_root = ElementTree.parse(path).getroot()
+    suite_nodes = list(xml_root.iter("testsuite"))
     if not suite_nodes:
-        suite_nodes = [root]
+        suite_nodes = [xml_root]
+    repo_root = root or Path.cwd()
 
     cases: dict[str, CaseResult] = {}
     for suite in suite_nodes:
         for case in suite.iter("testcase"):
-            nodeid = _nodeid(case)
+            nodeid = _nodeid(case, repo_root)
             unique = nodeid
             duplicate = 2
             while unique in cases:
@@ -161,11 +173,10 @@ def _summary_table(reports: list[SuiteResult]) -> list[str]:
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for report in reports:
-        p50 = statistics.median(report.durations) if report.durations else 0.0
         lines.append(
             f"| {report.label} | {report.tests} | {report.passed} | {report.failed} "
             f"| {report.errors} | {report.skipped} | {report.seconds:.2f} "
-            f"| {p50:.2f} | {report.percentile(0.95):.2f} |"
+            f"| {report.percentile(0.5):.2f} | {report.percentile(0.95):.2f} |"
         )
     return lines
 

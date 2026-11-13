@@ -206,13 +206,20 @@ for the SDK-only job. Image delivery waits for both `tests` and `sdk-isolated`.
 ## Scheduled monitoring
 
 The `Scheduled test monitoring` workflow runs every Monday at 06:00 UTC and on
-demand. It runs the core suite serially and again with `-n 4 --dist worksteal`,
-runs docstruct and SDK, and compares the two core JUnit reports. A test with a
-different outcome between the runs is an order or worker dependency; the
-workflow fails and keeps the reports for 30 days. It also fails when either run
-skips a test. The summary records totals, p50/p95 test durations and the slowest
-tests. JUnit time covers the tests; the job duration in GitHub Actions is the
-runner-consumption reference.
+demand. The cron only starts firing after the workflow file reaches the default
+branch; the schedule starts there, but the matrix checks out and tests both
+`main` and `develop`. Each ref runs the core suite serially and again
+with `-n 4 --dist worksteal`, runs docstruct and SDK, and compares the two core
+JUnit reports. A test with a different outcome between the runs is an order or
+worker dependency; the workflow fails and keeps the reports for 30 days. It also
+fails when the core comparison or the docstruct/SDK reports contain a failure,
+error or skip. The summary records totals, p50/p95 test durations and the
+slowest tests. JUnit time covers the tests; the job duration in GitHub Actions
+is the runner-consumption reference.
+
+A failure in a scheduled run opens or updates the issue `Scheduled test
+monitoring failed`, with a link to the run. Manual `workflow_dispatch` failures
+only show in the Actions run.
 
 The E2E job runs when the repository variables `TOOLBOX_BASE_URL` or
 `CORE_BASE_URL` are configured; otherwise it is skipped. It uses the optional

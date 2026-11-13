@@ -215,13 +215,20 @@ lentos e publicando os relatórios JUnit mesmo quando uma etapa falha:
 ## Monitoramento agendado
 
 O workflow `Scheduled test monitoring` roda toda segunda-feira às 06:00 UTC e
-sob demanda. Ele executa a suíte do core serialmente e de novo com
-`-n 4 --dist worksteal`, roda docstruct e SDK e compara os dois relatórios JUnit
-do core. Um teste com resultado diferente entre as execuções é uma dependência
-de ordem ou de worker; o workflow falha e mantém os relatórios por 30 dias. Ele
-também falha quando qualquer uma das execuções pula um teste. O resumo registra
-totais, p50/p95 das durações e os testes mais lentos. O tempo do JUnit cobre os
-testes; a duração do job no GitHub Actions é a referência de consumo do runner.
+sob demanda. O cron só começa a disparar depois que o arquivo do workflow chega
+ao branch padrão; o agendamento começa nele, mas a matriz faz checkout e testa
+`main` e `develop`. Cada ref executa a suíte do core serialmente e de novo
+com `-n 4 --dist worksteal`, roda docstruct e SDK e compara os dois relatórios
+JUnit do core. Um teste com resultado diferente entre as execuções é uma
+dependência de ordem ou de worker; o workflow falha e mantém os relatórios por
+30 dias. Ele também falha quando a comparação do core ou os relatórios do
+docstruct/SDK contêm falha, erro ou skip. O resumo registra totais, p50/p95 das
+durações e os testes mais lentos. O tempo do JUnit cobre os testes; a duração do
+job no GitHub Actions é a referência de consumo do runner.
+
+Uma falha em execução agendada abre ou atualiza a issue `Scheduled test
+monitoring failed`, com link para a execução. Falhas de `workflow_dispatch`
+manual apenas aparecem na execução do Actions.
 
 O job de E2E roda quando as variáveis do repositório `TOOLBOX_BASE_URL` ou
 `CORE_BASE_URL` estão configuradas; caso contrário, é pulado. Ele usa o secret

@@ -2,7 +2,8 @@ name: Scheduled test monitoring
 
 on:
   schedule:
-    # Mondays at 06:00 UTC; the default branch is the branch that runs.
+    # Mondays at 06:00 UTC. The schedule starts on the default branch, but
+    # every matrix job checks out the ref it monitors.
     - cron: '0 6 * * 1'
   workflow_dispatch:
 
@@ -15,14 +16,19 @@ concurrency:
 
 jobs:
   monitor:
-    name: serial and parallel suite
+    name: serial and parallel suite (${{ matrix.ref }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [main, develop]
 
     steps:
-      - name: Check out repository
+      - name: Check out ${{ matrix.ref }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ matrix.ref }}
           persist-credentials: false
 
       - name: Set up Python 3.11
@@ -39,7 +45,7 @@ jobs:
 
       - name: Check the Toolbox capability contract
         env:
-          TARGET_BRANCH: ${{ github.ref_name }}
+          TARGET_BRANCH: ${{ matrix.ref }}
         run: |
           TOOLBOX_REF=$(python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
@@ -63,10 +69,12 @@ jobs:
         run: python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=parallel-results.xml
 
       - name: Run docstruct library test suite
+        continue-on-error: true
         working-directory: libs/docstruct
         run: python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
 
       - name: Run SDK library test suite
+        continue-on-error: true
         working-directory: libs/sdk
         run: python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
@@ -79,11 +87,39 @@ jobs:
             --json test-monitoring-summary.json \
             --summary "$GITHUB_STEP_SUMMARY"
 
+      - name: Check docstruct and SDK reports
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          from scripts.test_report import parse_report
+
+          failed = False
+          for path in (
+              Path("libs/docstruct/docstruct-test-results.xml"),
+              Path("libs/sdk/sdk-test-results.xml"),
+          ):
+              try:
+                  suite = parse_report(path, str(path))
+              except Exception as exc:
+                  print(f"error: {path}: {exc}")
+                  failed = True
+                  continue
+              print(
+                  f"{path}: {suite.tests} tests, {suite.failed} failed, "
+                  f"{suite.errors} errors, {suite.skipped} skipped"
+              )
+              if suite.tests == 0 or suite.failed or suite.errors or suite.skipped:
+                  failed = True
+          raise SystemExit(1 if failed else 0)
+          PY
+
       - name: Upload scheduled test reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: scheduled-test-reports
+          name: scheduled-test-reports-${{ matrix.ref }}
           path: |
             serial-results.xml
             parallel-results.xml
@@ -134,3 +170,40 @@ jobs:
           path: e2e-results.xml
           if-no-files-found: ignore
           retention-days: 30
+
+  notify:
+    name: Open or update the failure issue
+    if: ${{ always() && failure() && github.event_name == 'schedule' }}
+    needs:
+      - monitor
+      - e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Create or update the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          title="Scheduled test monitoring failed"
+          body=$(cat <<EOF
+          The weekly scheduled test monitoring failed for one or more of
+          main/develop.
+
+          Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          Event: ${GITHUB_EVENT_NAME}
+
+          See the run summary and the serial/parallel artifacts for the failing ref.
+          EOF
+          )
+          issue=$(gh issue list --state open --search "$title in:title" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

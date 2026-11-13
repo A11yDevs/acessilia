@@ -33,9 +33,6 @@ uv run pytest
 uv run pytest tests/test_pddl_planning.py
 ```
 
-Revisões antigas mostravam um comando de container que apontava para um estágio
-`test` que não existe; a #190 acompanha a redação da validação em container.
-
 ## Fixtures
 
 `fixtures/` guarda os PDFs e imagens de exemplo, usados tanto pelos testes quanto pelos cenários de carga e benchmarks em `scripts/`. `fixtures/failures/` guarda documentos corrompidos inertes usados por `test_job_failure_e2e.py` para reproduzir a falha do pipeline e o e-mail de falha; veja o [README](fixtures/failures/README.md). Não há flag de debug envolvida: os arquivos vivem apenas na árvore de testes.
