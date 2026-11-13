@@ -118,6 +118,23 @@ def test_scheduled_workflow_runs_e2e_only_when_configured() -> None:
     assert "--timeout=900" in step["run"]
 
 
+def test_ruleset_templates_keep_live_review_settings_and_one_bypass() -> None:
+    ruleset = json.loads((RULESETS / "main.json.example").read_text(encoding="utf-8"))
+    pull_request = next(
+        rule for rule in ruleset["rules"] if rule["type"] == "pull_request"
+    )
+    parameters = pull_request["parameters"]
+
+    assert parameters["require_extra_approval_for_unattributed_changes"] is True
+    assert parameters["dismissal_restriction"] == {
+        "enabled": False,
+        "allowed_actors": [],
+    }
+    for template in ("main.json.example", "develop.json.example"):
+        data = json.loads((RULESETS / template).read_text(encoding="utf-8"))
+        assert len(data["bypass_actors"]) == 1
+
+
 def test_develop_template_keeps_parallel_pull_requests_mergeable() -> None:
     ruleset = json.loads(
         (RULESETS / "develop.json.example").read_text(encoding="utf-8")

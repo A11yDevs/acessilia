@@ -49,9 +49,15 @@ apply_ruleset() {
   local payload
   payload="$(jq '{name, target, enforcement, bypass_actors, conditions, rules}' "$file")"
 
-  # Adiciona bypass automático para administradores do repositório
-  # para que o ruleset não bloqueie os mantenedores
-  payload="$(echo "$payload" | jq '.bypass_actors += [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}]' 2>/dev/null || echo "$payload")"
+  # Adiciona bypass automático para administradores do repositório para que o
+  # ruleset não bloqueie os mantenedores. Os templates já o incluem, então a
+  # transformação é idempotente e remove duplicatas.
+  payload="$(echo "$payload" | jq '
+    .bypass_actors = (
+      ((.bypass_actors // []) + [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}])
+      | unique_by([.actor_id, .actor_type])
+    )
+  ')"
 
   # Ajusta required_status_checks para usar o formato que a API espera
   # A API do GitHub espera o objeto direto, não array
