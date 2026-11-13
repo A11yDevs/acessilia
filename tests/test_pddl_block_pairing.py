@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.agents.pddl_orchestrator import _SecondaryExtraction, _pair_block
+from backend.core.pipeline.secondary import (
+    _SecondaryExtraction,
+    _pair_block,
+)
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
 

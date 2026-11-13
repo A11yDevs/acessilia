@@ -14,12 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents.pddl_orchestrator import (
-    PddlAccessibilityOrchestrator,
+from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.handlers.fusion import (
     _handle_agreement_rule_method,
-    _handle_skeleton_order_method,
     _handle_table_smart_fusion_method,
 )
+from backend.core.pipeline.handlers.order import _handle_skeleton_order_method
 from backend.core.manifest.builder import (
     DEFAULT_METHOD_COSTS,
     SECONDARY_EXTRACTION_ARTIFACT_ID,
@@ -38,6 +38,7 @@ from backend.core.manifest.models import (
     SourceDocument,
 )
 from backend.core.planning.planner_agent import PlannerAgent
+from backend.core.pipeline import secondary as pipeline_secondary
 
 NOW = datetime(2026, 10, 16, tzinfo=timezone.utc)
 W, H = 600.0, 800.0
@@ -693,11 +694,10 @@ class TestVlmPairwiseJudge:
             return {"document": {"pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7, "model": "m"}}
 
         monkeypatch.setattr("backend.agents.pddl_orchestrator._judge_page", judge)
-        from backend.agents import pddl_orchestrator as pddl
-        secondary, _ = pddl._secondary_or_failure(manifest)
+        secondary, _ = pipeline_secondary._secondary_or_failure(manifest)
         monkeypatch.setattr(
             "backend.agents.pddl_orchestrator._secondary_or_failure",
-            lambda m: (pddl._SecondaryExtraction(secondary.provider, {1: secondary.pages[1], 2: [
+            lambda m: (pipeline_secondary._SecondaryExtraction(secondary.provider, {1: secondary.pages[1], 2: [
                 {"type": "paragraph", "text": manifest.elements[1].text}]}, secondary.sizes), None),
         )
 

@@ -10,13 +10,11 @@ import re
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Coroutine, Iterable
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from acessilia_sdk.toolbox.clients.adjudicate import page_judgement_probability
 from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
-from docstruct.fusion.similarity import ordered_box, pair_block
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip, holds_point
 from docstruct.placeholders import has_meaningful_text, is_mostly_visual, is_placeholder_visual
@@ -54,7 +52,6 @@ from backend.core.agents.informational_structural import InformationalStructural
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry, StepProgress
 from backend.core.execution.models import ExecutionReport, MethodResult
 from backend.core.manifest.builder import (
-    SECONDARY_EXTRACTION_KIND,
     TYPE_BOUND_V23_KINDS,
     _derive_processing_needs,
     is_unstructured_page_placeholder,
@@ -66,7 +63,6 @@ from backend.core.manifest.models import (
     ManifestElement,
     PageDescriptor,
     ProcessingManifest,
-    is_bottom_left,
 )
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.planning.domain_bundle import DomainBundle
@@ -130,7 +126,6 @@ from backend.core.pipeline.obligations import (
 from backend.core.pipeline.elements import (
     _OVERLAY_HOST_TOLERANCE,
     _bbox,
-    _element_bbox,
     _element_to_block,
     _table_ast_from_rows,
     _table_element_has_structured_content,
@@ -140,7 +135,6 @@ from backend.core.pipeline.payload import (
     build_pddl_structured_payload,
 )
 from backend.core.pipeline.handlers.common import (
-    _fusion_agent,
     _missing_obligation,
     _target_elements,
 )
@@ -160,6 +154,21 @@ from backend.core.pipeline.handlers.content import (
 )
 from backend.core.pipeline.handlers.review import (
     _handle_human_review_method,
+)
+from backend.core.pipeline.secondary import (
+    _CALIBRATED_PAIR,
+    _SecondaryExtraction,
+    _page_markdown,
+    _secondary_or_failure,
+)
+from backend.core.pipeline.handlers.fusion import (
+    _handle_agreement_rule_method,
+    _handle_single_provider_method,
+    _handle_table_smart_fusion_method,
+)
+from backend.core.pipeline.handlers.order import (
+    _handle_skeleton_order_method,
+    _handle_xycut_order_method,
 )
 
 if TYPE_CHECKING:
@@ -720,425 +729,6 @@ def _handle_vision_page_inspection_method(
         )
 
 
-# --- Methods that choose between the two providers of FUSION_MODE=dual -------
-#
-# table-smart-fusion, skeleton-order and agreement-rule port Dr.DocBench rules
-# (tree_differ_v2.py of the drbench-2026-snapshot tag and
-# docstruct.fusion.adjudication.decide_v1). They read the secondary provider's
-# extraction that the structure extractor keeps as a manifest artifact. The
-# rules were calibrated on the docling + mineru pair, so any other pair fails
-# explicitly instead of applying a preference nobody measured.
-
-_CALIBRATED_PAIR = ("docling", "mineru")
-#: Accepted Dr.DocBench table preference (TEDS): MinerU's table, unless Docling's
-#: has spans or is the only one.
-_TABLE_PREFERENCE = "mineru"
-#: Minimum intersection over union to pair two blocks by position.
-_MIN_BLOCK_IOU = 0.3
-#: Minimum text similarity to pair two blocks that could not be paired by position.
-_MIN_BLOCK_TEXT_RATIO = 0.8
-#: Share of a page's elements that must be paired to follow the skeleton order.
-_MIN_SKELETON_MATCH = 0.5
-
-_Box = tuple[float, float, float, float]
-
-
-@dataclass(frozen=True)
-class _SecondaryExtraction:
-    provider: str
-    #: page number -> raw elements of the secondary provider, in reading order.
-    pages: dict[int, list[dict[str, Any]]]
-    sizes: dict[int, tuple[float, float]]
-    #: page number -> primary elements of a page the manifest took from the
-    #: secondary provider (fusion.apply_page_routes), in reading order.
-    replaced_primary: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
-
-    def bbox(self, element: dict[str, Any]) -> _Box | None:
-        """Normalized box of a raw Toolbox element (same frame as _element_bbox)."""
-        for item in element.get("provenance") or []:
-            if not isinstance(item, dict) or not item.get("bbox"):
-                continue
-            box = item["bbox"]
-            page = _page_number(item.get("page_number", element.get("page_number")))
-            width, height = self.sizes.get(page, (0.0, 0.0)) if page else (0.0, 0.0)
-            if not width or not height:
-                return None
-            try:
-                left, right = float(box["left"]), float(box["right"])
-                top, bottom = float(box["top"]), float(box["bottom"])
-            except (KeyError, TypeError, ValueError):
-                return None
-            if is_bottom_left(box.get("coord_origin"), top, bottom):
-                top, bottom = height - top, height - bottom
-            return ordered_box(
-                left / width, top / height, right / width, bottom / height
-            )
-        return None
-
-
-def _page_number(value: Any) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _load_secondary_extraction(
-    manifest: ProcessingManifest,
-) -> tuple[_SecondaryExtraction | None, str]:
-    """The secondary provider's extraction, if recorded and unchanged.
-
-    When it cannot be used, the second item says why (missing, replaced or
-    unreadable), so the method result can tell those cases apart.
-    """
-    import json
-
-    artifact = next(
-        (a for a in manifest.artifacts if a.kind == SECONDARY_EXTRACTION_KIND), None
-    )
-    if artifact is None:
-        return None, "Extração do provider secundário ausente do manifesto"
-    try:
-        raw = Path(artifact.path).read_bytes()
-    except OSError:
-        return None, f"Extração do provider secundário indisponível: {artifact.path}"
-    if artifact.sha256 and hashlib.sha256(raw).hexdigest() != artifact.sha256:
-        logger.warning(
-            "Extração secundária {} não confere com o sha256 registrado",
-            artifact.path,
-        )
-        return None, (
-            "Extração do provider secundário alterada: sha256 diverge do "
-            f"registrado no manifesto ({artifact.path})"
-        )
-    unreadable = f"Extração do provider secundário ilegível: {artifact.path}"
-    try:
-        data = json.loads(raw)
-    except ValueError:
-        return None, unreadable
-    payload = data.get("document") if isinstance(data, dict) else None
-    if not isinstance(payload, dict):
-        return None, unreadable
-    document = payload.get("document", payload)
-    sizes: dict[int, tuple[float, float]] = {}
-    for page in document.get("pages") or []:
-        try:
-            sizes[int(page["page_number"])] = (
-                float(page.get("width") or 0),
-                float(page.get("height") or 0),
-            )
-        except (KeyError, TypeError, ValueError):
-            continue
-    pages: dict[int, list[dict[str, Any]]] = {}
-    for element in sorted(
-        (e for e in document.get("elements") or [] if isinstance(e, dict)),
-        key=lambda e: e.get("reading_order") or 0,
-    ):
-        page = _page_number(element.get("page_number"))
-        if page is not None:
-            pages.setdefault(page, []).append(element)
-    replaced: dict[int, list[dict[str, Any]]] = {}
-    for key, rows in (data.get("replaced_primary_pages") or {}).items():
-        page = _page_number(key)
-        if page is not None and isinstance(rows, list):
-            replaced[page] = sorted(
-                (row for row in rows if isinstance(row, dict)),
-                key=lambda row: row.get("reading_order") or 0,
-            )
-    return (
-        _SecondaryExtraction(str(data.get("provider") or ""), pages, sizes, replaced),
-        "",
-    )
-
-
-def _provider_pair_problem(
-    manifest: ProcessingManifest, secondary: _SecondaryExtraction
-) -> str | None:
-    primary = str((manifest.extractor.configuration or {}).get("toolbox_provider") or "")
-    if (primary, secondary.provider) == _CALIBRATED_PAIR:
-        return None
-    return (
-        f"Regra calibrada para {'+'.join(_CALIBRATED_PAIR)}; "
-        f"par atual: {primary or '?'}+{secondary.provider or '?'}"
-    )
-
-
-def _secondary_or_failure(
-    manifest: ProcessingManifest,
-) -> tuple[_SecondaryExtraction | None, MethodResult | None]:
-    secondary, problem = _load_secondary_extraction(manifest)
-    if secondary is None:
-        return None, MethodResult(success=False, validated=False, message=problem)
-    problem = _provider_pair_problem(manifest, secondary)
-    if problem:
-        return None, MethodResult(success=False, validated=False, message=problem)
-    return secondary, None
-
-
-def _pair_block(
-    element: ManifestElement,
-    manifest: ProcessingManifest,
-    candidates: list[dict[str, Any]],
-    secondary: _SecondaryExtraction,
-    used: set[int],
-) -> int | None:
-    """Index in ``candidates`` of the block that matches ``element`` (``pair_block``)."""
-    box = _element_bbox(element, manifest)
-    boxes = (
-        []
-        if box is None
-        else [
-            None if index in used else secondary.bbox(candidate)
-            for index, candidate in enumerate(candidates)
-        ]
-    )
-    return pair_block(
-        box,
-        element.text or "",
-        boxes,
-        [candidate.get("text") for candidate in candidates],
-        used,
-        min_iou=_MIN_BLOCK_IOU,
-        min_text_ratio=_MIN_BLOCK_TEXT_RATIO,
-    )
-
-
-def _handle_table_smart_fusion_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Pick each table's source between the two providers (Dr.DocBench rule).
-
-    Docling's table is kept when it has spans (MinerU flattens them) or when it
-    is the only one; otherwise MinerU's table is adopted. Tables are paired by
-    position or text; a page with a single table on each side pairs them only
-    when there is no position to compare. The choice and its reason are recorded
-    in ``table_source`` / ``table_source_reason``.
-    """
-    from docstruct.tables.ast import analyze_table_complexity
-
-    tables = [
-        element
-        for element in _target_elements(manifest, obligation_id)
-        if element.type == "table"
-    ]
-    if not tables:
-        return _missing_obligation(obligation_id)
-    secondary, failure = _secondary_or_failure(manifest)
-    if failure is not None:
-        return failure
-
-    primary_name, secondary_name = _CALIBRATED_PAIR
-    primary_tables_by_page = Counter(
-        element.page_number
-        for element in manifest.elements
-        if element.type == "table"
-    )
-    reasons: Counter = Counter()
-    for element in tables:
-        primary_ast = (element.metadata or {}).get("table_ast")
-        candidates = [
-            block
-            for block in secondary.pages.get(element.page_number or 0, [])
-            if block.get("type") == "table"
-        ]
-        match = _pair_block(element, manifest, candidates, secondary, set())
-        if (
-            match is None
-            and len(candidates) == 1
-            and primary_tables_by_page[element.page_number] == 1
-            and (
-                _element_bbox(element, manifest) is None
-                or secondary.bbox(candidates[0]) is None
-            )
-        ):
-            # One table on each side and no position to compare them by: the
-            # same table. With both positions known and no overlap, they are not.
-            match = 0
-        chosen = candidates[match] if match is not None else None
-        chosen_meta = (chosen or {}).get("metadata") or {}
-
-        if primary_ast and analyze_table_complexity(primary_ast).has_spans:
-            source, reason = primary_name, "primary-has-spans"
-        elif not candidates:
-            source, reason = primary_name, "no-secondary-table"
-        elif chosen is None:
-            source, reason = primary_name, "no-secondary-match"
-        elif not (chosen.get("text") or chosen_meta.get("table_ast")):
-            source, reason = primary_name, "secondary-table-empty"
-        else:
-            source, reason = _TABLE_PREFERENCE, f"preference-{_TABLE_PREFERENCE}"
-
-        if source == secondary_name and chosen is not None:
-            # Docling's table_* keys (AST, row/column counts, header) describe
-            # the table being replaced; the output prefers table_ast over the
-            # text, so a stale AST would hide the adopted MinerU text.
-            for key in [k for k in element.metadata if k.startswith("table_")]:
-                del element.metadata[key]
-            if chosen.get("text"):
-                element.text = chosen["text"]
-            for key, value in chosen_meta.items():
-                if key.startswith("table_"):
-                    element.metadata[key] = value
-        element.metadata["table_source"] = source
-        element.metadata["table_source_reason"] = reason
-        reasons[reason] += 1
-
-    return MethodResult(
-        success=True,
-        validated=True,
-        message="Fonte de tabela escolhida: "
-        + ", ".join(f"{reason}={count}" for reason, count in sorted(reasons.items())),
-    )
-
-
-def _handle_skeleton_order_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Follow the secondary provider's reading order (MinerU skeleton).
-
-    Page elements are paired with the secondary blocks by position (falling
-    back to text); paired elements take the skeleton order and unpaired ones
-    stay right after the element that preceded them. A page with fewer than
-    half its elements paired is left alone.
-    """
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-    secondary, failure = _secondary_or_failure(manifest)
-    if failure is not None:
-        return failure
-
-    by_page: dict[int, list[ManifestElement]] = {}
-    for element in elements:
-        if element.page_number is not None:
-            by_page.setdefault(element.page_number, []).append(element)
-
-    reordered: set[int] = set()
-    confirmed: set[int] = set()
-    for page_number, page_elements in by_page.items():
-        current = sorted(page_elements, key=lambda element: element.reading_order)
-        skeleton = secondary.pages.get(page_number, [])
-        used: set[int] = set()
-        keys: dict[int, int] = {}
-        for index, element in enumerate(current):
-            match = _pair_block(element, manifest, skeleton, secondary, used)
-            if match is not None:
-                used.add(match)
-                keys[index] = match
-        if len(current) < 2 or len(keys) < _MIN_SKELETON_MATCH * len(current):
-            continue
-        ranked: list[tuple[float, int, int]] = []
-        last = -1.0
-        for index in range(len(current)):
-            if index in keys:
-                last = float(keys[index])
-                ranked.append((last, 0, index))
-            else:
-                ranked.append((last, 1, index))
-        order = [index for _, _, index in sorted(ranked)]
-        if _apply_page_order(current, order):
-            reordered.add(page_number)
-        else:
-            confirmed.add(page_number)
-
-    if not reordered and not confirmed:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Esqueleto do provider secundário não casou com a página",
-        )
-    _refresh_page_element_ids(manifest, reordered)
-    parts = []
-    if reordered:
-        parts.append("aplicada nas páginas " + ", ".join(map(str, sorted(reordered))))
-    if confirmed:
-        parts.append("confirmada nas páginas " + ", ".join(map(str, sorted(confirmed))))
-    return MethodResult(
-        success=True,
-        validated=True,
-        message="Ordem do esqueleto " + "; ".join(parts),
-    )
-
-
-def _page_markdown(items: Iterable[tuple[str, str | None]]) -> str:
-    """Page text with the markers the page router looks for."""
-    parts = []
-    for kind, text in items:
-        text = (text or "").strip()
-        if kind == "table":
-            parts.append(f"<table>{text}</table>")
-        elif kind == "formula":
-            parts.append(f"$${text}$$")
-        elif text:
-            parts.append(text)
-    return "\n\n".join(parts)
-
-
-def _handle_agreement_rule_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Deterministic page router between the providers (``decide_v1``).
-
-    When the router keeps the primary (Docling) page the obligation is
-    satisfied without changing the text. When it picks the secondary page the
-    decision is recorded but not applied: replacing a whole page would reopen
-    the manifest mid-plan, and Dr.DocBench measured this router below the
-    block-level fusion the core already runs. The method then fails, so the
-    obligation goes to ``human-review`` with the route in ``page_route``.
-    """
-    from docstruct.fusion.adjudication import decide_v1
-
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-    secondary, failure = _secondary_or_failure(manifest)
-    if failure is not None:
-        return failure
-
-    primary_name = _CALIBRATED_PAIR[0]
-    routes: dict[int, tuple[str, str]] = {}
-    for page_number in sorted({e.page_number for e in elements if e.page_number}):
-        primary_md = _page_markdown(
-            (element.type, element.text)
-            for element in sorted(manifest.elements, key=lambda e: e.reading_order)
-            if element.page_number == page_number
-        )
-        secondary_md = _page_markdown(
-            (str(block.get("type") or ""), block.get("text"))
-            for block in secondary.pages.get(page_number, [])
-        )
-        routes[page_number] = decide_v1(primary_md, secondary_md)
-
-    for element in elements:
-        if element.page_number in routes:
-            choice, reason = routes[element.page_number]
-            element.metadata["page_route"] = {"choice": choice, "reason": reason}
-
-    rerouted = {page: route for page, route in routes.items() if route[0] != primary_name}
-    if not routes:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="Obrigação sem página identificada para o roteador",
-        )
-    if rerouted:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                "Roteador por página escolhe o provider secundário ("
-                + ", ".join(f"p{page}: {reason}" for page, (_, reason) in sorted(rerouted.items()))
-                + "); a troca de página não é aplicada automaticamente"
-            ),
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message="Roteador por página mantém o provider primário nas páginas "
-        + ", ".join(map(str, sorted(routes))),
-    )
-
-
 #: Longest side of the page image sent to the judge. Two candidates plus the
 #: image must fit one 8192-token slot of the production VLM server.
 _JUDGE_PAGE_MAX_SIDE = 1600
@@ -1428,81 +1018,6 @@ def _judgement_result(
     )
 
 
-def _apply_page_order(current: list[ManifestElement], order: list[int]) -> bool:
-    """Reassign the reading-order slots of ``current`` following ``order``.
-
-    ``order[i]`` is the index in ``current`` of the element that goes to the
-    i-th slot. Returns whether anything moved.
-    """
-    if order == list(range(len(current))):
-        return False
-    slots = sorted(element.reading_order for element in current)
-    for slot, index in zip(slots, order):
-        current[index].reading_order = slot
-    return True
-
-
-def _refresh_page_element_ids(
-    manifest: ProcessingManifest, page_numbers: set[int]
-) -> None:
-    manifest.elements.sort(key=lambda element: element.reading_order)
-    for page in manifest.pages:
-        if page.page_number in page_numbers:
-            page.element_ids = [
-                element.id
-                for element in manifest.elements
-                if element.page_number == page.page_number
-            ]
-
-
-def _handle_xycut_order_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Apply XY-cut reading order to the evidenced page elements."""
-    elements = _target_elements(manifest, obligation_id)
-    if not elements:
-        return _missing_obligation(obligation_id)
-
-    fusion_agent = _fusion_agent()
-    reordered_pages: set[int] = set()
-    by_page: dict[int, list[ManifestElement]] = {}
-    for element in elements:
-        if element.page_number is not None:
-            by_page.setdefault(element.page_number, []).append(element)
-
-    for page_number, page_elements in by_page.items():
-        positioned = [
-            element for element in page_elements
-            if _element_bbox(element, manifest) is not None
-        ]
-        if len(positioned) < 2:
-            continue
-        current = sorted(positioned, key=lambda element: element.reading_order)
-        boxes = [_element_bbox(element, manifest) for element in current]
-        order = fusion_agent.process_refine_reading_order(
-            [list(box) for box in boxes if box is not None]
-        )
-        if _apply_page_order(current, order):
-            reordered_pages.add(page_number)
-
-    if not reordered_pages:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="XY-cut não identificou uma mudança de ordem de leitura",
-        )
-
-    _refresh_page_element_ids(manifest, reordered_pages)
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=(
-            "Ordem de leitura XY-cut aplicada nas páginas "
-            + ", ".join(map(str, sorted(reordered_pages)))
-        ),
-    )
-
-
 DETERMINISTIC_METHOD_HANDLERS: dict[
     str, Callable[[ProcessingManifest, str], MethodResult]
 ] = {
@@ -1717,66 +1232,6 @@ def _fused_text_elements(
             element.reading_order = len(result) + 1
             result.append(element)
     return result
-
-
-def _handle_single_provider_method(
-    manifest: ProcessingManifest, obligation_id: str
-) -> MethodResult:
-    """Satisfy ``fuse-providers`` with the extraction the manifest already carries.
-
-    There is nothing to re-run: the manifest's elements are the configured
-    provider's extraction, with the pages the deterministic router took from
-    the secondary provider in dual mode (``fusion.apply_page_routes``). The
-    method does not claim a single-provider document; it checks only that the
-    manifest was extracted by the configured provider and has content. It used
-    to extract the whole document again, uploaded anew and with the Toolbox
-    cache off, once per ``fuse-providers`` step, and changed nothing in the
-    manifest: a full extraction of cost for no content.
-    """
-    from backend.config.settings import settings
-
-    obligation = next(
-        (item for item in manifest.obligations if item.id == obligation_id), None
-    )
-    if obligation is None:
-        return _missing_obligation(obligation_id)
-    if obligation.kind != "fuse-providers":
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="single-provider só é válido para fuse-providers",
-        )
-
-    provider = str(manifest.extractor.configuration.get("toolbox_provider") or "")
-    if not provider:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="The manifest does not record the provider it was extracted by",
-        )
-    if provider != settings.toolbox_provider:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=(
-                f"The manifest was extracted by {provider}, not by the configured "
-                f"provider ({settings.toolbox_provider})"
-            ),
-        )
-    if not manifest.elements:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message="The manifest extraction has no elements",
-        )
-    return MethodResult(
-        success=True,
-        validated=True,
-        message=(
-            f"The manifest already carries the extraction ({provider}); "
-            "nothing to re-extract"
-        ),
-    )
 
 
 def _persist_fusion_payload(
