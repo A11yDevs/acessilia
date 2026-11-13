@@ -15,7 +15,7 @@ from typing import Any
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox import ToolboxError, ToolboxInvalidInput
 from acessilia_sdk.toolbox.clients import ToolboxMathClient
-from acessilia_sdk.operations.formula import recognize_formula
+from acessilia_sdk.operations.formula import convert_formula, recognize_formula, verbalize_formula
 from acessilia_sdk.toolbox.clients.math import (
     CONVERT_CAPABILITY,
     RECOGNIZE_CAPABILITY,
@@ -75,7 +75,9 @@ async def _recognize_formula_async(image_bytes: bytes) -> list[dict[str, Any]]:
 class MathCapabilityUnavailable(RuntimeError):
     """``math.convert`` or ``math.verbalize`` could not serve a request.
 
-    Raised for an unreachable, failing or misconfigured Toolbox, never for an
+    Raised for an unreachable, failing or misconfigured Toolbox, or for an
+    answer outside the contract (``reason`` ``ToolboxContractViolation``: a
+    broken provider, not a formula without that text), never for an
     expression the Toolbox rejected. ADR-0007 forbids a silent local fallback:
     the caller decides between failing, replanning and a documented
     degradation. ``reason`` is the SDK error class, safe to show; the message
@@ -105,7 +107,7 @@ MSG_SPEECH_REJECTED: str = (
 
 
 def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str:
-    """Convert LaTeX to MathML (or MathML to LaTeX) through ``math.convert``.
+    """Convert LaTeX to MathML (or MathML to LaTeX): the SDK's ``convert_formula``.
 
     Args:
         latex: LaTeX expression, or MathML for ``mathml-to-latex``.
@@ -130,15 +132,13 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
 async def _convert_latex_async(latex: str, direction: str) -> str:
     client = make_toolbox_client(ToolboxMathClient)
     try:
-        result = await client.convert(latex, direction=direction)
-        doc = result.get("document", {})
-        return doc.get("mathml", "") if direction == "latex-to-mathml" else doc.get("latex", "")
+        return (await convert_formula(client, latex, direction=direction)).text
     finally:
         await client.close()
 
 
 def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
-    """Speak a LaTeX expression through ``math.verbalize`` (pt-BR).
+    """Speak a LaTeX expression (pt-BR): the SDK's ``verbalize_formula``.
 
     Args:
         latex: LaTeX expression.
@@ -162,8 +162,7 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
 async def _verbalize_latex_async(latex: str, language: str) -> str:
     client = make_toolbox_client(ToolboxMathClient)
     try:
-        result = await client.verbalize(latex, language=language)
-        return result.get("document", {}).get("verbalized", "")
+        return (await verbalize_formula(client, latex, language=language)).text
     finally:
         await client.close()
 

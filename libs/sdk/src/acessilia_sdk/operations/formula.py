@@ -11,8 +11,9 @@ the provider and the effective parameters:
    from a page of prose;
 2. :func:`recognize_formula` sends the crop to ``math.recognize`` and ranks the
    LaTeX candidates with ``docstruct.text.latex.ranked_latex_candidates``;
-3. :func:`speak_formula` turns LaTeX into MathML (``math.convert``) and into
-   spoken text (``math.verbalize``).
+3. :func:`convert_formula` turns LaTeX into MathML (``math.convert``), and
+   :func:`verbalize_formula` into spoken text (``math.verbalize``);
+   :func:`speak_formula` runs both.
 
 :func:`formula_chain` runs the three in order for one formula, speaking the
 candidate the caller chooses (the first by default).
@@ -44,6 +45,7 @@ from acessilia_sdk.toolbox.clients.math import (
     recognized_formulas,
 )
 from acessilia_sdk.toolbox.clients.pdf import RENDER_CAPABILITY, ToolboxPdfClient
+from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
 #: Resolution of a formula crop: chips read small subscripts better at 200 dpi.
 FORMULA_CROP_DPI = 200
@@ -90,11 +92,25 @@ class FormulaCandidates:
 
 
 @dataclass(frozen=True)
+class FormulaText:
+    """What ``math.convert`` or ``math.verbalize`` answered for one expression.
+
+    ``text`` is ``""`` when the answer's document has no such key.
+    ``ToolboxInvalidInput`` is raised instead when the Toolbox refused the
+    input, and ``ToolboxContractViolation`` when the answer is outside the
+    contract (a document that is not an object, a value that is not a string).
+    """
+
+    text: str
+    step: Step
+
+
+@dataclass(frozen=True)
 class FormulaSpeech:
     """A formula as MathML and as spoken text.
 
-    An empty string is a formula the Toolbox could not convert or verbalize
-    (``ToolboxInvalidInput`` is raised instead when it refused the input).
+    An empty string is an answer without that text (see :class:`FormulaText`
+    for the refusals and the answers outside the contract, which raise).
     """
 
     mathml: str
@@ -194,6 +210,71 @@ async def recognize_formula(
     )
 
 
+#: The key of ``math.convert``'s answer that holds each direction's result.
+_DIRECTION_KEYS = {"latex-to-mathml": "mathml", "mathml-to-latex": "latex"}
+
+
+def _answer_text(envelope: dict[str, Any], key: str, capability: str) -> str:
+    """The ``key`` of the answer's document; ``""`` when absent.
+
+    Anything outside the contract raises ``ToolboxContractViolation`` rather
+    than passing for a formula without that text (a silent degradation).
+    """
+    document = envelope.get("document")
+    if not isinstance(document, dict):
+        raise ToolboxContractViolation(
+            f"{capability} answered without a document object: {type(document).__name__}"
+        )
+    value = document.get(key, "")
+    if not isinstance(value, str):
+        raise ToolboxContractViolation(
+            f"{capability} answered a {key!r} that is not text: {type(value).__name__}"
+        )
+    return value
+
+
+async def convert_formula(
+    math: ToolboxMathClient,
+    expression: str,
+    *,
+    direction: str = "latex-to-mathml",
+    use_remote_cache: bool | None = None,
+) -> FormulaText:
+    """``expression`` converted by ``math.convert``: LaTeX to MathML, or back.
+
+    ``direction`` is ``latex-to-mathml`` (the answer's ``mathml``) or
+    ``mathml-to-latex`` (its ``latex``); any other value is a ``ValueError``,
+    before any request. See :class:`FormulaText` for what an answer without
+    that key, a refusal and an answer outside the contract give.
+    """
+    if direction not in _DIRECTION_KEYS:
+        raise ValueError(
+            f"direction must be one of {sorted(_DIRECTION_KEYS)}, not {direction!r}"
+        )
+    envelope = await math.convert(
+        expression, direction=direction, use_remote_cache=use_remote_cache
+    )
+    return FormulaText(
+        _answer_text(envelope, _DIRECTION_KEYS[direction], CONVERT_CAPABILITY),
+        Step(CONVERT_CAPABILITY, math.transform_provider, {"direction": direction}),
+    )
+
+
+async def verbalize_formula(
+    math: ToolboxMathClient,
+    latex: str,
+    *,
+    language: str = "pt-BR",
+    use_remote_cache: bool | None = None,
+) -> FormulaText:
+    """``latex`` as spoken text, by ``math.verbalize``."""
+    envelope = await math.verbalize(latex, language=language, use_remote_cache=use_remote_cache)
+    return FormulaText(
+        _answer_text(envelope, "verbalized", VERBALIZE_CAPABILITY),
+        Step(VERBALIZE_CAPABILITY, math.transform_provider, {"language": language}),
+    )
+
+
 async def speak_formula(
     math: ToolboxMathClient,
     latex: str,
@@ -201,19 +282,18 @@ async def speak_formula(
     language: str = "pt-BR",
     use_remote_cache: bool | None = None,
 ) -> FormulaSpeech:
-    """``latex`` as MathML (``math.convert``) and as spoken text (``math.verbalize``)."""
-    converted = await math.convert(
-        latex, direction="latex-to-mathml", use_remote_cache=use_remote_cache
+    """``latex`` as MathML and as spoken text: :func:`convert_formula`, then :func:`verbalize_formula`.
+
+    Either step's ``ToolboxInvalidInput`` (a refusal) or
+    ``ToolboxContractViolation`` (an answer outside the contract) is raised,
+    and the other step does not run; a caller that wants the other one anyway
+    calls the two steps itself.
+    """
+    mathml = await convert_formula(math, latex, use_remote_cache=use_remote_cache)
+    spoken = await verbalize_formula(
+        math, latex, language=language, use_remote_cache=use_remote_cache
     )
-    spoken = await math.verbalize(latex, language=language, use_remote_cache=use_remote_cache)
-    return FormulaSpeech(
-        mathml=str((converted.get("document") or {}).get("mathml") or ""),
-        verbalization=str((spoken.get("document") or {}).get("verbalized") or ""),
-        steps=(
-            Step(CONVERT_CAPABILITY, math.transform_provider, {"direction": "latex-to-mathml"}),
-            Step(VERBALIZE_CAPABILITY, math.transform_provider, {"language": language}),
-        ),
-    )
+    return FormulaSpeech(mathml.text, spoken.text, (mathml.step, spoken.step))
 
 
 async def formula_chain(
@@ -268,9 +348,12 @@ __all__ = [
     "FormulaChain",
     "FormulaCrop",
     "FormulaSpeech",
+    "FormulaText",
     "Step",
+    "convert_formula",
     "crop_formula_region",
     "formula_chain",
     "recognize_formula",
     "speak_formula",
+    "verbalize_formula",
 ]
