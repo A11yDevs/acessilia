@@ -82,6 +82,7 @@ case "$url" in
   *api.github.com*base=develop*) cat "$GH_FIXTURES/develop.json" ;;
   *api.github.com*pulls*) cat "$GH_FIXTURES/open.json" ;;
   *health*) [ -n "${HEALTH_UP:-}" ] || exit 7; echo '{"status": "healthy"}' ;;
+  *ready*) [ -n "${READY_UP:-}" ] || exit 7; echo '{"status": "ready"}' ;;
   *) exit 7 ;;
 esac
 """,
@@ -471,6 +472,7 @@ def _healthy_install(server, **extra):
         "DOCKER_PROJECT": "test-staging",
         "DOCKER_IMAGE": "ghcr.io/a11ydevs/acessilia:release-0.2.0",
         "HEALTH_UP": "1",
+        "READY_UP": "1",
     }
     env.update(extra)
     return env
@@ -502,6 +504,7 @@ def test_check_passes_on_a_healthy_install(server):
         ({"DOCKER_IMAGE": "ghcr.io/a11ydevs/acessilia:develop"}, "expected ghcr.io/a11ydevs/acessilia:release-0.2.0"),
         ({"DOCKER_PROJECT": "staging"}, "belongs to project 'staging', .env says 'test-staging'"),
         ({"HEALTH_UP": ""}, "health endpoint does not answer"),
+        ({"READY_UP": ""}, "readiness endpoint does not answer or reports unavailable"),
         ({"SYSTEMD_DOWN": "1"}, "cannot reach the systemd user instance"),
     ],
 )
