@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents import pddl_orchestrator
+from backend.core.pipeline.enrichment import inline_math as inline_math_stage
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
 
@@ -101,7 +101,7 @@ def spans(monkeypatch):
 
 def _run(manifest, text_spans=None):
     return asyncio.run(
-        pddl_orchestrator._mark_table_inline_math(manifest, Path("/tmp/amostra.pdf"), text_spans)
+        inline_math_stage._mark_table_inline_math(manifest, Path("/tmp/amostra.pdf"), text_spans)
     )
 
 
@@ -144,9 +144,9 @@ def test_a_marked_table_is_not_marked_again(spans):
 
 def test_the_prose_and_table_steps_fetch_a_page_once(spans):
     manifest = _manifest()
-    reader = pddl_orchestrator._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
+    reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
 
-    asyncio.run(pddl_orchestrator._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), reader))
+    asyncio.run(inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), reader))
     _run(manifest, reader)
 
     assert manifest.elements[0].text == "then $x$"
@@ -165,9 +165,9 @@ def test_an_unavailable_capability_is_asked_once(monkeypatch, spans):
 
     monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", failing)
     manifest = _manifest()
-    reader = pddl_orchestrator._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
+    reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
 
-    asyncio.run(pddl_orchestrator._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), reader))
+    asyncio.run(inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), reader))
     assert _run(manifest, reader)["marked"] == 0
 
     assert len(calls) == 1

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents import pddl_orchestrator
+from backend.core.pipeline.enrichment import inline_math as inline_math_stage
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
 
@@ -70,7 +70,7 @@ def spans(monkeypatch):
 
 
 def _run(manifest):
-    return asyncio.run(pddl_orchestrator._mark_inline_math(manifest, Path("/tmp/amostra.pdf")))
+    return asyncio.run(inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf")))
 
 
 def test_prose_gets_its_inline_math_and_formulas_are_left_alone(spans):
