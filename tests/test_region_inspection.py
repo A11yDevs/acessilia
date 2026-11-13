@@ -13,7 +13,6 @@ from types import SimpleNamespace
 import fitz
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
 from backend.core.pipeline.handlers import inspection as inspection_handlers
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import BoundingBox, PageDescriptor, ProcessingManifest, Provenance
@@ -24,6 +23,7 @@ from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from backend.core.pipeline.enrichment import common as enrichment_common
+from backend.core.pipeline import preflight as pipeline_preflight
 
 
 @pytest.fixture
@@ -287,7 +287,7 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
     async def no_media(*args):
         return None
 
-    monkeypatch.setattr(pddl, "inspect_source_media", no_media)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", no_media)
     result = await orchestrator.execute(
         Path(manifest.source.path), tmp_path, mode="baixo", structured_output=True,
     )

@@ -14,6 +14,7 @@ from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
+from backend.core.pipeline import preflight as pipeline_preflight
 
 isolated_runtime = runtime_fixture
 
@@ -98,7 +99,7 @@ async def test_orchestration_rejects_failed_or_exhausted_plan(monkeypatch, tmp_p
     async def noop(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(pddl, "inspect_source_media", noop)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     with pytest.raises(RuntimeError, match="linearize-table"):
@@ -124,7 +125,7 @@ async def test_failed_plan_marks_api_job_error_without_caching_or_download(
     async def forbidden(*args, **kwargs):
         pytest.fail("A failed plan must not be cached or published")
 
-    monkeypatch.setattr(pddl, "inspect_source_media", noop)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     monkeypatch.setattr(service, "agente", orchestrator)

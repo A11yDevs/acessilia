@@ -20,7 +20,6 @@ import httpx
 import pytest
 import respx
 
-from backend.agents import pddl_orchestrator as pddl
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.handlers import inspection as inspection_handlers
 from backend.agents.output_schemas import PageInspectionOutput
@@ -39,6 +38,7 @@ from backend.core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
 from docstruct.placeholders import is_placeholder_visual
 from tests.pddl_support import build_element, build_manifest
 from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
+from backend.core.pipeline import preflight as pipeline_preflight
 
 NOW = datetime(2026, 10, 19, tzinfo=timezone.utc)
 PNG = b"\x89PNG\r\n\x1a\nfake-page"
@@ -486,7 +486,7 @@ def _run(monkeypatch, tmp_path, manifest, *, max_replans=0):
         return None
 
     monkeypatch.setattr(settings, "toolbox_availability_gate", "off")
-    monkeypatch.setattr(pddl, "inspect_source_media", noop)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     orchestrator = build_orchestrator(max_replans=max_replans)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
     import asyncio

@@ -30,6 +30,7 @@ from backend.core.manifest.models import Obligation
 from backend.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline.enrichment import common as enrichment_common
+from backend.core.pipeline import preflight as pipeline_preflight
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -284,7 +285,7 @@ async def _run(manifest, monkeypatch, tmp_path):
     async def noop(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(pddl, "inspect_source_media", noop)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     return await orchestrator.execute(

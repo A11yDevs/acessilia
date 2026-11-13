@@ -13,6 +13,7 @@ import pytest
 
 from backend.tools import media_inspect
 from backend.tools.media_inspect import inspect_source_media
+from backend.core.pipeline import preflight as pipeline_preflight
 
 IMAGE = Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg"
 INSPECTION = {
@@ -149,17 +150,16 @@ def test_local_fallback_is_gone() -> None:
 async def test_orchestrator_records_the_inspection_status(
     monkeypatch, returned, enabled_setting, status
 ) -> None:
-    from backend.agents import pddl_orchestrator as pddl
     from backend.config import settings as settings_module
 
     async def fake(_path):
         return returned
 
-    monkeypatch.setattr(pddl, "inspect_source_media", fake)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", fake)
     monkeypatch.setattr(
         settings_module.settings, "toolbox_media_inspect_enabled", enabled_setting
     )
-    result, configuration = await pddl._inspect_media(IMAGE)
+    result, configuration = await pipeline_preflight._inspect_media(IMAGE)
 
     assert result == returned
     assert configuration == {"media_inspection": status}
@@ -177,7 +177,6 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
     monkeypatch, error, cause
 ) -> None:
     """Any exception degrades the step, not only a ToolboxError."""
-    from backend.agents import pddl_orchestrator as pddl
     from backend.tools.toolbox_client import ToolboxError
 
     async def fail(_path):
@@ -185,8 +184,8 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
             raise ToolboxError("toolbox down")
         raise ValueError("bad config")
 
-    monkeypatch.setattr(pddl, "inspect_source_media", fail)
-    result, configuration = await pddl._inspect_media(IMAGE)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", fail)
+    result, configuration = await pipeline_preflight._inspect_media(IMAGE)
 
     assert result is None
     assert configuration == {
@@ -199,15 +198,14 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
 async def test_orchestrator_does_not_swallow_cancellation(monkeypatch) -> None:
     import asyncio
 
-    from backend.agents import pddl_orchestrator as pddl
 
     async def cancelled(_path):
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(pddl, "inspect_source_media", cancelled)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", cancelled)
 
     with pytest.raises(asyncio.CancelledError):
-        await pddl._inspect_media(IMAGE)
+        await pipeline_preflight._inspect_media(IMAGE)
 
 
 @pytest.mark.parametrize(
