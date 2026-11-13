@@ -5,7 +5,7 @@ import httpx
 import pytest
 import respx
 
-from frontend.clients.api_client import ApiClient
+from frontend.clients.api_client import ApiClient, ApiError
 from backend.config.settings import settings
 from backend.i18n import get_translations, reset_request_locale, set_request_locale, t
 from backend.log_messages import LOG_PDF_UA_GENERATION_FAILED
@@ -13,6 +13,8 @@ from frontend.telegram import user_context
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
+    MSG_CONTACT_SERVER_FAILED,
     MSG_PACKAGE_PDF_UA_MISSING,
 )
 from frontend.telegram.handlers import document as doc_module
@@ -565,6 +567,37 @@ def test_operator_clears_the_cache_through_the_api(monkeypatch):
 
     assert calls == [True]
     assert message.answers == [t(MSG_CACHE_CLEARED).format(count=4)]
+
+
+@pytest.mark.parametrize("status_code", [401, 503, 429])
+def test_operator_clear_reports_api_errors(monkeypatch, status_code):
+    class _Client:
+        async def clear_cache(self):
+            raise ApiError(status_code, "nope")
+
+    monkeypatch.setattr(start_module, "client", _Client())
+    message = _FakeMessage(_FakeBot(b""), user_id=456)
+
+    asyncio.run(start_module.cmd_limpar(message))
+
+    assert message.answers == [
+        t(MSG_CACHE_CLEAR_FAILED).format(status_code=status_code, detail="nope")
+    ]
+    assert not any("Cache limpo" in answer for answer in message.answers)
+
+
+def test_operator_clear_reports_a_transport_failure(monkeypatch):
+    class _Client:
+        async def clear_cache(self):
+            raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(start_module, "client", _Client())
+    message = _FakeMessage(_FakeBot(b""), user_id=456)
+
+    asyncio.run(start_module.cmd_limpar(message))
+
+    assert message.answers == [t(MSG_CONTACT_SERVER_FAILED)]
+    assert not any("Cache limpo" in answer for answer in message.answers)
 
 
 def test_health_uses_provider_reported_by_api(monkeypatch, tmp_path):

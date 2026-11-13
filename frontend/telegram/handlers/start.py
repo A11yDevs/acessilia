@@ -20,6 +20,8 @@ from frontend.telegram.messages import (
     MSG_BOT_PAUSED,
     MSG_BOT_RESUMED,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
+    MSG_CONTACT_SERVER_FAILED,
     MSG_CANCEL_NO_TASK,
     MSG_EMAIL_CONFIGURED,
     MSG_EMAIL_HINT,
@@ -271,7 +273,19 @@ async def cmd_limpar(message: Message) -> None:
     if not _is_operator(message):
         await message.answer(t(MSG_ADMIN_ONLY))
         return
-    count = await client.clear_cache()
+    try:
+        count = await client.clear_cache()
+    except ApiError as e:
+        await message.answer(
+            t(MSG_CACHE_CLEAR_FAILED).format(
+                status_code=e.status_code, detail=e.detail
+            )
+        )
+        return
+    except Exception:
+        logger.exception("Telegram /limpar could not reach the operations API")
+        await message.answer(t(MSG_CONTACT_SERVER_FAILED))
+        return
     await message.answer(t(MSG_CACHE_CLEARED).format(count=count))
 
 

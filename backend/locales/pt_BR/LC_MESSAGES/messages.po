@@ -580,6 +580,10 @@ msgid "🧹 Cache cleared! {count} file(s) removed."
 msgstr "🧹 Cache limpo! {count} arquivo(s) removido(s)."
 
 #, python-brace-format
+msgid "❌ Could not clear the server cache ({status_code}): {detail}"
+msgstr "❌ Não foi possível limpar o cache do servidor ({status_code}): {detail}"
+
+#, python-brace-format
 msgid "💾 Free disk: {free_gb:.1f} GB"
 msgstr "💾 Disco livre: {free_gb:.1f} GB"
 

@@ -418,6 +418,7 @@ from frontend.telegram.messages import (
     MSG_BOT_RESUMED,
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
     MSG_CANCEL_NO_TASK,
     MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
     MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
@@ -625,6 +626,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_HEALTH_TEMP_MISSING,
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
+    MSG_CACHE_CLEAR_FAILED,
     MSG_HEALTH_DISK_FREE,
     # Telegram start.py command response ids: task cancel/result receipts, bot pause/resume confirmations, feedback prompt+thanks.
     MSG_CANCEL_NO_TASK,
@@ -1398,6 +1400,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_ADMIN_ONLY: "⛔ Este comando é restrito a operadores.",
         # Cache clearing receipt; {count} is how many files were removed from the cache store.
         MSG_CACHE_CLEARED: "🧹 Cache limpo! {count} arquivo(s) removido(s).",
+        MSG_CACHE_CLEAR_FAILED: (
+            "❌ Não foi possível limpar o cache do servidor ({status_code}): {detail}"
+        ),
         # Free disk space reported with one decimal in GB units (see /health disk probe).
         MSG_HEALTH_DISK_FREE: "💾 Disco livre: {free_gb:.1f} GB",
         # Confirmation receipt after successful cancellation of the user's task; {task_id} of the cancelled job.

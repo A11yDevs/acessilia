@@ -165,6 +165,10 @@ MSG_STATUS_PROCESSING_FAILED: str = ("❌ Error during processing.")
 MSG_ADMIN_ONLY: str = "⛔ This command is restricted to operators."
 #: Cache cleared reply; {count} is the number of files deleted from cache storage.
 MSG_CACHE_CLEARED: str = ("🧹 Cache cleared! {count} file(s) removed.")
+#: Failure reply when the operations API refuses the cache clear; {status_code}/{detail} are the API fields.
+MSG_CACHE_CLEAR_FAILED: str = (
+    "❌ Could not clear the server cache ({status_code}): {detail}"
+)
 #: Disk free space probe line; {free_gb} is formatted at call time with one decimal.
 MSG_HEALTH_DISK_FREE: str = "💾 Free disk: {free_gb:.1f} GB"
 #: /status reply when the chat has no recorded processing task yet.
