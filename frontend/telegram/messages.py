@@ -28,7 +28,7 @@ MSG_HELP_TEXT: str = (
     "\n/start - Start the bot"
     "\n/help - Show this message"
     "\n/formats - List supported input and output formats"
-    "\n/email <address> - Also send the next file's result to that address"
+    "\n/email &lt;address&gt; - Also send the next file's result to that address"
     "\n\n🎨 Description modes:"
     "\n/detailed - Maximum detail: typography, colors, layout, element positions"
     "\n/medium - Full text + clear image descriptions (default)"

@@ -1251,7 +1251,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "\n/start - Iniciar o bot"
             "\n/ajuda ou /help - Mostrar esta mensagem"
             "\n/formatos - Listar formatos de entrada e saída suportados"
-            "\n/email <endereço> - Também envia o resultado do próximo arquivo para esse e-mail"
+            "\n/email &lt;endereço&gt; - Também envia o resultado do próximo arquivo para esse e-mail"
             "\n\n🎨 Modos de Descrição:"
             "\n/detalhado - Máximo detalhe: tipografia, cores, layout, posição de elementos"
             "\n/medio - Texto completo + descrição clara de imagens (padrão)"

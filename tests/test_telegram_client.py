@@ -14,6 +14,7 @@ from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
     MSG_CACHE_CLEAR_FAILED,
+    MSG_HELP_TEXT,
     MSG_CONTACT_SERVER_FAILED,
     MSG_PACKAGE_PDF_UA_MISSING,
 )
@@ -559,6 +560,22 @@ def test_start_formats_and_help_match_the_validator(monkeypatch):
     assert "Markdown" not in formats_text
     assert "Searchable PDF" not in formats_text
     assert "/email" in help_text
+    assert "&lt;address&gt;" in help_text
+    assert "<" not in help_text and ">" not in help_text
+
+
+@pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
+def test_help_text_is_safe_for_the_html_parse_mode(locale):
+    token = set_request_locale(locale)
+    try:
+        text = t(MSG_HELP_TEXT)
+    finally:
+        reset_request_locale(token)
+
+    # aiogram sends commands with ParseMode.HTML; literal angle brackets in
+    # "/email <address>" would be parsed as an unsupported tag and drop the reply.
+    assert "<" not in text and ">" not in text
+    assert "&lt;" in text and "&gt;" in text
 
 
 def test_formats_follow_a_changed_validator_configuration(monkeypatch):
