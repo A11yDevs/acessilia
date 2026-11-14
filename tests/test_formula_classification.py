@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.handlers import review as review_handlers
 from backend.agents.output_schemas import VisionOutput

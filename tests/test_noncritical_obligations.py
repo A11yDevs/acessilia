@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import _derive_processing_needs

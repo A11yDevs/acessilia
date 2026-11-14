@@ -41,7 +41,7 @@ a capability because it is not currently activated.
 For planning-driven work there are further links: the obligation/method entry in
 `DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`), a registered handler
 in `PddlAccessibilityOrchestrator._build_executor`
-(`backend/agents/pddl_orchestrator.py`), and real evidence that causes the
+(`backend/core/pipeline/orchestrator.py`), and real evidence that causes the
 compiler to emit the required facts in `problem.pddl`.
 
 ## Matrix

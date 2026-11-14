@@ -18,7 +18,7 @@ package "Core (Docker container)" {
   component "REST API (FastAPI)\nbackend/api" as API
 
   package "PDDL engine" {
-    component "PddlAccessibilityOrchestrator\nbackend/agents/pddl_orchestrator.py" as Orchestrator
+    component "PddlAccessibilityOrchestrator\nbackend/core/pipeline/orchestrator.py" as Orchestrator
     component "ToolboxManifestExtractor\nbackend/core/manifest" as Manifest
     component "PlannerAgent\n(PDDL problem + plan validation)\nbackend/core/planning" as Planner
     component "ExecutorAgent\n(Agno Workflow)\nbackend/core/execution" as Executor

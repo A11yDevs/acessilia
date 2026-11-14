@@ -41,7 +41,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: impede colisões de processos na máquina do host.
 
 ### 8. Planejamento Determinístico com PDDL
-- Implementação: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordenados por [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.
+- Implementação: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordenados por [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.
 - Papel: separar *o que fazer* de *fazer*. Um manifesto determinístico descreve as regiões e obrigações do documento; um planejador PDDL o compila em um plano validado e ordenado; um executor Agno Workflow aplica o plano, chamando os agentes Vision/Data apenas onde o plano exige. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
 - Benefício: a ordem e as dependências das tarefas ficam explícitas e auditáveis, e o planejamento permanece determinístico (nenhum LLM escreve PDDL) enquanto a IA fica restrita à descrição. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística.
 

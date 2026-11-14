@@ -321,7 +321,7 @@ Plano PDDL
 ExecutorAgent (Agno Workflow)
    │  chama o handler registrado
    ▼
-_handle_dual_provider_fusion_method (backend/agents/pddl_orchestrator.py)
+_handle_dual_provider_fusion_method (backend/core/pipeline/handlers/fusion.py)
    │  chama extract_fused()
    ▼
 backend.pipeline.fusion.extract_fused

@@ -19,7 +19,8 @@ diferentes:
 - **O core**:
   - o manifesto, o planejamento e a execução (`backend/core`);
   - o orquestrador PDDL, com seus handlers e etapas de enriquecimento
-    (`backend/agents/pddl_orchestrator.py`);
+    (`backend/core/pipeline/`, para onde o passo 6 da #402 os moveu a partir
+    do `backend/agents/pddl_orchestrator.py`);
   - os agentes (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - a fusão dupla (`backend/pipeline`) e os exportadores (`backend/export`,
     `backend/adapters`);
@@ -128,7 +129,7 @@ Proposta: a opção 2.
   | Hoje | Vai para |
   |---|---|
   | `backend/core/{manifest,planning,execution}` | `acessilia_core.{manifest,planning,execution}` |
-  | `backend/agents/pddl_orchestrator.py`, `backend/pipeline` | `acessilia_core.pipeline` |
+  | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo), `backend/pipeline` | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
   | `backend/export`, `backend/adapters` | `acessilia_core.export` |

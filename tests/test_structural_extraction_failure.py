@@ -15,7 +15,7 @@ import pytest
 
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
 from backend import i18n
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from tests.pddl_support import build_orchestrator
 from backend.core.pipeline import preflight as pipeline_preflight
 

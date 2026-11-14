@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.service import _normalized_engine, _build_orchestrator
 
 

@@ -41,7 +41,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: prevents process collisions on the host machine.
 
 ### 8. Deterministic Planning with PDDL
-- Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/agents/pddl_orchestrator.py](../backend/agents/pddl_orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.
+- Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.
 - Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; an Agno Workflow executor applies the plan, calling the Vision/Data agents only where the plan requires. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 - Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. A planning failure fails the job; there is no fallback to deterministic extraction.
 

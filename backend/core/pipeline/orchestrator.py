@@ -1,3 +1,16 @@
+"""The PDDL pipeline's orchestrator: the sequence of ``execute``.
+
+``PddlAccessibilityOrchestrator.execute`` inspects the source and checks the
+page limit, extracts the manifest through the Toolbox, runs the enrichment
+stages, plans with the PDDL planner and executes the plan with the method
+registry, planning again while the execution report asks for it (up to
+``max_replans``); ``_plan_progress`` reports each step to the job, and
+``_log_availability`` the Toolbox's availability decision. The stages, the
+handlers and the page judge live in the modules of ``backend/core/pipeline``.
+Moved verbatim from ``backend/agents/pddl_orchestrator.py``, the last move of
+#402's phase 3, step 6; the module itself is gone.
+"""
+
 from __future__ import annotations
 
 import asyncio

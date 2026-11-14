@@ -659,7 +659,7 @@ def test_table_ast_from_metadata_preserves_empty_structural_cells() -> None:
 def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from backend.agents import pddl_orchestrator as pddl_module
+    from backend.core.pipeline import orchestrator as pddl_module
 
     manifest = _sample_manifest()
     element = manifest.elements[1]
@@ -714,7 +714,7 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
 def test_picture_reclassified_as_formula_reconciles_processing_needs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from backend.agents import pddl_orchestrator as pddl_module
+    from backend.core.pipeline import orchestrator as pddl_module
 
     manifest = _sample_manifest()
     element = manifest.elements[1]
@@ -830,7 +830,7 @@ def test_standalone_image_injects_full_page_picture_for_vision(
     media.inspect (is_image + requires_visual_inspection), o orquestrador deve
     injetar um elemento `picture` de página inteira e acionar o VisionAgent.
     """
-    from backend.agents import pddl_orchestrator as pddl_module
+    from backend.core.pipeline import orchestrator as pddl_module
 
     manifest = _sample_manifest()
     # Simula o Docling: só texto curto de OCR, sem elementos visuais.

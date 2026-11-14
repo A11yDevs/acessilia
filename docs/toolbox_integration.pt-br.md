@@ -312,8 +312,8 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   chama só a Toolbox; não há fallback local (ADR-0003, F3 da #150). Com
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
-- **Integração:** `backend/agents/pddl_orchestrator.py` chama
-  `inspect_source_media()` **antes** da extração e usa três sinais:
+- **Integração:** o `backend/core/pipeline/preflight.py` (`_inspect_media`, que o
+  `PddlAccessibilityOrchestrator.execute()` roda primeiro) chama `inspect_source_media()` **antes** da extração e usa três sinais:
   - `document_genre` (`pure-media-inspect` 1.1.0+): um PDF informado como
     `presentation` é extraído só pelo provider configurado (sem fusão dual) e
     estruturado slide a slide (`backend/core/manifest/slides.py`): um H1 para a

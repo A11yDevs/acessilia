@@ -77,7 +77,7 @@ def test_build_orchestrator_returns_legacy_by_default(monkeypatch):
 
 
 def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
-    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+    from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")
@@ -93,7 +93,7 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
 
 def test_build_orchestrator_pddl_with_toolbox_uses_toolbox_extractor(monkeypatch):
     """PIPELINE_ENGINE=pddl always extracts through ToolboxManifestExtractor."""
-    from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+    from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
     from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
