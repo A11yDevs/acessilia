@@ -204,7 +204,9 @@ Proposta: a opção 2.
      [inventário da #470](../architecture/operational-boundaries-inventory.pt-br.md)
      os lista. O que ficar no core depois da divisão (a política, e a ligação
      do `CoreConfig` aos parâmetros de cada operação) se reúne aqui em
-     seguida.
+     seguida. A ADR-0017 foi aceita em 2026-11-13: a política da cadeia de
+     fórmula foi para o `backend/core/pipeline/` (#513, #515), e o juiz de
+     página foi para lá inteiro, com a divisão com o SDK deixada para depois.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
      vez.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.

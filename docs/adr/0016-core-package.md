@@ -202,7 +202,9 @@ Proposed: option 2.
      [inventory of #470](../architecture/operational-boundaries-inventory.md)
      lists them. What stays in the core after the split (the policy, and the
      binding of `CoreConfig` to each operation's parameters) then gathers
-     here.
+     here. ADR-0017 was accepted on 2026-11-13: the formula chain's policy
+     moved into `backend/core/pipeline/` (#513, #515), and the page judge
+     moved there whole, its SDK split left for later.
   3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
