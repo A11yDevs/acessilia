@@ -32,6 +32,7 @@ from backend.log_messages import (
 )
 from backend.services.blocking import run_blocking
 from backend.services.job_store import delete_request, save_request, save_status
+from backend.services.operation_registry import operation_registry
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.services.remote_cancellation import cancel_task_operations
 from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
@@ -215,6 +216,11 @@ async def cancel_job(request: Request, task_id: str):
     remote = await cancel_task_operations(task_id)
     worker.state_manager.set_remote_cancellation(task_id, remote)
     status = await get_job_status_async(task_id)
+    if status is not None and status.get("status") == "cancelled":
+        # A queued job has no worker that would clear its cancellation marker.
+        
+
+        operation_registry.clear(task_id)
     await run_blocking(save_status, task_id, status)
     return CancelResponse(
         task_id=task_id,
