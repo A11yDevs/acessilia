@@ -193,5 +193,3 @@ MSG_FEEDBACK_PROMPT: str = (
 )
 #: Confirmation emitted once the user's feedback message has been recorded and logged; thanks them for contributing.
 MSG_FEEDBACK_THANKS: str = ("✅ Feedback received! Thanks for your contribution.")
-
-

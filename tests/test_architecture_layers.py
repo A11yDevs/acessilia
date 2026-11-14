@@ -40,6 +40,22 @@ def test_backend_does_not_import_the_toolbox_package() -> None:
     )
 
 
+
+CORE_DIR = BACKEND_DIR / "core"
+
+
+def test_the_core_imports_nothing_from_the_frontend() -> None:
+    """The core owns its messages (ADR-0016, step 2); the frontend may import the core, not the reverse.
+
+    Imports inside functions count: ``_imported_roots`` walks the whole module.
+    """
+    offenders = sorted(
+        str(path.relative_to(REPO_ROOT))
+        for path in CORE_DIR.rglob("*.py")
+        if "frontend" in _imported_roots(path)
+    )
+    assert not offenders, f"backend/core modules importing the frontend: {offenders}"
+
 #: Libraries that run operations (rendering, OCR, conversion, extraction). They
 #: belong to the Toolbox; the core reaches them through its capabilities
 #: (docs/adr/0003). Tests may still use some of them to build fixtures.

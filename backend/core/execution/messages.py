@@ -1,10 +1,15 @@
-"""Canonical English msgids for the nominal-plan executor's error and status strings.
+"""Canonical English msgids of execution: the executor's errors and statuses, and the models' guards.
 
-These constants hold the canonical English texts raised or reported by
+The ``EXE_*`` constants hold the canonical English texts raised or reported by
 :class:`backend.core.execution.executor.ExecutorAgent` and
-:class:`backend.core.execution.executor.MethodRegistry`. Callers resolve them at
-raise/report time through :func:`backend.core.i18n.t` so the operator-facing text
-follows the active locale, while the msgids stay stable English identifiers.
+:class:`backend.core.execution.executor.MethodRegistry`; the ``MSG_*`` ones at
+the end, the validation messages and schema description of
+:mod:`backend.core.execution.models`. Those came from
+``frontend.telegram.messages`` in ADR-0016's step 2 and joined this module,
+which execution already had, while planning, which had none, got
+``backend/core/planning/messages.py``. Callers resolve them at raise/report
+time through :func:`backend.core.i18n.t` so the operator-facing text follows
+the active locale, while the msgids stay stable English identifiers.
 Placeholders such as ``{method}`` are substituted by the caller after lookup.
 """
 
@@ -80,10 +85,10 @@ EXE_PREDECESSORS_UNSATISFIED: str = (
     "Unsatisfied predecessors for {obligation_id}: {unsatisfied}"
 )
 
-# --- Execution models (backend.core.execution.models); from frontend.telegram.messages until ADR-0016's step 2 ---
+# --- Execution models (backend.core.execution.models) ---
 #: Requires MethodResult to have been marked validated before claiming success; raise message text for that guard in backend.core.execution.models.MethodResult.success_requires_validation domain validation.
 MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION: str = ("A method result claimed as successful must also have passed its validation gate")
 #: Duplicate artifact identifier guard across the artifacts mapping on MethodResult, one per unique id expected; raise message text shown to users / developers reading that model's own pydantic validation context.
 MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS: str = ("The method result contains duplicate artifact identifiers")
-#: A normalized description for the execution-report JSON schema document, localized alongside every other user-visible string in this branch's i18n effort so tooling inspecting or rendering schema metadata can rely on catalog-driven localization rather than hardcoded strings; variable substituted at call time via t() like all other part-6 entries.
+#: Description of the ExecutionReport JSON schema, resolved with t() when the schema is built; no placeholders.
 MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION: str = ("Report of the execution of a nominal plan over one manifest, with per-step method results and collected artifacts")

@@ -20,23 +20,23 @@ MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB: str = ("A nominal plan must end with the
 MSG_EXPECTED_TOTAL_COST_MISMATCH: str = ("Declared expected_total_cost={declared}; plan steps sum to expected cost {calculated}")
 #: NominalPlan.validate_plan failure when a planned execute-obligation step has no corresponding entry in selected_obligations.
 MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION: str = ("A nominal plan contains an obligation that was not selected")
-#: PlannerOutcome validate_outcome requiring all plan content fields to be present for status==solved results per {message} below at the raise site in planning/models.py in the code change accompanying this constant. Used for a solved result lacking at least one of plan file, identifier or statistics content.
+#: PlannerOutcome.validate_outcome: a solved outcome lacks one of plan_file, plan_id, expected_total_cost, step_count or execution_step_count. The English text describes another rule (#530); the msgid is the catalog key, so it changes in its own PR.
 MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS: str = (
     "A solver outcome marked as ended before execution began cannot carry plan details"
 )
-#: Outcome validation requiring the recorded run to have been validated and accepted after solving for a result that claims solved status without successful validator pass recorded alongside it.
+#: PlannerOutcome.validate_outcome: a solved outcome whose plan did not pass validation (validation_passed is false).
 MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION: str = ("Marking a planner outcome as solved requires its computed solution to have passed validation")
-#: Prohibiting any error record field from being present on an otherwise-validated successful solver run result in PlannerOutcome validate_outcome for status==solved branches.
+#: PlannerOutcome.validate_outcome: a solved outcome that also carries error_type or error_message.
 MSG_PLANNER_OUTCOME_SOLVED_MUST_NOT_CARRY_ERROR: str = ("Solving a planner outcome cannot also hold recorded error information")
-#: Require both fields present when recording a run that reported no solution found at PlannerOutlet's validation site in Planning/Model.Py for a result claiming failed status without any diagnostic content attached at all.
+#: PlannerOutcome.validate_outcome: a failed outcome lacks error_type or error_message.
 MSG_PLANNER_OUTCOME_FAILED_REQUIRES_ERROR: str = ("A planner outcome marked as failed requires an error type and message")
-#: Forbid marking computed results both validated-and-passed while simultaneously flagged as having failed validation when the run finished solving successfully in a failed-status branch check on the same PlannerOutcome record during validate_outcome.
+#: PlannerOutcome.validate_outcome: a failed outcome that records validation_passed as true.
 MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION: str = ("A planner outcome marked as failed cannot simultaneously record successful validation")
-#: Requires both planned execution backends listed in outcomes mapping for PlanningComparison.validate_report domain-level consistency check comparing planner identities against recorded backend keys; raise message text shown to users / developers reading the generated JSON comparison result report body.
+#: PlanningComparison.validate_report: the outcomes do not include both the internal planner and Fast Downward.
 MSG_COMPARISON_REQUIRES_BOTH_BACKENDS: str = ("Planning comparisons must contain results from both the internal planner and Fast Downward")
-#: Outcome key mismatch guard on each backend, result pair in that mapping for {key} expecting {backend_name}; raise message text shown to users / developers reading validation context after a comparison report builds successfully with divergent identifiers attached elsewhere in its metadata fields as well.
+#: PlanningComparison.validate_report: an outcome stored under {key} records another planner {backend}.
 MSG_COMPARISON_OUTCOME_KEY_MISMATCH: str = ("Outcome key {key} does not match recorded planner backend {backend}")
-#: A normalized description for the planning-comparison JSON schema document, localized alongside every other user-visible string in this branch's i18n effort so tooling inspecting or rendering schema metadata can rely on catalog-driven localization rather than hardcoded strings; variable substituted at call time via t() like all other part-6 entries.
+#: Description of the PlanningComparison JSON schema, resolved with t() when the schema is built; no placeholders.
 MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION: str = ("Normalized comparison between the internal planner and Fast Downward executions of one planning problem")
-#: A normalized description for the nominal-plan JSON schema document, localized so tooling inspecting or rendering its metadata reads catalog-driven text; variable substituted at call time via t() like all other part-6 entries.
+#: Description of the NominalPlan JSON schema, resolved with t() when the schema is built; no placeholders. Its pt_BR entry drops the last clause (#530).
 MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION: str = ("Nominal plan derived from the processing manifest and PDDL domain of Acessilia; effects are confirmed only after executed by an executor")
