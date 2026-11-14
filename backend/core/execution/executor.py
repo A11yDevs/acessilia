@@ -4,7 +4,7 @@ import hashlib
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Any, Callable
 
 from backend.core.agents.agno_support import require_workflow_classes
 from backend.core.execution.messages import (
@@ -52,6 +52,23 @@ MethodHandler = Callable[[ProcessingManifest, str], MethodResult]
 #: 1-based position. It runs on the executor's thread and before the step's
 #: handler, so the last call names the step a crash happened in.
 StepProgress = Callable[[PlanStep, int, int], None]
+#: Called after each plan step with a JSON-ready snapshot of the run, so the
+#: caller can persist it and a restart can continue from the next step (#407).
+StepCheckpoint = Callable[[dict[str, Any]], None]
+
+
+@dataclass(frozen=True)
+class ExecutionResume:
+    """What a previous run of the same plan recorded before it was interrupted.
+
+    ``results`` are the steps already recorded, in plan order; the next step is
+    the one after the last result. ``replan_required`` carries the flag a step
+    may have set before the interruption, so a resumed run does not lose it.
+    """
+
+    manifest: ProcessingManifest
+    results: list[ExecutionStepResult]
+    replan_required: bool = False
 
 
 class MethodRegistry:
@@ -107,17 +124,27 @@ class ExecutorAgent:
         self,
         plan: NominalPlan,
         state: _ExecutionState,
+        *,
+        skip: int = 0,
+        on_step: StepCheckpoint | None = None,
     ):
         Workflow, Step, _, StepOutput = require_workflow_classes()
         workflow_steps = []
         total = len(plan.steps)
         for position, plan_step in enumerate(plan.steps, start=1):
+            # A resumed run keeps the steps already recorded in the checkpoint:
+            # their effect is in the manifest and their results in the report.
+            if position <= skip:
+                continue
+
             def execute_step(
                 _step_input, current: PlanStep = plan_step, position: int = position
             ):
                 if state.progress is not None:
                     state.progress(current, position, total)
                 result = self._execute_step(current, plan, state)
+                if on_step is not None:
+                    on_step(_execution_snapshot(plan, state))
                 failed = result.status == "failed"
                 # A failed obligation does not stop the workflow: the remaining
                 # independent obligations still run, and those depending on the
@@ -150,9 +177,30 @@ class ExecutorAgent:
         *,
         dry_run: bool = False,
         progress: StepProgress | None = None,
+        resume: ExecutionResume | None = None,
+        on_step: StepCheckpoint | None = None,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
         self._validate_binding(plan, manifest)
-        working = deepcopy(manifest)
+        if resume is not None and dry_run:
+            raise ValueError("A dry run has no checkpoint to resume")
+        if resume is None:
+            working = deepcopy(manifest)
+            results: list[ExecutionStepResult] = []
+            replan_required = False
+        else:
+            working = resume.manifest
+            results = list(resume.results)
+            replan_required = resume.replan_required
+            indexes = [result.index for result in results]
+            if indexes != list(range(len(results))):
+                raise ValueError(
+                    f"A resumed plan expects consecutive step results, got {indexes}"
+                )
+            if len(results) > len(plan.steps):
+                raise ValueError(
+                    f"A resumed plan has {len(results)} recorded steps, "
+                    f"but the plan has {len(plan.steps)}"
+                )
         for obligation in working.obligations:
             obligation.selected = obligation.id in set(plan.selected_obligations)
 
@@ -160,17 +208,25 @@ class ExecutorAgent:
         state = _ExecutionState(
             manifest=working,
             dry_run=dry_run,
-            results=[],
+            results=results,
+            failed_step_index=next(
+                (result.index for result in results if result.status == "failed"),
+                None,
+            ),
+            replan_required=replan_required,
             progress=progress,
         )
-        workflow = self.build_workflow(plan, state)
-        workflow.run(
-            input={
-                "plan_id": plan.plan_id,
-                "manifest_id": manifest.manifest_id,
-                "mode": "dry-run" if dry_run else "live",
-            }
-        )
+        if len(results) < len(plan.steps):
+            workflow = self.build_workflow(
+                plan, state, skip=len(results), on_step=on_step
+            )
+            workflow.run(
+                input={
+                    "plan_id": plan.plan_id,
+                    "manifest_id": manifest.manifest_id,
+                    "mode": "dry-run" if dry_run else "live",
+                }
+            )
         completed_at = datetime.now(timezone.utc)
 
         if dry_run:
@@ -501,6 +557,16 @@ class ExecutorAgent:
                     unsatisfied=unsatisfied,
                 )
             )
+
+
+def _execution_snapshot(plan: NominalPlan, state: _ExecutionState) -> dict[str, Any]:
+    """A JSON-ready snapshot after one plan step, for the job checkpoint (#407)."""
+    return {
+        "plan_id": plan.plan_id,
+        "manifest": state.manifest.model_dump(mode="json", by_alias=True),
+        "results": [result.model_dump(mode="json") for result in state.results],
+        "replan_required": state.replan_required,
+    }
 
 
 def _json_sha256(payload: dict) -> str:

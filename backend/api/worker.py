@@ -13,6 +13,7 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
 from backend.config.settings import settings
+from backend.services import job_checkpoint
 from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
 from backend.core.i18n import t
@@ -242,6 +243,16 @@ class ApiJob:
     object_markers: bool | None = None
 
 
+def _job_from_record(record: dict[str, Any]) -> ApiJob:
+    """The job a durable record describes; raises on a malformed payload."""
+    payload = dict(record["request"])
+    payload["file_path"] = Path(payload["file_path"])
+    payload["output_dir"] = (
+        Path(payload["output_dir"]) if payload.get("output_dir") else None
+    )
+    return ApiJob(**payload)
+
+
 class JobExecutor:
     def __init__(self) -> None:
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
@@ -328,11 +339,28 @@ class JobExecutor:
             return [t(EMAIL_AUDIT_UNAVAILABLE).format(error=type(exc).__name__)], None
         return lines, report_path
 
+    async def _restore_from_record(self, task_id: str) -> bool:
+        """Re-apply the durable progress of a job interrupted by a restart.
+
+        Returns ``True`` when the record says the job was already processing, so
+        the caller skips the one-time steps (confirmation e-mail, queue label).
+        """
+        try:
+            record = await run_blocking(load_record, task_id)
+        except Exception as exc:  # noqa: BLE001 - a missing record is not fatal here
+            logger.warning("Job {}: durable status not read: {}", task_id, exc)
+            return False
+        if not record or record["status"].get("status") != "processing":
+            return False
+        state_manager.restaurar(task_id, record["status"])
+        return True
+
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
         started_at = time.time()
         out_dir: Path | None = None
         result_published = False
+        resumed = state_manager.obter(task_id) is not None
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -353,6 +381,8 @@ class JobExecutor:
                 state_manager.criar_tarefa(
                     job.file_path, task_id=task_id, arquivo=job.filename
                 )
+                if await self._restore_from_record(task_id):
+                    resumed = True
             await run_blocking(save_status, task_id, get_job_status(task_id))
             await registrar_conversao(
                 task_id=task_id,
@@ -361,9 +391,12 @@ class JobExecutor:
                 tamanho_bytes=_file_size_or_zero(job.file_path),
                 modo=job.mode,
             )
-            state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
+            if not resumed:
+                state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
 
-            if job.email:
+            # The user already received the confirmation before the restart; a
+            # resumed job must not send it again.
+            if job.email and not resumed:
                 await send_confirmation_email(job.email, job.filename)
                 state_manager.verificar_cancelamento(task_id)
 
@@ -377,6 +410,7 @@ class JobExecutor:
                 thinking_mode=job.thinking_mode,
                 task_id=task_id,
                 display_filename=job.filename,
+                resumed=resumed,
             )
             state_manager.verificar_cancelamento(task_id)
 
@@ -627,6 +661,10 @@ class JobExecutor:
             )
         finally:
             await _persist_status(task_id)
+            try:
+                await run_blocking(job_checkpoint.clear, task_id)
+            except Exception as exc:  # noqa: BLE001 - cleanup is best-effort
+                logger.warning("Job {}: checkpoints not cleared: {}", task_id, exc)
             if job.file_path.exists():
                 try:
                     job.file_path.unlink()
@@ -714,9 +752,40 @@ async def recover_pending_jobs() -> None:
             status.update(status="cancelled", fim=time.time(), etapa_atual=t(STAGE_RESTART_CANCELLED))
             await run_blocking(save_status, task_id, status)
             Path(record["request"]["file_path"]).unlink(missing_ok=True)
+            await run_blocking(job_checkpoint.clear, task_id)
             await finalizar_conversao(task_id, status="cancelled")
             continue
         if status["status"] == "processing":
+            # A job that wrote a pipeline checkpoint continues where it stopped;
+            # one without a usable checkpoint fails as it did before #407.
+            job: ApiJob | None = None
+            try:
+                job = _job_from_record(record)
+            except (KeyError, TypeError, ValueError) as exc:
+                logger.warning("Job {}: resume record is unusable: {}", task_id, exc)
+            tracked = unified_queue.get_position(task_id) or (
+                task_id in unified_queue._active_tasks
+            )
+            if (
+                settings.job_resume_on_restart
+                and job is not None
+                and not tracked
+                and job.file_path.is_file()
+                and job_checkpoint.resumable(task_id)
+            ):
+                queued_jobs[task_id] = status
+                await unified_queue.enqueue(
+                    QueueItem(
+                        file_path=job.file_path,
+                        filename=job.filename,
+                        source=job.source,
+                        task_id=task_id,
+                        callback=job_executor.run,
+                        callback_args={"job": job},
+                    )
+                )
+                logger.info("Job {}: resuming from its checkpoint", task_id)
+                continue
             # The last stage was persisted before the process died, so the
             # error names the page or plan step the job was on.
             stage = trim_stage(status.get("etapa_atual"))
@@ -728,6 +797,7 @@ async def recover_pending_jobs() -> None:
             status.update(status="error", fim=time.time(), etapa_atual=t(STAGE_RESTART_INTERRUPTED))
             status.setdefault("erros", []).append(error)
             await run_blocking(save_status, task_id, status)
+            await run_blocking(job_checkpoint.clear, task_id)
             email = record["request"].get("email")
             if email:
                 sent = await _notify_failure(
@@ -742,10 +812,7 @@ async def recover_pending_jobs() -> None:
             continue
         if unified_queue.get_position(task_id):
             continue
-        payload = record["request"]
-        payload["file_path"] = Path(payload["file_path"])
-        payload["output_dir"] = Path(payload["output_dir"]) if payload.get("output_dir") else None
-        job = ApiJob(**payload)
+        job = _job_from_record(record)
         if not job.file_path.is_file():
             error = t(STAGE_PENDING_UPLOAD_MISSING)
             status.update(status="error", fim=time.time(), erros=[error])

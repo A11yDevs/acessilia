@@ -154,6 +154,7 @@ async def process(
     thinking_mode: bool = False,
     task_id: str | None = None,
     display_filename: str | None = None,
+    resumed: bool = False,
 ) -> dict[str, Any]:
     """Process one document and return its canonical document.
 
@@ -161,6 +162,10 @@ async def process(
     upload under a random name (``<uuid>.pdf``), so without it a document
     with no heading would take that UUID as its title and source name, in
     every export (#333).
+
+    ``resumed`` says the job continues from a checkpoint after a restart: the
+    progress and stage the user already saw are kept instead of being reset to
+    the start of the pipeline (#407).
     """
     external_task_id = task_id is not None
     # Only the name, never a path the client sent.
@@ -240,21 +245,23 @@ async def process(
                 await status_callback("✅ Processamento finalizado com sucesso!")
             return canonical_document
 
-        state_manager.atualizar(
-            task_id,
-            etapa=t(STAGE_PREPARING_FILE),
-            progresso=0.1,
-        )
+        if not resumed:
+            state_manager.atualizar(
+                task_id,
+                etapa=t(STAGE_PREPARING_FILE),
+                progresso=0.1,
+            )
         state_manager.verificar_cancelamento(task_id)
 
-        if status_callback:
+        if status_callback and not resumed:
             await status_callback(t(STAGE_ANALYZING_FILE))
 
-        state_manager.atualizar(
-            task_id,
-            etapa=t(STAGE_PROCESSING_WITH_AI),
-            progresso=0.3,
-        )
+        if not resumed:
+            state_manager.atualizar(
+                task_id,
+                etapa=t(STAGE_PROCESSING_WITH_AI),
+                progresso=0.3,
+            )
         state_manager.verificar_cancelamento(task_id)
 
         with task_context(task_id):

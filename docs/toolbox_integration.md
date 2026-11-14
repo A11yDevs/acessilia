@@ -425,6 +425,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` | `600` | Per-attempt HTTP timeout of `document.structure.extract`; matches the Toolbox providers' 600 s timeout |
 | `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` | `1500` | Total wall-clock budget for the extraction step: upload, retries, failover and both providers. Retries/failover cannot extend it, and a cancelled job waits at most this long for the extraction thread |
 | `TOOLBOX_CANCEL_TIMEOUT_SECONDS` | `5` | Wall-clock budget for the batch of best-effort remote cancellations when a job is cancelled. A failed or late cancel is recorded as `failed`, not retried indefinitely |
+| `JOB_RESUME_ON_RESTART` | `true` | Resume a job interrupted by a restart from its last durable pipeline checkpoint. `false` marks it interrupted for resubmission, as before #407 |
 | `TOOLBOX_RETRIES` | `1` | Retries on the same endpoint after a timeout or an unavailable instance (502/503/504), for the capabilities the Toolbox contract marks idempotent (all but `dataset.sample`); a non-idempotent call gets one attempt and no failover (#406). `0` disables them (ADR-0006). A timeout is retried too, so the worst case for a hung call is `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` per endpoint in `TOOLBOX_BASE_URLS` (2 h per endpoint with the defaults) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base of the exponential backoff between retries, with jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting, when the clients share one deployment. With independent endpoints in `TOOLBOX_BASE_URLS` the file is sent directly on each call instead (ADR-0013); a transient upload failure (timeout, unavailable) also falls back to direct input |
@@ -570,3 +571,17 @@ bounded by `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` (default 1500 s), with
 `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` (default 600 s) as the per-attempt HTTP
 timeout. Queue shutdown still joins active operations, no cancelled result is
 published, and the early `MAX_PAGES` check is unchanged.
+
+A restart no longer loses a job that reached a pipeline checkpoint. The core
+writes versioned, hashed checkpoints of the media inspection, the extracted and
+enriched manifest, the plan and every executed plan step under
+`DATA_DIR/jobs/<task_id>/checkpoints`. Recovery re-enqueues a `processing` job
+that has a usable checkpoint and the orchestrator continues from the latest
+phase, restoring the stage and progress the user saw and skipping the
+confirmation e-mail; a job without one still fails with the stage it was on.
+Operations the core already names keep their `operation_id` in the SQLite
+journal, so a phase that is re-run reaches the Toolbox as the same operation
+and the Toolbox joins it instead of executing the provider again. Checkpoints
+and journal rows are removed when the job ends and swept after seven days
+otherwise. ADR-0020 records the decision; `JOB_RESUME_ON_RESTART=false` keeps
+the old behaviour.

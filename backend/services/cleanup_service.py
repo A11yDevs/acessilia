@@ -72,6 +72,24 @@ def _clean_fusion_artifact_directory() -> None:
         logger.debug("Expired fusion artifacts removed: {}", removed)
 
 
+def _clean_operation_journal() -> None:
+    """Drop operation ids of jobs that can no longer resume (#407)."""
+    from backend.services import operation_journal
+
+    removed = operation_journal.expire(CACHE_MAX_AGE)
+    if removed:
+        logger.debug("Operation journal rows expired: {}", removed)
+
+
+def _clean_job_checkpoints() -> None:
+    """Drop pipeline checkpoints of jobs that no longer resume (#407)."""
+    from backend.services import job_checkpoint
+
+    removed = job_checkpoint.expire(CACHE_MAX_AGE)
+    if removed:
+        logger.debug("Job checkpoint directories expired: {}", removed)
+
+
 async def periodic_cleanup() -> None:
     while True:
         try:
@@ -80,6 +98,8 @@ async def periodic_cleanup() -> None:
             await run_blocking(_clean_output_directory)
             await run_blocking(_clean_cache_directory)
             await run_blocking(_clean_fusion_artifact_directory)
+            await run_blocking(_clean_job_checkpoints)
+            await run_blocking(_clean_operation_journal)
             _clean_in_memory_statuses()
             await limpar_tokens_expirados()
         except Exception:

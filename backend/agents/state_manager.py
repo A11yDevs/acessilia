@@ -47,6 +47,28 @@ class StateManager:
         self._cancel_events[task_id] = asyncio.Event()
         return task_id
 
+    def restaurar(self, task_id: str, status: dict) -> None:
+        """Re-apply the durable progress of a job resumed after a restart.
+
+        Only the fields the user sees are restored; the state itself stays
+        ``processing`` and the terminal fields (``fim``, ``download_url``) are
+        left to the current run.
+        """
+        task = self._tasks.get(task_id)
+        if task is None or task.get("status") != "processing":
+            return
+        for key in (
+            "progresso",
+            "etapa_atual",
+            "inicio",
+            "erros",
+            "email_delivery",
+            "remote_cancellation",
+        ):
+            value = status.get(key)
+            if value is not None:
+                task[key] = list(value) if key == "erros" else value
+
     def atualizar(
         self,
         task_id: str,
