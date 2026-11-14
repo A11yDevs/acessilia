@@ -10,10 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 
-from acessilia_sdk.toolbox.clients.operation import (
-    OperationCancelResult,
-    ToolboxOperationClient,
-)
+from acessilia_sdk.toolbox import OperationCancelResult, ToolboxOperationClient
 
 from backend.config.settings import settings
 from backend.services.operation_registry import operation_registry

@@ -26,7 +26,10 @@ from acessilia_sdk.toolbox.catalog import (
     snapshot_from_payloads,
 )
 from acessilia_sdk.toolbox.client import FailoverHook, ToolboxCapabilityClient
-from acessilia_sdk.toolbox.clients.operation import ToolboxOperationClient
+from acessilia_sdk.toolbox.clients.operation import (
+    OperationCancelResult,
+    ToolboxOperationClient,
+)
 from acessilia_sdk.toolbox.config import ToolboxClientConfig, make_client
 from acessilia_sdk.toolbox.endpoints import (
     FAILOVER_ERRORS,
@@ -85,6 +88,7 @@ __all__ = [
     "CatalogCache",
     "CatalogSnapshot",
     "FailoverHook",
+    "OperationCancelResult",
     "OperationContext",
     "Requirement",
     "ToolboxArtifactNotFound",
