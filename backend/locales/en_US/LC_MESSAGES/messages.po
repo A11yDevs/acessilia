@@ -2060,6 +2060,10 @@ msgstr ""
 "available."
 
 #, python-brace-format
+msgid "Toolbox structural extraction exceeded its {seconds}-second budget"
+msgstr "Toolbox structural extraction exceeded its {seconds}-second budget"
+
+#, python-brace-format
 msgid "Obligation not found: {obligation_id}"
 msgstr "Obligation not found: {obligation_id}"
 

@@ -4,6 +4,7 @@ import logging
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -1187,3 +1188,37 @@ def test_toolbox_model_health_probes_the_endpoint_the_agents_use(monkeypatch):
 
     assert asyncio.run(health._check_model_reachable()) is True
     assert "authorization" not in route.calls.last.request.headers
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_after_cancellation_is_reported_as_cancellation(
+    api_paths, monkeypatch
+):
+    """The extraction deadline wins over the cancellation it interrupts."""
+    from backend import service
+    from backend.agents.state_manager import TaskCancelledError, state_manager
+
+    task_id = "timeout-after-cancel"
+    source = api_paths / "timeout-after-cancel.pdf"
+    source.write_bytes(_fake_pdf_bytes())
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+    state_manager.criar_tarefa(source, task_id=task_id)
+
+    class _Agent:
+        async def execute(self, *_args, **_kwargs):
+            state_manager.cancelar(task_id, pending=True)
+            raise RuntimeError("extraction deadline")
+
+    monkeypatch.setattr(service, "agente", _Agent())
+    monkeypatch.setattr(service, "get_cached", AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "registrar_conversao", AsyncMock())
+    monkeypatch.setattr(service, "finalizar_conversao", AsyncMock())
+
+    with pytest.raises(TaskCancelledError):
+        await service.process(source, task_id=task_id)
+
+    task = state_manager.obter(task_id)
+    assert task is not None
+    # The worker turns this into "cancelled"; service must not report an error.
+    assert task["status"] == "cancelling"

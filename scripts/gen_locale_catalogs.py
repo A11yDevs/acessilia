@@ -223,6 +223,7 @@ from backend.log_messages import (
     MSG_SLIDE_HEADING,
     MSG_SLIDE_HEADING_WITH_TITLE,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
+    MSG_TOOLBOX_EXTRACTION_TIMEOUT,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
@@ -977,6 +978,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_PROVENANCE_UNKNOWN_PAGE,
     MSG_CHAR_RANGE_REVERSED,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
+    MSG_TOOLBOX_EXTRACTION_TIMEOUT,
     # Method results of the deterministic handlers and the VLM judge (#410).
     *handler_messages.SINGLE_MESSAGES,
 )
@@ -1897,6 +1899,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "o arquivo original será reenviado para extração, fusão e text spans."
         ),
         # Delivered warning: {provider} supplied the only available structural extraction.
+        MSG_TOOLBOX_EXTRACTION_TIMEOUT: (
+            "A extração estrutural da Toolbox excedeu o orçamento de {seconds} segundos"
+        ),
         MSG_STRUCTURAL_EXTRACTION_DEGRADED: (
             "A extração estrutural usou apenas {provider} porque o outro provedor falhou. "
             "O documento exige revisão; a comparação entre dois provedores não estava disponível."

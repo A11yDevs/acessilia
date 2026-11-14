@@ -82,6 +82,8 @@ def test_check_requires_verified_data_before_activation(config, tmp_path):
     ({"environment": {"MODEL_CALL_TIMEOUT_SECONDS": "600"}}, "timeout chain"),
     ({"environment": {"TOOLBOX_TIMEOUT_SECONDS": "2700"}}, "TOOLBOX_TIMEOUT_SECONDS"),
     ({"environment": {"TOOLBOX_TIMEOUT_SECONDS": "2819"}}, "TOOLBOX_TIMEOUT_SECONDS"),
+    ({"environment": {"TOOLBOX_STRUCTURE_TIMEOUT_SECONDS": "599"}}, "TOOLBOX_STRUCTURE_TIMEOUT_SECONDS"),
+    ({"environment": {"TOOLBOX_EXTRACTION_TIMEOUT_SECONDS": "1199"}}, "TOOLBOX_EXTRACTION_TIMEOUT_SECONDS"),
     ({"environment": {"DATA_DIR": "/tmp/data"}}, "DATA_DIR"),
     ({"environment": {"API_PORT": "9000"}}, "0.0.0.0:8000"),
 ])

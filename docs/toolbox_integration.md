@@ -421,7 +421,9 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_AVAILABILITY_GATE` | `observe` | Availability gate: `observe`, `enforce` or `off` (section 4.3) |
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | How long a catalogue snapshot is reused |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | How long the last good snapshot is served when the catalogue cannot be read |
-| `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout |
+| `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout for the capability clients that do not declare their own |
+| `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` | `600` | Per-attempt HTTP timeout of `document.structure.extract`; matches the Toolbox providers' 600 s timeout |
+| `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` | `1500` | Total wall-clock budget for the extraction step: upload, retries, failover and both providers. Retries/failover cannot extend it, and a cancelled job waits at most this long for the extraction thread |
 | `TOOLBOX_RETRIES` | `1` | Retries on the same endpoint after a timeout or an unavailable instance (502/503/504), for the capabilities the Toolbox contract marks idempotent (all but `dataset.sample`); a non-idempotent call gets one attempt and no failover (#406). `0` disables them (ADR-0006). A timeout is retried too, so the worst case for a hung call is `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` per endpoint in `TOOLBOX_BASE_URLS` (2 h per endpoint with the defaults) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base of the exponential backoff between retries, with jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Upload the file to `/v1/artifacts` before extracting, when the clients share one deployment. With independent endpoints in `TOOLBOX_BASE_URLS` the file is sent directly on each call instead (ADR-0013); a transient upload failure (timeout, unavailable) also falls back to direct input |
@@ -548,6 +550,11 @@ reads and cleared for terminal jobs. Direct use of the internal synchronous
 cancel helper changes memory only; its caller owns persistence. A crash
 before the API acknowledges a cancellation is not covered by this guarantee.
 Cancelling does not send an abort command to the Toolbox; remote work may
-continue until it finishes or times out. Queue shutdown still joins active
-operations, and no cancelled result is published. This change does not alter
-provider timeouts or the existing early `MAX_PAGES` check.
+continue until it finishes or times out. `cancelled` means the local job
+finished, not that the provider stopped computing. The extraction thread is
+bounded by `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` (default 1500 s): the deadline
+covers upload, retries, failover and both providers, so it is the upper bound
+for a cancelled job to reach `cancelled`. `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS`
+(default 600 s) is the per-attempt HTTP timeout and does not extend that
+budget. Queue shutdown still joins active operations, and no cancelled result
+is published. The early `MAX_PAGES` check is unchanged.

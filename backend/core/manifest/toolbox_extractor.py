@@ -16,6 +16,7 @@ from backend.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
     LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
+    MSG_TOOLBOX_EXTRACTION_TIMEOUT,
 )
 from backend.tools.logger import logger
 from acessilia_sdk.toolbox import artifact_endpoint_urls, one_artifact_endpoint
@@ -94,7 +95,22 @@ class ToolboxManifestExtractor:
         asyncio.to_thread(). With ``dual_fusion=False`` the secondary provider
         is not called even in FUSION_MODE=dual (a presentation).
         """
-        return asyncio.run(self._extract_async(source_path, dual_fusion=dual_fusion))
+        timeout = max(1, settings.toolbox_extraction_timeout_seconds)
+        try:
+            return asyncio.run(
+                asyncio.wait_for(
+                    self._extract_async(source_path, dual_fusion=dual_fusion),
+                    timeout=timeout,
+                )
+            )
+        except TimeoutError as exc:
+            # The deadline cancels the async HTTP work, so the thread returns
+            # even when run_blocking is waiting after a job cancellation. It
+            # covers upload, retries, failover and both providers; no new
+            # attempt starts after it expires.
+            message = t(MSG_TOOLBOX_EXTRACTION_TIMEOUT).format(seconds=timeout)
+            logger.warning(message)
+            raise ToolboxTimeout(message) from exc
 
     async def _extract_async(
         self, source_path: Path, *, dual_fusion: bool = True

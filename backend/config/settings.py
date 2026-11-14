@@ -387,6 +387,19 @@ class Settings:
     toolbox_api_key: str = field(
         default_factory=lambda: os.getenv("TOOLBOX_API_KEY", "")
     )
+    # The structural extraction runs through run_blocking, which waits for the
+    # thread on cancellation. This per-attempt HTTP timeout follows the
+    # Toolbox providers' 600 s timeout; the extraction-wide deadline below is
+    # what bounds a cancelled job.
+    toolbox_structure_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_STRUCTURE_TIMEOUT_SECONDS", "600"))
+    )
+    # Total wall-clock budget for the remote extraction step: upload, retries,
+    # failover and the primary/secondary providers. Two providers at 600 s plus
+    # upload and network margin; retries and failover cannot extend it.
+    toolbox_extraction_timeout_seconds: int = field(
+        default_factory=lambda: int(os.getenv("TOOLBOX_EXTRACTION_TIMEOUT_SECONDS", "1500"))
+    )
     toolbox_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     )

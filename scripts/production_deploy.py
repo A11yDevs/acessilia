@@ -107,6 +107,12 @@ def check_config(config: dict, directory: Path, *, require_data: bool) -> str:
     for key in ("MODEL_CALL_TIMEOUT_SECONDS", "DATA_AGENT_TIMEOUT_SECONDS", "TOOLBOX_TIMEOUT_SECONDS"):
         if int(environment.get(key, "0")) < 3000:
             raise ValueError(f"{key} must cover the Toolbox/gateway timeout chain (at least 3000 s)")
+    # The extraction has its own per-attempt and total budget, so a cancelled
+    # run does not wait for the shared 3000 s Toolbox timeout.
+    if int(environment.get("TOOLBOX_STRUCTURE_TIMEOUT_SECONDS", "600")) < 600:
+        raise ValueError("TOOLBOX_STRUCTURE_TIMEOUT_SECONDS must cover the Toolbox provider timeout (at least 600 s)")
+    if int(environment.get("TOOLBOX_EXTRACTION_TIMEOUT_SECONDS", "1500")) < 1200:
+        raise ValueError("TOOLBOX_EXTRACTION_TIMEOUT_SECONDS must cover both extraction providers (at least 1200 s)")
     if service.get("container_name") != "acessilia-production" or config.get("name") != "production":
         raise ValueError("Keep the existing production project/container identity")
     return image

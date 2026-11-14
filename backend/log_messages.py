@@ -561,6 +561,10 @@ LOG_ARTIFACT_STORE_DIRECT_INPUT: str = (
     "the source file will be sent again for extraction, fusion and text spans."
 )
 
+#: Toolbox structural extraction exceeded its total wall-clock budget; {seconds} is the configured budget.
+MSG_TOOLBOX_EXTRACTION_TIMEOUT: str = (
+    "Toolbox structural extraction exceeded its {seconds}-second budget"
+)
 #: Delivered document warning when only one structural provider succeeded; {provider} is its identifier.
 MSG_STRUCTURAL_EXTRACTION_DEGRADED: str = (
     "Structural extraction used only {provider} because the other provider failed. "

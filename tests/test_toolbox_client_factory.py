@@ -198,6 +198,7 @@ SETTINGS_CASES = {
         "toolbox_docx_timeout_seconds": 11,
         "toolbox_pdf_ua_timeout_seconds": 22,
         "toolbox_pdf_validate_timeout_seconds": 33,
+        "toolbox_structure_timeout_seconds": 44,
     },
     "retries": {"toolbox_retries": 3, "toolbox_retry_backoff_seconds": 0.25},
     "no_api_key": {"toolbox_api_key": ""},
@@ -234,6 +235,7 @@ def test_every_provider_key_and_timeout_key_is_a_setting():
         "toolbox_docx_timeout_seconds",
         "toolbox_pdf_ua_timeout_seconds",
         "toolbox_pdf_validate_timeout_seconds",
+        "toolbox_structure_timeout_seconds",
     }
     for key in toolbox_client.TIMEOUT_KEYS:
         assert hasattr(settings, key), key

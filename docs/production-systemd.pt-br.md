@@ -76,6 +76,9 @@ simulada, caminhos/portas incompatíveis e timeouts insuficientes para o gateway
 `MODEL_CALL_TIMEOUT_SECONDS`, `DATA_AGENT_TIMEOUT_SECONDS` e
 `TOOLBOX_TIMEOUT_SECONDS` devem ter pelo menos 3000 s, cobrindo a espera local
 de 120 s da Toolbox mais a chamada de 2700 s ao gateway.
+`TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` deve ficar em pelo menos 600 s (o timeout
+dos providers da Toolbox) e `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` em pelo menos
+1200 s (os dois providers mais margem).
 Medir picos de memória/CPU com documentos representativos em fusão dual antes
 de escolher limites. O core tem rotação dos logs Docker, prazo de parada de
 60 segundos e processo init; isso não implementa drenagem. Testar parada/reinício
