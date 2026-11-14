@@ -206,15 +206,17 @@ Proposed: option 2.
      **Operations that may go to the SDK stay where they are** until
      [ADR-0017](0017-operational-sdk-and-agentic-core.md) decides their
      split into mechanism (SDK) and policy (core), so they do not move twice.
-     These are the page judge, `backend/tools`' Toolbox adapters, and the
-     formula chain (the core's binding to the render stays in the core and is
+     These are the page judge, the core's Toolbox adapters (then in
+     `backend/tools`, now in `backend/core/toolbox`), and the formula chain (the core's binding to the render stays in the core and is
      not part of that hold; see ADR-0017); the
      [inventory of #470](../architecture/operational-boundaries-inventory.md)
      lists them. What stays in the core after the split (the policy, and the
      binding of `CoreConfig` to each operation's parameters) then gathers
      here. ADR-0017 was accepted on 2026-11-13: the formula chain's policy
      moved into `backend/core/pipeline/` (#513, #515), and the page judge
-     moved there whole, its SDK split left for later.
+     moved there whole, its SDK split left for later. The Toolbox adapters
+     moved whole to `backend/core/toolbox/` in step 2, their SDK split left for
+     later as well.
   3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions

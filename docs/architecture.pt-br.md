@@ -30,12 +30,15 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/services/cleanup_service.py](../backend/services/cleanup_service.py): limpeza periódica de arquivos temporários.
 - [backend/services/email_service.py](../backend/services/email_service.py): envio de e-mail SMTP assíncrono (confirmação + resultado com anexos ZIP).
 - [backend/services/download_token_service.py](../backend/services/download_token_service.py): geração de token para links de download seguro na Web.
+- [backend/services/validators.py](../backend/services/validators.py): validação de upload (extensão e tamanho de arquivo).
+- [backend/services/access_log_filter.py](../backend/services/access_log_filter.py) e [backend/services/filenames.py](../backend/services/filenames.py): o filtro do log de acesso e os nomes de arquivo de saída limitados.
 
-#### 0.4. Ferramentas e Utilitários de Domínio (`backend/tools/`)
+#### 0.4. Utilitários do Core e Adaptadores da Toolbox (`backend/core/`)
+- [backend/core/toolbox/](../backend/core/toolbox/): os adaptadores do core sobre a Toolbox, pelo SDK (cliente a partir das configurações, matemática, inspeção de mídia, auditoria PDF/UA, spans de texto, payload de visão).
 - [backend/core/logger.py](../backend/core/logger.py): configuração centralizada do logger loguru.
-- [backend/services/validators.py](../backend/services/validators.py): validação de extensão e tamanho de arquivo.
+- [backend/core/formula_tools.py](../backend/core/formula_tools.py): normalização de LaTeX e o rótulo da fórmula falada.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): normalização de texto e parsing de Markdown.
-- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): carregador de prompt e resolutor de templates.
+- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): carregador de prompt e resolutor de templates (vai com os agentes, passo 2 da ADR-0016).
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
 

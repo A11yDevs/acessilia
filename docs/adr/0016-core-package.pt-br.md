@@ -209,15 +209,17 @@ Proposta: a opção 2.
      **As operações que podem ir para o SDK ficam onde estão** até que a
      [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) decida a
      divisão delas em mecanismo (SDK) e política (core), para que não mudem
-     de lugar duas vezes. São o juiz de página, os adaptadores da Toolbox em
-     `backend/tools` e a cadeia de fórmula (a ligação do core com o render não
+     de lugar duas vezes. São o juiz de página, os adaptadores da Toolbox do core
+     (então em `backend/tools`, hoje em `backend/core/toolbox`) e a cadeia de fórmula (a ligação do core com o render não
      fica retida; veja a ADR-0017); o
      [inventário da #470](../architecture/operational-boundaries-inventory.pt-br.md)
      os lista. O que ficar no core depois da divisão (a política, e a ligação
      do `CoreConfig` aos parâmetros de cada operação) se reúne aqui em
      seguida. A ADR-0017 foi aceita em 2026-11-13: a política da cadeia de
      fórmula foi para o `backend/core/pipeline/` (#513, #515), e o juiz de
-     página foi para lá inteiro, com a divisão com o SDK deixada para depois.
+     página foi para lá inteiro, com a divisão com o SDK deixada para depois. Os adaptadores
+     da Toolbox foram inteiros para o `backend/core/toolbox/` no passo 2, também
+     com a divisão com o SDK deixada para depois.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
      vez.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.

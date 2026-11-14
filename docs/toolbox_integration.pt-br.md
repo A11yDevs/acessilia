@@ -18,7 +18,7 @@ cenários possíveis e define a política de implementação entre **tools locai
 
 ## 1. Contrato da Toolbox visto pelo core
 
-O core conversa com a Toolbox por HTTP. Todos os clientes vivem em `backend/tools/` e
+O core conversa com a Toolbox por HTTP. Todos os adaptadores dele vivem em `backend/core/toolbox/` e
 compartilham o mesmo padrão:
 
 | Endpoint | Método | Uso |
@@ -256,7 +256,7 @@ fixar uma rota `:execute` no código ou usar um ID não registrado.
 
 ### 4.2 Wrapper de tool Agno (opcional)
 
-Para expor a capacidade a um agente, crie `backend/tools/toolbox_<x>_tools.py`
+Para expor a capacidade a um agente, crie `backend/core/toolbox/toolbox_<x>_tools.py`
 chamando o cliente da seção 4.1 e convertendo `ToolboxError` no resultado de
 falha da tool. Não acrescente uma implementação local por trás dele (veja 2.3).
 

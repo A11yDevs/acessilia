@@ -18,7 +18,7 @@ distinguishes the two possible scenarios and defines the implementation policy b
 
 ## 1. Toolbox contract as seen by the core
 
-The core talks to the Toolbox over HTTP. All clients live in `backend/tools/` and share
+The core talks to the Toolbox over HTTP. All its adapters live in `backend/core/toolbox/` and share
 the same pattern:
 
 | Endpoint | Method | Use |
@@ -256,7 +256,7 @@ client hard-codes an `:execute` route or uses an unregistered id.
 
 ### 4.2 Agno tool wrapper (optional)
 
-To expose the capability to an agent, create `backend/tools/toolbox_<x>_tools.py`
+To expose the capability to an agent, create `backend/core/toolbox/toolbox_<x>_tools.py`
 that calls the client from 4.1 and turns `ToolboxError` into the tool's failure
 result. Do not add a local implementation behind it (see 2.3).
 
