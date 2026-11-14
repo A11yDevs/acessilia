@@ -18,6 +18,7 @@ RUN set -eux \
 # curl serves the compose healthcheck. Every Python dependency ships a
 # linux/amd64 wheel, so no compiler is needed.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
@@ -35,7 +36,7 @@ COPY pyproject.toml ./
 COPY libs/docstruct ./libs/docstruct
 COPY libs/sdk ./libs/sdk
 
-RUN pip install --upgrade pip \
+RUN pip install --upgrade pip setuptools wheel \
     && pip install ./libs/docstruct --no-cache-dir \
     && pip install ./libs/sdk --no-cache-dir \
     && pip install . --no-cache-dir
