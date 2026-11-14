@@ -1,7 +1,9 @@
 """The method registry: which handler runs each obligation method.
 
-``METHOD_HANDLERS`` maps every method the executor can run to its handler, in
-the order they are registered; ``build_method_registry`` registers them. A
+``METHOD_HANDLERS`` maps every method the executor can run to its handler;
+``build_method_registry`` registers them. The registry looks a handler up by
+its method's name, so the table's order does not change what runs; it keeps
+the order ``_build_executor`` used, for the reader. A
 method the manifest can require but that is absent here is reported to the
 planner as unavailable: no step only fails. Gathered from the orchestrator's
 ``DETERMINISTIC_METHOD_HANDLERS`` and the registrations of its
@@ -56,7 +58,7 @@ from backend.core.pipeline.handlers.text import (
     _handle_unicode_repair_method,
 )
 
-#: Method name -> handler, in registration order.
+#: Method name -> handler.
 METHOD_HANDLERS: dict[str, Callable[[ProcessingManifest, str], MethodResult]] = {
     # Methods that call a Toolbox capability or a model and fail explicitly
     # when it is unavailable, and the provider fusion and choice.
