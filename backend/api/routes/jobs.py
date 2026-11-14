@@ -22,7 +22,6 @@ from backend.api.worker import (
 )
 from backend.config.settings import settings
 from backend.i18n import t
-from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
 from backend.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_JOB_QUEUED,
@@ -31,9 +30,11 @@ from backend.log_messages import (
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
 )
-from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.blocking import run_blocking
+from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.queue_service import QueueItem, unified_queue
+from backend.services.remote_cancellation import cancel_task_operations
+from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
 from backend.tools.logger import logger
 from backend.tools.validators import (
     MSG_FILE_TOO_LARGE,
@@ -188,6 +189,7 @@ async def job_status(request: Request, task_id: str):
         email_delivery=job.get("email_delivery"),
         cancellation_requested_at=job.get("cancellation_requested_at"),
         cancellation_elapsed_seconds=job.get("cancellation_elapsed_seconds"),
+        remote_cancellation=job.get("remote_cancellation"),
     )
 
 
@@ -206,8 +208,14 @@ async def cancel_job(request: Request, task_id: str):
             status_code=409,
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
+    remote = await cancel_task_operations(task_id)
+    worker.state_manager.set_remote_cancellation(task_id, remote)
     status = await get_job_status_async(task_id)
     # Acknowledge only after cancelling + request timestamp are durable, even
     # while a shielded extraction is still running. The sync helper is live-only.
     await run_blocking(save_status, task_id, status)
-    return CancelResponse(task_id=task_id, status=status["status"])
+    return CancelResponse(
+        task_id=task_id,
+        status=status["status"],
+        remote_cancellation=remote,
+    )

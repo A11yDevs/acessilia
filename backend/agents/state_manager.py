@@ -6,8 +6,8 @@ from pathlib import Path
 from backend.i18n import t
 from backend.log_messages import LOG_TASK_CANCELLED_BY_USER
 from backend.stage_messages import (
-    STAGE_CANCELLED_BY_USER,
     STAGE_CANCELLATION_REQUESTED,
+    STAGE_CANCELLED_BY_USER,
     STAGE_FAILED_DURING,
 )
 
@@ -119,6 +119,12 @@ class StateManager:
                 event.set()
             return True
         return False
+
+    def set_remote_cancellation(self, task_id: str, state: str) -> None:
+        """Record the best-effort Toolbox cancellation result, without changing local status."""
+        task = self._tasks.get(task_id)
+        if task is not None:
+            task["remote_cancellation"] = state
 
     def foi_cancelada(self, task_id: str) -> bool:
         event = self._cancel_events.get(task_id)

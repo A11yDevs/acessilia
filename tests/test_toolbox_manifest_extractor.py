@@ -823,3 +823,62 @@ def test_extraction_deadline_covers_a_blocked_secondary(
         extractor.extract(FIXTURE_PDF)
 
     secondary.close.assert_awaited_once()
+
+
+def test_extraction_labels_upload_primary_and_secondary_operations(
+    mock_client, mock_artifact_client, monkeypatch
+):
+    """Each remote call gets a stable operation id for cancellation (ADR-0019)."""
+    from acessilia_sdk.toolbox.operation import current_operation
+    from backend.services.operation_context import task_context
+    from backend.services.operation_registry import operation_registry
+
+    seen: list[tuple[str, str | None, str | None]] = []
+
+    async def upload(*_args, **_kwargs):
+        context = current_operation()
+        seen.append(("upload", context.task_id if context else None,
+                     context.operation_id if context else None))
+        return "sha256:abc123"
+
+    async def primary(*_args, **_kwargs):
+        context = current_operation()
+        seen.append(("primary", context.task_id if context else None,
+                     context.operation_id if context else None))
+        return SAMPLE_TOOLBOX_RESPONSE
+
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.base_url = "http://secondary.test"
+    secondary.provider = "mineru"
+
+    async def secondary_call(*_args, **_kwargs):
+        context = current_operation()
+        seen.append(("secondary", context.task_id if context else None,
+                     context.operation_id if context else None))
+        return {**deepcopy(SAMPLE_TOOLBOX_RESPONSE), "provider": "mineru"}
+
+    mock_artifact_client.upload = AsyncMock(side_effect=upload)
+    mock_client.extract_structure = AsyncMock(side_effect=primary)
+    secondary.extract_structure = AsyncMock(side_effect=secondary_call)
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *_args, **_kwargs: secondary,
+    )
+    extractor = ToolboxManifestExtractor(
+        client=mock_client,
+        artifact_client=mock_artifact_client,
+        use_artifact_store=True,
+    )
+
+    operation_registry.clear("task-ops")
+    with task_context("task-ops"):
+        extractor.extract(FIXTURE_PDF)
+
+    assert [kind for kind, _, _ in seen] == ["upload", "primary", "secondary"]
+    assert {task for _, task, _ in seen} == {"task-ops"}
+    ids = [operation_id for _, _, operation_id in seen]
+    assert all(ids)
+    assert len(set(ids)) == 3
+    assert operation_registry.active("task-ops") == []

@@ -563,6 +563,8 @@ def test_cancel_respects_task_state(client, monkeypatch, status):
     if status == "processing":
         assert response.status_code == 200
         assert response.json()["status"] == actual["status"] == "cancelled"
+        assert response.json()["remote_cancellation"] == "none"
+        assert actual["remote_cancellation"] == "none"
         assert manager.foi_cancelada(task_id)
     else:
         assert response.status_code == 409

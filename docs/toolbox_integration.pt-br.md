@@ -427,6 +427,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições para os clientes de capacidade que não declaram o próprio |
 | `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` | `600` | Timeout HTTP por tentativa do `document.structure.extract`; acompanha o timeout de 600 s dos providers da Toolbox |
 | `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` | `1500` | Orçamento total de parede da etapa de extração: upload, retries, failover e os dois providers. Retries/failover não o estendem, e um job cancelado aguarda no máximo esse tempo pela thread de extração |
+| `TOOLBOX_CANCEL_TIMEOUT_SECONDS` | `5` | Orçamento de parede do lote de cancelamentos remotos de melhor esforço quando um job é cancelado. Um cancelamento que falha ou atrasa é registrado como `failed`, sem retry indefinido |
 | `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), nas capacidades que o contrato da Toolbox marca como idempotentes (todas menos `dataset.sample`); uma chamada não idempotente tem uma tentativa e nenhum failover (#406). `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair, quando os clientes compartilham uma implantação. Com endpoints independentes em `TOOLBOX_BASE_URLS`, o arquivo vai diretamente em cada chamada (ADR-0013); uma falha transitória do upload (timeout, indisponibilidade) também recai no envio direto |
@@ -544,7 +545,8 @@ mesmo que outro job seja cancelado. O ambiente deve reservar memória para essa
 sobreposição limitada.
 
 `GET /api/v1/jobs/{task_id}` informa `cancellation_requested_at` (segundos Unix),
-`cancellation_elapsed_seconds` durante a espera e uma etapa localizada que
+`cancellation_elapsed_seconds` durante a espera, `remote_cancellation` com o
+resultado de melhor esforço da Toolbox e uma etapa localizada que
 explica o motivo. A página web mostra essa etapa na atualização normal.
 A API persiste `cancelling` e o instante da solicitação antes de confirmar o
 cancelamento; após reiniciar, a recuperação marca esse registro durável como
@@ -552,14 +554,28 @@ cancelamento; após reiniciar, a recuperação marca esse registro durável como
 para jobs terminais. O helper síncrono interno altera apenas a memória; seu
 chamador é responsável pela persistência. Uma queda antes da confirmação da
 API não está coberta por essa garantia.
-Cancelar não envia um comando de interrupção à Toolbox; o trabalho remoto pode
-continuar até terminar ou atingir o timeout. `cancelled` significa que o job
-local terminou, não que o provider parou de calcular. A thread de extração é
-limitada por `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` (padrão 1500 s): o prazo cobre
-upload, retries, failover e os dois providers, então é o limite superior para um
-job cancelado chegar a `cancelled`. `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` (padrão
-600 s) é o timeout HTTP por tentativa e não estende esse orçamento. O
-encerramento da fila continua aguardando as operações ativas e nenhum resultado
-cancelado é publicado. Essa
+Cancelar agora também pede à Toolbox para parar as operações ativas do job
+(ADR-0019). O upload, a extração primária e a secundária carregam
+`X-Acessilia-Task-Id`, `X-Acessilia-Operation-Id` e `X-Acessilia-Attempt-Id`; o
+SDK mantém o id da operação entre retries/failover e dá um novo id de tentativa
+a cada requisição HTTP. A API registra um valor de melhor esforço
+`remote_cancellation`: `none` (nenhuma operação ativa), `requested` (ao menos um
+cancelamento aceito), `finished` (o trabalho já tinha terminado), `not_found`
+(nenhum endpoint conhecia a operação) ou `failed` (a requisição falhou ou
+excedeu `TOOLBOX_CANCEL_TIMEOUT_SECONDS`). Um cancelamento que falha nunca vira
+erro do job, retry, failover ou reenvio da entrada.
+
+`requested` não é confirmação de que o provider parou de calcular. O registro
+da Toolbox é em memória e por processo; um reinício, um endpoint independente
+ou um balanceador que encaminhe o cancelamento para outra réplica podem
+produzir `not_found`. `cancelled` continua significando que o job local
+terminou. Trabalho que um provider não consegue interromper pode continuar até
+terminar, mas seu resultado é descartado e não é cacheado, armazenado ou
+publicado. A thread de extração continua limitada por
+`TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` (padrão 1500 s), com
+`TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` (padrão 600 s) como timeout HTTP por
+tentativa. O encerramento da fila continua aguardando as operações ativas,
+nenhum resultado cancelado é publicado, e a checagem antecipada de `MAX_PAGES`
+não muda. Essa
 mudança não altera os timeouts dos providers nem a verificação antecipada de
 `MAX_PAGES` já existente.
