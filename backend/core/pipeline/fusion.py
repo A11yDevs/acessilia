@@ -17,9 +17,9 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-from backend.tools.toolbox_client import (
+from backend.core.toolbox.toolbox_client import (
     ToolboxArtifactNotFound,
     ToolboxError,
     ToolboxProviderUnavailable,

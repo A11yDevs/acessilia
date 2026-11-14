@@ -58,15 +58,15 @@ from backend.core.export.exporters.drbench_md_exporter import export_drbench_md
 from backend.core.export.markers import with_object_markers
 from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
-from backend.tools.pdf_ua_audit import audit_pdf_ua, summarize_audit
+from backend.core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from backend.services.email_service import (
     send_confirmation_email,
     send_failure_email,
     send_result_email,
 )
 from backend.services.history_service import finalizar_conversao, registrar_conversao
-from backend.tools.logger import logger
-from backend.tools.filenames import output_stem
+from backend.core.logger import logger
+from backend.services.filenames import output_stem
 
 queued_jobs: dict[str, dict[str, Any]] = {}
 

@@ -26,7 +26,9 @@ diferentes:
     do `backend/pipeline`) e os exportadores (`backend/core/export`, que o passo 2 reuniu a partir do
     `backend/export`; os envelopes
     sem uso de `backend/adapters` foram removidos no passo 2);
-  - os adaptadores da Toolbox (`backend/tools`);
+  - os adaptadores da Toolbox (`backend/core/toolbox`, com os auxiliares
+    `backend/core/logger.py` e `backend/core/formula_tools.py`; o passo 2 os reuniu a
+    partir do `backend/tools`);
   - as mensagens (`backend/core/i18n`, com o `log_messages`, o `stage_messages` e os
     catálogos, que o passo 2 reuniu a partir de `backend/i18n.py`,
     `backend/log_messages.py`, `backend/stage_messages.py` e `backend/locales`).
@@ -136,7 +138,7 @@ Proposta: a opção 2.
   | `backend/core/{manifest,planning,execution}` | `acessilia_core.{manifest,planning,execution}` |
   | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo; o `backend/pipeline` se reuniu ali no passo 2) | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
-  | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
+  | `backend/core/toolbox`, `backend/core/logger.py`, `backend/core/formula_tools.py` (reunidos a partir do `backend/tools` no passo 2; a carga de prompts vai com os agentes) | `acessilia_core.toolbox` e auxiliares |
   | `backend/core/export` (reunido a partir do `backend/export` no passo 2; o `backend/adapters`, sem uso, foi removido) | `acessilia_core.export` |
   | `backend/core/i18n` (reunido no passo 2 a partir de `backend/i18n.py`, `log_messages.py`, `stage_messages.py` e `locales/`) | `acessilia_core.i18n` |
 
@@ -145,7 +147,8 @@ Proposta: a opção 2.
   - os jobs, a fila, o histórico, o e-mail, os tokens de download e a limpeza;
   - os caches, que implementam os `ports` do core;
   - o estado do job (`state_manager`);
-  - o filtro de log de acesso e a validação de upload;
+  - o filtro de log de acesso e a validação de upload (`backend/services`, vindos
+    do `backend/tools` no passo 2, com os nomes de arquivo de saída);
   - o `config/settings.py`, que lê o ambiente e monta o `CoreConfig`.
 - **Direção das dependências:**
 
@@ -190,7 +193,7 @@ Proposta: a opção 2.
      | `backend/core/{manifest,planning,execution}` | já está no lugar | `planning/domains/`: os domínios PDDL e suas descrições |
      | `backend/pipeline` | `backend/core/pipeline/` (feito) | |
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
-     | `backend/tools` (adaptadores da Toolbox, ferramentas de fórmula e de código, carga de prompts, logger) | `backend/core/toolbox/` e auxiliares | |
+     | `backend/tools` (adaptadores da Toolbox, ferramentas de fórmula e de código, carga de prompts, logger) | `backend/core/toolbox/` e auxiliares (feito: os adaptadores para `backend/core/toolbox/`, `logger` e `formula_tools` para `backend/core/`, o `validators`, o `access_log_filter` e o `filenames` do serviço para `backend/services/`; o `code_tools`, morto, foi removido; o `prompt_tools` vai com os agentes) | |
      | `backend/export` (`backend/adapters`: removido, nada o importava) | `backend/core/export/` (feito) | |
      | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` (feito) | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
 
@@ -206,15 +209,17 @@ Proposta: a opção 2.
      **As operações que podem ir para o SDK ficam onde estão** até que a
      [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) decida a
      divisão delas em mecanismo (SDK) e política (core), para que não mudem
-     de lugar duas vezes. São o juiz de página, os adaptadores da Toolbox em
-     `backend/tools` e a cadeia de fórmula (a ligação do core com o render não
+     de lugar duas vezes. São o juiz de página, os adaptadores da Toolbox do core
+     (então em `backend/tools`, hoje em `backend/core/toolbox`) e a cadeia de fórmula (a ligação do core com o render não
      fica retida; veja a ADR-0017); o
      [inventário da #470](../architecture/operational-boundaries-inventory.pt-br.md)
      os lista. O que ficar no core depois da divisão (a política, e a ligação
      do `CoreConfig` aos parâmetros de cada operação) se reúne aqui em
      seguida. A ADR-0017 foi aceita em 2026-11-13: a política da cadeia de
      fórmula foi para o `backend/core/pipeline/` (#513, #515), e o juiz de
-     página foi para lá inteiro, com a divisão com o SDK deixada para depois.
+     página foi para lá inteiro, com a divisão com o SDK deixada para depois. Os adaptadores
+     da Toolbox foram inteiros para o `backend/core/toolbox/` no passo 2, também
+     com a divisão com o SDK deixada para depois.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
      vez.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.

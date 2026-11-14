@@ -30,12 +30,15 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 - [backend/services/cleanup_service.py](../backend/services/cleanup_service.py): periodic cleanup of temporary files.
 - [backend/services/email_service.py](../backend/services/email_service.py): async SMTP email sender (confirmation + result with ZIP attachments).
 - [backend/services/download_token_service.py](../backend/services/download_token_service.py): token generation for secure Web download links.
+- [backend/services/validators.py](../backend/services/validators.py): upload validation (file extension and size).
+- [backend/services/access_log_filter.py](../backend/services/access_log_filter.py) and [backend/services/filenames.py](../backend/services/filenames.py): the access log filter and bounded output file names.
 
-#### 0.4. Domain Tools & Utilities (`backend/tools/`)
-- [backend/tools/logger.py](../backend/tools/logger.py): centralized loguru logger setup.
-- [backend/tools/validators.py](../backend/tools/validators.py): file extension and size validation.
+#### 0.4. Core Utilities and Toolbox Adapters (`backend/core/`)
+- [backend/core/toolbox/](../backend/core/toolbox/): the core's adapters over the Toolbox, through the SDK (client from the settings, math, media inspection, PDF/UA audit, text spans, vision payload).
+- [backend/core/logger.py](../backend/core/logger.py): centralized loguru logger setup.
+- [backend/core/formula_tools.py](../backend/core/formula_tools.py): LaTeX normalization and the spoken-formula label.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.
-- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver.
+- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver (moves with the agents, ADR-0016 step 2).
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine
 
@@ -82,7 +85,7 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 - [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
 - [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
 - [backend/core/export/renderers/](../backend/core/export/renderers/): renderers for TXT and HTML (DOCX and PDF/UA render on the Toolbox).
-- [backend/core/export/exporters/](../backend/core/export/exporters/): the export adapters called by the worker, including `audio_exporter.py`, which produces the MP3 via edge-tts, and `pdf_exporter.py`, which produces the PDF/UA, the only PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) audits it with veraPDF on the Toolbox (`pdf.validate.pdf_ua`) for the result e-mail.
+- [backend/core/export/exporters/](../backend/core/export/exporters/): the export adapters called by the worker, including `audio_exporter.py`, which produces the MP3 via edge-tts, and `pdf_exporter.py`, which produces the PDF/UA, the only PDF. [backend/core/toolbox/pdf_ua_audit.py](../backend/core/toolbox/pdf_ua_audit.py) audits it with veraPDF on the Toolbox (`pdf.validate.pdf_ua`) for the result e-mail.
 
 ---
 

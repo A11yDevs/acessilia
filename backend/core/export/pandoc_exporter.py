@@ -34,7 +34,7 @@ from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.canonical_builder import sanitize_canonical_document
 from backend.core.pipeline.validators import audit_canonical_document
 from backend.core.pipeline.validators import validate_export_profile
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 #: BCP 47 language for the document metadata when the document declares none.
@@ -52,7 +52,7 @@ def _toolbox_export(
     """
     from acessilia_sdk.runtime import run_sync
 
-    from backend.tools.toolbox_client import make_toolbox_client
+    from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     async def export() -> dict[str, Any]:
         client = make_toolbox_client(client_cls)

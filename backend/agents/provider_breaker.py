@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_PROVIDER_BREAKER_OPEN
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 class ProviderBreaker:

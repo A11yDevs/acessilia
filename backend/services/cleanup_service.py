@@ -7,7 +7,7 @@ from backend.core.i18n.log_messages import (
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.agents.state_manager import state_manager
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue

@@ -14,7 +14,7 @@ from backend.core.i18n.log_messages import (
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,
     LOG_OUTPUT_DIR_REMOVED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.config.settings import settings
 
 # Database connection configuration

@@ -425,7 +425,7 @@ VALID_FORMULA = {
 
 @pytest.mark.asyncio
 async def test_vision_agent_retries_a_truncated_answer(monkeypatch) -> None:
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     vision_module, calls = _scripted_vision_agent(
         monkeypatch, [TRUNCATED_FORMULA, VALID_FORMULA]
@@ -453,7 +453,7 @@ async def test_vision_agent_retries_a_truncated_answer(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_vision_agent_gives_up_after_its_attempts(monkeypatch) -> None:
     from backend.agents.vision_agent import REGION_ATTEMPTS
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     vision_module, calls = _scripted_vision_agent(
         monkeypatch, [TRUNCATED_FORMULA] * REGION_ATTEMPTS
@@ -525,7 +525,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
     from backend.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
     from backend.core.i18n import reset_request_locale, set_request_locale
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     vision_module, calls, budgets = _context_retry_vision(
         monkeypatch,
@@ -621,7 +621,7 @@ async def test_context_overflow_is_critical_only_after_the_smaller_request_fails
     from backend.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
     from backend.core.i18n import reset_request_locale, set_request_locale
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     error = AgentRunError("model run failed: maximum context length exceeded")
     vision_module, calls, _ = _context_retry_vision(monkeypatch, [error, error])
@@ -733,8 +733,8 @@ async def test_page_inspection_recovers_with_the_whole_page_budget(
 @pytest.mark.asyncio
 async def test_a_failed_toolbox_render_lets_the_context_error_stand(monkeypatch):
     from backend.config.settings import settings
-    from backend.tools import vision_payload
-    from backend.tools.logger import logger
+    from backend.core.toolbox import vision_payload
+    from backend.core.logger import logger
 
     def unreachable_toolbox(*_args, **_kwargs):
         raise ValueError("Toolbox base_url must be an absolute http(s) URL")
@@ -1361,7 +1361,7 @@ async def test_failed_run_is_logged_with_its_real_cause(monkeypatch, agent_modul
 
     from agno.run.base import RunStatus
 
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     module = importlib.import_module(f"backend.agents.{agent_module}")
 

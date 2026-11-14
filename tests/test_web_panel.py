@@ -5,7 +5,7 @@ pytest.importorskip("fastapi.testclient")
 
 from backend.core.i18n import t  # noqa: E402
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS  # noqa: E402
-from backend.tools.validators import MSG_FILE_TOO_LARGE  # noqa: E402
+from backend.services.validators import MSG_FILE_TOO_LARGE  # noqa: E402
 from frontend.clients.api_client import ApiError  # noqa: E402
 from frontend.web import app as web_module  # noqa: E402
 from frontend.web.messages import (  # noqa: E402

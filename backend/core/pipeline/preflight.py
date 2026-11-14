@@ -23,8 +23,8 @@ from backend.core.i18n.log_messages import (
 from backend.core.i18n.stage_messages import (
     STAGE_DOCUMENT_TOO_MANY_PAGES,
 )
-from backend.tools.logger import logger
-from backend.tools.media_inspect import inspect_source_media
+from backend.core.logger import logger
+from backend.core.toolbox.media_inspect import inspect_source_media
 
 
 class DocumentTooLargeError(ValueError):

@@ -408,7 +408,7 @@ def test_a_source_the_toolbox_lost_is_sent_again(fake_toolbox_render, tmp_path):
 def test_a_raster_input_is_rendered_by_the_toolbox_as_its_single_page(
     fake_toolbox_render, tmp_path
 ):
-    from backend.tools.toolbox_client import ToolboxCapabilityError
+    from backend.core.toolbox.toolbox_client import ToolboxCapabilityError
 
     image = tmp_path / "scan.png"
     image.write_bytes(PNG_PAGE)
@@ -443,7 +443,7 @@ def test_a_source_sent_unlike_its_manifest_media_type_is_refused(
 
 
 def test_a_render_without_an_image_is_a_contract_violation(monkeypatch, tmp_path):
-    from backend.tools.toolbox_client import ToolboxContractViolation
+    from backend.core.toolbox.toolbox_client import ToolboxContractViolation
 
     monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox.test")
     monkeypatch.setattr(settings, "toolbox_base_urls", "")

@@ -100,7 +100,7 @@ A árvore canônica de cada provider pode ser inspecionada lado a lado:
 ```python
 from scripts.bench.core import payload_to_canonical
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 client = make_toolbox_client(ToolboxStructureClient, provider="mineru")  # ou "docling"
 try:

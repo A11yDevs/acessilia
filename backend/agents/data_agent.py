@@ -8,7 +8,7 @@ from backend.core.i18n.log_messages import (
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_REGION_ERROR,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.tools.prompt_tools import load_region_prompt
 from backend.ai.models.ai_client import get_agno_model
 from backend.config.settings import settings

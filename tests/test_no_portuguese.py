@@ -166,6 +166,9 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("frontend/web/messages.py", "idioma"),
     ("frontend/web/messages.py", "tradução"),
     ("frontend/web/messages.py", "configuração"),
+    # Spoken-formula label — user-facing, the core prepends it in alt text and plain-text exports
+    ("backend/core/formula_tools.py", "Fórmula:"),
+
     # Stage messages — user-facing pipeline stage names
     ("backend/core/i18n/stage_messages.py", "descrição"),
     ("backend/core/i18n/stage_messages.py", "imagem"),

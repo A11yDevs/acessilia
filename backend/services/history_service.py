@@ -7,7 +7,7 @@ from backend.core.i18n.log_messages import (
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_STALE_PROCESS_INTERRUPTED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.config.settings import settings
 
 _connection: sqlite3.Connection | None = None

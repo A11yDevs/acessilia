@@ -13,7 +13,7 @@ import respx
 
 from backend.config.settings import settings
 from backend.core.pipeline.fusion import extract_fused
-from backend.tools.toolbox_client import ToolboxProviderUnavailable
+from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
 BASE_URL = "http://toolbox.test"
 EXECUTE = f"{BASE_URL}/v1/capabilities/document.structure.extract:execute"

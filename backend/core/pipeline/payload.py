@@ -43,7 +43,7 @@ from backend.core.i18n.log_messages import (
     LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.core.pipeline.obligations import (
     _unsatisfied_obligations,
     _unsatisfied_summary,

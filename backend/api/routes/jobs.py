@@ -36,8 +36,8 @@ from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.operation_registry import operation_registry
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.services.remote_cancellation import cancel_task_operations
-from backend.tools.logger import logger
-from backend.tools.validators import (
+from backend.core.logger import logger
+from backend.services.validators import (
     MSG_FILE_TOO_LARGE,
     MSG_INVALID_EMAIL_ADDRESS,
     is_email_address_allowed,

@@ -42,7 +42,7 @@ from backend.core.pipeline.handlers.messages import (
 from backend.core.pipeline.elements import (
     _element_bbox,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 _CALIBRATED_PAIR = ("docling", "mineru")

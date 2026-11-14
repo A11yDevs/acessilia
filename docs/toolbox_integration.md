@@ -18,7 +18,7 @@ distinguishes the two possible scenarios and defines the implementation policy b
 
 ## 1. Toolbox contract as seen by the core
 
-The core talks to the Toolbox over HTTP. All clients live in `backend/tools/` and share
+The core talks to the Toolbox over HTTP. All its adapters live in `backend/core/toolbox/` and share
 the same pattern:
 
 | Endpoint | Method | Use |
@@ -58,7 +58,7 @@ receives `ToolboxCapabilityError` or `ToolboxContractViolation`.
 
 ### Exception hierarchy
 
-All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.toolbox.errors`, and re-exported by `backend/tools/toolbox_client.py`):
+All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.toolbox.errors`, and re-exported by `backend/core/toolbox/toolbox_client.py`):
 
 - `ToolboxProviderUnavailable` — service/provider unavailable (HTTP 502, 503)
 - `ToolboxTimeout` — exceeded `toolbox_timeout_seconds`
@@ -226,14 +226,14 @@ class Toolbox<X>Client(ToolboxCapabilityClient):
         )
 ```
 
-**3. Build it in the core** with `make_toolbox_client` (`backend/tools/toolbox_client.py`).
+**3. Build it in the core** with `make_toolbox_client` (`backend/core/toolbox/toolbox_client.py`).
 It fills the endpoints, the provider from the `settings` attribute named by
 `provider_key`, the timeout, the API key and a failover log hook; keyword
 arguments override them:
 
 ```python
 from acessilia_sdk.toolbox.clients import Toolbox<X>Client
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 client = make_toolbox_client(Toolbox<X>Client)
 try:
@@ -256,7 +256,7 @@ client hard-codes an `:execute` route or uses an unregistered id.
 
 ### 4.2 Agno tool wrapper (optional)
 
-To expose the capability to an agent, create `backend/tools/toolbox_<x>_tools.py`
+To expose the capability to an agent, create `backend/core/toolbox/toolbox_<x>_tools.py`
 that calls the client from 4.1 and turns `ToolboxError` into the tool's failure
 result. Do not add a local implementation behind it (see 2.3).
 
@@ -307,7 +307,7 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
 
 - **Client:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Core wrapper:** `backend/tools/media_inspect.py` (`inspect_source_media`) calls
+- **Core wrapper:** `backend/core/toolbox/media_inspect.py` (`inspect_source_media`) calls
   only the Toolbox; there is no local fallback (ADR-0003, #150 F3). With
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` it returns `None` without calling the
   Toolbox, and a Toolbox failure raises `ToolboxError`.
@@ -495,10 +495,10 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class, failover, artifacts and exception hierarchy (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — one client per capability family; `layout.py` is the Scenario B template
-- `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings) and the re-exported error types
+- `backend/core/toolbox/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings) and the re-exported error types
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — structure extraction, the artifact store and the dataset routes
-- `backend/tools/toolbox_math_tools.py` — the core's policy over the math client: a rejected input gives an empty result, an unavailable capability raises `MathCapabilityUnavailable` (ADR-0007); reading the two `math.recognize@1` document shapes is the SDK's `clients.math.recognized_formulas`
-- `backend/tools/media_inspect.py`, `backend/tools/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — when to call `media.inspect`, `pdf.validate.pdf_ua` and the exports (enable flags, remote cache), logging and the e-mail summary; each call is one SDK client method
+- `backend/core/toolbox/toolbox_math_tools.py` — the core's policy over the math client: a rejected input gives an empty result, an unavailable capability raises `MathCapabilityUnavailable` (ADR-0007); reading the two `math.recognize@1` document shapes is the SDK's `clients.math.recognized_formulas`
+- `backend/core/toolbox/media_inspect.py`, `backend/core/toolbox/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — when to call `media.inspect`, `pdf.validate.pdf_ua` and the exports (enable flags, remote cache), logging and the e-mail summary; each call is one SDK client method
 - `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`

@@ -1,6 +1,6 @@
 """The core's LaTeX helpers keep their outputs and defaults (#203, stage 2).
 
-``backend.tools.formula_tools`` normalizes conservatively: it strips one pair
+``backend.core.formula_tools`` normalizes conservatively: it strips one pair
 of outer delimiters and collapses whitespace, but never rewrites the math,
 unlike ``docstruct.text.latex.normalize_latex``. Its ``wrap_latex`` defaults
 to inline (``display=False``), unlike docstruct's. These cases pin that
@@ -15,7 +15,7 @@ import inspect
 
 import pytest
 
-from backend.tools.formula_tools import (
+from backend.core.formula_tools import (
     ensure_math_delimiters,
     normalize_latex,
     wrap_latex,

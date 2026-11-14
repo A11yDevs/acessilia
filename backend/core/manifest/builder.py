@@ -21,7 +21,7 @@ from backend.core.i18n.log_messages import (
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 from backend.core.manifest.models import (
     Artifact,

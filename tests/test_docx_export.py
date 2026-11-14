@@ -19,7 +19,7 @@ from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
 from backend.config.settings import settings
 from backend.core.export import pandoc_exporter
-from backend.tools.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
+from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
 
 BASE_URL = "http://localhost:8002"
 EXECUTE_URL = f"{BASE_URL}/v1/capabilities/document.export.docx:execute"

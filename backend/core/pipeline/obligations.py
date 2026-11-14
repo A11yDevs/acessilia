@@ -23,7 +23,7 @@ from backend.core.i18n.stage_messages import (
     STAGE_PAGES,
     STAGE_PAGE_UNKNOWN,
 )
-from backend.tools.formula_tools import normalize_latex
+from backend.core.formula_tools import normalize_latex
 
 if TYPE_CHECKING:
     pass

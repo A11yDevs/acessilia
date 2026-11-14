@@ -207,8 +207,8 @@ As três condições acima valeram em 2026-11-13:
     caracterização e comparação dos manifestos antes e depois.
 - **Relação com a ADR-0016.** O passo 6 da fase 3 da #402 não leva para
   `backend/core/` os módulos que guardam essas operações, para que eles não
-  mudem de lugar duas vezes: o juiz de página, os adaptadores da Toolbox em
-  `backend/tools` e a cadeia de fórmula. Cada um vai para o seu lugar quando a
+  mudem de lugar duas vezes: o juiz de página, os adaptadores da Toolbox do core
+  (então em `backend/tools`, hoje em `backend/core/toolbox`) e a cadeia de fórmula. Cada um vai para o seu lugar quando a
   divisão em mecanismo (SDK) e política (core) for decidida. O core continua
   ligando a sua configuração (`CoreConfig`) aos parâmetros explícitos de cada
   operação. Por isso, a ligação do core com o render (`_source_artifact_id` e

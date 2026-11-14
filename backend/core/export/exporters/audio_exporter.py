@@ -12,7 +12,7 @@ from backend.core.i18n.log_messages import (
     LOG_AUDIO_EXPORT_PROGRESS,
     LOG_AUDIO_EXPORT_START,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 async def export_mp3(

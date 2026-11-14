@@ -180,7 +180,7 @@ def _forbid_toolbox(monkeypatch):
     def fail(*_args, **_kwargs):
         raise AssertionError("single-provider called the Toolbox")
 
-    monkeypatch.setattr("backend.tools.toolbox_client.make_toolbox_client", fail)
+    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", fail)
 
 
 def test_single_provider_accepts_the_manifest_extraction_without_the_toolbox(

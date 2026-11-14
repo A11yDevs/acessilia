@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 from backend.core.i18n import t
-from backend.tools.logger import setup_logger, logger
+from backend.core.logger import setup_logger, logger
 from backend.config.settings import settings
 from backend.core.i18n.log_messages import (
     LOG_API_INTERFACE_ENABLED,

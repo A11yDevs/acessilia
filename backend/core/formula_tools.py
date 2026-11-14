@@ -9,7 +9,7 @@ presentation.
 
 Recognition, MathML conversion and speech run on the Toolbox
 (``math.recognize``, ``math.convert``, ``math.verbalize``; see
-backend/tools/toolbox_math_tools.py and ADR-0007).
+backend/core/toolbox/toolbox_math_tools.py and ADR-0007).
 """
 
 from __future__ import annotations

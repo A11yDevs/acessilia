@@ -16,7 +16,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Input: supported file.
 - Output: TXT, DOCX, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
 - Implementation:
-  - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
+  - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/services/validators.py](../backend/services/validators.py)
   - processing: [backend/service.py](../backend/service.py) runs the PDDL orchestrator [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; the legacy engine is disabled), which feeds [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py)
   - export: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py), [backend/core/export/exporters](../backend/core/export/exporters), [backend/core/export/renderers](../backend/core/export/renderers)
 

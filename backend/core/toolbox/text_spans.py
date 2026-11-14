@@ -28,7 +28,7 @@ async def fetch_text_spans(
     from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
     from backend.config.settings import settings
-    from backend.tools.toolbox_client import make_toolbox_client
+    from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     owned_client = client is None
     spans_client = client or make_toolbox_client(

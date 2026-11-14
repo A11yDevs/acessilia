@@ -24,8 +24,8 @@ from backend.core.i18n.log_messages import (
     MSG_VISION_TRUNCATION_NOTICE,
 )
 from docstruct.regions.classify import region_prompt_key
-from backend.tools.vision_payload import downscale_image
-from backend.tools.logger import logger
+from backend.core.toolbox.vision_payload import downscale_image
+from backend.core.logger import logger
 
 from backend.tools.prompt_tools import (
     build_page_prompt,

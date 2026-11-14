@@ -38,7 +38,7 @@ def get_agno_model(
         from agno.models.openai.like import OpenAILike
 
         from acessilia_sdk.toolbox import vlm_gateway_base_url
-        from backend.tools.toolbox_client import toolbox_vlm_endpoint
+        from backend.core.toolbox.toolbox_client import toolbox_vlm_endpoint
 
         # The model id is the Toolbox provider id and the key the Toolbox's own:
         # the VLM server's key stays with the Toolbox. The timeout also covers

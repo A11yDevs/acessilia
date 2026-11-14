@@ -8,7 +8,7 @@ from backend.core.i18n.log_messages import (
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_MESSAGE_SEND_FAILED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from frontend.telegram.messages import (
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,

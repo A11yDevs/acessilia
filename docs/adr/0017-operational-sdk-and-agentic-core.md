@@ -202,8 +202,8 @@ The three conditions above held on 2026-11-13:
     characterization and a comparison of the manifests before and after.
 - **Interaction with ADR-0016.** Phase 3, step 6 of #402 does not move into
   `backend/core/` the modules that hold these operations, so they do not move
-  twice: the page judge, `backend/tools`' Toolbox adapters, and the formula
-  chain. Each moves once its split into mechanism (SDK) and policy (core) is
+  twice: the page judge, the core's Toolbox adapters (then in `backend/tools`,
+  now in `backend/core/toolbox`), and the formula chain. Each moves once its split into mechanism (SDK) and policy (core) is
   decided. The core keeps the binding of its configuration (`CoreConfig`) to
   each operation's explicit parameters. So the core's binding to the render
   (`_source_artifact_id` and `_toolbox_render`, which bind the settings to

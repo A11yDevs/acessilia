@@ -9,7 +9,7 @@ from typing import Any
 
 from docstruct.export.markdown import document_to_markdown
 
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 def export_drbench_md(

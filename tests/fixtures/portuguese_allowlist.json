@@ -20,7 +20,6 @@
     "backend/core/planning/pddl_processor.py": 29,
     "backend/core/planning/planner_agent.py": 10,
     "backend/services/cleanup_service.py": 3,
-    "backend/tools/formula_tools.py": 3,
     "backend/tools/prompt_tools.py": 5,
     "docker-compose.yml": 1,
     "docs/README.md": 4,

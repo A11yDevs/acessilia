@@ -30,7 +30,7 @@ from backend.core.i18n.log_messages import (
     LOG_PDDL_VISION_RETRY_PASS_PICTURES,
     LOG_PDDL_VISION_RETRY_PASS_TABLES,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage

@@ -60,7 +60,7 @@ from backend.services.blocking import run_blocking
 from backend.core.i18n.stage_messages import (
     STAGE_RECOGNIZING_TABLE,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 async def _enrich_table_structures(
