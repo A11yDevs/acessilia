@@ -71,7 +71,8 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
 - **O core importa o frontend.** O `backend/core/planning/models.py` e o
   `backend/core/execution/models.py` pegam descrições de schema e mensagens de
   validação de `frontend.telegram.messages`. Sem o `frontend` instalado, os
-  dois levantam `ImportError`.
+  dois levantam `ImportError`. (Resolvido no passo 2: essas mensagens agora
+  ficam em `backend/core/planning/messages.py` e `backend/core/execution/messages.py`.)
 - **O core chega ao serviço em dois pontos.**
   - `backend.config`: 34 imports, e 59 chaves diferentes do `settings` lidas
     em 107 pontos. Só o orquestrador lê 12 chaves, e os exportadores, 3.
@@ -198,7 +199,9 @@ Proposta: a opção 2.
      As mensagens que o core pega de `frontend.telegram.messages` (as
      descrições de schema e as mensagens de validação de `planning/models.py`
      e `execution/models.py`) vão para as mensagens do core no mesmo passo. Se
-     o frontend ainda as usar, passa a importá-las do core.
+     o frontend ainda as usar, passa a importá-las do core. Feito: os 18 msgids
+     foram para o `planning/messages.py` e o `execution/messages.py`, e o
+     frontend não os usava.
 
      **As operações que podem ir para o SDK ficam onde estão** até que a
      [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) decida a
