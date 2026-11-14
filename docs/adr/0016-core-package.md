@@ -19,7 +19,8 @@ reasons:
 - **The core**:
   - manifest, planning and execution (`backend/core`);
   - the PDDL orchestrator, with its handlers and enrichment stages
-    (`backend/agents/pddl_orchestrator.py`);
+    (`backend/core/pipeline/`, where step 6 of #402 moved them from
+    `backend/agents/pddl_orchestrator.py`);
   - the agents (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - the dual fusion (`backend/pipeline`) and the exporters (`backend/export`,
     `backend/adapters`);

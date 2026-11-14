@@ -19,7 +19,8 @@ diferentes:
 - **O core**:
   - o manifesto, o planejamento e a execução (`backend/core`);
   - o orquestrador PDDL, com seus handlers e etapas de enriquecimento
-    (`backend/agents/pddl_orchestrator.py`);
+    (`backend/core/pipeline/`, para onde o passo 6 da #402 os moveu a partir
+    do `backend/agents/pddl_orchestrator.py`);
   - os agentes (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - a fusão dupla (`backend/pipeline`) e os exportadores (`backend/export`,
     `backend/adapters`);
