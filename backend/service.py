@@ -253,15 +253,21 @@ async def process(
         )
         state_manager.verificar_cancelamento(task_id)
 
-        resultado = await agente.execute(
-            file_path,
-            file_path.parent,
-            status_callback,
-            mode=mode,
-            structured_output=True,
-            custom_prompt=custom_prompt,
-            thinking_mode=thinking_mode,
-        )
+        try:
+            resultado = await agente.execute(
+                file_path,
+                file_path.parent,
+                status_callback,
+                mode=mode,
+                structured_output=True,
+                custom_prompt=custom_prompt,
+                thinking_mode=thinking_mode,
+            )
+        except Exception:
+            # A cancellation that arrives while the extraction thread is
+            # running must win over the timeout/error it produces when it ends.
+            state_manager.verificar_cancelamento(task_id)
+            raise
 
         canonical_metadata: dict[str, Any] | None = None
         technical_warnings: list[str] | None = None

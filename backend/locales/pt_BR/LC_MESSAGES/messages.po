@@ -2104,6 +2104,10 @@ msgstr ""
 " estava disponível."
 
 #, python-brace-format
+msgid "Toolbox structural extraction exceeded its {seconds}-second budget"
+msgstr "A extração estrutural da Toolbox excedeu o orçamento de {seconds} segundos"
+
+#, python-brace-format
 msgid "Obligation not found: {obligation_id}"
 msgstr "Obrigação não encontrada: {obligation_id}"
 

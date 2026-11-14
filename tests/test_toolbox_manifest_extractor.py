@@ -5,6 +5,8 @@ compatível com o pipeline PDDL.
 """
 from __future__ import annotations
 
+import asyncio
+import time
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
@@ -16,6 +18,9 @@ from backend.core.manifest.toolbox_extractor import (
     ToolboxManifestExtractor,
 )
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
+
+from backend.config.settings import settings
+from backend.tools.toolbox_client import ToolboxTimeout
 
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -755,3 +760,66 @@ def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, moc
     mock_artifact_client.upload.assert_not_awaited()
     assert result.artifact_id is None
     assert result.configuration["use_artifact_store"] is False
+
+
+def test_extraction_deadline_bounds_a_blocked_primary(mock_client, monkeypatch):
+    """The thread returns at the deadline even while run_blocking waits on it."""
+    async def hang(*_args, **_kwargs):
+        await asyncio.Event().wait()
+
+    mock_client.extract_structure = AsyncMock(side_effect=hang)
+    monkeypatch.setattr(settings, "toolbox_extraction_timeout_seconds", 1)
+    extractor = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False)
+
+    started = time.monotonic()
+    with pytest.raises(ToolboxTimeout):
+        extractor.extract(FIXTURE_PDF)
+
+    assert time.monotonic() - started < 3
+
+
+def test_extraction_deadline_covers_a_blocked_upload(
+    mock_client, mock_artifact_client, monkeypatch
+):
+    async def hang(*_args, **_kwargs):
+        await asyncio.Event().wait()
+
+    mock_artifact_client.upload = AsyncMock(side_effect=hang)
+    mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+    monkeypatch.setattr(settings, "toolbox_extraction_timeout_seconds", 1)
+    extractor = ToolboxManifestExtractor(
+        client=mock_client,
+        artifact_client=mock_artifact_client,
+        use_artifact_store=True,
+    )
+
+    with pytest.raises(ToolboxTimeout):
+        extractor.extract(FIXTURE_PDF)
+
+    mock_client.extract_structure.assert_not_awaited()
+
+
+def test_extraction_deadline_covers_a_blocked_secondary(
+    mock_client, monkeypatch
+):
+    async def hang(*_args, **_kwargs):
+        await asyncio.Event().wait()
+
+    mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+    secondary = AsyncMock(spec=ToolboxStructureClient)
+    secondary.base_url = "http://secondary.test"
+    secondary.provider = "mineru"
+    secondary.extract_structure = AsyncMock(side_effect=hang)
+    monkeypatch.setattr(settings, "fusion_mode", "dual")
+    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+    monkeypatch.setattr(settings, "toolbox_extraction_timeout_seconds", 1)
+    monkeypatch.setattr(
+        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *_args, **_kwargs: secondary,
+    )
+    extractor = ToolboxManifestExtractor(client=mock_client, use_artifact_store=False)
+
+    with pytest.raises(ToolboxTimeout):
+        extractor.extract(FIXTURE_PDF)
+
+    secondary.close.assert_awaited_once()

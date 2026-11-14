@@ -76,6 +76,9 @@ deployment variables in runtime, missing keys, dry-run execution, incompatible
 paths/ports or short gateway timeouts. `MODEL_CALL_TIMEOUT_SECONDS`,
 `DATA_AGENT_TIMEOUT_SECONDS` and `TOOLBOX_TIMEOUT_SECONDS` must each be at least
 3000 s, covering the environment Toolbox's 120 s wait plus 2700 s gateway call.
+`TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` must stay at least 600 s (the Toolbox
+provider timeout) and `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` at least 1200 s
+(both providers plus margin).
 Measure peak memory/CPU with representative
 dual-fusion documents before choosing resource caps. Core has bounded Docker
 logs, a 60-second stop grace and an init process; none implements job draining.

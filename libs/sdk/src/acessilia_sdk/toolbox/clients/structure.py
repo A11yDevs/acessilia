@@ -14,6 +14,7 @@ class ToolboxStructureClient(ToolboxCapabilityClient):
     """Structure extraction (Docling, MinerU, Nougat, TeleOCR…)."""
 
     provider_key = "toolbox_provider"
+    timeout_key = "toolbox_structure_timeout_seconds"
 
     async def extract_structure(
         self,

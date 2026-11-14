@@ -424,7 +424,9 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_AVAILABILITY_GATE` | `observe` | Gate de disponibilidade: `observe`, `enforce` ou `off` (seção 4.3) |
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
-| `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições |
+| `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições para os clientes de capacidade que não declaram o próprio |
+| `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` | `600` | Timeout HTTP por tentativa do `document.structure.extract`; acompanha o timeout de 600 s dos providers da Toolbox |
+| `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` | `1500` | Orçamento total de parede da etapa de extração: upload, retries, failover e os dois providers. Retries/failover não o estendem, e um job cancelado aguarda no máximo esse tempo pela thread de extração |
 | `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), nas capacidades que o contrato da Toolbox marca como idempotentes (todas menos `dataset.sample`); uma chamada não idempotente tem uma tentativa e nenhum failover (#406). `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair, quando os clientes compartilham uma implantação. Com endpoints independentes em `TOOLBOX_BASE_URLS`, o arquivo vai diretamente em cada chamada (ADR-0013); uma falha transitória do upload (timeout, indisponibilidade) também recai no envio direto |
@@ -551,7 +553,13 @@ para jobs terminais. O helper síncrono interno altera apenas a memória; seu
 chamador é responsável pela persistência. Uma queda antes da confirmação da
 API não está coberta por essa garantia.
 Cancelar não envia um comando de interrupção à Toolbox; o trabalho remoto pode
-continuar até terminar ou atingir o timeout. O encerramento da fila continua
-aguardando as operações ativas e nenhum resultado cancelado é publicado. Essa
+continuar até terminar ou atingir o timeout. `cancelled` significa que o job
+local terminou, não que o provider parou de calcular. A thread de extração é
+limitada por `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` (padrão 1500 s): o prazo cobre
+upload, retries, failover e os dois providers, então é o limite superior para um
+job cancelado chegar a `cancelled`. `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` (padrão
+600 s) é o timeout HTTP por tentativa e não estende esse orçamento. O
+encerramento da fila continua aguardando as operações ativas e nenhum resultado
+cancelado é publicado. Essa
 mudança não altera os timeouts dos providers nem a verificação antecipada de
 `MAX_PAGES` já existente.

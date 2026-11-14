@@ -55,6 +55,11 @@ def client_config() -> ToolboxClientConfig:
         retries=int(env.get("TOOLBOX_RETRIES", "1")),
         retry_backoff_seconds=float(env.get("TOOLBOX_RETRY_BACKOFF_SECONDS", "0.5")),
         providers={"toolbox_provider": provider} if provider else {},
+        timeouts={
+            "toolbox_structure_timeout_seconds": int(
+                env.get("TOOLBOX_STRUCTURE_TIMEOUT_SECONDS", "600")
+            )
+        },
         on_failover=_report_failover,
     )
 
