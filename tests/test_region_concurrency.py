@@ -12,7 +12,7 @@ import asyncio
 
 import pytest
 
-from backend.agents.output_schemas import VisionOutput
+from backend.core.agents.output_schemas import VisionOutput
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.config.settings import settings
 from tests.pddl_support import (

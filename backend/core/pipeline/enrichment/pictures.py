@@ -28,9 +28,9 @@ from docstruct.placeholders import (
     is_placeholder_visual,
 )
 
-from backend.agents.output_schemas import VisionOutput
-from backend.agents.provider_breaker import ProviderBreaker
-from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.output_schemas import VisionOutput
+from backend.core.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.vision_agent import VisionAgent
 from backend.core.manifest.builder import (
     _derive_processing_needs,
     is_unstructured_page_placeholder,

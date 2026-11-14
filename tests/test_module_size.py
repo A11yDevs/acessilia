@@ -21,15 +21,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWLIST_PATH = REPO_ROOT / "tests" / "fixtures" / "module_size_allowlist.json"
 
-#: The folders and files that hold the core's modules today (ADR-0016). The
-#: service's few modules inside them are scanned too; they are far below the
-#: limit.
-SCANNED_ROOTS = (
-    "backend/agents",
-    "backend/ai",
-    "backend/core",
-    "backend/tools",
-)
+#: The folders and files that hold the core's modules today (ADR-0016). Step 2
+#: gathered the core under backend/core; the job state left in backend/agents
+#: belongs to the service.
+SCANNED_ROOTS = ("backend/core",)
 #: Single files outside the roots above. The message modules were here until
 #: ADR-0016's step 2 gathered them into backend/core/i18n, which backend/core covers.
 SCANNED_FILES: tuple[str, ...] = ()

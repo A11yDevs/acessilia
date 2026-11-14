@@ -15,13 +15,14 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 
 ### 0. Backend (`backend/`) — lógica de negócio agnóstica de interface e pipeline de IA
 
-#### 0.1. Pipeline Multiagente e Orquestração (`backend/agents/`)
-- [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
-- [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades do LLM para converter tabelas complexas e fórmulas matemáticas em representações Markdown e LaTeX estruturadas.
-- [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo.
+#### 0.1. Pipeline Multiagente e Orquestração (`backend/core/agents/`)
+- [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
+- [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py): `DataAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades do LLM para converter tabelas complexas e fórmulas matemáticas em representações Markdown e LaTeX estruturadas.
+- [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo (o estado dos jobs do serviço; fica fora do core).
 
-#### 0.2. Integração do Cliente de IA (`backend/ai/`)
-- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) com base nas configurações de ambiente.
+#### 0.2. Integração do Cliente de IA (`backend/core/agents/ai_client.py`)
+- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) com base nas configurações de ambiente.
+- [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): carregador de prompt e resolutor de templates sobre os prompts em [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
 #### 0.3. Serviços de Infraestrutura (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): cache de texto por hash de arquivo em `var/temp/cache`.
@@ -38,7 +39,6 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/core/logger.py](../backend/core/logger.py): configuração centralizada do logger loguru.
 - [backend/core/formula_tools.py](../backend/core/formula_tools.py): normalização de LaTeX e o rótulo da fórmula falada.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): normalização de texto e parsing de Markdown.
-- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): carregador de prompt e resolutor de templates (vai com os agentes, passo 2 da ADR-0016).
 
 #### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
 

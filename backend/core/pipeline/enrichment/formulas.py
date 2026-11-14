@@ -28,9 +28,9 @@ from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 
-from backend.agents.output_schemas import VisionOutput
-from backend.agents.provider_breaker import ProviderBreaker
-from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.output_schemas import VisionOutput
+from backend.core.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.vision_agent import VisionAgent
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,

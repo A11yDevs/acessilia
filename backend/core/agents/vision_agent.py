@@ -27,15 +27,15 @@ from docstruct.regions.classify import region_prompt_key
 from backend.core.toolbox.vision_payload import downscale_image
 from backend.core.logger import logger
 
-from backend.tools.prompt_tools import (
+from backend.core.agents.prompt_tools import (
     build_page_prompt,
     load_chemistry_prompt,
     load_region_prompt,
     load_system_prompt,
 )
-from backend.ai.models.ai_client import active_model_name, get_agno_model
+from backend.core.agents.ai_client import active_model_name, get_agno_model
 from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
-from backend.agents.output_schemas import (
+from backend.core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
     OutputModel,

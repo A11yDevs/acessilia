@@ -25,8 +25,8 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from backend.agents.output_schemas import PageInspectionOutput, VisionOutput
-from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.output_schemas import PageInspectionOutput, VisionOutput
+from backend.core.agents.vision_agent import VisionAgent
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import (
     is_unstructured_page_placeholder,

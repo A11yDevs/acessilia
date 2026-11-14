@@ -35,7 +35,7 @@ from backend.core.logger import logger
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
 
-    from backend.agents.provider_breaker import ProviderBreaker
+    from backend.core.agents.provider_breaker import ProviderBreaker
 
 
 #: Picture failures a second try may fix: the provider gave no answer, or an

@@ -22,8 +22,8 @@ from agno.db.sqlite import SqliteDb
 from agno.media import Image  # noqa: F401  (available for multimodal tests in the panel)
 from agno.os import AgentOS
 
-from backend.ai.models.ai_client import get_agno_model
-from backend.agents.output_schemas import (
+from backend.core.agents.ai_client import get_agno_model
+from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
     DataOutput,
@@ -31,7 +31,7 @@ from backend.agents.output_schemas import (
 )
 from backend.config.settings import settings
 from backend.core.i18n import t
-from backend.tools.prompt_tools import load_region_prompt, load_system_prompt
+from backend.core.agents.prompt_tools import load_region_prompt, load_system_prompt
 from frontend.web.messages import (
     WEB_AGENT_DATA_DESCRIPTION,
     WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,

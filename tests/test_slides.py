@@ -350,7 +350,7 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypatch):
-    from backend.agents.output_schemas import VisionOutput
+    from backend.core.agents.output_schemas import VisionOutput
 
     manifest = _build(source)
     classifications = {}

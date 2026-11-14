@@ -17,7 +17,7 @@ Tools exposed:
 
 The deterministic methods live here so they can be unit-tested without Agno
 installed; the tool envelopes are only wired into the Agno agent when the
-optional stack is available (see ``backend.core.agno_support.build_agent``).
+optional stack is available (see ``backend.core.agents.agno_support.build_agent``).
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import difflib
 from collections import Counter
 from typing import Any
 
-from backend.core.agno_support import build_agent
+from backend.core.agents.agno_support import build_agent
 from docstruct.fusion.adjudication import (
     clean_transcription,
     decide,

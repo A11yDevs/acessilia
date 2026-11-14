@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents.output_schemas import DataOutput, VisionOutput
+from backend.core.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.pipeline.payload import build_pddl_structured_payload

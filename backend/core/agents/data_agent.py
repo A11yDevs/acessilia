@@ -1,4 +1,4 @@
-"""DataAgent – Extração validada de tabelas e fórmulas matemáticas."""
+"""DataAgent: validated extraction of tables and mathematical formulas."""
 
 import asyncio
 
@@ -9,10 +9,10 @@ from backend.core.i18n.log_messages import (
     LOG_DATA_AGENT_REGION_ERROR,
 )
 from backend.core.logger import logger
-from backend.tools.prompt_tools import load_region_prompt
-from backend.ai.models.ai_client import get_agno_model
+from backend.core.agents.prompt_tools import load_region_prompt
+from backend.core.agents.ai_client import get_agno_model
 from backend.config.settings import settings
-from backend.agents.output_schemas import (
+from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
     validate_structured_run,
@@ -29,7 +29,7 @@ DATA_PROMPT_KEY_MAP = {
 
 
 class DataAgent:
-    """Processa regiões de tabelas e fórmulas usando IA de visão."""
+    """Processes table and formula regions with a vision model."""
 
     async def process_region(
         self,

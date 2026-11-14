@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from backend.core.agno_support import build_agent
+from backend.core.agents.agno_support import build_agent
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor

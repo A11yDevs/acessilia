@@ -71,7 +71,7 @@ Deliver document and image conversion to accessible formats through:
    - PDDL domain (v2.2+) encodes task dependencies and ordering constraints
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
-3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/ai/prompts` and to verbosity profiles in `docstruct.profiles`.
+3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/core/agents/prompts` and to verbosity profiles in `docstruct.profiles`.
 4. Extraction is hybrid: deterministic text extraction first, then AI vision for scanned/no-text pages and image inputs (see principle 2.5).
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.

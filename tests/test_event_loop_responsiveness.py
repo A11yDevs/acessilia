@@ -8,9 +8,9 @@ from typing import Any, Awaitable, Callable
 
 import pytest
 
-from backend.agents.data_agent import DataAgent
-from backend.agents.output_schemas import DataOutput, VisionOutput
-from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.data_agent import DataAgent
+from backend.core.agents.output_schemas import DataOutput, VisionOutput
+from backend.core.agents.vision_agent import VisionAgent
 
 
 BLOCK_SECONDS = 0.2
@@ -60,7 +60,7 @@ async def _assert_event_loop_is_responsive(
 
 @pytest.mark.asyncio
 async def test_vision_inference_does_not_block_event_loop(monkeypatch):
-    import backend.agents.vision_agent as vision_module
+    import backend.core.agents.vision_agent as vision_module
 
     monkeypatch.setattr(vision_module, "Agent", _BlockingAgent)
     monkeypatch.setattr(vision_module, "get_agno_model", lambda **_kwargs: object())
@@ -74,7 +74,7 @@ async def test_vision_inference_does_not_block_event_loop(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_data_inference_does_not_block_event_loop(monkeypatch):
-    import backend.agents.data_agent as data_module
+    import backend.core.agents.data_agent as data_module
 
     monkeypatch.setattr(data_module, "Agent", _BlockingAgent)
     monkeypatch.setattr(data_module, "get_agno_model", lambda **_kwargs: object())

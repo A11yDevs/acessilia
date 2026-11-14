@@ -15,13 +15,14 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 
 ### 0. Backend (`backend/`) — Interface-agnostic business logic and AI pipeline
 
-#### 0.1. Multi-Agent Pipeline & Orchestration (`backend/agents/`)
-- [backend/agents/vision_agent.py](../backend/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
-- [backend/agents/data_agent.py](../backend/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
-- [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support.
+#### 0.1. Multi-Agent Pipeline & Orchestration (`backend/core/agents/`)
+- [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py): `VisionAgent` utilizes Agno (`agno.agent.Agent`) and LLM multimodal capabilities (`agno.media.Image`) to produce detailed alt-text and audio descriptions for visual elements and scanned pages.
+- [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py): `DataAgent` utilizes Agno (`agno.agent.Agent`) and LLM capabilities to convert complex tables and mathematical formulas into structured Markdown and LaTeX representations.
+- [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support (the service's job state; it stays outside the core).
 
-#### 0.2. AI Client Integration (`backend/ai/`)
-- [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) based on environment settings.
+#### 0.2. AI Client Integration (`backend/core/agents/ai_client.py`)
+- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) based on environment settings.
+- [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): prompt loader and template resolver over the prompts in [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
 #### 0.3. Infrastructure Services (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `var/temp/cache`.
@@ -38,7 +39,6 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 - [backend/core/logger.py](../backend/core/logger.py): centralized loguru logger setup.
 - [backend/core/formula_tools.py](../backend/core/formula_tools.py): LaTeX normalization and the spoken-formula label.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.
-- [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): prompt loader and template resolver (moves with the agents, ADR-0016 step 2).
 
 #### 0.5. Planning Layer (`backend/core/`) — PDDL engine
 

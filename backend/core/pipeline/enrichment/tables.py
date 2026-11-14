@@ -29,9 +29,9 @@ from docstruct.tables.ast import (
 from docstruct.tables.garble import table_garble_reason
 from docstruct.tables.text_rows import rows_from_visual_table_text
 
-from backend.agents.data_agent import DataAgent
-from backend.agents.output_schemas import DataOutput
-from backend.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.data_agent import DataAgent
+from backend.core.agents.output_schemas import DataOutput
+from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,

@@ -287,7 +287,7 @@ def test_the_guard_sees_every_form_of_a_forbidden_import(source) -> None:
         "from backend.core.pipeline.canonical_builder import build_canonical_document",
         "from backend.core import logger",
         "from backend.core.logger import logger",
-        "from backend.tools import prompt_tools",
+        "from backend.core.agents import prompt_tools",
         "import backend.service",
         "from acessilia_sdk.toolbox import make_client",
         "from . import toolbox",
