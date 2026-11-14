@@ -61,7 +61,7 @@ language.
   became a development dependency that tests use to build PDFs.
 - **Known deviation, tracked in [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73):** one local executor
   remains, so `remote_only` is not complete yet:
-  `backend/export/exporters/audio_exporter.py` synthesizes MP3 with
+  `backend/core/export/exporters/audio_exporter.py` synthesizes MP3 with
   `edge-tts`. It is replaced by a Toolbox capability reached through the SDK;
   then `edge_tts` joins the list below and leaves the core's runtime
   dependencies.

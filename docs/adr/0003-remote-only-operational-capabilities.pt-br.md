@@ -62,7 +62,7 @@ ignora o idioma pedido.
   virou uma dependência de desenvolvimento, usada pelos testes para gerar PDFs.
 - **Desvio conhecido, registrado na [acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73):** resta um
   executor local, então o `remote_only` ainda não está completo:
-  `backend/export/exporters/audio_exporter.py` sintetiza MP3 com `edge-tts`.
+  `backend/core/export/exporters/audio_exporter.py` sintetiza MP3 com `edge-tts`.
   Ele é substituído por uma capacidade da Toolbox acessada pelo SDK; então o
   `edge_tts` entra na lista abaixo e deixa as dependências de runtime do core.
 - **O renderizador local de PDF saiu.** Desde o

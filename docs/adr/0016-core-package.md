@@ -23,10 +23,13 @@ reasons:
     `backend/agents/pddl_orchestrator.py`);
   - the agents (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - the dual fusion (`backend/core/pipeline/fusion.py`, which step 2 gathered from
-    `backend/pipeline`) and the exporters (`backend/export`; the unused
+    `backend/pipeline`) and the exporters (`backend/core/export`, which step 2 gathered from
+    `backend/export`; the unused
     `backend/adapters` wrappers were removed in step 2);
   - the Toolbox adapters (`backend/tools`);
-  - the messages (`backend/i18n`, `log_messages`, `stage_messages`).
+  - the messages (`backend/core/i18n`, with `log_messages`, `stage_messages` and the
+    catalogs, which step 2 gathered from `backend/i18n.py`, `backend/log_messages.py`,
+    `backend/stage_messages.py` and `backend/locales`).
 - **The service around it**: the API and the worker (`backend/api`, FastAPI),
   jobs, history, e-mail, download tokens and caches (`backend/services`), the
   job state (`backend/agents/state_manager.py`) and the environment
@@ -57,10 +60,10 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
 - **The other libraries the core imports**, counted with an AST scan that
   includes imports inside functions:
   - pydantic and loguru;
-  - Babel (`backend/i18n.py`);
+  - Babel (`backend/core/i18n/__init__.py`);
   - jsonschema (`backend/core/manifest/schema.py`);
   - rapidfuzz (`backend/core/pipeline/fusion.py`);
-  - edge-tts (`backend/export/exporters/audio_exporter.py`). This is the
+  - edge-tts (`backend/core/export/exporters/audio_exporter.py`). This is the
     local executor that [ADR-0003](0003-remote-only-operational-capabilities.md)
     records as a known deviation
     ([acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)).
@@ -131,8 +134,8 @@ Proposed: option 2.
   | `backend/core/pipeline` (the orchestrator was `backend/agents/pddl_orchestrator.py` until #402's step 6 moved it; `backend/pipeline` gathered there in step 2) | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (the Toolbox adapters, formula and code tools, prompts, logger) | `acessilia_core.toolbox` and helpers |
-  | `backend/export` (`backend/adapters`, unused, was removed in step 2) | `acessilia_core.export` |
-  | `backend/i18n.py`, `log_messages.py`, `stage_messages.py`, `locales/` | `acessilia_core.i18n` |
+  | `backend/core/export` (gathered from `backend/export` in step 2; `backend/adapters`, unused, was removed) | `acessilia_core.export` |
+  | `backend/core/i18n` (gathered in step 2 from `backend/i18n.py`, `log_messages.py`, `stage_messages.py` and `locales/`) | `acessilia_core.i18n` |
 
 - **What stays in `backend/`, the service:**
   - the API and the worker;
@@ -185,8 +188,8 @@ Proposed: option 2.
      | `backend/pipeline` | `backend/core/pipeline/` (done) | |
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
      | `backend/tools` (Toolbox adapters, formula and code tools, prompt loading, logger) | `backend/core/toolbox/` and helpers | |
-     | `backend/export` (`backend/adapters`: removed, nothing imported it) | `backend/core/export/` | |
-     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (the `.po` catalogs) → `backend/core/i18n/locales/` |
+     | `backend/export` (`backend/adapters`: removed, nothing imported it) | `backend/core/export/` (done) | |
+     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` (done) | `backend/locales/` (the `.po` catalogs) → `backend/core/i18n/locales/` |
 
      The job state (`backend/agents/state_manager.py`) stays in the service.
 

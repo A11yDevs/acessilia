@@ -1,8 +1,8 @@
 import aiosmtplib
 from email.message import EmailMessage
 from pathlib import Path
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_FAILURE_BODY,

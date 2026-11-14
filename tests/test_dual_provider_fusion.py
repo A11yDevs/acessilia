@@ -10,7 +10,7 @@ import pytest
 
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers.common import _missing_obligation
-from backend.i18n import reset_request_locale, set_request_locale
+from backend.core.i18n import reset_request_locale, set_request_locale
 from backend.core.pipeline.handlers.fusion import (
     _handle_dual_provider_fusion_method,
     _handle_single_provider_method,

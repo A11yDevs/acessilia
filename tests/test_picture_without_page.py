@@ -27,7 +27,7 @@ from backend.core.pipeline.enrichment.common import _extract_picture_bytes
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.pipeline.handlers.content import _handle_vision_description_method
 from backend.core.manifest.models import Obligation
-from backend.i18n import t
+from backend.core.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight

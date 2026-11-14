@@ -13,7 +13,7 @@ from backend.core.pipeline.handlers.common import (
     _missing_obligation,
 )
 from backend.core.pipeline.handlers.messages import MSG_HUMAN_REVIEW
-from backend.i18n import t
+from backend.core.i18n import t
 
 
 def _handle_human_review_method(

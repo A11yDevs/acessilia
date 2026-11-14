@@ -176,8 +176,8 @@ async def test_normal_jobs_keep_the_configured_concurrency(tmp_path, max_concurr
 
 @pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
 def test_cancellation_wait_is_localized_and_read_only(isolated_runtime, monkeypatch, tmp_path, locale):
-    from backend import i18n
-    from backend.stage_messages import STAGE_CANCELLATION_WAITING
+    from backend.core import i18n
+    from backend.core.i18n.stage_messages import STAGE_CANCELLATION_WAITING
 
     _, manager = isolated_runtime
     manager.criar_tarefa(tmp_path / "input.pdf", task_id="localized")

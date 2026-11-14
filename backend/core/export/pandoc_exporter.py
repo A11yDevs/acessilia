@@ -4,7 +4,7 @@ Renders the canonical document after a deterministic structural audit and an exp
 verbosity check, so that only compliant documents ever reach the exporter. HTML, PDF and TXT
 render in-process; DOCX and PDF/UA are rendered from the Pandoc AST by the Toolbox, which pins
 Pandoc in its own image (docs/adr/0003). Every user-visible error string is resolved through the
-active locale strings files via :func:`backend.i18n.t`, with the canonical English msgid
+active locale strings files via :func:`backend.core.i18n.t`, with the canonical English msgid
 constants below acting as the single source of truth consumed by scripts/gen_locale_catalogs
 for catalog generation.
 """
@@ -19,26 +19,22 @@ from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.pandoc_ast import degrade_math_to_text
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
-from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
-from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
+from backend.core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
+from backend.core.i18n.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
+from backend.core.export.messages import (
+    MSG_AUDIT_FAILED,
+    MSG_DEFAULT_ACCESSIBLE_TITLE,
+    MSG_DOCX_DISABLED,
+    MSG_PDF_UA_DISABLED,
+    MSG_UNSUPPORTED_EXPORT_FORMAT,
+)
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.canonical_builder import sanitize_canonical_document
 from backend.core.pipeline.validators import audit_canonical_document
 from backend.core.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger
-
-#: Canonical English msgid for a default document title used when the caller passes none.
-MSG_DEFAULT_ACCESSIBLE_TITLE: str = "Accessible document"
-#: Canonical English msgid for a docx export requested while TOOLBOX_DOCX_ENABLED is false.
-MSG_DOCX_DISABLED: str = "DOCX export is disabled (TOOLBOX_DOCX_ENABLED=false)"
-#: Canonical English msgid for a pdf_ua export requested while TOOLBOX_PDF_UA_ENABLED is false.
-MSG_PDF_UA_DISABLED: str = "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
-#: Canonical English msgid template for an audit failure; {findings} is substituted by callers after lookup.
-MSG_AUDIT_FAILED: str = "Audit failed: {findings}"
-#: Canonical English msgid template for an unsupported export format; {format_name} is substituted by callers after lookup.
-MSG_UNSUPPORTED_EXPORT_FORMAT: str = "Unsupported export format: {format_name}"
 
 
 #: BCP 47 language for the document metadata when the document declares none.
@@ -214,7 +210,7 @@ def export_accessible_document(
     if profile_errors:
         raise ValueError("; ".join(profile_errors))
     if format_name == "html":
-        from backend.export.renderers.html_renderer import render_html
+        from backend.core.export.renderers.html_renderer import render_html
 
         return render_html(filtered, output_path, profile_name=profile)
     ast = build_pandoc_ast(filtered, target_format=format_name)
@@ -224,7 +220,7 @@ def export_accessible_document(
     if format_name == "pdf_ua":
         return _render_pdf_ua(ast, output_path, lang=lang)
     if format_name == "txt":
-        from backend.export.renderers.txt_renderer import render_txt
+        from backend.core.export.renderers.txt_renderer import render_txt
 
         return render_txt(filtered, output_path, profile_name=profile)
     raise ValueError(t(MSG_UNSUPPORTED_EXPORT_FORMAT).format(format_name=format_name))

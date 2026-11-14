@@ -75,14 +75,14 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 ---
 
-### 2. Canonical Document & Export Pipeline (`backend/core/pipeline/`, `backend/export/`)
+### 2. Canonical Document & Export Pipeline (`backend/core/pipeline/`, `backend/core/export/`)
 
 - [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py): builds the canonical document and sections tree.
 - [docstruct.text.sanitize](../libs/docstruct/src/docstruct/text/sanitize.py): cleans raw text, removes prompt leaks and Markdown artifacts.
 - [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py): validates schema, heading hierarchy, links, and output text; `audit_canonical_document` classifies structural and accessibility issues as `BLOCKER` or `WARNING`.
-- [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
-- [backend/export/renderers/](../backend/export/renderers/): renderers for TXT and HTML (DOCX and PDF/UA render on the Toolbox).
-- [backend/export/exporters/](../backend/export/exporters/): the export adapters called by the worker, including `audio_exporter.py`, which produces the MP3 via edge-tts, and `pdf_exporter.py`, which produces the PDF/UA, the only PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) audits it with veraPDF on the Toolbox (`pdf.validate.pdf_ua`) for the result e-mail.
+- [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py): single export coordinator for validation, filtering, AST build, and renderer dispatch; acts as a deterministic gatekeeper that halts export when the audit returns any `BLOCKER`.
+- [backend/core/export/renderers/](../backend/core/export/renderers/): renderers for TXT and HTML (DOCX and PDF/UA render on the Toolbox).
+- [backend/core/export/exporters/](../backend/core/export/exporters/): the export adapters called by the worker, including `audio_exporter.py`, which produces the MP3 via edge-tts, and `pdf_exporter.py`, which produces the PDF/UA, the only PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) audits it with veraPDF on the Toolbox (`pdf.validate.pdf_ua`) for the result e-mail.
 
 ---
 

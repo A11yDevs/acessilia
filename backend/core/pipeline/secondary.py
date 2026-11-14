@@ -31,7 +31,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     is_bottom_left,
 )
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.core.pipeline.handlers.messages import (
     MSG_PROVIDER_PAIR_UNCALIBRATED,
     MSG_SECONDARY_CHANGED,

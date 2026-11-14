@@ -3,8 +3,8 @@ import sys
 from loguru import logger
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import LOG_LOGGER_CONFIGURED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_LOGGER_CONFIGURED
 
 
 def setup_logger() -> None:

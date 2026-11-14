@@ -4,10 +4,10 @@ import os
 import subprocess
 import sys
 
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.tools.logger import setup_logger, logger
 from backend.config.settings import settings
-from backend.log_messages import (
+from backend.core.i18n.log_messages import (
     LOG_API_INTERFACE_ENABLED,
     LOG_BOT_ALREADY_RUNNING,
     LOG_BOT_INTERRUPTED_BY_USER,

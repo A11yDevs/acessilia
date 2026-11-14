@@ -14,7 +14,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
 )
 from backend.core.pipeline.handlers.messages import MSG_HANDLER_OBLIGATION_NOT_FOUND
-from backend.i18n import t
+from backend.core.i18n import t
 
 
 def _fusion_agent() -> FusionAgent:

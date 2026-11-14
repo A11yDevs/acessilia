@@ -11,8 +11,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api.limiter import limiter
 from backend.api.routes import download, health, history, jobs, logs, operations
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     API_INTERNAL_ERROR_DETAIL,
     API_RATE_LIMIT_DETAIL,
     LOG_API_ERROR,

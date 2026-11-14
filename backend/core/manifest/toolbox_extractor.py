@@ -18,8 +18,8 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
     LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,

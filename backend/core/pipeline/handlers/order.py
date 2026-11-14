@@ -32,7 +32,7 @@ from backend.core.pipeline.secondary import (
     _pair_block,
     _secondary_or_failure,
 )
-from backend.i18n import t
+from backend.core.i18n import t
 
 
 #: Share of a page's elements that must be paired to follow the skeleton order.

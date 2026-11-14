@@ -21,8 +21,9 @@ from backend.api.worker import (
     register_queued_job,
 )
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
+from backend.core.i18n.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_JOB_QUEUED,
     API_OPTIONS_UNAVAILABLE,
@@ -35,7 +36,6 @@ from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.operation_registry import operation_registry
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.services.remote_cancellation import cancel_task_operations
-from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
 from backend.tools.logger import logger
 from backend.tools.validators import (
     MSG_FILE_TOO_LARGE,

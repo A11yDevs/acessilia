@@ -20,13 +20,13 @@ from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import ManifestElement
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
     LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
 )
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_PAGE,
     STAGE_RECOGNIZING_FORMULA,

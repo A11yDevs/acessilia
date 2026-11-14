@@ -14,8 +14,8 @@ from frontend.clients import default_client
 from frontend.telegram import user_context
 
 from backend.tools.logger import logger
-from backend.i18n import SUPPORTED_LOCALES, get_translations, t
-from backend.log_messages import (
+from backend.core.i18n import SUPPORTED_LOCALES, get_translations, t
+from backend.core.i18n.log_messages import (
     LOG_TELEGRAM_API_JOB_REJECTED,
     LOG_TELEGRAM_API_CONTACT_FAILED,
     LOG_TELEGRAM_FILE_PROCESSING_ERROR,
@@ -84,7 +84,7 @@ async def _send_with_retry(
     Args:
         bot (Bot): Aiogram Bot instance used for sending; no default (required).
         chat_id (int): Numeric id of the target chat; no default (required).
-        msg (str): Full message text already localized by the caller via backend.i18n.t(); no default (required).
+        msg (str): Full message text already localized by the caller via backend.core.i18n.t(); no default (required).
         message_thread_id (int|None): Forum-topic thread identifier or None for top-level chats (default: None).
         reply_to_message_id (int|None): Optional message identifier to reply directly to (default: None).
         max_retries (int): Number of send attempts before giving up (default: 3).

@@ -21,8 +21,8 @@ verdict costs one call, not one per remaining object.
 
 from __future__ import annotations
 
-from backend.i18n import t
-from backend.log_messages import LOG_PROVIDER_BREAKER_OPEN
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_PROVIDER_BREAKER_OPEN
 from backend.tools.logger import logger
 
 

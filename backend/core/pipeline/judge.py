@@ -33,7 +33,7 @@ from backend.core.pipeline.toolbox import (
     _source_artifact_id,
     _toolbox_render,
 )
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.tools.logger import logger
 
 

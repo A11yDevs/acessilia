@@ -44,7 +44,7 @@ dist/
 **/*.fdb_latexmk
 **/*.fls
 **/*.synctex.gz
-backend/locales/*/LC_MESSAGES/*.mo
+backend/core/i18n/locales/*/LC_MESSAGES/*.mo
 
 # Not read at runtime: the image installs no test dependencies, and docs,
 # CI config and the Dr.DocBench experiments are for development only.

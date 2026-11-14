@@ -23,10 +23,13 @@ diferentes:
     do `backend/agents/pddl_orchestrator.py`);
   - os agentes (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - a fusão dupla (`backend/core/pipeline/fusion.py`, que o passo 2 reuniu a partir
-    do `backend/pipeline`) e os exportadores (`backend/export`; os envelopes
+    do `backend/pipeline`) e os exportadores (`backend/core/export`, que o passo 2 reuniu a partir do
+    `backend/export`; os envelopes
     sem uso de `backend/adapters` foram removidos no passo 2);
   - os adaptadores da Toolbox (`backend/tools`);
-  - as mensagens (`backend/i18n`, `log_messages`, `stage_messages`).
+  - as mensagens (`backend/core/i18n`, com o `log_messages`, o `stage_messages` e os
+    catálogos, que o passo 2 reuniu a partir de `backend/i18n.py`,
+    `backend/log_messages.py`, `backend/stage_messages.py` e `backend/locales`).
 - **O serviço em volta dele**: a API e o worker (`backend/api`, FastAPI), os
   jobs, o histórico, o e-mail, os tokens de download e os caches
   (`backend/services`), o estado do job (`backend/agents/state_manager.py`) e
@@ -58,10 +61,10 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
 - **As outras bibliotecas que o core importa**, contadas com uma varredura de
   AST que inclui os imports dentro de funções:
   - pydantic e loguru;
-  - Babel (`backend/i18n.py`);
+  - Babel (`backend/core/i18n/__init__.py`);
   - jsonschema (`backend/core/manifest/schema.py`);
   - rapidfuzz (`backend/core/pipeline/fusion.py`);
-  - edge-tts (`backend/export/exporters/audio_exporter.py`). É o executor
+  - edge-tts (`backend/core/export/exporters/audio_exporter.py`). É o executor
     local que a [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md)
     registra como desvio conhecido
     ([acessilia-toolbox#73](https://github.com/A11yDevs/acessilia-toolbox/issues/73)).
@@ -133,8 +136,8 @@ Proposta: a opção 2.
   | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo; o `backend/pipeline` se reuniu ali no passo 2) | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
-  | `backend/export` (o `backend/adapters`, sem uso, foi removido no passo 2) | `acessilia_core.export` |
-  | `backend/i18n.py`, `log_messages.py`, `stage_messages.py`, `locales/` | `acessilia_core.i18n` |
+  | `backend/core/export` (reunido a partir do `backend/export` no passo 2; o `backend/adapters`, sem uso, foi removido) | `acessilia_core.export` |
+  | `backend/core/i18n` (reunido no passo 2 a partir de `backend/i18n.py`, `log_messages.py`, `stage_messages.py` e `locales/`) | `acessilia_core.i18n` |
 
 - **O que fica no `backend/`, o serviço:**
   - a API e o worker;
@@ -187,8 +190,8 @@ Proposta: a opção 2.
      | `backend/pipeline` | `backend/core/pipeline/` (feito) | |
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
      | `backend/tools` (adaptadores da Toolbox, ferramentas de fórmula e de código, carga de prompts, logger) | `backend/core/toolbox/` e auxiliares | |
-     | `backend/export` (`backend/adapters`: removido, nada o importava) | `backend/core/export/` | |
-     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
+     | `backend/export` (`backend/adapters`: removido, nada o importava) | `backend/core/export/` (feito) | |
+     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` (feito) | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
 
      O estado do job (`backend/agents/state_manager.py`) fica no serviço.
 

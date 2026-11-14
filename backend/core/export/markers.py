@@ -10,7 +10,7 @@ from typing import Any
 
 from docstruct.export.markers import wrap_object_markers
 
-from backend.i18n import t
+from backend.core.i18n import t
 
 #: Canonical English msgid for the marker word of a described picture.
 MSG_OBJECT_MARKER_IMAGE: str = "image"

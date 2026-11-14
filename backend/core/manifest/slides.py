@@ -41,8 +41,8 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     Provenance,
 )
-from backend.i18n import t
-from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 from docstruct.geometry import is_bottom_left, union
 
 #: Default share of the slide its pictures must cover for the slide to be

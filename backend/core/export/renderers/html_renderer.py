@@ -8,8 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from backend.export.pandoc_exporter import MSG_DEFAULT_ACCESSIBLE_TITLE
-from backend.i18n import t
+from backend.core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
+from backend.core.i18n import t
 from docstruct.export.html import (  # noqa: F401
     HtmlLabels,
     _collect_section,

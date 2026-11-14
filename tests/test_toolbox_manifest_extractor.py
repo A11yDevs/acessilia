@@ -744,8 +744,8 @@ def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
 def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, mock_artifact_client, monkeypatch):
     from acessilia_sdk.toolbox import ToolboxEndpoint
     from backend.core.manifest import toolbox_extractor as module
-    from backend.i18n import t
-    from backend.log_messages import LOG_ARTIFACT_STORE_DIRECT_INPUT
+    from backend.core.i18n import t
+    from backend.core.i18n.log_messages import LOG_ARTIFACT_STORE_DIRECT_INPUT
 
     mock_client.endpoints = (
         ToolboxEndpoint("http://toolbox-a.test"), ToolboxEndpoint("http://toolbox-b.test"),

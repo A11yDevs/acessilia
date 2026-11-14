@@ -1,6 +1,6 @@
 """
 What this suite verifies: the pure-Python fallback renderers in
-backend/export/renderers (txt, html, pdf) turn a canonical document mapping into
+backend/core/export/renderers (txt, html, pdf) turn a canonical document mapping into
 rendered files while honoring the export profile's block filtering; the txt renderer uses the
 localized table captions/row lines from backend/core/pipeline/table_ast, and the html renderer emits
 the localized table-of-contents and technical-metadata markup.
@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-import backend.i18n as i8n
-from backend.export.renderers.html_renderer import render_html
-from backend.export.renderers.txt_renderer import render_txt
+import backend.core.i18n as i8n
+from backend.core.export.renderers.html_renderer import render_html
+from backend.core.export.renderers.txt_renderer import render_txt
 
 
 @pytest.fixture(autouse=True)

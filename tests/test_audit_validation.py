@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-import backend.i18n as i8n
+import backend.core.i18n as i8n
 from backend.core.pipeline.validators import audit_canonical_document
 
 
@@ -17,7 +17,7 @@ from backend.core.pipeline.validators import audit_canonical_document
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.
 
-    The audit findings resolve through backend.i18n.t, so assertions need a deterministic locale;
+    The audit findings resolve through backend.core.i18n.t, so assertions need a deterministic locale;
     en_US returns the canonical English msgids.
     """
     monkeypatch.setenv("LOCALE", "en_US")

@@ -16,13 +16,6 @@ from backend.core.pipeline.payload import (
     records_extraction_degradation,
     records_visual_failures,
 )
-from backend.i18n import t
-from backend.log_messages import (
-    LOG_CANONICAL_JSON_SAVE_FAILED,
-    LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
-    LOG_PIPELINE_ERROR,
-    LOG_TASK_CANCELLED_BY_USER,
-)
 from backend.services.cache import (
     drop_cache,
     get_cached,
@@ -34,9 +27,14 @@ from backend.services.history_service import (
     finalizar_conversao,
     registrar_conversao,
 )
-from backend.services.operation_context import task_context
-from backend.services.operation_registry import operation_registry
-from backend.stage_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
+    LOG_CANONICAL_JSON_SAVE_FAILED,
+    LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
+    LOG_PIPELINE_ERROR,
+    LOG_TASK_CANCELLED_BY_USER,
+)
+from backend.core.i18n.stage_messages import (
     STAGE_ANALYZING_FILE,
     STAGE_CANCELLED_BY_USER,
     STAGE_PREPARING_FILE,
@@ -44,6 +42,8 @@ from backend.stage_messages import (
     STAGE_PROCESSING_FINISHED,
     STAGE_PROCESSING_WITH_AI,
 )
+from backend.services.operation_context import task_context
+from backend.services.operation_registry import operation_registry
 from backend.tools.logger import logger
 
 

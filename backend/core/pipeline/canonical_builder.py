@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.logger import logger
 from backend.tools.toolbox_math_tools import (

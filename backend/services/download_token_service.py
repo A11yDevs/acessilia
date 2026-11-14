@@ -7,8 +7,8 @@ import threading
 import shutil
 from pathlib import Path
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_DOWNLOAD_TOKEN_CREATED,
     LOG_DOWNLOAD_TOKEN_DIR_MISSING,
     LOG_DOWNLOAD_TOKEN_NOT_FOUND,

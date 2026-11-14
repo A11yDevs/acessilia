@@ -18,7 +18,7 @@ import pytest
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
 from backend.config.settings import settings
-from backend.export import pandoc_exporter
+from backend.core.export import pandoc_exporter
 from backend.tools.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
 
 BASE_URL = "http://localhost:8002"
@@ -56,7 +56,7 @@ def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, t
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
 
-    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report")
     document["language"] = "en-US"
 
@@ -74,7 +74,7 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_
     def toolbox_down(ast, output_path, *, lang):
         raise ToolboxProviderUnavailable("docx renderer offline")
 
-    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", toolbox_down)
+    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_down)
 
     with pytest.raises(ToolboxProviderUnavailable, match="offline"):
         _export_docx(tmp_path)
@@ -108,7 +108,7 @@ def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
         raise AssertionError("the Toolbox ran while DOCX is disabled")
 
     monkeypatch.setattr(
-        "backend.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
+        "backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
     )
 
     with pytest.raises(RuntimeError, match="TOOLBOX_DOCX_ENABLED=false"):
@@ -152,7 +152,7 @@ def test_the_destination_directory_is_created(monkeypatch, tmp_path):
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
 
-    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     output = pandoc_exporter.export_accessible_document(
         "# Relatório\n", tmp_path / "missing" / "doc.docx", format_name="docx"
     )
@@ -202,7 +202,7 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
 
-    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
 
     document = {
         "id": "doc-1",

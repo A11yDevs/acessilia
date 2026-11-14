@@ -12,8 +12,8 @@ from frontend.telegram.handlers.errors import router as error_router
 from backend.tools.logger import setup_logger, logger
 from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
     LOG_BOT_STARTING_POLLING,

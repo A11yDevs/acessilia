@@ -28,10 +28,11 @@ SCANNED_ROOTS = (
     "backend/agents",
     "backend/ai",
     "backend/core",
-    "backend/export",
     "backend/tools",
 )
-SCANNED_FILES = ("backend/i18n.py", "backend/log_messages.py", "backend/stage_messages.py")
+#: Single files outside the roots above. The message modules were here until
+#: ADR-0016's step 2 gathered them into backend/core/i18n, which backend/core covers.
+SCANNED_FILES: tuple[str, ...] = ()
 
 
 def _allowlist() -> tuple[int, dict[str, int]]:

@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 ## Padrões Identificados
 
 ### 1. Pipeline de Documento Canônico
-- Implementação: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
+- Implementação: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py)
 - Papel: normalizar cargas de regiões estruturadas em um esquema de documento canônico, validar estrutura e hierarquia de títulos, construir o AST intermediário e despachar para os renderizadores.
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
@@ -23,7 +23,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: separação limpa de responsabilidades e execução em paralelo (`asyncio.gather`).
 
 ### 4. Adaptadores de Exportação e Renderizadores
-- Implementação: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) com renderizadores em `backend/export/renderers/` (TXT, HTML) e adaptadores de exportação em `backend/export/exporters/` (MP3 via edge-tts; DOCX e PDF/UA, o único PDF, renderizados na Toolbox, que também audita o PDF/UA com o veraPDF).
+- Implementação: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py) com renderizadores em `backend/core/export/renderers/` (TXT, HTML) e adaptadores de exportação em `backend/core/export/exporters/` (MP3 via edge-tts; DOCX e PDF/UA, o único PDF, renderizados na Toolbox, que também audita o PDF/UA com o veraPDF).
 - Benefício: um documento canônico idêntico produz diversos formatos de saída de forma limpa.
 
 ### 5. Máquina de Estados em Memória e Cancelamento Cooperativo

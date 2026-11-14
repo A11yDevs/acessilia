@@ -9,7 +9,7 @@ import pytest
 
 from backend.config import settings as settings_module
 from backend.config.settings import settings
-from backend.export.exporters import audio_exporter
+from backend.core.export.exporters import audio_exporter
 
 
 class _FakeCommunicate:

@@ -35,7 +35,7 @@ from backend.core.pipeline.handlers.content import (
     _handle_vision_description_method,
 )
 from backend.core.pipeline.handlers.review import _handle_human_review_method
-from backend.i18n import reset_request_locale, set_request_locale
+from backend.core.i18n import reset_request_locale, set_request_locale
 from backend.core.pipeline.handlers.text import (
     _handle_repetition_guard_method,
     _tailjoin_position,

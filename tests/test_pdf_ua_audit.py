@@ -1,6 +1,6 @@
 """The veraPDF audit of the PDF/UA: its e-mail summary, and the worker step.
 
-Every user-visible line is resolved through backend.i18n.t, so the assertions
+Every user-visible line is resolved through backend.core.i18n.t, so the assertions
 hold under any supported server locale.
 """
 
@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     EMAIL_AUDIT_COMPLIANT,
     EMAIL_AUDIT_MORE_RULES,
     EMAIL_AUDIT_NON_COMPLIANT,

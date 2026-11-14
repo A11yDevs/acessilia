@@ -1,6 +1,6 @@
 import pytest
 
-from backend.export.exporters.drbench_md_exporter import export_drbench_md
+from backend.core.export.exporters.drbench_md_exporter import export_drbench_md
 
 
 def test_canonical_document_is_rendered_from_its_sections(tmp_path):

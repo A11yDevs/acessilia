@@ -1,13 +1,13 @@
 """
 What this module verifies: the result e-mail sent when a job finishes lists only the actually-completed
 output formats and appends any optional-format failures, with every user-visible line resolved through the
-active locale's Babel catalog (backend.i18n.t) so the assertions stay correct under any supported server locale.
+active locale's Babel catalog (backend.core.i18n.t) so the assertions stay correct under any supported server locale.
 """
 
 import pytest
 
-from backend.i18n import t
-from backend.log_messages import EMAIL_FAILURE_SUBJECT, EMAIL_FORMAT_MP3, EMAIL_FORMAT_TXT
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import EMAIL_FAILURE_SUBJECT, EMAIL_FORMAT_MP3, EMAIL_FORMAT_TXT
 from backend.config.settings import settings
 from backend.services.email_service import send_failure_email, send_result_email
 

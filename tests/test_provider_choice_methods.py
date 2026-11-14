@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.i18n import reset_request_locale, set_request_locale
+from backend.core.i18n import reset_request_locale, set_request_locale
 
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.manifest.builder import (

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-import backend.i18n as i8n
+import backend.core.i18n as i8n
 from backend.core.pipeline.validators import validate_canonical_document
 from backend.core.pipeline.validators import validate_export_profile
 from backend.core.pipeline.validators import validate_output_text
@@ -22,7 +22,7 @@ from docstruct.profiles import verbosity_for_mode
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.
 
-    The validators resolve every finding through backend.i18n.t, so assertions on the
+    The validators resolve every finding through backend.core.i18n.t, so assertions on the
     localized text need a deterministic locale; en_US returns the canonical English msgids.
     """
     monkeypatch.setenv("LOCALE", "en_US")

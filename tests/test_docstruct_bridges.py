@@ -29,8 +29,8 @@ ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
     "backend/tools/code_tools.py": REEXPORT,
-    "backend/export/renderers/html_renderer.py": ADAPTER,
-    "backend/export/renderers/txt_renderer.py": ADAPTER,
+    "backend/core/export/renderers/html_renderer.py": ADAPTER,
+    "backend/core/export/renderers/txt_renderer.py": ADAPTER,
     "backend/core/pipeline/canonical_builder.py": ADAPTER,
     "backend/core/pipeline/table_ast.py": ADAPTER,
     "backend/core/pipeline/validators.py": ADAPTER,

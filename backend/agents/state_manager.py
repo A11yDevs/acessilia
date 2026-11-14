@@ -3,9 +3,9 @@ import time
 import uuid
 from pathlib import Path
 
-from backend.i18n import t
-from backend.log_messages import LOG_TASK_CANCELLED_BY_USER
-from backend.stage_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_TASK_CANCELLED_BY_USER
+from backend.core.i18n.stage_messages import (
     STAGE_CANCELLATION_REQUESTED,
     STAGE_CANCELLED_BY_USER,
     STAGE_FAILED_DURING,

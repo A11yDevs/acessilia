@@ -84,7 +84,7 @@ def test_document_cache_excludes_credentials(monkeypatch):
 
 @pytest.mark.parametrize("cancel", [False, True])
 def test_audio_failure_or_cancellation_joins_siblings_before_cleanup(monkeypatch, tmp_path, cancel):
-    from backend.export.exporters import audio_exporter
+    from backend.core.export.exporters import audio_exporter
     finished = []
     started = asyncio.Event()
     sibling_started = asyncio.Event()
