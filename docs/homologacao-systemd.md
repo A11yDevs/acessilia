@@ -117,6 +117,31 @@ systemctl --user start acessilia-staging-update.timer    # resume them
 To test a locally built image, stop the timer first: otherwise the next update pulls the
 GHCR image over it.
 
+## Readiness alerting
+
+`auto-update check` also probes `GET /api/v1/ready`, which checks every Toolbox provider the extraction chain needs. A failed probe is a problem, so the command exits 1. Point an existing monitor or a small cron/systemd timer at it, for example:
+
+```bash
+cd /path/to/acessilia
+./scripts/ops.sh auto-update check >/var/log/acessilia-readiness.log 2>&1 \
+  || logger -t acessilia "staging is not ready; see /var/log/acessilia-readiness.log"
+```
+
+A monitor that should only watch readiness can use `curl -fsS http://localhost:8000/api/v1/ready` instead; the endpoint returns 503 when a chain provider is unhealthy. The check allows 30 s for `/ready` because the route probes providers sequentially (3 s each) and may fail over between Toolbox endpoints; a 5 s limit would alert while the application was still ready. Raise `OPS_READY_TIMEOUT` when the deployment has more endpoints than that budget covers.
+
+To test the alert with the homologation `FUSION_MODE=single`, in a test instance set `TOOLBOX_PROVIDER` to an invalid id (the primary provider is always checked), restart the API and run the command: it must report `readiness endpoint does not answer or reports unavailable` and exit 1. Restore the setting afterwards. To exercise the secondary provider, set `FUSION_MODE=dual` and invalidate `FUSION_SECONDARY_PROVIDER` instead, restoring both afterwards.
+
+## Processing limits and fusion mode
+
+The effective `MAX_PAGES` and `FUSION_MODE` are the values inside the running container, not the `.env.example` defaults. `auto-update status` prints both; record them with the install:
+
+```bash
+docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
+```
+
+- **Preflight decision:** the early check rejects only a PDF whose count comes from `pymupdf` (`page_count_source == "pymupdf"`). Without a trustworthy count — a failed inspection, a content-stream scan, a non-PDF — rejecting before extraction would refuse legitimate scanned documents, so the limit stays authoritative after extraction (`_check_page_limit(manifest)`). No separate page cap is added for dual extraction: the same limit applies to the extracted manifest and the provider timeouts bound remote work.
+- **Fusion mode decision:** homologation uses `FUSION_MODE=single`. With `dual`, `/ready` depends on MinerU as well, so one provider outage fails readiness and degrades every job; dual is used only while evaluating fusion, with both providers monitored. This is a decision for the staging environment, not a product default.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

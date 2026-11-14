@@ -119,6 +119,31 @@ systemctl --user start acessilia-staging-update.timer    # retoma
 Para testar uma imagem construída localmente, pare o timer antes: senão a próxima
 atualização puxa a imagem do GHCR por cima dela.
 
+## Alerta de prontidão
+
+`auto-update check` também consulta `GET /api/v1/ready`, que verifica todos os providers da Toolbox usados pela cadeia de extração. Uma falha é um problema, então o comando sai com status 1. Aponte o monitor existente ou um cron/timer systemd para ele, por exemplo:
+
+```bash
+cd /caminho/para/acessilia
+./scripts/ops.sh auto-update check >/var/log/acessilia-readiness.log 2>&1 \
+  || logger -t acessilia "staging não está pronto; veja /var/log/acessilia-readiness.log"
+```
+
+Um monitor que só deve acompanhar a prontidão pode usar `curl -fsS http://localhost:8000/api/v1/ready`; o endpoint responde 503 quando um provider da cadeia está fora. O check permite 30 s para o `/ready` porque a rota consulta os providers em sequência (3 s cada) e pode fazer failover entre endpoints da Toolbox; um limite de 5 s alertaria com a aplicação ainda pronta. Aumente `OPS_READY_TIMEOUT` quando a instalação tiver mais endpoints do que esse orçamento cobre.
+
+Para testar o alerta com o `FUSION_MODE=single` da homologação, em uma instância de teste defina `TOOLBOX_PROVIDER` com um id inválido (o provider primário é sempre consultado), reinicie a API e rode o comando: ele deve reportar `readiness endpoint does not answer or reports unavailable` e sair com 1. Restaure o valor depois. Para exercitar o provider secundário, defina `FUSION_MODE=dual` e invalide `FUSION_SECONDARY_PROVIDER`, restaurando os dois depois.
+
+## Limites de processamento e modo de fusão
+
+O `MAX_PAGES` e o `FUSION_MODE` efetivos são os valores dentro do container em execução, não os padrões do `.env.example`. `auto-update status` mostra os dois; registre-os com a instalação:
+
+```bash
+docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
+```
+
+- **Decisão do preflight:** a checagem antecipada recusa apenas PDF cuja contagem veio do `pymupdf` (`page_count_source == "pymupdf"`). Sem contagem confiável — inspeção falhou, varredura de content stream, formato não-PDF — recusar antes da extração rejeitaria documentos digitalizados legítimos, então o limite vale de forma autoritativa depois da extração (`_check_page_limit(manifest)`). Não há teto separado para extração dual: o mesmo limite vale para o manifesto extraído e os timeouts dos providers limitam o trabalho remoto.
+- **Decisão do modo de fusão:** a homologação usa `FUSION_MODE=single`. Com `dual`, o `/ready` também depende do MinerU, então a queda de um provider derruba a prontidão e degrada todos os jobs; `dual` só é usado durante avaliação da fusão, com os dois providers monitorados. Esta é uma decisão do ambiente de homologação, não um padrão do produto.
+
 ## Solução de problemas
 
 | Sintoma | Causa | Solução |

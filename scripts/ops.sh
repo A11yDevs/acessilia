@@ -38,6 +38,10 @@ COMPOSE_FILE="docker-compose.staging.yml"
 COMPOSE_PROJECT="acessilia-staging"
 CONTAINER_NAME="acessilia-staging"
 HEALTH_URL="http://localhost:8000/api/v1/health"
+READY_URL="http://localhost:8000/api/v1/ready"
+# /ready probes providers sequentially (3 s each) and may fail over between
+# endpoints; a short timeout would alert while the application is still ready.
+READY_TIMEOUT="${OPS_READY_TIMEOUT:-30}"
 UNIT="acessilia-staging-update"
 # Unit installed by the former setup-homologacao.sh, replaced by $UNIT.
 LEGACY_UNIT="staging-update"
@@ -711,6 +715,13 @@ _auto_update_check() {
   else
     _check_problem "health endpoint does not answer (${HEALTH_URL})"
   fi
+  # /ready checks the providers the extraction chain needs, so a provider
+  # outage is a monitoring failure, not something discovered by a user job.
+  if curl -fsS --max-time "$READY_TIMEOUT" "$READY_URL" >/dev/null 2>&1; then
+    _check_ok "readiness endpoint answers (${READY_URL})"
+  else
+    _check_problem "readiness endpoint does not answer or reports unavailable (${READY_URL})"
+  fi
 
   echo ""
   if [ "$CHECK_PROBLEMS" -gt 0 ]; then
@@ -750,6 +761,13 @@ _auto_update_status() {
   else
     echo "  (none yet)"
   fi
+
+  echo ""
+  echo "Settings in ${CONTAINER_NAME}:"
+  for name in MAX_PAGES FUSION_MODE; do
+    value="$(docker exec "$CONTAINER_NAME" printenv "$name" 2>/dev/null || true)"
+    echo "  ${name}=${value:-<unset>}"
+  done
 
   echo ""
   echo "Health (${HEALTH_URL}):"
