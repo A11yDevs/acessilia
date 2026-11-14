@@ -6,6 +6,7 @@ compatível com o pipeline PDDL.
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -882,3 +883,74 @@ def test_extraction_labels_upload_primary_and_secondary_operations(
     assert all(ids)
     assert len(set(ids)) == 3
     assert operation_registry.active("task-ops") == []
+
+
+def test_cancelling_during_upload_refuses_the_next_operation(
+    mock_client, mock_artifact_client, monkeypatch
+):
+    """A cancel during upload marks the task before the primary begins."""
+    from acessilia_sdk.toolbox import OperationCancelResult
+    from backend.services import remote_cancellation
+    from backend.services.operation_context import task_context
+    from backend.services.operation_registry import (
+        RemoteOperationCancelled,
+        operation_registry,
+    )
+
+    entered, release = threading.Event(), threading.Event()
+
+    async def blocked_upload(*_args, **_kwargs):
+        entered.set()
+        await asyncio.to_thread(release.wait, 3)
+        return "sha256:abc123"
+
+    mock_artifact_client.upload = AsyncMock(side_effect=blocked_upload)
+    mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
+
+    class CancelClient:
+        async def cancel(self, operation_id, *, task_id, timeout_seconds):
+            return OperationCancelResult(
+                operation_id=operation_id,
+                state="cancel_requested",
+                cancel_requested=True,
+            )
+
+        async def close(self):
+            return None
+
+    monkeypatch.setattr(
+        remote_cancellation, "make_toolbox_client", lambda _cls: CancelClient()
+    )
+    extractor = ToolboxManifestExtractor(
+        client=mock_client,
+        artifact_client=mock_artifact_client,
+        use_artifact_store=True,
+    )
+    errors: list[BaseException] = []
+
+    def run() -> None:
+        try:
+            with task_context("task-upload-cancel"):
+                extractor.extract(FIXTURE_PDF)
+        except BaseException as exc:
+            errors.append(exc)
+
+    operation_registry.clear("task-upload-cancel")
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert entered.wait(3)
+        assert [op.kind for op in operation_registry.active("task-upload-cancel")] == [
+            "upload"
+        ]
+        assert (
+            asyncio.run(remote_cancellation.cancel_task_operations("task-upload-cancel"))
+            == "requested"
+        )
+    finally:
+        release.set()
+        worker.join(5)
+
+    assert errors and isinstance(errors[0], RemoteOperationCancelled)
+    mock_client.extract_structure.assert_not_awaited()
+    operation_registry.clear("task-upload-cancel")
