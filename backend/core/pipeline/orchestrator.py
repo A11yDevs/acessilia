@@ -22,8 +22,8 @@ from typing import Any
 from backend.services.blocking import run_blocking
 from backend.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.execution.executor import ExecutorAgent, MethodRegistry, StepProgress
-from backend.core.execution.models import ExecutionReport, MethodResult
+from backend.core.execution.executor import ExecutorAgent, StepProgress
+from backend.core.execution.models import ExecutionReport
 from backend.core.manifest.models import (
     ProcessingManifest,
 )
@@ -58,37 +58,6 @@ from backend.core.pipeline.obligations import (
 from backend.core.pipeline.payload import (
     build_pddl_structured_payload,
 )
-from backend.core.pipeline.handlers.text import (
-    _handle_chunk_verse_method,
-    _handle_deterministic_heading_repair_method,
-    _handle_extract_line_numbers_method,
-    _handle_norm_fix_method,
-    _handle_repetition_guard_method,
-    _handle_tailjoin_method,
-    _handle_unicode_repair_method,
-)
-from backend.core.pipeline.handlers.content import (
-    _handle_pandoc_code_method,
-    _handle_pandoc_table_method,
-    _handle_vision_description_method,
-)
-from backend.core.pipeline.handlers.review import (
-    _handle_human_review_method,
-)
-from backend.core.pipeline.handlers.fusion import (
-    _handle_agreement_rule_method,
-    _handle_dual_provider_fusion_method,
-    _handle_single_provider_method,
-    _handle_table_smart_fusion_method,
-)
-from backend.core.pipeline.handlers.order import (
-    _handle_skeleton_order_method,
-    _handle_xycut_order_method,
-)
-from backend.core.pipeline.handlers.inspection import (
-    _handle_pymupdf_region_method,
-    _handle_vision_page_inspection_method,
-)
 from backend.core.pipeline.enrichment.pictures import (
     _enrich_picture_descriptions,
 )
@@ -106,46 +75,11 @@ from backend.core.pipeline.preflight import (
     _inspect_media,
     _is_presentation,
 )
-from backend.core.pipeline.handlers.formula import (
-    _handle_latex_normalizer_method,
-    _handle_latex_verbalizer_method,
-    _handle_mathml_method,
-)
 from backend.core.pipeline.enrichment.formulas import (
     _classify_formula_regions,
     _enrich_formula_latex,
 )
-from backend.core.pipeline.handlers.judge import (
-    _handle_vlm_pairwise_judge_method,
-)
-
-
-DETERMINISTIC_METHOD_HANDLERS: dict[
-    str, Callable[[ProcessingManifest, str], MethodResult]
-] = {
-    #: Method name -> handler for every method run directly: work done before
-    #: planning, deterministic work, or one vision model call (pymupdf-region,
-    #: vision-page-inspection). A method the manifest can require but that is
-    #: absent here is reported to the planner as unavailable: no step only fails.
-    "vision-description": _handle_vision_description_method,
-    "pandoc-table": _handle_pandoc_table_method,
-    "pandoc-code": _handle_pandoc_code_method,
-    "pymupdf-region": _handle_pymupdf_region_method,
-    "vision-page-inspection": _handle_vision_page_inspection_method,
-    "latex-normalizer": _handle_latex_normalizer_method,
-    "norm-fix": _handle_norm_fix_method,
-    "unicode-repair": _handle_unicode_repair_method,
-    "rep-guard": _handle_repetition_guard_method,
-    "line-number-extractor": _handle_extract_line_numbers_method,
-    "verse-chunker": _handle_chunk_verse_method,
-    "tailjoin": _handle_tailjoin_method,
-    "tailjoin-positioned": _handle_tailjoin_method,
-    "xycut-order": _handle_xycut_order_method,
-    "skeleton-order": _handle_skeleton_order_method,
-    "table-smart-fusion": _handle_table_smart_fusion_method,
-    "agreement-rule": _handle_agreement_rule_method,
-    "deterministic-heading-repair": _handle_deterministic_heading_repair_method,
-}
+from backend.core.pipeline.handlers.registry import build_method_registry
 
 
 class StructuralExtractionError(RuntimeError):
@@ -212,24 +146,7 @@ class PddlAccessibilityOrchestrator:
 
     @staticmethod
     def _build_executor() -> ExecutorAgent:
-        registry = MethodRegistry()
-
-        # Model-backed or cross-cutting methods already wired by the pipeline.
-        registry.register("mathml", _handle_mathml_method)
-        registry.register("latex-verbalizer", _handle_latex_verbalizer_method)
-        registry.register(
-            "dual-provider-fusion", _handle_dual_provider_fusion_method
-        )
-        registry.register("single-provider", _handle_single_provider_method)
-        registry.register("vlm-pairwise-judge", _handle_vlm_pairwise_judge_method)
-        for method, handler in DETERMINISTIC_METHOD_HANDLERS.items():
-            registry.register(method, handler)
-
-        # `human-review` has its own semantics: it is the terminal escalation the
-        # pipeline performs when no automated method can satisfy an obligation.
-        registry.register("human-review", _handle_human_review_method)
-
-        return ExecutorAgent(registry, domain=DomainBundle.load())
+        return ExecutorAgent(build_method_registry(), domain=DomainBundle.load())
 
     async def execute(
         self,

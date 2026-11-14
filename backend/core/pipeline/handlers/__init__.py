@@ -11,4 +11,6 @@ extraction; ``order`` reorders a page; ``inspection`` asks the vision agent
 about a rendered region or page; ``formula`` converts, speaks and normalizes
 the LaTeX of formula obligations through the Toolbox; ``judge`` runs the page
 judge between the two providers (``backend/core/pipeline/judge.py``).
+``registry`` maps every method to its handler (``METHOD_HANDLERS``) and builds
+the executor's ``MethodRegistry``.
 """

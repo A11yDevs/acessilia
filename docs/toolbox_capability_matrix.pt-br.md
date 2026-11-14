@@ -40,8 +40,8 @@ sem descartar a capacidade por falta de acionamento atual.
 
 Para o trabalho guiado por planejamento há dois elos adicionais: a entrada de
 obrigação/método em `DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`),
-um handler registrado em `PddlAccessibilityOrchestrator._build_executor`
-(`backend/core/pipeline/orchestrator.py`) e uma evidência real que faça o
+um handler em
+`METHOD_HANDLERS` (`backend/core/pipeline/handlers/registry.py`) e uma evidência real que faça o
 compilador emitir os fatos necessários em `problem.pddl`.
 
 ## Matriz

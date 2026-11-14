@@ -269,7 +269,7 @@ On failure:
 
 The `dual-provider-fusion` method (Phase 5) represents extraction fused from
 two toolbox providers (default `docling` + `mineru`) via `docstruct.fusion`.
-The handler registered in `PddlAccessibilityOrchestrator._build_executor`
+The handler registered in `METHOD_HANDLERS` (`backend/core/pipeline/handlers/registry.py`)
 reuses `backend.pipeline.fusion.extract_fused`, persists the fused payload to
 `data_dir/artifacts/fusion/<obligation_id>.json`, and returns it in
 `MethodResult.artifacts`. The `ExecutorAgent` then incorporates the artifact

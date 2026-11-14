@@ -39,9 +39,8 @@ a capability because it is not currently activated.
 | Provider registration | `providers-config.yaml` entry with an adapter | `acessilia-toolbox` |
 
 For planning-driven work there are further links: the obligation/method entry in
-`DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`), a registered handler
-in `PddlAccessibilityOrchestrator._build_executor`
-(`backend/core/pipeline/orchestrator.py`), and real evidence that causes the
+`DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`), a handler in
+`METHOD_HANDLERS` (`backend/core/pipeline/handlers/registry.py`), and real evidence that causes the
 compiler to emit the required facts in `problem.pddl`.
 
 ## Matrix
