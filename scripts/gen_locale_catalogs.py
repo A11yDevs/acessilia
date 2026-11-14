@@ -752,7 +752,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_TABLE_AST_CELL_NO_TEXT,
     MSG_TABLE_AST_WIDTH_INCONSISTENT,
     # Pandoc exporter runtime errors and default document title
-    # (backend/core/export/pandoc_exporter.py), surfaced as RuntimeError/ValueError
+    # (backend/core/export/messages.py), surfaced as RuntimeError/ValueError
     # text in logs and HTTP error details.
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
@@ -1640,7 +1640,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "table_ast.{section_name} com largura inconsistente em {block_id} (row {row_index})"
         ),
         # Pandoc exporter runtime errors and default document title
-        # (pt-BR mirrors of the backend/core/export/pandoc_exporter.py ids above).
+        # (pt-BR mirrors of the backend/core/export/messages.py ids above).
         MSG_DEFAULT_ACCESSIBLE_TITLE: "Documento acessível",
         MSG_DOCX_DISABLED: (
             "A exportação DOCX está desativada (TOOLBOX_DOCX_ENABLED=false)"
