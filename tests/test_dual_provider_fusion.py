@@ -96,7 +96,7 @@ def test_fusion_handler_returns_artifact_in_method_result(tmp_path, monkeypatch)
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
 
@@ -122,7 +122,7 @@ def test_fusion_handler_fails_when_payload_not_succeeded(tmp_path, monkeypatch):
         return {"status": "failed", "document": {"elements": []}}
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
 
@@ -139,7 +139,7 @@ def test_fusion_handler_fails_on_unknown_obligation(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-inexistente")
 
@@ -160,7 +160,7 @@ def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     token = set_request_locale("en_US")
     try:
@@ -276,7 +276,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
 
     registry = MethodRegistry()

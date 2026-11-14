@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import pytest
 
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines

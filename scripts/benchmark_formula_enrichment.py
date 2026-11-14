@@ -15,8 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.pipeline.canonical_builder import build_canonical_document
-from backend.pipeline.validators import validate_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.validators import validate_canonical_document
 from backend.export.renderers.html_renderer import _render_block as render_html
 from backend.export.renderers.txt_renderer import _render_block as render_txt
 

@@ -31,7 +31,7 @@ package "Core (Docker container)" {
   }
 
   package "Canonical pipeline and exporters" {
-    component "Canonical builder and sanitizer\nbackend/pipeline" as Pipeline
+    component "Canonical builder and sanitizer\nbackend/core/pipeline" as Pipeline
     component "Renderers and exporters\n(TXT/DOCX/PDF/HTML/MP3)\nbackend/export" as Exporters
   }
 

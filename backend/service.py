@@ -39,7 +39,7 @@ from backend.stage_messages import (
 )
 from backend.tools.logger import logger
 from docstruct.text.paragraphs import merge_broken_paragraphs
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
 
 

@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Identified Patterns
 
 ### 1. Canonical Document Pipeline
-- Implementation: [backend/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py), [backend/pipeline/validators.py](../backend/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
+- Implementation: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
@@ -52,7 +52,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ### 10. Deterministic Fusion Agent (docstruct tools)
 - Implementation: [backend/core/agents/fusion_agent.py](../backend/core/agents/fusion_agent.py) (`FusionAgent`), wrapping the pure `docstruct` library (`libs/docstruct`).
 - Role: exposes four deterministic tools to Agno — `fuse_providers` (merge two toolbox providers via `docstruct.fusion`), `audit_document` (canonical-document audit), `classify_block` (region classification), and `needs_reinfer` (decide whether a region needs vision/orientation re-inference). Each capability has a pure `process_*` method (unit-testable without Agno) plus a thin JSON tool envelope.
-- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 8) reuses `backend.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
+- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 8) reuses `backend.core.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
 
 ---
 

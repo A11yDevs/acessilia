@@ -2,7 +2,7 @@
 What this suite verifies: the pure-Python fallback renderers in
 backend/export/renderers (txt, html, pdf) turn a canonical document mapping into
 rendered files while honoring the export profile's block filtering; the txt renderer uses the
-localized table captions/row lines from backend/pipeline/table_ast, and the html renderer emits
+localized table captions/row lines from backend/core/pipeline/table_ast, and the html renderer emits
 the localized table-of-contents and technical-metadata markup.
 """
 

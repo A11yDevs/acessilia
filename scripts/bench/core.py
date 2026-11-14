@@ -12,7 +12,7 @@ from typing import Any
 
 from docstruct.export.markdown import bare_latex
 
-from backend.pipeline.canonical_builder import (
+from backend.core.pipeline.canonical_builder import (
     build_canonical_document,
     sanitize_canonical_document,
 )

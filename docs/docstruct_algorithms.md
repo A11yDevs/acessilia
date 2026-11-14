@@ -34,7 +34,7 @@ different things: Docling is strong on reading order and headings; MinerU is
 strong on text quality and formula extraction. Fusion combines them into a
 single, higher-quality block sequence.
 
-### 1.2 Pipeline (`backend/pipeline/fusion.py`)
+### 1.2 Pipeline (`backend/core/pipeline/fusion.py`)
 
 `extract_fused()` orchestrates the two providers and calls the pure
 `docstruct.fusion.merge_blocks()`:
@@ -313,7 +313,7 @@ ExecutorAgent (Agno Workflow)
 _handle_dual_provider_fusion_method (backend/core/pipeline/handlers/fusion.py)
    │  calls extract_fused()
    ▼
-backend.pipeline.fusion.extract_fused
+backend.core.pipeline.fusion.extract_fused
    │  extracts with docling + mineru (parallel)
    ▼
 docstruct.fusion.merge_blocks (Tree Differ)

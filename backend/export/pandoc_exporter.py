@@ -23,10 +23,10 @@ from backend.i18n import t
 from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
 from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
-from backend.pipeline.canonical_builder import build_canonical_document
-from backend.pipeline.canonical_builder import sanitize_canonical_document
-from backend.pipeline.validators import audit_canonical_document
-from backend.pipeline.validators import validate_export_profile
+from backend.core.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import sanitize_canonical_document
+from backend.core.pipeline.validators import audit_canonical_document
+from backend.core.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger
 
 #: Canonical English msgid for a default document title used when the caller passes none.

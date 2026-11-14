@@ -1,7 +1,7 @@
 """Deterministic handlers for the providers' extraction: fusing, choosing or confirming it.
 
 ``dual-provider-fusion`` runs both providers and fuses their extraction
-(``backend.pipeline.fusion.extract_fused``), reusing a fusion already recorded
+(``backend.core.pipeline.fusion.extract_fused``), reusing a fusion already recorded
 for the same source. ``single-provider`` is the other method for
 ``fuse-providers``; it chooses nothing, and only checks that the manifest
 already carries the configured provider's extraction.
@@ -305,7 +305,7 @@ def _run_extract_fused(
     """
     import concurrent.futures
 
-    from backend.pipeline.fusion import extract_fused
+    from backend.core.pipeline.fusion import extract_fused
 
     try:
         asyncio.get_running_loop()
@@ -357,7 +357,7 @@ def _handle_dual_provider_fusion_method(
 ) -> MethodResult:
     """Fuse two providers (docling+mineru) for the target obligation.
 
-    Reuses ``backend.pipeline.fusion.extract_fused`` (phase 4) to produce the
+    Reuses ``backend.core.pipeline.fusion.extract_fused`` (phase 4) to produce the
     fused payload, writes the JSON to ``data_dir/artifacts/fusion/`` and returns
     it in ``MethodResult.artifacts``, leaving the ``ExecutorAgent`` to fold it
     into the manifest and record the provenance on the attempt.

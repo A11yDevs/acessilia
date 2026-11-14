@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
 
 

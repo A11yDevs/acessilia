@@ -245,7 +245,7 @@ from backend.core.manifest.models import (
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
 )
-from backend.pipeline.validators import (
+from backend.core.pipeline.validators import (
     MSG_BLOCK_NOT_ALLOWED_IN_PROFILE,
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_DOCUMENT_NO_SECTIONS,
@@ -305,7 +305,7 @@ from backend.export.renderers.html_renderer import (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TABLE_REGION,
 )
-from backend.pipeline.table_ast import (
+from backend.core.pipeline.table_ast import (
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_FOOTER,
     MSG_TABLE_TEXT_ROW,
@@ -717,7 +717,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,
     # Canonical-document / export-profile / output-text validation findings
-    # (backend/pipeline/validators.py), surfaced in audit reports and ValueError
+    # (backend/core/pipeline/validators.py), surfaced in audit reports and ValueError
     # messages raised by backend/export/pandoc_exporter.py.
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_FIELD_MISSING,
@@ -771,7 +771,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_REGION,
-    # TXT table line templates (backend/pipeline/table_ast.py).
+    # TXT table line templates (backend/core/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
     MSG_TABLE_TEXT_FOOTER,
@@ -1567,7 +1567,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_STATUS_CONVERSION_DONE: "✅ Conversão concluída!",
         MSG_STATUS_PROCESSING_FAILED: ("❌ Erro durante o processamento."),
         # Canonical-document / export-profile / output-text validation findings
-        # (pt-BR mirrors of the backend/pipeline/validators.py ids above).
+        # (pt-BR mirrors of the backend/core/pipeline/validators.py ids above).
         MSG_CANONICAL_DOC_NOT_OBJECT: (
             "Documento canônico deve ser um objeto JSON."
         ),

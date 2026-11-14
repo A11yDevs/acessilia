@@ -35,7 +35,7 @@ produzem listas de blocos independentes para o mesmo documento. Cada provider
 MinerU é forte em qualidade de texto e extração de fórmulas. A fusão os
 combina em uma única sequência de blocos de maior qualidade.
 
-### 1.2 Pipeline (`backend/pipeline/fusion.py`)
+### 1.2 Pipeline (`backend/core/pipeline/fusion.py`)
 
 `extract_fused()` orquestra os dois providers e chama o puro
 `docstruct.fusion.merge_blocks()`:
@@ -324,7 +324,7 @@ ExecutorAgent (Agno Workflow)
 _handle_dual_provider_fusion_method (backend/core/pipeline/handlers/fusion.py)
    │  chama extract_fused()
    ▼
-backend.pipeline.fusion.extract_fused
+backend.core.pipeline.fusion.extract_fused
    │  extrai com docling + mineru (em paralelo)
    ▼
 docstruct.fusion.merge_blocks (Tree Differ)

@@ -281,7 +281,7 @@ def test_the_guard_sees_every_form_of_a_forbidden_import(source) -> None:
 @pytest.mark.parametrize(
     "source",
     [
-        "from backend.pipeline.canonical_builder import build_canonical_document",
+        "from backend.core.pipeline.canonical_builder import build_canonical_document",
         "from backend.tools import logger",
         "from backend.tools.logger import logger",
         "import backend.service",

@@ -1,5 +1,5 @@
 """
-What this suite verifies: backend/pipeline/validators.audit_canonical_document separates findings
+What this suite verifies: backend/core/pipeline/validators.audit_canonical_document separates findings
 into BLOCKER (base-structural failures plus missing sections) and WARNING (accessibility issues
 such as images without alt text and tables lacking an explicit table_ast header). Locale is pinned
 to en_US for deterministic canonical-English assertions.
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 import backend.i18n as i8n
-from backend.pipeline.validators import audit_canonical_document
+from backend.core.pipeline.validators import audit_canonical_document
 
 
 @pytest.fixture(autouse=True)

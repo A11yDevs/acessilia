@@ -102,11 +102,11 @@ class FusionAgent:
     ) -> dict[str, Any]:
         """Merge two toolbox providers into a single fused payload.
 
-        Delegates to ``backend.pipeline.fusion.extract_fused`` (the only layer
+        Delegates to ``backend.core.pipeline.fusion.extract_fused`` (the only layer
         that knows both the toolbox and the lib). Returns the fused payload in
         the same shape as ``extract_structure``.
         """
-        from backend.pipeline.fusion import extract_fused
+        from backend.core.pipeline.fusion import extract_fused
 
         return asyncio.run(
             extract_fused(

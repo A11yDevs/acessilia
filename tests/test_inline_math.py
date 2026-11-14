@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from backend.pipeline import canonical_builder
+from backend.core.pipeline import canonical_builder
 from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
 from docstruct.canonical import _enrich_math_blocks, build_canonical_document
 from docstruct.export.html import document_to_html

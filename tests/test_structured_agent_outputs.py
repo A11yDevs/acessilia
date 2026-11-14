@@ -15,7 +15,7 @@ from backend.agents.output_schemas import (
     validate_structured_content,
     validate_structured_run,
 )
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 
 
 @pytest.mark.parametrize(

@@ -384,7 +384,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     from docstruct.validation import validate_canonical_document
 
     from backend.core.pipeline import orchestrator as pddl
-    from backend.pipeline.canonical_builder import build_canonical_document
+    from backend.core.pipeline.canonical_builder import build_canonical_document
     from tests.pddl_support import build_orchestrator
 
     calls = []

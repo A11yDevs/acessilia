@@ -253,7 +253,7 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
     monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
     monkeypatch.setattr(settings, "fusion_apply_page_routes", apply_routes)
     monkeypatch.setattr(
-        "backend.pipeline.fusion.decide_v1",
+        "backend.core.pipeline.fusion.decide_v1",
         lambda primary, secondary: ("mineru", "both_formula->mineru"),
     )
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
@@ -329,7 +329,7 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
         return {"fusion_stats": {}, "fusion_evidence": {"pages": []}}
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.fuse_extraction_payloads", fake_fuse
+        "backend.core.pipeline.fusion.fuse_extraction_payloads", fake_fuse
     )
     policy = FusionPolicy(text_pick="mineru")
 

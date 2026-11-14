@@ -17,9 +17,9 @@ from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.schema import validate_manifest
 from backend.export.exporters.docx_exporter import export_docx
 from backend.export.exporters.txt_exporter import export_txt
-from backend.pipeline.canonical_builder import build_canonical_document
-from backend.pipeline.table_ast import rows_from_table_ast
-from backend.pipeline.validators import validate_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.table_ast import rows_from_table_ast
+from backend.core.pipeline.validators import validate_canonical_document
 
 
 def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path, monkeypatch):

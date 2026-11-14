@@ -11,7 +11,7 @@ participant "PlannerAgent\nbackend/core/planning" as Planner
 participant "ExecutorAgent\n(Agno Workflow)" as Executor
 participant "VisionAgent / DataAgent\n(Agno LLM)" as Agents
 participant "Acessilia Toolbox\n(via acessilia-sdk)" as Toolbox
-participant "Canonical builder\nbackend/pipeline" as Builder
+participant "Canonical builder\nbackend/core/pipeline" as Builder
 participant "Renderers\nbackend/export" as Export
 
 User -> Front: Upload a document (PDF/image)

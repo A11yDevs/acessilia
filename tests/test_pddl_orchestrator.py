@@ -15,7 +15,7 @@ from backend.core.pipeline.elements import (
     _table_ast_from_metadata,
     _table_element_has_structured_content,
 )
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.manifest.models import (
     ExtractorRun,
     ManifestElement,
@@ -802,7 +802,7 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
 
     # MathML comes from the Toolbox's math.convert (ADR-0007); simulate it so
     # the test needs no running Toolbox.
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     converted: list[str] = []
     monkeypatch.setattr(

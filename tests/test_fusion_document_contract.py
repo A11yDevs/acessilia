@@ -124,7 +124,7 @@ def test_recovered_pages_and_extra_blocks_reach_output(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
-    from backend.pipeline.fusion import extract_fused
+    from backend.core.pipeline.fusion import extract_fused
 
     class Client:
         def __init__(self, provider):
@@ -141,7 +141,7 @@ async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
                 ]
             }}
 
-    monkeypatch.setattr("backend.pipeline.fusion._structure_client", Client)
+    monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
     result = await extract_fused("doc.pdf", primary_provider="docling", secondary_provider="mineru")
     elements = result["document"]["elements"]
     assert {element["page_number"] for element in elements} == {1, 2}
