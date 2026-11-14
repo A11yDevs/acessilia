@@ -192,7 +192,7 @@ def test_every_web_message_constant_has_a_pt_br_translation() -> None:
 def test_default_checked_in_catalog_tree_is_generated_by_repo_layout(tmp_path: Path) -> None:
     """Check the production location and generate its layout without rewriting tracked catalogs."""
     assert gen_locales.DEFAULT_LOCALES_DIR.resolve() == DEFAULT_REPOS_CATALOGS_DIR.resolve()
-    generated_root = tmp_path / "backend" / "locales"
+    generated_root = tmp_path / "i18n-locales"
     gen_locales.build_locales(generated_root)
     for locale in gen_locales.SUPPORTED_LOCALES:
         assert (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po").is_file()

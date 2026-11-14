@@ -27,7 +27,9 @@ reasons:
     `backend/export`; the unused
     `backend/adapters` wrappers were removed in step 2);
   - the Toolbox adapters (`backend/tools`);
-  - the messages (`backend/i18n`, `log_messages`, `stage_messages`).
+  - the messages (`backend/core/i18n`, with `log_messages`, `stage_messages` and the
+    catalogs, which step 2 gathered from `backend/i18n.py`, `backend/log_messages.py`,
+    `backend/stage_messages.py` and `backend/locales`).
 - **The service around it**: the API and the worker (`backend/api`, FastAPI),
   jobs, history, e-mail, download tokens and caches (`backend/services`), the
   job state (`backend/agents/state_manager.py`) and the environment

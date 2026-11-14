@@ -27,7 +27,9 @@ diferentes:
     `backend/export`; os envelopes
     sem uso de `backend/adapters` foram removidos no passo 2);
   - os adaptadores da Toolbox (`backend/tools`);
-  - as mensagens (`backend/i18n`, `log_messages`, `stage_messages`).
+  - as mensagens (`backend/core/i18n`, com o `log_messages`, o `stage_messages` e os
+    catálogos, que o passo 2 reuniu a partir de `backend/i18n.py`,
+    `backend/log_messages.py`, `backend/stage_messages.py` e `backend/locales`).
 - **O serviço em volta dele**: a API e o worker (`backend/api`, FastAPI), os
   jobs, o histórico, o e-mail, os tokens de download e os caches
   (`backend/services`), o estado do job (`backend/agents/state_manager.py`) e
