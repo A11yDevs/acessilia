@@ -25,7 +25,6 @@ ALLOWLIST_PATH = REPO_ROOT / "tests" / "fixtures" / "module_size_allowlist.json"
 #: service's few modules inside them are scanned too; they are far below the
 #: limit.
 SCANNED_ROOTS = (
-    "backend/adapters",
     "backend/agents",
     "backend/ai",
     "backend/core",

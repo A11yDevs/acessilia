@@ -23,8 +23,8 @@ diferentes:
     do `backend/agents/pddl_orchestrator.py`);
   - os agentes (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - a fusão dupla (`backend/core/pipeline/fusion.py`, que o passo 2 reuniu a partir
-    do `backend/pipeline`) e os exportadores (`backend/export`,
-    `backend/adapters`);
+    do `backend/pipeline`) e os exportadores (`backend/export`; os envelopes
+    sem uso de `backend/adapters` foram removidos no passo 2);
   - os adaptadores da Toolbox (`backend/tools`);
   - as mensagens (`backend/i18n`, `log_messages`, `stage_messages`).
 - **O serviço em volta dele**: a API e o worker (`backend/api`, FastAPI), os
@@ -133,7 +133,7 @@ Proposta: a opção 2.
   | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo; o `backend/pipeline` se reuniu ali no passo 2) | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
-  | `backend/export`, `backend/adapters` | `acessilia_core.export` |
+  | `backend/export` (o `backend/adapters`, sem uso, foi removido no passo 2) | `acessilia_core.export` |
   | `backend/i18n.py`, `log_messages.py`, `stage_messages.py`, `locales/` | `acessilia_core.i18n` |
 
 - **O que fica no `backend/`, o serviço:**
@@ -187,7 +187,7 @@ Proposta: a opção 2.
      | `backend/pipeline` | `backend/core/pipeline/` (feito) | |
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
      | `backend/tools` (adaptadores da Toolbox, ferramentas de fórmula e de código, carga de prompts, logger) | `backend/core/toolbox/` e auxiliares | |
-     | `backend/export`, `backend/adapters` | `backend/core/export/` | |
+     | `backend/export` (`backend/adapters`: removido, nada o importava) | `backend/core/export/` | |
      | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
 
      O estado do job (`backend/agents/state_manager.py`) fica no serviço.

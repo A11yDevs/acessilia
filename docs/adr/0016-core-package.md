@@ -23,8 +23,8 @@ reasons:
     `backend/agents/pddl_orchestrator.py`);
   - the agents (`backend/agents`, `backend/ai`, `backend/core/agents`);
   - the dual fusion (`backend/core/pipeline/fusion.py`, which step 2 gathered from
-    `backend/pipeline`) and the exporters (`backend/export`,
-    `backend/adapters`);
+    `backend/pipeline`) and the exporters (`backend/export`; the unused
+    `backend/adapters` wrappers were removed in step 2);
   - the Toolbox adapters (`backend/tools`);
   - the messages (`backend/i18n`, `log_messages`, `stage_messages`).
 - **The service around it**: the API and the worker (`backend/api`, FastAPI),
@@ -131,7 +131,7 @@ Proposed: option 2.
   | `backend/core/pipeline` (the orchestrator was `backend/agents/pddl_orchestrator.py` until #402's step 6 moved it; `backend/pipeline` gathered there in step 2) | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (the Toolbox adapters, formula and code tools, prompts, logger) | `acessilia_core.toolbox` and helpers |
-  | `backend/export`, `backend/adapters` | `acessilia_core.export` |
+  | `backend/export` (`backend/adapters`, unused, was removed in step 2) | `acessilia_core.export` |
   | `backend/i18n.py`, `log_messages.py`, `stage_messages.py`, `locales/` | `acessilia_core.i18n` |
 
 - **What stays in `backend/`, the service:**
@@ -185,7 +185,7 @@ Proposed: option 2.
      | `backend/pipeline` | `backend/core/pipeline/` (done) | |
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
      | `backend/tools` (Toolbox adapters, formula and code tools, prompt loading, logger) | `backend/core/toolbox/` and helpers | |
-     | `backend/export`, `backend/adapters` | `backend/core/export/` | |
+     | `backend/export` (`backend/adapters`: removed, nothing imported it) | `backend/core/export/` | |
      | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (the `.po` catalogs) → `backend/core/i18n/locales/` |
 
      The job state (`backend/agents/state_manager.py`) stays in the service.

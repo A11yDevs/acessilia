@@ -88,7 +88,7 @@ The PDDL domain lives under `backend/core/planning/domains/`. The JSON schemas (
 
 ## Layering & Dependency Direction
 
-The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. A few controlled exceptions exist: `backend/adapters/exporters` is a thin compatibility wrapper over `backend/export`, and the orchestrator coordinates both processing and infrastructure concerns (cache, history).
+The codebase follows a pragmatic layered architecture with a top-down flow: Interface → Orchestration → Extraction → Canonical Document → Output. Infrastructure services and shared tools support multiple layers but do not own business decisions. One controlled exception exists: the orchestrator coordinates both processing and infrastructure concerns (cache, history).
 
 ### Libraries and the Toolbox (`libs/`)
 

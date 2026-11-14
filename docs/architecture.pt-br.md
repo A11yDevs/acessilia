@@ -88,7 +88,7 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 
 ## Empilhamento e Direção de Dependência
 
-A base de código segue uma arquitetura em camadas pragmática com fluxo de cima para baixo: Interface → Orquestração → Extração → Documento Canônico → Saída. Os serviços de infraestrutura e as ferramentas compartilhadas sustentam várias camadas, mas não possuem decisões de negócio. Existem algumas exceções controladas: `backend/adapters/exporters` é um envelope fino de compatibilidade sobre `backend/export`, e o orquestrador coordena tanto preocupações de processamento quanto de infraestrutura (cache, histórico).
+A base de código segue uma arquitetura em camadas pragmática com fluxo de cima para baixo: Interface → Orquestração → Extração → Documento Canônico → Saída. Os serviços de infraestrutura e as ferramentas compartilhadas sustentam várias camadas, mas não possuem decisões de negócio. Existe uma exceção controlada: o orquestrador coordena tanto preocupações de processamento quanto de infraestrutura (cache, histórico).
 
 ### Bibliotecas e a Toolbox (`libs/`)
 
