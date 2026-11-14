@@ -9,8 +9,9 @@ Each such module is registered here.
 
 The ``reexport`` category, modules made only of docstruct imports, was closed
 when its last module (``backend/tools/code_tools.py``) went (#191). A module
-like that is now rejected wherever it appears, by its imports, whether or not
-its docstring says it was "migrated to docstruct".
+like that is now rejected wherever it appears in ``backend/`` or ``frontend/``
+(where the core's code lives), by its imports, whether or not its docstring
+says it was "migrated to docstruct".
 
 A last check compares function bodies across the core and docstruct, so a
 copy of a docstruct function cannot hide in a module that is not registered.
@@ -70,9 +71,12 @@ def _is_docstring(node: ast.stmt) -> bool:
 
 
 def _is_all(node: ast.stmt) -> bool:
-    return isinstance(node, ast.Assign) and [
-        getattr(target, "id", None) for target in node.targets
-    ] == ["__all__"]
+    """``__all__ = ...``, ``__all__: list[str] = ...`` or ``__all__ += ...``."""
+    if isinstance(node, ast.Assign):
+        return [getattr(target, "id", None) for target in node.targets] == ["__all__"]
+    if isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+        return getattr(node.target, "id", None) == "__all__"
+    return False
 
 
 def _statement_count(function: ast.AST) -> int:
@@ -133,13 +137,27 @@ def test_the_reexport_check_finds_a_shim() -> None:
     )
     adapter = ast.parse("from docstruct.text import x\n\ndef y():\n    return x()\n")
 
+    annotated = ast.parse(
+        '"""Temporary shim."""\nfrom docstruct.text.code_reflow import normalize_code_text\n'
+        '__all__: list[str] = ["normalize_code_text"]\n'
+    )
+    extended = ast.parse(
+        "from docstruct.text.code_reflow import normalize_code_text\n"
+        "__all__ = []\n__all__ += [\"normalize_code_text\"]\n"
+    )
+
     assert _is_pure_docstruct_reexport(shim)
+    assert _is_pure_docstruct_reexport(annotated)
+    assert _is_pure_docstruct_reexport(extended)
     assert not _is_pure_docstruct_reexport(adapter)
 
 
-@pytest.mark.parametrize(
-    "module", sorted(path for path, kind in BRIDGES.items() if kind == ADAPTER)
-)
+def test_every_registered_bridge_is_an_adapter() -> None:
+    """The re-export category is closed, so a registered bridge can only be an adapter."""
+    assert set(BRIDGES.values()) == {ADAPTER}
+
+
+@pytest.mark.parametrize("module", sorted(BRIDGES))
 def test_adapter_only_wraps(module: str) -> None:
     tree = _tree(module)
     imported = {
