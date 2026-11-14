@@ -4,7 +4,7 @@ Também disponível em **inglês (EUA)**: [English version](docstruct_algorithms
 
 Este documento explica como funcionam os algoritmos determinísticos por trás
 da biblioteca `docstruct` e como os agentes de Acessilia os invocam. É o
-companheiro de [`libs/docstruct/README.md`](../../libs/docstruct/README.md)
+companheiro de [`libs/docstruct/README.md`](../libs/docstruct/README.md)
 (API pública) e de [`pmv_agno_pddl.md`](pmv_agno_pddl.md) (orquestração PDDL).
 
 ## Escopo
@@ -391,7 +391,7 @@ de letra ou prefixo de apêndice, como `1`, `2.3`, `4a` e `A.1`.
 
 ## 7. Documentação relacionada
 
-- [libs/docstruct/README.md](../../libs/docstruct/README.md) — API pública.
+- [libs/docstruct/README.md](../libs/docstruct/README.md) — API pública.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — orquestração PDDL e o método
   `dual-provider-fusion`.
 - [architecture.md](architecture.md) — arquitetura do sistema.
