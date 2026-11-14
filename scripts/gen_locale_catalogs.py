@@ -279,7 +279,7 @@ from backend.core.pipeline.validators import (
     MSG_TECHNICAL_METADATA_IN_TXT,
     MSG_UNKNOWN_EXPORT_PROFILE,
 )
-from backend.export.pandoc_exporter import (
+from backend.core.export.pandoc_exporter import (
     MSG_AUDIT_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
@@ -292,12 +292,12 @@ from backend.core.pipeline.payload import (
     MSG_TABLES_NOT_READ,
 )
 from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
-from backend.export.markers import (
+from backend.core.export.markers import (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_OBJECT_MARKER_IMAGE,
     MSG_OBJECT_MARKER_TABLE,
 )
-from backend.export.renderers.html_renderer import (
+from backend.core.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TABLE_REGION,
@@ -715,7 +715,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_STATUS_PROCESSING_FAILED,
     # Canonical-document / export-profile / output-text validation findings
     # (backend/core/pipeline/validators.py), surfaced in audit reports and ValueError
-    # messages raised by backend/export/pandoc_exporter.py.
+    # messages raised by backend/core/export/pandoc_exporter.py.
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_FIELD_MISSING,
     MSG_SECTIONS_NOT_LIST,
@@ -752,14 +752,14 @@ MESSAGES: tuple[str, ...] = (
     MSG_TABLE_AST_CELL_NO_TEXT,
     MSG_TABLE_AST_WIDTH_INCONSISTENT,
     # Pandoc exporter runtime errors and default document title
-    # (backend/export/pandoc_exporter.py), surfaced as RuntimeError/ValueError
+    # (backend/core/export/pandoc_exporter.py), surfaced as RuntimeError/ValueError
     # text in logs and HTTP error details.
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
     MSG_AUDIT_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
-    # HTML renderer UI chrome (backend/export/renderers/html_renderer.py).
+    # HTML renderer UI chrome (backend/core/export/renderers/html_renderer.py).
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_UNDESCRIBED_PICTURE_ALT,
     MSG_LETTERHEAD_TEXT,
@@ -1640,7 +1640,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "table_ast.{section_name} com largura inconsistente em {block_id} (row {row_index})"
         ),
         # Pandoc exporter runtime errors and default document title
-        # (pt-BR mirrors of the backend/export/pandoc_exporter.py ids above).
+        # (pt-BR mirrors of the backend/core/export/pandoc_exporter.py ids above).
         MSG_DEFAULT_ACCESSIBLE_TITLE: "Documento acessível",
         MSG_DOCX_DISABLED: (
             "A exportação DOCX está desativada (TOOLBOX_DOCX_ENABLED=false)"

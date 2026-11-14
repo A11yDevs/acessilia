@@ -214,7 +214,7 @@ def export_accessible_document(
     if profile_errors:
         raise ValueError("; ".join(profile_errors))
     if format_name == "html":
-        from backend.export.renderers.html_renderer import render_html
+        from backend.core.export.renderers.html_renderer import render_html
 
         return render_html(filtered, output_path, profile_name=profile)
     ast = build_pandoc_ast(filtered, target_format=format_name)
@@ -224,7 +224,7 @@ def export_accessible_document(
     if format_name == "pdf_ua":
         return _render_pdf_ua(ast, output_path, lang=lang)
     if format_name == "txt":
-        from backend.export.renderers.txt_renderer import render_txt
+        from backend.core.export.renderers.txt_renderer import render_txt
 
         return render_txt(filtered, output_path, profile_name=profile)
     raise ValueError(t(MSG_UNSUPPORTED_EXPORT_FORMAT).format(format_name=format_name))

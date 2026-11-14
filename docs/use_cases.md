@@ -18,7 +18,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
   - processing: [backend/service.py](../backend/service.py) runs the PDDL orchestrator [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; the legacy engine is disabled), which feeds [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py)
-  - export: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
+  - export: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py), [backend/core/export/exporters](../backend/core/export/exporters), [backend/core/export/renderers](../backend/core/export/renderers)
 
 ## UC-02 Select description level
 - Primary actor: End user.

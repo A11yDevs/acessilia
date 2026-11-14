@@ -58,7 +58,7 @@ async def test_untitled_document_takes_the_uploaded_name(
 
     assert document["title"] == "51-pages"
     assert document["source"]["name"] == UPLOADED
-    from backend.export.renderers.html_renderer import render_html
+    from backend.core.export.renderers.html_renderer import render_html
 
     html = render_html(document, tmp_path / "result.html").read_text(encoding="utf-8")
     assert "<title>51-pages</title>" in html

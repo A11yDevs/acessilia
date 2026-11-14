@@ -18,7 +18,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Implementação:
   - entrada/validação: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/tools/validators.py](../backend/tools/validators.py)
   - processamento: [backend/service.py](../backend/service.py) executa o orquestrador PDDL [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; o motor legado está desativado), que alimenta o [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py)
-  - exportação: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py), [backend/export/exporters](../backend/export/exporters), [backend/export/renderers](../backend/export/renderers)
+  - exportação: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py), [backend/core/export/exporters](../backend/core/export/exporters), [backend/core/export/renderers](../backend/core/export/renderers)
 
 ## UC-02 Selecionar nível de descrição
 - Ator principal: Usuário final.

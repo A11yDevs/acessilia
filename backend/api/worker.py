@@ -50,13 +50,13 @@ from backend.stage_messages import (
     STAGE_PROCESSING_FAILURE,
     STAGE_QUEUE_WAITING_POSITION,
 )
-from backend.export.exporters.audio_exporter import export_mp3
-from backend.export.exporters.docx_exporter import export_docx
-from backend.export.exporters.pdf_exporter import export_pdf_ua
-from backend.export.exporters.txt_exporter import export_txt
-from backend.export.exporters.drbench_md_exporter import export_drbench_md
-from backend.export.markers import with_object_markers
-from backend.export.pandoc_exporter import export_accessible_document
+from backend.core.export.exporters.audio_exporter import export_mp3
+from backend.core.export.exporters.docx_exporter import export_docx
+from backend.core.export.exporters.pdf_exporter import export_pdf_ua
+from backend.core.export.exporters.txt_exporter import export_txt
+from backend.core.export.exporters.drbench_md_exporter import export_drbench_md
+from backend.core.export.markers import with_object_markers
+from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
 from backend.tools.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from backend.services.email_service import (

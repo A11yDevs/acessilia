@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from backend.export.renderers.html_renderer import _render_block as render_html_block
-from backend.export.renderers.txt_renderer import _render_block as render_txt_block
+from backend.core.export.renderers.html_renderer import _render_block as render_html_block
+from backend.core.export.renderers.txt_renderer import _render_block as render_txt_block
 from backend.core.pipeline.validators import validate_canonical_document
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.toolbox_math_tools import MathCapabilityUnavailable

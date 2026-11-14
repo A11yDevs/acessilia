@@ -133,7 +133,7 @@ def _export_outputs(
         try:
             if fmt == "pdf_ua":
                 export_pdf_ua = getattr(
-                    import_module("backend.export.exporters.pdf_exporter"),
+                    import_module("backend.core.export.exporters.pdf_exporter"),
                     "export_pdf_ua",
                 )
                 export_pdf_ua(
@@ -143,13 +143,13 @@ def _export_outputs(
                 )
             elif fmt == "txt":
                 export_txt = getattr(
-                    import_module("backend.export.exporters.txt_exporter"),
+                    import_module("backend.core.export.exporters.txt_exporter"),
                     "export_txt",
                 )
                 export_txt(canonical, output_path, title=canonical.get("title", engine_name))
             elif fmt == "docx":
                 export_docx = getattr(
-                    import_module("backend.export.exporters.docx_exporter"),
+                    import_module("backend.core.export.exporters.docx_exporter"),
                     "export_docx",
                 )
                 export_docx(canonical, output_path, filename=canonical.get("title", engine_name))

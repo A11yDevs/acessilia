@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from backend.core.manifest.builder import _derive_processing_needs
-from backend.export.pandoc_exporter import export_accessible_document
+from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.validation import (

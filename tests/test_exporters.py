@@ -1,9 +1,9 @@
 import tempfile
 from pathlib import Path
 
-from backend.export.exporters.txt_exporter import export_txt
-from backend.export.exporters.docx_exporter import export_docx
-from backend.export.exporters.pdf_exporter import export_pdf_ua
+from backend.core.export.exporters.txt_exporter import export_txt
+from backend.core.export.exporters.docx_exporter import export_docx
+from backend.core.export.exporters.pdf_exporter import export_pdf_ua
 
 
 def test_export_txt():
@@ -22,8 +22,8 @@ def test_export_docx_renders_on_the_toolbox(monkeypatch):
         output_path.write_bytes(b"PK\x03\x04")
         return {}
 
-    monkeypatch.setattr("backend.export.pandoc_exporter.settings.toolbox_docx_enabled", True)
-    monkeypatch.setattr("backend.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("backend.core.export.pandoc_exporter.settings.toolbox_docx_enabled", True)
+    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "test.docx"
         result = export_docx("# Titulo\n\nParagrafo.", out, "test.docx")
@@ -48,7 +48,7 @@ def test_export_pdf_ua_calls_accessible_exporter(monkeypatch):
         return output_path
 
     monkeypatch.setattr(
-        "backend.export.exporters.pdf_exporter.export_accessible_document",
+        "backend.core.export.exporters.pdf_exporter.export_accessible_document",
         _fake_export_accessible_document,
     )
 

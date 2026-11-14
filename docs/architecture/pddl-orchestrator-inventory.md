@@ -259,7 +259,7 @@ The near-duplicates in finding 1 are behaviour decisions, each in its own PR (P8
     - **No test enforced D4 yet**, and step 5 grew the orchestrator from 5,531 to 5,823 lines (#461–#466). Each split shortened its function, but added signatures and docstrings. The allowlist starts at the sizes of the day the test lands.
     - **The test lands with step 6**, before its first move: `tests/test_module_size.py`, with the allowlist in a fixture.
     - **What it checks:**
-      - a module of the core above 900 lines fails, unless it is listed. The scan covers the core's modules where they are today (`backend/agents/`, `backend/core/`, `backend/ai/`, `backend/tools/`, `backend/export/` and the message modules), and `acessilia_core` once [ADR-0016](../adr/0016-core-package.md) moves them;
+      - a module of the core above 900 lines fails, unless it is listed. The scan covers the core's modules where they are today (`backend/agents/`, `backend/core/`, `backend/ai/`, `backend/tools/` and the message modules), and `acessilia_core` once [ADR-0016](../adr/0016-core-package.md) moves them;
       - a listed module that grows fails;
       - a listed module that shrinks fails until its entry is lowered, as the Portuguese allowlist does (`tests/test_no_portuguese.py`), so a gain is kept;
       - an entry at 900 or below is removed.

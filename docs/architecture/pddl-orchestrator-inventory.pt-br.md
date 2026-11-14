@@ -259,7 +259,7 @@ As quase duplicatas do achado 1 são decisões de comportamento, cada uma num PR
     - **Nenhum teste fazia a D4 valer ainda**, e o passo 5 aumentou o orquestrador de 5.531 para 5.823 linhas (#461–#466). Cada divisão encurtou a sua função, mas acrescentou assinaturas e docstrings. A allowlist começa com os tamanhos do dia em que o teste entrar.
     - **O teste entra com o passo 6**, antes da primeira movimentação: `tests/test_module_size.py`, com a allowlist em uma fixture.
     - **O que ele confere:**
-      - um módulo do core acima de 900 linhas falha, a menos que esteja na lista. A varredura cobre os módulos do core onde eles estão hoje (`backend/agents/`, `backend/core/`, `backend/ai/`, `backend/tools/`, `backend/export/` e os módulos de mensagens), e o `acessilia_core` quando a [ADR-0016](../adr/0016-core-package.pt-br.md) os mover;
+      - um módulo do core acima de 900 linhas falha, a menos que esteja na lista. A varredura cobre os módulos do core onde eles estão hoje (`backend/agents/`, `backend/core/`, `backend/ai/`, `backend/tools/` e os módulos de mensagens), e o `acessilia_core` quando a [ADR-0016](../adr/0016-core-package.pt-br.md) os mover;
       - um módulo da lista que cresce falha;
       - um módulo da lista que diminui falha até sua entrada ser reduzida, como faz a allowlist de português (`tests/test_no_portuguese.py`), para que o ganho fique registrado;
       - uma entrada com 900 ou menos é removida.
