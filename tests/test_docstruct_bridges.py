@@ -1,14 +1,16 @@
 """Core modules that bridge to docstruct stay bridges (#203).
 
-When a pure algorithm moves from the core to docstruct, the core module keeps
-its import path for existing consumers. Each such module is registered here
-in one of two categories:
+When a pure algorithm moves from the core to docstruct, the core's callers
+import docstruct directly. A core module may still bridge to docstruct only as
+a ``compatibility_adapter``: small wrappers that delegate to docstruct and add
+what belongs to the core (i18n, file writes, Toolbox calls, the core's
+historical defaults), never a reimplementation of the structural algorithm.
+Each such module is registered here.
 
-- ``reexport``: only imports from docstruct and ``__all__``. No definitions.
-- ``compatibility_adapter``: may also define small wrappers that delegate to
-  docstruct and add what belongs to the core (i18n, file writes, Toolbox
-  calls, the core's historical defaults). It must not reimplement the
-  structural algorithm.
+The ``reexport`` category, modules made only of docstruct imports, was closed
+when its last module (``backend/tools/code_tools.py``) went (#191). A module
+like that is now rejected wherever it appears, by its imports, whether or not
+its docstring says it was "migrated to docstruct".
 
 A last check compares function bodies across the core and docstruct, so a
 copy of a docstruct function cannot hide in a module that is not registered.
@@ -24,11 +26,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 DOCSTRUCT = ROOT / "libs" / "docstruct" / "src" / "docstruct"
 
-REEXPORT = "reexport"
 ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
-    "backend/tools/code_tools.py": REEXPORT,
     "backend/core/export/renderers/html_renderer.py": ADAPTER,
     "backend/core/export/renderers/txt_renderer.py": ADAPTER,
     "backend/core/pipeline/canonical_builder.py": ADAPTER,
@@ -95,21 +95,46 @@ def test_bridge_imports_from_docstruct(module: str) -> None:
     assert _docstruct_imports(_tree(module))
 
 
-@pytest.mark.parametrize(
-    "module", sorted(path for path, kind in BRIDGES.items() if kind == REEXPORT)
-)
-def test_reexport_defines_nothing(module: str) -> None:
-    offenders = [
-        f"line {node.lineno}: {type(node).__name__}"
-        for node in _tree(module).body
-        if not (
-            isinstance(node, (ast.Import, ast.ImportFrom))
-            or _is_docstring(node)
-            or _is_all(node)
-        )
+def _is_pure_docstruct_reexport(tree: ast.Module) -> bool:
+    """A module of docstruct imports and nothing else (docstring, ``__all__`` and
+    ``from __future__`` aside): a re-export bridge."""
+    imports = [
+        node for node in tree.body
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        and getattr(node, "module", None) != "__future__"
     ]
+    others = [
+        node for node in tree.body
+        if not (isinstance(node, (ast.Import, ast.ImportFrom)) or _is_docstring(node) or _is_all(node))
+    ]
+    return bool(imports) and not others and all(
+        isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == "docstruct"
+        for node in imports
+    )
 
-    assert offenders == []
+
+def test_no_module_is_a_pure_docstruct_reexport() -> None:
+    """The re-export category is closed (#191): callers import docstruct directly."""
+    offenders = sorted(
+        path.relative_to(ROOT).as_posix()
+        for base in ("backend", "frontend")
+        for path in (ROOT / base).rglob("*.py")
+        if _is_pure_docstruct_reexport(ast.parse(path.read_text("utf-8")))
+    )
+
+    assert offenders == [], f"modules that only re-export docstruct: {offenders}"
+
+
+def test_the_reexport_check_finds_a_shim() -> None:
+    shim = ast.parse(
+        '"""Moved."""\nfrom __future__ import annotations\n\n'
+        "from docstruct.text.code_reflow import normalize_code_text  # noqa: F401\n\n"
+        '__all__ = ["normalize_code_text"]\n'
+    )
+    adapter = ast.parse("from docstruct.text import x\n\ndef y():\n    return x()\n")
+
+    assert _is_pure_docstruct_reexport(shim)
+    assert not _is_pure_docstruct_reexport(adapter)
 
 
 @pytest.mark.parametrize(
