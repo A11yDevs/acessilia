@@ -3,8 +3,8 @@
 These strings are user-facing: the executor persists ``MethodResult.message`` in
 the obligation attempts (``ExecutionStepResult.message`` and the manifest), and
 the orchestrator publishes the last attempt as ``last_message`` in the
-open-obligations summary. Handlers must resolve them with :func:`backend.i18n.t`
-or :func:`backend.i18n.n` when the step runs, never at import time, so the
+open-obligations summary. Handlers must resolve them with :func:`backend.core.i18n.t`
+or :func:`backend.core.i18n.n` when the step runs, never at import time, so the
 request locale applies.
 
 Entries whose text depends on a count are ``(singular, plural)`` pairs and must

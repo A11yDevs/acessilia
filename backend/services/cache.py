@@ -9,8 +9,8 @@ from typing import Any
 import aiofiles
 import aiofiles.os
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_CACHE_CLEARED,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,

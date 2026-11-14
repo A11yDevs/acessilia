@@ -36,7 +36,7 @@ from backend.core.pipeline.handlers.messages import (
     MSG_VISION_UNDESCRIBED,
     MSG_VISION_VALIDATED,
 )
-from backend.i18n import n, t
+from backend.core.i18n import n, t
 
 
 def _handle_vision_description_method(

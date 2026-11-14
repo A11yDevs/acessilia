@@ -41,7 +41,7 @@ temp/
 *.synctex.gz
 
 # Compiled Babel locale catalogs (build artifacts, regenerated from .po sources at import time)
-backend/locales/*/LC_MESSAGES/*.mo
+backend/core/i18n/locales/*/LC_MESSAGES/*.mo
 
 # PDFs temporarios gerados durante benchmark em fixtures
 tests/fixtures/tutorials/pagina_*.pdf

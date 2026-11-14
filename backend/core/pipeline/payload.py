@@ -38,8 +38,8 @@ from backend.core.manifest.models import (
     ProcessingManifest,
 )
 from backend.core.planning.models import NominalPlan, PlanningComparison
-from backend.i18n import locale_for_user, n, reset_request_locale, set_request_locale, t
-from backend.log_messages import (
+from backend.core.i18n import locale_for_user, n, reset_request_locale, set_request_locale, t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )

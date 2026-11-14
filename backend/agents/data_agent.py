@@ -2,8 +2,8 @@
 
 import asyncio
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_REGION_ERROR,

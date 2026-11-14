@@ -1,6 +1,6 @@
 """A presentation is structured slide by slide (backend.core.manifest.slides).
 
-Every user-visible heading is resolved through backend.i18n.t, so the
+Every user-visible heading is resolved through backend.core.i18n.t, so the
 assertions hold under any supported server locale.
 """
 
@@ -15,8 +15,8 @@ from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.slides import is_slide_heading
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
-from backend.i18n import t
-from backend.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline import preflight as pipeline_preflight
 

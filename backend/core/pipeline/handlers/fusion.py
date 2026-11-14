@@ -62,7 +62,7 @@ from backend.core.pipeline.secondary import (
 from backend.core.pipeline.toolbox import (
     _source_artifact_id,
 )
-from backend.i18n import t
+from backend.core.i18n import t
 
 
 #: Accepted Dr.DocBench table preference (TEDS): MinerU's table, unless Docling's

@@ -47,8 +47,8 @@ from backend.core.pipeline.toolbox import (
     _source_artifact_id,
     _toolbox_formula_crop,
 )
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
     LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
@@ -56,7 +56,7 @@ from backend.log_messages import (
     LOG_PDDL_FORMULAS_RECOGNIZED,
 )
 from backend.services.blocking import run_blocking
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_RECOGNIZING_FORMULA,
 )

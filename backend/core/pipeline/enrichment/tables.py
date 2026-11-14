@@ -50,14 +50,14 @@ from backend.core.pipeline.obligations import (
 from backend.core.pipeline.toolbox import (
     _source_artifact_id,
 )
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_TABLE_REREAD_ACCEPTED,
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_PDDL_TABLES_ENRICHED,
 )
 from backend.services.blocking import run_blocking
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_RECOGNIZING_TABLE,
 )
 from backend.tools.logger import logger

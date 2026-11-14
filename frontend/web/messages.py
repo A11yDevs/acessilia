@@ -3,7 +3,7 @@
 The web panel (frontend/web/app.py) renders HTML responses whose error and
 success notices were previously hardcoded in Portuguese. Each id below is the
 canonical English string; callers resolve it at render time through
-:func:`backend.i18n.t` so the panel output follows the active locale, exactly
+:func:`backend.core.i18n.t` so the panel output follows the active locale, exactly
 like the Telegram and API surfaces.
 """
 

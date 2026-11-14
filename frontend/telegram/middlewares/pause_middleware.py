@@ -2,7 +2,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 from typing import Any, Awaitable, Callable, Dict
 
-from backend.i18n import t
+from backend.core.i18n import t
 from frontend.telegram.messages import MSG_BOT_PAUSED
 
 _paused_chats: set[int] = set()

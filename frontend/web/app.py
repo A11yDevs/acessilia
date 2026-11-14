@@ -26,9 +26,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
-from backend.i18n import t, active_locale
+from backend.core.i18n import t, active_locale
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
-from backend.log_messages import (
+from backend.core.i18n.log_messages import (
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
     LOG_WEB_GLOBAL_ERROR,

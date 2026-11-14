@@ -2,8 +2,8 @@ import re
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_STATUS_EDIT_UNEXPECTED,
     LOG_STATUS_MESSAGE_EDIT_FAILED,
     LOG_STATUS_MESSAGE_SEND_FAILED,

@@ -5,8 +5,8 @@ from typing import Any
 
 from backend.core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
 from backend.core.export.pandoc_exporter import export_accessible_document
-from backend.i18n import t
-from backend.log_messages import LOG_DOCX_EXPORTED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_DOCX_EXPORTED
 from backend.tools.logger import logger
 
 

@@ -7,8 +7,8 @@ from fastapi.responses import FileResponse
 
 from backend.api.limiter import limiter
 from backend.api.schemas import DownloadFormat, DownloadInfo
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     API_FILE_NOT_FOUND,
     API_FORMAT_INVALID,
     API_LINK_INVALID,

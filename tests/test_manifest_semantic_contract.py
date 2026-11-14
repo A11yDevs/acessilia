@@ -224,7 +224,7 @@ DOCUMENT_INVARIANT_MESSAGES = {
 @pytest.mark.parametrize("case", list(DOCUMENT_INVARIANT_MESSAGES))
 def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, locale, case):
     import docstruct.manifest as model
-    from backend.i18n import t
+    from backend.core.i18n import t
     from scripts.gen_locale_catalogs import TRANSLATIONS
 
     monkeypatch.setenv("LOCALE", locale)
@@ -246,8 +246,8 @@ MIXED_INTERVALS = {
 @pytest.mark.parametrize("case", list(MIXED_INTERVALS))
 def test_mixed_timezones_are_a_validation_error_not_a_type_error(case) -> None:
     from backend.core.manifest.models import ExtractorRun, ObligationAttempt
-    from backend.i18n import t
-    from backend.log_messages import MSG_TIMESTAMPS_MIXED_TIMEZONES
+    from backend.core.i18n import t
+    from backend.core.i18n.log_messages import MSG_TIMESTAMPS_MIXED_TIMEZONES
 
     started_at, completed_at = MIXED_INTERVALS[case]
     expected = re.escape(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))

@@ -3,8 +3,8 @@ from __future__ import annotations
 from importlib.util import find_spec
 from typing import Any, Callable, Sequence
 
-from backend.i18n import t
-from backend.log_messages import LOG_AGNO_NOT_INSTALLED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_AGNO_NOT_INSTALLED
 
 
 def agno_available() -> bool:
@@ -61,7 +61,7 @@ def require_workflow_classes() -> tuple[Any, Any, Any, Any]:
         tuple[Any, Any, Any, Any]: The Agno ``Workflow``, ``Step``, ``StepInput`` and ``StepOutput`` classes in that order.
 
     Raises:
-        RuntimeError: When the Agno package cannot be imported, carrying the localized "Agno is not installed" message resolved through ``backend.i18n.t()`` for the active locale.
+        RuntimeError: When the Agno package cannot be imported, carrying the localized "Agno is not installed" message resolved through ``backend.core.i18n.t()`` for the active locale.
     """
     if not agno_available():
         raise RuntimeError(t(LOG_AGNO_NOT_INSTALLED))

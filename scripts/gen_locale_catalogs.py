@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate Babel locale string catalogs (.po sources and .mo binaries) for every supported runtime locale.
 
-Catalogs are written to ``backend/locales/<LOCALE>/LC_MESSAGES/messages.po`` (human-editable translation source)
-after compiling each into the matching ``messages.mo`` consumed at runtime by :mod:`backend.i18n`. Adding a new
+Catalogs are written to ``backend/core/i18n/locales/<LOCALE>/LC_MESSAGES/messages.po`` (human-editable translation source)
+after compiling each into the matching ``messages.mo`` consumed at runtime by :mod:`backend.core.i18n`. Adding a new
 locale later only requires extending TRANSLATIONS with its mapping and rerunning this script, which matches the
 project i18n goal of requiring zero or minimal code changes per added language.
 """
@@ -41,7 +41,7 @@ from backend.core.execution.messages import (
     EXE_START_JOB_INVALID_STATE,
     EXE_UNKNOWN_ACTION,
 )
-from backend.log_messages import (
+from backend.core.i18n.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_FILE_NOT_FOUND,
     API_FORMAT_INVALID,
@@ -307,7 +307,7 @@ from backend.core.pipeline.table_ast import (
     MSG_TABLE_TEXT_FOOTER,
     MSG_TABLE_TEXT_ROW,
 )
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_CANCELLATION_REQUESTED,
     STAGE_CANCELLATION_WAITING,
     STAGE_RESTART_CANCELLED,
@@ -487,7 +487,7 @@ from frontend.telegram.messages import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LOCALES_DIR: Path = PROJECT_ROOT / "backend" / "locales"
+DEFAULT_LOCALES_DIR: Path = PROJECT_ROOT / "backend" / "core" / "i18n" / "locales"
 SUPPORTED_LOCALES: tuple[str, ...] = ("en_US", "pt_BR")
 #: Locale whose strings act as canonical English identity lookups.
 DEFAULT_LOCALE: str = "en_US"
@@ -495,7 +495,7 @@ DEFAULT_LOCALE: str = "en_US"
 #: Value stamped into ``POT-Creation-Date``.
 #:
 #: Babel defaults the header to ``datetime.now()``, so regenerating the catalogs
-#: rewrote that one header line and left ``backend/locales`` dirty even when not a
+#: rewrote that one header line and left ``backend/core/i18n/locales`` dirty even when not a
 #: single message had changed. `tests/test_i18n.py` regenerates the checked-in tree
 #: on purpose, which made every test run a source-tree modification and, when the
 #: worktree was not restored, made unrelated tests time-sensitive.
@@ -805,7 +805,7 @@ MESSAGES: tuple[str, ...] = (
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_RATE_LIMIT_EXCEEDED,
     WEB_SUCCESS_QUEUED,
-    # Server-side runtime log and e-mail message ids (backend/log_messages.py),
+    # Server-side runtime log and e-mail message ids (backend/core/i18n/log_messages.py),
     # resolved at log time through t() so local logs and outgoing e-mail content
     # follow the server-side detected locale (shell locale, then .env LOCALE,
     # then en_US) per the project i18n goal for operator-facing output.
@@ -1730,7 +1730,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Converta tabelas e fórmulas matemáticas de imagens em texto estruturado "
             "acessível (Markdown para tabelas, LaTeX para fórmulas)."
         ),
-        # Server-side runtime log messages (pt-BR mirrors of backend/log_messages.py),
+        # Server-side runtime log messages (pt-BR mirrors of backend/core/i18n/log_messages.py),
         # resolved at log time through t() so operator logs follow the server locale.
         LOG_LOGGER_CONFIGURED: "Logger configurado - nível: {level}",
         LOG_BOT_ALREADY_RUNNING: "Outra instância do bot já está em execução (PID={pid})",
@@ -2246,7 +2246,7 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
     """Build every supported locale's .po/.mo pair after validating translation tables are complete.
 
     Args:
-        locales_dir (Path): Output root receiving one directory per locale; tests pass a temporary directory outside the repo so generated artifacts never land inside the checked-in backend/locales production layout. Defaults to :data:`DEFAULT_LOCALES_DIR`.
+        locales_dir (Path): Output root receiving one directory per locale; tests pass a temporary directory outside the repo so generated artifacts never land inside the checked-in backend/core/i18n/locales production layout. Defaults to :data:`DEFAULT_LOCALES_DIR`.
 
     Returns:
         dict: locale name mapped to its (po_path, mo_path) artifact pair written by this pass for that locale's LC_MESSAGES tree.
@@ -2281,7 +2281,7 @@ def build_parser() -> argparse.ArgumentParser:
         argparse.ArgumentParser: Argument parser accepting an optional --locales-dir flag whose default is :data:`DEFAULT_LOCALES_DIR` when omitted.
     """
     parser = argparse.ArgumentParser(prog="gen-locale-catalogs", description=__doc__)
-    parser.add_argument("--locales-dir", type=Path, default=None, help="output root directory for locale catalogs (default: backend/locales).")
+    parser.add_argument("--locales-dir", type=Path, default=None, help="output root directory for locale catalogs (default: backend/core/i18n/locales).")
     return parser
 
 

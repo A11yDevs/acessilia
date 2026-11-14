@@ -3,7 +3,7 @@
 These constants hold the canonical English texts raised or reported by
 :class:`backend.core.execution.executor.ExecutorAgent` and
 :class:`backend.core.execution.executor.MethodRegistry`. Callers resolve them at
-raise/report time through :func:`backend.i18n.t` so the operator-facing text
+raise/report time through :func:`backend.core.i18n.t` so the operator-facing text
 follows the active locale, while the msgids stay stable English identifiers.
 Placeholders such as ``{method}`` are substituted by the caller after lookup.
 """

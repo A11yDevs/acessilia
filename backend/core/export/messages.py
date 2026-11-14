@@ -1,6 +1,6 @@
 """Canonical English msgids of the export: the default title and the export errors.
 
-Callers resolve them with :func:`backend.i18n.t` when they run, so the request
+Callers resolve them with :func:`backend.core.i18n.t` when they run, so the request
 locale applies. They live apart from ``pandoc_exporter`` so that the renderers
 and exporters can use the default title without importing the module that
 imports them, which was an import cycle (``pandoc_exporter`` ↔

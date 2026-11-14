@@ -15,8 +15,8 @@ from backend.agents.state_manager import TaskCancelledError, state_manager, trim
 from backend.config.settings import settings
 from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,
     LOG_DOCX_GENERATION_FAILED,
     LOG_DOCX_SKIPPED_DISABLED,
@@ -30,7 +30,7 @@ from backend.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_UA_SKIPPED_DISABLED,
 )
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_INTERRUPTED_DURING,

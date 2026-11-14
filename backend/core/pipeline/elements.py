@@ -27,7 +27,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     is_bottom_left,
 )
-from backend.i18n import t
+from backend.core.i18n import t
 
 if TYPE_CHECKING:
     pass

@@ -1,8 +1,8 @@
 from backend.services.blocking import offload
 import threading
 import sqlite3
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_STALE_PROCESS_INTERRUPTED,

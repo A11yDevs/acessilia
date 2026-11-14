@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend import i18n
+from backend.core import i18n
 from backend.core.pipeline import orchestrator as pddl
 from backend.config.settings import settings
 from tests.pddl_support import build_orchestrator

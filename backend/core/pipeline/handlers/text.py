@@ -78,7 +78,7 @@ from backend.core.pipeline.handlers.structure import (
     split_provenance,
     unique_element_id,
 )
-from backend.i18n import n, t
+from backend.core.i18n import n, t
 
 
 def _handle_norm_fix_method(

@@ -2,7 +2,7 @@
 
 These constants hold the canonical English texts emitted by the server's own
 loggers (startup, queue worker, cleanup, cache, API lifespan, email). Callers
-resolve them at log time through :func:`backend.i18n.t` so the log output is
+resolve them at log time through :func:`backend.core.i18n.t` so the log output is
 displayed in the server-side locale detected from the shell environment
 (then the .env LOCALE value, then en_US), while the msgids themselves stay
 stable English identifiers across every supported locale.

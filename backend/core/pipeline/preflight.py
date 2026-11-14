@@ -16,11 +16,11 @@ from typing import Any
 from backend.core.manifest.models import (
     ProcessingManifest,
 )
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
 )
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_DOCUMENT_TOO_MANY_PAGES,
 )
 from backend.tools.logger import logger

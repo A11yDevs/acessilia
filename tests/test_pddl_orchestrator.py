@@ -168,9 +168,9 @@ def _sample_manifest_without_page_element_ids() -> ProcessingManifest:
 
 
 def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
-    from backend.i18n import reset_request_locale, set_request_locale
-    from backend.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
-    from backend.i18n import t
+    from backend.core.i18n import reset_request_locale, set_request_locale
+    from backend.core.i18n.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
+    from backend.core.i18n import t
 
     manifest = _sample_manifest()
     manifest.extractor.configuration.update(

@@ -4,7 +4,7 @@ Renders the canonical document after a deterministic structural audit and an exp
 verbosity check, so that only compliant documents ever reach the exporter. HTML, PDF and TXT
 render in-process; DOCX and PDF/UA are rendered from the Pandoc AST by the Toolbox, which pins
 Pandoc in its own image (docs/adr/0003). Every user-visible error string is resolved through the
-active locale strings files via :func:`backend.i18n.t`, with the canonical English msgid
+active locale strings files via :func:`backend.core.i18n.t`, with the canonical English msgid
 constants below acting as the single source of truth consumed by scripts/gen_locale_catalogs
 for catalog generation.
 """
@@ -19,10 +19,10 @@ from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.pandoc_ast import degrade_math_to_text
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
-from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
-from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
+from backend.core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
+from backend.core.i18n.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from backend.core.export.messages import (
     MSG_AUDIT_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,

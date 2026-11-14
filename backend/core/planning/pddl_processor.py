@@ -14,8 +14,8 @@ from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
 from backend.core.manifest.models import Obligation, ProcessingManifest
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
     LOG_PDDL_DOMAIN_HASH_MISMATCH,
     LOG_PDDL_PROBLEM_HASH_MISMATCH,

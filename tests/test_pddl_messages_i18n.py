@@ -28,7 +28,7 @@ from backend.core.pipeline.handlers.text import (
     _handle_extract_line_numbers_method,
 )
 from backend.core.pipeline.obligations import _unsatisfied_obligations
-from backend.i18n import n, reset_request_locale, set_request_locale
+from backend.core.i18n import n, reset_request_locale, set_request_locale
 from backend.services.blocking import run_blocking
 
 from tests.pddl_support import (

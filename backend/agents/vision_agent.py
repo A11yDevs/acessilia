@@ -10,8 +10,8 @@ from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
 
 from backend.config.settings import settings
-from backend.i18n import active_locale, t
-from backend.log_messages import (
+from backend.core.i18n import active_locale, t
+from backend.core.i18n.log_messages import (
     LOG_VISION_AGENT_CONTEXT_RETRY,
     LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
     LOG_VISION_AGENT_RATE_LIMIT_RETRY,

@@ -190,7 +190,7 @@ async def test_invalid_recipient_is_rejected_before_upload(isolated, email):
     ],
 )
 async def test_invalid_recipient_error_is_localized(isolated, monkeypatch, tmp_path, locale, expected):
-    from backend import i18n
+    from backend.core import i18n
     from scripts.gen_locale_catalogs import build_locales
 
     catalogs = tmp_path / "locales"

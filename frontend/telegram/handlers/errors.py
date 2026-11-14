@@ -2,8 +2,8 @@ from aiogram import Router
 from aiogram.types import ErrorEvent
 from aiogram.filters import ExceptionTypeFilter
 
-from backend.i18n import t
-from backend.log_messages import LOG_TELEGRAM_UNHANDLED_ERROR
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_TELEGRAM_UNHANDLED_ERROR
 from backend.tools.logger import logger
 
 router = Router()

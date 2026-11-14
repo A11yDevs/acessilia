@@ -19,7 +19,7 @@ from docstruct.tables.ast import (  # noqa: F401
     table_ast_from_block,
     table_ast_from_rows,
 )
-from backend.i18n import t
+from backend.core.i18n import t
 
 __all__ = [
     "ALLOWED_SCOPES",

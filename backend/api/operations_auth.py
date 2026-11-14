@@ -6,8 +6,8 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import API_OPERATIONS_NOT_CONFIGURED, API_TOKEN_INVALID
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import API_OPERATIONS_NOT_CONFIGURED, API_TOKEN_INVALID
 
 
 _bearer = HTTPBearer(auto_error=False, scheme_name="OperationsToken")

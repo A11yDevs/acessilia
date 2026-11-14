@@ -8,8 +8,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import LOG_TELEGRAM_FEEDBACK_RECEIVED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_TELEGRAM_FEEDBACK_RECEIVED
 from backend.tools.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client

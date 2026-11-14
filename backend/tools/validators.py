@@ -4,7 +4,7 @@ from pathlib import Path
 from email.headerregistry import Address
 from email.errors import HeaderParseError
 
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.config.settings import settings
 
 #: Canonical English msgid for the unsupported-format error shown to API and Telegram callers.
@@ -76,7 +76,7 @@ def validate_file(filename: str, file_size: int) -> tuple[bool, str]:
         file_size (int): Size in bytes compared with settings.max_file_size_bytes; no default (required).
 
     Returns:
-        tuple[bool, str]: (True, "") when allowed; otherwise (False, reason) where reason is the localized message resolved from the active locale strings files via :func:`backend.i18n.t`.
+        tuple[bool, str]: (True, "") when allowed; otherwise (False, reason) where reason is the localized message resolved from the active locale strings files via :func:`backend.core.i18n.t`.
     """
     if not is_extension_allowed(filename):
         return False, t(MSG_UNSUPPORTED_FORMAT)

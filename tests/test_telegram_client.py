@@ -7,9 +7,9 @@ import respx
 
 from frontend.clients.api_client import ApiClient, ApiError
 from backend.config.settings import settings
-from backend.i18n import get_translations, reset_request_locale, set_request_locale, t
+from backend.core.i18n import get_translations, reset_request_locale, set_request_locale, t
 from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
-from backend.log_messages import LOG_PDF_UA_GENERATION_FAILED
+from backend.core.i18n.log_messages import LOG_PDF_UA_GENERATION_FAILED
 from frontend.telegram import user_context
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
