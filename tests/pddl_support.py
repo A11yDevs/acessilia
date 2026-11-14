@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.manifest.models import (
     ExtractorRun,
     ManifestElement,

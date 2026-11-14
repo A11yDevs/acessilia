@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers.common import _missing_obligation
 from backend.i18n import reset_request_locale, set_request_locale
 from backend.core.pipeline.handlers.fusion import (

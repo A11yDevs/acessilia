@@ -126,7 +126,7 @@ Proposed: option 2.
   | Today | Moves to |
   |---|---|
   | `backend/core/{manifest,planning,execution}` | `acessilia_core.{manifest,planning,execution}` |
-  | `backend/agents/pddl_orchestrator.py`, `backend/pipeline` | `acessilia_core.pipeline` |
+  | `backend/core/pipeline` (the orchestrator was `backend/agents/pddl_orchestrator.py` until #402's step 6 moved it), `backend/pipeline` | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (the Toolbox adapters, formula and code tools, prompts, logger) | `acessilia_core.toolbox` and helpers |
   | `backend/export`, `backend/adapters` | `acessilia_core.export` |

@@ -13,7 +13,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.handlers import inspection as inspection_handlers
 from tests.pddl_support import build_element, build_manifest, build_obligation

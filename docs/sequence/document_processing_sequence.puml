@@ -5,7 +5,7 @@ title Processing sequence — PDDL engine
 
 actor User
 participant "Frontend\n(Web/Telegram/CLI, via REST API)" as Front
-participant "PddlAccessibilityOrchestrator\nbackend/agents/pddl_orchestrator.py" as Orchestrator
+participant "PddlAccessibilityOrchestrator\nbackend/core/pipeline/orchestrator.py" as Orchestrator
 participant "ToolboxManifestExtractor\nbackend/core/manifest" as Manifest
 participant "PlannerAgent\nbackend/core/planning" as Planner
 participant "ExecutorAgent\n(Agno Workflow)" as Executor

@@ -16,7 +16,7 @@ from typing import ClassVar
 import pytest
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import ManifestElement

@@ -128,7 +128,7 @@ Proposta: a opção 2.
   | Hoje | Vai para |
   |---|---|
   | `backend/core/{manifest,planning,execution}` | `acessilia_core.{manifest,planning,execution}` |
-  | `backend/agents/pddl_orchestrator.py`, `backend/pipeline` | `acessilia_core.pipeline` |
+  | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo), `backend/pipeline` | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
   | `backend/export`, `backend/adapters` | `acessilia_core.export` |

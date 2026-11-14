@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.agents.pddl_orchestrator import PddlAccessibilityOrchestrator
+from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
 

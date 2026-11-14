@@ -193,7 +193,7 @@ def test_a_run_the_vision_model_failed_is_not_cacheable(elements, failures):
 
 
 def _enrich_tables(monkeypatch, table, *, image, reading):
-    from backend.agents import pddl_orchestrator as pddl
+    from backend.core.pipeline import orchestrator as pddl
     from backend.config.settings import settings
     from tests.pddl_support import build_manifest
 

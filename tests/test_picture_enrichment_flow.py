@@ -12,7 +12,7 @@ from typing import ClassVar
 
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from backend.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest, build_obligation

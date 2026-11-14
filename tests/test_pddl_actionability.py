@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.agents.pddl_orchestrator import (
+from backend.core.pipeline.orchestrator import (
     DETERMINISTIC_METHOD_HANDLERS,
     PddlAccessibilityOrchestrator,
 )

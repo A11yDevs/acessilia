@@ -69,7 +69,7 @@ def _reading(rows: list[list[str]]) -> DataOutput:
 def _run(monkeypatch, rows, reading, image=b"image"):
     """Enrich a table read as ``rows``; ``reading`` answers every call, or each
     call in turn when it is a list."""
-    from backend.agents import pddl_orchestrator as pddl_module
+    from backend.core.pipeline import orchestrator as pddl_module
 
     table = _element("t-1", "table", metadata={"table_ast": _ast(rows)})
     manifest = _manifest([table], [])

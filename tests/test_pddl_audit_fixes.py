@@ -5,7 +5,7 @@ from backend.core.pipeline import payload as pipeline_payload
 
 import pytest
 
-from backend.agents import pddl_orchestrator as pddl
+from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.handlers import content as content_handlers
 from tests.pddl_support import (
     build_element as _element,
