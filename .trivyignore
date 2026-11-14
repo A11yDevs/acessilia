@@ -1,0 +1,6 @@
+# The Debian system copy of setuptools in the pinned python:3.11-slim base is
+# 70.3.0. The image upgrades the /usr/local copy used by pip, but the distro
+# copy remains and Trivy reports CVE-2025-47273 against it. Track the base-image
+# update (Dependabot docker ecosystem) and remove this exception once the
+# distro package is >= 78.1.1.
+CVE-2025-47273
