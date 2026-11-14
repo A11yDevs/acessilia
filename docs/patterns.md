@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Identified Patterns
 
 ### 1. Canonical Document Pipeline
-- Implementation: [backend/core/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
+- Implementation: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 

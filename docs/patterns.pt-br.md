@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 ## Padrões Identificados
 
 ### 1. Pipeline de Documento Canônico
-- Implementação: [backend/core/pipeline/canonical_builder.py](../backend/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
+- Implementação: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
 - Papel: normalizar cargas de regiões estruturadas em um esquema de documento canônico, validar estrutura e hierarquia de títulos, construir o AST intermediário e despachar para os renderizadores.
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
