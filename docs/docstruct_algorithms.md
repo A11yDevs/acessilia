@@ -2,7 +2,7 @@
 
 This document explains how the deterministic algorithms behind the `docstruct`
 library work and how the Acessilia agents invoke them. It is the companion to
-[`libs/docstruct/README.md`](../../libs/docstruct/README.md) (public API) and
+[`libs/docstruct/README.md`](../libs/docstruct/README.md) (public API) and
 [`pmv_agno_pddl.md`](pmv_agno_pddl.md) (PDDL orchestration).
 
 > Also available in **Brazilian Portuguese**: [Portuguese version](docstruct_algorithms.pt-br.md)
@@ -377,7 +377,7 @@ and letter suffixes or an appendix prefix, such as `1`, `2.3`, `4a` and `A.1`.
 
 ## 7. Related documentation
 
-- [libs/docstruct/README.md](../../libs/docstruct/README.md) — public API.
+- [libs/docstruct/README.md](../libs/docstruct/README.md) — public API.
 - [pmv_agno_pddl.md](pmv_agno_pddl.md) — PDDL orchestration and the
   `dual-provider-fusion` method.
 - [architecture.md](architecture.md) — system architecture.
