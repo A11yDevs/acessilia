@@ -1,16 +1,7 @@
 name: Security
 
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-      - 'release/**'
-  push:
-    branches:
-      - main
-      - develop
-      - 'release/**'
+  workflow_call:
   schedule:
     - cron: "43 4 * * 1"
   workflow_dispatch:
@@ -18,7 +9,6 @@ on:
 permissions:
   contents: read
   security-events: write
-  packages: read
 
 concurrency:
   group: security-${{ github.event.pull_request.number || github.ref }}
@@ -41,9 +31,12 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Check the lock is current
+        run: uv lock --check
+
       - name: Export locked dependencies
         run: |
-          uv export --frozen --all-extras --no-hashes --no-emit-project \
+          uv export --locked --all-extras --no-hashes --no-emit-project \
             --output-file requirements-audit.txt
 
       - name: Audit known vulnerabilities

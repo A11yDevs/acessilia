@@ -16,6 +16,7 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -314,6 +315,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  security:
+    name: security checks
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write
+
   delivery:
     name: publish verified images
     if: >
@@ -327,6 +335,7 @@ jobs:
       - tests
       - sdk-isolated
       - docstruct-isolated
+      - security
     uses: ./.github/workflows/delivery.yml
     with:
       ref: ${{ github.sha }}
