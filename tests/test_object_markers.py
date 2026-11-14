@@ -10,13 +10,13 @@ import pytest
 from backend.api import worker
 from backend.api.app import create_app
 from backend.config.settings import settings
-from backend.export.markers import (
+from backend.core.export.markers import (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_OBJECT_MARKER_IMAGE,
     MSG_OBJECT_MARKER_TABLE,
     with_object_markers,
 )
-from backend.export.pandoc_exporter import export_accessible_document
+from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.i18n import t
 from backend.services import job_store
 from backend.services.job_store import load_record

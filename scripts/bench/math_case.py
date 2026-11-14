@@ -600,8 +600,8 @@ def pdf_text(path: Path) -> str:
 
 async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, Path | None]:
     """Run the core on ``pdf`` and write the canonical document, TXT and PDF/UA."""
-    from backend.export.exporters.pdf_exporter import export_pdf_ua
-    from backend.export.exporters.txt_exporter import export_txt
+    from backend.core.export.exporters.pdf_exporter import export_pdf_ua
+    from backend.core.export.exporters.txt_exporter import export_txt
     from backend.service import process
 
     canonical = await process(pdf)

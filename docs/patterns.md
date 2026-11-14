@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Identified Patterns
 
 ### 1. Canonical Document Pipeline
-- Implementation: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py)
+- Implementation: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py)
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
@@ -23,7 +23,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
 
 ### 4. Export Adapters & Renderers
-- Implementation: [backend/export/pandoc_exporter.py](../backend/export/pandoc_exporter.py) with renderers in `backend/export/renderers/` (TXT, HTML) and export adapters in `backend/export/exporters/` (MP3 via edge-tts; DOCX and PDF/UA, the only PDF, rendered on the Toolbox, which also audits the PDF/UA with veraPDF).
+- Implementation: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py) with renderers in `backend/core/export/renderers/` (TXT, HTML) and export adapters in `backend/core/export/exporters/` (MP3 via edge-tts; DOCX and PDF/UA, the only PDF, rendered on the Toolbox, which also audits the PDF/UA with veraPDF).
 - Benefit: identical canonical document produces multiple output formats cleanly.
 
 ### 5. In-Memory State Machine & Cooperative Cancellation

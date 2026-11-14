@@ -99,7 +99,7 @@ operations, with the decision part staying in the core:
 | Media inspection | `backend/tools/media_inspect.py` | `media.inspect` | what a slide deck or a page limit means for the job |
 | PDF/UA audit | `backend/tools/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | what a failed audit does to the job |
 | Text spans | `backend/tools/text_spans.py` | already `ToolboxPdfClient.text_spans_by_page` (#455) | which pages, the per-document cache |
-| Pandoc export | `backend/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | which profile, which formats |
+| Pandoc export | `backend/core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | which profile, which formats |
 
 ## Open, for ADR-0017 and its follow-ups
 

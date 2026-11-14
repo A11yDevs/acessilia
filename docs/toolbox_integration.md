@@ -497,7 +497,7 @@ service.py: _build_orchestrator()
 - `backend/tools/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the core settings) and the re-exported error types
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — structure extraction, the artifact store and the dataset routes
 - `backend/tools/toolbox_math_tools.py` — the core's policy over the math client: a rejected input gives an empty result, an unavailable capability raises `MathCapabilityUnavailable` (ADR-0007); reading the two `math.recognize@1` document shapes is the SDK's `clients.math.recognized_formulas`
-- `backend/tools/media_inspect.py`, `backend/tools/pdf_ua_audit.py`, `backend/export/pandoc_exporter.py` (`_toolbox_export`) — when to call `media.inspect`, `pdf.validate.pdf_ua` and the exports (enable flags, remote cache), logging and the e-mail summary; each call is one SDK client method
+- `backend/tools/media_inspect.py`, `backend/tools/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — when to call `media.inspect`, `pdf.validate.pdf_ua` and the exports (enable flags, remote cache), logging and the e-mail summary; each call is one SDK client method
 - `clients/page_ocr.py` — `document.ocr.page` (whole-page VLM)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`

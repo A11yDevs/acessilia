@@ -99,7 +99,7 @@ candidatos a operações do SDK, com a parte da decisão ficando no core:
 | Inspeção de mídia | `backend/tools/media_inspect.py` | `media.inspect` | o que uma apresentação ou um limite de páginas significa para o job |
 | Auditoria PDF/UA | `backend/tools/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | o que uma auditoria reprovada faz com o job |
 | Text spans | `backend/tools/text_spans.py` | já é `ToolboxPdfClient.text_spans_by_page` (#455) | quais páginas, o cache por documento |
-| Exportação Pandoc | `backend/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | qual perfil, quais formatos |
+| Exportação Pandoc | `backend/core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | qual perfil, quais formatos |
 
 ## Em aberto, para a ADR-0017 e as seguintes
 
