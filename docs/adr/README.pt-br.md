@@ -34,6 +34,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0016](0016-core-package.pt-br.md) | O core como um pacote próprio, `acessilia_core` | Proposto |
 | [0017](0017-operational-sdk-and-agentic-core.pt-br.md) | Fronteiras entre o SDK operacional e o core agêntico | Aceito |
 | [0018](0018-core-uses-sdk-public-api.pt-br.md) | O core usa só a API pública do SDK | Proposto |
+| [0019](0019-operation-identifiers-and-cancellation.pt-br.md) | Identificadores de operação e cancelamento remoto | Aceita |
 
 ## Processo
 

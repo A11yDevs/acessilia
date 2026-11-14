@@ -31,9 +31,11 @@ from backend.core.i18n.log_messages import (
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
 )
-from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.blocking import run_blocking
+from backend.services.job_store import delete_request, save_request, save_status
+from backend.services.operation_registry import operation_registry
 from backend.services.queue_service import QueueItem, unified_queue
+from backend.services.remote_cancellation import cancel_task_operations
 from backend.tools.logger import logger
 from backend.tools.validators import (
     MSG_FILE_TOO_LARGE,
@@ -188,6 +190,7 @@ async def job_status(request: Request, task_id: str):
         email_delivery=job.get("email_delivery"),
         cancellation_requested_at=job.get("cancellation_requested_at"),
         cancellation_elapsed_seconds=job.get("cancellation_elapsed_seconds"),
+        remote_cancellation=job.get("remote_cancellation"),
     )
 
 
@@ -206,8 +209,21 @@ async def cancel_job(request: Request, task_id: str):
             status_code=409,
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
+    # Persist the local cancellation first: a slow or failed remote cancel must
+    # not lose a user's request. The sync helper is live-only.
     status = await get_job_status_async(task_id)
-    # Acknowledge only after cancelling + request timestamp are durable, even
-    # while a shielded extraction is still running. The sync helper is live-only.
     await run_blocking(save_status, task_id, status)
-    return CancelResponse(task_id=task_id, status=status["status"])
+    remote = await cancel_task_operations(task_id)
+    worker.state_manager.set_remote_cancellation(task_id, remote)
+    status = await get_job_status_async(task_id)
+    if status is not None and status.get("status") == "cancelled":
+        # A queued job has no worker that would clear its cancellation marker.
+        
+
+        operation_registry.clear(task_id)
+    await run_blocking(save_status, task_id, status)
+    return CancelResponse(
+        task_id=task_id,
+        status=status["status"],
+        remote_cancellation=remote,
+    )

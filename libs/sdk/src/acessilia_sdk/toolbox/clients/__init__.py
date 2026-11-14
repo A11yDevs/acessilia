@@ -14,6 +14,7 @@ from acessilia_sdk.toolbox.clients.layout import ToolboxLayoutClient
 from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
 from acessilia_sdk.toolbox.clients.media_inspect import ToolboxMediaInspectClient
 from acessilia_sdk.toolbox.clients.ocr import ToolboxOcrClient
+from acessilia_sdk.toolbox.clients.operation import ToolboxOperationClient
 from acessilia_sdk.toolbox.clients.orientation import ToolboxOrientationClient
 from acessilia_sdk.toolbox.clients.page_ocr import ToolboxPageOcrClient
 from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
@@ -31,6 +32,7 @@ __all__ = [
     "ToolboxMathClient",
     "ToolboxMediaInspectClient",
     "ToolboxOcrClient",
+    "ToolboxOperationClient",
     "ToolboxOrientationClient",
     "ToolboxPageOcrClient",
     "ToolboxPdfClient",

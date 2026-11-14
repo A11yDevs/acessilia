@@ -7,6 +7,14 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** identificadores de operação e cancelamento (ADR-0019):
+  `operation_context` e `operation_attempt` anexam `task_id`, um
+  `operation_id` estável e um `attempt_id` novo aos cabeçalhos de capacidade e
+  artefato da Toolbox, sem ler configuração. `ToolboxOperationClient.cancel`
+  pede aos endpoints configurados que parem uma operação com timeout curto e
+  devolve `OperationCancelResult` (`cancel_requested`, `cancelled`, `finished`,
+  `failed` ou `not_found`) em vez de levantar; um cancelamento que falha fica
+  para o chamador registrar (#409).
 - **Adicionado** `convert_formula` e `verbalize_formula` em
   `acessilia_sdk.operations.formula`, um passo por capacidade (`math.convert`,
   nas duas direções, e `math.verbalize`), cada um devolvendo um `FormulaText`

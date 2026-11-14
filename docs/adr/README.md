@@ -34,6 +34,7 @@ ones here instead of restating them.
 | [0016](0016-core-package.md) | The core as a package of its own, `acessilia_core` | Proposed |
 | [0017](0017-operational-sdk-and-agentic-core.md) | Operational SDK and agentic core boundaries | Accepted |
 | [0018](0018-core-uses-sdk-public-api.md) | The core uses only the SDK's public API | Proposed |
+| [0019](0019-operation-identifiers-and-cancellation.md) | Operation identifiers and remote cancellation | Accepted |
 
 ## Process
 

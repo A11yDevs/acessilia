@@ -32,6 +32,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxTimeout,
     ToolboxUnavailable,
 )
+from acessilia_sdk.toolbox.operation import operation_attempt, operation_headers
 from acessilia_sdk.toolbox.transport import (
     auth_headers,
     execute_capability,
@@ -222,14 +223,19 @@ class ToolboxCapabilityClient:
         """
         if timeout_seconds is not None:
             kwargs["timeout"] = httpx.Timeout(timeout_seconds)
+        extra_headers = kwargs.pop("headers", {})
 
         async def call(http: httpx.AsyncClient) -> httpx.Response:
+            # Built inside the attempt so every retry gets a fresh attempt id.
+            headers = {**operation_headers(), **extra_headers}
             try:
                 if files_factory is None:
-                    response = await http.request(method, path, **kwargs)
+                    response = await http.request(method, path, headers=headers, **kwargs)
                 else:
                     with files_factory() as files:
-                        response = await http.request(method, path, files=files, **kwargs)
+                        response = await http.request(
+                            method, path, files=files, headers=headers, **kwargs
+                        )
             except httpx.TimeoutException as e:
                 raise ToolboxTimeout(f"Timed out on {method} {path}: {e}") from e
             except httpx.RequestError as e:
@@ -338,7 +344,8 @@ class ToolboxCapabilityClient:
         """
         for attempt in range(retries + 1):
             try:
-                return await attempt_call()
+                with operation_attempt():
+                    return await attempt_call()
             except FAILOVER_ERRORS:
                 if attempt == retries:
                     raise

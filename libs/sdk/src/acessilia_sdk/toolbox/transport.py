@@ -29,6 +29,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxTimeout,
     ToolboxUnsupportedMediaType,
 )
+from acessilia_sdk.toolbox.operation import operation_headers
 
 _MEDIA_TYPES = {
     ".pdf": "application/pdf",
@@ -162,15 +163,16 @@ async def execute_capability(
         form["no_cache"] = True
 
     path = f"/v1/capabilities/{capability_id}:execute"
+    headers = operation_headers() or None
     try:
         if artifact_id:
-            response = await http.post(path, data=form)
+            response = await http.post(path, data=form, headers=headers)
         elif upload is not None:
-            response = await http.post(path, files={"file": upload}, data=form)
+            response = await http.post(path, files={"file": upload}, data=form, headers=headers)
         else:
             with open(file_path, "rb") as f:
                 files = {"file": (file_path.name, f, media_type_for(file_path))}
-                response = await http.post(path, files=files, data=form)
+                response = await http.post(path, files=files, data=form, headers=headers)
     except httpx.TimeoutException as e:
         raise ToolboxTimeout(
             f"Timeout ao executar {capability_id} via Toolbox: {e}"

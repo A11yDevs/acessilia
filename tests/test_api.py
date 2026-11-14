@@ -563,6 +563,8 @@ def test_cancel_respects_task_state(client, monkeypatch, status):
     if status == "processing":
         assert response.status_code == 200
         assert response.json()["status"] == actual["status"] == "cancelled"
+        assert response.json()["remote_cancellation"] == "none"
+        assert actual["remote_cancellation"] == "none"
         assert manager.foi_cancelada(task_id)
     else:
         assert response.status_code == 409
@@ -570,6 +572,39 @@ def test_cancel_respects_task_state(client, monkeypatch, status):
         assert actual["status"] == status
         assert manager.obter(task_id) == before
         assert manager.foi_cancelada(task_id) == (status == "cancelled")
+
+
+def test_cancel_reports_a_requested_remote_cancellation(client, monkeypatch):
+    from backend.agents.state_manager import StateManager
+    from backend.api import worker
+    from backend.services import remote_cancellation
+    from backend.services.operation_registry import operation_registry
+
+    manager = StateManager()
+    monkeypatch.setattr(worker, "state_manager", manager)
+    task_id = manager.criar_tarefa(Path("doc.pdf"))
+    operation = operation_registry.begin(task_id, "primary")
+
+    class Client:
+        async def cancel(self, operation_id, *, task_id, timeout_seconds):
+            assert operation_id == operation.operation_id
+            return remote_cancellation.OperationCancelResult(
+                operation_id=operation_id,
+                state="cancel_requested",
+                cancel_requested=True,
+            )
+
+        async def close(self):
+            return None
+
+    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls: Client())
+    try:
+        response = client.post(f"/api/v1/jobs/{task_id}/cancel")
+        assert response.status_code == 200
+        assert response.json()["remote_cancellation"] == "requested"
+        assert client.get(f"/api/v1/jobs/{task_id}").json()["remote_cancellation"] == "requested"
+    finally:
+        operation_registry.clear(task_id)
 
 
 @pytest.mark.parametrize("in_queue", [True, False])
