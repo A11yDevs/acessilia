@@ -375,13 +375,13 @@ from backend.core.i18n.stage_messages import (
     STAGE_FAILED_DURING,
     STAGE_RESTART_INTERRUPTED_DURING,
 )
-from backend.tools.toolbox_math_tools import (
+from backend.core.toolbox.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
     MSG_MATHML_UNAVAILABLE,
     MSG_SPEECH_REJECTED,
     MSG_SPEECH_UNAVAILABLE,
 )
-from backend.tools.validators import MSG_FILE_TOO_LARGE, MSG_INVALID_EMAIL_ADDRESS, MSG_UNSUPPORTED_FORMAT
+from backend.services.validators import MSG_FILE_TOO_LARGE, MSG_INVALID_EMAIL_ADDRESS, MSG_UNSUPPORTED_FORMAT
 from frontend.web.messages import (
     WEB_JOB_TITLE,
     WEB_JOB_PENDING,

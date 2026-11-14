@@ -619,7 +619,7 @@ class TestVlmPairwiseJudge:
 
     def test_toolbox_failure_lets_the_planner_move_on(self, tmp_path, monkeypatch) -> None:
         from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
-        from backend.tools.toolbox_client import ToolboxProviderUnavailable
+        from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
         manifest = self._manifest(tmp_path)
 
@@ -738,7 +738,7 @@ class TestVlmPairwiseJudge:
 
     def test_rejected_call_is_not_reported_as_unavailable(self, tmp_path, monkeypatch) -> None:
         from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
-        from backend.tools.toolbox_client import ToolboxAuthenticationError
+        from backend.core.toolbox.toolbox_client import ToolboxAuthenticationError
 
         manifest = self._manifest(tmp_path)
 
@@ -807,7 +807,7 @@ class TestVlmPairwiseJudge:
             return FakeClient()
 
         monkeypatch.setattr(
-            "backend.tools.toolbox_client.make_toolbox_client", fake_factory
+            "backend.core.toolbox.toolbox_client.make_toolbox_client", fake_factory
         )
 
         result = _judge_page(b"\x89PNG-fake", "A", "B")

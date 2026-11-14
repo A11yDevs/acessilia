@@ -42,7 +42,7 @@ from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.core.pipeline.elements import (
     _OVERLAY_HOST_TOLERANCE,
     _bbox,

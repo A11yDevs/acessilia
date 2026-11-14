@@ -8,7 +8,7 @@ from backend.core.i18n.log_messages import (
     LOG_TELEGRAM_FILE_DOWNLOADING,
     LOG_TELEGRAM_FILE_DOWNLOADED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 async def download_file(bot: Bot, file_id: str, destination: Path) -> Path:

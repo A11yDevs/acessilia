@@ -36,9 +36,9 @@ from backend.core.i18n.log_messages import (
     LOG_WEB_RATE_LIMIT_EXCEEDED,
     LOG_WEB_UPLOAD_ERROR,
 )
-from backend.tools.access_log_filter import AccessLogFilter
-from backend.tools.logger import logger
-from backend.tools.validators import MSG_FILE_TOO_LARGE
+from backend.services.access_log_filter import AccessLogFilter
+from backend.core.logger import logger
+from backend.services.validators import MSG_FILE_TOO_LARGE
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.web.messages import (

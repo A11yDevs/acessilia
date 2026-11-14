@@ -355,7 +355,7 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
 
 def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
     """PDF/UA is rendered only by the Toolbox (docs/adr/0003)."""
-    from backend.tools.toolbox_client import ToolboxProviderUnavailable
+    from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
     monkeypatch.setattr("backend.core.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", True)
 

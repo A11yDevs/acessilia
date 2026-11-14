@@ -16,7 +16,7 @@ from backend.core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 async def inspect_source_media(
@@ -51,7 +51,7 @@ async def inspect_source_media(
     from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
     from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
-    from backend.tools.toolbox_client import make_toolbox_client
+    from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     owned_client = client is None
     inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient)

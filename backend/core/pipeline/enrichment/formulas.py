@@ -60,9 +60,9 @@ from backend.core.i18n.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_RECOGNIZING_FORMULA,
 )
-from backend.tools.formula_tools import normalize_latex
-from backend.tools.logger import logger
-from backend.tools.toolbox_math_tools import (
+from backend.core.formula_tools import normalize_latex
+from backend.core.logger import logger
+from backend.core.toolbox.toolbox_math_tools import (
     MathCapabilityUnavailable,
     toolbox_recognize_formula,
 )

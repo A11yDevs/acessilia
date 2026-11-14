@@ -121,7 +121,7 @@ def _render_client(artifact_id: str | None):
     """
     from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
-    from backend.tools.toolbox_client import make_toolbox_client
+    from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     return make_toolbox_client(
         ToolboxPdfClient, resend_file_on_missing_artifact=artifact_id is not None

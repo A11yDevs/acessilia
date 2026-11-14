@@ -93,7 +93,7 @@ def spans(monkeypatch):
         return {1: {"page_number": 1, "width": 612.0, "height": HEIGHT, "rotation": 0,
                     "lines": [{"bbox": [0, 0, 0, 0], "spans": line} for line in [PARAGRAPH, *LINES]]}}
 
-    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
     from backend.config.settings import settings
     monkeypatch.setattr(settings, "inline_math_detection", "fonts")
     return calls
@@ -163,7 +163,7 @@ def test_an_unavailable_capability_is_asked_once(monkeypatch, spans):
         calls.append(args)
         raise ToolboxError("document.text.spans is not in the catalogue")
 
-    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", failing)
+    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", failing)
     manifest = _manifest()
     reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
 
@@ -229,7 +229,7 @@ def test_a_slash_on_a_tables_second_page_is_claimed_there(monkeypatch, spans):
             for page in pages
         }
 
-    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
     manifest = _manifest()
     table, slash = manifest.elements[1], manifest.elements[2]
     table.provenance = _box(173, 695, 453, 715) + _box(173, 254, 453, 311, page=2)

@@ -36,7 +36,7 @@ def test_cache_tracks_fusion_and_model_revision(monkeypatch, name, value):
 
 @pytest.mark.parametrize("extension", [".bmp", ".gif", ".webp"])
 def test_unsupported_inputs_rejected_before_job_creation(extension):
-    from backend.tools.validators import validate_file
+    from backend.services.validators import validate_file
 
     assert validate_file("input" + extension, 100)[0] is False
 
@@ -95,7 +95,7 @@ def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
 
 def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
     from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-    from backend.tools.toolbox_client import ToolboxProviderUnavailable
+    from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
     source = tmp_path / "doc.pdf"

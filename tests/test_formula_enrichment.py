@@ -13,8 +13,8 @@ import pytest
 from backend.core.export.renderers.html_renderer import _render_block as render_html_block
 from backend.core.export.renderers.txt_renderer import _render_block as render_txt_block
 from backend.core.pipeline.validators import validate_canonical_document
-from backend.tools.formula_tools import label_spoken_formula, normalize_latex
-from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
+from backend.core.formula_tools import label_spoken_formula, normalize_latex
+from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from backend.core.pipeline.handlers import formula as formula_handlers
 
@@ -67,7 +67,7 @@ def test_label_spoken_formula():
 
 
 def test_core_has_no_local_converter_or_verbalizer():
-    from backend.tools import formula_tools
+    from backend.core import formula_tools
 
     assert not hasattr(formula_tools, "latex_to_mathml")
     assert not hasattr(formula_tools, "verbalize_latex_fallback")

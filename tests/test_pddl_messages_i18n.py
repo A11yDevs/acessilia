@@ -396,8 +396,8 @@ class TestHandlerMessagesFollowTheLocale:
 
     def test_math_controlled_error_is_localized(self, locale, monkeypatch) -> None:
         from backend.core.pipeline.handlers.formula import _handle_mathml_method
-        from backend.tools.toolbox_client import ToolboxProviderUnavailable
-        from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
+        from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
+        from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 
         def unavailable(*_args, **_kwargs):
             raise MathCapabilityUnavailable(

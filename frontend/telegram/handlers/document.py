@@ -13,7 +13,7 @@ from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.telegram import user_context
 
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.core.i18n import SUPPORTED_LOCALES, get_translations, t
 from backend.core.i18n.log_messages import (
     LOG_TELEGRAM_API_JOB_REJECTED,
@@ -24,7 +24,7 @@ from backend.core.i18n.log_messages import (
     LOG_TELEGRAM_RATE_LIMIT_WAIT,
     LOG_TELEGRAM_SEND_FAILED_AFTER_RETRIES,
 )
-from backend.tools.validators import validate_file
+from backend.services.validators import validate_file
 from frontend.telegram.adapters.status_tracker import StatusTracker
 from backend.config.settings import settings
 from frontend.telegram.messages import (

@@ -38,7 +38,7 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox import clients as _sdk_clients
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from backend.config.settings import settings
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 ClientT = TypeVar("ClientT", bound=ToolboxCapabilityClient)

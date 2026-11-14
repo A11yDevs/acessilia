@@ -34,7 +34,7 @@ from backend.core.pipeline.toolbox import (
     _toolbox_render,
 )
 from backend.core.i18n import t
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 #: Longest side of the page image sent to the judge. Two candidates plus the
@@ -69,7 +69,7 @@ def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, A
     from acessilia_sdk.runtime import run_sync
     from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
 
-    from backend.tools.toolbox_client import make_toolbox_client
+    from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     async def call(path: Path) -> dict[str, Any]:
         client = make_toolbox_client(ToolboxAdjudicateClient)
@@ -162,7 +162,7 @@ def _judge_one_page(
     """
     from docstruct.fusion.judge import DEFAULT_NEW_THR
 
-    from backend.tools.toolbox_client import (
+    from backend.core.toolbox.toolbox_client import (
         ToolboxAuthenticationError,
         ToolboxContractViolation,
         ToolboxError,

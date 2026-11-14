@@ -14,7 +14,7 @@ from backend.core.i18n.log_messages import (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 @dataclass

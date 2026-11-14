@@ -2,7 +2,7 @@
 
 Runs before planning, when inline math detection is enabled. It reads the
 source's text spans through the core's per-document reader (``_TextSpanReader``,
-which binds ``backend.tools.text_spans`` and records a failure in
+which binds ``backend.core.toolbox.text_spans`` and records a failure in
 ``configuration["inline_math_detection"]``), finds the math runs of each boxed
 element with ``docstruct.text.inline_math``, splices them into the text or the
 table cells, and claims the negation slashes that overlay a relation. Moved
@@ -41,7 +41,7 @@ from backend.core.pipeline.elements import (
 from backend.core.pipeline.toolbox import (
     _source_artifact_id,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 #: Element types whose text the exporters render as prose with inline math.
 _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})
@@ -66,7 +66,7 @@ class _TextSpanReader:
         the Toolbox cannot read them (recorded as ``unavailable``)."""
         from acessilia_sdk.toolbox.errors import ToolboxError
 
-        from backend.tools.text_spans import fetch_text_spans
+        from backend.core.toolbox.text_spans import fetch_text_spans
 
         if self._failed:
             return None

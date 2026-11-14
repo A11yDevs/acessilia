@@ -20,7 +20,7 @@ from backend.core.i18n.log_messages import (
     LOG_PDF_UA_AUDIT_FINISHED,
     LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 #: Validation profile the exported PDF is audited against.
 AUDIT_PROFILE = "ua1"
@@ -50,7 +50,7 @@ async def audit_pdf_ua(pdf_path: Path, *, client: Any | None = None) -> dict[str
 
     from acessilia_sdk.toolbox.clients import ToolboxPdfValidateClient
 
-    from backend.tools.toolbox_client import make_toolbox_client
+    from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     owned_client = client is None
     validate_client = client or make_toolbox_client(ToolboxPdfValidateClient)

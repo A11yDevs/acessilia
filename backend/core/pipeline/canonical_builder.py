@@ -13,9 +13,9 @@ from typing import Any
 from uuid import uuid4
 
 from backend.core.i18n import t
-from backend.tools.formula_tools import label_spoken_formula, normalize_latex
-from backend.tools.logger import logger
-from backend.tools.toolbox_math_tools import (
+from backend.core.formula_tools import label_spoken_formula, normalize_latex
+from backend.core.logger import logger
+from backend.core.toolbox.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
     MSG_MATHML_UNAVAILABLE,
     MSG_SPEECH_REJECTED,

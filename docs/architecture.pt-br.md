@@ -32,8 +32,8 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/services/download_token_service.py](../backend/services/download_token_service.py): geração de token para links de download seguro na Web.
 
 #### 0.4. Ferramentas e Utilitários de Domínio (`backend/tools/`)
-- [backend/tools/logger.py](../backend/tools/logger.py): configuração centralizada do logger loguru.
-- [backend/tools/validators.py](../backend/tools/validators.py): validação de extensão e tamanho de arquivo.
+- [backend/core/logger.py](../backend/core/logger.py): configuração centralizada do logger loguru.
+- [backend/services/validators.py](../backend/services/validators.py): validação de extensão e tamanho de arquivo.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): normalização de texto e parsing de Markdown.
 - [backend/tools/prompt_tools.py](../backend/tools/prompt_tools.py): carregador de prompt e resolutor de templates.
 
@@ -82,7 +82,7 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 - [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
 - [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
 - [backend/core/export/renderers/](../backend/core/export/renderers/): renderizadores para TXT e HTML (DOCX e PDF/UA são renderizados na Toolbox).
-- [backend/core/export/exporters/](../backend/core/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz o PDF/UA, o único PDF. [backend/tools/pdf_ua_audit.py](../backend/tools/pdf_ua_audit.py) o audita com o veraPDF na Toolbox (`pdf.validate.pdf_ua`) para o e-mail de resultado.
+- [backend/core/export/exporters/](../backend/core/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz o PDF/UA, o único PDF. [backend/core/toolbox/pdf_ua_audit.py](../backend/core/toolbox/pdf_ua_audit.py) o audita com o veraPDF na Toolbox (`pdf.validate.pdf_ua`) para o e-mail de resultado.
 
 ---
 

@@ -4,7 +4,7 @@ from aiogram.filters import ExceptionTypeFilter
 
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_TELEGRAM_UNHANDLED_ERROR
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 router = Router()
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_PROMPT_FILE_NOT_FOUND
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "ai" / "prompts"
 

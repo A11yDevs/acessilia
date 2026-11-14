@@ -24,7 +24,7 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox.capabilities import provider_default
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient, ToolboxStructureClient
 from backend.config.settings import Settings, settings
-from backend.tools import toolbox_client
+from backend.core.toolbox import toolbox_client
 from scripts.bench import toolbox
 
 PRIMARY = "http://toolbox-a.test"
@@ -239,13 +239,15 @@ def test_a_failover_is_reported_on_stderr(capsys) -> None:
 BENCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "bench"
 
 
-FORBIDDEN_PREFIX = "backend.tools.toolbox_"
+#: The core's Toolbox adapters (backend/tools/toolbox_* until ADR-0016's step 2 gathered
+#: them in backend/core/toolbox).
+FORBIDDEN_PREFIX = "backend.core.toolbox"
 
 
 def _forbidden_imports(source: str) -> list[str]:
-    """Modules under ``backend.tools.toolbox_*`` that ``source`` imports.
+    """Modules under ``backend.core.toolbox`` that ``source`` imports.
 
-    ``from backend.tools import toolbox_client`` names the module only through
+    ``from backend.core.toolbox import toolbox_client`` names the module only through
     the imported name, so a ``from`` import is checked both as its module and
     as each ``module.name`` it imports; aliases do not matter.
     """
@@ -264,14 +266,15 @@ def _forbidden_imports(source: str) -> list[str]:
 @pytest.mark.parametrize(
     "source",
     [
-        "import backend.tools.toolbox_client",
-        "import backend.tools.toolbox_client as tc",
-        "from backend.tools.toolbox_client import make_toolbox_client",
-        "from backend.tools.toolbox_client import make_toolbox_client as m",
-        "from backend.tools import toolbox_client",
-        "from backend.tools import toolbox_client as tc",
-        "from backend.tools import logger, toolbox_math_tools",
-        "def f():\n    from backend.tools import toolbox_client",
+        "import backend.core.toolbox.toolbox_client",
+        "import backend.core.toolbox.toolbox_client as tc",
+        "from backend.core.toolbox.toolbox_client import make_toolbox_client",
+        "from backend.core.toolbox.toolbox_client import make_toolbox_client as m",
+        "from backend.core.toolbox import toolbox_client",
+        "from backend.core.toolbox import toolbox_client as tc",
+        "from backend.core.toolbox import media_inspect, toolbox_math_tools",
+        "from backend.core import logger, toolbox",
+        "def f():\n    from backend.core.toolbox import toolbox_client",
     ],
 )
 def test_the_guard_sees_every_form_of_a_forbidden_import(source) -> None:
@@ -282,8 +285,9 @@ def test_the_guard_sees_every_form_of_a_forbidden_import(source) -> None:
     "source",
     [
         "from backend.core.pipeline.canonical_builder import build_canonical_document",
-        "from backend.tools import logger",
-        "from backend.tools.logger import logger",
+        "from backend.core import logger",
+        "from backend.core.logger import logger",
+        "from backend.tools import prompt_tools",
         "import backend.service",
         "from acessilia_sdk.toolbox import make_client",
         "from . import toolbox",
@@ -295,7 +299,7 @@ def test_the_guard_leaves_other_imports_alone(source) -> None:
 
 
 def test_the_harness_reaches_the_toolbox_without_the_core_s_toolbox_modules() -> None:
-    """#402 acceptance: scripts/bench imports no backend.tools.toolbox_* module."""
+    """#402 acceptance: scripts/bench imports none of the core's Toolbox adapters (backend.core.toolbox)."""
     offenders = [
         f"{path.relative_to(BENCH_DIR)}: {name}"
         for path in sorted(BENCH_DIR.rglob("*.py"))

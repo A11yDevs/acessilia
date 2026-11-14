@@ -16,8 +16,8 @@ from fastapi.testclient import TestClient
 from backend.api.limiter import limiter
 from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
-from backend.tools.access_log_filter import AccessLogFilter
-from backend.tools.logger import logger
+from backend.services.access_log_filter import AccessLogFilter
+from backend.core.logger import logger
 
 pytest.importorskip("fastapi.testclient")
 

@@ -22,7 +22,7 @@ from backend.core.i18n.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,
     EMAIL_RESULT_AUDIT_HEADER,
 )
-from backend.tools.pdf_ua_audit import audit_pdf_ua, summarize_audit
+from backend.core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from tests.conftest import COMPLIANT_PDF_UA_REPORT
 
 

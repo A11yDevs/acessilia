@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from acessilia_sdk.toolbox import ToolboxError, ToolboxInvalidInput
 from acessilia_sdk.toolbox.clients import ToolboxMathClient
 from acessilia_sdk.operations.formula import convert_formula, recognize_formula, verbalize_formula
@@ -22,7 +22,7 @@ from acessilia_sdk.toolbox.clients.math import (
     VERBALIZE_CAPABILITY,
 )
 from acessilia_sdk.runtime import run_sync
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 
 def toolbox_recognize_formula(

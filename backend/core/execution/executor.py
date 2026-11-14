@@ -44,7 +44,7 @@ from backend.core.manifest.models import (
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanStep
 from backend.core.i18n import t
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 MethodHandler = Callable[[ProcessingManifest, str], MethodResult]

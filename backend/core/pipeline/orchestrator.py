@@ -46,8 +46,8 @@ from backend.core.i18n.stage_messages import (
     STAGE_EXECUTING_PLAN,
     STAGE_EXECUTING_PLAN_STEP,
 )
-from backend.tools.logger import logger
-from backend.tools.toolbox_client import ToolboxError
+from backend.core.logger import logger
+from backend.core.toolbox.toolbox_client import ToolboxError
 from backend.core.pipeline.obligations import (
     _blocks_delivery,
     _pages_label,

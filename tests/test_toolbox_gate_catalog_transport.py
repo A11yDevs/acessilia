@@ -23,8 +23,8 @@ from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxProviderUnavail
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from backend.config.settings import settings
 from backend.core.planning import toolbox_gate
-from backend.tools import toolbox_client
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.toolbox import toolbox_client
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
 PRIMARY = "http://toolbox-a.test"

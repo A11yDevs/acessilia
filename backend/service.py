@@ -44,7 +44,7 @@ from backend.core.i18n.stage_messages import (
 )
 from backend.services.operation_context import task_context
 from backend.services.operation_registry import operation_registry
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 
 def _normalized_engine() -> str:

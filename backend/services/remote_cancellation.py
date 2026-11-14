@@ -14,8 +14,8 @@ from acessilia_sdk.toolbox import OperationCancelResult, ToolboxOperationClient
 
 from backend.config.settings import settings
 from backend.services.operation_registry import operation_registry
-from backend.tools.logger import logger
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.logger import logger
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 
 async def cancel_task_operations(task_id: str) -> str:

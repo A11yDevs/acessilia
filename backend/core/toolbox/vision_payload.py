@@ -11,8 +11,8 @@ from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
-from backend.tools.logger import logger
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.logger import logger
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 
 def _image_size(payload: bytes) -> tuple[int, int, str] | None:

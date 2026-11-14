@@ -82,7 +82,7 @@ class TestExtractFused:
             "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        from backend.tools.toolbox_client import ToolboxProviderUnavailable
+        from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
         with pytest.raises(ToolboxProviderUnavailable):
             await extract_fused("arquivo.pdf")
@@ -287,7 +287,7 @@ class _RecordingClient:
     async def extract_structure(
         self, file_path=None, *, artifact_id=None, language="pt-BR", **kw
     ):
-        from backend.tools.toolbox_client import ToolboxArtifactNotFound
+        from backend.core.toolbox.toolbox_client import ToolboxArtifactNotFound
 
         self._recorder.calls.append((self.provider, artifact_id, file_path))
         if artifact_id and self._recorder.missing_artifact:

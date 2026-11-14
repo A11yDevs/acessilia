@@ -391,7 +391,7 @@ def test_one_paragraph_that_fits_two_empty_lists_feeds_neither() -> None:
 
 def test_dropped_empty_list_items_are_logged() -> None:
     from backend.core import i18n
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     warnings: list[str] = []
     sink = logger.add(warnings.append, level="WARNING", format="{message}")

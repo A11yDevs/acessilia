@@ -44,7 +44,7 @@ from backend.core.pipeline.toolbox import (
     _source_artifact_id,
     _toolbox_render,
 )
-from backend.tools.formula_tools import normalize_latex
+from backend.core.formula_tools import normalize_latex
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin

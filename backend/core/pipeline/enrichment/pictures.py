@@ -61,7 +61,7 @@ from backend.services.blocking import run_blocking
 from backend.core.i18n.stage_messages import (
     STAGE_DESCRIBING_IMAGE,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 
 #: Why a picture was left undescribed, recorded in metadata["vision_failure_reason"]
 #: for the operator: the crop could not be rendered, the source has no page to

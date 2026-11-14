@@ -34,7 +34,7 @@ from acessilia_sdk.toolbox import (
 )
 from backend.config.settings import settings
 from backend.core.manifest.models import ProcessingManifest
-from backend.tools.toolbox_client import toolbox_client_config
+from backend.core.toolbox.toolbox_client import toolbox_client_config
 
 GATE_MODES = ("observe", "enforce", "off")
 

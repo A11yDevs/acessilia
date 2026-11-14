@@ -31,7 +31,7 @@ from backend.core.i18n.stage_messages import (
     STAGE_PAGE,
     STAGE_RECOGNIZING_FORMULA,
 )
-from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
+from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from tests.pddl_support import (
     install_formula_recognizer,
     build_element,
@@ -149,7 +149,7 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
 
 
 def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     records: list[tuple[str, str]] = []
     sink = logger.add(
@@ -259,7 +259,7 @@ async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropp
     an outage: each fallback is a DEBUG line and the document gets one INFO
     line that names the provider."""
     from backend.config.settings import settings
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     manifest = _formula_manifest(None, None)
     FakeVision.output = VisionOutput(
@@ -298,7 +298,7 @@ async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, 
     from acessilia_sdk.toolbox.capabilities import provider_default
 
     from backend.config.settings import settings
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     manifest = _formula_manifest()
     _recognizer_answers(monkeypatch, [])
@@ -319,7 +319,7 @@ async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, 
 
 @pytest.mark.asyncio
 async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
-    from backend.tools.logger import logger
+    from backend.core.logger import logger
 
     manifest = _formula_manifest(None, None)
 

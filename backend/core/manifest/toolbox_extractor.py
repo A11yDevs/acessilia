@@ -28,8 +28,8 @@ from backend.core.i18n.log_messages import (
 )
 from backend.services.operation_context import current_task_id
 from backend.services.operation_registry import OperationKind, operation_registry
-from backend.tools.logger import logger
-from backend.tools.toolbox_client import (
+from backend.core.logger import logger
+from backend.core.toolbox.toolbox_client import (
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,

@@ -21,7 +21,7 @@ from backend.core.manifest.toolbox_extractor import (
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 from backend.config.settings import settings
-from backend.tools.toolbox_client import ToolboxTimeout
+from backend.core.toolbox.toolbox_client import ToolboxTimeout
 
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -386,7 +386,7 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     mock_client, monkeypatch
 ):
     from backend.config.settings import settings
-    from backend.tools.toolbox_client import ToolboxProviderUnavailable
+    from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
     monkeypatch.setattr(settings, "fusion_mode", "dual")
     monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")

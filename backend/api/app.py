@@ -21,8 +21,8 @@ from backend.core.i18n.log_messages import (
 from backend.services.cleanup_service import periodic_cleanup
 from backend.services.download_token_service import limpar_tokens_expirados
 from backend.services.queue_service import unified_queue
-from backend.tools.access_log_filter import AccessLogFilter
-from backend.tools.logger import logger, setup_logger
+from backend.services.access_log_filter import AccessLogFilter
+from backend.core.logger import logger, setup_logger
 
 
 @asynccontextmanager

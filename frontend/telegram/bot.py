@@ -9,7 +9,7 @@ from aiogram.enums import ParseMode
 from frontend.telegram.handlers.start import router as start_router
 from frontend.telegram.handlers.document import router as document_router
 from frontend.telegram.handlers.errors import router as error_router
-from backend.tools.logger import setup_logger, logger
+from backend.core.logger import setup_logger, logger
 from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
 from backend.core.i18n import t

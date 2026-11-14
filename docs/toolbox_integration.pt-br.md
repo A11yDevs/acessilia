@@ -57,7 +57,7 @@ falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 ### Hierarquia de exceções
 
-Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/tools/toolbox_client.py`):
+Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/core/toolbox/toolbox_client.py`):
 
 - `ToolboxProviderUnavailable` — serviço/provedor indisponível (HTTP 502, 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
@@ -226,14 +226,14 @@ class Toolbox<X>Client(ToolboxCapabilityClient):
         )
 ```
 
-**3. Criá-lo no core** com `make_toolbox_client` (`backend/tools/toolbox_client.py`).
+**3. Criá-lo no core** com `make_toolbox_client` (`backend/core/toolbox/toolbox_client.py`).
 Ela preenche os endpoints, o provider (do atributo do `settings` indicado por
 `provider_key`), o timeout, a chave de API e um hook que registra os failovers
 no log; argumentos nomeados os sobrescrevem:
 
 ```python
 from acessilia_sdk.toolbox.clients import Toolbox<X>Client
-from backend.tools.toolbox_client import make_toolbox_client
+from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 client = make_toolbox_client(Toolbox<X>Client)
 try:
@@ -308,7 +308,7 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
 
 - **Cliente:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Wrapper no core:** `backend/tools/media_inspect.py` (`inspect_source_media`)
+- **Wrapper no core:** `backend/core/toolbox/media_inspect.py` (`inspect_source_media`)
   chama só a Toolbox; não há fallback local (ADR-0003, F3 da #150). Com
   `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
@@ -497,10 +497,10 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes, failover, artefatos e hierarquia de exceções (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — um cliente por família de capacidades; `layout.py` é o modelo do Cenário B
-- `backend/tools/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir do settings do core) e os tipos de erro reexportados
+- `backend/core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir do settings do core) e os tipos de erro reexportados
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — extração de estrutura, armazenamento de artefatos e as rotas de datasets
-- `backend/tools/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
-- `backend/tools/media_inspect.py`, `backend/tools/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK
+- `backend/core/toolbox/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
+- `backend/core/toolbox/media_inspect.py`, `backend/core/toolbox/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK
 - `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`

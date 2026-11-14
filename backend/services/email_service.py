@@ -22,7 +22,7 @@ from backend.core.i18n.log_messages import (
     LOG_EMAIL_SENT,
     LOG_SMTP_NOT_CONFIGURED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.config.settings import settings
 
 

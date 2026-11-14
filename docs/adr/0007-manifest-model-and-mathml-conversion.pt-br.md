@@ -25,7 +25,7 @@ A auditoria encontrou duas questões que precisavam de decisão:
    `artifact/structured-document@1` (achado A1).
 2. **Onde ocorrem a conversão LaTeX → MathML e a verbalização de fórmulas.**
    Hoje o core converte com o `latex2mathml` e verbaliza com regras próprias
-   em pt-BR, ambos em `backend/tools/formula_tools.py`, enquanto a Toolbox tem
+   em pt-BR, ambos em `backend/core/formula_tools.py`, enquanto a Toolbox tem
    implementações próprias por trás do `math.convert` e do `math.verbalize`;
    os dois verbalizadores divergiram (achado A3).
 

@@ -63,7 +63,7 @@ def spans(monkeypatch):
         calls.append(pages)
         return {1: _page(PARAGRAPH_LINE, DISPLAY_LINE)}
 
-    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
     from backend.config.settings import settings
     monkeypatch.setattr(settings, "inline_math_detection", "fonts")
     return calls
@@ -102,7 +102,7 @@ def test_an_unavailable_capability_leaves_the_text(monkeypatch, spans):
     async def failing(*args, **kwargs):
         raise ToolboxError("document.text.spans is not in the catalogue")
 
-    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", failing)
+    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", failing)
     manifest = _manifest()
 
     assert _run(manifest)["marked"] == 0
@@ -158,7 +158,7 @@ def _fetch_page(monkeypatch, **changes):
     async def fetch(source_path, pages, *, artifact_id=None, client=None):
         return {1: {**_page(PARAGRAPH_LINE, DISPLAY_LINE), **changes}}
 
-    monkeypatch.setattr("backend.tools.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
 
 
 def test_a_rotated_page_is_left_out(monkeypatch, spans):

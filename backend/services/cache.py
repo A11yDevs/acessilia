@@ -16,7 +16,7 @@ from backend.core.i18n.log_messages import (
     LOG_CACHE_DEBUG_SET,
     LOG_CACHE_SAVE_FAILED,
 )
-from backend.tools.logger import logger
+from backend.core.logger import logger
 from backend.services.cache_lock import cache_directory_lock
 
 CACHE_DIR = Path("var/temp/cache")

@@ -90,7 +90,7 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
 
 
 def test_output_stem_preserves_short_names_and_distinguishes_long_names():
-    from backend.tools.filenames import MAX_OUTPUT_STEM_BYTES, output_stem
+    from backend.services.filenames import MAX_OUTPUT_STEM_BYTES, output_stem
 
     assert output_stem("report-final.pdf") == "report-final"
     assert output_stem("report-α.pdf") == "report-α"
@@ -104,7 +104,7 @@ def test_output_stem_preserves_short_names_and_distinguishes_long_names():
 
 @pytest.mark.parametrize("stem", [" " * 250, "." * 250, " ." * 125])
 def test_empty_shortened_prefix_uses_document(stem):
-    from backend.tools.filenames import MAX_OUTPUT_STEM_BYTES, output_stem
+    from backend.services.filenames import MAX_OUTPUT_STEM_BYTES, output_stem
 
     result = output_stem(stem + ".pdf")
     assert result.startswith("document-")

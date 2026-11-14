@@ -25,7 +25,7 @@ The audit found two questions that needed a decision:
    publishes it as `artifact/structured-document@1` (finding A1).
 2. **Where LaTeX → MathML conversion and the verbalization of formulas
    happen.** Today the core converts with `latex2mathml` and verbalizes with
-   its own pt-BR rules, both in `backend/tools/formula_tools.py`, while the
+   its own pt-BR rules, both in `backend/core/formula_tools.py`, while the
    Toolbox has its own implementations behind `math.convert` and
    `math.verbalize`; the two verbalizers have diverged (finding A3).
 
