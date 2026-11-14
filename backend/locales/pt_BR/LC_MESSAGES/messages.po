@@ -1437,22 +1437,6 @@ msgstr "Não foi possível enviar o e-mail de falha do job {task_id}: {error}"
 msgid "Failure e-mail for job {task_id} was not sent"
 msgstr "O e-mail de falha do job {task_id} não foi enviado"
 
-#, python-brace-format
-msgid "Exporting TXT to {path}"
-msgstr "Exportando TXT para {path}"
-
-#, python-brace-format
-msgid "Exporting DOCX to {path}"
-msgstr "Exportando DOCX para {path}"
-
-#, python-brace-format
-msgid "Exporting PDF/UA to {path}"
-msgstr "Exportando PDF/UA para {path}"
-
-#, python-brace-format
-msgid "Exporting MP3 to {path}"
-msgstr "Exportando MP3 para {path}"
-
 msgid ""
 "PDDL pipeline ignores custom_prompt/thinking_mode; only the deterministic"
 " manifest/planning/execution flow runs"

@@ -407,14 +407,6 @@ MSG_VISION_TRUNCATION_NOTICE: str = (
     "Note: this image is informationally very extensive; the description was "
     "limited to the available budget and many details were not described."
 )
-#: Debug logged by the exporters adapter wrapper just before a plain-text export runs; {path} is the output file path.
-LOG_EXPORT_TXT_START: str = "Exporting TXT to {path}"
-#: Debug logged by the exporters adapter wrapper just before a DOCX export runs; {path} is the output file path.
-LOG_EXPORT_DOCX_START: str = "Exporting DOCX to {path}"
-#: Debug logged by the exporters adapter wrapper just before a PDF/UA export runs; {path} is the output file path.
-LOG_EXPORT_PDF_UA_START: str = "Exporting PDF/UA to {path}"
-#: Debug logged by the exporters adapter wrapper just before an MP3 audio export runs; {path} is the output file path.
-LOG_EXPORT_MP3_START: str = "Exporting MP3 to {path}"
 #: Error raised when the language-agent returns an empty result for a document; no placeholders.
 LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE: str = "Empty response from the agent"
 #: Warning logged by the PDDL pipeline when a caller passes custom_prompt or thinking_mode, which the deterministic manifest/planning/execution flow does not use.

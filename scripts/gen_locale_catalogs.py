@@ -124,10 +124,6 @@ from backend.log_messages import (
     LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_EMAIL_SEND_ERROR,
     LOG_EMAIL_SENT,
-    LOG_EXPORT_DOCX_START,
-    LOG_EXPORT_MP3_START,
-    LOG_EXPORT_PDF_UA_START,
-    LOG_EXPORT_TXT_START,
     LOG_FAILURE_EMAIL_FAILED,
     LOG_FAILURE_EMAIL_NOT_SENT,
     LOG_FATAL_ERROR_IN_BOT,
@@ -860,10 +856,6 @@ MESSAGES: tuple[str, ...] = (
     LOG_EMAIL_SEND_ERROR,
     LOG_FAILURE_EMAIL_FAILED,
     LOG_FAILURE_EMAIL_NOT_SENT,
-    LOG_EXPORT_TXT_START,
-    LOG_EXPORT_DOCX_START,
-    LOG_EXPORT_PDF_UA_START,
-    LOG_EXPORT_MP3_START,
     LOG_PDDL_IGNORED_OPTIONS,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
@@ -1810,10 +1802,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_FAILURE_EMAIL_NOT_SENT: (
             "O e-mail de falha do job {task_id} não foi enviado"
         ),
-        LOG_EXPORT_TXT_START: "Exportando TXT para {path}",
-        LOG_EXPORT_DOCX_START: "Exportando DOCX para {path}",
-        LOG_EXPORT_PDF_UA_START: "Exportando PDF/UA para {path}",
-        LOG_EXPORT_MP3_START: "Exportando MP3 para {path}",
         LOG_PDDL_IGNORED_OPTIONS: (
             "Pipeline PDDL ignora custom_prompt/thinking_mode; "
             "apenas fluxo deterministico de manifesto/planejamento/execucao"
