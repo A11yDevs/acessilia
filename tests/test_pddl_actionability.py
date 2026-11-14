@@ -21,10 +21,8 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.pipeline.orchestrator import (
-    DETERMINISTIC_METHOD_HANDLERS,
-    PddlAccessibilityOrchestrator,
-)
+from backend.core.pipeline.handlers.registry import METHOD_HANDLERS
+from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers import content as content_handlers
 from backend.core.pipeline.handlers import fusion as fusion_handlers
 from backend.core.pipeline.handlers import inspection as inspection_handlers
@@ -110,9 +108,11 @@ class TestRegistryCoverage:
         assert "pandoc-code" in names
         assert "human-review" in names
 
-    def test_deterministic_handlers_are_all_registered(self) -> None:
-        registered = set(PddlAccessibilityOrchestrator._build_executor().registry.names())
-        assert set(DETERMINISTIC_METHOD_HANDLERS) <= registered
+    def test_the_registry_is_the_method_table(self) -> None:
+        """Every method of METHOD_HANDLERS is registered, with its handler, and nothing else."""
+        registry = PddlAccessibilityOrchestrator._build_executor().registry
+        assert registry.names() == sorted(METHOD_HANDLERS)
+        assert all(registry.get(method) is handler for method, handler in METHOD_HANDLERS.items())
 
     def test_no_handler_is_a_silent_success(self) -> None:
         """A handler must not report success without doing anything.
@@ -166,8 +166,8 @@ class TestRegistryWiring:
     }
 
     @pytest.mark.parametrize("method", sorted(MOVED))
-    def test_the_deterministic_table_points_at_the_moved_handler(self, method) -> None:
-        assert DETERMINISTIC_METHOD_HANDLERS[method] is self.MOVED[method]
+    def test_the_method_table_points_at_the_moved_handler(self, method) -> None:
+        assert METHOD_HANDLERS[method] is self.MOVED[method]
 
     @pytest.mark.parametrize("method", sorted(MOVED))
     def test_the_executor_runs_the_moved_handler(self, method) -> None:
@@ -229,7 +229,7 @@ class TestXycutOrder:
             manifest.pages[0].width = 100
             manifest.pages[0].height = 100
 
-            result = DETERMINISTIC_METHOD_HANDLERS["xycut-order"](manifest, "o-1")
+            result = METHOD_HANDLERS["xycut-order"](manifest, "o-1")
 
             assert result.success is True
             assert [element.id for element in manifest.elements] == [
@@ -763,7 +763,7 @@ class TestEveryHandlerIsCallable:
             monkeypatch.setattr(
                 "backend.config.settings.settings.toolbox_provider", "docling"
             )
-        handler = DETERMINISTIC_METHOD_HANDLERS.get(
+        handler = METHOD_HANDLERS.get(
             method, PddlAccessibilityOrchestrator._build_executor().registry.get(method)
         )
 

@@ -3,7 +3,7 @@
 Unicode and negation-overlay repair, normalization, the repetition guard, line
 numbers, verse chunking, tail joins and the heading hierarchy. None calls a
 model or the Toolbox. Moved verbatim from the PDDL orchestrator (#402, phase 3,
-step 6); the orchestrator's ``DETERMINISTIC_METHOD_HANDLERS`` registers them.
+step 6); ``handlers/registry.py``'s ``METHOD_HANDLERS`` registers them.
 """
 
 from __future__ import annotations

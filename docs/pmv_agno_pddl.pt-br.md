@@ -280,7 +280,7 @@ Em caso de falha:
 
 O método `dual-provider-fusion` (Fase 5) representa a extração fundida de dois
 providers de toolbox (por padrão `docling` + `mineru`) via `docstruct.fusion`.
-O handler registrado em `PddlAccessibilityOrchestrator._build_executor`
+O handler registrado em `METHOD_HANDLERS` (`backend/core/pipeline/handlers/registry.py`)
 reutiliza `backend.pipeline.fusion.extract_fused`, persiste o payload fundido
 em `data_dir/artifacts/fusion/<obligation_id>.json` e o retorna em
 `MethodResult.artifacts`. O `ExecutorAgent` incorpora o artefato ao manifesto
