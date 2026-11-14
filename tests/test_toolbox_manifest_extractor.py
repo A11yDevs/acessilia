@@ -926,14 +926,14 @@ def test_cancelling_during_upload_refuses_the_next_operation(
         artifact_client=mock_artifact_client,
         use_artifact_store=True,
     )
-    errors: list[BaseException] = []
+    outcomes: list[BaseException] = []
 
     def run() -> None:
         try:
             with task_context("task-upload-cancel"):
                 extractor.extract(FIXTURE_PDF)
         except BaseException as exc:
-            errors.append(exc)
+            outcomes.append(exc)
 
     operation_registry.clear("task-upload-cancel")
     worker = threading.Thread(target=run)
@@ -951,6 +951,6 @@ def test_cancelling_during_upload_refuses_the_next_operation(
         release.set()
         worker.join(5)
 
-    assert errors and isinstance(errors[0], RemoteOperationCancelled)
+    assert outcomes and isinstance(outcomes[0], RemoteOperationCancelled)
     mock_client.extract_structure.assert_not_awaited()
     operation_registry.clear("task-upload-cancel")
