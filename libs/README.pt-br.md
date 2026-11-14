@@ -16,7 +16,7 @@ Pacotes Python compartilhados que vivem neste repositório, ao lado do core (`ba
 | **O que é** | Algoritmos de estrutura de documentos: tipos canônicos (`CanonicalDocument`, `BBox`…), ordem de leitura, fusão de vários provedores, normalização de texto e LaTeX, tabelas, validação | Acesso uniforme às capacidades da Toolbox: registro de contratos, transporte HTTP (`execute_capability`), clientes, catálogo, erros, referências de artefatos, retries e failover |
 | **Natureza** | Pura: sem rede, arquivos, subprocess ou settings | Faz I/O: cliente HTTP assíncrono |
 | **Dependências** | Nenhuma (`dependencies = []`) | `httpx` |
-| **Quem usa** | O core (`backend/pipeline`, `tools`, `export`…) **e a Toolbox**, que roda esses algoritmos do lado dela | Só o core, para falar com a Toolbox |
+| **Quem usa** | O core (`backend/core/pipeline`, `tools`, `export`…) **e a Toolbox**, que roda esses algoritmos do lado dela | Só o core, para falar com a Toolbox |
 | **Distribuição** | Wheel publicada em GitHub Release (`.github/workflows/docstruct-release.yml`, tags `docstruct-v*`); a Toolbox a fixa por hash | Instalada em modo editável, só dentro deste repositório |
 | **Restrição de imports** (`tests/test_purity.py`) | Não pode importar `backend`, `acessilia_toolbox` nem `acessilia_sdk` | Não pode importar `backend` nem `acessilia_toolbox` |
 

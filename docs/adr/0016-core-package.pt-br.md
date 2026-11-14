@@ -22,7 +22,8 @@ diferentes:
     (`backend/core/pipeline/`, para onde o passo 6 da #402 os moveu a partir
     do `backend/agents/pddl_orchestrator.py`);
   - os agentes (`backend/agents`, `backend/ai`, `backend/core/agents`);
-  - a fusão dupla (`backend/pipeline`) e os exportadores (`backend/export`,
+  - a fusão dupla (`backend/core/pipeline/fusion.py`, que o passo 2 reuniu a partir
+    do `backend/pipeline`) e os exportadores (`backend/export`,
     `backend/adapters`);
   - os adaptadores da Toolbox (`backend/tools`);
   - as mensagens (`backend/i18n`, `log_messages`, `stage_messages`).
@@ -59,7 +60,7 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
   - pydantic e loguru;
   - Babel (`backend/i18n.py`);
   - jsonschema (`backend/core/manifest/schema.py`);
-  - rapidfuzz (`backend/pipeline/fusion.py`);
+  - rapidfuzz (`backend/core/pipeline/fusion.py`);
   - edge-tts (`backend/export/exporters/audio_exporter.py`). É o executor
     local que a [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md)
     registra como desvio conhecido
@@ -129,7 +130,7 @@ Proposta: a opção 2.
   | Hoje | Vai para |
   |---|---|
   | `backend/core/{manifest,planning,execution}` | `acessilia_core.{manifest,planning,execution}` |
-  | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo), `backend/pipeline` | `acessilia_core.pipeline` |
+  | `backend/core/pipeline` (o orquestrador era `backend/agents/pddl_orchestrator.py` até o passo 6 da #402 movê-lo; o `backend/pipeline` se reuniu ali no passo 2) | `acessilia_core.pipeline` |
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
   | `backend/export`, `backend/adapters` | `acessilia_core.export` |
@@ -183,7 +184,7 @@ Proposta: a opção 2.
      | Hoje | Reúne-se em | Recursos que vão junto |
      |---|---|---|
      | `backend/core/{manifest,planning,execution}` | já está no lugar | `planning/domains/`: os domínios PDDL e suas descrições |
-     | `backend/pipeline` | `backend/core/pipeline/` | |
+     | `backend/pipeline` | `backend/core/pipeline/` (feito) | |
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
      | `backend/tools` (adaptadores da Toolbox, ferramentas de fórmula e de código, carga de prompts, logger) | `backend/core/toolbox/` e auxiliares | |
      | `backend/export`, `backend/adapters` | `backend/core/export/` | |

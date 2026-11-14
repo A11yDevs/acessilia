@@ -19,7 +19,6 @@
     "backend/core/planning/models.py": 1,
     "backend/core/planning/pddl_processor.py": 29,
     "backend/core/planning/planner_agent.py": 10,
-    "backend/pipeline/table_ast.py": 1,
     "backend/services/cleanup_service.py": 3,
     "backend/tools/formula_tools.py": 3,
     "backend/tools/prompt_tools.py": 5,

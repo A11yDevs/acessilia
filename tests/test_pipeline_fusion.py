@@ -4,7 +4,7 @@ Toolbox is mocked — no test requires a running service.
 """
 import pytest
 
-from backend.pipeline.fusion import (
+from backend.core.pipeline.fusion import (
     _group_by_page,
     extract_fused,
 )
@@ -66,7 +66,7 @@ class TestExtractFused:
             return _payload([_el("só mineru", 0)])
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         result = await extract_fused("arquivo.pdf")
@@ -79,7 +79,7 @@ class TestExtractFused:
             return None
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         from backend.tools.toolbox_client import ToolboxProviderUnavailable
@@ -93,7 +93,7 @@ class TestExtractFused:
             raise FileNotFoundError("arquivo ausente")
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
 
@@ -116,7 +116,7 @@ class TestExtractFused:
             ])
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         result = await extract_fused("arquivo.pdf")
@@ -145,7 +145,7 @@ class TestExtractFused:
             ])
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
         result = await extract_fused("arquivo.pdf")
@@ -161,10 +161,10 @@ class TestExtractFused:
             return [" ".join(["observacao"] * 6)], {}
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+        monkeypatch.setattr("backend.core.pipeline.fusion.merge_blocks", fake_merge_blocks)
 
         result = await extract_fused("arquivo.pdf")
 
@@ -193,10 +193,10 @@ class TestExtractFused:
             return list(blocks), {}
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+        monkeypatch.setattr("backend.core.pipeline.fusion.merge_blocks", fake_merge_blocks)
 
         result = await extract_fused("arquivo.pdf")
 
@@ -228,10 +228,10 @@ class TestExtractFused:
             return [docling[0].md], stats
 
         monkeypatch.setattr(
-            "backend.pipeline.fusion._structure_client",
+            "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        monkeypatch.setattr("backend.pipeline.fusion.merge_blocks", fake_merge_blocks)
+        monkeypatch.setattr("backend.core.pipeline.fusion.merge_blocks", fake_merge_blocks)
 
         result = await extract_fused("arquivo.pdf")
         pages = result["fusion_evidence"]["pages"]
@@ -301,7 +301,7 @@ class _RecordingClient:
 @pytest.mark.asyncio
 async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
     toolbox = _RecordingToolbox()
-    monkeypatch.setattr("backend.pipeline.fusion._structure_client", toolbox)
+    monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", toolbox)
 
     await extract_fused(
         "doc.pdf",
@@ -319,7 +319,7 @@ async def test_extract_fused_reuses_the_stored_artifact(monkeypatch):
 @pytest.mark.asyncio
 async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
     toolbox = _RecordingToolbox(missing_artifact=True)
-    monkeypatch.setattr("backend.pipeline.fusion._structure_client", toolbox)
+    monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", toolbox)
 
     result = await extract_fused(
         "doc.pdf",
@@ -361,7 +361,7 @@ async def test_extract_fused_forwards_the_remote_cache_setting(
         async def close(self):
             pass
 
-    monkeypatch.setattr("backend.pipeline.fusion._structure_client", Client)
+    monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
 
     await extract_fused("arquivo.pdf", artifact_id=artifact_id)
 

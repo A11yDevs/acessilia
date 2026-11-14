@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
 
 

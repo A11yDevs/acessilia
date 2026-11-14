@@ -262,7 +262,7 @@ result. Do not add a local implementation behind it (see 2.3).
 
 ### 4.3 Pipeline integration (if applicable)
 
-- **Dual fusion** (`backend/pipeline/fusion.py`): if the capability produces canonical
+- **Dual fusion** (`backend/core/pipeline/fusion.py`): if the capability produces canonical
   blocks, it can participate as a provider in `extract_fused()`.
 - **PDDL method** (`backend/core/planning/toolbox_gate.py`): if a planning method's
   handler calls the capability, declare it in `METHOD_TOOLBOX_REQUIREMENTS`
@@ -500,7 +500,7 @@ service.py: _build_orchestrator()
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
-- `backend/pipeline/fusion.py` — `extract_fused()` (dual fusion)
+- `backend/core/pipeline/fusion.py` — `extract_fused()` (dual fusion)
 - `backend/config/settings.py` — Toolbox configuration
 - `docs/drbench.md` — provider benchmark (Docling vs MinerU)
 

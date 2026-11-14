@@ -133,7 +133,7 @@ def test_handler_returns_artifact_in_method_result(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
 
@@ -160,7 +160,7 @@ def test_handler_fails_when_single_provider(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
 
@@ -182,7 +182,7 @@ async def test_handler_inside_running_event_loop_without_warning(
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
 
     with warnings.catch_warnings():
@@ -203,7 +203,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.pipeline.fusion.extract_fused", _fake_extract_fused
+        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
 
     registry = MethodRegistry()
@@ -281,7 +281,7 @@ def _get_small_pdf() -> Path:
 async def test_extract_fused_against_real_toolbox():
     """Real dual-provider extraction via the Toolbox (docling + mineru)."""
     _require_fusion_providers()
-    from backend.pipeline.fusion import extract_fused
+    from backend.core.pipeline.fusion import extract_fused
 
     pdf = _get_small_pdf()
     payload = await extract_fused(pdf)

@@ -4,7 +4,7 @@ import pytest
 
 from backend.core.pipeline.payload import build_pddl_structured_payload
 from backend.core.manifest.builder import _derive_processing_needs
-from backend.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.validation import (
     validate_canonical_document, MSG_HEADING_LEVELS_SKIPPED,

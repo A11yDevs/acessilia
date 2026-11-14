@@ -465,7 +465,7 @@ Regras de compilação:
   escolha quando a qualidade do texto for crítica ou quando o método
   single não estiver disponível/admissível;
 - o handler registrado no executor chama
-  `backend.pipeline.fusion.extract_fused`, persiste o payload fundido em
+  `backend.core.pipeline.fusion.extract_fused`, persiste o payload fundido em
   `data_dir/artifacts/fusion/<escopo-sha256>/<conteudo-sha256>.json`
   com escrita atômica e SHA-256 registrado no artefato, e o retorna em
   `MethodResult.artifacts` — o `ExecutorAgent` é quem o incorpora ao

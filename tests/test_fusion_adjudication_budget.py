@@ -22,7 +22,7 @@ from backend.core.manifest.builder import (
     _derive_v23_processing_needs,
 )
 from backend.core.manifest.models import ManifestElement
-from backend.pipeline.fusion import (
+from backend.core.pipeline.fusion import (
     _similarity,
     apply_page_routes,
     fuse_extraction_payloads,

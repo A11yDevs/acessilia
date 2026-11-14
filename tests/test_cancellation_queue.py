@@ -43,7 +43,7 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
 
     async def process(*args, **kwargs):
         if kwargs["task_id"] == "next":
-            from backend.pipeline.canonical_builder import build_canonical_document
+            from backend.core.pipeline.canonical_builder import build_canonical_document
             advanced.set()
             return build_canonical_document("Next document.", title="Next")
         await run_blocking(extract)

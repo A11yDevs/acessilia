@@ -12,7 +12,7 @@ import pytest
 
 from backend.export.renderers.html_renderer import _render_block as render_html_block
 from backend.export.renderers.txt_renderer import _render_block as render_txt_block
-from backend.pipeline.validators import validate_canonical_document
+from backend.core.pipeline.validators import validate_canonical_document
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
@@ -33,7 +33,7 @@ def _unavailable(capability):
 @pytest.fixture
 def toolbox_math(monkeypatch):
     """Simula math.convert e math.verbalize no builder canônico e no PDDL."""
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     calls = {"convert": [], "verbalize": []}
 
@@ -79,7 +79,7 @@ def test_core_has_no_local_converter_or_verbalizer():
 def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
     from copy import deepcopy
 
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     def unexpected(*args):
         pytest.fail("Non-math blocks must not invoke formula helpers")
@@ -95,7 +95,7 @@ def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
 
 
 def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     calls = []
 
@@ -112,7 +112,7 @@ def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
 
 
 def test_canonical_document_enriches_math_blocks(toolbox_math):
-    from backend.pipeline.canonical_builder import build_canonical_document
+    from backend.core.pipeline.canonical_builder import build_canonical_document
 
     document = build_canonical_document(
         "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física"
@@ -136,7 +136,7 @@ def test_canonical_document_enriches_math_blocks(toolbox_math):
 
 def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
     """LaTeX que a Toolbox rejeita fica sem MathML; o documento conta as fórmulas."""
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", lambda latex: "")
     document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$")
@@ -153,7 +153,7 @@ def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
 
 def test_unavailable_capabilities_are_reported_once(monkeypatch):
     """Sem fallback local: a fórmula fica com o LaTeX e o documento avisa."""
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     convert = _unavailable("math.convert")
     verbalize = _unavailable("math.verbalize")
@@ -196,7 +196,7 @@ def test_an_answer_outside_the_contract_turns_the_capability_off_for_the_documen
     Declared in #470 phase 3 (PR 3): on develop, ``mathml: null`` left only that
     formula without MathML and the next one was converted.
     """
-    from backend.pipeline import canonical_builder
+    from backend.core.pipeline import canonical_builder
 
     convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
     verbalize = _broken_then_good(respx_mock, "verbalize", "verbalized", "x igual a 1")
@@ -504,7 +504,7 @@ def test_pddl_handlers_send_a_variable_product_as_a_product(toolbox_math, handle
 
 
 def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math):
-    from backend.pipeline.canonical_builder import build_canonical_document
+    from backend.core.pipeline.canonical_builder import build_canonical_document
 
     payload = {
         "pages": [

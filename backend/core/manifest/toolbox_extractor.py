@@ -200,7 +200,7 @@ class ToolboxManifestExtractor:
                     )
                 )
             else:
-                from backend.pipeline.fusion import (
+                from backend.core.pipeline.fusion import (
                     apply_page_routes,
                     fuse_extraction_payloads,
                 )

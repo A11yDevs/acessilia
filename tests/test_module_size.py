@@ -30,7 +30,6 @@ SCANNED_ROOTS = (
     "backend/ai",
     "backend/core",
     "backend/export",
-    "backend/pipeline",
     "backend/tools",
 )
 SCANNED_FILES = ("backend/i18n.py", "backend/log_messages.py", "backend/stage_messages.py")

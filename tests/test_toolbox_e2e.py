@@ -394,7 +394,7 @@ class TestStructureClientE2E:
         from backend.core.pipeline.payload import _manifest_pages_to_payload
         from backend.core.manifest.builder import build_processing_manifest
         from backend.core.manifest.toolbox_extractor import ToolboxExtraction
-        from backend.pipeline.canonical_builder import build_canonical_document
+        from backend.core.pipeline.canonical_builder import build_canonical_document
         from docstruct.export.html import document_to_html
         from docstruct.export.pandoc_ast import build_pandoc_ast
         from docstruct.export.txt import document_to_txt_lines

@@ -121,7 +121,7 @@ async def test_the_worker_passes_the_uploaded_name_to_the_pipeline(
         seen.update(kwargs)
         if manager.obter(task_id) is None:
             manager.criar_tarefa(stored, task_id=task_id)
-        from backend.pipeline.canonical_builder import build_canonical_document
+        from backend.core.pipeline.canonical_builder import build_canonical_document
         return build_canonical_document(_untitled_payload(), title="51-pages")
 
     monkeypatch.setattr("backend.service.process", fake_process)

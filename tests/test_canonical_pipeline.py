@@ -1,7 +1,7 @@
 """
-What this suite verifies: backend/pipeline/canonical_builder builds a well-formed, sanitized
+What this suite verifies: backend/core/pipeline/canonical_builder builds a well-formed, sanitized
 canonical document from raw markdown or structured payloads (inferring titles, ids, sections and a
-fallback minimum section for non-textual sources), backend/pipeline/validators flags markdown and
+fallback minimum section for non-textual sources), backend/core/pipeline/validators flags markdown and
 prompt-leak artifacts in final output text, and backend/export/pandoc_exporter exports those
 documents to txt/html while enforcing the deterministic audit and export-profile checks.
 """
@@ -13,9 +13,9 @@ import pytest
 
 import backend.i18n as i8n
 from backend.export.pandoc_exporter import export_accessible_document
-from backend.pipeline.canonical_builder import build_canonical_document
-from backend.pipeline.validators import validate_canonical_document
-from backend.pipeline.validators import validate_output_text
+from backend.core.pipeline.canonical_builder import build_canonical_document
+from backend.core.pipeline.validators import validate_canonical_document
+from backend.core.pipeline.validators import validate_output_text
 
 
 @pytest.fixture(autouse=True)

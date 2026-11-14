@@ -49,7 +49,7 @@ def _translate(line: str) -> str:
     """
     # Caption: "Table: <rest>" / Footer: "Footer: <rest>"
     for prefix_template, key in _LINE_TO_MSGID:
-        prefix = prefix_template.split("{")[0]  # "Table: " (com espaço final)
+        prefix = prefix_template.split("{")[0]  # "Table: " (with its trailing space)
         if line.startswith(prefix):
             value = line[len(prefix):].strip()
             return t(prefix_template).format(**{key: value})

@@ -75,7 +75,7 @@ async def test_concurrent_downloads_have_independent_temporary_files(tmp_path):
 
 @pytest.mark.parametrize("kind", ["table", "picture", "formula"])
 def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
-    from backend.pipeline.fusion import _group_by_page, fuse_extraction_payloads
+    from backend.core.pipeline.fusion import _group_by_page, fuse_extraction_payloads
 
     primary = {"document": {"elements": []}}
     secondary = {
@@ -368,7 +368,7 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
 
 @pytest.mark.parametrize('kind', ['table', 'picture', 'formula'])
 def test_route_uses_structure_when_text_agrees(kind):
-    from backend.pipeline.fusion import fuse_extraction_payloads
+    from backend.core.pipeline.fusion import fuse_extraction_payloads
 
     text = {'type': 'paragraph', 'text': 'Texto da pagina com conteudo suficiente', 'page': 0}
     primary = {'document': {'elements': [text]}}

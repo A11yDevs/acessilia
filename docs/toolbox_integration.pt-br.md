@@ -262,7 +262,7 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
 
 ### 4.3 Integração no pipeline (se aplicável)
 
-- **Fusão dual** (`backend/pipeline/fusion.py`): se a capacidade produz blocos
+- **Fusão dual** (`backend/core/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
 - **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
   método de planejamento chama a capacidade, declare-a em
@@ -502,7 +502,7 @@ service.py: _build_orchestrator()
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
 - `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
-- `backend/pipeline/fusion.py` — `extract_fused()` (fusão dual)
+- `backend/core/pipeline/fusion.py` — `extract_fused()` (fusão dual)
 - `backend/config/settings.py` — configuração da Toolbox
 - `docs/drbench.pt-br.md` — benchmark de providers (Docling vs MinerU)
 
