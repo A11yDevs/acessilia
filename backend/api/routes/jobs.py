@@ -208,11 +208,13 @@ async def cancel_job(request: Request, task_id: str):
             status_code=409,
             detail=t(API_CANCEL_STATE_INVALID).format(status=job["status"]),
         )
+    # Persist the local cancellation first: a slow or failed remote cancel must
+    # not lose a user's request. The sync helper is live-only.
+    status = await get_job_status_async(task_id)
+    await run_blocking(save_status, task_id, status)
     remote = await cancel_task_operations(task_id)
     worker.state_manager.set_remote_cancellation(task_id, remote)
     status = await get_job_status_async(task_id)
-    # Acknowledge only after cancelling + request timestamp are durable, even
-    # while a shielded extraction is still running. The sync helper is live-only.
     await run_blocking(save_status, task_id, status)
     return CancelResponse(
         task_id=task_id,
