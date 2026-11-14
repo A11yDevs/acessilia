@@ -14,7 +14,7 @@ dependencies = [
     "loguru>=0.7.3,<0.8",
     "aiosmtplib>=5.1.2,<6",
     "edge-tts>=7.3.1,<8",
-    "fastapi>=0.115,<0.116",
+    "fastapi>=0.162,<0.163",
     "pydantic>=2.10,<3",
     "uvicorn>=0.30,<0.31",
     "aiogram>=3.13,<4",
@@ -50,7 +50,7 @@ dev = [
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
     # Builds the page images the Toolbox end-to-end tests send.
-    "pillow>=10.4,<11",
+    "pillow>=13,<14",
     # Builds and renders test PDFs (tests/toolbox_render_fake.py and fixtures);
     # the application renders and extracts only on the Toolbox.
     "pymupdf>=1.24,<2",

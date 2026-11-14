@@ -168,6 +168,10 @@ python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf 
 
 As regras detalhadas estão em [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Segurança
+
+Relate vulnerabilidades em privado pela aba Security do repositório; não abra issue pública. Veja [SECURITY.pt-br.md](SECURITY.pt-br.md) para versões suportadas e o processo.
+
 ## Licença
 
 MIT © 2026 Jhonata Fernandes Cordeiro

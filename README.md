@@ -168,6 +168,10 @@ python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf 
 
 Detailed rules live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Security
+
+Report vulnerabilities privately through the repository's Security tab; do not open a public issue. See [SECURITY.md](SECURITY.md) for supported versions and the process.
+
 ## License
 
 MIT © 2026 Jhonata Fernandes Cordeiro
