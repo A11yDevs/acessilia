@@ -1,15 +1,21 @@
 import datetime
 import json
 import time
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, Callable, Coroutine
+from typing import Any
 
+from docstruct.profiles import verbosity_for_mode
+from docstruct.text.paragraphs import merge_broken_paragraphs
+
+from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.config.settings import settings
+from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.payload import (
     records_extraction_degradation,
     records_visual_failures,
 )
-from backend.agents.state_manager import TaskCancelledError, state_manager
 from backend.services.cache import (
     drop_cache,
     get_cached,
@@ -21,7 +27,6 @@ from backend.services.history_service import (
     finalizar_conversao,
     registrar_conversao,
 )
-from backend.config.settings import settings
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     LOG_CANONICAL_JSON_SAVE_FAILED,
@@ -32,15 +37,14 @@ from backend.core.i18n.log_messages import (
 from backend.core.i18n.stage_messages import (
     STAGE_ANALYZING_FILE,
     STAGE_CANCELLED_BY_USER,
+    STAGE_PREPARING_FILE,
     STAGE_PROCESSING_FAILED_LABEL,
     STAGE_PROCESSING_FINISHED,
     STAGE_PROCESSING_WITH_AI,
-    STAGE_PREPARING_FILE,
 )
+from backend.services.operation_context import task_context
+from backend.services.operation_registry import operation_registry
 from backend.tools.logger import logger
-from docstruct.text.paragraphs import merge_broken_paragraphs
-from backend.core.pipeline.canonical_builder import build_canonical_document
-from docstruct.profiles import verbosity_for_mode
 
 
 def _normalized_engine() -> str:
@@ -253,21 +257,24 @@ async def process(
         )
         state_manager.verificar_cancelamento(task_id)
 
-        try:
-            resultado = await agente.execute(
-                file_path,
-                file_path.parent,
-                status_callback,
-                mode=mode,
-                structured_output=True,
-                custom_prompt=custom_prompt,
-                thinking_mode=thinking_mode,
-            )
-        except Exception:
-            # A cancellation that arrives while the extraction thread is
-            # running must win over the timeout/error it produces when it ends.
-            state_manager.verificar_cancelamento(task_id)
-            raise
+        with task_context(task_id):
+            try:
+                resultado = await agente.execute(
+                    file_path,
+                    file_path.parent,
+                    status_callback,
+                    mode=mode,
+                    structured_output=True,
+                    custom_prompt=custom_prompt,
+                    thinking_mode=thinking_mode,
+                )
+            except Exception:
+                # A cancellation that arrives while the extraction thread is
+                # running must win over the timeout/error it produces when it ends.
+                state_manager.verificar_cancelamento(task_id)
+                raise
+            finally:
+                operation_registry.clear(task_id)
 
         canonical_metadata: dict[str, Any] | None = None
         technical_warnings: list[str] | None = None

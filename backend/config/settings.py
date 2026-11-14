@@ -400,6 +400,11 @@ class Settings:
     toolbox_extraction_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_EXTRACTION_TIMEOUT_SECONDS", "1500"))
     )
+    # A cancel request is best-effort and must never delay the API: the whole
+    # batch of active operations gets this short wall-clock budget (ADR-0019).
+    toolbox_cancel_timeout_seconds: float = field(
+        default_factory=lambda: float(os.getenv("TOOLBOX_CANCEL_TIMEOUT_SECONDS", "5"))
+    )
     toolbox_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_TIMEOUT_SECONDS", "3600"))
     )

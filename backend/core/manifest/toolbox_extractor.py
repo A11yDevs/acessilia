@@ -3,24 +3,32 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
+from acessilia_sdk.toolbox import (
+    artifact_endpoint_urls,
+    one_artifact_endpoint,
+    operation_context,
+)
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
+
 from backend.config.settings import settings
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
-    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
+    LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
     MSG_TOOLBOX_EXTRACTION_TIMEOUT,
 )
+from backend.services.operation_context import current_task_id
+from backend.services.operation_registry import OperationKind, operation_registry
 from backend.tools.logger import logger
-from acessilia_sdk.toolbox import artifact_endpoint_urls, one_artifact_endpoint
-from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from backend.tools.toolbox_client import (
     ToolboxError,
     ToolboxProviderUnavailable,
@@ -112,6 +120,26 @@ class ToolboxManifestExtractor:
             logger.warning(message)
             raise ToolboxTimeout(message) from exc
 
+    @contextmanager
+    def _remote_operation(self, kind: OperationKind):
+        """Register and label one remote call for cancellation (ADR-0019).
+
+        Outside a job there is no task id and no registry entry: the call keeps
+        the pre-ADR behaviour.  Inside a job the operation id stays the same
+        across SDK retries and failover, while the SDK gives each attempt its
+        own attempt id.
+        """
+        task_id = current_task_id()
+        if task_id is None:
+            yield
+            return
+        operation = operation_registry.begin(task_id, kind)
+        try:
+            with operation_context(task_id, operation.operation_id):
+                yield
+        finally:
+            operation_registry.finish(task_id, operation.operation_id)
+
     async def _extract_async(
         self, source_path: Path, *, dual_fusion: bool = True
     ) -> ToolboxExtraction:
@@ -155,7 +183,7 @@ class ToolboxManifestExtractor:
         if not source_path.is_file():
             raise FileNotFoundError(f"Document not found: {source_path}")
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         started_clock = perf_counter()
 
         artifact_id: str | None = None
@@ -164,7 +192,8 @@ class ToolboxManifestExtractor:
             logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
         if use_artifact_store and artifacts is not None:
             try:
-                artifact_id = await artifacts.upload(source_path)
+                with self._remote_operation("upload"):
+                    artifact_id = await artifacts.upload(source_path)
             except (ToolboxTimeout, ToolboxProviderUnavailable) as exc:
                 upload_error = type(exc).__name__
                 use_artifact_store = False
@@ -186,12 +215,13 @@ class ToolboxManifestExtractor:
             and settings.fusion_secondary_provider != structure.provider
         )
         try:
-            result = await structure.extract_structure(
-                file_path=None if artifact_id else source_path,
-                artifact_id=artifact_id,
-                language="pt-BR",
-                use_remote_cache=self.use_remote_cache,
-            )
+            with self._remote_operation("primary"):
+                result = await structure.extract_structure(
+                    file_path=None if artifact_id else source_path,
+                    artifact_id=artifact_id,
+                    language="pt-BR",
+                    use_remote_cache=self.use_remote_cache,
+                )
         except ToolboxError as exc:
             if not dual_enabled or not _provider_failure(exc):
                 raise
@@ -234,12 +264,13 @@ class ToolboxManifestExtractor:
                     )
                     if artifact_id is not None and secondary_artifact_id is None:
                         logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
-                    secondary_result = await secondary_client.extract_structure(
-                        file_path=None if secondary_artifact_id else source_path,
-                        artifact_id=secondary_artifact_id,
-                        language="pt-BR",
-                        use_remote_cache=self.use_remote_cache,
-                    )
+                    with self._remote_operation("secondary"):
+                        secondary_result = await secondary_client.extract_structure(
+                            file_path=None if secondary_artifact_id else source_path,
+                            artifact_id=secondary_artifact_id,
+                            language="pt-BR",
+                            use_remote_cache=self.use_remote_cache,
+                        )
                 except ToolboxError as exc:
                     # With the primary's result in hand the comparison is only
                     # a gain, so any secondary failure degrades instead of
@@ -316,7 +347,7 @@ class ToolboxManifestExtractor:
 
         assert result is not None
         duration_ms = round((perf_counter() - started_clock) * 1000)
-        completed_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(UTC)
 
         provenance = result.get("provenance", {})
         cache_key = provenance.get("cache_key")

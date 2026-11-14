@@ -7,6 +7,13 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** operation identifiers and cancellation (ADR-0019): `operation_context`
+  and `operation_attempt` attach `task_id`, a stable `operation_id` and a fresh
+  `attempt_id` to Toolbox capability and artifact headers, without reading
+  settings. `ToolboxOperationClient.cancel` asks the configured endpoints to
+  stop an operation with a short timeout and returns `OperationCancelResult`
+  (`cancel_requested`, `cancelled`, `finished`, `failed` or `not_found`) instead
+  of raising; a failed cancel is for the caller to record (#409).
 - **Added** `convert_formula` and `verbalize_formula` in
   `acessilia_sdk.operations.formula`, one step per capability (`math.convert`,
   in either direction, and `math.verbalize`), each returning a `FormulaText`

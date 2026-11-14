@@ -15,6 +15,7 @@ class UploadResponse(BaseModel):
 class CancelResponse(BaseModel):
     task_id: str
     status: str
+    remote_cancellation: str | None = None
 
 
 class JobStatus(BaseModel):
@@ -30,6 +31,7 @@ class JobStatus(BaseModel):
     fim: float | None = None
     cancellation_requested_at: float | None = None
     cancellation_elapsed_seconds: int | None = None
+    remote_cancellation: str | None = None
 
 
 class DownloadFormat(BaseModel):
