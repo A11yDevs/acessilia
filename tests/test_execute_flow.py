@@ -73,8 +73,8 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
 async def test_the_progress_messages_come_in_order(monkeypatch, tmp_path) -> None:
     _, _, statuses, _ = await _run(monkeypatch, tmp_path)
 
-    from backend.i18n import t
-    from backend.stage_messages import (
+    from backend.core.i18n import t
+    from backend.core.i18n.stage_messages import (
         STAGE_ANALYZING_STRUCTURAL,
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
         STAGE_ENRICHING_TABLES_OCR,

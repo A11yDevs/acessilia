@@ -149,7 +149,7 @@ def _warnings(failures):
         MSG_PICTURES_NOT_DESCRIBED,
         MSG_TABLES_NOT_READ,
     )
-    from backend.i18n import n
+    from backend.core.i18n import n
 
     expected = []
     for kind, msgids in (("pictures", MSG_PICTURES_NOT_DESCRIBED), ("tables", MSG_TABLES_NOT_READ)):

@@ -10,8 +10,8 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_ARTIFACT_UPLOAD_DEGRADED,
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
     LOG_DUAL_FUSION_SKIPPED_IDENTICAL_PROVIDERS,

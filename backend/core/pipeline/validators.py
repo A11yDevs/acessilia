@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.i18n import t
+from backend.core.i18n import t
 from docstruct.validation import (  # noqa: F401
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_FIELD_MISSING,

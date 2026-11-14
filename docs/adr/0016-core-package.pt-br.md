@@ -59,7 +59,7 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
 - **As outras bibliotecas que o core importa**, contadas com uma varredura de
   AST que inclui os imports dentro de funções:
   - pydantic e loguru;
-  - Babel (`backend/i18n.py`);
+  - Babel (`backend/core/i18n/__init__.py`);
   - jsonschema (`backend/core/manifest/schema.py`);
   - rapidfuzz (`backend/core/pipeline/fusion.py`);
   - edge-tts (`backend/core/export/exporters/audio_exporter.py`). É o executor
@@ -135,7 +135,7 @@ Proposta: a opção 2.
   | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
   | `backend/tools` (os adaptadores da Toolbox, ferramentas de fórmula e de código, prompts, logger) | `acessilia_core.toolbox` e auxiliares |
   | `backend/core/export` (reunido a partir do `backend/export` no passo 2; o `backend/adapters`, sem uso, foi removido) | `acessilia_core.export` |
-  | `backend/i18n.py`, `log_messages.py`, `stage_messages.py`, `locales/` | `acessilia_core.i18n` |
+  | `backend/core/i18n` (reunido no passo 2 a partir de `backend/i18n.py`, `log_messages.py`, `stage_messages.py` e `locales/`) | `acessilia_core.i18n` |
 
 - **O que fica no `backend/`, o serviço:**
   - a API e o worker;
@@ -189,7 +189,7 @@ Proposta: a opção 2.
      | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
      | `backend/tools` (adaptadores da Toolbox, ferramentas de fórmula e de código, carga de prompts, logger) | `backend/core/toolbox/` e auxiliares | |
      | `backend/export` (`backend/adapters`: removido, nada o importava) | `backend/core/export/` (feito) | |
-     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
+     | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` (feito) | `backend/locales/` (os catálogos `.po`) → `backend/core/i18n/locales/` |
 
      O estado do job (`backend/agents/state_manager.py`) fica no serviço.
 

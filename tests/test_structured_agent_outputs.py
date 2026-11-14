@@ -524,7 +524,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
 
     from backend.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
-    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.core.i18n import reset_request_locale, set_request_locale
     from backend.tools.logger import logger
 
     vision_module, calls, budgets = _context_retry_vision(
@@ -620,7 +620,7 @@ async def test_context_overflow_is_critical_only_after_the_smaller_request_fails
 ):
     from backend.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
-    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.core.i18n import reset_request_locale, set_request_locale
     from backend.tools.logger import logger
 
     error = AgentRunError("model run failed: maximum context length exceeded")
@@ -829,8 +829,8 @@ def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
         _truncate_description,
     )
     from backend.config.settings import settings
-    from backend.i18n import t
-    from backend.log_messages import MSG_VISION_TRUNCATION_NOTICE
+    from backend.core.i18n import t
+    from backend.core.i18n.log_messages import MSG_VISION_TRUNCATION_NOTICE
 
     limit_chars = settings.vision_region_max_tokens * DESCRIPTION_CHARS_PER_TOKEN
     output = VisionOutput(
@@ -1144,7 +1144,7 @@ async def test_a_salvaged_description_is_not_cached(monkeypatch, tmp_path) -> No
 def test_the_region_cache_key_varies_with_what_the_answer_depends_on(monkeypatch) -> None:
     from backend.agents.vision_agent import _region_cache_extra
     from backend.config.settings import settings
-    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.core.i18n import reset_request_locale, set_request_locale
 
     monkeypatch.setattr(settings, "ai_client", "openrouter")
     monkeypatch.setattr(settings, "openrouter_model", "test/model")

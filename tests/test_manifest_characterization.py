@@ -19,7 +19,7 @@ import pytest
 
 from docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL
 
-from backend import i18n
+from backend.core import i18n
 from backend.core.manifest.builder import (
     _element_bbox,
     _normalized_element_bbox,
@@ -505,7 +505,7 @@ GOLDEN_CASES = {
 @pytest.mark.parametrize("name", list(GOLDEN_CASES))
 def test_manifest_wire_payload_matches_the_golden_file(tmp_path: Path, name: str) -> None:
     response, refine = GOLDEN_CASES[name]
-    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.core.i18n import reset_request_locale, set_request_locale
 
     token = set_request_locale("en_US")
     try:
@@ -532,8 +532,8 @@ def test_golden_manifest_round_trips_unchanged(name: str) -> None:
 
 @pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
 def test_processing_need_messages_follow_the_request_locale(tmp_path, locale):
-    from backend.i18n import reset_request_locale, set_request_locale, t
-    from backend.log_messages import MSG_OBLIGATION_IMAGE
+    from backend.core.i18n import reset_request_locale, set_request_locale, t
+    from backend.core.i18n.log_messages import MSG_OBLIGATION_IMAGE
 
     response, refine = GOLDEN_CASES["toolbox-v2-contract"]
     token = set_request_locale(locale)

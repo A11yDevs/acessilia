@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Coroutine, Any
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_QUEUE_ITEM_ENQUEUED,
     LOG_WORKER_STARTED,
     LOG_WORKER_TASK_COMPLETED,

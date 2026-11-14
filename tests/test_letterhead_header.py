@@ -8,7 +8,7 @@ two page_header lines to its right, above the title.
 from __future__ import annotations
 
 from backend.core.pipeline.payload import _manifest_pages_to_payload
-from backend.i18n import reset_request_locale, set_request_locale
+from backend.core.i18n import reset_request_locale, set_request_locale
 from tests.test_page_number_furniture import FOOTER_BOX, HEIGHT, WIDTH, _placed
 from tests.pddl_support import build_manifest
 

@@ -28,7 +28,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from backend.i18n import reset_request_locale, set_request_locale
+from backend.core.i18n import reset_request_locale, set_request_locale
 from acessilia_sdk.toolbox.transport import auth_headers
 
 from backend.core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method

@@ -2,7 +2,7 @@
 
 Each msgid is the canonical English stage label the bot displays while a job
 moves through the queue, per-format exports, audio generation and completion.
-Callers resolve them at display time through :func:`backend.i18n.t` so a
+Callers resolve them at display time through :func:`backend.core.i18n.t` so a
 portuguese-speaking Telegram user sees the stage text in their own locale,
 while the server's own locale is used for local logging.
 """

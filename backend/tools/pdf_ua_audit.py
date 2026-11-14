@@ -11,8 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     EMAIL_AUDIT_COMPLIANT,
     EMAIL_AUDIT_MORE_RULES,
     EMAIL_AUDIT_NON_COMPLIANT,

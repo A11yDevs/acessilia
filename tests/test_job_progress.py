@@ -17,8 +17,8 @@ from backend.core.pipeline.obligations import _pages_label
 from backend.agents.state_manager import describe_failure, state_manager
 from backend.config.settings import settings
 from backend.core.planning.models import PlanStep
-from backend.i18n import t
-from backend.stage_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.stage_messages import (
     STAGE_DESCRIBING_IMAGE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
@@ -102,7 +102,7 @@ class TestPagesLabel:
 
 
 def test_the_image_progress_message_names_the_location_with_the_page_total():
-    from backend.i18n import reset_request_locale, set_request_locale
+    from backend.core.i18n import reset_request_locale, set_request_locale
 
     token = set_request_locale("en_US")
     try:

@@ -24,8 +24,8 @@ from backend.core.manifest.models import (
 from backend.core.pipeline.toolbox import (
     _toolbox_render,
 )
-from backend.i18n import n, t
-from backend.log_messages import (
+from backend.core.i18n import n, t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
     LOG_PDDL_VISION_RETRY_PASS_PICTURES,
     LOG_PDDL_VISION_RETRY_PASS_TABLES,

@@ -32,7 +32,7 @@ from backend.core.pipeline.handlers.common import (
 from backend.core.pipeline.obligations import (
     _formula_elements_for_obligation,
 )
-from backend.i18n import n, t
+from backend.core.i18n import n, t
 from backend.tools.formula_tools import label_spoken_formula, normalize_latex
 from backend.tools.logger import logger
 from backend.tools.toolbox_math_tools import (

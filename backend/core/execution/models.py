@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.core.manifest.models import Artifact  # noqa: E402
-from backend.i18n import t  # noqa: E402
+from backend.core.i18n import t  # noqa: E402
 from frontend.telegram.messages import (  # noqa: E402
     MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,

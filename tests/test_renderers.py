@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-import backend.i18n as i8n
+import backend.core.i18n as i8n
 from backend.core.export.renderers.html_renderer import render_html
 from backend.core.export.renderers.txt_renderer import render_txt
 

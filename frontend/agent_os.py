@@ -30,7 +30,7 @@ from backend.agents.output_schemas import (
     VisionOutput,
 )
 from backend.config.settings import settings
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.tools.prompt_tools import load_region_prompt, load_system_prompt
 from frontend.web.messages import (
     WEB_AGENT_DATA_DESCRIPTION,

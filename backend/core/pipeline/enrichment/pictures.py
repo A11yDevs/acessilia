@@ -51,14 +51,14 @@ from backend.core.pipeline.obligations import (
 from backend.core.pipeline.toolbox import (
     _source_artifact_id,
 )
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_EMPTY_VISION_DESCRIPTION,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_VISION_ELEMENT_DESCRIPTION,
 )
 from backend.services.blocking import run_blocking
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_DESCRIBING_IMAGE,
 )
 from backend.tools.logger import logger

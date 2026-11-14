@@ -5,8 +5,8 @@ from typing import Callable, Coroutine
 import edge_tts
 
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_AUDIO_EXPORTED,
     LOG_AUDIO_EXPORT_ERROR,
     LOG_AUDIO_EXPORT_PROGRESS,

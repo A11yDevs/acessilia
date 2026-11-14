@@ -2,8 +2,8 @@ import asyncio
 import time
 from pathlib import Path
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
 )

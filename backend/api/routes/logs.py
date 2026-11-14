@@ -6,8 +6,8 @@ from fastapi.responses import FileResponse
 from backend.api.limiter import limiter
 from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import API_LOG_FILE_NOT_FOUND
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import API_LOG_FILE_NOT_FOUND
 
 
 router = APIRouter(tags=["logs"], dependencies=[Depends(require_observability_token)])

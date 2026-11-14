@@ -22,14 +22,14 @@ from backend.services.history_service import (
     registrar_conversao,
 )
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_CANONICAL_JSON_SAVE_FAILED,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
     LOG_PIPELINE_ERROR,
     LOG_TASK_CANCELLED_BY_USER,
 )
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_ANALYZING_FILE,
     STAGE_CANCELLED_BY_USER,
     STAGE_PROCESSING_FAILED_LABEL,

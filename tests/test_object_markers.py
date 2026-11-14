@@ -17,7 +17,7 @@ from backend.core.export.markers import (
     with_object_markers,
 )
 from backend.core.export.pandoc_exporter import export_accessible_document
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.services import job_store
 from backend.services.job_store import load_record
 from tests.test_pending_fixes import isolated_runtime  # noqa: F401  (fixture)

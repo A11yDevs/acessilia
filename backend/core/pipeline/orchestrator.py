@@ -32,11 +32,11 @@ from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from backend.core.planning import toolbox_gate
 from backend.core.planning.planner_agent import PlannerAgent
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_PDDL_PREFERRED_PLAN_MISSING,
 )
-from backend.stage_messages import (
+from backend.core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,

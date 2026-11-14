@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
-from backend.i18n import t
+from backend.core.i18n import t
 from docstruct.export.html import (  # noqa: F401
     HtmlLabels,
     _collect_section,

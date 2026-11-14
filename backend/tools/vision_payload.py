@@ -9,8 +9,8 @@ from pathlib import Path
 from acessilia_sdk.toolbox import ToolboxError
 from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
-from backend.i18n import t
-from backend.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
 from backend.tools.logger import logger
 from backend.tools.toolbox_client import make_toolbox_client
 

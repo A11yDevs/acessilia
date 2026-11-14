@@ -17,8 +17,8 @@ from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import _derive_processing_needs
 from backend.core.manifest.models import Obligation
 from backend.core.pipeline.obligations import _unsatisfied_summary
-from backend.i18n import t
-from backend.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
+from backend.core.i18n import t
+from backend.core.i18n.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.tools.logger import logger
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline import preflight as pipeline_preflight

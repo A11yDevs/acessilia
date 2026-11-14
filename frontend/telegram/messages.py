@@ -4,7 +4,7 @@ Telegram bot's general command handlers and the document/photo processing lifecy
 table mirroring each msgid for locale catalog generation,
 and a per-locale mapping builder that scripts/gen_locale_catalogs consumes so adding another supported language later only
 requires one additional entry in BOT_PT_TRANSLATIONS-style tables plus re-running catalog generation. Module-level constants
-doube as the single source of truth that frontend/telegram/handlers/start.py formats at runtime through backend.i18n.t().
+doube as the single source of truth that frontend/telegram/handlers/start.py formats at runtime through backend.core.i18n.t().
 """
 
 from __future__ import annotations

@@ -33,5 +33,5 @@ Principles P1–P9 are in [docs/constitution.md, section 7](https://github.com/A
 ## Quality
 
 - [ ] `uv run pytest -m "not e2e"` (the command CI runs) passes with no unexpected skip, and new behaviour has tests.
-- [ ] User-facing strings go through `backend.i18n` with their pt-BR translation in `scripts/gen_locale_catalogs.py`, and the catalogs are regenerated.
+- [ ] User-facing strings go through `backend.core.i18n` with their pt-BR translation in `scripts/gen_locale_catalogs.py`, and the catalogs are regenerated.
 - [ ] Every changed `.md` file has its `.pt-br.md` mirror updated in this pull request.

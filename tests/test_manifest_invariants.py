@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.i18n import t
+from backend.core.i18n import t
 from backend.core.manifest.models import (
     MSG_ELEMENT_UNKNOWN_PAGE,
     MSG_PAGE_DUPLICATE_ELEMENT_IDS,

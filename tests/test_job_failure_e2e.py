@@ -19,8 +19,8 @@ import pytest
 
 from backend.agents.state_manager import trim_stage
 from backend.config.settings import settings
-from backend.i18n import t
-from backend.stage_messages import STAGE_ANALYZING_STRUCTURAL
+from backend.core.i18n import t
+from backend.core.i18n.stage_messages import STAGE_ANALYZING_STRUCTURAL
 from backend.tools.toolbox_client import toolbox_endpoints
 
 FAILURES_DIR = Path(__file__).resolve().parent / "fixtures" / "failures"

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-import backend.i18n as i8n
+import backend.core.i18n as i8n
 from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.validators import validate_canonical_document
@@ -22,7 +22,7 @@ from backend.core.pipeline.validators import validate_output_text
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.
 
-    The exporter and validators resolve every user-visible string through backend.i18n.t, so
+    The exporter and validators resolve every user-visible string through backend.core.i18n.t, so
     error-message assertions need a deterministic locale; en_US returns the canonical English
     msgids the assertions below are written against.
     """

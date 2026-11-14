@@ -5,7 +5,7 @@ locale strings files under each supported locale (en_US identity lookup vs pt_BR
 """
 
 from backend.config.settings import settings
-from backend.i18n import _catalog_for
+from backend.core.i18n import _catalog_for
 from backend.tools.validators import (
     is_extension_allowed,
     is_file_size_allowed,

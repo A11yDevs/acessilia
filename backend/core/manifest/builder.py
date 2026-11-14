@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 from docstruct.text.equations import preserve_equation_number
 from docstruct.text.latex import has_latex_markup
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
     MSG_HEADING_GAP,
     MSG_OBLIGATION_CODE,

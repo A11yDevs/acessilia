@@ -75,10 +75,10 @@ Edit `ENABLED_INTERFACES` in `.env`, e.g. `api,web`. The API must always be enab
 
 ## Internationalization (i18n)
 
-The project is internationalized in `en_US` (default) and `pt_BR` using **Babel** (`babel` in `pyproject.toml`). User-facing strings, Telegram bot command responses, e-mails, and server-side log lines are variablized through per-locale strings files (`backend/locales/<locale>/LC_MESSAGES/messages.po`), and the runtime-selected locale decides which strings file is used for variable substitution — adding a new supported locale requires only one new strings file (minimal code changes).
+The project is internationalized in `en_US` (default) and `pt_BR` using **Babel** (`babel` in `pyproject.toml`). User-facing strings, Telegram bot command responses, e-mails, and server-side log lines are variablized through per-locale strings files (`backend/core/i18n/locales/<locale>/LC_MESSAGES/messages.po`), and the runtime-selected locale decides which strings file is used for variable substitution — adding a new supported locale requires only one new strings file (minimal code changes).
 
 - The active server locale is negotiated from `LOCALE`/`LANGUAGE` in the environment against the supported locales, falling back to `en_US`; the Telegram bot additionally detects each user's language and replies in the user's own locale when it is offered by `I18N_LOCALES_ACTIVE` in `.env` (bottom section: `LOCALE`, `I18N_LOCALES_ACTIVE`).
-- Code looks up strings through `t()` in [backend/i18n.py](backend/i18n.py) using canonical English message ids defined as `MSG_*`/`LOG_*`/`EXE_*` constants; if a translation is missing for the active locale, Babel falls back to the English msgid unchanged.
+- Code looks up strings through `t()` in [backend/core/i18n/__init__.py](backend/core/i18n/__init__.py) using canonical English message ids defined as `MSG_*`/`LOG_*`/`EXE_*` constants; if a translation is missing for the active locale, Babel falls back to the English msgid unchanged.
 - Portuguese slash commands (`/ativar`, `/ajuda`, ...) keep working in every locale, each with a US English alias (`/activate`, `/help`, ...) — command listings and responses render in the user's locale.
 
 Full documentation — where the i18n files live, how to add a new string, how to internationalize an existing file, and how to add and activate a new locale — is in [docs/i18n.md](docs/i18n.md). (Brazilian Portuguese: [português brasileiro](docs/i18n.pt-br.md))

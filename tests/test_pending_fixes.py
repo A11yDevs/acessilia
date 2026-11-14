@@ -422,8 +422,8 @@ def test_status_persistence_excludes_canonical_result(isolated_runtime):
 @pytest.mark.asyncio
 async def test_queue_status_uses_actual_enqueue_position(isolated_runtime, monkeypatch):
     from backend.api.app import create_app
-    from backend.i18n import t
-    from backend.stage_messages import STAGE_QUEUE_WAITING_POSITION
+    from backend.core.i18n import t
+    from backend.core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
     queue, _ = isolated_runtime
     monkeypatch.setattr(queue, "qsize", lambda: 99)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(create_app()), base_url="http://test") as client:

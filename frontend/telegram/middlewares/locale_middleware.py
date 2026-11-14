@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Dict
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 
-from backend.i18n import locale_for_user, set_request_locale
+from backend.core.i18n import locale_for_user, set_request_locale
 
 
 class LocaleMiddleware(BaseMiddleware):

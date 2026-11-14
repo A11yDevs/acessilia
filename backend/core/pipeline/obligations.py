@@ -16,8 +16,8 @@ from backend.core.manifest.models import (
     Obligation,
     ProcessingManifest,
 )
-from backend.i18n import t
-from backend.stage_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.stage_messages import (
     STAGE_PAGE,
     STAGE_PAGE_OF,
     STAGE_PAGES,

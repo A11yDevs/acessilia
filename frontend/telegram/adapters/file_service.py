@@ -3,8 +3,8 @@ from pathlib import Path
 from aiogram import Bot
 from aiogram.types import FSInputFile
 
-from backend.i18n import t
-from backend.log_messages import (
+from backend.core.i18n import t
+from backend.core.i18n.log_messages import (
     LOG_TELEGRAM_FILE_DOWNLOADING,
     LOG_TELEGRAM_FILE_DOWNLOADED,
 )
