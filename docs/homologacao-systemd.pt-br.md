@@ -129,7 +129,9 @@ cd /caminho/para/acessilia
   || logger -t acessilia "staging não está pronto; veja /var/log/acessilia-readiness.log"
 ```
 
-Um monitor que só deve acompanhar a prontidão pode usar `curl -fsS http://localhost:8000/api/v1/ready`; o endpoint responde 503 quando um provider da cadeia está fora. Para testar o alerta, em uma instância de teste defina `FUSION_SECONDARY_PROVIDER` com um id inválido, reinicie a API e rode o comando: ele deve reportar `readiness endpoint does not answer or reports unavailable` e sair com 1. Restaure o valor depois.
+Um monitor que só deve acompanhar a prontidão pode usar `curl -fsS http://localhost:8000/api/v1/ready`; o endpoint responde 503 quando um provider da cadeia está fora. O check permite 30 s para o `/ready` porque a rota consulta os providers em sequência (3 s cada) e pode fazer failover entre endpoints da Toolbox; um limite de 5 s alertaria com a aplicação ainda pronta. Aumente `OPS_READY_TIMEOUT` quando a instalação tiver mais endpoints do que esse orçamento cobre.
+
+Para testar o alerta com o `FUSION_MODE=single` da homologação, em uma instância de teste defina `TOOLBOX_PROVIDER` com um id inválido (o provider primário é sempre consultado), reinicie a API e rode o comando: ele deve reportar `readiness endpoint does not answer or reports unavailable` e sair com 1. Restaure o valor depois. Para exercitar o provider secundário, defina `FUSION_MODE=dual` e invalide `FUSION_SECONDARY_PROVIDER`, restaurando os dois depois.
 
 ## Limites de processamento e modo de fusão
 

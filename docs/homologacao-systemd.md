@@ -127,7 +127,9 @@ cd /path/to/acessilia
   || logger -t acessilia "staging is not ready; see /var/log/acessilia-readiness.log"
 ```
 
-A monitor that should only watch readiness can use `curl -fsS http://localhost:8000/api/v1/ready` instead; the endpoint returns 503 when a chain provider is unhealthy. To test the alert, in a test instance set `FUSION_SECONDARY_PROVIDER` to an invalid id, restart the API and run the command: it must report `readiness endpoint does not answer or reports unavailable` and exit 1. Restore the setting afterwards.
+A monitor that should only watch readiness can use `curl -fsS http://localhost:8000/api/v1/ready` instead; the endpoint returns 503 when a chain provider is unhealthy. The check allows 30 s for `/ready` because the route probes providers sequentially (3 s each) and may fail over between Toolbox endpoints; a 5 s limit would alert while the application was still ready. Raise `OPS_READY_TIMEOUT` when the deployment has more endpoints than that budget covers.
+
+To test the alert with the homologation `FUSION_MODE=single`, in a test instance set `TOOLBOX_PROVIDER` to an invalid id (the primary provider is always checked), restart the API and run the command: it must report `readiness endpoint does not answer or reports unavailable` and exit 1. Restore the setting afterwards. To exercise the secondary provider, set `FUSION_MODE=dual` and invalidate `FUSION_SECONDARY_PROVIDER` instead, restoring both afterwards.
 
 ## Processing limits and fusion mode
 
