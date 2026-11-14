@@ -70,7 +70,8 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
 - **The core imports the frontend.** `backend/core/planning/models.py` and
   `backend/core/execution/models.py` take schema descriptions and validation
   messages from `frontend.telegram.messages`. Without `frontend` installed,
-  both raise `ImportError`.
+  both raise `ImportError`. (Fixed in step 2: those messages now live in
+  `backend/core/planning/messages.py` and `backend/core/execution/messages.py`.)
 - **The core reaches the service in two places.**
   - `backend.config`: 34 imports, and 59 distinct `settings` keys read at
     107 points. The orchestrator alone reads 12 keys, and the exporters 3.
@@ -196,7 +197,9 @@ Proposed: option 2.
      The messages the core takes from `frontend.telegram.messages` (the schema
      descriptions and validation messages of `planning/models.py` and
      `execution/models.py`) move to the core's messages in the same step. If
-     the frontend still uses them, it imports them from the core.
+     the frontend still uses them, it imports them from the core. Done: the 18
+     msgids moved to `planning/messages.py` and `execution/messages.py`, and
+     the frontend did not use them.
 
      **Operations that may go to the SDK stay where they are** until
      [ADR-0017](0017-operational-sdk-and-agentic-core.md) decides their

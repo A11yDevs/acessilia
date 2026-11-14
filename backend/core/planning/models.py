@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from backend.core.i18n import t  # noqa: E402
-from frontend.telegram.messages import (  # noqa: E402
+from backend.core.planning.messages import (  # noqa: E402
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
     MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
