@@ -279,7 +279,7 @@ from backend.core.pipeline.validators import (
     MSG_TECHNICAL_METADATA_IN_TXT,
     MSG_UNKNOWN_EXPORT_PROFILE,
 )
-from backend.core.export.pandoc_exporter import (
+from backend.core.export.messages import (
     MSG_AUDIT_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,

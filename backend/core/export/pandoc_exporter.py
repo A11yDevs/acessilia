@@ -23,22 +23,18 @@ from backend.i18n import t
 from backend.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from backend.log_messages import LOG_PDF_UA_MATH_DEGRADED
 from backend.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
+from backend.core.export.messages import (
+    MSG_AUDIT_FAILED,
+    MSG_DEFAULT_ACCESSIBLE_TITLE,
+    MSG_DOCX_DISABLED,
+    MSG_PDF_UA_DISABLED,
+    MSG_UNSUPPORTED_EXPORT_FORMAT,
+)
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.canonical_builder import sanitize_canonical_document
 from backend.core.pipeline.validators import audit_canonical_document
 from backend.core.pipeline.validators import validate_export_profile
 from backend.tools.logger import logger
-
-#: Canonical English msgid for a default document title used when the caller passes none.
-MSG_DEFAULT_ACCESSIBLE_TITLE: str = "Accessible document"
-#: Canonical English msgid for a docx export requested while TOOLBOX_DOCX_ENABLED is false.
-MSG_DOCX_DISABLED: str = "DOCX export is disabled (TOOLBOX_DOCX_ENABLED=false)"
-#: Canonical English msgid for a pdf_ua export requested while TOOLBOX_PDF_UA_ENABLED is false.
-MSG_PDF_UA_DISABLED: str = "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
-#: Canonical English msgid template for an audit failure; {findings} is substituted by callers after lookup.
-MSG_AUDIT_FAILED: str = "Audit failed: {findings}"
-#: Canonical English msgid template for an unsupported export format; {format_name} is substituted by callers after lookup.
-MSG_UNSUPPORTED_EXPORT_FORMAT: str = "Unsupported export format: {format_name}"
 
 
 #: BCP 47 language for the document metadata when the document declares none.
