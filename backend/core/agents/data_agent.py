@@ -23,7 +23,7 @@ from backend.core.logger import logger
 from backend.core.agents.prompt_tools import load_region_prompt
 from backend.core.agents.ai_client import get_agno_model
 from backend.core.agents.model_call_policy import CALL_DEADLINE_GRACE_SECONDS
-from backend.config.settings import settings
+from backend.core.config import ModelConfig, ToolboxConfig
 from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
@@ -42,6 +42,12 @@ DATA_PROMPT_KEY_MAP = {
 
 class DataAgent:
     """Processes table and formula regions with a vision model."""
+
+    def __init__(self, *, models: ModelConfig, toolbox: ToolboxConfig) -> None:
+        """The run's model configuration (``ModelConfig``: client, budgets, timeout)
+        and its Toolbox (the gateway with ``ai_client == "toolbox"``)."""
+        self.models = models
+        self.toolbox = toolbox
 
     async def process_region(
         self,
@@ -79,12 +85,14 @@ class DataAgent:
                 )
             )
 
-            timeout_seconds = settings.data_agent_timeout_seconds
+            timeout_seconds = self.models.data_agent_timeout_seconds
             agent = Agent(
                 name="DataAgent",
                 model=get_agno_model(
+                    self.models,
+                    self.toolbox,
                     max_tokens=(
-                        settings.data_agent_max_tokens
+                        self.models.data_agent_max_tokens
                         if classification == "table"
                         else None
                     ),

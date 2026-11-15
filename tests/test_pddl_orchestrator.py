@@ -29,7 +29,7 @@ from backend.core.manifest.models import (
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import toolbox_config, vision_config
+from tests.core_config_support import model_config, toolbox_config, vision_config
 
 
 def _sample_manifest() -> ProcessingManifest:
@@ -673,6 +673,9 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
     element.metadata = {}
 
     class FakeDataAgent:
+        def __init__(self, **_kwargs):
+            pass
+
         async def process_region(self, **_kwargs):
             return DataOutput(
                 kind="table",
@@ -710,6 +713,7 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
             Path("/tmp/amostra.pdf"),
             vision=vision_config(),
             toolbox=toolbox_config(),
+            models=model_config(),
         )
     )
 
@@ -779,6 +783,7 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
             mode="medio",
             vision=vision_config(),
             toolbox=toolbox_config(),
+            models=model_config(),
         )
     )
 
@@ -915,6 +920,7 @@ def test_standalone_image_injects_full_page_picture_for_vision(
             media_inspection=media_inspection,
             vision=vision_config(),
             toolbox=toolbox_config(),
+            models=model_config(),
         )
     )
 

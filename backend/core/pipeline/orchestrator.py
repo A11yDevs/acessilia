@@ -453,7 +453,8 @@ class PddlAccessibilityOrchestrator:
         progress = _EnrichmentCheckpoint(current_task_id(), manifest).save
         await _classify_formula_regions(
             manifest, source_path, mode=effective_mode, vision=config.vision,
-            toolbox=config.toolbox, breaker=breaker, on_progress=progress,
+            toolbox=config.toolbox, models=config.models,
+            breaker=breaker, on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         await _enrich_picture_descriptions(
@@ -462,6 +463,7 @@ class PddlAccessibilityOrchestrator:
             mode=effective_mode,
             vision=config.vision,
             toolbox=config.toolbox,
+            models=config.models,
             media_inspection=media_inspection,
             status_callback=status_callback,
             breaker=breaker,
@@ -478,6 +480,7 @@ class PddlAccessibilityOrchestrator:
             document=config.document,
             vision=config.vision,
             toolbox=config.toolbox,
+            models=config.models,
             status_callback=status_callback,
             breaker=breaker,
             on_progress=progress,
@@ -491,6 +494,7 @@ class PddlAccessibilityOrchestrator:
             file_path.resolve(),
             vision=config.vision,
             toolbox=config.toolbox,
+            models=config.models,
             status_callback=status_callback,
             breaker=breaker,
             on_progress=progress,

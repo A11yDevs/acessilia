@@ -21,7 +21,7 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support (the service's job state; it stays outside the core).
 
 #### 0.2. AI Client Integration (`backend/core/agents/ai_client.py`)
-- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) based on environment settings.
+- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): central `get_agno_model(models, toolbox)` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) from the run's `ModelConfig` and `ToolboxConfig` ([ADR-0016](adr/0016-core-package.md), step 3).
 - [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): prompt loader and template resolver over the prompts in [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
 **DataAgent call deadline (#276, step 1).** Each `process_region` call awaits

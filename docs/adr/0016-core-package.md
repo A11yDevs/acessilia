@@ -235,8 +235,10 @@ Proposed: option 2.
      store, extraction timeout, and the primary and math providers; each
      helper that calls the client factory takes the run's `ToolboxConfig`),
      then the client factory and its callers (done:
-     `make_toolbox_client(cls, toolbox)`; the model client's VLM endpoint and
-     key wait for the models group). The method handlers that read the
+     `make_toolbox_client(cls, toolbox)`). The `models` group is done too:
+     `get_agno_model(models, toolbox)` and `active_model_name(models)`, and
+     `VisionAgent` and `DataAgent` take the run's `ModelConfig`, given by
+     the stages and the inspection handlers. The method handlers that read the
      config declare a `config` parameter (the dual-provider and
      single-provider fusion handlers, the region and page inspection
      handlers, the `mathml` and `latex-verbalizer` formula handlers, and the

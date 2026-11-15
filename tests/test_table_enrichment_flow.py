@@ -17,7 +17,7 @@ from backend.core.agents.output_schemas import DataOutput
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import toolbox_config, vision_config
+from tests.core_config_support import model_config, toolbox_config, vision_config
 
 
 def _reading(rows, *, warnings=()):
@@ -35,6 +35,9 @@ def run(monkeypatch):
         calls = []
 
         class Agent:
+            def __init__(self, **_kwargs):
+                pass
+
             async def process_region(self, **kwargs):
                 calls.append(kwargs["fallback_text"])
                 queue = answers.setdefault("_queue", list(answers.get("all", [])))
@@ -52,6 +55,7 @@ def run(monkeypatch):
         asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/doc.pdf"), breaker=breaker,
             vision=vision_config(table_visual_review=True, retry_pass_delay_seconds=0),
             toolbox=toolbox_config(),
+            models=model_config(),
         ))
         return manifest, calls
 

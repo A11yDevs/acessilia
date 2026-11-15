@@ -23,7 +23,7 @@ from tests.pddl_support import (
 from tests.pddl_support import (
     build_obligation as _obligation,
 )
-from tests.core_config_support import toolbox_config, vision_config
+from tests.core_config_support import model_config, toolbox_config, vision_config
 
 _DESCRIPTION = VisionOutput(
     kind="description",
@@ -50,7 +50,7 @@ def _patch(monkeypatch, answer, *, image=b"image-bytes", error=None):
     calls = []
 
     class FakeVision:
-        def __init__(self, mode: str, *, region_cache, toolbox) -> None:
+        def __init__(self, mode: str, *, region_cache, toolbox, models) -> None:
             self.mode = mode
 
         async def describe_region(self, *, errors=None, **kwargs):
@@ -68,7 +68,7 @@ def _patch(monkeypatch, answer, *, image=b"image-bytes", error=None):
 
 
 async def _enrich(manifest, tmp_path):
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config())
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
     return manifest.elements[0]
 
 

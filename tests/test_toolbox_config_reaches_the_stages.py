@@ -19,7 +19,7 @@ from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import core_config, document_config, toolbox_config, vision_config
+from tests.core_config_support import core_config, document_config, model_config, toolbox_config, vision_config
 from tests.pddl_support import build_element, build_manifest
 
 #: The run's Toolbox config: its own object, unlike one built from the settings.
@@ -29,7 +29,7 @@ VISION = vision_config(region_cache_enabled=False, retry_pass_delay_seconds=0)
 
 def _vision(monkeypatch, *stages, seen):
     class Vision:
-        def __init__(self, mode, *, region_cache, toolbox):
+        def __init__(self, mode, *, region_cache, toolbox, models):
             seen.append(("agent", toolbox))
 
         async def describe_region(self, **_kwargs):
@@ -52,7 +52,8 @@ async def test_the_picture_stage_gives_its_agent_and_crops_the_run_config(monkey
     manifest = build_manifest([build_element("pic-1", "picture")], [])
 
     await picture_stage._enrich_picture_descriptions(
-        manifest, Path("doc.pdf"), mode="medio", vision=VISION, toolbox=RUN
+        manifest, Path("doc.pdf"), mode="medio", vision=VISION, toolbox=RUN,
+        models=model_config(),
     )
 
     assert {kind for kind, _ in seen} == {"agent", "crop"}
@@ -64,6 +65,9 @@ async def test_the_table_stage_gives_its_crops_the_run_config(monkeypatch) -> No
     seen: list = []
 
     class Data:
+        def __init__(self, **_kwargs):
+            pass
+
         async def process_region(self, **_kwargs):
             return None
 
@@ -76,7 +80,8 @@ async def test_the_table_stage_gives_its_crops_the_run_config(monkeypatch) -> No
     manifest = build_manifest([build_element("t-1", "table", text="")], [])
 
     await table_stage._enrich_table_structures(
-        manifest, Path("doc.pdf"), vision=VISION, toolbox=RUN
+        manifest, Path("doc.pdf"), vision=VISION, toolbox=RUN,
+        models=model_config(),
     )
 
     assert seen and all(toolbox is RUN for toolbox in seen)
@@ -99,6 +104,7 @@ async def test_the_formula_classification_gives_its_agent_and_crops_the_run_conf
     await formula_stage._classify_formula_regions(
         manifest, Path("doc.pdf"), mode="medio", vision=VISION, toolbox=RUN,
         breaker=ProviderBreaker(3),
+        models=model_config(),
     )
 
     assert {kind for kind, _ in seen} == {"agent", "crop"}
@@ -127,6 +133,7 @@ async def test_the_formula_recognition_gives_its_agent_crops_and_recognizer_the_
     await formula_stage._enrich_formula_latex(
         manifest, Path("doc.pdf"), mode="medio", document=document_config(),
         vision=VISION, toolbox=RUN,
+        models=model_config(),
     )
 
     assert {kind for kind, _ in seen} == {"agent", "crop", "recognize"}

@@ -18,7 +18,7 @@ from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import document_config, toolbox_config, vision_config
+from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
 from tests.pddl_support import build_element, build_manifest, install_formula_recognizer
 
 #: Values unlike the service's defaults, so a stage that falls back on them fails.
@@ -45,7 +45,7 @@ def _record(monkeypatch, stage) -> dict[str, list]:
         monkeypatch.setattr(stage, "_tables_to_read", record_tables)
 
     class Vision:
-        def __init__(self, mode, *, region_cache, toolbox):
+        def __init__(self, mode, *, region_cache, toolbox, models):
             seen["region_cache"].append(region_cache)
 
         async def describe_region(self, **_kwargs):
@@ -83,6 +83,7 @@ async def test_the_picture_stage_reads_its_vision_config(monkeypatch) -> None:
     await picture_stage._enrich_picture_descriptions(
         manifest, Path("doc.pdf"), mode="medio", vision=VISION,
         toolbox=toolbox_config(),
+        models=model_config(),
     )
 
     assert seen == {"region_cache": [True], "threshold": [4], "slots": [3], "delay": [6]}
@@ -97,6 +98,7 @@ async def test_the_formula_classification_reads_its_vision_config(monkeypatch) -
     await formula_stage._classify_formula_regions(
         manifest, Path("doc.pdf"), mode="medio", vision=VISION, breaker=ProviderBreaker(1),
         toolbox=toolbox_config(),
+        models=model_config(),
     )
 
     assert seen["region_cache"] == [True]
@@ -113,6 +115,7 @@ async def test_the_formula_recognition_reads_its_vision_config(monkeypatch) -> N
     await formula_stage._enrich_formula_latex(
         manifest, Path("doc.pdf"), mode="medio", document=document_config(), vision=VISION,
         toolbox=toolbox_config(),
+        models=model_config(),
     )
 
     assert seen == {"region_cache": [True], "threshold": [4], "slots": [3], "delay": []}
@@ -123,6 +126,9 @@ async def test_the_table_stage_reads_its_vision_config(monkeypatch) -> None:
     seen = _record(monkeypatch, table_stage)
 
     class Data:
+        def __init__(self, **_kwargs):
+            pass
+
         async def process_region(self, **_kwargs):
             return None
 
@@ -130,7 +136,7 @@ async def test_the_table_stage_reads_its_vision_config(monkeypatch) -> None:
     monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args, **_kwargs: (b"png", 1))
     manifest = build_manifest([build_element("t-1", "table", text="")], [])
 
-    await table_stage._enrich_table_structures(manifest, Path("doc.pdf"), vision=VISION, toolbox=toolbox_config())
+    await table_stage._enrich_table_structures(manifest, Path("doc.pdf"), vision=VISION, toolbox=toolbox_config(), models=model_config())
 
     assert seen["threshold"] == [4]
     assert seen["delay"] == [6]

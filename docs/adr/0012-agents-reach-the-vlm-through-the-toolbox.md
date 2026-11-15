@@ -9,7 +9,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 ## Context
 
-The core's agents (VisionAgent, DataAgent and the AgentOS agents) hold a chat with a vision model through an Agno model built by `get_agno_model()` (`backend/ai/models/ai_client.py`). Until now the model was either Ollama or an OpenAI-compatible server reached as OpenRouter, and the core held that server's address and key.
+The core's agents (VisionAgent, DataAgent and the AgentOS agents) hold a chat with a vision model through an Agno model built by `get_agno_model(models, toolbox)` (`backend/core/agents/ai_client.py`; since ADR-0016's step 3 it takes the run's `ModelConfig` and `ToolboxConfig`). Until now the model was either Ollama or an OpenAI-compatible server reached as OpenRouter, and the core held that server's address and key.
 
 On staging, `OPENROUTER_BASE_URL` pointed straight at the llama-server that also serves the Toolbox's own VLM capabilities (`document.ocr.page`, `document.adjudicate.*`, `table.recognize`). The server has two parallel slots on a CPU-only host. The core's calls and the Toolbox's, each limited on its own side, together went over those slots and stalled the server.
 

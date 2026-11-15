@@ -9,6 +9,8 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from tests.core_config_support import model_config, toolbox_config
+
 from backend.core.agents import data_agent as data_module
 
 
@@ -54,14 +56,13 @@ async def blocked_model(monkeypatch):
 async def test_deadline_degrades_while_the_model_is_still_blocked(
     monkeypatch, blocked_model, classification
 ):
-    monkeypatch.setattr(data_module.settings, "data_agent_timeout_seconds", 0)
     monkeypatch.setattr(data_module, "CALL_DEADLINE_GRACE_SECONDS", 0.1)
     validation = Mock(wraps=data_module.validate_structured_run)
     monkeypatch.setattr(data_module, "validate_structured_run", validation)
     messages: list[str] = []
     sink = data_module.logger.add(messages.append, level="DEBUG", format="{message}")
     call = asyncio.create_task(
-        data_module.DataAgent().process_region(b"image", classification, page_num=4)
+        data_module.DataAgent(models=model_config(data_agent_timeout_seconds=0), toolbox=toolbox_config()).process_region(b"image", classification, page_num=4)
     )
     try:
         await _wait_for_event(blocked_model.started)
@@ -90,7 +91,7 @@ async def test_cancellation_propagates_while_the_model_is_still_blocked(
 ):
     validation = Mock(wraps=data_module.validate_structured_run)
     monkeypatch.setattr(data_module, "validate_structured_run", validation)
-    call = asyncio.create_task(data_module.DataAgent().process_region(b"image", "table"))
+    call = asyncio.create_task(data_module.DataAgent(models=model_config(), toolbox=toolbox_config()).process_region(b"image", "table"))
     try:
         await _wait_for_event(blocked_model.started)
         call.cancel()
@@ -114,7 +115,7 @@ async def test_transient_error_degrades_and_requests_no_openai_retries(
         data_module, "Agent", lambda **_kwargs: SimpleNamespace(run=run)
     )
 
-    result = await data_module.DataAgent().process_region(b"image", classification)
+    result = await data_module.DataAgent(models=model_config(), toolbox=toolbox_config()).process_region(b"image", classification)
 
     assert result is None
     run.assert_called_once()

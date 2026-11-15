@@ -9,8 +9,7 @@ import re
 from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
 
-from backend.core.config import ToolboxConfig
-from backend.config.settings import settings
+from backend.core.config import ModelConfig, ToolboxConfig
 from backend.core.i18n import active_locale, t
 from backend.core.i18n.log_messages import (
     LOG_VISION_AGENT_CONTEXT_RETRY,
@@ -99,7 +98,12 @@ class VisionAgent:
     """Processes visual regions and produces accessible audio descriptions."""
 
     def __init__(
-        self, mode: str = "medio", *, region_cache: bool, toolbox: ToolboxConfig
+        self,
+        mode: str = "medio",
+        *,
+        region_cache: bool,
+        toolbox: ToolboxConfig,
+        models: ModelConfig,
     ) -> None:
         """Create a vision agent with a default prompting mode.
 
@@ -109,10 +113,13 @@ class VisionAgent:
                 stored in the cache (``VisionConfig.region_cache_enabled``).
             toolbox (ToolboxConfig): The run's Toolbox, which renders a smaller
                 image when the model rejects one for its context.
+            models (ModelConfig): The run's model client, budgets and call
+                timeout.
         """
         self.mode = mode
         self.region_cache = region_cache
         self.toolbox = toolbox
+        self.models = models
         self.system_prompt = load_system_prompt(mode)
 
     async def describe_region(
@@ -172,14 +179,17 @@ class VisionAgent:
         max_tokens = (
             None
             if full_budget or classification.startswith("full_page")
-            else settings.vision_region_max_tokens
+            else self.models.vision_region_max_tokens
         )
 
-        context_retry_max_tokens = _context_retry_max_tokens(classification, max_tokens)
+        context_retry_max_tokens = _context_retry_max_tokens(
+            classification, max_tokens, self.models.vision_region_max_tokens
+        )
         cache_extra = _region_cache_extra(
             prompt,
             effective_mode,
             max_tokens,
+            self.models,
             context_retry_max_tokens=context_retry_max_tokens,
         )
         if self.region_cache:
@@ -195,7 +205,7 @@ class VisionAgent:
         try:
             output = await _run_with_retry(
                 prompt, image_bytes, VisionOutput, page_num=page_num, label=classification,
-                toolbox=self.toolbox, max_tokens=max_tokens,
+                toolbox=self.toolbox, models=self.models, max_tokens=max_tokens,
             )
         except Exception as error:
             salvaged = (
@@ -264,7 +274,7 @@ class VisionAgent:
         )
         return await _run_with_retry(
             prompt, image_bytes, PageInspectionOutput, page_num=page_num, label="page_inspection",
-            toolbox=self.toolbox,
+            toolbox=self.toolbox, models=self.models,
         )
 
 
@@ -276,6 +286,7 @@ async def _run_with_retry(
     page_num: int,
     label: str,
     toolbox: ToolboxConfig,
+    models: ModelConfig,
     max_tokens: int | None = None,
 ) -> OutputModel:
     """Ask the vision model for ``schema``, retrying answers that fail validation.
@@ -309,7 +320,9 @@ async def _run_with_retry(
 
         size_before = len(image_bytes)
         image_bytes = smaller_image
-        fallback_max_tokens = _context_retry_max_tokens(label, max_tokens)
+        fallback_max_tokens = _context_retry_max_tokens(
+            label, max_tokens, models.vision_region_max_tokens
+        )
         if fallback_max_tokens is not None:
             max_tokens = fallback_max_tokens
         context_retries += 1
@@ -344,14 +357,14 @@ async def _run_with_retry(
             model_options["reasoning_enabled"] = False
         agent = Agent(
             name="VisionAgent",
-            model=get_agno_model(**model_options),
+            model=get_agno_model(models, toolbox, **model_options),
             output_schema=schema,
             telemetry=False,
         )
         run = functools.partial(
             agent.run, input=attempt_prompt, images=[Image(content=image_bytes)]
         )
-        deadline = settings.model_call_timeout_seconds + CALL_DEADLINE_GRACE_SECONDS
+        deadline = models.model_call_timeout_seconds + CALL_DEADLINE_GRACE_SECONDS
         call = asyncio.ensure_future(asyncio.to_thread(run))
         try:
             response = await asyncio.wait_for(call, timeout=deadline)
@@ -469,16 +482,18 @@ def _is_whole_page(label: str) -> bool:
     return label.startswith("full_page") or label == "page_inspection"
 
 
-def _context_retry_max_tokens(label: str, max_tokens: int | None) -> int | None:
+def _context_retry_max_tokens(
+    label: str, max_tokens: int | None, configured: int
+) -> int | None:
     """Bound the output budget only for whole-page requests on context retry.
 
     A whole page is the request that gets the full output budget (a page
     inspection gets the provider default), so its overflow is the one the
-    budget can cause; a smaller region keeps its own cap.
+    budget can cause; a smaller region keeps its own cap. ``configured`` is
+    the run's ``ModelConfig.vision_region_max_tokens``.
     """
     if not _is_whole_page(label):
         return None
-    configured = settings.vision_region_max_tokens
     return configured if max_tokens is None else min(configured, max_tokens)
 
 
@@ -616,6 +631,7 @@ def _region_cache_extra(
     prompt: str,
     mode: str,
     max_tokens: int | None,
+    models: ModelConfig,
     *,
     context_retry_max_tokens: int | None = None,
 ) -> str:
@@ -639,8 +655,8 @@ def _region_cache_extra(
     return options_cache_key(
         "vision_region",
         version="v2",
-        ai_client=settings.ai_client,
-        model=active_model_name(),
+        ai_client=models.ai_client,
+        model=active_model_name(models),
         mode=mode,
         budget=max_tokens,
         context_retry_image_scale=_CONTEXT_RETRY_IMAGE_SCALE,

@@ -9,7 +9,7 @@ import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import toolbox_config, vision_config
+from tests.core_config_support import model_config, toolbox_config, vision_config
 
 isolated_runtime = runtime_fixture
 
@@ -198,6 +198,9 @@ def _enrich_tables(monkeypatch, table, *, image, reading):
     from tests.pddl_support import build_manifest
 
     class FakeDataAgent:
+        def __init__(self, **_kwargs):
+            pass
+
         async def process_region(self, **kwargs):
             return reading
 
@@ -208,7 +211,7 @@ def _enrich_tables(monkeypatch, table, *, image, reading):
     monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args, **_kwargs: (image, 1))
     monkeypatch.setattr(pddl.asyncio, "to_thread", run_inline)
     manifest = build_manifest([table], [])
-    asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/deck.pdf"), vision=vision_config(table_visual_review=True), toolbox=toolbox_config()))
+    asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/deck.pdf"), vision=vision_config(table_visual_review=True), toolbox=toolbox_config(), models=model_config()))
     return _payload(manifest)
 
 
