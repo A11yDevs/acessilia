@@ -1545,7 +1545,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         # Normalized description for the nominal-plan JSON schema document in pt_BR.
         MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION: (
-            "Plano nominal derivado do manifesto de processamento e o domínio PDDL do Acessilia"
+            "Plano nominal derivado do manifesto de processamento e do domínio PDDL do Acessilia; os efeitos só são confirmados após a execução por um executor"
         ),
         # Execution model guard: a result claiming success must have passed validation.
         MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION: (

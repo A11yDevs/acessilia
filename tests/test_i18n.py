@@ -301,3 +301,26 @@ def test_generated_catalogs_preserve_versioned_messages(tmp_path):
         with (DEFAULT_REPOS_CATALOGS_DIR / locale / "LC_MESSAGES/messages.po").open("rb") as stream:
             expected = {msg.id: msg.string for msg in read_po(stream) if msg.id}
         assert actual == expected
+
+
+def test_planning_messages_state_the_rule_they_report(monkeypatch, catalogs) -> None:
+    """#530: the solved-outcome msgid names its rule, and pt_BR keeps the schema clause."""
+    from backend.core.planning.messages import (
+        MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
+        MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS,
+    )
+
+    monkeypatch.setenv("LOCALE", "en_US")
+    i8n._catalog_for.cache_clear()
+    english = i8n.t(MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS)
+    assert "solved" in english
+    assert "plan_file" in english
+    assert "ended before execution" not in english
+
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    i8n._catalog_for.cache_clear()
+    assert i8n.t(MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS) != english
+    schema = i8n.t(MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION)
+    # The old translation stopped before the clause that names the executor.
+    assert schema != MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION
+    assert ";" in schema and "executor" in schema
