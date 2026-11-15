@@ -27,14 +27,14 @@ from acessilia_sdk.toolbox import (
     CatalogCache,
     CatalogSnapshot,
     Requirement,
-    ToolboxClientConfig,
+    ToolboxEndpoint,
     ToolboxProviderUnavailable,
     missing_requirements,
     read_catalog,
 )
-from backend.config.settings import settings
+from backend.core.config import CoreConfig, ToolboxConfig
 from backend.core.manifest.models import ProcessingManifest
-from backend.core.toolbox.toolbox_client import toolbox_client_config
+from backend.core.toolbox.toolbox_client import endpoints_from
 
 GATE_MODES = ("observe", "enforce", "off")
 
@@ -45,25 +45,34 @@ CATALOG_TIMEOUT_SECONDS = 10.0
 
 _EXTRACT = "document.structure.extract"
 
-#: Method -> Toolbox requirements, resolved when evaluated so provider overrides
-#: in the environment apply. Methods not listed run locally.
-METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[], list[Requirement]]] = {
-    "dual-provider-fusion": lambda: [
-        Requirement(_EXTRACT, settings.toolbox_provider),
-        Requirement(_EXTRACT, settings.fusion_secondary_provider),
+def _provider(config: CoreConfig, key: str) -> str:
+    return config.toolbox.providers[key]
+
+
+#: Method -> Toolbox requirements, resolved from the run's config when
+#: evaluated, so the providers checked are the ones the run calls. Methods not
+#: listed run locally.
+METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
+    "dual-provider-fusion": lambda config: [
+        Requirement(_EXTRACT, _provider(config, "toolbox_provider")),
+        Requirement(_EXTRACT, config.fusion.secondary_provider),
     ],
-    "single-provider": lambda: [Requirement(_EXTRACT, settings.toolbox_provider)],
+    "single-provider": lambda config: [
+        Requirement(_EXTRACT, _provider(config, "toolbox_provider"))
+    ],
     # Methods that render pages or regions; pdf.render@2 also renders raster
     # inputs, so they need it for images too.
-    "vision-page-inspection": lambda: [
-        Requirement("pdf.render", settings.toolbox_pdf_provider)
+    "vision-page-inspection": lambda config: [
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
     ],
-    "pymupdf-region": lambda: [
-        Requirement("pdf.render", settings.toolbox_pdf_provider)
+    "pymupdf-region": lambda config: [
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
     ],
-    "vlm-pairwise-judge": lambda: [
-        Requirement("document.adjudicate.page", settings.toolbox_adjudicate_provider),
-        Requirement("pdf.render", settings.toolbox_pdf_provider),
+    "vlm-pairwise-judge": lambda config: [
+        Requirement(
+            "document.adjudicate.page", _provider(config, "toolbox_adjudicate_provider")
+        ),
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider")),
     ],
 }
 
@@ -95,8 +104,9 @@ class AvailabilityDecision:
         }
 
 
-def gate_mode() -> str:
-    mode = settings.toolbox_availability_gate
+def gate_mode(toolbox: ToolboxConfig) -> str:
+    """``toolbox.availability_gate``, or ``observe`` for a value it does not know."""
+    mode = toolbox.availability_gate
     return mode if mode in GATE_MODES else "observe"
 
 
@@ -114,15 +124,16 @@ def evaluate(
     snapshot: CatalogSnapshot | None,
     *,
     mode: str,
+    config: CoreConfig,
     catalog_error: str | None = None,
 ) -> AvailabilityDecision:
-    """Which of ``methods`` cannot run against ``snapshot``."""
+    """Which of ``methods`` cannot run against ``snapshot``, with ``config``'s providers."""
     blocked: dict[str, list[str]] = {}
     for method in sorted(set(methods)):
         requirements = METHOD_TOOLBOX_REQUIREMENTS.get(method)
         if requirements is None:
             continue
-        reasons = missing_requirements(snapshot, requirements())
+        reasons = missing_requirements(snapshot, requirements(config))
         if reasons:
             blocked[method] = reasons
     return AvailabilityDecision(
@@ -133,22 +144,23 @@ def evaluate(
     )
 
 
-def _catalog_config() -> ToolboxClientConfig:
-    """The capability clients' configuration, so the gate checks where they call.
+def _catalog_endpoint(toolbox: ToolboxConfig) -> ToolboxEndpoint:
+    """The capability clients' primary endpoint, so the gate checks where they call.
 
-    A URL the SDK cannot use is reported as an unavailable Toolbox, which the
-    cache records like any failed read, so a misconfiguration degrades
-    planning instead of failing the document.
+    The same rule as the clients' (:func:`endpoints_from`). A URL the SDK
+    cannot use is reported as an unavailable Toolbox, which the cache records
+    like any failed read, so a misconfiguration degrades planning instead of
+    failing the document.
     """
     try:
-        return toolbox_client_config()
+        return endpoints_from(toolbox.base_urls, toolbox.base_url)[0]
     except ValueError as exc:
         raise ToolboxProviderUnavailable(
             f"Toolbox catalogue endpoint is not usable: {exc}"
         ) from exc
 
 
-async def _fetch() -> CatalogSnapshot:
+async def _fetch(toolbox: ToolboxConfig) -> CatalogSnapshot:
     """The catalogue of the clients' primary endpoint, on the catalogue's budget.
 
     The primary is the first of ``TOOLBOX_BASE_URLS``, else
@@ -161,38 +173,52 @@ async def _fetch() -> CatalogSnapshot:
     ``CATALOG_TIMEOUT_SECONDS`` per request and no retries; the cache's next
     refresh is the retry.
     """
-    config = _catalog_config()
     return await read_catalog(
-        config.endpoints[0],
+        _catalog_endpoint(toolbox),
         timeout_seconds=CATALOG_TIMEOUT_SECONDS,
-        api_key=config.api_key,
+        api_key=toolbox.api_key,
     )
 
 
-_cache: CatalogCache | None = None
+#: One cache per catalogue source and timing, shared by the process.
+_caches: dict[tuple[str, str, str, int, int], CatalogCache] = {}
 
 
-def catalog_cache() -> CatalogCache:
-    """Process-wide cache, so concurrent documents share one catalogue read."""
-    global _cache
-    if _cache is None:
-        _cache = CatalogCache(
-            _fetch,
-            refresh_seconds=settings.toolbox_catalog_refresh_seconds,
-            stale_seconds=settings.toolbox_catalog_stale_seconds,
+def catalog_cache(toolbox: ToolboxConfig) -> CatalogCache:
+    """The process-wide cache for ``toolbox``'s catalogue.
+
+    Concurrent documents with the same endpoint, key and timings share one
+    catalogue read. A run with another of these gets its own cache, so it
+    never reads a snapshot taken from a deployment it does not call.
+    """
+    key = (
+        toolbox.base_url,
+        toolbox.base_urls,
+        toolbox.api_key,
+        toolbox.catalog_refresh_seconds,
+        toolbox.catalog_stale_seconds,
+    )
+    cache = _caches.get(key)
+    if cache is None:
+        cache = _caches[key] = CatalogCache(
+            lambda: _fetch(toolbox),
+            refresh_seconds=toolbox.catalog_refresh_seconds,
+            stale_seconds=toolbox.catalog_stale_seconds,
         )
-    return _cache
+    return cache
 
 
-async def decide(manifest: ProcessingManifest) -> AvailabilityDecision:
+async def decide(manifest: ProcessingManifest, config: CoreConfig) -> AvailabilityDecision:
     """Take the catalogue snapshot for one document and evaluate its methods."""
-    mode = gate_mode()
+    mode = gate_mode(config.toolbox)
     methods = requested_methods(manifest)
     if mode == "off" or not methods & set(METHOD_TOOLBOX_REQUIREMENTS):
         return AvailabilityDecision(mode=mode, catalog_revision=None)
-    cache = catalog_cache()
+    cache = catalog_cache(config.toolbox)
     snapshot = await cache.get()
-    return evaluate(methods, snapshot, mode=mode, catalog_error=cache.last_error)
+    return evaluate(
+        methods, snapshot, mode=mode, config=config, catalog_error=cache.last_error
+    )
 
 
 __all__ = [

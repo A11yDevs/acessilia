@@ -23,7 +23,7 @@ from backend.services.blocking import run_blocking
 from backend.services import job_checkpoint
 from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.config import CoreConfig, DocumentConfig, FusionConfig
+from backend.core.config import CoreConfig, DocumentConfig, FusionConfig, ToolboxConfig
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import (
     ExecutionResume,
@@ -271,7 +271,9 @@ class PddlAccessibilityOrchestrator:
                 else None
             )
             planning_manifest = ProcessingManifest.model_validate(plan_state["manifest"])
-            availability = _availability_from(plan_state.get("availability") or {})
+            availability = _availability_from(
+                plan_state.get("availability") or {}, config.toolbox
+            )
             gated = list(plan_state.get("gated") or [])
             replans = int(plan_state.get("replans") or 0)
         else:
@@ -279,7 +281,7 @@ class PddlAccessibilityOrchestrator:
                 await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
             # One catalogue snapshot per document, so the first plan and every
             # replan see the same Toolbox.
-            availability = await toolbox_gate.decide(manifest)
+            availability = await toolbox_gate.decide(manifest, config)
             _log_availability(availability)
             gated = availability.unavailable_methods
             plan, comparison = await run_blocking(
@@ -755,11 +757,16 @@ async def _save_plan(
     )
 
 
-def _availability_from(metadata: dict[str, Any]) -> toolbox_gate.AvailabilityDecision:
-    """Rebuild the gate decision the plan was built under, for the payload."""
+def _availability_from(
+    metadata: dict[str, Any], toolbox: ToolboxConfig
+) -> toolbox_gate.AvailabilityDecision:
+    """Rebuild the gate decision the plan was built under, for the payload.
+
+    A checkpoint without the mode gets the run's (``toolbox``).
+    """
     blocked = metadata.get("blocked_methods") or {}
     return toolbox_gate.AvailabilityDecision(
-        mode=str(metadata.get("mode") or toolbox_gate.gate_mode()),
+        mode=str(metadata.get("mode") or toolbox_gate.gate_mode(toolbox)),
         catalog_revision=metadata.get("catalog_revision"),
         blocked={
             str(method): [str(reason) for reason in reasons]

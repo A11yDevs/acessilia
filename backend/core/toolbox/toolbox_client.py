@@ -44,14 +44,19 @@ from backend.core.logger import logger
 ClientT = TypeVar("ClientT", bound=ToolboxCapabilityClient)
 
 
-def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
-    """The Toolbox endpoints configured for the capability clients.
+def endpoints_from(base_urls: str, base_url: str) -> tuple[ToolboxEndpoint, ...]:
+    """The Toolbox endpoints, in the order they are tried.
 
-    ``TOOLBOX_BASE_URLS`` lists independent deployments, tried in order;
-    without it, ``TOOLBOX_BASE_URL`` is the only endpoint (docs/adr/0006).
+    ``base_urls`` (``TOOLBOX_BASE_URLS``) lists independent deployments;
+    without it, ``base_url`` (``TOOLBOX_BASE_URL``) is the only endpoint
+    (docs/adr/0006). Raises ``ValueError`` for a URL the SDK cannot use.
     """
-    base_urls = settings.toolbox_base_urls.strip()
-    return parse_endpoints(base_urls or settings.toolbox_base_url)
+    return parse_endpoints(base_urls.strip() or base_url)
+
+
+def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
+    """The Toolbox endpoints configured for the capability clients (:func:`endpoints_from`)."""
+    return endpoints_from(settings.toolbox_base_urls, settings.toolbox_base_url)
 
 
 def toolbox_vlm_endpoint() -> ToolboxEndpoint:
@@ -135,6 +140,7 @@ __all__ = [
     "ToolboxUnavailable",
     "ToolboxUnsupportedMediaType",
     "auth_headers",
+    "endpoints_from",
     "execute_capability",
     "make_toolbox_client",
     "require_capability",

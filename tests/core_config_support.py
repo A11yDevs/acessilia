@@ -15,6 +15,7 @@ from backend.core.config import (
     DocumentConfig,
     ExportConfig,
     FusionConfig,
+    ToolboxConfig,
     VisionConfig,
 )
 
@@ -49,3 +50,15 @@ def fusion_config(**fields: Any) -> FusionConfig:
 def vision_config(**fields: Any) -> VisionConfig:
     """The service's ``VisionConfig``, with ``fields`` replaced."""
     return core_config(vision=fields).vision
+
+
+def toolbox_config(*, providers: dict[str, str] | None = None, **fields: Any) -> ToolboxConfig:
+    """The service's ``ToolboxConfig``, with ``fields`` replaced.
+
+    ``providers`` replaces only the provider keys it names; the others keep
+    the service's.
+    """
+    base = core_config_from_settings().toolbox
+    if providers:
+        fields["providers"] = {**base.providers, **providers}
+    return replace(base, **fields)

@@ -8,14 +8,15 @@ out of the plan and fails closed without a catalogue.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from acessilia_sdk.toolbox import snapshot_from_payloads
-from backend.config.settings import settings
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
 from backend.core.planning import toolbox_gate
+from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import (
     build_element as _element,
     build_manifest as _manifest,
@@ -41,10 +42,14 @@ def _fuse_manifest(methods=FUSE_METHODS):
     return _manifest([_element("el-1", "paragraph", text="texto")], [obligation])
 
 
-@pytest.fixture(autouse=True)
-def _default_providers(monkeypatch):
-    monkeypatch.setattr(settings, "toolbox_provider", "docling")
-    monkeypatch.setattr(settings, "fusion_secondary_provider", "mineru")
+def _config(*, secondary="mineru", gate="observe"):
+    """The default providers, whatever the environment says."""
+    return replace(
+        core_config(fusion={"secondary_provider": secondary}),
+        toolbox=toolbox_config(
+            providers={"toolbox_provider": "docling"}, availability_gate=gate
+        ),
+    )
 
 
 def test_default_providers_pass_against_the_staging_catalogue() -> None:
@@ -55,18 +60,17 @@ def test_default_providers_pass_against_the_staging_catalogue() -> None:
     this test fails for that reason, not because the gate regressed.
     """
     decision = toolbox_gate.evaluate(
-        FUSE_METHODS, _staging_snapshot(), mode="enforce"
+        FUSE_METHODS, _staging_snapshot(), mode="enforce", config=_config()
     )
 
     assert decision.blocked == {}
     assert decision.unavailable_methods == []
 
 
-def test_unregistered_secondary_provider_blocks_only_dual_fusion(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "fusion_secondary_provider", "qwen3-vl-page")
-
+def test_unregistered_secondary_provider_blocks_only_dual_fusion() -> None:
     decision = toolbox_gate.evaluate(
-        FUSE_METHODS, _staging_snapshot(), mode="enforce"
+        FUSE_METHODS, _staging_snapshot(), mode="enforce",
+        config=_config(secondary="qwen3-vl-page"),
     )
 
     assert list(decision.blocked) == ["dual-provider-fusion"]
@@ -75,13 +79,13 @@ def test_unregistered_secondary_provider_blocks_only_dual_fusion(monkeypatch) ->
 
 def test_methods_without_toolbox_requirements_are_never_blocked() -> None:
     decision = toolbox_gate.evaluate(
-        ["pandoc-table", "rep-guard", "human-review"], None, mode="enforce"
+        ["pandoc-table", "rep-guard", "human-review"], None, mode="enforce", config=_config()
     )
     assert decision.blocked == {}
 
 
 def test_observe_reports_without_removing() -> None:
-    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe")
+    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
 
     assert set(decision.blocked) == {"dual-provider-fusion", "single-provider"}
     assert decision.unavailable_methods == []
@@ -90,7 +94,8 @@ def test_observe_reports_without_removing() -> None:
 
 def test_enforce_without_a_catalogue_fails_closed() -> None:
     decision = toolbox_gate.evaluate(
-        FUSE_METHODS, None, mode="enforce", catalog_error="ToolboxTimeout: slow"
+        FUSE_METHODS, None, mode="enforce", config=_config(),
+        catalog_error="ToolboxTimeout: slow",
     )
 
     assert decision.unavailable_methods == ["dual-provider-fusion", "single-provider"]
@@ -129,14 +134,13 @@ class _CountingCache:
 @pytest.mark.asyncio
 async def test_decide_skips_the_catalogue_when_nothing_needs_it(monkeypatch) -> None:
     cache = _CountingCache()
-    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda: cache)
-    monkeypatch.setattr(settings, "toolbox_availability_gate", "enforce")
+    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: cache)
     manifest = _manifest(
         [_element("el-1", "table")],
         [_obligation("linearize-table", ["el-1"], ["pandoc-table", "human-review"])],
     )
 
-    decision = await toolbox_gate.decide(manifest)
+    decision = await toolbox_gate.decide(manifest, _config(gate="enforce"))
 
     assert cache.calls == 0
     assert decision.blocked == {}
@@ -145,10 +149,8 @@ async def test_decide_skips_the_catalogue_when_nothing_needs_it(monkeypatch) -> 
 @pytest.mark.asyncio
 async def test_decide_is_a_no_op_when_off(monkeypatch) -> None:
     cache = _CountingCache()
-    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda: cache)
-    monkeypatch.setattr(settings, "toolbox_availability_gate", "off")
-
-    decision = await toolbox_gate.decide(_fuse_manifest())
+    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: cache)
+    decision = await toolbox_gate.decide(_fuse_manifest(), _config(gate="off"))
 
     assert cache.calls == 0
     assert decision.mode == "off"
@@ -158,22 +160,130 @@ async def test_decide_is_a_no_op_when_off(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_decide_reads_the_cache_once(monkeypatch) -> None:
     cache = _CountingCache(_staging_snapshot())
-    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda: cache)
-    monkeypatch.setattr(settings, "toolbox_availability_gate", "enforce")
-
-    decision = await toolbox_gate.decide(_fuse_manifest())
+    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: cache)
+    decision = await toolbox_gate.decide(_fuse_manifest(), _config(gate="enforce"))
 
     assert cache.calls == 1
     assert decision.catalog_revision == _staging_snapshot().revision
     assert decision.blocked == {}
 
 
-def test_unknown_mode_falls_back_to_observe(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "toolbox_availability_gate", "strict")
-    assert toolbox_gate.gate_mode() == "observe"
+def test_unknown_mode_falls_back_to_observe() -> None:
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="strict")) == "observe"
 
 
 def test_every_gated_method_has_a_handler() -> None:
     """A requirement for a method nobody runs would be dead configuration."""
     registered = set(_orchestrator().executor.registry.names())
     assert set(toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS) <= registered
+
+
+def test_runs_with_one_catalogue_source_share_its_cache(monkeypatch) -> None:
+    monkeypatch.setattr(toolbox_gate, "_caches", {})
+
+    first = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test"))
+    again = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test", retries=9))
+
+    assert again is first
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"base_url": "http://b.test"},
+        {"base_urls": "http://b.test,http://a.test"},
+        {"api_key": "another-key"},
+        {"catalog_refresh_seconds": 1},
+        {"catalog_stale_seconds": 1},
+    ],
+)
+def test_a_run_with_another_catalogue_source_gets_its_own_cache(monkeypatch, fields) -> None:
+    """A snapshot is never read for a run that calls another deployment, or on other timings."""
+    monkeypatch.setattr(toolbox_gate, "_caches", {})
+    base = {"base_url": "http://a.test", "base_urls": "", "api_key": "key",
+            "catalog_refresh_seconds": 300, "catalog_stale_seconds": 900}
+
+    first = toolbox_gate.catalog_cache(toolbox_config(**base))
+    other = toolbox_gate.catalog_cache(toolbox_config(**(base | fields)))
+
+    assert other is not first
+
+
+@pytest.mark.asyncio
+async def test_decide_reads_the_cache_of_the_run_config(monkeypatch) -> None:
+    caches = []
+
+    def cache_for(toolbox):
+        caches.append(toolbox)
+        return _CountingCache(_staging_snapshot())
+
+    monkeypatch.setattr(toolbox_gate, "catalog_cache", cache_for)
+    config = _config(gate="enforce")
+
+    await toolbox_gate.decide(_fuse_manifest(), config)
+
+    assert caches == [config.toolbox]
+
+
+@pytest.mark.asyncio
+async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_path) -> None:
+    """Through ``execute``: the gate gets the run's ``CoreConfig``, not the settings."""
+    from types import SimpleNamespace
+
+    from backend.core.pipeline import orchestrator as pddl
+
+    class Stop(Exception):
+        pass
+
+    received = []
+
+    async def decide(manifest, config):
+        received.append(config)
+        raise Stop
+
+    async def no_step(*_args, **_kwargs):
+        return None
+
+    async def no_media(*_args, **_kwargs):
+        return None, {}
+
+    monkeypatch.setattr(pddl, "_inspect_media", no_media)
+    for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
+                 "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"):
+        monkeypatch.setattr(pddl, name, no_step)
+    monkeypatch.setattr(toolbox_gate, "decide", decide)
+    orchestrator = _orchestrator()
+    orchestrator.config = _config(gate="enforce")
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: _fuse_manifest())
+
+    with pytest.raises(Stop):
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+
+    assert received == [orchestrator.config]
+
+
+def test_a_checkpoint_without_the_mode_gets_the_mode_of_the_run() -> None:
+    from backend.core.pipeline.orchestrator import _availability_from
+
+    decision = _availability_from({}, toolbox_config(availability_gate="enforce"))
+
+    assert decision.mode == "enforce"
+
+
+@pytest.mark.parametrize(
+    ("key", "method"),
+    [
+        ("toolbox_provider", "single-provider"),
+        ("toolbox_pdf_provider", "vision-page-inspection"),
+        ("toolbox_pdf_provider", "pymupdf-region"),
+        ("toolbox_adjudicate_provider", "vlm-pairwise-judge"),
+    ],
+)
+def test_the_providers_checked_are_the_run_config_ones(key, method) -> None:
+    config = replace(
+        _config(), toolbox=toolbox_config(providers={key: "not-registered-anywhere"})
+    )
+
+    decision = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=config)
+
+    assert "not-registered-anywhere" in " ".join(decision.blocked[method])

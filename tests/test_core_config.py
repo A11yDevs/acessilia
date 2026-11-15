@@ -188,12 +188,19 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 MOVED_GROUPS = {"document", "export", "fusion", "vision"}
 
 #: Reads of a moved group's setting that wait for another group's pull
-#: request, by file. The planning gate's requirement table reads the fusion
-#: secondary provider among the Toolbox providers; it moves whole with the
-#: toolbox group.
-PENDING_READS: dict[str, set[str]] = {
-    "backend/core/planning/toolbox_gate.py": {"fusion_secondary_provider"},
-}
+#: request, by file. Empty since the planning gate took the run's config.
+PENDING_READS: dict[str, set[str]] = {}
+
+#: Modules of a group still moving that already read no setting at all. The
+#: toolbox group moves in three pull requests (planning gate, switches, client
+#: factory); "toolbox" joins MOVED_GROUPS with the last one.
+SETTINGS_FREE = {"backend/core/planning/toolbox_gate.py"}
+
+
+def test_the_settings_free_modules_read_no_setting() -> None:
+    found = {rel: _scan(ROOT / rel) for rel in sorted(SETTINGS_FREE)}
+
+    assert not {rel: scan for rel, scan in found.items() if scan[0] or scan[1]}
 
 
 def test_the_moved_groups_are_not_read_from_settings() -> None:
@@ -552,6 +559,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
             "fusion",
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
+        ("backend.core.planning.toolbox_gate:evaluate", "config"),
         ("backend.core.agents.vision_agent:VisionAgent.__init__", "region_cache"),
         ("backend.core.pipeline.enrichment.common:_retry_failed", "delay_seconds"),
         ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "vision"),
