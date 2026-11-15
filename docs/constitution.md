@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](constitution.pt-br.md)
 
-- **Version:** 2.0.7 (2026-11-14). See the [changelog](#9-changelog) for how
+- **Version:** 3.0.0 (2026-11-15). See the [changelog](#9-changelog) for how
   versions are numbered.
 
 ## 1. Purpose
@@ -19,7 +19,7 @@ Deliver document and image conversion to accessible formats through:
 4. Configurable operation: behavior must be driven by environment variables and local folders. Configuration selects where capabilities run (for example the Toolbox endpoint); it does not imply local execution (P4).
 5. Deterministic-first extraction: text-based PDFs should prefer deterministic extraction before invoking AI. Deterministic extraction runs as a Toolbox capability or a docstruct algorithm, not as a local operational executor in the core (P4).
 6. Hybrid determinism and intelligence: the system combines deterministic planning (PDDL processing, manifesto generation) with AI-driven execution to ensure reliability and flexibility. Deterministic functions are the source of truth; LLMs provide interpretation and description.
-7. Container-first validation: test suite must pass in Docker container (production-equivalent environment) before merge. Native environment testing is secondary and environment-specific.
+7. Reproducible CI validation: before merge, the automated CI gate must pass the applicable test suites on Python 3.11 with dependencies installed from the committed lockfiles (section 3.7). Before publication, the production image must build, start and pass the API health smoke test. The production image does not need to include test dependencies or the full test suite.
 8. **English-first documentation with Brazilian Portuguese as official secondary language**: all source code (identifiers, comments, docstrings, log messages), Markdown documentation, issues, pull requests, and commit messages must be written in English — the mandatory, authoritative language. Brazilian Portuguese is the official secondary language: desirable for all documentation, and every `*.pt-br.md` mirror must be updated in the same PR whenever its English source changes. The English version is authoritative in case of divergence. Translation and support for other languages is an important secondary goal (internationalization/i18n) aimed at a broad, inclusive audience; localized content for other languages is welcome but never blocks a merge. User-facing content (Telegram messages, rendered output, prompts for the AI models) must be localized according to the user's locale — including English and Brazilian Portuguese, and extended to other languages as the i18n effort grows. Educational materials are a priority domain for internationalization: they should be produced in the audience's language whenever possible, with English and Brazilian Portuguese as the primary supported languages.
 
 ## 3. Architectural quality rules
@@ -54,10 +54,32 @@ Deliver document and image conversion to accessible formats through:
 5. History persistence must register conversion start and finish.
 6. The canonical document is the source of truth for every exported format.
 7. Testing strategy:
-   - Primary validation: pytest inside Docker container (production-equivalent)
-   - Secondary validation: native environment (Python native syntax check only)
-   - All tests must pass in container before merge (gate requirement)
-   - Regression tests of existing agents must remain at or above current coverage
+   - **Local development:** run the relevant tests during implementation
+     (`make test-file` and `make test-failed`), then `make test-all` before
+     opening a pull request. See the [testing workflow](testing.md).
+   - **CI gate:** before merge, the applicable unit, regression, contract and
+     integration tests must pass in [.github/workflows/ci.yml](../.github/workflows/ci.yml).
+     CI uses Python 3.11, checks the root `uv.lock` with `uv lock --check` and
+     installs the environment from it with `uv sync --locked --extra dev`.
+     It runs the non-E2E core, docstruct and SDK suites in that root environment
+     and rejects unexpected skipped tests. Additional isolation jobs install
+     docstruct and the SDK from their own checked lockfiles with `--no-editable`
+     and run their suites.
+   - **E2E:** tests marked `e2e` require a running Toolbox or Core API, as
+     applicable, and run separately from the regular merge gate. The conditional
+     E2E job in [.github/workflows/scheduled-tests.yml](../.github/workflows/scheduled-tests.yml)
+     runs when `TOOLBOX_BASE_URL` or `CORE_BASE_URL` is configured; developers
+     can also run them explicitly against a configured environment.
+   - **Production image:** [infra/Dockerfile](../infra/Dockerfile) installs the
+     runtime dependencies from the same root `uv.lock`, without development
+     dependencies or the test suite. Before publication,
+     [.github/workflows/delivery.yml](../.github/workflows/delivery.yml) and
+     [.github/workflows/release.yml](../.github/workflows/release.yml) build the
+     image, start its API and check `/api/v1/health`. These operational smoke
+     checks complement the CI test gate.
+   - Preserve regression tests for existing agents. Coverage measurement and
+     reporting are tracked in [#366](https://github.com/A11yDevs/acessilia/issues/366);
+     CI does not currently enforce a coverage threshold.
 
 ## 4. Domain contracts
 1. Document processing lifecycle (extended for planning phase):
@@ -228,6 +250,14 @@ Versions follow `MAJOR.MINOR.PATCH`:
 
 The unversioned text before 2026-10-18 counts as **1.0.0**.
 
+- **3.0.0 (2026-11-15):** principle 2.7 and section 3.7 replace the requirement
+  to run the full suite in a Docker container with the reproducible CI gate
+  and production-image build, startup and API health smoke checks (#190).
+  This changes a non-negotiable principle and therefore requires a major
+  version. The strategy distinguishes local development, CI and external E2E,
+  preserves P8's regression, contract and integration tests, records the
+  lockfile installation delivered by #405 / PR #539, and leaves coverage
+  reporting to #366.
 - **2.0.7 (2026-11-14):** section 4.3 names `backend/core/agents/prompts`
   for the mode prompts, which ADR-0016's step 2 moved there from
   `backend/ai/prompts`. No principle changes.

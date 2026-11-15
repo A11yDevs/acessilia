@@ -41,7 +41,8 @@ Principais endpoints (`/api/v1`):
 O repositório fixa o Python 3.11 em `.python-version`, a mesma versão usada pelo CI e pela imagem Docker. O `uv` lê esse arquivo e baixa o interpretador se for preciso.
 
 ```bash
-uv sync
+uv lock --check
+uv sync --locked
 cp .env.example .env   # configure as chaves (IA, SMTP, Telegram)
 ```
 
@@ -88,13 +89,14 @@ A documentação completa — onde ficam os arquivos de i18n, como adicionar uma
 Instale as dependências de desenvolvimento:
 
 ```bash
-uv sync --extra dev
+uv lock --check
+uv sync --locked --extra dev
 ```
 
-Execute a suíte completa da pasta `tests/`:
+Execute as suítes do core sem E2E, da docstruct e do SDK:
 
 ```bash
-uv run pytest
+make test-all
 ```
 
 O GitHub Actions repete essa validação em Python 3.11 para todo pull request direcionado à `main`, à `develop` ou a `release/**`. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
@@ -108,7 +110,8 @@ O diretório [`docs/notebooks/`](docs/notebooks/) contém notebooks Jupyter que 
 Para executar os notebooks:
 
 ```bash
-uv sync --extra dev
+uv lock --check
+uv sync --locked --extra dev
 uv run --with jupyter jupyter notebook docs/notebooks/
 ```
 
@@ -163,7 +166,7 @@ python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf 
 1. Fork o repositório.
 2. Crie uma branch de feature.
 3. Escreva testes para a nova funcionalidade.
-4. Rode `uv run pytest` e corrija falhas, erros ou skips.
+4. Rode `make test-all` e corrija falhas, erros ou skips.
 5. Envie um pull request.
 
 As regras detalhadas estão em [CONTRIBUTING.md](CONTRIBUTING.md).

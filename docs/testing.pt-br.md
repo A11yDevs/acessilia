@@ -2,8 +2,8 @@
 
 Você também pode ler esta documentação em **inglês**: [English](testing.md).
 
-O projeto tem cerca de 4.700 testes: aproximadamente 3.000 non-E2E no core,
-1.272 em `libs/docstruct` e 450 em `libs/sdk`. Rodar tudo depois de cada pequena
+Na verificação de 2026-11-15, o projeto tem 5.098 testes: 3.313 sem E2E no core,
+1.278 em `libs/docstruct` e 507 em `libs/sdk`. Rodar tudo depois de cada pequena
 edição é caro, tanto localmente quanto na CI. Este guia explica como a suíte está
 organizada, quais comandos usar em cada etapa do ciclo editar–testar–corrigir e
 quais técnicas tornam o ciclo mais rápido sem enfraquecer o gate de regressão. As
@@ -416,17 +416,20 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 - **`uv`** é necessário ([documentação](https://docs.astral.sh/uv/)). Rode os
   comandos a partir da raiz do repositório. As bibliotecas são pacotes separados
   e são chamadas com `uv run --extra dev pytest` em seus diretórios.
-- `uv sync --extra dev` instala o `pytest-xdist` e as dependências usadas pelos
-  alvos do Makefile e pela CI.
+- Rode `uv lock --check`, depois `uv sync --locked --extra dev` para instalar
+  o `pytest-xdist` e as dependências usadas pelos alvos do Makefile e pelo CI
+  a partir do lock versionado da raiz.
 
 ## Escopo e trabalhos relacionados
 
-- A constituição ainda indica o container Docker como portão primário; a
-  [#190](https://github.com/A11yDevs/acessilia/issues/190) acompanha a reescrita
-  dessa regra. O [README dos testes](../tests/README.pt-br.md#execução) afirma
-  que a CI é o portão aplicado e que a imagem não tem estágio `test`.
-- Instalação e cache de dependências continuam na
-  [#405](https://github.com/A11yDevs/acessilia/issues/405).
+- A [Constituição 3.0.0](constitution.pt-br.md#3-regras-de-qualidade-arquitetural)
+  define o CI como gate de testes e as verificações de build, inicialização e
+  saúde da API por smoke tests da imagem de produção como validação operacional,
+  resolvendo a [#190](https://github.com/A11yDevs/acessilia/issues/190).
+- CI e imagem instalam a partir do `uv.lock` da raiz; os jobs de isolamento das
+  bibliotecas usam os próprios locks verificados. A instalação e o cache de
+  dependências foram alinhados pela
+  [#405](https://github.com/A11yDevs/acessilia/issues/405) / PR #539.
 - Os comandos locais, as correções de isolamento, a paralelização da CI, a
   decisão sobre o testmon e o monitoramento agendado foram entregues pelos cinco
   PRs da [#448](https://github.com/A11yDevs/acessilia/issues/448).

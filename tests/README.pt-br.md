@@ -4,7 +4,12 @@ Também disponível em **inglês (EUA)**: [English version](README.md)
 
 A suíte de testes unitários do projeto cobre o pipeline canônico, o motor PDDL, a API e os exportadores. Tudo é rápido e isolado: arquivos vão para diretórios temporários; chamadas de rede e de LLM são simuladas (mock), e os fluxos assíncronos rodam com `pytest-asyncio`.
 
-O portão de merge é a CI, que executa nativamente as suítes non-E2E do core, docstruct e SDK. A constituição ainda cita o container como portão; a [#190](https://github.com/A11yDevs/acessilia/issues/190) acompanha essa redação, e a imagem não tem estágio `test` hoje.
+O gate de merge é o CI, que executa as suítes do core sem E2E, da docstruct e do
+SDK no Python 3.11, no ambiente do `uv.lock` da raiz. Jobs adicionais testam as
+bibliotecas isoladamente a partir dos próprios locks. A imagem de produção
+carrega dependências de runtime e passa por verificações de build, inicialização
+e saúde da API por smoke tests antes da publicação. Veja a
+[estratégia de testes da constituição](../docs/constitution.pt-br.md#3-regras-de-qualidade-arquitetural).
 
 As regressões da issue #342 cobrem continuações de listas após parágrafos e tabelas com numeração explicitamente consecutiva. O scorecard separa sequências quando o grupo de origem muda sem numeração de continuação correspondente, a numeração reinicia explicitamente, muda de estilo, pula um número, cruza títulos ou páginas ou encontra blocos diferentes de parágrafos, tabelas ou fórmulas. Blocos adjacentes antigos sem metadados de grupo mantêm seu agrupamento. TXT/MP3 continuam usando a fala enriquecida conforme o ADR-0011; use as expectativas atuais do dataset, que aceitam o sinal negativo falado.
 
