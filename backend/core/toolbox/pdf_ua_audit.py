@@ -20,6 +20,7 @@ from backend.core.i18n.log_messages import (
     LOG_PDF_UA_AUDIT_FINISHED,
     LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
 )
+from backend.core.config import ToolboxConfig
 from backend.core.logger import logger
 
 #: Validation profile the exported PDF is audited against.
@@ -29,22 +30,23 @@ AUDIT_PROFILE = "ua1"
 PROFILE_LABELS = {"ua1": "PDF/UA-1", "ua2": "PDF/UA-2"}
 
 
-async def audit_pdf_ua(pdf_path: Path, *, client: Any | None = None) -> dict[str, Any] | None:
+async def audit_pdf_ua(
+    pdf_path: Path, *, toolbox: ToolboxConfig, client: Any | None = None
+) -> dict[str, Any] | None:
     """Validates ``pdf_path`` against PDF/UA-1 with veraPDF on the Toolbox.
 
     Args:
         pdf_path (Path): The exported PDF/UA.
+        toolbox (ToolboxConfig): The run's Toolbox configuration: whether the audit runs, and whether the Toolbox cache is used.
         client (ToolboxPdfValidateClient | None): Optional client to reuse; when None one is created and closed here.
 
     Returns:
-        dict | None: The ``artifact/pdf-validation-report@1`` document, or None when TOOLBOX_PDF_VALIDATE_ENABLED is false.
+        dict | None: The ``artifact/pdf-validation-report@1`` document, or None when ``toolbox.pdf_validate_enabled`` is false.
 
     Raises:
         acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot validate the file.
     """
-    from backend.config.settings import settings
-
-    if not settings.toolbox_pdf_validate_enabled:
+    if not toolbox.pdf_validate_enabled:
         logger.info(t(LOG_PDF_UA_AUDIT_SKIPPED_DISABLED))
         return None
 
@@ -58,7 +60,7 @@ async def audit_pdf_ua(pdf_path: Path, *, client: Any | None = None) -> dict[str
         report = await validate_client.validate(
             file_path=pdf_path,
             profile=AUDIT_PROFILE,
-            use_remote_cache=settings.toolbox_use_remote_cache,
+            use_remote_cache=toolbox.use_remote_cache,
         )
     finally:
         if owned_client:

@@ -29,7 +29,7 @@ from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.vision_agent import VisionAgent
-from backend.core.config import DocumentConfig, VisionConfig
+from backend.core.config import DocumentConfig, ToolboxConfig, VisionConfig
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,
@@ -270,6 +270,7 @@ async def _enrich_formula_latex(
     mode: str,
     document: DocumentConfig,
     vision: VisionConfig,
+    toolbox: ToolboxConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -338,8 +339,6 @@ async def _enrich_formula_latex(
     """
     from acessilia_sdk.toolbox.capabilities import provider_default
 
-    from backend.config.settings import settings
-
     for element in manifest.elements:
         separate_equation_number(element)
     formulas = [
@@ -363,7 +362,7 @@ async def _enrich_formula_latex(
 
     # Resolved like ``ToolboxCapabilityClient``: an empty setting means the
     # registry default, which is the provider the request actually asked.
-    recognize_provider = settings.toolbox_math_recognize_provider or provider_default(
+    recognize_provider = toolbox.providers["toolbox_math_recognize_provider"] or provider_default(
         "toolbox_math_recognize_provider"
     )
     enrichment = _FormulaEnrichment(

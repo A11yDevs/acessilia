@@ -19,6 +19,7 @@ from rapidfuzz import fuzz
 
 from backend.core.logger import logger
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.core.config import ToolboxConfig
 from backend.core.toolbox.toolbox_client import (
     ToolboxArtifactNotFound,
     ToolboxError,
@@ -103,6 +104,7 @@ async def extract_fused(
     *,
     language: str = "pt-BR",
     secondary_provider: str,
+    toolbox: ToolboxConfig,
     policy: FusionPolicy | None = None,
     primary_provider: str | None = None,
     artifact_id: str | None = None,
@@ -124,12 +126,12 @@ async def extract_fused(
     Fallback: if one provider reports a Toolbox error, uses the other result
     and logs which provider failed. Unexpected errors are propagated.
 
-    ``secondary_provider`` is the run's ``FusionConfig.secondary_provider``.
+    ``secondary_provider`` is the run's ``FusionConfig.secondary_provider``,
+    and ``toolbox`` its ``ToolboxConfig``: the primary provider when
+    ``primary_provider`` is not given, and whether the Toolbox cache is used.
     """
-    from backend.config.settings import settings
-
     policy = policy or FusionPolicy()
-    primary = primary_provider or settings.toolbox_provider
+    primary = primary_provider or toolbox.providers["toolbox_provider"]
     secondary = secondary_provider
 
     failures: dict[str, Exception] = {}
@@ -142,7 +144,7 @@ async def extract_fused(
                     return await client.extract_structure(
                         artifact_id=artifact_id,
                         language=language,
-                        use_remote_cache=settings.toolbox_use_remote_cache,
+                        use_remote_cache=toolbox.use_remote_cache,
                     )
                 except ToolboxArtifactNotFound:
                     logger.info(
@@ -153,7 +155,7 @@ async def extract_fused(
             return await client.extract_structure(
                 file_path,
                 language=language,
-                use_remote_cache=settings.toolbox_use_remote_cache,
+                use_remote_cache=toolbox.use_remote_cache,
             )
         except ToolboxError as exc:
             failures[provider] = exc

@@ -26,7 +26,7 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import httpx
-from tests.core_config_support import core_config
+from tests.core_config_support import core_config, toolbox_config
 import pytest
 
 from backend.core.pipeline.handlers.registry import bind_config
@@ -286,7 +286,7 @@ async def test_extract_fused_against_real_toolbox():
     from backend.core.pipeline.fusion import extract_fused
 
     pdf = _get_small_pdf()
-    payload = await extract_fused(pdf, secondary_provider="mineru")
+    payload = await extract_fused(pdf, secondary_provider="mineru", toolbox=toolbox_config())
 
     assert payload.get("status") == "succeeded"
     provider = str(payload.get("provider") or "")

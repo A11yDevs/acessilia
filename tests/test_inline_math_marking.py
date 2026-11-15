@@ -9,7 +9,7 @@ import pytest
 from backend.core.pipeline.enrichment import inline_math as inline_math_stage
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
-from tests.core_config_support import document_config
+from tests.core_config_support import document_config, toolbox_config
 
 HEIGHT = 792.0
 
@@ -56,11 +56,16 @@ def _manifest():
     return manifest
 
 
+#: The run's Toolbox config: the reader passes it, not one built from the settings.
+RUN_TOOLBOX = toolbox_config(use_remote_cache=False)
+
+
 @pytest.fixture
 def spans(monkeypatch):
     calls = []
 
-    async def fetch(source_path, pages, *, artifact_id=None, client=None):
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        assert toolbox is RUN_TOOLBOX
         calls.append(pages)
         return {1: _page(PARAGRAPH_LINE, DISPLAY_LINE)}
 
@@ -71,7 +76,12 @@ def spans(monkeypatch):
 def _run(manifest, detection="fonts"):
     document = document_config(inline_math_detection=detection)
     return asyncio.run(
-        inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), document)
+        inline_math_stage._mark_inline_math(
+            manifest,
+            Path("/tmp/amostra.pdf"),
+            document,
+            inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"), RUN_TOOLBOX),
+        )
     )
 
 
@@ -154,7 +164,7 @@ def test_a_top_left_box_reads_the_same_spans(spans):
 
 
 def _fetch_page(monkeypatch, **changes):
-    async def fetch(source_path, pages, *, artifact_id=None, client=None):
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
         return {1: {**_page(PARAGRAPH_LINE, DISPLAY_LINE), **changes}}
 
     monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)

@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from backend.core.config import DocumentConfig
+from backend.core.config import DocumentConfig, ToolboxConfig
 from backend.core.manifest.models import (
     ProcessingManifest,
 )
@@ -79,7 +79,7 @@ def _check_page_limit(manifest: ProcessingManifest, document: DocumentConfig) ->
 
 
 async def _inspect_media(
-    source_path: Path,
+    source_path: Path, toolbox: ToolboxConfig
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Runs ``media.inspect`` and degrades visibly when it fails.
 
@@ -93,14 +93,12 @@ async def _inspect_media(
     Returns the inspection and the outcome for
     ``manifest.extractor.configuration``, since it runs before the manifest
     exists: ``media_inspection`` is ``toolbox``, ``disabled`` (by
-    ``TOOLBOX_MEDIA_INSPECT_ENABLED``), ``source_missing`` or ``failed``, plus
+    ``toolbox.media_inspect_enabled``), ``source_missing`` or ``failed``, plus
     ``media_inspection_error`` on failure, and ``document_genre`` with its
     ``genre_signals`` when the Toolbox reports them.
     """
-    from backend.config.settings import settings
-
     try:
-        media_inspection = await inspect_source_media(source_path)
+        media_inspection = await inspect_source_media(source_path, toolbox=toolbox)
     except Exception as exc:  # noqa: BLE001 - the step degrades, never fails the job
         cause = f"{type(exc).__name__}: {exc}"
         logger.warning(
@@ -111,7 +109,7 @@ async def _inspect_media(
         return None, {"media_inspection": "failed", "media_inspection_error": cause}
     if media_inspection is not None:
         status = "toolbox"
-    elif not settings.toolbox_media_inspect_enabled:
+    elif not toolbox.media_inspect_enabled:
         status = "disabled"
     else:
         status = "source_missing"

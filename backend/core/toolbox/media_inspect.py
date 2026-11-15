@@ -16,24 +16,25 @@ from backend.core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
 )
+from backend.core.config import ToolboxConfig
 from backend.core.logger import logger
 
 
 async def inspect_source_media(
     source_path: Path,
     *,
+    toolbox: ToolboxConfig,
     client: Any | None = None,
-    use_remote_cache: bool | None = None,
 ) -> dict[str, Any] | None:
     """Inspects the source file with the Toolbox ``media.inspect`` capability.
 
     Args:
         source_path (Path): File to inspect.
         client (ToolboxMediaInspectClient | None): Optional client to reuse; when None one is created and closed here.
-        use_remote_cache (bool | None): Forwarded to the client; when None, TOOLBOX_USE_REMOTE_CACHE applies.
+        toolbox (ToolboxConfig): The run's Toolbox configuration: whether the inspection runs, and whether the Toolbox cache is used.
 
     Returns:
-        dict | None: The ``artifact/media-inspection@1`` document, or None when the file does not exist or TOOLBOX_MEDIA_INSPECT_ENABLED is false.
+        dict | None: The ``artifact/media-inspection@1`` document, or None when the file does not exist or ``toolbox.media_inspect_enabled`` is false.
 
     Raises:
         acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot inspect the file or returns no document.
@@ -42,9 +43,7 @@ async def inspect_source_media(
     if not source_path.is_file():
         return None
 
-    from backend.config.settings import settings
-
-    if not settings.toolbox_media_inspect_enabled:
+    if not toolbox.media_inspect_enabled:
         logger.info(t(LOG_MEDIA_INSPECT_SKIPPED_DISABLED))
         return None
 
@@ -58,11 +57,7 @@ async def inspect_source_media(
     try:
         result = await inspect_client.inspect(
             file_path=source_path,
-            use_remote_cache=(
-                use_remote_cache
-                if use_remote_cache is not None
-                else settings.toolbox_use_remote_cache
-            ),
+            use_remote_cache=toolbox.use_remote_cache,
         )
     finally:
         if owned_client:

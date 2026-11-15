@@ -28,7 +28,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from backend.core.config import CoreConfig
+from backend.core.config import CoreConfig, ToolboxConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
     Artifact,
@@ -230,7 +230,7 @@ def _handle_agreement_rule_method(
 
 
 def _handle_single_provider_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Satisfy ``fuse-providers`` with the extraction the manifest already carries.
 
@@ -243,8 +243,7 @@ def _handle_single_provider_method(
     cache off, once per ``fuse-providers`` step, and changed nothing in the
     manifest: a full extraction of cost for no content.
     """
-    from backend.config.settings import settings
-
+    configured = config.toolbox.providers["toolbox_provider"]
     obligation = next(
         (item for item in manifest.obligations if item.id == obligation_id), None
     )
@@ -264,13 +263,13 @@ def _handle_single_provider_method(
             validated=False,
             message="The manifest does not record the provider it was extracted by",
         )
-    if provider != settings.toolbox_provider:
+    if provider != configured:
         return MethodResult(
             success=False,
             validated=False,
             message=(
                 f"The manifest was extracted by {provider}, not by the configured "
-                f"provider ({settings.toolbox_provider})"
+                f"provider ({configured})"
             ),
         )
     if not manifest.elements:
@@ -290,7 +289,12 @@ def _handle_single_provider_method(
 
 
 def _run_extract_fused(
-    source_path: Path, *, secondary_provider: str, artifact_id: str | None = None, policy=None
+    source_path: Path,
+    *,
+    secondary_provider: str,
+    toolbox: ToolboxConfig,
+    artifact_id: str | None = None,
+    policy=None,
 ) -> dict:
     """Run ``extract_fused`` in a way that suits the current event loop.
 
@@ -316,7 +320,7 @@ def _run_extract_fused(
         return asyncio.run(
             extract_fused(
                 source_path, artifact_id=artifact_id, policy=policy,
-                secondary_provider=secondary_provider,
+                secondary_provider=secondary_provider, toolbox=toolbox,
             )
         )
 
@@ -327,7 +331,7 @@ def _run_extract_fused(
             lambda: asyncio.run(
                 extract_fused(
                     source_path, artifact_id=artifact_id, policy=policy,
-                    secondary_provider=secondary_provider,
+                    secondary_provider=secondary_provider, toolbox=toolbox,
                 )
             )
         ).result()
@@ -397,12 +401,13 @@ def _handle_dual_provider_fusion_method(
             secondary = config.fusion.secondary_provider
             if policy is None:
                 payload = _run_extract_fused(
-                    source_path, artifact_id=artifact_id, secondary_provider=secondary
+                    source_path, artifact_id=artifact_id, secondary_provider=secondary,
+                    toolbox=config.toolbox,
                 )
             else:
                 payload = _run_extract_fused(
                     source_path, artifact_id=artifact_id, policy=policy,
-                    secondary_provider=secondary,
+                    secondary_provider=secondary, toolbox=config.toolbox,
                 )
     except Exception as exc:  # noqa: BLE001
         return MethodResult(

@@ -17,7 +17,7 @@ import pytest
 
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
-from tests.core_config_support import export_config
+from tests.core_config_support import export_config, toolbox_config
 from backend.config.settings import settings
 from backend.core.export import pandoc_exporter
 from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
@@ -39,6 +39,7 @@ def _export_docx(
     return pandoc_exporter.export_accessible_document(
         document, tmp_path / "doc.docx", format_name="docx", title="Relatório",
         export=export_config(toolbox_docx_enabled=enabled),
+        toolbox=toolbox_config(),
     )
 
 
@@ -54,7 +55,7 @@ def test_client_uses_the_docx_timeout_and_provider(monkeypatch):
 def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, tmp_path):
     calls = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         calls.append((ast, lang))
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
@@ -73,7 +74,7 @@ def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, t
 
 def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_path):
 
-    def toolbox_down(ast, output_path, *, lang):
+    def toolbox_down(ast, output_path, *, lang, toolbox):
         raise ToolboxProviderUnavailable("docx renderer offline")
 
     monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_down)
@@ -88,7 +89,7 @@ def test_numbered_equation_reaches_docx_renderer_without_unsupported_tag(monkeyp
 
     calls = []
 
-    def render(ast, output_path, *, lang):
+    def render(ast, output_path, *, lang, toolbox):
         calls.append(ast)
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
@@ -146,7 +147,7 @@ def test_the_python_docx_renderer_is_gone():
 
 def test_the_destination_directory_is_created(monkeypatch, tmp_path):
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         assert output_path.parent.is_dir()
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
@@ -155,6 +156,7 @@ def test_the_destination_directory_is_created(monkeypatch, tmp_path):
     output = pandoc_exporter.export_accessible_document(
         "# Relatório\n", tmp_path / "missing" / "doc.docx", format_name="docx",
         export=export_config(),
+        toolbox=toolbox_config(),
     )
     assert output.read_bytes() == DOCX
 
@@ -183,7 +185,7 @@ def test_sync_wrapper_downloads_the_stored_docx(respx_mock, monkeypatch, tmp_pat
         return_value=httpx.Response(200, content=DOCX)
     )
 
-    document = pandoc_exporter.toolbox_export_docx(AST, tmp_path / "doc.docx", lang="pt-BR")
+    document = pandoc_exporter.toolbox_export_docx(AST, tmp_path / "doc.docx", lang="pt-BR", toolbox=toolbox_config())
 
     assert document["artifact_id"] == DOCX_ID
     assert (tmp_path / "doc.docx").read_bytes() == DOCX
@@ -196,7 +198,7 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
     format, not only where LaTeX runs."""
     captured = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         captured.append(ast)
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
@@ -222,6 +224,7 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
     pandoc_exporter.export_accessible_document(
         document, tmp_path / "doc.docx", format_name="docx", title="Report",
         export=export_config(),
+        toolbox=toolbox_config(),
     )
 
     ast, = captured
@@ -248,4 +251,12 @@ def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
     with pytest.raises(TypeError, match="ExportConfig"):
         pandoc_exporter.export_accessible_document(
             "# Report\n", tmp_path / "doc.docx", format_name="docx"
+        )
+
+
+def test_the_format_needs_the_run_toolbox_config(tmp_path):
+    """No fallback to the settings: a Toolbox format without a ``ToolboxConfig`` is a programming error."""
+    with pytest.raises(TypeError, match="ToolboxConfig"):
+        pandoc_exporter.export_accessible_document(
+            "# Report\n", tmp_path / "doc.docx", format_name="docx", export=export_config()
         )

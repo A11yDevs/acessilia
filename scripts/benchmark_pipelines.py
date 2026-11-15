@@ -129,7 +129,8 @@ def _export_outputs(
         "pdf_ua": "pdf_ua.pdf",
     }
     # One snapshot for the engine's exports, as the worker takes per job.
-    export = core_config_from_settings().export
+    snapshot = core_config_from_settings()
+    export, toolbox = snapshot.export, snapshot.toolbox
 
     for fmt in export_formats:
         output_path = output_dir / f"{engine_name}.{output_suffix.get(fmt, fmt)}"
@@ -144,6 +145,7 @@ def _export_outputs(
                     output_path,
                     title=canonical.get("title", engine_name),
                     export=export,
+                    toolbox=toolbox,
                 )
             elif fmt == "txt":
                 export_txt = getattr(
@@ -161,6 +163,7 @@ def _export_outputs(
                     output_path,
                     filename=canonical.get("title", engine_name),
                     export=export,
+                    toolbox=toolbox,
                 )
             elif fmt == "pdf":
                 export_errors.append("Formato pdf removido: use pdf_ua, o unico PDF exportado")

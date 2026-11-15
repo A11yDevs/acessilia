@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from tests.core_config_support import document_config, fusion_config
+from tests.core_config_support import document_config, fusion_config, toolbox_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.schema import processing_manifest_schema, validate_manifest
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
@@ -48,7 +48,7 @@ def _manifest(tmp_path: Path):
     source = tmp_path / "sample.pdf"
     source.write_bytes(b"%PDF-test")
     return InformationalStructuralAgent(extractor=FakeExtractor()).process(
-        source, document=document_config(), fusion=fusion_config()
+        source, document=document_config(), fusion=fusion_config(), toolbox=toolbox_config()
     )
 
 
@@ -205,7 +205,7 @@ def test_process_passes_the_run_document_config_to_the_builder(tmp_path, monkeyp
     )
 
     InformationalStructuralAgent(extractor=FakeExtractor()).process(
-        source, document=document, fusion=fusion_config()
+        source, document=document, fusion=fusion_config(), toolbox=toolbox_config()
     )
 
     assert received["slide_visual_coverage"] == 0.25
@@ -264,10 +264,11 @@ def test_process_passes_the_run_fusion_config_to_the_extractor_and_the_builder(
     source = tmp_path / "sample.pdf"
     source.write_bytes(b"%PDF-test")
     fusion = fusion_config(mode="dual", secondary_provider="mineru", judge_max_pages=3)
+    toolbox = toolbox_config(use_artifact_store=False)
 
     InformationalStructuralAgent(extractor=RecordingExtractor()).process(
-        source, document=document_config(), fusion=fusion, presentation=True
+        source, document=document_config(), fusion=fusion, toolbox=toolbox, presentation=True
     )
 
-    assert extracted == {"fusion": fusion, "dual_fusion": False}
+    assert extracted == {"fusion": fusion, "toolbox": toolbox, "dual_fusion": False}
     assert built["fusion_judge_max_pages"] == 3

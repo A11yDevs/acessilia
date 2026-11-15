@@ -614,7 +614,10 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
     pdf_ua_path = None
     if pdf_ua:
         pdf_ua_path = out / f"{pdf.stem}.pdf_ua.pdf"
-        export_pdf_ua(canonical, pdf_ua_path, pdf.name, export=core_config_from_settings().export)
+        config = core_config_from_settings()
+        export_pdf_ua(
+            canonical, pdf_ua_path, pdf.name, export=config.export, toolbox=config.toolbox
+        )
     return canonical_path, txt_path, pdf_ua_path
 
 

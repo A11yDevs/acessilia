@@ -349,9 +349,19 @@ async def test_a_run_config_the_clients_would_not_follow_is_refused(monkeypatch,
 
 @pytest.mark.parametrize(
     "fields",
-    [{"availability_gate": "off"}, {"catalog_refresh_seconds": 1}, {"catalog_stale_seconds": 1}],
+    [
+        {"availability_gate": "off"},
+        {"catalog_refresh_seconds": 1},
+        {"catalog_stale_seconds": 1},
+        # Moved by toolbox PR 2: each reader takes the run's ToolboxConfig.
+        {"use_remote_cache": False},
+        {"use_artifact_store": False},
+        {"extraction_timeout_seconds": 1},
+        {"media_inspect_enabled": False},
+        {"pdf_validate_enabled": False},
+    ],
 )
-def test_the_fields_only_the_gate_reads_may_differ_from_the_settings(fields) -> None:
+def test_the_fields_the_clients_no_longer_read_may_differ_from_the_settings(fields) -> None:
     from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
 
     refuse_toolbox_unlike_the_clients(toolbox_config(**fields), toolbox_config())

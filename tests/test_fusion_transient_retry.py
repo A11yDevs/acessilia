@@ -14,6 +14,7 @@ import respx
 from backend.config.settings import settings
 from backend.core.pipeline.fusion import extract_fused
 from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
+from tests.core_config_support import toolbox_config
 
 BASE_URL = "http://toolbox.test"
 EXECUTE = f"{BASE_URL}/v1/capabilities/document.structure.extract:execute"
@@ -98,7 +99,8 @@ async def test_transient_failure_recovers_without_repeating_success(
             else _ok(p),
         )
         result = await extract_fused(
-            source, primary_provider="docling", secondary_provider="mineru"
+            source, primary_provider="docling", secondary_provider="mineru",
+            toolbox=toolbox_config(),
         )
     assert result["provider"] == "docling+mineru"
     assert calls[provider] == 2
@@ -116,7 +118,8 @@ async def test_permanent_failure_is_not_retried(source, status):
             else _ok(p),
         )
         result = await extract_fused(
-            source, primary_provider="docling", secondary_provider="mineru"
+            source, primary_provider="docling", secondary_provider="mineru",
+            toolbox=toolbox_config(),
         )
     assert result["provider"] == "mineru"
     assert calls == {"docling": 1, "mineru": 1}
@@ -142,7 +145,8 @@ async def test_unexpected_error_is_propagated_without_retry(monkeypatch, source)
     monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
     with pytest.raises(RuntimeError):
         await extract_fused(
-            source, primary_provider="docling", secondary_provider="mineru"
+            source, primary_provider="docling", secondary_provider="mineru",
+            toolbox=toolbox_config(),
         )
     assert calls["docling"] == 1
 
@@ -157,7 +161,8 @@ async def test_persistent_transient_failure_keeps_single_provider_fallback(sourc
             else _ok(p),
         )
         result = await extract_fused(
-            source, primary_provider="docling", secondary_provider="mineru"
+            source, primary_provider="docling", secondary_provider="mineru",
+            toolbox=toolbox_config(),
         )
     assert result["provider"] == "mineru"
     assert calls == {"docling": 2, "mineru": 1}
@@ -171,7 +176,8 @@ async def test_both_persistently_unavailable_stop_after_the_retries(source):
         )
         with pytest.raises(ToolboxProviderUnavailable):
             await extract_fused(
-                source, primary_provider="docling", secondary_provider="mineru"
+                source, primary_provider="docling", secondary_provider="mineru",
+                toolbox=toolbox_config(),
             )
     assert calls == {"docling": 2, "mineru": 2}
 
@@ -187,7 +193,8 @@ async def test_retries_follow_the_setting(monkeypatch, source):
             else _ok(p),
         )
         result = await extract_fused(
-            source, primary_provider="docling", secondary_provider="mineru"
+            source, primary_provider="docling", secondary_provider="mineru",
+            toolbox=toolbox_config(),
         )
     assert result["provider"] == "mineru"
     assert calls == {"docling": 1, "mineru": 1}

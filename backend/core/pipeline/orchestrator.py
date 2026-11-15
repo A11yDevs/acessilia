@@ -214,7 +214,9 @@ class PddlAccessibilityOrchestrator:
         else:
             # media.inspect runs first: a slide deck is extracted and structured
             # slide by slide, which has to be decided before extraction.
-            media_inspection, media_configuration = await _inspect_media(source_path)
+            media_inspection, media_configuration = await _inspect_media(
+                source_path, config.toolbox
+            )
             await _save_checkpoint(
                 task_id,
                 job_checkpoint.PHASE_MEDIA,
@@ -231,7 +233,7 @@ class PddlAccessibilityOrchestrator:
             if status_callback:
                 await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
             manifest = await self._extract_structure(
-                source_path, presentation, config.document, config.fusion
+                source_path, presentation, config.document, config.fusion, config.toolbox
             )
         _check_page_limit(manifest, config.document)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
@@ -393,6 +395,7 @@ class PddlAccessibilityOrchestrator:
         presentation: bool,
         document: DocumentConfig,
         fusion: FusionConfig,
+        toolbox: ToolboxConfig,
     ) -> ProcessingManifest:
         """The document's manifest from ``document.structure.extract``.
 
@@ -407,6 +410,7 @@ class PddlAccessibilityOrchestrator:
                 presentation=presentation,
                 document=document,
                 fusion=fusion,
+                toolbox=toolbox,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local
@@ -464,7 +468,7 @@ class PddlAccessibilityOrchestrator:
             on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
-        text_spans = _TextSpanReader(manifest, source_path)
+        text_spans = _TextSpanReader(manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
         await self._checkpoint_enrichment(manifest)
         await _enrich_formula_latex(
@@ -473,6 +477,7 @@ class PddlAccessibilityOrchestrator:
             mode=effective_mode,
             document=config.document,
             vision=config.vision,
+            toolbox=config.toolbox,
             status_callback=status_callback,
             breaker=breaker,
             on_progress=progress,

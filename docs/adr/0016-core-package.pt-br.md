@@ -235,7 +235,11 @@ Proposta: a opção 2.
      passa em três pull requests: o gate de planejamento e o seu catálogo
      (feito; o cache do catálogo é compartilhado pelas execuções com o mesmo
      endpoint, chave e tempos), depois as chaves de ativação e as opções do
-     extrator, depois a fábrica de clientes e quem a chama. Os handlers de
+     extrator (feito: inspeção de mídia, validação de PDF, cache remoto,
+     armazenamento de artefatos, timeout da extração e os providers primário
+     e de matemática; cada função que chama a fábrica de clientes recebe a
+     `ToolboxConfig` da execução), depois a fábrica de clientes e quem a
+     chama. Os handlers de
      método que leem a config declaram um parâmetro `config` (o handler de
      fusão e os de inspeção de região e de página), e cada execução vincula
      a sua config a eles (`bind_config`) numa cópia do registro.
