@@ -117,7 +117,7 @@ def test_audio_failure_or_cancellation_joins_siblings_before_cleanup(monkeypatch
 
     async def run():
         task = asyncio.create_task(audio_exporter.export_mp3("A" * 1490 + "\n" + "B" * 1490,
-            tmp_path / "audio.mp3", progress_callback=report))
+            tmp_path / "audio.mp3", "pt-BR-FranciscaNeural", progress_callback=report))
         await started.wait()
         await sibling_started.wait()
         if cancel:

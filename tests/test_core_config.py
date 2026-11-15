@@ -185,7 +185,7 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 
 #: The groups the core now receives from its caller: none of their settings
 #: may be read again. Each step-3 pull request adds the group it moves.
-MOVED_GROUPS = {"document"}
+MOVED_GROUPS = {"document", "export"}
 
 
 def test_the_moved_groups_are_not_read_from_settings() -> None:

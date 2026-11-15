@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 import backend.core.i18n as i8n
+from tests.core_config_support import export_config
 from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.validators import validate_canonical_document
@@ -357,7 +358,6 @@ def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
     """PDF/UA is rendered only by the Toolbox (docs/adr/0003)."""
     from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
-    monkeypatch.setattr("backend.core.export.pandoc_exporter.settings.toolbox_pdf_ua_enabled", True)
 
     def toolbox_down(ast, output_path, *, lang):
         raise ToolboxProviderUnavailable("pdf-ua-render offline")
@@ -372,6 +372,7 @@ def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
                 out,
                 format_name="pdf_ua",
                 title="Titulo",
+                export=export_config(),
             )
 
 

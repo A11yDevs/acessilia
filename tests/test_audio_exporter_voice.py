@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 from pathlib import Path
 from typing import ClassVar
 
@@ -38,18 +39,15 @@ def test_default_voice_is_pinned(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_export_uses_the_configured_voice(monkeypatch, fake_tts, tmp_path):
-    monkeypatch.setattr(settings, "tts_voice", "pt-BR-AntonioNeural")
-
-    await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3")
+async def test_export_uses_the_given_voice(fake_tts, tmp_path):
+    """The voice is the run's ``ExportConfig.tts_voice``, passed by the caller."""
+    await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3", "pt-BR-AntonioNeural")
 
     assert fake_tts.voices == ["pt-BR-AntonioNeural"]
 
 
-@pytest.mark.asyncio
-async def test_explicit_voice_overrides_the_setting(monkeypatch, fake_tts, tmp_path):
-    monkeypatch.setattr(settings, "tts_voice", "pt-BR-AntonioNeural")
+def test_the_voice_is_required():
+    """No default: the caller passes the run's voice (``ExportConfig.tts_voice``)."""
+    voice = inspect.signature(audio_exporter.export_mp3).parameters["voice"]
 
-    await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3", voice="pt-BR-FranciscaNeural")
-
-    assert fake_tts.voices == ["pt-BR-FranciscaNeural"]
+    assert voice.default is inspect.Parameter.empty

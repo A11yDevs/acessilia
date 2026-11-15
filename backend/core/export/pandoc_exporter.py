@@ -19,6 +19,7 @@ from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.pandoc_ast import degrade_math_to_text
 
 from backend.config.settings import settings
+from backend.core.config import ExportConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from backend.core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
@@ -99,19 +100,19 @@ def toolbox_export_docx(
 
 
 def _render_docx(
-    ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_EXPORT_LANG
+    ast: dict[str, Any], output_path: Path, *, enabled: bool, lang: str = DEFAULT_EXPORT_LANG
 ) -> Path:
     """Renders DOCX on the Toolbox, which pins Pandoc in its image.
 
     There is no local fallback (docs/adr/0003): a Toolbox failure propagates
-    so the caller can report it, and TOOLBOX_DOCX_ENABLED=false makes the
-    format unavailable.
+    so the caller can report it, and ``enabled`` false (the run's
+    ``ExportConfig.toolbox_docx_enabled``) makes the format unavailable.
 
     Raises:
         RuntimeError: When TOOLBOX_DOCX_ENABLED is false.
         acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the DOCX.
     """
-    if not settings.toolbox_docx_enabled:
+    if not enabled:
         raise RuntimeError(t(MSG_DOCX_DISABLED))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     toolbox_export_docx(ast, output_path, lang=lang)
@@ -120,13 +121,13 @@ def _render_docx(
 
 
 def _render_pdf_ua(
-    ast: dict[str, Any], output_path: Path, *, lang: str = DEFAULT_EXPORT_LANG
+    ast: dict[str, Any], output_path: Path, *, enabled: bool, lang: str = DEFAULT_EXPORT_LANG
 ) -> Path:
     """Renders PDF/UA on the Toolbox, which pins Pandoc and TeX Live in its image.
 
     There is no local fallback (docs/adr/0003): a Toolbox failure propagates
-    so the caller can report it, and TOOLBOX_PDF_UA_ENABLED=false makes the
-    format unavailable.
+    so the caller can report it, and ``enabled`` false (the run's
+    ``ExportConfig.toolbox_pdf_ua_enabled``) makes the format unavailable.
 
     Args:
         ast (dict): Pandoc JSON AST mapping for the canonical document.
@@ -142,7 +143,7 @@ def _render_pdf_ua(
             rejection (``ToolboxInvalidInput``) gets one retry with the math exported as literal text, so a
             formula the LaTeX compiler rejects cannot lose the whole document; a second rejection propagates.
     """
-    if not settings.toolbox_pdf_ua_enabled:
+    if not enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
     from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -175,6 +176,7 @@ def export_accessible_document(
     format_name: str,
     title: str | None = None,
     profile_name: str | None = None,
+    export: ExportConfig | None = None,
 ) -> Path:
     """Exports a canonical document (or raw markdown/text) to the named format.
 
@@ -184,13 +186,15 @@ def export_accessible_document(
         format_name (str): Target format key: "html", "docx", "pdf_ua" or "txt".
         title (str | None): Document title override; when None the localized default title from MSG_DEFAULT_ACCESSIBLE_TITLE is used.
         profile_name (str | None): Export verbosity profile applied to block filtering and validation; falls back to format_name when None.
+        export (ExportConfig | None): The run's export configuration; required for "docx" and "pdf_ua", whose Toolbox rendering it enables.
 
     Returns:
         Path: The output_path where the formatted document was written.
 
     Raises:
         ValueError: When the deterministic audit reports BLOCKER findings, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
-        RuntimeError: When format_name is "pdf_ua" or "docx" and its TOOLBOX_*_ENABLED setting is false.
+        RuntimeError: When format_name is "pdf_ua" or "docx" and the run's ExportConfig disables it.
+        TypeError: When format_name is "pdf_ua" or "docx" and no ExportConfig is given.
         acessilia_sdk.toolbox.errors.ToolboxError: When format_name is "pdf_ua" or "docx" and the Toolbox cannot render or deliver the file.
     """
     document = _ensure_document(
@@ -216,14 +220,23 @@ def export_accessible_document(
     ast = build_pandoc_ast(filtered, target_format=format_name)
     lang = filtered.get("language") or DEFAULT_EXPORT_LANG
     if format_name == "docx":
-        return _render_docx(ast, output_path, lang=lang)
+        enabled = _export_config(export, format_name).toolbox_docx_enabled
+        return _render_docx(ast, output_path, enabled=enabled, lang=lang)
     if format_name == "pdf_ua":
-        return _render_pdf_ua(ast, output_path, lang=lang)
+        enabled = _export_config(export, format_name).toolbox_pdf_ua_enabled
+        return _render_pdf_ua(ast, output_path, enabled=enabled, lang=lang)
     if format_name == "txt":
         from backend.core.export.renderers.txt_renderer import render_txt
 
         return render_txt(filtered, output_path, profile_name=profile)
     raise ValueError(t(MSG_UNSUPPORTED_EXPORT_FORMAT).format(format_name=format_name))
+
+
+def _export_config(export: ExportConfig | None, format_name: str) -> ExportConfig:
+    """The run's ``ExportConfig``, which a Toolbox-rendered format cannot do without."""
+    if export is None:
+        raise TypeError(f"exporting {format_name} needs the run's ExportConfig")
+    return export
 
 
 def _ensure_document(

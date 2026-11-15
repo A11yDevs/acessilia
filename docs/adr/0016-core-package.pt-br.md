@@ -227,7 +227,8 @@ Proposta: a opção 2.
      orquestrador monta um por execução até que cada etapa receba o seu grupo.
      Já passou para ele o grupo `document` (primeiro o limite de páginas,
      depois a matemática inline, o reparo de Unicode legado, as opções de
-     slides e o limiar de concordância das fórmulas).
+     slides e o limiar de concordância das fórmulas) e o grupo `export`, que o
+     worker captura uma vez por job e passa aos exportadores.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:

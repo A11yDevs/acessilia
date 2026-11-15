@@ -23,6 +23,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxInvalidInput,
     ToolboxTimeout,
 )
+from tests.core_config_support import export_config
 from backend.config.settings import settings
 from backend.core.export import pandoc_exporter
 from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
@@ -84,17 +85,17 @@ def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
 # ── Exporter: Toolbox only ──────────────────────────────────────────────
 
 
-def _export_pdf_ua(tmp_path: Path) -> Path:
+def _export_pdf_ua(tmp_path: Path, *, enabled: bool = True) -> Path:
     return pandoc_exporter.export_accessible_document(
         "# Relatório\n\nParágrafo.\n",
         tmp_path / "doc.pdf_ua.pdf",
         format_name="pdf_ua",
         title="Relatório",
+        export=export_config(toolbox_pdf_ua_enabled=enabled),
     )
 
 
 def test_exporter_renders_on_the_toolbox(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     calls = []
 
     def fake_toolbox(ast, output_path, *, lang):
@@ -121,7 +122,6 @@ def test_exporter_renders_on_the_toolbox(monkeypatch, tmp_path):
 def test_a_toolbox_failure_propagates_without_a_local_fallback(
     monkeypatch, tmp_path, error
 ):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
 
     def failing_toolbox(ast, output_path, *, lang):
         raise error
@@ -134,7 +134,6 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(
 
 
 def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", False)
 
     def toolbox_must_not_run(*args, **kwargs):
         raise AssertionError("Toolbox called although TOOLBOX_PDF_UA_ENABLED=false")
@@ -144,11 +143,10 @@ def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
     )
 
     with pytest.raises(RuntimeError, match="TOOLBOX_PDF_UA_ENABLED=false"):
-        _export_pdf_ua(tmp_path)
+        _export_pdf_ua(tmp_path, enabled=False)
 
 
 def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     langs = []
 
     def fake_toolbox(ast, output_path, *, lang):
@@ -163,7 +161,8 @@ def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
     document["language"] = "en-US"
 
     pandoc_exporter.export_accessible_document(
-        document, tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", title="Report"
+        document, tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", title="Report",
+        export=export_config(),
     )
 
     assert langs == ["en-US"]
@@ -291,6 +290,7 @@ def _export_math_document(tmp_path: Path) -> Path:
         tmp_path / "doc.pdf_ua.pdf",
         format_name="pdf_ua",
         title="Report",
+        export=export_config(),
     )
 
 
@@ -300,7 +300,6 @@ def test_a_math_rejection_degrades_to_text_and_retries_once(monkeypatch, tmp_pat
     sequence). ToolboxInvalidInput says the renderer is healthy and the AST is
     the problem, so the retry is a deterministic degradation: the formulas go
     as literal text, and one block no longer loses the whole PDF."""
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     calls = []
 
     def fake_toolbox(ast, output_path, *, lang):
@@ -343,7 +342,6 @@ def test_a_math_rejection_degrades_to_text_and_retries_once(monkeypatch, tmp_pat
 def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
     """A healthy renderer rejecting the input retries with degraded math; an
     outage or a contract drift does not — retrying would only add latency."""
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     calls = []
 
     def failing_toolbox(ast, output_path, *, lang):
@@ -363,7 +361,6 @@ def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
 def test_a_second_rejection_propagates(monkeypatch, tmp_path):
     """One retry is the whole contract: if the degraded AST is rejected too,
     that is a real failure, not another degradation to attempt."""
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     calls = []
 
     def failing_toolbox(ast, output_path, *, lang):
@@ -386,7 +383,6 @@ def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
     """ToolboxInvalidInput covers any 400 invalid_input, not only math: when
     the degradation changes nothing, a retry would resend the identical
     request — double the latency of a 42-page render for the same rejection."""
-    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", True)
     calls = []
 
     def failing_toolbox(ast, output_path, *, lang):
@@ -403,6 +399,23 @@ def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
             tmp_path / "doc.pdf_ua.pdf",
             format_name="pdf_ua",
             title="Report",
+            export=export_config(),
         )
 
     assert len(calls) == 1
+
+
+def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
+    """No fallback to the settings: PDF/UA without an ``ExportConfig`` is a programming error."""
+
+    def toolbox_must_not_run(*args, **kwargs):
+        raise AssertionError("the Toolbox ran without an export config")
+
+    monkeypatch.setattr(
+        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
+    )
+
+    with pytest.raises(TypeError, match="ExportConfig"):
+        pandoc_exporter.export_accessible_document(
+            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua"
+        )

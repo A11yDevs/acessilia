@@ -9,6 +9,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
@@ -127,6 +128,8 @@ def _export_outputs(
     output_suffix = {
         "pdf_ua": "pdf_ua.pdf",
     }
+    # One snapshot for the engine's exports, as the worker takes per job.
+    export = core_config_from_settings().export
 
     for fmt in export_formats:
         output_path = output_dir / f"{engine_name}.{output_suffix.get(fmt, fmt)}"
@@ -140,6 +143,7 @@ def _export_outputs(
                     canonical,
                     output_path,
                     title=canonical.get("title", engine_name),
+                    export=export,
                 )
             elif fmt == "txt":
                 export_txt = getattr(
@@ -152,7 +156,12 @@ def _export_outputs(
                     import_module("backend.core.export.exporters.docx_exporter"),
                     "export_docx",
                 )
-                export_docx(canonical, output_path, filename=canonical.get("title", engine_name))
+                export_docx(
+                    canonical,
+                    output_path,
+                    filename=canonical.get("title", engine_name),
+                    export=export,
+                )
             elif fmt == "pdf":
                 export_errors.append("Formato pdf removido: use pdf_ua, o unico PDF exportado")
                 continue
