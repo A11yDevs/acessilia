@@ -1,7 +1,8 @@
 """How the availability gate reads the Toolbox catalogue (#402, step 3).
 
 The catalogue is read from the capability clients' primary endpoint: the first
-of ``TOOLBOX_BASE_URLS``, else ``TOOLBOX_BASE_URL``, with the core's API key.
+of ``TOOLBOX_BASE_URLS``, else ``TOOLBOX_BASE_URL``, with the API key of the
+run's ``ToolboxConfig``.
 That is the deployment every capability call goes to first. There is no
 failover for the catalogue: a secondary's snapshot would admit methods that
 execution still sends to the primary (#429). Each read has a 10 s budget per
@@ -11,6 +12,8 @@ never raises out of the gate: the cache records it and the gate reports it as
 """
 
 from __future__ import annotations
+
+from collections import OrderedDict
 
 import json
 from pathlib import Path
@@ -43,7 +46,7 @@ def catalogue_settings(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_api_key", "core-key")
     monkeypatch.setattr(settings, "toolbox_timeout_seconds", 3600.0)
     monkeypatch.setattr(settings, "toolbox_retries", 3)
-    monkeypatch.setattr(toolbox_gate, "_caches", {})
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
 
 
 def _toolbox(**fields):

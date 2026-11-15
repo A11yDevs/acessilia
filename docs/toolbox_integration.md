@@ -265,9 +265,19 @@ result. Do not add a local implementation behind it (see 2.3).
 - **Dual fusion** (`backend/core/pipeline/fusion.py`): if the capability produces canonical
   blocks, it can participate as a provider in `extract_fused()`.
 - **PDDL method** (`backend/core/planning/toolbox_gate.py`): if a planning method's
-  handler calls the capability, declare it in `METHOD_TOOLBOX_REQUIREMENTS`
-  (capability and provider). The availability gate then checks it against the live
-  catalogue before each document is planned (see below).
+  handler calls the capability, declare it in `METHOD_TOOLBOX_REQUIREMENTS`.
+  Each entry is a function of the run's `CoreConfig` that returns the
+  requirements (capability and provider), so the provider checked is the one the
+  run calls:
+
+  ```python
+  "my-method": lambda config: [
+      Requirement("my.capability", config.toolbox.providers["toolbox_my_provider"]),
+  ],
+  ```
+
+  The availability gate then checks it against the live catalogue before each
+  document is planned (see below).
 
 #### Availability gate
 

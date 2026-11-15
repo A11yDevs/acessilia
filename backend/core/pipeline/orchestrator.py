@@ -54,7 +54,7 @@ from backend.core.i18n.stage_messages import (
     STAGE_EXECUTING_PLAN_STEP,
 )
 from backend.core.logger import logger
-from backend.core.toolbox.toolbox_client import ToolboxError
+from backend.core.toolbox.toolbox_client import ToolboxError, refuse_toolbox_unlike_the_clients
 from backend.core.pipeline.obligations import (
     _blocks_delivery,
     _pages_label,
@@ -164,10 +164,11 @@ class PddlAccessibilityOrchestrator:
         a caller that passes no config gets the settings of the run's start.
         The last step-3 pull request makes the config required.
         """
-        if self.config is not None:
-            return self.config
         from backend.config.core_config import core_config_from_settings
 
+        if self.config is not None:
+            refuse_toolbox_unlike_the_clients(self.config.toolbox)
+            return self.config
         return core_config_from_settings()
 
     def _run_executor(self, config: CoreConfig) -> ExecutorAgent:

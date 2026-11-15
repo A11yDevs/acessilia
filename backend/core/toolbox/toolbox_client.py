@@ -2,10 +2,11 @@
 
 The transport, the capability registry, the per-capability clients and the
 client factory live in the SDK (``libs/sdk``, package ``acessilia_sdk``). This
-module only maps the core's ``settings`` onto the SDK's
+module maps the core's ``settings`` onto the SDK's
 :class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
-(:func:`toolbox_client_config`, constitution 3.2), and keeps the names other
-modules import from here.
+(:func:`toolbox_client_config`, constitution 3.2), states the endpoint rule
+both the clients and the planning gate follow (:func:`endpoints_from`), and
+keeps the names other modules import from here.
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox import clients as _sdk_clients
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from backend.config.settings import settings
+from backend.core.config import ToolboxConfig
 from backend.core.logger import logger
 
 
@@ -109,6 +111,50 @@ def toolbox_client_config() -> ToolboxClientConfig:
     )
 
 
+#: ``ToolboxConfig`` fields the Toolbox clients and handlers still read from
+#: ``settings`` (ADR-0016, step 3, toolbox PRs 2 and 3). The planning gate
+#: reads the run's config; a run whose config differs from the settings here
+#: would be admitted by the gate for a deployment, key or provider its calls
+#: do not use. Each toolbox PR removes the fields it moves, and the last one
+#: removes this check.
+TOOLBOX_FIELDS_STILL_IN_SETTINGS = (
+    "base_url",
+    "base_urls",
+    "api_key",
+    "timeout_seconds",
+    "retries",
+    "retry_backoff_seconds",
+    "extraction_timeout_seconds",
+    "providers",
+    "timeouts",
+    "use_remote_cache",
+    "use_artifact_store",
+    "media_inspect_enabled",
+    "pdf_validate_enabled",
+)
+
+
+def refuse_toolbox_unlike_the_clients(toolbox: ToolboxConfig) -> None:
+    """Refuse a run's ``toolbox`` that the clients, still on ``settings``, would not follow.
+
+    Raises ``ValueError`` naming the fields that differ.
+    """
+    from backend.config.core_config import core_config_from_settings
+
+    clients = core_config_from_settings().toolbox
+    differ = [
+        name
+        for name in TOOLBOX_FIELDS_STILL_IN_SETTINGS
+        if getattr(toolbox, name) != getattr(clients, name)
+    ]
+    if differ:
+        raise ValueError(
+            "The run's ToolboxConfig differs from the settings the Toolbox clients "
+            f"still read, in {', '.join(differ)}; until ADR-0016's toolbox group is "
+            "moved, pass these through the settings."
+        )
+
+
 def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
     """Build an SDK capability client configured from the core's ``settings``.
 
@@ -143,6 +189,7 @@ __all__ = [
     "endpoints_from",
     "execute_capability",
     "make_toolbox_client",
+    "refuse_toolbox_unlike_the_clients",
     "require_capability",
     "toolbox_client_config",
     "toolbox_endpoints",

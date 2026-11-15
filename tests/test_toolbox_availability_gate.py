@@ -7,6 +7,8 @@ out of the plan and fails closed without a catalogue.
 
 from __future__ import annotations
 
+from collections import OrderedDict
+
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -15,6 +17,7 @@ import pytest
 
 from acessilia_sdk.toolbox import snapshot_from_payloads
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
+from backend.config.settings import settings
 from backend.core.planning import toolbox_gate
 from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import (
@@ -179,7 +182,7 @@ def test_every_gated_method_has_a_handler() -> None:
 
 
 def test_runs_with_one_catalogue_source_share_its_cache(monkeypatch) -> None:
-    monkeypatch.setattr(toolbox_gate, "_caches", {})
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
 
     first = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test"))
     again = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test", retries=9))
@@ -199,7 +202,7 @@ def test_runs_with_one_catalogue_source_share_its_cache(monkeypatch) -> None:
 )
 def test_a_run_with_another_catalogue_source_gets_its_own_cache(monkeypatch, fields) -> None:
     """A snapshot is never read for a run that calls another deployment, or on other timings."""
-    monkeypatch.setattr(toolbox_gate, "_caches", {})
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
     base = {"base_url": "http://a.test", "base_urls": "", "api_key": "key",
             "catalog_refresh_seconds": 300, "catalog_stale_seconds": 900}
 
@@ -287,3 +290,84 @@ def test_the_providers_checked_are_the_run_config_ones(key, method) -> None:
     decision = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=config)
 
     assert "not-registered-anywhere" in " ".join(decision.blocked[method])
+
+
+def test_equivalent_spellings_of_the_primary_share_a_cache(monkeypatch) -> None:
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
+
+    first = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test", base_urls=""))
+    again = toolbox_gate.catalog_cache(
+        toolbox_config(base_url="http://other.test", base_urls="http://a.test/,http://b.test")
+    )
+
+    assert again is first
+
+
+def test_a_rotated_key_gets_its_own_cache_and_no_key_is_kept_in_the_table(monkeypatch) -> None:
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
+
+    old = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test", api_key="old-secret"))
+    new = toolbox_gate.catalog_cache(toolbox_config(base_url="http://a.test", api_key="new-secret"))
+
+    assert new is not old
+    assert not any("secret" in str(part) for key in toolbox_gate._caches for part in key)
+
+
+def test_the_least_recently_used_cache_goes_past_the_bound(monkeypatch) -> None:
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
+    monkeypatch.setattr(toolbox_gate, "CATALOG_CACHES_MAX", 2)
+
+    def cache(name):
+        return toolbox_gate.catalog_cache(toolbox_config(base_url=f"http://{name}.test"))
+
+    a, b = cache("a"), cache("b")
+    assert cache("a") is a  # used again: "b" is now the oldest
+    cache("c")
+
+    assert len(toolbox_gate._caches) == 2
+    assert cache("a") is a
+    assert cache("b") is not b
+
+
+@pytest.mark.asyncio
+async def test_a_run_config_the_clients_would_not_follow_is_refused(monkeypatch, tmp_path) -> None:
+    """Until the client factory takes the run's config (toolbox PR 3).
+
+    The review's case: the settings say ``docling`` and the run's config
+    ``other-provider``. The gate would check ``other-provider`` while the
+    clients and the single-provider handler use ``docling``.
+    """
+    monkeypatch.setattr(settings, "toolbox_provider", "docling")
+    orchestrator = _orchestrator()
+    orchestrator.config = replace(
+        _config(), toolbox=toolbox_config(providers={"toolbox_provider": "other-provider"})
+    )
+
+    with pytest.raises(ValueError, match="providers"):
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"availability_gate": "off"}, {"catalog_refresh_seconds": 1}, {"catalog_stale_seconds": 1}],
+)
+def test_the_fields_only_the_gate_reads_may_differ_from_the_settings(fields) -> None:
+    from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
+
+    refuse_toolbox_unlike_the_clients(toolbox_config(**fields))
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"base_url": "http://elsewhere.test"},
+        {"api_key": "another-key"},
+        {"retries": 99},
+        {"providers": {"toolbox_pdf_provider": "another-pdf"}},
+    ],
+)
+def test_the_fields_the_clients_read_must_match_the_settings(fields) -> None:
+    from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
+
+    with pytest.raises(ValueError, match=next(iter(fields))):
+        refuse_toolbox_unlike_the_clients(toolbox_config(**fields))

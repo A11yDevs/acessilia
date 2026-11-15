@@ -19,6 +19,8 @@ SDK allowlist is never made available.
 
 from __future__ import annotations
 
+import hashlib
+from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -180,24 +182,46 @@ async def _fetch(toolbox: ToolboxConfig) -> CatalogSnapshot:
     )
 
 
-#: One cache per catalogue source and timing, shared by the process.
-_caches: dict[tuple[str, str, str, int, int], CatalogCache] = {}
+#: How many catalogue sources the process keeps a cache for. The service has
+#: one; the bound only stops a process that sees many from keeping them all.
+CATALOG_CACHES_MAX = 8
+
+#: One cache per catalogue source and timing, least recently used first.
+_caches: OrderedDict[tuple[str, str, int, int], CatalogCache] = OrderedDict()
+
+
+def _source_key(toolbox: ToolboxConfig) -> tuple[str, str, int, int]:
+    """What decides the snapshot: the primary endpoint, the key, the timings.
+
+    The endpoint is the normalized primary, the only one the catalogue is
+    read from, so equivalent spellings share a cache; an unusable URL keys on
+    its text, and its cache records the error. The API key enters as a
+    digest, so the key of the table holds no credential (the cache's reader
+    still needs it, and goes with the entry).
+    """
+    try:
+        endpoint = endpoints_from(toolbox.base_urls, toolbox.base_url)[0].base_url
+    except ValueError:
+        endpoint = f"unusable:{toolbox.base_urls}|{toolbox.base_url}"
+    credential = hashlib.sha256(toolbox.api_key.encode("utf-8")).hexdigest()
+    return (
+        endpoint,
+        credential,
+        toolbox.catalog_refresh_seconds,
+        toolbox.catalog_stale_seconds,
+    )
 
 
 def catalog_cache(toolbox: ToolboxConfig) -> CatalogCache:
     """The process-wide cache for ``toolbox``'s catalogue.
 
-    Concurrent documents with the same endpoint, key and timings share one
-    catalogue read. A run with another of these gets its own cache, so it
-    never reads a snapshot taken from a deployment it does not call.
+    Concurrent documents with the same primary endpoint, key and timings
+    share one catalogue read. A run with another of these gets its own
+    cache, so it never reads a snapshot taken from a deployment it does not
+    call, or with a key it does not hold. At most ``CATALOG_CACHES_MAX``
+    caches are kept; the least recently used one goes first.
     """
-    key = (
-        toolbox.base_url,
-        toolbox.base_urls,
-        toolbox.api_key,
-        toolbox.catalog_refresh_seconds,
-        toolbox.catalog_stale_seconds,
-    )
+    key = _source_key(toolbox)
     cache = _caches.get(key)
     if cache is None:
         cache = _caches[key] = CatalogCache(
@@ -205,6 +229,10 @@ def catalog_cache(toolbox: ToolboxConfig) -> CatalogCache:
             refresh_seconds=toolbox.catalog_refresh_seconds,
             stale_seconds=toolbox.catalog_stale_seconds,
         )
+        while len(_caches) > CATALOG_CACHES_MAX:
+            _caches.popitem(last=False)
+    else:
+        _caches.move_to_end(key)
     return cache
 
 
