@@ -21,7 +21,7 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo (o estado dos jobs do serviço; fica fora do core).
 
 #### 0.2. Integração do Cliente de IA (`backend/core/agents/ai_client.py`)
-- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) com base nas configurações de ambiente.
+- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): inicializador central `get_agno_model(models, toolbox)` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) a partir da `ModelConfig` e da `ToolboxConfig` da execução ([ADR-0016](adr/0016-core-package.pt-br.md), passo 3).
 - [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): carregador de prompt e resolutor de templates sobre os prompts em [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
 **Deadline de chamada do DataAgent (#276, etapa 1).** Cada chamada de

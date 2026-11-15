@@ -239,8 +239,11 @@ Proposta: a opção 2.
      armazenamento de artefatos, timeout da extração e os providers primário
      e de matemática; cada função que chama a fábrica de clientes recebe a
      `ToolboxConfig` da execução), depois a fábrica de clientes e quem a
-     chama (feito: `make_toolbox_client(cls, toolbox)`; o endpoint e a chave
-     da VLM do cliente de modelo esperam o grupo dos modelos). Os handlers de
+     chama (feito: `make_toolbox_client(cls, toolbox)`). O grupo `models`
+     também foi feito: `get_agno_model(models, toolbox)` e
+     `active_model_name(models)`, e o `VisionAgent` e o `DataAgent` recebem a
+     `ModelConfig` da execução, dada pelas etapas e pelos handlers de
+     inspeção. Os handlers de
      método que leem a config declaram um parâmetro `config` (os handlers
      de fusão de dois providers e de provider único, os de inspeção de
      região e de página, os de fórmula, `mathml` e `latex-verbalizer`, e o

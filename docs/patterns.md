@@ -10,7 +10,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
 ### 2. Strategy & Model Abstraction for AI (Agno)
-- Implementation: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model()`)
+- Implementation: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model(models, toolbox)`, from the run's `ModelConfig` and `ToolboxConfig`)
 - Strategies:
   - Ollama (local open-weights models like LLaVA/Qwen-VL)
   - OpenRouter (cloud API models like Claude/GPT-4o)

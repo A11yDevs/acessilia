@@ -31,7 +31,7 @@ from backend.core.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import toolbox_config, vision_config
+from tests.core_config_support import model_config, toolbox_config, vision_config
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -76,7 +76,7 @@ def _fake_vision(monkeypatch, answer=_DESCRIPTION):
     calls = []
 
     class FakeVision:
-        def __init__(self, mode: str, *, region_cache, toolbox) -> None:
+        def __init__(self, mode: str, *, region_cache, toolbox, models) -> None:
             self.mode = mode
 
         async def describe_region(self, *, errors=None, **kwargs):
@@ -200,6 +200,7 @@ async def test_a_docx_picture_with_an_embedded_image_is_described(
         manifest, tmp_path / "qa_word.docx", mode="medio",
         vision=vision_config(),
         toolbox=toolbox_config(),
+        models=model_config(),
     )
 
     picture = manifest.elements[0]
@@ -234,6 +235,7 @@ async def test_a_pageless_picture_without_an_image_is_not_sent_to_the_model(
         manifest, tmp_path / "qa_word.docx", mode="medio",
         vision=vision_config(),
         toolbox=toolbox_config(),
+        models=model_config(),
     )
 
     picture = manifest.elements[0]
@@ -258,7 +260,7 @@ async def test_a_paged_picture_whose_crop_failed_is_still_a_crop_failure(
     )
     manifest = build_manifest([build_element("pic-1", "picture")], [])
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config())
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
 
     assert manifest.elements[0].metadata["vision_failure_reason"] == "crop_unavailable"
 

@@ -177,19 +177,12 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 
 #: The groups the core now receives from its caller: none of their settings
 #: may be read again. Each step-3 pull request adds the group it moves.
-MOVED_GROUPS = {"document", "export", "fusion", "toolbox", "vision"}
+MOVED_GROUPS = {"document", "export", "fusion", "models", "toolbox", "vision"}
 
 #: Reads of a moved group's setting that wait for another group's pull
-#: request, by file. The model client sends the agents' VLM chats to the
-#: Toolbox (``AI_CLIENT=toolbox``) with the Toolbox's endpoint and key; it
-#: moves with the models group, which gives it the run's ``ToolboxConfig``.
-PENDING_READS: dict[str, set[str]] = {
-    "backend/core/agents/ai_client.py": {
-        "toolbox_api_key",
-        "toolbox_base_url",
-        "toolbox_base_urls",
-    },
-}
+#: request, by file. Empty since the model client took the run's
+#: ``ModelConfig`` and ``ToolboxConfig`` (models group).
+PENDING_READS: dict[str, set[str]] = {}
 
 def test_the_moved_groups_are_not_read_from_settings() -> None:
     moved = {
@@ -548,6 +541,15 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
         ("backend.core.planning.toolbox_gate:evaluate", "config"),
+        ("backend.core.agents.vision_agent:VisionAgent.__init__", "models"),
+        ("backend.core.agents.data_agent:DataAgent.__init__", "models"),
+        ("backend.core.agents.data_agent:DataAgent.__init__", "toolbox"),
+        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "models"),
+        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "models"),
+        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "models"),
+        ("backend.core.pipeline.enrichment.tables:_enrich_table_structures", "models"),
+        ("backend.core.pipeline.handlers.inspection:_inspect_region", "models"),
+        ("backend.core.pipeline.handlers.inspection:_inspect_page", "models"),
         ("backend.core.pipeline.toolbox:_toolbox_render", "toolbox"),
         ("backend.core.pipeline.toolbox:_toolbox_formula_crop", "toolbox"),
         ("backend.core.pipeline.enrichment.common:_extract_picture_bytes", "toolbox"),
@@ -631,6 +633,9 @@ def test_the_run_config_parameters_are_required(function, parameter) -> None:
     ("function", "parameter"),
     [
         ("backend.core.pipeline.preflight:_inspect_media", "toolbox"),
+        ("backend.core.agents.ai_client:get_agno_model", "models"),
+        ("backend.core.agents.ai_client:get_agno_model", "toolbox"),
+        ("backend.core.agents.ai_client:active_model_name", "models"),
         ("backend.core.toolbox.toolbox_client:make_toolbox_client", "toolbox"),
         ("backend.core.toolbox.toolbox_client:toolbox_client_config", "toolbox"),
         ("backend.core.toolbox.toolbox_client:toolbox_endpoints", "toolbox"),

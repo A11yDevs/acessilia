@@ -30,7 +30,7 @@ from docstruct.tables.text_rows import rows_from_visual_table_text
 from backend.core.agents.data_agent import DataAgent
 from backend.core.agents.output_schemas import DataOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.config import ToolboxConfig, VisionConfig
+from backend.core.config import ModelConfig, ToolboxConfig, VisionConfig
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -68,6 +68,7 @@ async def _enrich_table_structures(
     *,
     vision: VisionConfig,
     toolbox: ToolboxConfig,
+    models: ModelConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -78,7 +79,7 @@ async def _enrich_table_structures(
     if not table_elements:
         return
 
-    data_agent = DataAgent()
+    data_agent = DataAgent(models=models, toolbox=toolbox)
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
 
     async def read_one(position: int, element: ManifestElement) -> bool:
