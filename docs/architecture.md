@@ -24,6 +24,28 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 - [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) based on environment settings.
 - [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): prompt loader and template resolver over the prompts in [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
+**DataAgent call deadline (#276, step 1).** Each `process_region` call awaits
+`Agent.run` for at most `DATA_AGENT_TIMEOUT_SECONDS + 30` seconds. The HTTP
+client still uses `DATA_AGENT_TIMEOUT_SECONDS`; the extra grace bounds the
+asynchronous wait even if a provider keeps resetting the per-read HTTP timeout
+by trickling bytes. With `AI_CLIENT=toolbox`, the timeout also includes the wait
+for a VLM gateway slot, so it must allow for that queue (see
+[ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)).
+
+The OpenAI client's implicit retries are disabled (`max_retries=0`): its two
+extra attempts are removed, so a transient transport failure now immediately
+returns `None` through the existing logged degradation path. Successful answers
+still undergo structured-output and region-kind validation. Table rereads
+(`_TABLE_REREAD_ATTEMPTS`) and the `_retry_failed` pass keep their own policies;
+the deadline bounds one model call, not the whole table or document.
+
+An expired await does not kill the synchronous call. Its thread, connection and
+per-call Agent/model client remain occupied until the provider finishes or the
+process stops. Calls still run on the event loop's default executor, and a
+synchronous caller using `asyncio.run()` may wait for that executor during loop
+shutdown. Isolating Vision/Data calls, bounding admission and defining the
+executor's lifecycle remain the second step of #276, after review of step 1.
+
 #### 0.3. Infrastructure Services (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `var/temp/cache`.
 - [backend/services/history_service.py](../backend/services/history_service.py): SQLite persistence (WAL mode) for conversions and audit logs, in `var/data/history.db`.
