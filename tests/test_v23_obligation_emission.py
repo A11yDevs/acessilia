@@ -11,6 +11,12 @@ from backend.core.manifest.models import BoundingBox, ManifestElement, Provenanc
 from tests.pddl_support import build_orchestrator
 
 
+#: Pages the VLM judge may adjudicate in these tests: the service's default
+#: (FUSION_JUDGE_MAX_PAGES), given explicitly since the builder takes the
+#: run's value and defaults to no judge.
+JUDGE_PAGES = 5
+
+
 def _element(
     element_id: str,
     element_type: str,
@@ -106,6 +112,7 @@ def test_v23_obligations_require_concrete_signals_and_cover_catalog():
         elements,
         page_sizes={1: (100, 100), 3: (100, 100)},
         fusion_evidence=evidence,
+        fusion_judge_max_pages=JUDGE_PAGES,
     )
 
     expected = {
@@ -216,7 +223,9 @@ def test_toolbox_manifest_needs_are_derived_by_the_core(
         configuration={},
     )
 
-    manifest = build_processing_manifest(source, extraction)
+    manifest = build_processing_manifest(
+        source, extraction, fusion_judge_max_pages=JUDGE_PAGES
+    )
 
     # Planning policy belongs to the core: the Toolbox's own obligation is
     # dropped and the needs come from the core's rules plus fusion evidence.

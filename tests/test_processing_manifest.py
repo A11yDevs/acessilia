@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from tests.core_config_support import document_config
+from tests.core_config_support import document_config, fusion_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.schema import processing_manifest_schema, validate_manifest
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
@@ -48,7 +48,7 @@ def _manifest(tmp_path: Path):
     source = tmp_path / "sample.pdf"
     source.write_bytes(b"%PDF-test")
     return InformationalStructuralAgent(extractor=FakeExtractor()).process(
-        source, document=document_config()
+        source, document=document_config(), fusion=fusion_config()
     )
 
 
@@ -204,7 +204,9 @@ def test_process_passes_the_run_document_config_to_the_builder(tmp_path, monkeyp
         slide_visual_coverage=0.25, slide_fold_figure_labels=False, legacy_unicode_repair="detect"
     )
 
-    InformationalStructuralAgent(extractor=FakeExtractor()).process(source, document=document)
+    InformationalStructuralAgent(extractor=FakeExtractor()).process(
+        source, document=document, fusion=fusion_config()
+    )
 
     assert received["slide_visual_coverage"] == 0.25
     assert received["slide_fold_figure_labels"] is False
@@ -224,7 +226,7 @@ async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monk
     received: list = []
 
     def process(source_path, **options):
-        received.append(options["document"])
+        received.append((options["document"], options["fusion"]))
         raise Stop
 
     async def no_inspection(*_args, **_kwargs):
@@ -238,4 +240,34 @@ async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monk
     with pytest.raises(Stop):
         await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
 
-    assert received == [orchestrator.config.document]
+    assert received == [(orchestrator.config.document, orchestrator.config.fusion)]
+
+
+def test_process_passes_the_run_fusion_config_to_the_extractor_and_the_builder(
+    tmp_path, monkeypatch
+):
+    from backend.core.agents import informational_structural
+
+    built: dict = {}
+    extracted: dict = {}
+
+    class RecordingExtractor(FakeExtractor):
+        def extract(self, path, **options):
+            extracted.update(options)
+            return super().extract(path)
+
+    def record(source_path, extraction, **options):
+        built.update(options)
+        return "manifest"
+
+    monkeypatch.setattr(informational_structural, "build_processing_manifest", record)
+    source = tmp_path / "sample.pdf"
+    source.write_bytes(b"%PDF-test")
+    fusion = fusion_config(mode="dual", secondary_provider="mineru", judge_max_pages=3)
+
+    InformationalStructuralAgent(extractor=RecordingExtractor()).process(
+        source, document=document_config(), fusion=fusion, presentation=True
+    )
+
+    assert extracted == {"fusion": fusion, "dual_fusion": False}
+    assert built["fusion_judge_max_pages"] == 3

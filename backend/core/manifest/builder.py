@@ -204,6 +204,7 @@ def build_processing_manifest(
     slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
     slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
     legacy_unicode_repair: str = "off",
+    fusion_judge_max_pages: int = 0,
 ) -> ProcessingManifest:
     """Builds the processing manifest from the Toolbox structural extraction.
 
@@ -233,6 +234,7 @@ def build_processing_manifest(
         slide_visual_coverage=slide_visual_coverage,
         slide_fold_figure_labels=slide_fold_figure_labels,
         legacy_unicode_repair=legacy_unicode_repair,
+        fusion_judge_max_pages=fusion_judge_max_pages,
     )
 
 
@@ -267,6 +269,7 @@ def _build_from_toolbox_json(
     slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
     slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
     legacy_unicode_repair: str = "off",
+    fusion_judge_max_pages: int = 0,
 ) -> ProcessingManifest:
     """Build a ProcessingManifest from a pre-built Toolbox JSON response.
 
@@ -359,6 +362,7 @@ def _build_from_toolbox_json(
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
         legacy_unicode_repair=legacy_unicode_repair,
+        fusion_judge_max_pages=fusion_judge_max_pages,
         secondary_extraction_available=secondary_extraction_readable,
     )
     observations.extend(v23_observations)
@@ -661,14 +665,14 @@ def _derive_v23_processing_needs(
     page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
     fusion_evidence: Any = None,
     fusion_stats: Any = None,
-    fusion_judge_max_pages: int | None = None,
+    fusion_judge_max_pages: int = 0,
     legacy_unicode_repair: str = "off",
     secondary_extraction_available: bool = False,
 ) -> tuple[list[Observation], list[Obligation]]:
     """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
 
     ``fusion_judge_max_pages`` caps how many pages get the VLM judge
-    (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
+    (the run's ``FusionConfig``; 0, no judge). ``legacy_unicode_repair`` is
     ``off``/``detect``/``repair``, the run's ``DocumentConfig`` value; only
     ``repair`` emits the obligation, while ``detect`` keeps the observation.
     ``skeleton-order`` is admissible only when the secondary extraction file
@@ -840,10 +844,6 @@ def _derive_v23_processing_needs(
     stats = fusion_stats
     if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
         stats = fusion_evidence.get("stats")
-    if fusion_judge_max_pages is None:
-        from backend.config.settings import settings
-
-        fusion_judge_max_pages = settings.fusion_judge_max_pages
     if isinstance(fusion_evidence, dict):
         pages = fusion_evidence.get("pages")
         if isinstance(pages, list):

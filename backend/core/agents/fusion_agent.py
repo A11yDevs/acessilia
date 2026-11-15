@@ -97,8 +97,8 @@ class FusionAgent:
         document_path: Path | str,
         *,
         language: str = "pt-BR",
+        secondary_provider: str,
         primary_provider: str | None = None,
-        secondary_provider: str | None = None,
     ) -> dict[str, Any]:
         """Merge two toolbox providers into a single fused payload.
 
@@ -269,6 +269,13 @@ class FusionAgent:
         Returns:
             dict: Payload fundido com ``document.elements`` e ``fusion_stats``.
         """
+        if secondary_provider is None:
+            # The Agno tool has no run to take a config from: the bridge of
+            # ADR-0016's step 3 reads it from the settings until the last
+            # step-3 pull request gives the agent its configuration.
+            from backend.config.core_config import core_config_from_settings
+
+            secondary_provider = core_config_from_settings().fusion.secondary_provider
         return self.process_fuse_providers(
             Path(document_path),
             language=language,

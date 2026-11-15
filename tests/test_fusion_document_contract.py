@@ -3,6 +3,7 @@
 import hashlib
 from pathlib import Path
 
+from tests.core_config_support import core_config
 import pytest
 
 from backend.config.settings import settings
@@ -56,14 +57,14 @@ def test_artifacts_are_isolated_across_documents_and_payloads(monkeypatch, tmp_p
     second.manifest_id = "manifest-second"
     second.source.document_id = "document-second"
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", lambda path, **_: payload(str(path)))
-    one = fusion_handlers._handle_dual_provider_fusion_method(first, "o-1").artifacts[0]
+    one = fusion_handlers._handle_dual_provider_fusion_method(first, "o-1", config=core_config()).artifacts[0]
     original = Path(one.path).read_bytes()
-    two = fusion_handlers._handle_dual_provider_fusion_method(second, "o-1").artifacts[0]
+    two = fusion_handlers._handle_dual_provider_fusion_method(second, "o-1", config=core_config()).artifacts[0]
     assert one.path != two.path
     assert one.id != two.id
     assert Path(one.path).read_bytes() == original
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", lambda path, **_: payload("Different revision"))
-    three = fusion_handlers._handle_dual_provider_fusion_method(first, "o-1").artifacts[0]
+    three = fusion_handlers._handle_dual_provider_fusion_method(first, "o-1", config=core_config()).artifacts[0]
     assert three.path != one.path
     assert Path(one.path).read_bytes() == original
 
@@ -80,7 +81,7 @@ def test_invalid_fusion_does_not_mutate_or_certify_manifest(monkeypatch, tmp_pat
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", lambda path, **_: {
         "status": "succeeded", "provider": "docling+mineru", "document": invalid,
     })
-    result = fusion_handlers._handle_dual_provider_fusion_method(source, "o-1")
+    result = fusion_handlers._handle_dual_provider_fusion_method(source, "o-1", config=core_config())
     assert not result.success
     assert source.model_dump() == original
     assert not result.artifacts
@@ -92,7 +93,7 @@ def test_text_fusion_does_not_flatten_structured_manifest(monkeypatch, tmp_path)
     source.elements[0].type = "table"
     original = source.model_dump()
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", lambda path, **_: payload())
-    result = fusion_handlers._handle_dual_provider_fusion_method(source, "o-1")
+    result = fusion_handlers._handle_dual_provider_fusion_method(source, "o-1", config=core_config())
     assert not result.success
     assert source.model_dump() == original
 
@@ -112,7 +113,7 @@ def test_recovered_pages_and_extra_blocks_reach_output(monkeypatch, tmp_path):
         {"type": "paragraph", "text": "Recovered page two", "page_number": 2},
     ])
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", lambda path, **_: fused)
-    assert fusion_handlers._handle_dual_provider_fusion_method(source, "o-1").success
+    assert fusion_handlers._handle_dual_provider_fusion_method(source, "o-1", config=core_config()).success
     ProcessingManifest.model_validate(source.model_dump())
     assert len(source.elements) == 3
     assert [element.reading_order for element in source.elements] == [1, 2, 3]

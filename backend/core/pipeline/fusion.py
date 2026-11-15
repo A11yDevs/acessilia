@@ -102,9 +102,9 @@ async def extract_fused(
     file_path,
     *,
     language: str = "pt-BR",
+    secondary_provider: str,
     policy: FusionPolicy | None = None,
     primary_provider: str | None = None,
-    secondary_provider: str | None = None,
     artifact_id: str | None = None,
 ) -> dict[str, Any]:
     """Extract with the primary + secondary providers and merge the results.
@@ -123,12 +123,14 @@ async def extract_fused(
 
     Fallback: if one provider reports a Toolbox error, uses the other result
     and logs which provider failed. Unexpected errors are propagated.
+
+    ``secondary_provider`` is the run's ``FusionConfig.secondary_provider``.
     """
     from backend.config.settings import settings
 
     policy = policy or FusionPolicy()
     primary = primary_provider or settings.toolbox_provider
-    secondary = secondary_provider or settings.fusion_secondary_provider
+    secondary = secondary_provider
 
     failures: dict[str, Exception] = {}
 

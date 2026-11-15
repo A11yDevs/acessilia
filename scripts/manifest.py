@@ -63,8 +63,9 @@ def main(argv: list[str] | None = None) -> int:
         agent = InformationalStructuralAgent(
             ToolboxManifestExtractor(enable_ocr=not args.no_ocr)
         )
+        config = core_config_from_settings()
         manifest = agent.process(
-            source, language=args.language, document=core_config_from_settings().document
+            source, language=args.language, document=config.document, fusion=config.fusion
         )
         payload = manifest.model_dump(mode="json", by_alias=True)
         errors = validate_manifest(payload, args.schema.resolve())

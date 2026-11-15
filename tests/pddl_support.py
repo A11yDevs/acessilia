@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from backend.core.pipeline.handlers.registry import bind_config
+from tests.core_config_support import core_config
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.manifest.models import (
     ExtractorRun,
@@ -118,7 +120,11 @@ def build_orchestrator(*, max_replans: int = 0) -> PddlAccessibilityOrchestrator
     planning and execution, so the extractor is irrelevant.
     """
     orchestrator = PddlAccessibilityOrchestrator.__new__(PddlAccessibilityOrchestrator)
-    orchestrator.executor = PddlAccessibilityOrchestrator._build_executor()
+    # The test's executor has the handlers bound to the service's config, so
+    # a test that calls it directly runs them; a run binds its own again.
+    executor = PddlAccessibilityOrchestrator._build_executor()
+    executor.registry = bind_config(executor.registry, core_config())
+    orchestrator.executor = executor
     orchestrator.config = None  # the run builds it from settings (ADR-0016, step 3)
     orchestrator.planner_backend = "internal"
     orchestrator.preferred_plan = "internal"

@@ -10,7 +10,7 @@ from dataclasses import replace
 from typing import Any
 
 from backend.config.core_config import core_config_from_settings
-from backend.core.config import CoreConfig, DocumentConfig, ExportConfig
+from backend.core.config import CoreConfig, DocumentConfig, ExportConfig, FusionConfig
 
 
 def core_config(**groups: dict[str, Any]) -> CoreConfig:
@@ -33,3 +33,8 @@ def document_config(**fields: Any) -> DocumentConfig:
 def export_config(**fields: Any) -> ExportConfig:
     """The service's ``ExportConfig``, with ``fields`` replaced."""
     return core_config(export=fields).export
+
+
+def fusion_config(**fields: Any) -> FusionConfig:
+    """The service's ``FusionConfig``, with ``fields`` replaced."""
+    return core_config(fusion=fields).fusion

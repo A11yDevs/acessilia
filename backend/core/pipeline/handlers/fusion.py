@@ -28,6 +28,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from backend.core.config import CoreConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
     Artifact,
@@ -289,7 +290,7 @@ def _handle_single_provider_method(
 
 
 def _run_extract_fused(
-    source_path: Path, *, artifact_id: str | None = None, policy=None
+    source_path: Path, *, secondary_provider: str, artifact_id: str | None = None, policy=None
 ) -> dict:
     """Run ``extract_fused`` in a way that suits the current event loop.
 
@@ -312,14 +313,22 @@ def _run_extract_fused(
     except RuntimeError:
         # Synchronous context (deterministic executor, CLI, tests): no event
         # loop is running in this thread.
-        return asyncio.run(extract_fused(source_path, artifact_id=artifact_id, policy=policy))
+        return asyncio.run(
+            extract_fused(
+                source_path, artifact_id=artifact_id, policy=policy,
+                secondary_provider=secondary_provider,
+            )
+        )
 
     # An event loop is already running in this thread; since the handler is
     # synchronous, the coroutine runs in a dedicated thread with its own loop.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(
             lambda: asyncio.run(
-                extract_fused(source_path, artifact_id=artifact_id, policy=policy)
+                extract_fused(
+                    source_path, artifact_id=artifact_id, policy=policy,
+                    secondary_provider=secondary_provider,
+                )
             )
         ).result()
 
@@ -353,7 +362,7 @@ def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
 
 
 def _handle_dual_provider_fusion_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Fuse two providers (docling+mineru) for the target obligation.
 
@@ -367,7 +376,8 @@ def _handle_dual_provider_fusion_method(
 
     Reuses the initial fusion when the hash, the document and the configuration
     match. Missing, corrupt or incompatible evidence triggers a new dual
-    extraction.
+    extraction, whose secondary provider is the run's
+    ``FusionConfig.secondary_provider``.
     """
     obligation = next(
         (o for o in manifest.obligations if o.id == obligation_id), None
@@ -384,10 +394,16 @@ def _handle_dual_provider_fusion_method(
 
             policy_config = manifest.extractor.configuration.get("fusion_policy")
             policy = FusionPolicy.from_dict(policy_config) if policy_config else None
+            secondary = config.fusion.secondary_provider
             if policy is None:
-                payload = _run_extract_fused(source_path, artifact_id=artifact_id)
+                payload = _run_extract_fused(
+                    source_path, artifact_id=artifact_id, secondary_provider=secondary
+                )
             else:
-                payload = _run_extract_fused(source_path, artifact_id=artifact_id, policy=policy)
+                payload = _run_extract_fused(
+                    source_path, artifact_id=artifact_id, policy=policy,
+                    secondary_provider=secondary,
+                )
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,

@@ -224,8 +224,11 @@ Proposed: option 2.
      orchestrator builds one per run until every stage takes its group. Moved
      so far: the `document` group (the page limit first, then inline math,
      the legacy Unicode repair, the slide options and the formula agreement
-     threshold) and the `export` group, which the worker snapshots once per
-     job and passes to the exporters.
+     threshold), the `export` group, which the worker snapshots once per
+     job and passes to the exporters, and the `fusion` group. The method
+     handlers that read the config declare a `config` parameter, and each
+     run binds its config to them (`bind_config`) on a copy of the
+     registry.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:
