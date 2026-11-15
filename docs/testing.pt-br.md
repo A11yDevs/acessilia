@@ -421,12 +421,14 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 
 ## Escopo e trabalhos relacionados
 
-- A constituição ainda indica o container Docker como portão primário; a
-  [#190](https://github.com/A11yDevs/acessilia/issues/190) acompanha a reescrita
-  dessa regra. O [README dos testes](../tests/README.pt-br.md#execução) afirma
-  que a CI é o portão aplicado e que a imagem não tem estágio `test`.
-- Instalação e cache de dependências continuam na
-  [#405](https://github.com/A11yDevs/acessilia/issues/405).
+- A [Constituição 3.0.0](constitution.pt-br.md#3-regras-de-qualidade-arquitetural)
+  define o CI como gate de testes e as verificações de build, inicialização e
+  saúde da API por smoke tests da imagem de produção como validação operacional,
+  resolvendo a [#190](https://github.com/A11yDevs/acessilia/issues/190).
+- CI e imagem instalam a partir do `uv.lock` da raiz; os jobs de isolamento das
+  bibliotecas usam os próprios locks verificados. A instalação e o cache de
+  dependências foram alinhados pela
+  [#405](https://github.com/A11yDevs/acessilia/issues/405) / PR #539.
 - Os comandos locais, as correções de isolamento, a paralelização da CI, a
   decisão sobre o testmon e o monitoramento agendado foram entregues pelos cinco
   PRs da [#448](https://github.com/A11yDevs/acessilia/issues/448).

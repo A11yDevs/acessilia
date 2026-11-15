@@ -170,7 +170,8 @@ python -m pytest -q tests/test_data_migration.py \
   tests/test_download_token_service.py tests/test_cleanup_service.py
 ```
 
-Eles foram executados no container de testes do projeto antes da migração.
+Para o gate atual de testes do CI e os smoke tests da imagem de produção, veja a
+[estratégia de testes da constituição](constitution.pt-br.md#3-regras-de-qualidade-arquitetural).
 
 Para rollback, pare a 0.2.0 e restaure imagem, configuração e dados originais da
 0.1.0. Não aponte a 0.1.0 para o banco migrado. O script não reverte escritas novas

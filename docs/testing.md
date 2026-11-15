@@ -413,12 +413,13 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 
 ## Scope and related work
 
-- The constitution still names the Docker container as the primary gate;
-  [#190](https://github.com/A11yDevs/acessilia/issues/190) tracks rewording that
-  rule. The [tests README](../tests/README.md#running) states that CI is the
-  enforced gate and the image has no `test` stage.
-- Dependency installation and caching remain under
-  [#405](https://github.com/A11yDevs/acessilia/issues/405).
+- [Constitution 3.0.0](constitution.md#3-architectural-quality-rules) makes CI
+  the test gate and production-image build, startup and API health smoke checks
+  the operational validation, resolving
+  [#190](https://github.com/A11yDevs/acessilia/issues/190).
+- CI and the image install from the root `uv.lock`; library isolation jobs use
+  their own checked locks. Dependency installation and caching were aligned by
+  [#405](https://github.com/A11yDevs/acessilia/issues/405) / PR #539.
 - The local commands, isolation fixes, CI parallelization, testmon decision and
   scheduled monitoring were delivered through the five PRs of
   [#448](https://github.com/A11yDevs/acessilia/issues/448).

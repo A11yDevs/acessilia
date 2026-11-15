@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.7 (2026-11-14). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 3.0.0 (2026-11-15). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -19,7 +19,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 4. Operação configurável: o comportamento deve ser dirigido por variáveis de ambiente e pastas locais. A configuração escolhe onde as capacidades rodam (por exemplo, o endpoint da Toolbox); ela não implica execução local (P4).
 5. Extração determinística primeiro: PDFs com base textual devem preferir extração determinística antes de invocar IA. A extração determinística roda como capacidade da Toolbox ou como algoritmo da docstruct, e não como executor operacional local no core (P4).
 6. Determinismo e inteligência híbridos: o sistema combina planejamento determinístico (processamento PDDL, geração do manifesto) com execução dirigida por IA para garantir confiabilidade e flexibilidade. Funções determinísticas são a fonte de verdade; LLMs fornecem interpretação e descrição.
-7. Validação com container em primeiro lugar: a suíte de testes deve passar no container Docker (ambiente equivalente ao de produção) antes do merge. Testes no ambiente nativo são secundários e específicos de ambiente.
+7. Validação reproduzível no CI: antes do merge, o gate automatizado de CI deve aprovar as suítes de testes aplicáveis no Python 3.11, com dependências instaladas a partir dos lockfiles versionados (seção 3.7). Antes da publicação, a imagem de produção deve ser construída, iniciar e passar no smoke test de saúde da API. A imagem de produção não precisa incluir dependências de teste nem a suíte completa.
 8. **Documentação com prioridade ao inglês e português brasileiro como língua oficial secundária**: todo o código-fonte (identificadores, comentários, docstrings, mensagens de log), documentação Markdown, issues, pull requests e mensagens de commit devem ser escritos em inglês — a língua obrigatória e autoritativa. O português brasileiro é a língua oficial secundária: desejável para toda a documentação, e todo espelho `*.pt-br.md` deve ser atualizado no mesmo PR sempre que sua fonte em inglês mudar. Em caso de divergência, a versão em inglês é autoritativa. Tradução e suporte a outras línguas é um objetivo secundário importante (internacionalização/i18n), voltado a uma audiência-alvo ampla e inclusiva; conteúdo localizado em outras línguas é bem-vindo, mas nunca bloqueia um merge. Conteúdo voltado ao usuário (mensagens do Telegram, saída renderizada, prompts para os modelos de IA) deve ser localizado conforme o locale do usuário — incluindo inglês e português brasileiro, e estendido a outras línguas conforme o esforço de i18n avança. Materiais educacionais são um domínio prioritário para a internacionalização: devem ser produzidos na língua da audiência sempre que possível, com inglês e português brasileiro como as línguas primárias suportadas.
 
 ## 3. Regras de qualidade arquitetural
@@ -54,10 +54,33 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 5. A persistência de histórico deve registrar o início e o fim da conversão.
 6. O documento canônico é a fonte de verdade de todo formato exportado.
 7. Estratégia de testes:
-   - Validação primária: pytest dentro do container Docker (equivalente ao de produção)
-   - Validação secundária: ambiente nativo (apenas checagem de sintaxe Python)
-   - Todos os testes devem passar no container antes do merge (requisito de gate)
-   - Os testes de regressão dos agentes existentes devem manter ou superar a cobertura atual
+   - **Desenvolvimento local:** execute os testes relevantes durante a implementação
+     (`make test-file` e `make test-failed`), depois `make test-all` antes de
+     abrir um pull request. Veja o [fluxo de testes](testing.pt-br.md).
+   - **Gate de CI:** antes do merge, os testes unitários, de regressão, contrato
+     e integração aplicáveis devem passar em [.github/workflows/ci.yml](../.github/workflows/ci.yml).
+     O CI usa Python 3.11, verifica o `uv.lock` da raiz com `uv lock --check` e
+     o instala com `uv sync --locked --extra dev`. Executa as suítes do core
+     sem E2E, da docstruct e do SDK nesse ambiente da raiz e rejeita testes
+     pulados inesperadamente. Jobs adicionais de isolamento instalam docstruct
+     e SDK a partir dos próprios lockfiles verificados, com `--no-editable`, e
+     executam suas suítes.
+   - **E2E:** testes marcados como `e2e` exigem uma Toolbox ou API do Core em
+     execução, conforme o caso, e rodam separadamente do gate regular de merge.
+     O job condicional de E2E em [.github/workflows/scheduled-tests.yml](../.github/workflows/scheduled-tests.yml)
+     roda quando `TOOLBOX_BASE_URL` ou `CORE_BASE_URL` está configurada;
+     desenvolvedores também podem executá-los explicitamente contra um
+     ambiente configurado.
+   - **Imagem de produção:** [infra/Dockerfile](../infra/Dockerfile) instala as
+     dependências de runtime a partir do mesmo `uv.lock` da raiz, sem
+     dependências de desenvolvimento nem a suíte de testes. Antes da publicação,
+     [.github/workflows/delivery.yml](../.github/workflows/delivery.yml) e
+     [.github/workflows/release.yml](../.github/workflows/release.yml) constroem
+     a imagem, iniciam sua API e verificam `/api/v1/health`. Essas verificações
+     operacionais por smoke tests complementam o gate de testes do CI.
+   - Preserve os testes de regressão dos agentes existentes. A medição e a
+     publicação da cobertura são acompanhadas na [#366](https://github.com/A11yDevs/acessilia/issues/366);
+     o CI ainda não impõe um limite mínimo de cobertura.
 
 ## 4. Contratos de domínio
 1. Ciclo de vida do processamento de documentos (estendido para a fase de planejamento):
@@ -230,6 +253,14 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **3.0.0 (2026-11-15):** o princípio 2.7 e a seção 3.7 substituem a exigência
+  de executar a suíte completa em um container Docker pelo gate reproduzível
+  de CI e pelas verificações de build, inicialização e saúde da API por smoke
+  tests da imagem de produção (#190). Isso muda um princípio inegociável e,
+  portanto, exige uma versão maior. A estratégia distingue desenvolvimento
+  local, CI e E2E externo, preserva os testes de regressão, contrato e integração
+  da P8, registra a instalação por lockfile entregue pela #405 / PR #539 e
+  deixa a publicação de cobertura para a #366.
 - **2.0.7 (2026-11-14):** a seção 4.3 passa a citar
   `backend/core/agents/prompts` para os prompts dos modos, que o passo 2 da
   ADR-0016 moveu de `backend/ai/prompts`. Nenhum princípio muda.
