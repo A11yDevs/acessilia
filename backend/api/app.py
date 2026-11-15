@@ -35,6 +35,8 @@ async def _lifespan(app: FastAPI):
     reset_shutdown()
     with runtime_lease():
         setup_logger()
+        from backend.services.model_calls import get_model_calls, shutdown_model_calls
+        get_model_calls()
         from backend.services.blocking import run_blocking
         from backend.services.history_service import limpar_orfas
         await run_blocking(limpar_orfas)
@@ -70,6 +72,7 @@ async def _lifespan(app: FastAPI):
                 pass
             # Every callback observed the signal; do not leak it into another
             # lifespan started in the same process (the test suite).
+            shutdown_model_calls()
             reset()
 
 

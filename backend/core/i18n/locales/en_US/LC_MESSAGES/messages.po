@@ -1763,6 +1763,52 @@ msgid "[page {page_num}] Prompt not found for type={type}, using fallback"
 msgstr "[page {page_num}] Prompt not found for type={type}, using fallback"
 
 #, python-brace-format
+msgid ""
+"[model-calls] {event}: {label}; active={active}, pending={pending}, "
+"abandoned={abandoned}, queue_wait={queue_wait:.3f}s, "
+"execution={execution:.3f}s"
+msgstr ""
+"[model-calls] {event}: {label}; active={active}, pending={pending}, "
+"abandoned={abandoned}, queue_wait={queue_wait:.3f}s, "
+"execution={execution:.3f}s"
+
+#, python-brace-format
+msgid ""
+"[model-calls] Abandoned {label}; active={active}, pending={pending}, "
+"abandoned={abandoned}"
+msgstr ""
+"[model-calls] Abandoned {label}; active={active}, pending={pending}, "
+"abandoned={abandoned}"
+
+#, python-brace-format
+msgid ""
+"[model-calls] Deadline expired for {label}; active={active}, "
+"pending={pending}, expirations={expirations}, "
+"queue_wait={queue_wait:.3f}s"
+msgstr ""
+"[model-calls] Deadline expired for {label}; active={active}, "
+"pending={pending}, expirations={expirations}, "
+"queue_wait={queue_wait:.3f}s"
+
+#, python-brace-format
+msgid ""
+"[model-calls] Rejected {label}; active={active}, pending={pending}, "
+"rejections={rejections}"
+msgstr ""
+"[model-calls] Rejected {label}; active={active}, pending={pending}, "
+"rejections={rejections}"
+
+msgid "Model-call executor is closed"
+msgstr "Model-call executor is closed"
+
+msgid "Model-call execution capacity is full"
+msgstr "Model-call execution capacity is full"
+
+#, python-brace-format
+msgid "No model answer within the {seconds}s call deadline"
+msgstr "No model answer within the {seconds}s call deadline"
+
+#, python-brace-format
 msgid "[page {page_num}] DataAgent processing region ({size} bytes, type={type})"
 msgstr "[page {page_num}] DataAgent processing region ({size} bytes, type={type})"
 

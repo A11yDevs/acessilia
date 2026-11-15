@@ -10,6 +10,20 @@ from tests.toolbox_render_fake import fake_toolbox_render  # noqa: F401
 
 
 @pytest.fixture(autouse=True)
+def model_calls():
+    """Each test explicitly owns execution, independently of its event loops."""
+    from backend.core.agents.model_calls import model_call_scope
+    from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
+
+    runner = ModelCallExecutor(ModelCallLimits(workers=4, max_pending=4))
+    try:
+        with model_call_scope(runner):
+            yield runner
+    finally:
+        runner.close(wait=True)
+
+
+@pytest.fixture(autouse=True)
 def _vision_cache_stays_out_of_tests(monkeypatch):
     """Keep region-description cache hits out of the test suite.
 

@@ -41,12 +41,51 @@ region-kind validation. Table rereads (`_TABLE_REREAD_ATTEMPTS`) and the
 `_retry_failed` pass keep their own policies;
 the deadline bounds one model call, not the whole table or document.
 
-An expired await does not kill the synchronous call. Its thread, connection and
-per-call Agent/model client remain occupied until the provider finishes or the
-process stops. Calls still run on the event loop's default executor, and a
-synchronous caller using `asyncio.run()` may wait for that executor during loop
-shutdown. Isolating Vision/Data calls, bounding admission and defining the
-executor's lifecycle remain the second step of #276, after review of step 1.
+**Shared model execution (#276, step 2).** VisionAgent and DataAgent receive the
+core's `ModelCallRunner` port by composition. The application owns its
+implementation, `backend.services.model_calls.ModelCallExecutor`, independently
+of event loops. The service supplies one runner through `model_call_scope` for
+each document; callers can also pass `model_calls` to an agent or the PDDL
+orchestrator. The orchestrator's legacy bridge obtains the service's process
+owner when no dependency/scope is supplied, like its transitional CoreConfig
+bridge (ADR-0016). Agents read no execution-capacity settings. AgentOS's separate
+Agno chat agents are outside this execution path.
+
+`MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and
+transient loops; `MODEL_CALL_MAX_PENDING` (default 4) bounds additional waiting
+calls. These are process setup, not per-run CoreConfig values. Only worker
+reservations reach the ThreadPoolExecutor. Pending calls stay in a bounded FIFO
+that removes cancelled/expired closures promptly; a pending call cannot start
+inference after abandonment. Saturation raises an explicit `ModelCallRejected`
+and follows the existing agent degradation path. With zero pending capacity,
+every occupied worker immediately counts toward saturation.
+
+The overall per-attempt deadline includes local queue wait and execution; with
+the Toolbox it also includes the gateway's slot wait. `VISION_CONCURRENCY`
+continues to limit one stage of one document, and the Toolbox independently owns
+its provider's slots. Size the Core workers for that gateway capacity and keep
+the model timeout large enough for legitimate queue wait. Table rereads and the
+VisionAgent's timeout retry remain separate from this execution mechanism.
+
+Each submission copies its ContextVars, including request locale. Synchronous
+region/page handlers preserve that context through their transient-loop bridge.
+`run_blocking`, cache I/O and structural extraction keep their existing executor
+and cancellation policies. Localized logs record saturation, deadline expiry,
+abandonment, queue wait and execution duration. `snapshot()` exposes active
+worker reservations, pending/abandoned calls, rejections and deadline expirations
+for observability (#385), without logging image/prompt content.
+
+An expired/cancelled running call still retains its reservation, thread,
+connection and per-call Agent/model client until the provider finishes. Its late
+result is discarded. `asyncio.run()` never joins this application-owned pool.
+API/CLI shutdown closes admission, removes pending work and uses
+`close(wait=False)`. That does not kill threads or guarantee immediate process
+termination: Python still joins executor threads at interpreter exit. A provider
+that never returns may require external process termination. A subsequent
+application lifecycle in the same process cannot replace a closed pool while
+abandoned workers remain; calls are rejected until those workers finish.
+Standalone users own and close their runner explicitly. See
+[ADR-0021](adr/0021-bounded-model-call-execution.md).
 
 #### 0.3. Infrastructure Services (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): file-hash-based text cache in `var/temp/cache`.

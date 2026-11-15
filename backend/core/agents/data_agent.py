@@ -6,12 +6,9 @@ reread and retry-pass budgets remain separate from this per-call bound.
 
 Abandoning the await does not stop the thread: it retains its connection and
 per-call Agent/model client until the provider finishes or the process stops.
-Calls still use the event loop's default executor, whose shutdown (including
-``asyncio.run``) may wait for those threads. Dedicated execution and bounded
-admission are the second step of #276.
+The application supplies a shared runner with bounded admission; abandoned
+calls retain its capacity, independently of transient event loops (#276).
 """
-
-import asyncio
 
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
@@ -22,7 +19,8 @@ from backend.core.i18n.log_messages import (
 from backend.core.logger import logger
 from backend.core.agents.prompt_tools import load_region_prompt
 from backend.core.agents.ai_client import get_agno_model
-from backend.core.agents.model_call_policy import CALL_DEADLINE_GRACE_SECONDS
+from backend.core.agents.model_call_policy import model_call_deadline
+from backend.core.agents.model_calls import ModelCallRunner, current_model_calls
 from backend.config.settings import settings
 from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
@@ -42,6 +40,9 @@ DATA_PROMPT_KEY_MAP = {
 
 class DataAgent:
     """Processes table and formula regions with a vision model."""
+
+    def __init__(self, *, model_calls: ModelCallRunner | None = None):
+        self.model_calls = model_calls if model_calls is not None else current_model_calls()
 
     async def process_region(
         self,
@@ -101,9 +102,9 @@ class DataAgent:
                     images=[Image(content=image_bytes)],
                 )
 
-            deadline = timeout_seconds + CALL_DEADLINE_GRACE_SECONDS
-            response = await asyncio.wait_for(
-                asyncio.to_thread(_run_data), timeout=deadline
+            response = await self.model_calls.run(
+                _run_data, timeout=model_call_deadline(timeout_seconds),
+                label=f"DataAgent/{classification}/page-{page_num}",
             )
             result = validate_structured_run(response, DataOutput)
             if result.kind != classification:

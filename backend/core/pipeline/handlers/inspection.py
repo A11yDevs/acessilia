@@ -17,6 +17,7 @@ import base64
 import hashlib
 import json
 import math
+import contextvars
 import os
 import tempfile
 from collections import Counter
@@ -108,14 +109,20 @@ def _inspect_region(
             total_pages=total_pages, mode=mode, full_budget=True,
         )
 
+    return _run_inspection(inspect())
+
+
+def _run_inspection(coro):
+    """Preserve the request context across a synchronous handler's bridge."""
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(inspect())
+        return asyncio.run(coro)
     import concurrent.futures
 
+    context = contextvars.copy_context()
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(lambda: asyncio.run(inspect())).result()
+        return pool.submit(context.run, asyncio.run, coro).result()
 
 
 def _save_region_artifact(content: bytes, scope: str, kind: str, suffix: str, media_type: str) -> Artifact:
@@ -252,9 +259,7 @@ def _inspect_page(
     region_cache: bool,
     toolbox: ToolboxConfig,
 ) -> PageInspectionOutput:
-    from acessilia_sdk.runtime import run_sync
-
-    return run_sync(
+    return _run_inspection(
         VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox).inspect_page(
             image_bytes=image, page_num=number, total_pages=total_pages
         )
