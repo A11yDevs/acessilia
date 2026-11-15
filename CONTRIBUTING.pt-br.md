@@ -226,7 +226,11 @@ repositório. Eles seguem as camadas descritas em
   o `tests/test_architecture_layers.py` impede o `backend` de importar o pacote da
   Toolbox.
 - **Rode as suítes delas**, que o CI também roda:
-  `cd libs/docstruct && python -m pytest` e `cd libs/sdk && python -m pytest`.
+  `cd libs/docstruct && uv run --extra dev pytest` e
+  `cd libs/sdk && uv run --extra dev pytest`. Esses comandos usam o lock de cada
+  biblioteca, para construí-la e testá-la isoladamente; o gate da aplicação roda
+  as três suítes no ambiente raiz, a partir do `uv.lock` da raiz (seção
+  “Integração contínua”).
 - **Mantenha os READMEs nos dois idiomas.** O
   `tests/test_docstruct_readme_sync.py` confere o par da docstruct.
 - **A docstruct é publicada para outros repositórios.** Uma mudança que a
@@ -378,10 +382,11 @@ rm .github/rulesets/main.json
 ## Setup do ambiente
 
 ```bash
-# Clone e instale dependências
+# Clone e instale as versões do uv.lock (CI e imagem usam o mesmo lock)
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
-uv sync --extra dev   # usa o Python 3.11 fixado em .python-version
+uv lock --check                    # falha quando pyproject.toml precisa de lock novo
+uv sync --locked --extra dev       # usa o Python 3.11 fixado em .python-version
 
 # Configure as variáveis de ambiente
 cp .env.example .env
@@ -389,6 +394,13 @@ cp .env.example .env
 # Execute os testes para verificar se está tudo ok
 make test-all
 ```
+
+O `uv.lock` é a fonte única das versões de dependência para desenvolvedores, CI
+e imagem. O CI roda `uv lock --check` e `uv sync --locked --extra dev`; a imagem
+roda `uv sync --locked --no-dev --no-editable` num estágio de build, então
+carrega as mesmas versões de runtime sem as ferramentas de teste. Uma mudança de
+dependência em `pyproject.toml` precisa vir com o `uv.lock` no mesmo pull
+request, senão o CI falha; `uv lock` o atualiza.
 
 ## Triagem de issues
 
@@ -437,7 +449,7 @@ Durante um ciclo de refatoração, `is:open -type:Feature` mostra o backlog do c
 
 A esteira de CI/CD está definida em três workflows:
 
-- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, roda as suítes de teste do core, da docstruct e do SDK no Python 3.11 e rejeita testes pulados inesperados.
+- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), roda as suítes de teste do core, da docstruct e do SDK no Python 3.11 e rejeita testes pulados inesperados.
 - **`.github/workflows/delivery.yml`** — depois que o CI passa num push, constrói a imagem, roda um smoke test de saúde e uma verificação de tamanho, e a publica no GHCR.
 - **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria a GitHub Release.
 

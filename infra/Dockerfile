@@ -1,9 +1,51 @@
 # syntax=docker/dockerfile:1.4
-FROM python:3.11-slim@sha256:94c50be2dc994b873b55bc123e95e6dbade08095b3dfd790f51c34de3f08cbb7
+
+# The image and CI install the same runtime versions from the committed lock
+# (#405). uv is pinned by release tag and by digest: the tag names the version,
+# the digest fixes the artifact that runs.
+FROM python:3.11-slim@sha256:94c50be2dc994b873b55bc123e95e6dbade08095b3dfd790f51c34de3f08cbb7 AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.17@sha256:03bdc89bb9798628846e60c3a9ad19006c8c3c724ccd2985a33145c039a0577b /uv /uvx /bin/
+
+# Metadata and the two path dependencies first, so the dependency layer is
+# reused when only application sources change. `--no-install-project` skips the
+# application wheel but still installs docstruct and the SDK from the lock.
+COPY pyproject.toml uv.lock .python-version README.md ./
+COPY libs/docstruct ./libs/docstruct
+COPY libs/sdk ./libs/sdk
+RUN uv sync --locked --no-dev --no-editable --no-install-project
+
+# The application, still installed from the lock and not editably. The final
+# check proves docstruct and the SDK import from wheels, not from this tree.
+COPY . .
+RUN uv sync --locked --no-dev --no-editable \
+    && /app/.venv/bin/python - <<'PY'
+from pathlib import Path
+
+import acessilia_sdk
+import docstruct
+
+for module in (docstruct, acessilia_sdk):
+    location = Path(module.__file__).resolve()
+    if "site-packages" not in location.parts:
+        raise SystemExit(f"{module.__name__} is not installed from a wheel: {location}")
+print("docstruct and the SDK are installed from wheels.")
+PY
+
+# The runtime carries the locked environment, not the builder's uv or cache.
+FROM python:3.11-slim@sha256:94c50be2dc994b873b55bc123e95e6dbade08095b3dfd790f51c34de3f08cbb7 AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app
 
 WORKDIR /app
@@ -33,15 +75,15 @@ ENV GIT_COMMIT=${GIT_COMMIT} \
     IMAGE_TAG=${IMAGE_TAG} \
     IMAGE_DIGEST=${IMAGE_DIGEST}
 
-COPY pyproject.toml ./
-COPY libs/docstruct ./libs/docstruct
-COPY libs/sdk ./libs/sdk
+# The base image keeps pip, setuptools and wheel in the system site-packages.
+# Trivy scans them even though the application runs from /app/.venv; upgrading
+# them replaces the vendored jars the scanner flags.
+RUN /usr/local/bin/python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-RUN pip install --upgrade pip setuptools wheel \
-    && pip install ./libs/docstruct --no-cache-dir \
-    && pip install ./libs/sdk --no-cache-dir \
-    && pip install . --no-cache-dir
-
+# The locked environment first; /app keeps the package data the wheel does not
+# carry (templates, static assets, locale catalogs). PYTHONPATH above makes the
+# application import from here while its dependencies come from the venv.
+COPY --from=builder /app/.venv /app/.venv
 COPY . .
 
 EXPOSE 8000 8001

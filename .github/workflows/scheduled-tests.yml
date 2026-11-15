@@ -36,18 +36,29 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install project dependencies
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py3.11-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.11-
+
+      - name: Check the lock and install from it
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ./libs/docstruct --no-cache-dir
-          python -m pip install "./libs/sdk[dev]" --no-cache-dir
-          python -m pip install ".[dev]" --no-cache-dir
+          uv lock --check
+          uv sync --locked --extra dev
 
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ matrix.ref }}
         run: |
-          TOOLBOX_REF=$(python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
+          TOOLBOX_REF=$(uv run --locked --extra dev python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
           echo "Toolbox contract: $url"
           if ! curl --fail --silent --show-error --location --retry 3 \
@@ -55,33 +66,33 @@ jobs:
             echo "::error::Failed to download the Toolbox contract from ${TOOLBOX_REF}."
             exit 1
           fi
-          python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
+          uv run --locked --extra dev python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
 
       # The scheduled job changes the execution order and worker count. A test
       # with a different outcome is an order/worker dependency; the comparison
       # step below fails the run.
       - name: Run core suite serially
         continue-on-error: true
-        run: python -m pytest -m "not e2e" --durations=25 --junitxml=serial-results.xml
+        run: uv run --locked --extra dev python -m pytest -m "not e2e" --durations=25 --junitxml=serial-results.xml
 
       - name: Run core suite with four workers
         continue-on-error: true
-        run: python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=parallel-results.xml
+        run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=parallel-results.xml
 
       - name: Run docstruct library test suite
         continue-on-error: true
         working-directory: libs/docstruct
-        run: python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
 
       - name: Run SDK library test suite
         continue-on-error: true
         working-directory: libs/sdk
-        run: python -m pytest --durations=25 --junitxml=sdk-test-results.xml
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
       - name: Compare outcomes and write the monitoring summary
         if: always()
         run: |
-          python scripts/test_report.py \
+          uv run --locked --extra dev python scripts/test_report.py \
             serial-results.xml parallel-results.xml \
             --fail-on-skip \
             --json test-monitoring-summary.json \
@@ -90,7 +101,7 @@ jobs:
       - name: Check docstruct and SDK reports
         if: always()
         run: |
-          python - <<'PY'
+          uv run --locked --extra dev python - <<'PY'
           from pathlib import Path
 
           from scripts.test_report import parse_report
@@ -122,7 +133,7 @@ jobs:
         if: always()
         env:
           TARGET_BRANCH: ${{ matrix.ref }}
-        run: python scripts/check_docstruct_pin.py "$TARGET_BRANCH"
+        run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH"
 
       - name: Upload scheduled test reports
         if: always()
@@ -156,12 +167,23 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install project dependencies
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py3.11-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.11-
+
+      - name: Check the lock and install from it
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ./libs/docstruct --no-cache-dir
-          python -m pip install "./libs/sdk[dev]" --no-cache-dir
-          python -m pip install ".[dev]" --no-cache-dir
+          uv lock --check
+          uv sync --locked --extra dev
 
       - name: Run end-to-end tests
         env:
@@ -169,7 +191,7 @@ jobs:
           TOOLBOX_API_KEY: ${{ secrets.TOOLBOX_API_KEY }}
           CORE_BASE_URL: ${{ vars.CORE_BASE_URL }}
           CORE_EXPECT_BUILD_INFO: ${{ vars.CORE_EXPECT_BUILD_INFO }}
-        run: python -m pytest -m e2e -v --timeout=900 --durations=25 --junitxml=e2e-results.xml
+        run: uv run --locked --extra dev python -m pytest -m e2e -v --timeout=900 --durations=25 --junitxml=e2e-results.xml
 
       - name: Upload E2E report
         if: always()
