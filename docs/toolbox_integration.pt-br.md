@@ -428,6 +428,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` | `600` | Timeout HTTP por tentativa do `document.structure.extract`; acompanha o timeout de 600 s dos providers da Toolbox |
 | `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` | `1500` | Orçamento total de parede da etapa de extração: upload, retries, failover e os dois providers. Retries/failover não o estendem, e um job cancelado aguarda no máximo esse tempo pela thread de extração |
 | `TOOLBOX_CANCEL_TIMEOUT_SECONDS` | `5` | Orçamento de parede do lote de cancelamentos remotos de melhor esforço quando um job é cancelado. Um cancelamento que falha ou atrasa é registrado como `failed`, sem retry indefinido |
+| `JOB_RESUME_ON_RESTART` | `true` | Retoma um job interrompido por reinício a partir do último checkpoint durável do pipeline. Com `false`, ele é marcado como interrompido, exigindo reenvio, como antes da #407 |
 | `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), nas capacidades que o contrato da Toolbox marca como idempotentes (todas menos `dataset.sample`); uma chamada não idempotente tem uma tentativa e nenhum failover (#406). `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
 | `TOOLBOX_USE_ARTIFACT_STORE` | `true` | Envia o arquivo para `/v1/artifacts` antes de extrair, quando os clientes compartilham uma implantação. Com endpoints independentes em `TOOLBOX_BASE_URLS`, o arquivo vai diretamente em cada chamada (ADR-0013); uma falha transitória do upload (timeout, indisponibilidade) também recai no envio direto |
@@ -579,3 +580,20 @@ nenhum resultado cancelado é publicado, e a checagem antecipada de `MAX_PAGES`
 não muda. Essa
 mudança não altera os timeouts dos providers nem a verificação antecipada de
 `MAX_PAGES` já existente.
+
+Um reinício não perde mais um job que chegou a um checkpoint do pipeline. O core
+grava checkpoints versionados e com hash da inspeção de mídia, do manifesto
+extraído e enriquecido, do plano e de cada passo executado do plano em
+`DATA_DIR/jobs/<task_id>/checkpoints`. A recuperação recoloca na fila um job em
+`processing` com checkpoint utilizável e o orchestrator continua da última fase,
+restaurando a etapa e o progresso que o usuário via e sem reenviar o e-mail de
+confirmação; um job sem checkpoint ainda falha com a etapa em que estava. As
+operações que o core já nomeia mantêm seu `operation_id` no diário SQLite, de
+modo que uma fase reexecutada chega à Toolbox como a mesma operação e a Toolbox
+se junta a ela em vez de executar o provider de novo. Um desligamento gracioso
+mantém o job retomável: a API marca o desligamento antes de parar a fila, de
+modo que o registro, o upload, os checkpoints e os ids de operação sobrevivem, e
+um job recuperado esperando na fila ainda pode ser cancelado. Checkpoints e
+linhas do diário são removidos quando o job termina e varridos após sete dias nos
+demais casos. A ADR-0020 registra a decisão; `JOB_RESUME_ON_RESTART=false`
+mantém o comportamento antigo.

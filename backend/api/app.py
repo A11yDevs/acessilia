@@ -28,6 +28,11 @@ from backend.core.logger import logger, setup_logger
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     from backend.services.runtime_lease import runtime_lease
+    from backend.services.shutdown import reset as reset_shutdown
+
+    # A fresh startup forgets a previous shutdown (tests run several lifespans
+    # in one process); only the shutdown path sets the signal again.
+    reset_shutdown()
     with runtime_lease():
         setup_logger()
         from backend.services.blocking import run_blocking
@@ -45,6 +50,12 @@ async def _lifespan(app: FastAPI):
         try:
             yield
         finally:
+            # A shutdown is not a job cancellation: mark it before the queue
+            # worker stops its callbacks, so they keep their durable state and
+            # the next startup can resume them (#407).
+            from backend.services.shutdown import begin_shutdown, reset
+
+            begin_shutdown()
             access_logger.removeFilter(access_filter)
             if unified_queue._worker_task is not None:
                 unified_queue._worker_task.cancel()
@@ -57,6 +68,9 @@ async def _lifespan(app: FastAPI):
                 await cleanup_task
             except asyncio.CancelledError:
                 pass
+            # Every callback observed the signal; do not leak it into another
+            # lifespan started in the same process (the test suite).
+            reset()
 
 
 def create_app() -> FastAPI:

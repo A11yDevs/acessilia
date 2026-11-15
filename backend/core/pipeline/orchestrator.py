@@ -20,10 +20,16 @@ from typing import Any
 
 
 from backend.services.blocking import run_blocking
+from backend.services import job_checkpoint
+from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.execution.executor import ExecutorAgent, StepProgress
-from backend.core.execution.models import ExecutionReport
+from backend.core.execution.executor import (
+    ExecutionResume,
+    ExecutorAgent,
+    StepProgress,
+)
+from backend.core.execution.models import ExecutionReport, ExecutionStepResult
 from backend.core.manifest.models import (
     ProcessingManifest,
 )
@@ -164,36 +170,99 @@ class PddlAccessibilityOrchestrator:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
         source_path = file_path.resolve()
-        # media.inspect runs first: a slide deck is extracted and structured
-        # slide by slide, which has to be decided before extraction.
-        media_inspection, media_configuration = await _inspect_media(source_path)
+        # Inside a job this id names the checkpoints; a benchmark or the CLI
+        # calls the orchestrator without one and keeps the old behaviour.
+        task_id = current_task_id()
+
+        media_state = _load_checkpoint(task_id, job_checkpoint.PHASE_MEDIA)
+        if media_state is not None:
+            media_inspection = media_state.get("inspection")
+            media_configuration = dict(media_state.get("configuration") or {})
+        else:
+            # media.inspect runs first: a slide deck is extracted and structured
+            # slide by slide, which has to be decided before extraction.
+            media_inspection, media_configuration = await _inspect_media(source_path)
+            await _save_checkpoint(
+                task_id,
+                job_checkpoint.PHASE_MEDIA,
+                {"inspection": media_inspection, "configuration": media_configuration},
+            )
         _check_page_limit_before_extraction(media_inspection)
         presentation = _is_presentation(media_inspection)
 
-        if status_callback:
-            await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-        manifest = await self._extract_structure(source_path, presentation)
+        manifest_state = _load_checkpoint(task_id, job_checkpoint.PHASE_MANIFEST)
+        resumed_manifest = manifest_state is not None
+        if manifest_state is not None:
+            manifest = ProcessingManifest.model_validate(manifest_state["manifest"])
+        else:
+            if status_callback:
+                await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
+            manifest = await self._extract_structure(source_path, presentation)
         _check_page_limit(manifest)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
         manifest.extractor.configuration.update(media_configuration)
+        if not resumed_manifest:
+            # Saved after the page limit and the media configuration: an
+            # oversized document must not leave a checkpoint to resume from.
+            await _save_checkpoint(
+                task_id,
+                job_checkpoint.PHASE_MANIFEST,
+                {"manifest": _manifest_payload(manifest)},
+            )
 
-        await self._enrich_before_planning(
-            manifest, file_path, source_path, effective_mode, media_inspection, status_callback
-        )
+        enriched_state = _load_checkpoint(task_id, job_checkpoint.PHASE_ENRICHED)
+        if enriched_state is not None:
+            manifest = ProcessingManifest.model_validate(enriched_state["manifest"])
+            # An enrichment checkpoint is complete for the mode it ran in; the
+            # configuration is re-applied so a changed default is still visible.
+            manifest.extractor.configuration["region_inspection_mode"] = effective_mode
+            manifest.extractor.configuration.update(media_configuration)
+        else:
+            await self._enrich_before_planning(
+                manifest, file_path, source_path, effective_mode, media_inspection, status_callback
+            )
+            await _save_checkpoint(
+                task_id,
+                job_checkpoint.PHASE_ENRICHED,
+                {"manifest": _manifest_payload(manifest)},
+            )
 
-        if status_callback:
-            await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
-        # One catalogue snapshot per document, so the first plan and every replan
-        # see the same Toolbox.
-        availability = await toolbox_gate.decide(manifest)
-        _log_availability(availability)
-        gated = availability.unavailable_methods
-        plan, comparison = await run_blocking(
-            self._build_plan, manifest, extra_unavailable=gated
-        )
+        plan_state = _load_checkpoint(task_id, job_checkpoint.PHASE_PLAN)
+        if plan_state is not None:
+            plan = NominalPlan.model_validate(plan_state["plan"])
+            comparison = (
+                PlanningComparison.model_validate(plan_state["comparison"])
+                if plan_state.get("comparison")
+                else None
+            )
+            planning_manifest = ProcessingManifest.model_validate(plan_state["manifest"])
+            availability = _availability_from(plan_state.get("availability") or {})
+            gated = list(plan_state.get("gated") or [])
+            replans = int(plan_state.get("replans") or 0)
+        else:
+            if status_callback:
+                await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
+            # One catalogue snapshot per document, so the first plan and every
+            # replan see the same Toolbox.
+            availability = await toolbox_gate.decide(manifest)
+            _log_availability(availability)
+            gated = availability.unavailable_methods
+            plan, comparison = await run_blocking(
+                self._build_plan, manifest, extra_unavailable=gated
+            )
+            planning_manifest = manifest
+            replans = 0
+            await _save_plan(
+                task_id, plan, comparison, planning_manifest, availability, gated, replans
+            )
 
-        execution_report: ExecutionReport | None = None
-        if status_callback:
+        execution_state = _load_checkpoint(task_id, job_checkpoint.PHASE_EXECUTION)
+        if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
+            # The plan checkpoint was replaced after this execution checkpoint
+            # was written (a replan that crashed before it started). The old
+            # progress does not apply to the new plan.
+            execution_state = None
+        if status_callback and execution_state is None:
             await status_callback(
                 t(STAGE_VALIDATING_PLAN_DRY_RUN)
                 if self.execute_dry_run
@@ -204,15 +273,26 @@ class PddlAccessibilityOrchestrator:
         # that was never executed and a report of None. Real execution is now the
         # other branch instead of silence.
         loop = asyncio.get_running_loop()
-        manifest, execution_report = await run_blocking(
-            self.executor.execute,
+        manifest, execution_report = await self._run_plan(
             plan,
-            manifest,
-            dry_run=self.execute_dry_run,
-            progress=_plan_progress(manifest, status_callback, loop),
+            planning_manifest,
+            execution_state,
+            task_id,
+            status_callback,
+            loop,
         )
         manifest, execution_report, plan, comparison = await self._replan_until_done(
-            manifest, execution_report, plan, comparison, gated, status_callback, loop
+            manifest,
+            execution_report,
+            plan,
+            comparison,
+            gated,
+            status_callback,
+            loop,
+            task_id=task_id,
+            planning_manifest=planning_manifest,
+            availability=availability,
+            replans=replans,
         )
         self._check_unsatisfied(manifest, execution_report)
 
@@ -229,6 +309,41 @@ class PddlAccessibilityOrchestrator:
         if structured_output:
             return payload
         return payload["text"]
+
+    async def _run_plan(
+        self,
+        plan: NominalPlan,
+        planning_manifest: ProcessingManifest,
+        execution_state: dict[str, Any] | None,
+        task_id: str | None,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        loop: asyncio.AbstractEventLoop,
+    ) -> tuple[ProcessingManifest, ExecutionReport]:
+        """Execute ``plan``, continuing from ``execution_state`` when it exists."""
+        resume = None
+        if execution_state is not None:
+            resume = ExecutionResume(
+                manifest=ProcessingManifest.model_validate(execution_state["manifest"]),
+                results=[
+                    ExecutionStepResult.model_validate(item)
+                    for item in execution_state.get("results") or []
+                ],
+                replan_required=bool(execution_state.get("replan_required")),
+            )
+        on_step = (
+            _execution_saver(task_id, plan)
+            if task_id is not None and not self.execute_dry_run
+            else None
+        )
+        return await run_blocking(
+            self.executor.execute,
+            plan,
+            planning_manifest,
+            dry_run=self.execute_dry_run,
+            progress=_plan_progress(planning_manifest, status_callback, loop),
+            resume=resume,
+            on_step=on_step,
+        )
 
     async def _extract_structure(self, source_path: Path, presentation: bool) -> ProcessingManifest:
         """The document's manifest from ``document.structure.extract``.
@@ -270,6 +385,10 @@ class PddlAccessibilityOrchestrator:
         The steps run in this order and share one provider breaker; the inline
         math of prose and of tables share one text-span reader. ``source_path``
         is ``file_path`` resolved.
+
+        The manifest is checkpointed after each step (#407). Each step records
+        per-object progress in the manifest and skips an object it already
+        finished, so a restart repeats at most the step that was running.
         """
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
@@ -279,9 +398,12 @@ class PddlAccessibilityOrchestrator:
         from backend.config.settings import settings
 
         breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        progress = _EnrichmentCheckpoint(current_task_id(), manifest).save
         await _classify_formula_regions(
             manifest, source_path, mode=effective_mode, breaker=breaker,
+            on_progress=progress,
         )
+        await self._checkpoint_enrichment(manifest)
         await _enrich_picture_descriptions(
             manifest,
             source_path,
@@ -289,16 +411,21 @@ class PddlAccessibilityOrchestrator:
             media_inspection=media_inspection,
             status_callback=status_callback,
             breaker=breaker,
+            on_progress=progress,
         )
+        await self._checkpoint_enrichment(manifest)
         text_spans = _TextSpanReader(manifest, source_path)
         await _mark_inline_math(manifest, source_path, text_spans)
+        await self._checkpoint_enrichment(manifest)
         await _enrich_formula_latex(
             manifest,
             source_path,
             mode=effective_mode,
             status_callback=status_callback,
             breaker=breaker,
+            on_progress=progress,
         )
+        await self._checkpoint_enrichment(manifest)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
@@ -307,9 +434,23 @@ class PddlAccessibilityOrchestrator:
             file_path.resolve(),
             status_callback=status_callback,
             breaker=breaker,
+            on_progress=progress,
         )
+        await self._checkpoint_enrichment(manifest)
         # After the table enrichment, which can replace a table's cells.
         await _mark_table_inline_math(manifest, source_path, text_spans)
+        await self._checkpoint_enrichment(manifest)
+
+    async def _checkpoint_enrichment(self, manifest: ProcessingManifest) -> None:
+        """Keep the manifest checkpoint current between enrichment steps (#407)."""
+        task_id = current_task_id()
+        if task_id is None:
+            return
+        await _save_checkpoint(
+            task_id,
+            job_checkpoint.PHASE_MANIFEST,
+            {"manifest": _manifest_payload(manifest)},
+        )
 
     async def _replan_until_done(
         self,
@@ -320,17 +461,23 @@ class PddlAccessibilityOrchestrator:
         gated: Any,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         loop: asyncio.AbstractEventLoop,
+        *,
+        task_id: str | None,
+        planning_manifest: ProcessingManifest,
+        availability: Any,
+        replans: int,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
         """Plan and execute again while the report asks for it, up to ``max_replans``.
 
-        Returns the last manifest, report, plan and comparison.
+        Returns the last manifest, report, plan and comparison. The replan count
+        and the plan it produced come from the checkpoint, so a restart after a
+        replan neither repeats one nor exceeds the budget.
         """
         # A `replan-required` report means the executor recorded `(tried ?o ?m)`
         # for a method that failed and left the obligation pending. Without this
         # loop the status was terminal in production: the pipeline returned a plan
         # it already knew was wrong, and `complete-job` never ran, so no document
         # was produced.
-        replans = 0
         while (
             execution_report.replan_required
             and replans < self.max_replans
@@ -356,18 +503,26 @@ class PddlAccessibilityOrchestrator:
                 self.max_replans,
                 execution_report.status,
             )
+            # The new plan applies to the manifest the execution just produced.
+            planning_manifest = manifest
             plan, comparison = await run_blocking(
                 self._build_plan,
-                manifest,
+                planning_manifest,
                 extra_unavailable=gated,
                 selected_roots=roots,
             )
-            manifest, execution_report = await run_blocking(
-                self.executor.execute,
+            await _save_plan(
+                task_id, plan, comparison, planning_manifest, availability, gated, replans
+            )
+            # The previous execution checkpoint belongs to the previous plan.
+            _remove_checkpoint(task_id, job_checkpoint.PHASE_EXECUTION)
+            manifest, execution_report = await self._run_plan(
                 plan,
-                manifest,
-                dry_run=False,
-                progress=_plan_progress(manifest, status_callback, loop),
+                planning_manifest,
+                None,
+                task_id,
+                status_callback,
+                loop,
             )
         return manifest, execution_report, plan, comparison
 
@@ -459,6 +614,124 @@ class PddlAccessibilityOrchestrator:
             for method in obligation.admissible_methods
         }
         return sorted(requested - registered)
+
+
+class _EnrichmentCheckpoint:
+    """Coalesced manifest checkpoints during one enrichment stage (#407).
+
+    Each completed object calls :meth:`save`. One write runs at a time and a
+    burst of completions during a write produces one more write with the latest
+    manifest, so every object becomes durable without one full checkpoint per
+    object. The manifest snapshot is taken synchronously before the write is
+    handed to a thread, so concurrent folds never race with serialization.
+    """
+
+    def __init__(self, task_id: str | None, manifest: ProcessingManifest) -> None:
+        self._task_id = task_id
+        self._manifest = manifest
+        self._lock = asyncio.Lock()
+        self._pending = 0
+
+    async def save(self) -> None:
+        if self._task_id is None:
+            return
+        self._pending += 1
+        if self._lock.locked():
+            # The running writer sees the increment and writes again.
+            return
+        async with self._lock:
+            while self._pending:
+                self._pending = 0
+                await _save_checkpoint(
+                    self._task_id,
+                    job_checkpoint.PHASE_MANIFEST,
+                    {"manifest": _manifest_payload(self._manifest)},
+                )
+
+
+def _manifest_payload(manifest: ProcessingManifest) -> dict[str, Any]:
+    return manifest.model_dump(mode="json", by_alias=True)
+
+
+def _load_checkpoint(task_id: str | None, phase: str) -> dict[str, Any] | None:
+    if task_id is None:
+        return None
+    return job_checkpoint.load(task_id, phase)
+
+
+async def _save_checkpoint(
+    task_id: str | None, phase: str, payload: dict[str, Any]
+) -> None:
+    """Persist one phase off the event loop; a failed write never fails the job."""
+    if task_id is None:
+        return
+    try:
+        await run_blocking(job_checkpoint.save, task_id, phase, payload)
+    except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail the job
+        logger.warning("Job {}: {} checkpoint not written: {}", task_id, phase, exc)
+
+
+def _remove_checkpoint(task_id: str | None, phase: str) -> None:
+    if task_id is not None:
+        job_checkpoint.remove(task_id, phase)
+
+
+async def _save_plan(
+    task_id: str | None,
+    plan: NominalPlan,
+    comparison: PlanningComparison | None,
+    manifest: ProcessingManifest,
+    availability: toolbox_gate.AvailabilityDecision,
+    gated: Iterable[str],
+    replans: int,
+) -> None:
+    await _save_checkpoint(
+        task_id,
+        job_checkpoint.PHASE_PLAN,
+        {
+            "plan": plan.model_dump(mode="json", by_alias=True),
+            "comparison": (
+                comparison.model_dump(mode="json", by_alias=True)
+                if comparison is not None
+                else None
+            ),
+            "manifest": _manifest_payload(manifest),
+            "availability": availability.to_metadata(),
+            "gated": sorted(gated),
+            "replans": replans,
+        },
+    )
+
+
+def _availability_from(metadata: dict[str, Any]) -> toolbox_gate.AvailabilityDecision:
+    """Rebuild the gate decision the plan was built under, for the payload."""
+    blocked = metadata.get("blocked_methods") or {}
+    return toolbox_gate.AvailabilityDecision(
+        mode=str(metadata.get("mode") or toolbox_gate.gate_mode()),
+        catalog_revision=metadata.get("catalog_revision"),
+        blocked={
+            str(method): [str(reason) for reason in reasons]
+            for method, reasons in blocked.items()
+        },
+        catalog_error=metadata.get("catalog_error"),
+    )
+
+
+def _execution_saver(task_id: str, plan: NominalPlan):
+    """A callback the executor calls after each step, writing the checkpoint."""
+
+    def save(snapshot: dict[str, Any]) -> None:
+        if snapshot.get("plan_id") != plan.plan_id:
+            # A snapshot from another plan must never overwrite this one.
+            return
+        try:
+            job_checkpoint.save(task_id, job_checkpoint.PHASE_EXECUTION, snapshot)
+        except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail a step
+            logger.warning(
+                "Job {}: execution checkpoint not written: {}", task_id, exc
+            )
+
+    return save
 
 
 def _plan_progress(

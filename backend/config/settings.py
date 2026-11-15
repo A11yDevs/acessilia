@@ -32,6 +32,15 @@ class Settings:
     data_dir: Path = field(
         default_factory=lambda: _path_from_env("DATA_DIR", BASE_DIR / "var" / "data")
     )
+    # A job interrupted by a restart continues from its durable pipeline
+    # checkpoint. The flag allows a deployment to keep the old behaviour
+    # (mark it failed) without a code revert (#407).
+    job_resume_on_restart: bool = field(
+        default_factory=lambda: (
+            os.getenv("JOB_RESUME_ON_RESTART", "true").strip().lower()
+            in {"1", "true", "yes", "on", "sim"}
+        )
+    )
     logs_dir: Path = field(
         default_factory=lambda: _path_from_env("LOGS_DIR", BASE_DIR / "var" / "logs")
     )
