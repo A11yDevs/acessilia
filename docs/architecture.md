@@ -36,6 +36,7 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 
 #### 0.4. Core Utilities and Toolbox Adapters (`backend/core/`)
 - [backend/core/toolbox/](../backend/core/toolbox/): the core's adapters over the Toolbox, through the SDK (client from the settings, math, media inspection, PDF/UA audit, text spans, vision payload).
+- [backend/core/config.py](../backend/core/config.py): `CoreConfig`, the core's configuration in frozen groups, which the service builds from its settings in [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, step 3).
 - [backend/core/logger.py](../backend/core/logger.py): centralized loguru logger setup.
 - [backend/core/formula_tools.py](../backend/core/formula_tools.py): LaTeX normalization and the spoken-formula label.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.

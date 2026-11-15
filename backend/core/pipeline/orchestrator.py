@@ -23,6 +23,7 @@ from backend.services.blocking import run_blocking
 from backend.services import job_checkpoint
 from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
+from backend.core.config import CoreConfig
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import (
     ExecutionResume,
@@ -122,7 +123,9 @@ class PddlAccessibilityOrchestrator:
         enable_ocr: bool = True,
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
+        config: CoreConfig | None = None,
     ) -> None:
+        self.config = config
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
@@ -150,6 +153,19 @@ class PddlAccessibilityOrchestrator:
         self.planner = PlannerAgent()
         self.executor = self._build_executor()
 
+    def _run_config(self) -> CoreConfig:
+        """The configuration of one run: the one given, or one built from ``settings`` now.
+
+        The bridge of ADR-0016's step 3: until every stage takes its group,
+        a caller that passes no config gets the settings of the run's start.
+        The last step-3 pull request makes the config required.
+        """
+        if self.config is not None:
+            return self.config
+        from backend.config.core_config import core_config_from_settings
+
+        return core_config_from_settings()
+
     @staticmethod
     def _build_executor() -> ExecutorAgent:
         return ExecutorAgent(build_method_registry(), domain=DomainBundle.load())
@@ -169,6 +185,7 @@ class PddlAccessibilityOrchestrator:
         if custom_prompt or thinking_mode:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
+        config = self._run_config()
         source_path = file_path.resolve()
         # Inside a job this id names the checkpoints; a benchmark or the CLI
         # calls the orchestrator without one and keeps the old behaviour.
@@ -187,7 +204,7 @@ class PddlAccessibilityOrchestrator:
                 job_checkpoint.PHASE_MEDIA,
                 {"inspection": media_inspection, "configuration": media_configuration},
             )
-        _check_page_limit_before_extraction(media_inspection)
+        _check_page_limit_before_extraction(media_inspection, config.document)
         presentation = _is_presentation(media_inspection)
 
         manifest_state = _load_checkpoint(task_id, job_checkpoint.PHASE_MANIFEST)
@@ -198,7 +215,7 @@ class PddlAccessibilityOrchestrator:
             if status_callback:
                 await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
             manifest = await self._extract_structure(source_path, presentation)
-        _check_page_limit(manifest)
+        _check_page_limit(manifest, config.document)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
         manifest.extractor.configuration.update(media_configuration)
         if not resumed_manifest:
