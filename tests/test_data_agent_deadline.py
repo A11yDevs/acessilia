@@ -57,9 +57,9 @@ async def test_deadline_degrades_while_the_model_is_still_blocked(
     monkeypatch.setattr(data_module.settings, "data_agent_timeout_seconds", 0)
     monkeypatch.setattr(data_module, "CALL_DEADLINE_GRACE_SECONDS", 0.1)
     validation = Mock(wraps=data_module.validate_structured_run)
-    critical = Mock()
     monkeypatch.setattr(data_module, "validate_structured_run", validation)
-    monkeypatch.setattr(data_module.logger, "critical", critical)
+    messages: list[str] = []
+    sink = data_module.logger.add(messages.append, level="DEBUG", format="{message}")
     call = asyncio.create_task(
         data_module.DataAgent().process_region(b"image", classification, page_num=4)
     )
@@ -69,16 +69,19 @@ async def test_deadline_degrades_while_the_model_is_still_blocked(
         assert not blocked_model.release.is_set()
         assert not blocked_model.finished.is_set()
         validation.assert_not_called()
-        critical.assert_called_once()
-        assert "TimeoutError" in critical.call_args.args[0]
+        assert any("TimeoutError" in message for message in messages)
 
         blocked_model.release.set()
         await _wait_for_event(blocked_model.finished)
         await asyncio.sleep(0)
         validation.assert_not_called()
     finally:
+        blocked_model.release.set()
         call.cancel()
-        await asyncio.gather(call, return_exceptions=True)
+        try:
+            await asyncio.gather(call, return_exceptions=True)
+        finally:
+            data_module.logger.remove(sink)
 
 
 @pytest.mark.asyncio
@@ -96,13 +99,14 @@ async def test_cancellation_propagates_while_the_model_is_still_blocked(
         assert not blocked_model.finished.is_set()
         validation.assert_not_called()
     finally:
+        blocked_model.release.set()
         call.cancel()
         await asyncio.gather(call, return_exceptions=True)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("classification", ["table", "formula"])
-async def test_transient_transport_error_degrades_without_sdk_retries(
+async def test_transient_error_degrades_and_requests_no_openai_retries(
     monkeypatch, model_factory, classification
 ):
     run = Mock(side_effect=httpx.ReadTimeout("temporary provider timeout"))
@@ -115,4 +119,7 @@ async def test_transient_transport_error_degrades_without_sdk_retries(
     assert result is None
     run.assert_called_once()
     model_factory.assert_called_once()
+    # This checks the agent-to-factory contract. test_ai_client.py verifies
+    # forwarding to OpenRouter/Toolbox; Ollama ignores this OpenAI-specific
+    # option and keeps its existing retry policy.
     assert model_factory.call_args.kwargs["max_retries"] == 0

@@ -33,12 +33,13 @@ leitura HTTP sendo reiniciado ao enviar bytes aos poucos. Com
 VLM, por isso deve comportar essa fila (veja a
 [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)).
 
-Os retries implícitos do cliente OpenAI estão desativados (`max_retries=0`): as
-duas tentativas adicionais são removidas, de modo que uma falha transitória de
-transporte retorna `None` imediatamente pelo caminho existente de degradação
-com registro em log. Respostas bem-sucedidas continuam passando pela validação
-de saída estruturada e do tipo da região. As releituras de tabela
-(`_TABLE_REREAD_ATTEMPTS`) e a passagem `_retry_failed` mantêm suas próprias
+Nos clientes OpenRouter e Toolbox compatíveis com OpenAI, os retries implícitos
+estão desativados (`max_retries=0`): as duas tentativas adicionais do SDK OpenAI
+são removidas. Ollama não consome essa opção e mantém sua política de retries
+existente. Uma falha transitória de transporte retorna `None` pelo caminho
+existente de degradação com registro em log. Respostas bem-sucedidas continuam
+passando pela validação de saída estruturada e do tipo da região. As releituras
+de tabela (`_TABLE_REREAD_ATTEMPTS`) e a passagem `_retry_failed` mantêm suas próprias
 políticas; o deadline limita uma chamada de modelo, não toda a tabela ou o
 documento.
 

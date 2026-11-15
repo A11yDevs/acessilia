@@ -32,11 +32,13 @@ by trickling bytes. With `AI_CLIENT=toolbox`, the timeout also includes the wait
 for a VLM gateway slot, so it must allow for that queue (see
 [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)).
 
-The OpenAI client's implicit retries are disabled (`max_retries=0`): its two
-extra attempts are removed, so a transient transport failure now immediately
-returns `None` through the existing logged degradation path. Successful answers
-still undergo structured-output and region-kind validation. Table rereads
-(`_TABLE_REREAD_ATTEMPTS`) and the `_retry_failed` pass keep their own policies;
+For the OpenAI-compatible OpenRouter and Toolbox clients, implicit retries are
+disabled (`max_retries=0`): the OpenAI SDK's two extra attempts are removed.
+Ollama does not consume this option and keeps its existing retry policy.
+A transient transport failure returns `None` through the existing logged
+degradation path. Successful answers still undergo structured-output and
+region-kind validation. Table rereads (`_TABLE_REREAD_ATTEMPTS`) and the
+`_retry_failed` pass keep their own policies;
 the deadline bounds one model call, not the whole table or document.
 
 An expired await does not kill the synchronous call. Its thread, connection and

@@ -22,6 +22,7 @@ from backend.core.i18n.log_messages import (
 from backend.core.logger import logger
 from backend.core.agents.prompt_tools import load_region_prompt
 from backend.core.agents.ai_client import get_agno_model
+from backend.core.agents.model_call_policy import CALL_DEADLINE_GRACE_SECONDS
 from backend.config.settings import settings
 from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
@@ -37,12 +38,6 @@ DATA_PROMPT_KEY_MAP = {
     "table": "regiao_tabela",
     "formula": "regiao_formula",
 }
-
-
-#: Match VisionAgent's grace above the per-read HTTP timeout. The hard deadline
-#: also bounds a trickling provider and, with AI_CLIENT=toolbox, includes the
-#: wait for a gateway slot. It is a per-call bound, not a table or job budget.
-CALL_DEADLINE_GRACE_SECONDS = 30
 
 
 class DataAgent:
