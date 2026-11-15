@@ -225,7 +225,9 @@ Proposta: a opção 2.
      grupos congelados (Toolbox, modelos, visão, fusão, documento, exportação,
      caminhos), o serviço o monta em `backend/config/core_config.py`, e o
      orquestrador monta um por execução até que cada etapa receba o seu grupo.
-     O limite de páginas foi a primeira etapa.
+     Já passou para ele o grupo `document` (primeiro o limite de páginas,
+     depois a matemática inline, o reparo de Unicode legado, as opções de
+     slides e o limiar de concordância das fórmulas).
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:

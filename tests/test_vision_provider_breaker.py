@@ -18,6 +18,7 @@ import pytest
 from backend.core.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline.enrichment.formulas import _enrich_formula_latex
+from tests.core_config_support import document_config
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.agents.provider_breaker import ProviderBreaker
@@ -357,7 +358,7 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
 
     await _enrich_picture_descriptions(pictures, tmp_path / "doc.pdf", mode="medio", breaker=breaker)
     await _enrich_formula_latex(
-        formulas, tmp_path / "doc.pdf", mode="medio", breaker=breaker
+        formulas, tmp_path / "doc.pdf", mode="medio", document=document_config(), breaker=breaker
     )
 
     # Pictures: two failures to open the breaker, one probe through it. The

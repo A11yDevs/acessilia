@@ -23,7 +23,7 @@ from backend.services.blocking import run_blocking
 from backend.services import job_checkpoint
 from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.config import CoreConfig
+from backend.core.config import CoreConfig, DocumentConfig
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import (
     ExecutionResume,
@@ -218,7 +218,7 @@ class PddlAccessibilityOrchestrator:
         else:
             if status_callback:
                 await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-            manifest = await self._extract_structure(source_path, presentation)
+            manifest = await self._extract_structure(source_path, presentation, config.document)
         _check_page_limit(manifest, config.document)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
         manifest.extractor.configuration.update(media_configuration)
@@ -240,7 +240,8 @@ class PddlAccessibilityOrchestrator:
             manifest.extractor.configuration.update(media_configuration)
         else:
             await self._enrich_before_planning(
-                manifest, file_path, source_path, effective_mode, media_inspection, status_callback
+                manifest, file_path, source_path, effective_mode, media_inspection, status_callback,
+                config,
             )
             await _save_checkpoint(
                 task_id,
@@ -366,7 +367,9 @@ class PddlAccessibilityOrchestrator:
             on_step=on_step,
         )
 
-    async def _extract_structure(self, source_path: Path, presentation: bool) -> ProcessingManifest:
+    async def _extract_structure(
+        self, source_path: Path, presentation: bool, document: DocumentConfig
+    ) -> ProcessingManifest:
         """The document's manifest from ``document.structure.extract``.
 
         A Toolbox failure becomes a ``StructuralExtractionError`` whose message
@@ -378,6 +381,7 @@ class PddlAccessibilityOrchestrator:
                 source_path,
                 language="pt-BR",
                 presentation=presentation,
+                document=document,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local
@@ -400,6 +404,7 @@ class PddlAccessibilityOrchestrator:
         effective_mode: str,
         media_inspection: dict[str, Any] | None,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        config: CoreConfig,
     ) -> None:
         """Describe pictures, recognize formulas and inline math, read tables.
 
@@ -436,12 +441,13 @@ class PddlAccessibilityOrchestrator:
         )
         await self._checkpoint_enrichment(manifest)
         text_spans = _TextSpanReader(manifest, source_path)
-        await _mark_inline_math(manifest, source_path, text_spans)
+        await _mark_inline_math(manifest, source_path, config.document, text_spans)
         await self._checkpoint_enrichment(manifest)
         await _enrich_formula_latex(
             manifest,
             source_path,
             mode=effective_mode,
+            document=config.document,
             status_callback=status_callback,
             breaker=breaker,
             on_progress=progress,
@@ -459,7 +465,7 @@ class PddlAccessibilityOrchestrator:
         )
         await self._checkpoint_enrichment(manifest)
         # After the table enrichment, which can replace a table's cells.
-        await _mark_table_inline_math(manifest, source_path, text_spans)
+        await _mark_table_inline_math(manifest, source_path, config.document, text_spans)
         await self._checkpoint_enrichment(manifest)
 
     async def _checkpoint_enrichment(self, manifest: ProcessingManifest) -> None:

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, MethodRegistry
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -173,7 +174,9 @@ def _run_manifest(
     agent = InformationalStructuralAgent(
         ToolboxManifestExtractor(enable_ocr=not no_ocr)
     )
-    manifest = agent.process(document.resolve(), language=language)
+    manifest = agent.process(
+        document.resolve(), language=language, document=core_config_from_settings().document
+    )
     payload = manifest.model_dump(mode="json", by_alias=True)
     errors = validate_manifest(payload, DEFAULT_MANIFEST_SCHEMA)
     if errors:

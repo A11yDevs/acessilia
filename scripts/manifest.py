@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from backend.core.manifest.schema import validate_manifest
@@ -62,7 +63,9 @@ def main(argv: list[str] | None = None) -> int:
         agent = InformationalStructuralAgent(
             ToolboxManifestExtractor(enable_ocr=not args.no_ocr)
         )
-        manifest = agent.process(source, language=args.language)
+        manifest = agent.process(
+            source, language=args.language, document=core_config_from_settings().document
+        )
         payload = manifest.model_dump(mode="json", by_alias=True)
         errors = validate_manifest(payload, args.schema.resolve())
         if errors:

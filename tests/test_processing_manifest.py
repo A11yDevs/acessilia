@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.agents.informational_structural import InformationalStructuralAgent
+from tests.core_config_support import document_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.schema import processing_manifest_schema, validate_manifest
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
@@ -46,7 +47,9 @@ class FakeExtractor:
 def _manifest(tmp_path: Path):
     source = tmp_path / "sample.pdf"
     source.write_bytes(b"%PDF-test")
-    return InformationalStructuralAgent(extractor=FakeExtractor()).process(source)
+    return InformationalStructuralAgent(extractor=FakeExtractor()).process(
+        source, document=document_config()
+    )
 
 
 def test_agent_builds_valid_manifest_and_candidate_obligation(tmp_path: Path):

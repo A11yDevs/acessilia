@@ -10,7 +10,7 @@ from dataclasses import replace
 from typing import Any
 
 from backend.config.core_config import core_config_from_settings
-from backend.core.config import CoreConfig
+from backend.core.config import CoreConfig, DocumentConfig
 
 
 def core_config(**groups: dict[str, Any]) -> CoreConfig:
@@ -23,3 +23,8 @@ def core_config(**groups: dict[str, Any]) -> CoreConfig:
         base,
         **{name: replace(getattr(base, name), **fields) for name, fields in groups.items()},
     )
+
+
+def document_config(**fields: Any) -> DocumentConfig:
+    """The service's ``DocumentConfig``, with ``fields`` replaced."""
+    return core_config(document=fields).document

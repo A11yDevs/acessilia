@@ -29,6 +29,7 @@ from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.vision_agent import VisionAgent
+from backend.core.config import DocumentConfig
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,
@@ -268,6 +269,7 @@ async def _enrich_formula_latex(
     source_file: Path,
     *,
     mode: str,
+    document: DocumentConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -374,6 +376,7 @@ async def _enrich_formula_latex(
         slots=asyncio.Semaphore(max(1, settings.vision_concurrency)),
         total=len(formulas),
         recognize_provider=recognize_provider,
+        agreement_min=document.formula_text_agreement_min,
         on_progress=on_progress,
     )
 
@@ -413,6 +416,7 @@ class _FormulaEnrichment:
         slots: asyncio.Semaphore,
         total: int,
         recognize_provider: str,
+        agreement_min: float,
         on_progress: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self.manifest = manifest
@@ -424,6 +428,7 @@ class _FormulaEnrichment:
         self.slots = slots
         self.total = total
         self.recognize_provider = recognize_provider
+        self.agreement_min = agreement_min
         self.on_progress = on_progress
         self.total_pages = len(manifest.pages)
         self.artifact_id = _source_artifact_id(manifest)
@@ -464,7 +469,7 @@ class _FormulaEnrichment:
                 return False
 
             original_text = element.text or ""
-            gate = _TextLayerGate(normalize_latex(original_text))
+            gate = _TextLayerGate(normalize_latex(original_text), self.agreement_min)
 
             method = "math.recognize"
             candidates = await self.recognizer.recognize(image_bytes)
@@ -565,8 +570,9 @@ class _TextLayerGate:
     accepted reading.
     """
 
-    def __init__(self, text_layer: str) -> None:
+    def __init__(self, text_layer: str, agreement_min: float) -> None:
         self.text_layer = text_layer
+        self.agreement_min = agreement_min
         self.rejected: dict[str, float | None] = {}
         self.agreement: float | None = None
 
@@ -577,13 +583,11 @@ class _TextLayerGate:
         there is no evidence the recognition read the same formula, so it is
         refused like a disagreement.
         """
-        from backend.config.settings import settings
-
         if not latex or not self.text_layer:
             return latex
         expression, _ = split_equation_number(latex)
         score = latex_text_agreement(expression, self.text_layer)
-        if score is None or score < settings.formula_text_agreement_min:
+        if score is None or score < self.agreement_min:
             self.rejected[method] = None if score is None else round(score, 3)
             return ""
         self.agreement = round(score, 3)

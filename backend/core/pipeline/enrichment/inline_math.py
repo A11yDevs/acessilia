@@ -30,6 +30,7 @@ from docstruct.text.negation_overlay import (
     is_detached_overlay,
 )
 
+from backend.core.config import DocumentConfig
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -86,11 +87,9 @@ class _TextSpanReader:
         return self._pages
 
 
-def _inline_math_enabled(manifest: ProcessingManifest) -> bool:
-    from backend.config.settings import settings
-
+def _inline_math_enabled(manifest: ProcessingManifest, document: DocumentConfig) -> bool:
     return (
-        settings.inline_math_detection == "fonts"
+        document.inline_math_detection == "fonts"
         and manifest.source.media_type == "application/pdf"
     )
 
@@ -109,6 +108,7 @@ def _boxed_pages(elements: Iterable[ManifestElement]) -> list[int]:
 async def _mark_inline_math(
     manifest: ProcessingManifest,
     source_path: Path,
+    document: DocumentConfig,
     text_spans: _TextSpanReader | None = None,
 ) -> dict[str, int]:
     """Write the inline math of PDF prose as ``$…$``, from the text layer's fonts (#265).
@@ -129,7 +129,7 @@ async def _mark_inline_math(
     and when the Toolbox cannot read the spans.
     """
     counts = {"elements": 0, "marked": 0, "unmatched": 0}
-    if not _inline_math_enabled(manifest):
+    if not _inline_math_enabled(manifest, document):
         return counts
     candidates = [
         element
@@ -175,6 +175,7 @@ async def _mark_inline_math(
 async def _mark_table_inline_math(
     manifest: ProcessingManifest,
     source_path: Path,
+    document: DocumentConfig,
     text_spans: _TextSpanReader | None = None,
 ) -> dict[str, int]:
     """Write the inline math of PDF table cells as ``$…$`` (#260).
@@ -187,7 +188,7 @@ async def _mark_table_inline_math(
     Returns ``{elements, marked, unmatched}``, skipping as the prose step does.
     """
     counts = {"elements": 0, "marked": 0, "unmatched": 0}
-    if not _inline_math_enabled(manifest):
+    if not _inline_math_enabled(manifest, document):
         return counts
     tables = [
         element

@@ -203,6 +203,7 @@ def build_processing_manifest(
     presentation: bool = False,
     slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
     slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
+    legacy_unicode_repair: str = "off",
 ) -> ProcessingManifest:
     """Builds the processing manifest from the Toolbox structural extraction.
 
@@ -231,6 +232,7 @@ def build_processing_manifest(
         presentation=presentation,
         slide_visual_coverage=slide_visual_coverage,
         slide_fold_figure_labels=slide_fold_figure_labels,
+        legacy_unicode_repair=legacy_unicode_repair,
     )
 
 
@@ -264,6 +266,7 @@ def _build_from_toolbox_json(
     presentation: bool = False,
     slide_visual_coverage: float = DEFAULT_VISUAL_COVERAGE,
     slide_fold_figure_labels: bool = DEFAULT_FOLD_FIGURE_LABELS,
+    legacy_unicode_repair: str = "off",
 ) -> ProcessingManifest:
     """Build a ProcessingManifest from a pre-built Toolbox JSON response.
 
@@ -355,6 +358,7 @@ def _build_from_toolbox_json(
         },
         fusion_evidence=extraction.document.get("fusion_evidence"),
         fusion_stats=extraction.document.get("fusion_stats"),
+        legacy_unicode_repair=legacy_unicode_repair,
         secondary_extraction_available=secondary_extraction_readable,
     )
     observations.extend(v23_observations)
@@ -658,14 +662,14 @@ def _derive_v23_processing_needs(
     fusion_evidence: Any = None,
     fusion_stats: Any = None,
     fusion_judge_max_pages: int | None = None,
-    legacy_unicode_repair: str | None = None,
+    legacy_unicode_repair: str = "off",
     secondary_extraction_available: bool = False,
 ) -> tuple[list[Observation], list[Obligation]]:
     """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
 
     ``fusion_judge_max_pages`` caps how many pages get the VLM judge
     (FUSION_JUDGE_MAX_PAGES when None). ``legacy_unicode_repair`` is
-    ``off``/``detect``/``repair`` (LEGACY_UNICODE_REPAIR when None); only
+    ``off``/``detect``/``repair``, the run's ``DocumentConfig`` value; only
     ``repair`` emits the obligation, while ``detect`` keeps the observation.
     ``skeleton-order`` is admissible only when the secondary extraction file
     the extractor recorded for this document can be read.
@@ -709,10 +713,6 @@ def _derive_v23_processing_needs(
             if normalized != text:
                 add("normalize-text", [element], {"before": text, "after": normalized})
 
-    if legacy_unicode_repair is None:
-        from backend.config.settings import settings
-
-        legacy_unicode_repair = settings.legacy_unicode_repair
     unicode_mode = str(legacy_unicode_repair or "off").strip().lower()
     if unicode_mode not in {"off", "detect", "repair"}:
         unicode_mode = "off"
