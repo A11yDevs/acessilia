@@ -2,10 +2,11 @@
 
 The transport, the capability registry, the per-capability clients and the
 client factory live in the SDK (``libs/sdk``, package ``acessilia_sdk``). This
-module only maps the core's ``settings`` onto the SDK's
+module maps the core's ``settings`` onto the SDK's
 :class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
-(:func:`toolbox_client_config`, constitution 3.2), and keeps the names other
-modules import from here.
+(:func:`toolbox_client_config`, constitution 3.2), states the endpoint rule
+both the clients and the planning gate follow (:func:`endpoints_from`), and
+keeps the names other modules import from here.
 """
 
 from __future__ import annotations
@@ -38,20 +39,26 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox import clients as _sdk_clients
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from backend.config.settings import settings
+from backend.core.config import ToolboxConfig
 from backend.core.logger import logger
 
 
 ClientT = TypeVar("ClientT", bound=ToolboxCapabilityClient)
 
 
-def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
-    """The Toolbox endpoints configured for the capability clients.
+def endpoints_from(base_urls: str, base_url: str) -> tuple[ToolboxEndpoint, ...]:
+    """The Toolbox endpoints, in the order they are tried.
 
-    ``TOOLBOX_BASE_URLS`` lists independent deployments, tried in order;
-    without it, ``TOOLBOX_BASE_URL`` is the only endpoint (docs/adr/0006).
+    ``base_urls`` (``TOOLBOX_BASE_URLS``) lists independent deployments;
+    without it, ``base_url`` (``TOOLBOX_BASE_URL``) is the only endpoint
+    (docs/adr/0006). Raises ``ValueError`` for a URL the SDK cannot use.
     """
-    base_urls = settings.toolbox_base_urls.strip()
-    return parse_endpoints(base_urls or settings.toolbox_base_url)
+    return parse_endpoints(base_urls.strip() or base_url)
+
+
+def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
+    """The Toolbox endpoints configured for the capability clients (:func:`endpoints_from`)."""
+    return endpoints_from(settings.toolbox_base_urls, settings.toolbox_base_url)
 
 
 def toolbox_vlm_endpoint() -> ToolboxEndpoint:
@@ -104,6 +111,48 @@ def toolbox_client_config() -> ToolboxClientConfig:
     )
 
 
+#: ``ToolboxConfig`` fields the Toolbox clients and handlers still read from
+#: ``settings`` (ADR-0016, step 3, toolbox PRs 2 and 3). The planning gate
+#: reads the run's config; a run whose config differs from the settings here
+#: would be admitted by the gate for a deployment, key or provider its calls
+#: do not use. Each toolbox PR removes the fields it moves, and the last one
+#: removes this check.
+TOOLBOX_FIELDS_STILL_IN_SETTINGS = (
+    "base_url",
+    "base_urls",
+    "api_key",
+    "timeout_seconds",
+    "retries",
+    "retry_backoff_seconds",
+    "extraction_timeout_seconds",
+    "providers",
+    "timeouts",
+    "use_remote_cache",
+    "use_artifact_store",
+    "media_inspect_enabled",
+    "pdf_validate_enabled",
+)
+
+
+def refuse_toolbox_unlike_the_clients(toolbox: ToolboxConfig, clients: ToolboxConfig) -> None:
+    """Refuse a run's ``toolbox`` that the clients would not follow.
+
+    ``clients`` is the ``ToolboxConfig`` built from the settings the clients
+    still read. Raises ``ValueError`` naming the fields that differ.
+    """
+    differ = [
+        name
+        for name in TOOLBOX_FIELDS_STILL_IN_SETTINGS
+        if getattr(toolbox, name) != getattr(clients, name)
+    ]
+    if differ:
+        raise ValueError(
+            "The run's ToolboxConfig differs from the settings the Toolbox clients "
+            f"still read, in {', '.join(differ)}; until ADR-0016's toolbox group is "
+            "moved, pass these through the settings."
+        )
+
+
 def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
     """Build an SDK capability client configured from the core's ``settings``.
 
@@ -135,8 +184,10 @@ __all__ = [
     "ToolboxUnavailable",
     "ToolboxUnsupportedMediaType",
     "auth_headers",
+    "endpoints_from",
     "execute_capability",
     "make_toolbox_client",
+    "refuse_toolbox_unlike_the_clients",
     "require_capability",
     "toolbox_client_config",
     "toolbox_endpoints",

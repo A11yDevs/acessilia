@@ -266,9 +266,18 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
   canônicos, pode participar como provider em `extract_fused()`.
 - **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
   método de planejamento chama a capacidade, declare-a em
-  `METHOD_TOOLBOX_REQUIREMENTS` (capacidade e provider). O gate de disponibilidade
-  passa a conferi-la contra o catálogo vivo antes de cada documento ser planejado
-  (veja abaixo).
+  `METHOD_TOOLBOX_REQUIREMENTS`. Cada entrada é uma função do `CoreConfig` da
+  execução que devolve os requisitos (capacidade e provider), para que o provider
+  conferido seja o que a execução chama:
+
+  ```python
+  "meu-metodo": lambda config: [
+      Requirement("minha.capacidade", config.toolbox.providers["toolbox_meu_provider"]),
+  ],
+  ```
+
+  O gate de disponibilidade passa a conferi-la contra o catálogo vivo antes de
+  cada documento ser planejado (veja abaixo).
 
 #### Gate de disponibilidade
 

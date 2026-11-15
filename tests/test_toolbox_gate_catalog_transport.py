@@ -1,7 +1,8 @@
 """How the availability gate reads the Toolbox catalogue (#402, step 3).
 
 The catalogue is read from the capability clients' primary endpoint: the first
-of ``TOOLBOX_BASE_URLS``, else ``TOOLBOX_BASE_URL``, with the core's API key.
+of ``TOOLBOX_BASE_URLS``, else ``TOOLBOX_BASE_URL``, with the API key of the
+run's ``ToolboxConfig``.
 That is the deployment every capability call goes to first. There is no
 failover for the catalogue: a secondary's snapshot would admit methods that
 execution still sends to the primary (#429). Each read has a 10 s budget per
@@ -11,6 +12,8 @@ never raises out of the gate: the cache records it and the gate reports it as
 """
 
 from __future__ import annotations
+
+from collections import OrderedDict
 
 import json
 from pathlib import Path
@@ -25,6 +28,7 @@ from backend.config.settings import settings
 from backend.core.planning import toolbox_gate
 from backend.core.toolbox import toolbox_client
 from backend.core.toolbox.toolbox_client import make_toolbox_client
+from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
 PRIMARY = "http://toolbox-a.test"
@@ -36,12 +40,24 @@ CONTRACT = json.loads(
 
 @pytest.fixture(autouse=True)
 def catalogue_settings(monkeypatch):
+    """The settings the capability clients read in the end-to-end tests below."""
     monkeypatch.setattr(settings, "toolbox_base_url", PRIMARY)
     monkeypatch.setattr(settings, "toolbox_base_urls", "")
     monkeypatch.setattr(settings, "toolbox_api_key", "core-key")
     monkeypatch.setattr(settings, "toolbox_timeout_seconds", 3600.0)
     monkeypatch.setattr(settings, "toolbox_retries", 3)
-    monkeypatch.setattr(toolbox_gate, "_cache", None)
+    monkeypatch.setattr(toolbox_gate, "_caches", OrderedDict())
+
+
+def _toolbox(**fields):
+    """A run's Toolbox config: the primary endpoint, the core's key, long client budgets."""
+    return toolbox_config(**({
+        "base_url": PRIMARY,
+        "base_urls": "",
+        "api_key": "core-key",
+        "timeout_seconds": 3600,
+        "retries": 3,
+    } | fields))
 
 
 def _serve(
@@ -77,7 +93,7 @@ def failovers(monkeypatch) -> list[tuple[str, str]]:
 async def test_the_catalogue_is_read_from_toolbox_base_url_with_the_core_key() -> None:
     with respx.mock(assert_all_called=False) as router:
         seen = _serve(router, PRIMARY)
-        snapshot = await toolbox_gate._fetch()
+        snapshot = await toolbox_gate._fetch(_toolbox())
 
     assert snapshot.capabilities
     assert seen
@@ -86,15 +102,24 @@ async def test_the_catalogue_is_read_from_toolbox_base_url_with_the_core_key() -
 
 
 @pytest.mark.asyncio
+async def test_the_catalogue_is_read_with_the_key_of_the_run_config() -> None:
+    with respx.mock(assert_all_called=False) as router:
+        seen = _serve(router, PRIMARY)
+        await toolbox_gate._fetch(_toolbox(api_key="run-key"))
+
+    assert seen
+    assert all(r.headers["Authorization"] == "Bearer run-key" for r in seen)
+
+
+@pytest.mark.asyncio
 async def test_toolbox_base_urls_sets_the_catalogue_endpoint_like_the_clients(
     monkeypatch, failovers
 ) -> None:
     """The clients call the first of TOOLBOX_BASE_URLS; the gate checks that one."""
-    monkeypatch.setattr(settings, "toolbox_base_urls", f"{SECONDARY},{PRIMARY}")
     with respx.mock(assert_all_called=False) as router:
         primary = _serve(router, PRIMARY)
         secondary = _serve(router, SECONDARY)
-        await toolbox_gate._fetch()
+        await toolbox_gate._fetch(_toolbox(base_urls=f"{SECONDARY},{PRIMARY}"))
 
     assert secondary
     assert primary == []
@@ -102,11 +127,10 @@ async def test_toolbox_base_urls_sets_the_catalogue_endpoint_like_the_clients(
 
 
 @pytest.mark.asyncio
-async def test_a_trailing_slash_in_the_url_is_ignored(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "toolbox_base_url", f"{PRIMARY}/")
+async def test_a_trailing_slash_in_the_url_is_ignored() -> None:
     with respx.mock() as router:
         seen = _serve(router, PRIMARY)
-        await toolbox_gate._fetch()
+        await toolbox_gate._fetch(_toolbox(base_url=f"{PRIMARY}/"))
 
     assert [r.url.path for r in seen][:2] == ["/v1/capabilities", "/v1/providers"]
 
@@ -115,7 +139,7 @@ async def test_a_trailing_slash_in_the_url_is_ignored(monkeypatch) -> None:
 async def test_each_request_gets_the_catalogue_budget_not_the_extraction_one() -> None:
     with respx.mock() as router:
         seen = _serve(router, PRIMARY)
-        await toolbox_gate._fetch()
+        await toolbox_gate._fetch(_toolbox())
 
     budgets = {
         key: value
@@ -138,7 +162,7 @@ async def test_a_timeout_is_not_retried() -> None:
     with respx.mock() as router:
         router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=timeout)
         with pytest.raises(ToolboxTimeout):
-            await toolbox_gate._fetch()
+            await toolbox_gate._fetch(_toolbox())
 
     assert calls == 1
 
@@ -151,7 +175,7 @@ async def test_an_unreachable_toolbox_is_a_typed_error() -> None:
     with respx.mock() as router:
         router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=refuse)
         with pytest.raises(ToolboxProviderUnavailable):
-            await toolbox_gate._fetch()
+            await toolbox_gate._fetch(_toolbox())
 
 
 @pytest.mark.asyncio
@@ -159,13 +183,8 @@ async def test_an_unreachable_toolbox_is_a_typed_error() -> None:
     ("url", "urls"),
     [("", ""), ("toolbox-without-scheme", ""), (PRIMARY, "toolbox-without-scheme")],
 )
-async def test_an_unusable_url_is_recorded_by_the_cache_not_raised(
-    monkeypatch, url, urls
-) -> None:
-    monkeypatch.setattr(settings, "toolbox_base_url", url)
-    monkeypatch.setattr(settings, "toolbox_base_urls", urls)
-
-    cache = toolbox_gate.catalog_cache()
+async def test_an_unusable_url_is_recorded_by_the_cache_not_raised(url, urls) -> None:
+    cache = toolbox_gate.catalog_cache(_toolbox(base_url=url, base_urls=urls))
     snapshot = await cache.get()
 
     assert snapshot is None
@@ -174,13 +193,12 @@ async def test_an_unusable_url_is_recorded_by_the_cache_not_raised(
 
 
 @pytest.mark.asyncio
-async def test_the_catalogue_never_fails_over_to_a_secondary(monkeypatch, failovers) -> None:
-    monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
+async def test_the_catalogue_never_fails_over_to_a_secondary(failovers) -> None:
     with respx.mock(assert_all_called=False) as router:
         router.get(f"{PRIMARY}/v1/capabilities").mock(side_effect=httpx.ReadTimeout("slow"))
         secondary = _serve(router, SECONDARY)
         with pytest.raises(ToolboxTimeout):
-            await toolbox_gate._fetch()
+            await toolbox_gate._fetch(_toolbox(base_urls=f"{PRIMARY},{SECONDARY}"))
 
     assert secondary == []
     assert failovers == []
@@ -229,7 +247,7 @@ async def test_a_bad_port_is_a_catalogue_error_not_a_traceback(
     monkeypatch.setattr(settings, "toolbox_availability_gate", "enforce")
     monkeypatch.setattr(settings, "toolbox_provider", "docling")
 
-    decision = await toolbox_gate.decide(_single_provider_manifest())
+    decision = await toolbox_gate.decide(_single_provider_manifest(), core_config())
 
     assert decision.catalog_error is not None
     assert decision.catalog_error.startswith("ToolboxProviderUnavailable: ")
@@ -252,7 +270,7 @@ async def test_an_unreadable_primary_catalogue_blocks_what_would_run_there(
         execute_on_primary = router.post(f"{PRIMARY}{EXTRACT_ON}").mock(
             return_value=httpx.Response(400, json={"detail": "unsupported provider"})
         )
-        decision = await toolbox_gate.decide(_single_provider_manifest())
+        decision = await toolbox_gate.decide(_single_provider_manifest(), core_config())
 
     assert "single-provider" in decision.blocked
     assert decision.catalog_error is not None
@@ -272,7 +290,7 @@ async def test_an_admitted_method_executes_on_the_deployment_that_was_checked(
             return_value=httpx.Response(400, json={"detail": "rejected"})
         )
         execute_on_secondary = router.post(f"{SECONDARY}{EXTRACT_ON}")
-        decision = await toolbox_gate.decide(_single_provider_manifest())
+        decision = await toolbox_gate.decide(_single_provider_manifest(), core_config())
         with pytest.raises(ToolboxCapabilityError):
             await _extract(tmp_path)
 

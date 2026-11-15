@@ -152,7 +152,7 @@ def test_the_obligation_is_critical():
 
 
 def test_the_method_requires_pdf_render_on_the_toolbox():
-    [requirement] = toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS["vision-page-inspection"]()
+    [requirement] = toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS["vision-page-inspection"](core_config())
     assert requirement.capability_id == "pdf.render"
 
 

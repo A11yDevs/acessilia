@@ -231,10 +231,14 @@ Proposta: a opção 2.
      worker captura uma vez por job e passa aos exportadores, o grupo
      `fusion` e o grupo `vision` (a concorrência das etapas, o limiar do
      disjuntor, a espera da nova tentativa, a revisão de tabelas e o cache
-     de regiões, além do DPI da inspeção de páginas). Os handlers de método
-     que leem a config declaram um parâmetro `config` (o handler de fusão e
-     os de inspeção de região e de página), e cada execução vincula a sua
-     config a eles (`bind_config`) numa cópia do registro.
+     de regiões, além do DPI da inspeção de páginas). O grupo `toolbox`
+     passa em três pull requests: o gate de planejamento e o seu catálogo
+     (feito; o cache do catálogo é compartilhado pelas execuções com o mesmo
+     endpoint, chave e tempos), depois as chaves de ativação e as opções do
+     extrator, depois a fábrica de clientes e quem a chama. Os handlers de
+     método que leem a config declaram um parâmetro `config` (o handler de
+     fusão e os de inspeção de região e de página), e cada execução vincula
+     a sua config a eles (`bind_config`) numa cópia do registro.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:

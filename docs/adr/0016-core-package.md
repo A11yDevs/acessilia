@@ -227,7 +227,11 @@ Proposed: option 2.
      threshold), the `export` group, which the worker snapshots once per
      job and passes to the exporters, the `fusion` group, and the `vision`
      group (the stages' concurrency, breaker threshold, retry delay, table
-     review and region cache, and the page inspection's DPI). The method
+     review and region cache, and the page inspection's DPI). The `toolbox`
+     group moves in three pull requests: the planning gate and its
+     catalogue (done; the catalogue cache is shared by runs with the same
+     endpoint, key and timings), then the switches and the extractor's
+     options, then the client factory and its callers. The method
      handlers that read the config declare a `config` parameter (the fusion
      handler and the region and page inspection handlers), and each run
      binds its config to them (`bind_config`) on a copy of the registry.
