@@ -652,9 +652,11 @@ def test_the_run_config_parameters_are_required(function, parameter) -> None:
     ],
 )
 def test_the_internal_run_parameters_have_no_default(function, parameter) -> None:
-    """Positional in these internal helpers, but never defaulted: the run's
-    ``ToolboxConfig``, and the inline math steps' reader, which they no longer
-    build themselves.
+    """Positional in these helpers, but never defaulted: the run's
+    ``ToolboxConfig`` (the client factory, the endpoints, the render and
+    fusion clients, the math enricher), its ``ModelConfig`` (the model
+    factory, ``active_model_name``) and the inline math steps' reader, which
+    they no longer build themselves.
     """
     import importlib
     import inspect
@@ -665,3 +667,83 @@ def test_the_internal_run_parameters_have_no_default(function, parameter) -> Non
         target = getattr(target, part)
 
     assert inspect.signature(target).parameters[parameter].default is inspect.Parameter.empty
+
+
+#: Functions whose run configuration is required, by the name callers use.
+#: Every call to them outside the tests, in the core, the service, the
+#: frontends and the scripts, must bind to the signature (review of #555:
+#: the AgentOS runtime in ``frontend/`` kept the old call).
+CALLERS_CHECKED = {
+    "get_agno_model": "backend.core.agents.ai_client:get_agno_model",
+    "active_model_name": "backend.core.agents.ai_client:active_model_name",
+    "make_toolbox_client": "backend.core.toolbox.toolbox_client:make_toolbox_client",
+    "toolbox_client_config": "backend.core.toolbox.toolbox_client:toolbox_client_config",
+    "toolbox_endpoints": "backend.core.toolbox.toolbox_client:toolbox_endpoints",
+    "toolbox_vlm_endpoint": "backend.core.toolbox.toolbox_client:toolbox_vlm_endpoint",
+    "VisionAgent": "backend.core.agents.vision_agent:VisionAgent",
+    "DataAgent": "backend.core.agents.data_agent:DataAgent",
+    "extract_fused": "backend.core.pipeline.fusion:extract_fused",
+    "inspect_source_media": "backend.core.toolbox.media_inspect:inspect_source_media",
+    "audit_pdf_ua": "backend.core.toolbox.pdf_ua_audit:audit_pdf_ua",
+    "fetch_text_spans": "backend.core.toolbox.text_spans:fetch_text_spans",
+    "export_docx": "backend.core.export.exporters.docx_exporter:export_docx",
+    "export_pdf_ua": "backend.core.export.exporters.pdf_exporter:export_pdf_ua",
+}
+
+CALLER_ROOTS = ("backend", "frontend", "scripts")
+
+
+def _resolve(target: str):
+    import importlib
+
+    module_name, qualname = target.split(":")
+    value = importlib.import_module(module_name)
+    for part in qualname.split("."):
+        value = getattr(value, part)
+    return value
+
+
+def test_every_caller_passes_the_run_configuration() -> None:
+    """Each call binds to the signature: no required config is left out."""
+    import inspect
+
+    signatures = {name: inspect.signature(_resolve(target)) for name, target in CALLERS_CHECKED.items()}
+    unbound = []
+    for root in CALLER_ROOTS:
+        for path in sorted((ROOT / root).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else (
+                    func.attr if isinstance(func, ast.Attribute) else None
+                )
+                if name not in signatures:
+                    continue
+                if any(isinstance(arg, ast.Starred) for arg in node.args) or any(
+                    keyword.arg is None for keyword in node.keywords
+                ):
+                    continue  # a splat: the scan cannot count what it passes
+                try:
+                    signatures[name].bind(
+                        *node.args, **{keyword.arg: keyword.value for keyword in node.keywords}
+                    )
+                except TypeError as error:
+                    rel = path.relative_to(ROOT).as_posix()
+                    unbound.append(f"{rel}:{node.lineno} {name}: {error}")
+
+    assert not unbound, "calls that leave out a required argument:\n" + "\n".join(unbound)
+
+
+def test_the_caller_scan_sees_a_call_that_leaves_out_the_config() -> None:
+    import inspect
+
+    signature = inspect.signature(_resolve(CALLERS_CHECKED["get_agno_model"]))
+    [call] = [
+        node for node in ast.walk(ast.parse("get_agno_model(timeout_seconds=5)"))
+        if isinstance(node, ast.Call)
+    ]
+
+    with pytest.raises(TypeError):
+        signature.bind(*call.args, **{k.arg: k.value for k in call.keywords})
