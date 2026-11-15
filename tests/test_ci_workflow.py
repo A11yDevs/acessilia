@@ -61,16 +61,21 @@ def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
 
 
 def test_docstruct_runs_alone_from_its_wheel() -> None:
-    """docstruct installs and passes on the standard library alone (#470, phase 2)."""
+    """docstruct installs from its wheel and its own lock, on the standard library alone."""
     job = _workflow()["jobs"]["docstruct-isolated"]
     steps = {step.get("name"): step for step in job["steps"]}
 
     assert job["name"] == "docstruct alone (Python 3.11)"
-    install = steps["Install docstruct alone"]["run"]
-    assert '"./libs/docstruct[dev]"' in install
+    install = steps["Install docstruct alone from its lock"]["run"]
+    assert "uv lock --check --project libs/docstruct" in install
+    assert (
+        "uv sync --locked --extra dev --project libs/docstruct --no-editable" in install
+    )
     assert "libs/sdk" not in install and '".[dev]"' not in install
     check = steps["Check that no other project package or accelerator is importable"]
     assert check["working-directory"] == "libs/docstruct"
+    assert "uv run --locked --extra dev --no-editable" in check["run"]
+    assert '--project "$GITHUB_WORKSPACE/libs/docstruct"' in check["run"]
     for name in ("backend", "acessilia_sdk", "acessilia_toolbox", "rapidfuzz"):
         assert f'"{name}"' in check["run"]
     assert "site-packages" in check["run"]
@@ -85,14 +90,47 @@ def test_sdk_runs_alone_with_docstruct_only() -> None:
     job = _workflow()["jobs"]["sdk-isolated"]
     steps = {step.get("name"): step for step in job["steps"]}
 
-    install = steps["Install the SDK alone"]["run"]
-    assert install.index("./libs/docstruct ") < install.index('"./libs/sdk[dev]"')
+    install = steps["Install the SDK alone from its lock"]["run"]
+    assert "uv lock --check --project libs/sdk" in install
+    assert "uv sync --locked --extra dev --project libs/sdk --no-editable" in install
     assert '".[dev]"' not in install
     check = steps["Check that the core is not importable"]["run"]
+    assert '"$GITHUB_WORKSPACE/libs/sdk"' in check
     for name in ("backend", "acessilia_toolbox", "agno", "fastapi"):
         assert f'"{name}"' in check
     assert '"docstruct"' not in check
     assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
+
+
+def test_ci_installs_the_root_environment_from_the_lock() -> None:
+    """The CI gate is the root uv.lock environment (#405)."""
+    job = _workflow()["jobs"]["tests"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    uv = steps["Set up uv"]
+    assert uv["uses"].startswith("astral-sh/setup-uv@")
+    assert uv["with"]["version"] == "0.11.17"
+
+    cache = steps["Restore uv cache"]
+    assert cache["with"]["path"] == "~/.cache/uv"
+    assert "hashFiles('uv.lock')" in cache["with"]["key"]
+
+    install = steps["Check the lock and install from it"]["run"]
+    assert "uv lock --check" in install
+    assert "uv sync --locked --extra dev" in install
+
+    for name in (
+        "Run complete test suite",
+        "Run docstruct library test suite",
+        "Run SDK library test suite",
+    ):
+        assert "uv run --locked" in steps[name]["run"]
+    for name in ("Run docstruct library test suite", "Run SDK library test suite"):
+        assert '--project "$GITHUB_WORKSPACE"' in steps[name]["run"]
+
+    assert not any(
+        "pip install" in (step.get("run") or "") for step in job["steps"]
+    )
 
 
 def test_ruleset_templates_require_the_full_gate() -> None:
@@ -107,6 +145,19 @@ def test_ruleset_templates_require_the_full_gate() -> None:
         )
         assert {check["context"] for check in checks} == expected
         assert {check.get("integration_id") for check in checks} == {15368}
+
+
+def test_scheduled_workflow_installs_from_the_lock() -> None:
+    """The weekly monitor runs the same root environment as the gate (#405)."""
+    workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
+    for name in ("monitor", "e2e"):
+        runs = [step.get("run", "") for step in workflow["jobs"][name]["steps"]]
+        assert not any("pip install" in run for run in runs)
+        assert any(
+            "uv lock --check" in run and "uv sync --locked --extra dev" in run
+            for run in runs
+        )
+        assert all("uv run --locked" in run for run in runs if "pytest" in run)
 
 
 def test_scheduled_workflow_runs_serial_and_parallel() -> None:
@@ -252,3 +303,31 @@ def test_docstruct_pin_is_reported_in_pull_requests_and_enforced_on_schedule() -
     assert "--report-only" not in strict["run"]
     assert strict["if"] == "always()"
     assert strict["env"]["TARGET_BRANCH"] == "${{ matrix.ref }}"
+
+
+def test_the_security_audit_pins_uv_and_checks_the_lock() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/security.yml").read_text(encoding="utf-8")
+    )
+    steps = {
+        step.get("name"): step
+        for step in workflow["jobs"]["dependency-audit"]["steps"]
+    }
+    uv = steps["Set up uv"]
+    assert uv["uses"].startswith("astral-sh/setup-uv@")
+    assert uv["with"]["version"] == "0.11.17"
+    assert "uv lock --check" in steps["Check the lock is current"]["run"]
+    assert "uv export --locked" in steps["Export locked dependencies"]["run"]
+
+
+def test_the_image_scan_reads_the_recorded_exception() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/security.yml").read_text(encoding="utf-8")
+    )
+    scans = [
+        step
+        for step in workflow["jobs"]["container-scan"]["steps"]
+        if step.get("uses", "").startswith("aquasecurity/trivy-action@")
+    ]
+    assert len(scans) == 2
+    assert all(step["with"]["trivyignores"] == ".trivyignore" for step in scans)

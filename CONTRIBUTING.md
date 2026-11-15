@@ -224,6 +224,9 @@ repository. They follow the layering described in
   package.
 - **Run their own suites**, which CI also runs:
   `cd libs/docstruct && uv run --extra dev pytest` and `cd libs/sdk && uv run --extra dev pytest`.
+  Those commands use each library's own lock, for building and testing it on
+  its own; the application gate runs all three suites in the root environment
+  from the root `uv.lock` (section “Continuous integration”).
 - **Keep the READMEs in both languages.** `tests/test_docstruct_readme_sync.py`
   checks the docstruct pair.
 - **docstruct is published for other repositories.** A change the Toolbox
@@ -375,10 +378,11 @@ rm .github/rulesets/main.json
 ## Environment setup
 
 ```bash
-# Clone and install dependencies
+# Clone and install the versions in uv.lock (CI and the image use the same lock)
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
-uv sync --extra dev   # uses the Python 3.11 pinned in .python-version
+uv lock --check                    # fails when pyproject.toml needs a new lock
+uv sync --locked --extra dev       # uses the Python 3.11 pinned in .python-version
 
 # Configure environment variables
 cp .env.example .env
@@ -386,6 +390,13 @@ cp .env.example .env
 # Run the tests to check that everything is OK
 make test-all
 ```
+
+`uv.lock` is the single source of dependency versions for developers, CI and
+the image. CI runs `uv lock --check` and `uv sync --locked --extra dev`; the
+image runs `uv sync --locked --no-dev --no-editable` in a build stage, so it
+carries the same runtime versions without the test tools. A dependency change
+in `pyproject.toml` must arrive with its `uv.lock` in the same pull request, or
+CI fails; `uv lock` updates it.
 
 ## Issue triage
 
@@ -434,7 +445,7 @@ During a refactoring cycle, `is:open -type:Feature` shows the cycle's backlog, a
 
 The CI/CD pipeline is defined by three workflows:
 
-- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, runs the core, docstruct and SDK test suites on Python 3.11 and rejects unexpected skipped tests.
+- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the core, docstruct and SDK test suites on Python 3.11 and rejects unexpected skipped tests.
 - **`.github/workflows/delivery.yml`** — after CI passes on a push, builds the image, runs a health smoke test and a size guardrail, and publishes it to GHCR.
 - **`.github/workflows/release.yml`** — when a maintainer creates a `v*` tag, builds, publishes and creates the GitHub Release.
 

@@ -63,18 +63,32 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install the SDK alone
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-sdk-${{ hashFiles('libs/sdk/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-sdk-
+
+      - name: Install the SDK alone from its lock
         run: |
-          python -m pip install --upgrade pip
           # The SDK's only project dependency (ADR-0017): its operations
           # compose Toolbox capabilities with docstruct's algorithms.
-          python -m pip install ./libs/docstruct --no-cache-dir
-          python -m pip install "./libs/sdk[dev]" --no-cache-dir
+          # --locked keeps this extra check reproducible from its own lock, and
+          # --no-editable installs the wheel users install.
+          uv lock --check --project libs/sdk
+          uv sync --locked --extra dev --project libs/sdk --no-editable
 
       - name: Check that the core is not importable
         working-directory: libs/sdk
         run: |
-          python - <<'PY'
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/sdk" python - <<'PY'
           import importlib.util
 
           present = [
@@ -89,15 +103,16 @@ jobs:
 
       - name: Run the SDK test suite
         working-directory: libs/sdk
-        run: python -m pytest -rs --junitxml=sdk-isolated-results.xml
+        run: uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/sdk" python -m pytest -rs --junitxml=sdk-isolated-results.xml
 
       - name: Run the command line
         working-directory: libs/sdk
         run: |
-          python -m acessilia_sdk --help
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/sdk" python -m acessilia_sdk --help
           # Nothing listens on port 9: a typed transport error and exit status 1.
           status=0
-          python -m acessilia_sdk --endpoint http://127.0.0.1:9 --timeout 2 catalog \
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/sdk" python -m acessilia_sdk \
+            --endpoint http://127.0.0.1:9 --timeout 2 catalog \
             2> "$RUNNER_TEMP/cli-error.txt" || status=$?
           cat "$RUNNER_TEMP/cli-error.txt"
           test "$status" -eq 1
@@ -106,7 +121,7 @@ jobs:
       - name: Reject unexpected skipped tests
         working-directory: libs/sdk
         run: |
-          python - <<'PY'
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/sdk" python - <<'PY'
           from xml.etree import ElementTree
 
           root = ElementTree.parse("sdk-isolated-results.xml").getroot()
@@ -144,15 +159,31 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install docstruct alone
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-docstruct-${{ hashFiles('libs/docstruct/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-docstruct-
+
+      - name: Install docstruct alone from its lock
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install "./libs/docstruct[dev]" --no-cache-dir
+          # The library's own lock builds and tests it on its own; the gate for
+          # the application is the root environment. --no-editable installs the
+          # wheel that is published.
+          uv lock --check --project libs/docstruct
+          uv sync --locked --extra dev --project libs/docstruct --no-editable
 
       - name: Check that no other project package or accelerator is importable
         working-directory: libs/docstruct
         run: |
-          python - <<'PY'
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/docstruct" python - <<'PY'
           import importlib.util
           from pathlib import Path
 
@@ -177,12 +208,12 @@ jobs:
 
       - name: Run the docstruct test suite
         working-directory: libs/docstruct
-        run: python -m pytest -rs --junitxml=docstruct-isolated-results.xml
+        run: uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/docstruct" python -m pytest -rs --junitxml=docstruct-isolated-results.xml
 
       - name: Reject unexpected skipped tests
         working-directory: libs/docstruct
         run: |
-          python - <<'PY'
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/docstruct" python - <<'PY'
           from xml.etree import ElementTree
 
           root = ElementTree.parse("docstruct-isolated-results.xml").getroot()
@@ -217,20 +248,26 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Restore dependency cache
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py3.11-${{ hashFiles('pyproject.toml') }}
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py3.11-${{ hashFiles('uv.lock') }}
           restore-keys: |
-            pip-${{ runner.os }}-py3.11-
+            uv-${{ runner.os }}-py3.11-
 
-      - name: Install project dependencies
+      - name: Check the lock and install from it
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ./libs/docstruct --no-cache-dir
-          python -m pip install "./libs/sdk[dev]" --no-cache-dir
-          python -m pip install ".[dev]" --no-cache-dir
+          # --locked fails when pyproject.toml needs a new lock, so a dependency
+          # change always arrives with its uv.lock. The cache above is only an
+          # optimization: the install still comes from the lock after a hit.
+          uv lock --check
+          uv sync --locked --extra dev
 
       # The SDK registry must match the contract the Toolbox publishes on the
       # branch this code is deployed with (#186): main runs against the
@@ -243,7 +280,7 @@ jobs:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
           # Fails (bash -e) when a release has neither ref: no fallback.
-          TOOLBOX_REF=$(python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
+          TOOLBOX_REF=$(uv run --locked --extra dev python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
           # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
           # curl stays here for --retry, which the script's urllib fetch lacks.
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
@@ -253,7 +290,7 @@ jobs:
             echo "::error::Failed to download the Toolbox contract from ${TOOLBOX_REF} (missing file or network error; see the curl output above)."
             exit 1
           fi
-          python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
+          uv run --locked --extra dev python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
 
       # The Toolbox pins a docstruct release by URL and sha256 (#470, P8). Only
       # the Toolbox can move that pin, so a pull request is not blocked by it:
@@ -261,25 +298,28 @@ jobs:
       - name: Report the Toolbox's docstruct pin
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
-        run: python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
+        run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
 
       # Four workers match the ubuntu-latest four-vCPU runner and keep the
       # slowest test from dominating the tail. The run also collects the suite,
       # so the old standalone `--collect-only` step is redundant.
       - name: Run complete test suite
-        run: python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=test-results.xml
+        run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=test-results.xml
 
+      # The gate is the root environment (#405). A step inside a library points
+      # at that project explicitly, so `uv run` neither selects the library's
+      # own lock nor updates one.
       - name: Run docstruct library test suite
         working-directory: libs/docstruct
-        run: python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
 
       - name: Run SDK library test suite
         working-directory: libs/sdk
-        run: python -m pytest --durations=25 --junitxml=sdk-test-results.xml
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
       - name: Reject unexpected skipped tests
         run: |
-          python - <<'PY'
+          uv run --locked --extra dev python - <<'PY'
           from pathlib import Path
           from xml.etree import ElementTree
 
