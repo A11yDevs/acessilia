@@ -23,13 +23,26 @@ from tests.pddl_support import build_element, build_manifest, install_formula_re
 
 #: Values unlike the service's defaults, so a stage that falls back on them fails.
 VISION = vision_config(
-    concurrency=3, breaker_threshold=4, region_cache_enabled=True, retry_pass_delay_seconds=6
+    concurrency=3,
+    breaker_threshold=4,
+    region_cache_enabled=True,
+    retry_pass_delay_seconds=6,
+    table_visual_review=False,
 )
 
 
 def _record(monkeypatch, stage) -> dict[str, list]:
     """Record what ``stage`` builds from its config: agents, breakers, semaphores, retries."""
     seen: dict[str, list] = {"region_cache": [], "threshold": [], "slots": [], "delay": []}
+    if hasattr(stage, "_tables_to_read"):
+        tables_to_read = stage._tables_to_read
+        seen["visual_review"] = []
+
+        def record_tables(manifest, *, visual_review):
+            seen["visual_review"].append(visual_review)
+            return tables_to_read(manifest, visual_review=visual_review)
+
+        monkeypatch.setattr(stage, "_tables_to_read", record_tables)
 
     class Vision:
         def __init__(self, mode, *, region_cache):
@@ -118,3 +131,4 @@ async def test_the_table_stage_reads_its_vision_config(monkeypatch) -> None:
 
     assert seen["threshold"] == [4]
     assert seen["delay"] == [6]
+    assert seen["visual_review"] == [False]

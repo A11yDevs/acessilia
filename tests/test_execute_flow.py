@@ -86,6 +86,44 @@ async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, t
 
 
 @pytest.mark.asyncio
+async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tmp_path) -> None:
+    """Runs share the stages, not their config: each stage call sees its own run's."""
+    import asyncio
+
+    seen: dict[int, set] = {}
+
+    async def step(manifest, source, *args, vision, **kwargs):
+        await asyncio.sleep(0)  # let the other run interleave
+        seen.setdefault(id(manifest), set()).add(vision)
+
+    async def no_step(*_args, **_kwargs):
+        return None
+
+    async def inspect(path):
+        return None
+
+    for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
+                 "_enrich_formula_latex", "_enrich_table_structures"):
+        monkeypatch.setattr(pddl, name, step)
+    for name in ("_mark_inline_math", "_mark_table_inline_math"):
+        monkeypatch.setattr(pddl, name, no_step)
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
+
+    async def run(threshold):
+        manifest = build_manifest([build_element("h", "heading", text="Title")], [])
+        orchestrator = build_orchestrator(max_replans=1)
+        orchestrator.config = core_config(vision={"breaker_threshold": threshold})
+        orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
+        await orchestrator.execute(tmp_path / f"doc-{threshold}.pdf", tmp_path)
+        return manifest, orchestrator.config.vision
+
+    runs = await asyncio.gather(run(3), run(9))
+
+    for manifest, vision in runs:
+        assert seen[id(manifest)] == {vision}
+
+
+@pytest.mark.asyncio
 async def test_the_progress_messages_come_in_order(monkeypatch, tmp_path) -> None:
     _, _, statuses, _ = await _run(monkeypatch, tmp_path)
 

@@ -1078,6 +1078,27 @@ async def test_an_identical_region_reuses_the_cached_description(monkeypatch, tm
 
 
 @pytest.mark.asyncio
+async def test_an_agent_without_the_region_cache_neither_reads_nor_writes_it(
+    monkeypatch, tmp_path
+) -> None:
+    """``region_cache=False`` asks the model even when an entry is stored, and stores nothing."""
+    from backend.services import cache as cache_module
+
+    vision_module, calls = _scripted_vision_agent(monkeypatch, [VALID_FORMULA] * 3)
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setattr(cache_module, "CACHE_DIR", cache_dir)
+
+    await vision_module.VisionAgent(region_cache=True).describe_region(b"image", "embedded_image")
+    stored = sorted(cache_dir.rglob("*"))
+    await vision_module.VisionAgent(region_cache=False).describe_region(b"image", "embedded_image")
+    await vision_module.VisionAgent(region_cache=False).describe_region(b"other", "embedded_image")
+
+    assert stored
+    assert len(calls) == 3
+    assert sorted(cache_dir.rglob("*")) == stored
+
+
+@pytest.mark.asyncio
 async def test_a_truncated_description_is_not_cached(monkeypatch, tmp_path) -> None:
     from backend.config.settings import settings
     from backend.services import cache as cache_module

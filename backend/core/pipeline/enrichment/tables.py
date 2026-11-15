@@ -172,7 +172,7 @@ def _tables_to_read(
     """The tables to read from their image, and why each misread one is read again.
 
     A table without a usable structure is read. With ``visual_review``
-    (``TABLE_VISUAL_REVIEW``), so is a table read in the wrong shape (rows
+    (``VisionConfig.table_visual_review``), so is a table read in the wrong shape (rows
     collapsed into one, cells doubled): it has structure but not the right
     one, and ``garbled`` maps its id to the reason (``table_garble_reason``).
     """

@@ -325,7 +325,7 @@ async def _enrich_formula_latex(
     ``method`` or ``method#rank`` strings.
 
     Crops are independent, so they run concurrently, bounded by
-    ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
+    ``VisionConfig.concurrency`` for the same reason as the picture descriptions:
     the vision fallback shares that provider budget. An outage is still paid
     once per document: the first ``MathCapabilityUnavailable`` sets a flag the
     remaining formulas read before calling recognition, and the probe itself

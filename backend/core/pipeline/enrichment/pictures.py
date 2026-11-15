@@ -106,7 +106,7 @@ async def _enrich_picture_descriptions(
     total_pages = len(manifest.pages)
 
     # Descriptions are independent, so they run concurrently, bounded by
-    # VISION_CONCURRENCY to stay inside what the model provider accepts (a
+    # ``VisionConfig.concurrency`` to stay inside what the model provider accepts (a
     # rate-limited hosted API, or a local Ollama that queues beyond its own
     # parallelism). The progress callback is serialized separately: two
     # admitted tasks would otherwise interleave the state writes behind it
