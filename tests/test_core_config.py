@@ -206,8 +206,12 @@ SETTINGS_FREE = {
 }
 
 #: Settings of the toolbox group already moved, until the whole group is in
-#: MOVED_GROUPS: the switches and the extractor's options (toolbox PR 2).
+#: MOVED_GROUPS: the planning gate's (toolbox PR 1, #548), then the switches
+#: and the extractor's options (toolbox PR 2).
 MOVED_TOOLBOX_SETTINGS = {
+    "toolbox_availability_gate",
+    "toolbox_catalog_refresh_seconds",
+    "toolbox_catalog_stale_seconds",
     "toolbox_extraction_timeout_seconds",
     "toolbox_media_inspect_enabled",
     "toolbox_pdf_validate_enabled",
@@ -645,3 +649,28 @@ def test_the_run_config_parameters_are_required(function, parameter) -> None:
 
     assert signature.default is inspect.Parameter.empty
     assert signature.kind is inspect.Parameter.KEYWORD_ONLY
+
+
+@pytest.mark.parametrize(
+    ("function", "parameter"),
+    [
+        ("backend.core.pipeline.preflight:_inspect_media", "toolbox"),
+        ("backend.core.pipeline.enrichment.inline_math:_TextSpanReader.__init__", "toolbox"),
+        ("backend.core.pipeline.enrichment.inline_math:_mark_inline_math", "text_spans"),
+        ("backend.core.pipeline.enrichment.inline_math:_mark_table_inline_math", "text_spans"),
+    ],
+)
+def test_the_internal_run_parameters_have_no_default(function, parameter) -> None:
+    """Positional in these internal helpers, but never defaulted: the run's
+    ``ToolboxConfig``, and the inline math steps' reader, which they no longer
+    build themselves.
+    """
+    import importlib
+    import inspect
+
+    module_name, qualname = function.split(":")
+    target = importlib.import_module(module_name)
+    for part in qualname.split("."):
+        target = getattr(target, part)
+
+    assert inspect.signature(target).parameters[parameter].default is inspect.Parameter.empty

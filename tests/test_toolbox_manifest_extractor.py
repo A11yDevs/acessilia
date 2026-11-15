@@ -733,10 +733,16 @@ def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, moc
     assert result.configuration["use_artifact_store"] is False
 
 
+#: A blocked call in the deadline tests: long past their 1 s deadline, but
+#: bounded, so an extraction that ignored its deadline fails the test in
+#: seconds instead of hanging the suite.
+HANG_SECONDS = 5
+
+
 def test_extraction_deadline_bounds_a_blocked_primary(mock_client, monkeypatch):
     """The thread returns at the deadline even while run_blocking waits on it."""
     async def hang(*_args, **_kwargs):
-        await asyncio.Event().wait()
+        await asyncio.sleep(HANG_SECONDS)
 
     mock_client.extract_structure = AsyncMock(side_effect=hang)
     extractor = ToolboxManifestExtractor(client=mock_client)
@@ -752,7 +758,7 @@ def test_extraction_deadline_covers_a_blocked_upload(
     mock_client, mock_artifact_client, monkeypatch
 ):
     async def hang(*_args, **_kwargs):
-        await asyncio.Event().wait()
+        await asyncio.sleep(HANG_SECONDS)
 
     mock_artifact_client.upload = AsyncMock(side_effect=hang)
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
@@ -771,7 +777,7 @@ def test_extraction_deadline_covers_a_blocked_secondary(
     mock_client, monkeypatch
 ):
     async def hang(*_args, **_kwargs):
-        await asyncio.Event().wait()
+        await asyncio.sleep(HANG_SECONDS)
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary = AsyncMock(spec=ToolboxStructureClient)
@@ -914,3 +920,31 @@ def test_cancelling_during_upload_refuses_the_next_operation(
     assert outcomes and isinstance(outcomes[0], RemoteOperationCancelled)
     mock_client.extract_structure.assert_not_awaited()
     operation_registry.clear("task-upload-cancel")
+
+
+def test_two_extractions_at_once_each_use_their_own_toolbox_config(mock_client):
+    """One extractor, two runs in two threads: each call carries its own run's options."""
+    import threading
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    both_started = threading.Barrier(2)
+
+    async def extract_structure(**kwargs):
+        await asyncio.to_thread(both_started.wait, 5)
+        return deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+
+    mock_client.extract_structure = AsyncMock(side_effect=extract_structure)
+    extractor = ToolboxManifestExtractor(client=mock_client)
+
+    def run(use_remote_cache):
+        toolbox = toolbox_config(use_artifact_store=False, use_remote_cache=use_remote_cache)
+        return extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        cached, uncached = pool.map(run, [True, False])
+
+    assert cached.configuration["use_remote_cache"] is True
+    assert uncached.configuration["use_remote_cache"] is False
+    sent = sorted(call.kwargs["use_remote_cache"] for call in mock_client.extract_structure.await_args_list)
+    assert sent == [False, True]
