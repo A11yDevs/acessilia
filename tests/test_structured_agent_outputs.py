@@ -1317,9 +1317,17 @@ async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) 
 
 @pytest.mark.asyncio
 async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> None:
+    import asyncio
+
     from backend.core.agents import data_agent as data_module
 
     captured: dict[str, object] = {}
+    deadlines: list[float] = []
+    wait_for = asyncio.wait_for
+
+    async def capture_deadline(call, *, timeout):
+        deadlines.append(timeout)
+        return await wait_for(call, timeout=timeout)
 
     class FakeAgent:
         def __init__(self, **kwargs):
@@ -1345,6 +1353,7 @@ async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> No
     )
     monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
     monkeypatch.setattr(data_module.asyncio, "to_thread", run_inline)
+    monkeypatch.setattr(data_module.asyncio, "wait_for", capture_deadline)
     monkeypatch.setattr(data_module.settings, "data_agent_max_tokens", 8192)
     monkeypatch.setattr(data_module.settings, "data_agent_timeout_seconds", 3600)
 
@@ -1356,8 +1365,10 @@ async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> No
     assert captured["model_kwargs"] == {
         "max_tokens": 8192,
         "timeout_seconds": 3600,
+        "max_retries": 0,
     }
     assert captured["output_schema"] is DataOutput
+    assert deadlines == [3630]
 
 
 def test_run_content_raises_when_the_run_failed() -> None:

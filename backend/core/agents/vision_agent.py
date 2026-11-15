@@ -35,6 +35,7 @@ from backend.core.agents.prompt_tools import (
     load_system_prompt,
 )
 from backend.core.agents.ai_client import active_model_name, get_agno_model
+from backend.core.agents.model_call_policy import CALL_DEADLINE_GRACE_SECONDS
 from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
 from backend.core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
@@ -92,21 +93,6 @@ RETRY_INSTRUCTION = (
     "Responda com um objeto JSON completo e válido, fechando todas as strings e "
     "chaves. Não repita tokens nem preencha campos com repetições ou espaços."
 )
-
-#: Seconds added to the client's HTTP timeout for the hard deadline around one
-#: model call. That timeout bounds the HTTP exchange, but httpx applies it per
-#: read: a provider (or a proxy in front of it) that trickles bytes keeps
-#: resetting it, and the call outlives the configured bound. This deadline is
-#: what the job actually waits for, so a hung call degrades the region instead
-#: of stalling the pipeline. It sits above the HTTP timeout so an ordinary one
-#: still arrives as the provider's own error.
-#:
-#: An abandoned call is not killed (Python cannot kill a thread): until the
-#: provider resolves it keeps its worker thread, its open connection and its
-#: per-call client, on the default executor shared with ``run_blocking`` and
-#: the DataAgent. Isolating model calls on their own executor is tracked in
-#: issue #276.
-CALL_DEADLINE_GRACE_SECONDS = 30
 
 
 class VisionAgent:
