@@ -13,7 +13,7 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
 from backend.config.settings import settings
-from backend.services import job_checkpoint
+from backend.services import job_checkpoint, shutdown
 from backend.services.job_store import load_record, save_status, pending_records
 from backend.services.blocking import run_blocking
 from backend.core.i18n import t
@@ -216,7 +216,9 @@ def cancel_job_status(task_id: str) -> bool:
             unified_queue.cancel(task_id)
         return accepted
     queued = queued_jobs.get(task_id)
-    if queued is not None and queued.get("status") == "queued":
+    # "processing" here is a job recovery put back in the queue: it has no
+    # in-memory task yet but is still waiting, so it must be cancellable (#407).
+    if queued is not None and queued.get("status") in {"queued", "processing"}:
         from backend.services.queue_service import unified_queue
 
         if not unified_queue.cancel(task_id):
@@ -224,6 +226,7 @@ def cancel_job_status(task_id: str) -> bool:
         queued["status"] = "cancelled"
         queued["etapa_atual"] = t(STAGE_CANCELLED_IN_QUEUE)
         queued["fim"] = time.time()
+        job_checkpoint.clear(task_id)
         return True
     return False
 
@@ -361,6 +364,7 @@ class JobExecutor:
         out_dir: Path | None = None
         result_published = False
         resumed = state_manager.obter(task_id) is not None
+        preserve_for_resume = False
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -610,6 +614,15 @@ class JobExecutor:
             )
 
         except (TaskCancelledError, asyncio.CancelledError):
+            if shutdown.shutting_down():
+                # The queue worker stops the callback on a normal restart. Keep
+                # the durable record, upload and checkpoints so the next startup
+                # resumes the job instead of losing it (#407).
+                preserve_for_resume = True
+                logger.info(
+                    "Job {}: service shutdown; keeping it resumable", task_id
+                )
+                raise
             if result_published:
                 state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
                 return
@@ -660,16 +673,17 @@ class JobExecutor:
                 tempo_segundos=time.time() - started_at,
             )
         finally:
-            await _persist_status(task_id)
-            try:
-                await run_blocking(job_checkpoint.clear, task_id)
-            except Exception as exc:  # noqa: BLE001 - cleanup is best-effort
-                logger.warning("Job {}: checkpoints not cleared: {}", task_id, exc)
-            if job.file_path.exists():
+            if not preserve_for_resume:
+                await _persist_status(task_id)
                 try:
-                    job.file_path.unlink()
-                except OSError:
-                    pass
+                    await run_blocking(job_checkpoint.clear, task_id)
+                except Exception as exc:  # noqa: BLE001 - cleanup is best-effort
+                    logger.warning("Job {}: checkpoints not cleared: {}", task_id, exc)
+                if job.file_path.exists():
+                    try:
+                        job.file_path.unlink()
+                    except OSError:
+                        pass
 
 
 
@@ -766,10 +780,13 @@ async def recover_pending_jobs() -> None:
             tracked = unified_queue.get_position(task_id) or (
                 task_id in unified_queue._active_tasks
             )
+            if tracked:
+                # A previous recovery already put this job back in the queue:
+                # leave its processing status and checkpoints untouched.
+                continue
             if (
                 settings.job_resume_on_restart
                 and job is not None
-                and not tracked
                 and job.file_path.is_file()
                 and job_checkpoint.resumable(task_id)
             ):

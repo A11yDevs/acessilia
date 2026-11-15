@@ -14,7 +14,7 @@ The agents it asks (the vision or the data agent) live in the core, in
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
 
@@ -67,6 +67,7 @@ async def _enrich_table_structures(
     *,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
+    on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     from backend.config.settings import settings
 
@@ -136,16 +137,24 @@ async def _enrich_table_structures(
         _fold_table_reading(element, table_output, page_number, reason, attempt)
         return True
 
+    async def read_and_notify(position: int, element: ManifestElement) -> bool:
+        """Read one table, then let the caller persist its outcome (#407)."""
+        try:
+            return await read_one(position, element)
+        finally:
+            if on_progress is not None:
+                await on_progress()
+
     enriched = 0
     for position, element in enumerate(table_elements, start=1):
-        enriched += await read_one(position, element)
+        enriched += await read_and_notify(position, element)
     enriched += await _retry_failed(
         [
             (position, element)
             for position, element in enumerate(table_elements, start=1)
             if element.metadata.get("table_read_failure") == "model_failed"
         ],
-        read_one,
+        read_and_notify,
         kind="tables",
         breaker=breaker,
     )

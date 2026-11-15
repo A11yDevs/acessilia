@@ -581,7 +581,10 @@ phase, restoring the stage and progress the user saw and skipping the
 confirmation e-mail; a job without one still fails with the stage it was on.
 Operations the core already names keep their `operation_id` in the SQLite
 journal, so a phase that is re-run reaches the Toolbox as the same operation
-and the Toolbox joins it instead of executing the provider again. Checkpoints
-and journal rows are removed when the job ends and swept after seven days
+and the Toolbox joins it instead of executing the provider again. A graceful
+shutdown keeps the job resumable: the API marks the shutdown before stopping the
+queue, so the record, upload, checkpoints and operation ids survive, and a
+recovered job waiting in the queue can still be cancelled. Checkpoints and
+journal rows are removed when the job ends and swept after seven days
 otherwise. ADR-0020 records the decision; `JOB_RESUME_ON_RESTART=false` keeps
 the old behaviour.

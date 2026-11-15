@@ -398,8 +398,10 @@ class PddlAccessibilityOrchestrator:
         from backend.config.settings import settings
 
         breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        progress = _EnrichmentCheckpoint(current_task_id(), manifest).save
         await _classify_formula_regions(
             manifest, source_path, mode=effective_mode, breaker=breaker,
+            on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         await _enrich_picture_descriptions(
@@ -409,6 +411,7 @@ class PddlAccessibilityOrchestrator:
             media_inspection=media_inspection,
             status_callback=status_callback,
             breaker=breaker,
+            on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         text_spans = _TextSpanReader(manifest, source_path)
@@ -420,6 +423,7 @@ class PddlAccessibilityOrchestrator:
             mode=effective_mode,
             status_callback=status_callback,
             breaker=breaker,
+            on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
 
@@ -430,6 +434,7 @@ class PddlAccessibilityOrchestrator:
             file_path.resolve(),
             status_callback=status_callback,
             breaker=breaker,
+            on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         # After the table enrichment, which can replace a table's cells.
@@ -609,6 +614,39 @@ class PddlAccessibilityOrchestrator:
             for method in obligation.admissible_methods
         }
         return sorted(requested - registered)
+
+
+class _EnrichmentCheckpoint:
+    """Coalesced manifest checkpoints during one enrichment stage (#407).
+
+    Each completed object calls :meth:`save`. One write runs at a time and a
+    burst of completions during a write produces one more write with the latest
+    manifest, so every object becomes durable without one full checkpoint per
+    object. The manifest snapshot is taken synchronously before the write is
+    handed to a thread, so concurrent folds never race with serialization.
+    """
+
+    def __init__(self, task_id: str | None, manifest: ProcessingManifest) -> None:
+        self._task_id = task_id
+        self._manifest = manifest
+        self._lock = asyncio.Lock()
+        self._pending = 0
+
+    async def save(self) -> None:
+        if self._task_id is None:
+            return
+        self._pending += 1
+        if self._lock.locked():
+            # The running writer sees the increment and writes again.
+            return
+        async with self._lock:
+            while self._pending:
+                self._pending = 0
+                await _save_checkpoint(
+                    self._task_id,
+                    job_checkpoint.PHASE_MANIFEST,
+                    {"manifest": _manifest_payload(self._manifest)},
+                )
 
 
 def _manifest_payload(manifest: ProcessingManifest) -> dict[str, Any]:

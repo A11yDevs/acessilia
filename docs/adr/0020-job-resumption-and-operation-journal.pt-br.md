@@ -32,7 +32,7 @@ O core deve gravar um checkpoint JSON por fase do pipeline, em
 | Fase | Gravada quando | Contém |
 |---|---|---|
 | `media` | `media.inspect` respondeu (ou degradou) | a inspeção e sua configuração |
-| `manifest` | a extração estrutural passou pelo limite de páginas, depois após cada etapa de enriquecimento | o manifesto extraído, mantido atualizado conforme o enriquecimento registra progresso |
+| `manifest` | a extração estrutural passou pelo limite de páginas, depois conforme cada objeto de enriquecimento termina | o manifesto extraído, mantido atualizado com os objetos já concluídos |
 | `enriched` | as etapas de enriquecimento terminaram | o manifesto enriquecido |
 | `plan` | um plano foi gerado | o plano, a comparação, o manifesto de origem, a decisão do gate e a contagem de replanejamentos |
 | `execution` | após cada passo do plano | o manifesto em trabalho, os resultados dos passos até ali e `replan_required` |
@@ -60,7 +60,19 @@ deixado em `processing`, deve:
 1. recolocá-lo na fila quando a retomada estiver habilitada
    (`JOB_RESUME_ON_RESTART`), o upload ainda existir e todos os checkpoints
    forem utilizáveis;
-2. em qualquer outro caso, falhá-lo como hoje, com a etapa em que estava.
+2. em qualquer outro caso, falhá-lo como hoje, com a etapa em que estava;
+3. deixar intacto um job que já voltou à fila, para que uma recuperação repetida
+   não o enfileire duas vezes nem invalide seu status e seus checkpoints.
+
+Um job recuperado esperando na fila ainda não tem tarefa em memória. Ele deve
+continuar cancelável: o cancelamento remove sua entrada na fila, o upload e os
+checkpoints, e registra o status terminal como faz para um job apenas na fila.
+
+Um desligamento gracioso não é um cancelamento. A API deve marcar o processo
+como em desligamento antes de parar o worker da fila, e um job interrompido deve
+manter o registro em `processing`, o upload, os checkpoints e os identificadores
+de operação. A inicialização seguinte então o retoma. Apenas um cancelamento
+explícito do usuário limpa esse estado.
 
 Uma execução retomada deve restaurar o progresso durável que o job mostra (etapa,
 progresso, instante de início), não reenviar o e-mail de confirmação e deixar o
@@ -102,10 +114,11 @@ muda esta ADR.
 ## Consequências
 
 - Reiniciar a API durante a extração, o enriquecimento, o planejamento ou a
-  execução do plano continua o documento a partir do último checkpoint. Uma
-  interrupção dentro de uma fase repete só as chamadas inacabadas daquela fase;
-  as etapas de enriquecimento pulam objetos já registrados como completos, e
-  toda operação é idempotente.
+  execução do plano continua o documento a partir do último checkpoint. Um
+  desligamento gracioso mantém o job retomável em vez de marcá-lo como
+  cancelado. Uma interrupção dentro de uma fase repete só as chamadas inacabadas
+  daquela fase; as etapas de enriquecimento persistem cada objeto concluído, de
+  modo que um reinício os pula, e toda operação é idempotente.
 - Um job sem checkpoint utilizável falha exatamente como antes, então a mensagem
   de recuperação e o e-mail de falha continuam funcionando para jobs mortos antes
   do primeiro checkpoint.

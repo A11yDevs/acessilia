@@ -44,6 +44,7 @@ from backend.core.i18n.stage_messages import (
 )
 from backend.services.operation_context import task_context
 from backend.services.operation_registry import operation_registry
+from backend.services import shutdown
 from backend.core.logger import logger
 
 
@@ -281,7 +282,10 @@ async def process(
                 state_manager.verificar_cancelamento(task_id)
                 raise
             finally:
-                operation_registry.clear(task_id)
+                # A graceful shutdown keeps the operation ids so the resumed
+                # call reaches the Toolbox as the same operation (#407).
+                if not shutdown.shutting_down():
+                    operation_registry.clear(task_id)
 
         canonical_metadata: dict[str, Any] | None = None
         technical_warnings: list[str] | None = None

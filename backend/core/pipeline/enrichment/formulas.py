@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any
 
@@ -179,6 +179,7 @@ async def _classify_formula_regions(
     *,
     mode: str,
     breaker: ProviderBreaker,
+    on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     """Check extractor formula labels before a mathematical recognizer sees them.
 
@@ -204,6 +205,7 @@ async def _classify_formula_regions(
         return
     slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
     vision = VisionAgent(mode=mode)
+    progress_lock = asyncio.Lock()
 
     async def classify(element: ManifestElement) -> None:
         async with slots:
@@ -247,9 +249,18 @@ async def _classify_formula_regions(
             if status == "unresolved":
                 _escalate_unresolved_formula(manifest, element)
 
+    async def classify_and_notify(element: ManifestElement) -> None:
+        """Classify one formula, then let the caller persist its outcome (#407)."""
+        try:
+            await classify(element)
+        finally:
+            if on_progress is not None:
+                async with progress_lock:
+                    await on_progress()
+
     async with asyncio.TaskGroup() as group:
         for element in candidates:
-            group.create_task(classify(element))
+            group.create_task(classify_and_notify(element))
 
 
 async def _enrich_formula_latex(
@@ -259,6 +270,7 @@ async def _enrich_formula_latex(
     mode: str,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
+    on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     """Give LaTeX to formulas the extractor delivered without it.
 
@@ -362,6 +374,7 @@ async def _enrich_formula_latex(
         slots=asyncio.Semaphore(max(1, settings.vision_concurrency)),
         total=len(formulas),
         recognize_provider=recognize_provider,
+        on_progress=on_progress,
     )
 
     # The fold touches only its own element and runs without awaits, so
@@ -370,7 +383,7 @@ async def _enrich_formula_latex(
     # picture descriptions; no task keeps mutating the manifest after it failed.
     async with asyncio.TaskGroup() as group:
         tasks = [
-            group.create_task(enrichment.enrich_one(position, element))
+            group.create_task(enrichment.enrich_and_notify(position, element))
             for position, element in enumerate(formulas, start=1)
         ]
     recognized = sum(task.result() for task in tasks)
@@ -400,6 +413,7 @@ class _FormulaEnrichment:
         slots: asyncio.Semaphore,
         total: int,
         recognize_provider: str,
+        on_progress: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self.manifest = manifest
         self.source_file = source_file
@@ -410,12 +424,22 @@ class _FormulaEnrichment:
         self.slots = slots
         self.total = total
         self.recognize_provider = recognize_provider
+        self.on_progress = on_progress
         self.total_pages = len(manifest.pages)
         self.artifact_id = _source_artifact_id(manifest)
         self.progress_lock = asyncio.Lock()
         self.recognizer = _MathRecognizer()
         #: Crops ``math.recognize`` answered without LaTeX, outside an outage.
         self.empty_answers = 0
+
+    async def enrich_and_notify(self, position: int, element: ManifestElement) -> bool:
+        """Recognize one formula, then let the caller persist its outcome (#407)."""
+        try:
+            return await self.enrich_one(position, element)
+        finally:
+            if self.on_progress is not None:
+                async with self.progress_lock:
+                    await self.on_progress()
 
     async def enrich_one(self, position: int, element: ManifestElement) -> bool:
         """Recognize one formula and fold the answer into it; True when filled."""

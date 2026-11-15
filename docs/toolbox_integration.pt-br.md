@@ -590,7 +590,10 @@ restaurando a etapa e o progresso que o usuário via e sem reenviar o e-mail de
 confirmação; um job sem checkpoint ainda falha com a etapa em que estava. As
 operações que o core já nomeia mantêm seu `operation_id` no diário SQLite, de
 modo que uma fase reexecutada chega à Toolbox como a mesma operação e a Toolbox
-se junta a ela em vez de executar o provider de novo. Checkpoints e linhas do
-diário são removidos quando o job termina e varridos após sete dias nos demais
-casos. A ADR-0020 registra a decisão; `JOB_RESUME_ON_RESTART=false` mantém o
-comportamento antigo.
+se junta a ela em vez de executar o provider de novo. Um desligamento gracioso
+mantém o job retomável: a API marca o desligamento antes de parar a fila, de
+modo que o registro, o upload, os checkpoints e os ids de operação sobrevivem, e
+um job recuperado esperando na fila ainda pode ser cancelado. Checkpoints e
+linhas do diário são removidos quando o job termina e varridos após sete dias nos
+demais casos. A ADR-0020 registra a decisão; `JOB_RESUME_ON_RESTART=false`
+mantém o comportamento antigo.

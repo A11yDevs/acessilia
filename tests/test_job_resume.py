@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -319,9 +320,42 @@ async def test_recovery_requeues_a_processing_job_that_has_a_checkpoint(isolated
     assert load_record("resume-task")["status"]["status"] == "processing"
     assert isolated_worker.get_position("resume-task") == 1
 
-    # A second recovery in the same process must not enqueue it twice.
+    # A second recovery in the same process must not enqueue it twice, and it
+    # must leave the already queued job's status and checkpoints alone.
     await recover_pending_jobs()
     assert isolated_worker.qsize() == 1
+    assert load_record("resume-task")["status"]["status"] == "processing"
+    assert job_checkpoint.resumable("resume-task") is True
+
+
+@pytest.mark.asyncio
+async def test_a_recovered_job_can_be_cancelled_while_it_waits(
+    isolated_worker, tmp_path, data_dir
+):
+    from backend.api import worker
+    from backend.api.worker import cancel_job_status, recover_pending_jobs
+    from backend.services.job_store import load_record, save_status
+
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    _save_processing_job("resume-cancel", path)
+    job_checkpoint.save(
+        "resume-cancel", job_checkpoint.PHASE_MEDIA, {"inspection": None, "configuration": {}}
+    )
+
+    await recover_pending_jobs()
+    assert isolated_worker.get_position("resume-cancel") == 1
+
+    assert cancel_job_status("resume-cancel") is True
+    assert isolated_worker.qsize() == 0
+    status = worker.get_job_status("resume-cancel")
+    assert status["status"] == "cancelled"
+    assert status["progresso"] == 0.5  # the restored progress is kept
+    # The endpoint persists the in-memory status after the cancellation.
+    save_status("resume-cancel", status)
+    assert load_record("resume-cancel")["status"]["status"] == "cancelled"
+    assert job_checkpoint.resumable("resume-cancel") is False
+    assert not path.exists()
 
 
 @pytest.mark.asyncio
@@ -535,3 +569,163 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
     assert len(handler_calls) == 2
     assert len(set(handler_calls)) == 2
     assert result["canonical_metadata"]["pddl_execution_status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_a_graceful_shutdown_keeps_the_job_resumable(
+    isolated_worker, monkeypatch, tmp_path
+):
+    """The queue worker stopping on SIGTERM is not a user cancellation."""
+    from dataclasses import asdict
+    from unittest.mock import AsyncMock
+
+    from backend.api import worker
+    from backend.api.worker import ApiJob, JobExecutor
+    from backend.services import shutdown
+    from backend.services.job_store import load_record, save_request
+
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    payload = asdict(ApiJob("shutdown-job", path, "doc.pdf"))
+    payload["file_path"] = str(path)
+    save_request(
+        "shutdown-job",
+        "token",
+        payload,
+        {
+            "task_id": "shutdown-job",
+            "status": "processing",
+            "etapa_atual": "Executing the plan: step 3 of 9...",
+        },
+    )
+    job_checkpoint.save("shutdown-job", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+
+    started = asyncio.Event()
+
+    async def blocked(*_args, **_kwargs):
+        started.set()
+        await asyncio.Future()
+
+    monkeypatch.setattr(worker, "registrar_conversao", AsyncMock())
+    monkeypatch.setattr("backend.service.process", blocked)
+
+    run = asyncio.create_task(
+        JobExecutor().run(
+            ApiJob(task_id="shutdown-job", file_path=path, filename="doc.pdf")
+        )
+    )
+    try:
+        await asyncio.wait_for(started.wait(), 5)
+        shutdown.begin_shutdown()
+        run.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await run
+    finally:
+        shutdown.reset()
+
+    status = load_record("shutdown-job")["status"]
+    assert status["status"] == "processing"
+    assert path.exists()
+    assert job_checkpoint.resumable("shutdown-job") is True
+
+
+@pytest.mark.asyncio
+async def test_a_graceful_shutdown_keeps_the_operation_journal(
+    monkeypatch, tmp_path, data_dir
+):
+    from backend import service
+    from backend.agents.state_manager import state_manager
+    from backend.services import shutdown
+
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(b"%PDF")
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+    operation = OperationRegistry().begin("journal-task", "primary")
+    started = asyncio.Event()
+
+    async def blocked(*_args, **_kwargs):
+        started.set()
+        await asyncio.Future()
+
+    monkeypatch.setattr(service.agente, "execute", blocked)
+    run = asyncio.create_task(service.process(path, task_id="journal-task"))
+    try:
+        await asyncio.wait_for(started.wait(), 5)
+        shutdown.begin_shutdown()
+        run.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await run
+    finally:
+        shutdown.reset()
+
+    assert (
+        OperationRegistry().begin("journal-task", "primary").operation_id
+        == operation.operation_id
+    )
+    OperationRegistry().clear("journal-task")
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+
+@pytest.mark.asyncio
+async def test_a_completed_picture_is_checkpointed_during_the_stage(
+    monkeypatch, data_dir
+):
+    """A picture folded before the stage ends must be durable for a resume."""
+    from backend.core.agents.output_schemas import VisionOutput
+    from backend.core.pipeline.enrichment import pictures as picture_stage
+
+    manifest = build_manifest(
+        [
+            build_element("pic-1", "picture"),
+            build_element("pic-2", "picture", reading_order=2),
+        ],
+        [],
+    )
+    monkeypatch.setattr(settings, "vision_concurrency", 1)
+    monkeypatch.setattr(
+        picture_stage,
+        "_extract_picture_bytes",
+        lambda _source, element, *_a, **_k: (element.id.encode(), 1),
+    )
+    started, release = asyncio.Event(), asyncio.Event()
+
+    class Vision:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            if image_bytes == b"pic-2":
+                started.set()
+                await release.wait()
+            return VisionOutput(
+                kind="description",
+                description="A photo of a building.",
+                language="en",
+                confidence=0.9,
+            )
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
+
+    async def save() -> None:
+        job_checkpoint.save(
+            "pictures",
+            job_checkpoint.PHASE_MANIFEST,
+            {"manifest": manifest.model_dump(mode="json", by_alias=True)},
+        )
+
+    task = asyncio.create_task(
+        picture_stage._enrich_picture_descriptions(
+            manifest, Path("doc.pdf"), mode="medio", on_progress=save
+        )
+    )
+    try:
+        await asyncio.wait_for(started.wait(), 5)
+        saved = job_checkpoint.load("pictures", job_checkpoint.PHASE_MANIFEST)
+        by_id = {element["id"]: element for element in saved["manifest"]["elements"]}
+        assert by_id["pic-1"]["metadata"].get("vision_description_complete") is True
+        assert not by_id["pic-2"]["metadata"].get("vision_description_complete")
+    finally:
+        release.set()
+        await task

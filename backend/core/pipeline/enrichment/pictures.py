@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
 
@@ -91,6 +91,7 @@ async def _enrich_picture_descriptions(
     media_inspection: dict[str, Any] | None = None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
+    on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     from backend.config.settings import settings
 
@@ -115,7 +116,7 @@ async def _enrich_picture_descriptions(
     slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
     progress_lock = asyncio.Lock()
 
-    async def describe_one(position: int, element: ManifestElement) -> bool:
+    async def _describe_one(position: int, element: ManifestElement) -> bool:
         """Describe one picture and fold the answer into it; True when enriched."""
         fallback_page_number = element.page_number
         if fallback_page_number is None and len(manifest.pages) == 1:
@@ -167,6 +168,20 @@ async def _enrich_picture_descriptions(
             _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
             return False
         return _fold_picture_description(manifest, element, vision_output, page_number)
+
+    async def describe_one(position: int, element: ManifestElement) -> bool:
+        """Describe one picture, then let the caller persist its outcome.
+
+        The fold happens synchronously inside ``_describe_one``; the progress
+        callback is serialized on ``progress_lock`` so concurrent descriptions
+        never write the checkpoint at the same time (#407).
+        """
+        try:
+            return await _describe_one(position, element)
+        finally:
+            if on_progress is not None:
+                async with progress_lock:
+                    await on_progress()
 
     # The fold above touches only its own element and runs without awaits, so
     # concurrent folds cannot interleave. The TaskGroup cancels the sibling

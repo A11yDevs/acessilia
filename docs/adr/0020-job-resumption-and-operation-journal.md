@@ -32,7 +32,7 @@ The core must write one JSON checkpoint per pipeline phase, under
 | Phase | Written when | Holds |
 |---|---|---|
 | `media` | `media.inspect` returned (or degraded) | the inspection and its configuration |
-| `manifest` | structural extraction passed the page limit, then after each enrichment step | the extracted manifest, kept current as enrichment records progress |
+| `manifest` | structural extraction passed the page limit, then as each enrichment object completes | the extracted manifest, kept current with the objects already finished |
 | `enriched` | the enrichment steps finished | the enriched manifest |
 | `plan` | a plan was built | the plan, the comparison, the manifest it was built from, the gate decision and the replan count |
 | `execution` | after every plan step | the working manifest, the step results so far and `replan_required` |
@@ -61,7 +61,18 @@ becomes `cancelled`) and for `queued` (the job is enqueued again). For a job lef
 1. re-enqueue the job when resumption is enabled
    (`JOB_RESUME_ON_RESTART`), the upload still exists, and every checkpoint is
    usable;
-2. fail it as today, with the stage it was on, in every other case.
+2. fail it as today, with the stage it was on, in every other case;
+3. leave a job already back in the queue untouched, so a repeated recovery
+   neither enqueues it twice nor invalidates its status and checkpoints.
+
+A recovered job waiting in the queue has no in-memory task yet. It must still be
+cancellable: the cancellation removes its queue entry, upload and checkpoints,
+and records the terminal status as it does for a queue-only job.
+
+A graceful shutdown is not a cancellation. The API must mark the process as
+shutting down before it stops the queue worker, and an interrupted job must keep
+its `processing` record, upload, checkpoints and operation ids. The next startup
+then resumes it. Only an explicit user cancellation clears that state.
 
 A resumed run must restore the durable progress the job shows (stage, progress,
 start time), skip the one-time confirmation e-mail, and let the orchestrator
@@ -101,9 +112,11 @@ Toolbox calls does not change this ADR.
 ## Consequences
 
 - Restarting the API during extraction, enrichment, planning or plan execution
-  continues the document from the last checkpoint. An interruption inside one
-  phase repeats only that phase's unfinished calls; the enrichment steps skip
-  objects already recorded as complete, and every operation is idempotent.
+  continues the document from the last checkpoint. A graceful shutdown keeps the
+  job resumable instead of marking it cancelled. An interruption inside one
+  phase repeats only that phase's unfinished calls; the enrichment steps persist
+  each completed object, so a restart skips them, and every operation is
+  idempotent.
 - A job without a usable checkpoint fails exactly as before, so the recovery
   message and the failure e-mail keep working for jobs killed before the first
   checkpoint.
