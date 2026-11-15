@@ -42,7 +42,7 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
         path.write_bytes(b"audit output")
         return path
 
-    async def audio(text, path, **kwargs):
+    async def audio(text, path, voice, **kwargs):
         return export(None, path)
 
     for name in ("export_txt", "export_accessible_document", "export_drbench_md", "export_docx", "export_pdf_ua"):

@@ -38,18 +38,14 @@ def test_default_voice_is_pinned(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_export_uses_the_configured_voice(monkeypatch, fake_tts, tmp_path):
-    monkeypatch.setattr(settings, "tts_voice", "pt-BR-AntonioNeural")
-
-    await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3")
+async def test_export_uses_the_given_voice(fake_tts, tmp_path):
+    """The voice is the run's ``ExportConfig.tts_voice``, passed by the caller."""
+    await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3", "pt-BR-AntonioNeural")
 
     assert fake_tts.voices == ["pt-BR-AntonioNeural"]
 
 
 @pytest.mark.asyncio
-async def test_explicit_voice_overrides_the_setting(monkeypatch, fake_tts, tmp_path):
-    monkeypatch.setattr(settings, "tts_voice", "pt-BR-AntonioNeural")
-
-    await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3", voice="pt-BR-FranciscaNeural")
-
-    assert fake_tts.voices == ["pt-BR-FranciscaNeural"]
+async def test_the_voice_is_required(fake_tts, tmp_path):
+    with pytest.raises(TypeError):
+        await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3")  # type: ignore[call-arg]

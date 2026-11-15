@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
+from backend.config.core_config import core_config_from_settings
 from backend.config.settings import settings
 from backend.services import job_checkpoint, shutdown
 from backend.services.job_store import load_record, save_status, pending_records
@@ -433,12 +434,15 @@ class JobExecutor:
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []
             optional_errors: list[str] = []
+            # One snapshot of the export settings for the whole job: the skip
+            # decisions below and the exporters read the same values.
+            export = core_config_from_settings().export
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_TXT), progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
             # The formats a reader gets carry the object markers when the job
             # asks for them; the benchmark markdown and the stored result do not.
-            delivered = with_object_markers(canonical, job.object_markers)
+            delivered = with_object_markers(canonical, job.object_markers, export)
             await self._run_in_executor(export_txt, delivered, txt_path, job.filename)
             completed_formats.append("txt")
             state_manager.verificar_cancelamento(task_id)
@@ -474,10 +478,10 @@ class JobExecutor:
             # without one, with a warning in the result e-mail.
             docx_path = await self._optional_toolbox_export(
                 task_id,
-                enabled=settings.toolbox_docx_enabled,
+                enabled=export.toolbox_docx_enabled,
                 stage=STAGE_EXPORTING_DOCX,
                 progress=0.92,
-                export_fn=export_docx,
+                export_fn=functools.partial(export_docx, export=export),
                 canonical=delivered,
                 path=out_dir / f"{base}.docx",
                 filename=job.filename,
@@ -491,10 +495,10 @@ class JobExecutor:
 
             pdf_ua_path = await self._optional_toolbox_export(
                 task_id,
-                enabled=settings.toolbox_pdf_ua_enabled,
+                enabled=export.toolbox_pdf_ua_enabled,
                 stage=STAGE_EXPORTING_PDF_UA,
                 progress=0.93,
-                export_fn=export_pdf_ua,
+                export_fn=functools.partial(export_pdf_ua, export=export),
                 canonical=delivered,
                 path=out_dir / f"{base}.pdf_ua.pdf",
                 filename=job.filename,
@@ -529,7 +533,9 @@ class JobExecutor:
                 try:
                     await _until_cancelled(
                         task_id,
-                        export_mp3(clean_text, mp3_path, progress_callback=audio_progress),
+                        export_mp3(
+                            clean_text, mp3_path, export.tts_voice, progress_callback=audio_progress
+                        ),
                     )
                 except TaskCancelledError:
                     raise

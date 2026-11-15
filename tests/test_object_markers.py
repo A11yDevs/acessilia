@@ -7,6 +7,7 @@ import json
 import httpx
 import pytest
 
+from tests.core_config_support import export_config
 from backend.api import worker
 from backend.api.app import create_app
 from backend.config.settings import settings
@@ -67,7 +68,7 @@ def _in_order(text: str, *parts: str) -> bool:
 @pytest.mark.parametrize("format_name", ["html", "txt"])
 def test_a_delivered_format_carries_the_markers_around_each_object(tmp_path, format_name):
     image, table = t(MSG_OBJECT_MARKER_IMAGE), t(MSG_OBJECT_MARKER_TABLE)
-    marked = with_object_markers(_canonical(), True)
+    marked = with_object_markers(_canonical(), True, export_config())
 
     path = export_accessible_document(
         marked, tmp_path / f"deck.{format_name}", format_name=format_name, title="Deck"
@@ -84,7 +85,7 @@ def test_the_pandoc_document_of_docx_and_pdf_ua_carries_them_too():
     from docstruct.export.pandoc_ast import build_pandoc_ast
 
     image = t(MSG_OBJECT_MARKER_IMAGE)
-    ast = build_pandoc_ast(with_object_markers(_canonical(), True))
+    ast = build_pandoc_ast(with_object_markers(_canonical(), True, export_config()))
 
     assert f"[{image}]" in str(ast) and f"[/{image}]" in str(ast)
 
@@ -93,7 +94,7 @@ def test_a_formula_is_marked_as_a_formula():
     document = _canonical()
     document["sections"][0]["blocks"].append({"id": "m-1", "type": "math", "text": "x = y"})
 
-    blocks = with_object_markers(document, True)["sections"][0]["blocks"]
+    blocks = with_object_markers(document, True, export_config())["sections"][0]["blocks"]
 
     formula = t(MSG_OBJECT_MARKER_FORMULA)
     assert [b.get("text") for b in blocks[-3:]] == [f"[{formula}]", "x = y", f"[/{formula}]"]
@@ -104,11 +105,10 @@ def test_a_formula_is_marked_as_a_formula():
     [(False, None, False), (True, None, True), (True, False, False), (False, True, True)],
     ids=["off", "on-by-setting", "job-turns-off", "job-turns-on"],
 )
-def test_the_job_choice_wins_over_the_setting(monkeypatch, setting, job, marked):
-    monkeypatch.setattr(settings, "object_markers_enabled", setting)
+def test_the_job_choice_wins_over_the_setting(setting, job, marked):
     document = _canonical()
 
-    result = with_object_markers(document, job)
+    result = with_object_markers(document, job, export_config(object_markers_enabled=setting))
 
     assert (result is not document) is marked
     assert (len(result["sections"][0]["blocks"]) == 8) is marked
@@ -140,7 +140,7 @@ async def test_the_worker_marks_what_a_reader_gets_and_stores_the_document_unmar
 
         return export
 
-    async def audio(text, destination, **kw):
+    async def audio(text, destination, voice, **kw):
         destination.write_bytes(b"audio")
 
     async def no_email(*a, **kw):
