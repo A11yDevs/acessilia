@@ -20,9 +20,10 @@ MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB: str = ("A nominal plan must end with the
 MSG_EXPECTED_TOTAL_COST_MISMATCH: str = ("Declared expected_total_cost={declared}; plan steps sum to expected cost {calculated}")
 #: NominalPlan.validate_plan failure when a planned execute-obligation step has no corresponding entry in selected_obligations.
 MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION: str = ("A nominal plan contains an obligation that was not selected")
-#: PlannerOutcome.validate_outcome: a solved outcome lacks one of plan_file, plan_id, expected_total_cost, step_count or execution_step_count. The English text describes another rule (#530); the msgid is the catalog key, so it changes in its own PR.
+#: PlannerOutcome.validate_outcome: a solved outcome lacks one of plan_file, plan_id, expected_total_cost, step_count or execution_step_count.
 MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS: str = (
-    "A solver outcome marked as ended before execution began cannot carry plan details"
+    "A planner outcome marked as solved requires the complete plan: "
+    "plan_file, plan_id, expected_total_cost, step_count and execution_step_count"
 )
 #: PlannerOutcome.validate_outcome: a solved outcome whose plan did not pass validation (validation_passed is false).
 MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION: str = ("Marking a planner outcome as solved requires its computed solution to have passed validation")
@@ -38,5 +39,5 @@ MSG_COMPARISON_REQUIRES_BOTH_BACKENDS: str = ("Planning comparisons must contain
 MSG_COMPARISON_OUTCOME_KEY_MISMATCH: str = ("Outcome key {key} does not match recorded planner backend {backend}")
 #: Description of the PlanningComparison JSON schema, resolved with t() when the schema is built; no placeholders.
 MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION: str = ("Normalized comparison between the internal planner and Fast Downward executions of one planning problem")
-#: Description of the NominalPlan JSON schema, resolved with t() when the schema is built; no placeholders. Its pt_BR entry drops the last clause (#530).
+#: Description of the NominalPlan JSON schema, resolved with t() when the schema is built; no placeholders.
 MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION: str = ("Nominal plan derived from the processing manifest and PDDL domain of Acessilia; effects are confirmed only after executed by an executor")
