@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from backend.core.pipeline import orchestrator as pddl
-from backend.agents.output_schemas import DataOutput
+from backend.core.agents.output_schemas import DataOutput
 from backend.config.settings import settings
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest

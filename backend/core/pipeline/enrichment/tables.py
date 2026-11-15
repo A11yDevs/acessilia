@@ -7,10 +7,8 @@ reading only when it shares enough words with the old one, records why a table
 was left unread, and retries the failures a second try may fix. Moved verbatim
 from the PDDL orchestrator (#402, phase 3, step 6).
 
-Like every module of ``backend/core`` that asks an agent (the vision or the
-data agent), this one imports ``backend.agents``. The dependency is transient:
-step 2 of ADR-0016's roadmap gathers the agents into the core before its
-boundary test (step 5) refuses imports of ``backend`` from outside the core.
+The agents it asks (the vision or the data agent) live in the core, in
+``backend.core.agents`` (ADR-0016, step 2).
 """
 
 from __future__ import annotations
@@ -29,9 +27,9 @@ from docstruct.tables.ast import (
 from docstruct.tables.garble import table_garble_reason
 from docstruct.tables.text_rows import rows_from_visual_table_text
 
-from backend.agents.data_agent import DataAgent
-from backend.agents.output_schemas import DataOutput
-from backend.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.data_agent import DataAgent
+from backend.core.agents.output_schemas import DataOutput
+from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,

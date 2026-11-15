@@ -5,7 +5,7 @@ from time import perf_counter
 from pathlib import Path
 from typing import Any, Iterable
 
-from backend.core.agno_support import build_agent
+from backend.core.agents.agno_support import build_agent
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.planning.comparison import build_planning_comparison
 from backend.core.planning.domain_bundle import (

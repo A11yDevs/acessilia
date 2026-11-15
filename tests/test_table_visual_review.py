@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.agents.output_schemas import DataOutput
+from backend.core.agents.output_schemas import DataOutput
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.config.settings import settings
 from tests.pddl_support import build_element as _element

@@ -65,62 +65,29 @@ GLOBAL_EXEMPT_STRINGS = ("português brasileiro",)
 # Tuple of (relative_file_path, substring). Add new entries here when
 # adding intentional detection patterns that match Portuguese words.
 EXEMPT_STRINGS: list[tuple[str, str]] = [
-    # AI prompts — user-facing content, allowed by constitution
-    ("backend/ai/prompts/vision_agent.py", "área"),
-    ("backend/ai/prompts/vision_agent.py", "descrição"),
-    ("backend/ai/prompts/vision_agent.py", "imagem"),
-    ("backend/ai/prompts/vision_agent.py", "texto"),
-    ("backend/ai/prompts/vision_agent.py", "tabela"),
-    ("backend/ai/prompts/vision_agent.py", "gráfico"),
-    ("backend/ai/prompts/vision_agent.py", "fórmula"),
-    ("backend/ai/prompts/vision_agent.py", "legenda"),
-    ("backend/ai/prompts/vision_agent.py", "rótulo"),
-    ("backend/ai/prompts/vision_agent.py", "página"),
-    ("backend/ai/prompts/vision_agent.py", "elemento"),
-    ("backend/ai/prompts/vision_agent.py", "capítulo"),
-    ("backend/ai/prompts/vision_agent.py", "seção"),
-    ("backend/ai/prompts/vision_agent.py", "título"),
-    ("backend/ai/prompts/vision_agent.py", "conteúdo"),
-    ("backend/ai/prompts/vision_agent.py", "estrutura"),
-    ("backend/ai/prompts/vision_agent.py", "descrições"),
-    ("backend/ai/prompts/vision_agent.py", "imagens"),
-    ("backend/ai/prompts/vision_agent.py", "tabelas"),
-    ("backend/ai/prompts/vision_agent.py", "gráficos"),
-    ("backend/ai/prompts/vision_agent.py", "fórmulas"),
-    ("backend/ai/prompts/vision_agent.py", "legendas"),
-    ("backend/ai/prompts/vision_agent.py", "rótulos"),
-    ("backend/ai/prompts/vision_agent.py", "páginas"),
-    ("backend/ai/prompts/vision_agent.py", "elementos"),
-    ("backend/ai/prompts/vision_agent.py", "capítulos"),
-    ("backend/ai/prompts/vision_agent.py", "seções"),
-    ("backend/ai/prompts/vision_agent.py", "títulos"),
     # Vision retry instruction — an AI prompt, in the language of the region prompts
-    ("backend/agents/vision_agent.py", "Responda com um objeto JSON completo e válido"),
-    ("backend/agents/vision_agent.py", "Não repita tokens nem preencha campos"),
+    ("backend/core/agents/vision_agent.py", "Responda com um objeto JSON completo e válido"),
+    ("backend/core/agents/vision_agent.py", "Não repita tokens nem preencha campos"),
     # Vision schema instruction — an AI prompt, allowed by constitution
-    ("backend/agents/output_schemas.py", "molécula é kind='description'"),
-    # Data agent prompts — user-facing content
-    ("backend/ai/prompts/data_agent.py", "tabela"),
-    ("backend/ai/prompts/data_agent.py", "fórmula"),
-    ("backend/ai/prompts/data_agent.py", "matemática"),
-    ("backend/ai/prompts/data_agent.py", "célula"),
-    ("backend/ai/prompts/data_agent.py", "linha"),
-    ("backend/ai/prompts/data_agent.py", "coluna"),
-    ("backend/ai/prompts/data_agent.py", "conteúdo"),
-    ("backend/ai/prompts/data_agent.py", "estrutura"),
-    # Editor agent prompts — user-facing content
-    ("backend/ai/prompts/editor_agent.py", "conteúdo"),
-    ("backend/ai/prompts/editor_agent.py", "descrição"),
-    ("backend/ai/prompts/editor_agent.py", "elemento"),
-    ("backend/ai/prompts/editor_agent.py", "texto"),
-    ("backend/ai/prompts/editor_agent.py", "seção"),
-    ("backend/ai/prompts/editor_agent.py", "parágrafo"),
-    ("backend/ai/prompts/editor_agent.py", "tabela"),
-    ("backend/ai/prompts/editor_agent.py", "legenda"),
-    ("backend/ai/prompts/editor_agent.py", "imagem"),
-    ("backend/ai/prompts/editor_agent.py", "gráfico"),
-    ("backend/ai/prompts/editor_agent.py", "fórmula"),
-    ("backend/ai/prompts/editor_agent.py", "referência"),
+    ("backend/core/agents/output_schemas.py", "molécula é kind='description'"),
+    # Vision, page-inspection and data schema instructions — AI prompts, moved
+    # with output_schemas.py out of the allowlist (ADR-0016, step 2)
+    ("backend/core/agents/output_schemas.py", "description para conteúdo visual/textual"),
+    ("backend/core/agents/output_schemas.py", "quando a região for predominantemente"),
+    ("backend/core/agents/output_schemas.py", "O extrator estrutural não encontrou"),
+    ("backend/core/agents/output_schemas.py", "tem conteúdo. Use kind='blank'"),
+    ("backend/core/agents/output_schemas.py", "ruído de digitalização"),
+    ("backend/core/agents/output_schemas.py", "contrário, use kind='content'"),
+    ("backend/core/agents/output_schemas.py", "descreva os elementos visuais"),
+    ("backend/core/agents/output_schemas.py", "para tabelas, incluindo caption"),
+    ("backend/core/agents/output_schemas.py", "latex para fórmulas"),
+    # Page prompt and its fallback — AI prompts, moved with prompt_tools.py out
+    # of the allowlist (ADR-0016, step 2)
+    ("backend/core/agents/prompt_tools.py", "Você é um sistema de acessibilidade digital"),
+    ("backend/core/agents/prompt_tools.py", "forneça a audiodescrição entre colchetes"),
+    ("backend/core/agents/prompt_tools.py", "Preserve a ênfase do texto original"),
+    ("backend/core/agents/prompt_tools.py", "Para MATEMÁTICA: linearize fórmulas"),
+    ("backend/core/agents/prompt_tools.py", "Se um parágrafo termina com hífen"),
     # Telegram messages — user-facing content
     ("frontend/telegram/messages.py", "área"),
     ("frontend/telegram/messages.py", "descrição"),
@@ -370,3 +337,13 @@ def test_exempt_paths_still_exist() -> None:
         assert path.exists(), f"Exempt path {path} no longer exists"
     for rel in EXEMPT_FILES:
         assert (REPO_ROOT / rel).exists(), f"Exempt file {rel} no longer exists"
+
+
+def test_exempt_strings_name_existing_files() -> None:
+    """A string exemption bound to a missing file exempts nothing; remove it.
+
+    48 entries named prompt modules that never existed until ADR-0016's
+    step 2 removed them; this keeps the list honest, like the allowlist.
+    """
+    missing = sorted({rel for rel, _ in EXEMPT_STRINGS if not (REPO_ROOT / rel).is_file()})
+    assert not missing, f"EXEMPT_STRINGS entries for files that do not exist: {missing}"

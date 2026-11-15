@@ -15,12 +15,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.agents.output_schemas import DataOutput, VisionOutput
+from backend.core.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline.enrichment.formulas import _enrich_formula_latex
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from backend.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.config.settings import settings
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest

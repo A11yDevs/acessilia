@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from acessilia_sdk.toolbox import vlm_provider_healthy
-from backend.ai.models.ai_client import active_model_name
+from backend.core.agents.ai_client import active_model_name
 from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings

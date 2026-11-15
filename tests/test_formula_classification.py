@@ -6,7 +6,7 @@ import pytest
 from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.handlers import review as review_handlers
-from backend.agents.output_schemas import VisionOutput
+from backend.core.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import _element_to_block
 from tests.pddl_support import (
     build_element,
@@ -251,7 +251,7 @@ def _html_of(element):
 
 
 def test_a_missing_candidate_prompt_falls_back_to_the_system_prompt(monkeypatch):
-    from backend.agents import vision_agent
+    from backend.core.agents import vision_agent
 
     monkeypatch.setattr(vision_agent, "load_region_prompt", lambda key: "")
     agent = vision_agent.VisionAgent(mode="medio")

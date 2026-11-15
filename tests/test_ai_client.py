@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from agno.models import ollama, openrouter
 
-from backend.ai.models import ai_client
+from backend.core.agents import ai_client
 from backend.config.settings import settings
 
 

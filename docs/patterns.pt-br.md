@@ -10,7 +10,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
 ### 2. Estratégia e Abstração de Modelo para IA (Agno)
-- Implementação: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py) (`get_agno_model()`)
+- Implementação: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model()`)
 - Estratégias:
   - Ollama (modelos locais de pesos abertos como LLaVA/Qwen-VL)
   - OpenRouter (modelos de API em nuvem como Claude/GPT-4o)
@@ -18,8 +18,8 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 
 ### 3. Especialização Multiagente
 - Implementação:
-  - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py) (`VisionAgent` - alt-text visual e descrições em áudio via LLM do Agno)
-  - [backend/agents/data_agent.py](../backend/agents/data_agent.py) (`DataAgent` - tabelas e fórmulas matemáticas via LLM do Agno)
+  - [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py) (`VisionAgent` - alt-text visual e descrições em áudio via LLM do Agno)
+  - [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py) (`DataAgent` - tabelas e fórmulas matemáticas via LLM do Agno)
 - Benefício: separação limpa de responsabilidades e execução em paralelo (`asyncio.gather`).
 
 ### 4. Adaptadores de Exportação e Renderizadores

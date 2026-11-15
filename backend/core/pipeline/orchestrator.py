@@ -20,7 +20,7 @@ from typing import Any
 
 
 from backend.services.blocking import run_blocking
-from backend.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import ExecutorAgent, StepProgress
 from backend.core.execution.models import ExecutionReport

@@ -24,8 +24,8 @@ package "Core (Docker container)" {
     component "ExecutorAgent\n(Agno Workflow)\nbackend/core/execution" as Executor
 
     package "Method handlers" {
-      component "VisionAgent\n[Agno LLM]\nbackend/agents/vision_agent.py" as Vision
-      component "DataAgent\n[Agno LLM]\nbackend/agents/data_agent.py" as Data
+      component "VisionAgent\n[Agno LLM]\nbackend/core/agents/vision_agent.py" as Vision
+      component "DataAgent\n[Agno LLM]\nbackend/core/agents/data_agent.py" as Data
       component "Deterministic handlers\n(docstruct algorithms)" as Deterministic
     }
   }

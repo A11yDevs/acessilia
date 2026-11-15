@@ -232,7 +232,7 @@ def test_a_table_read_from_scratch_that_failed_is_not_cacheable(monkeypatch, ima
 
 def test_a_refused_reading_of_a_misread_table_is_cacheable(monkeypatch):
     """A reading refused as worse than the table is the model's answer, not its failure."""
-    from backend.agents.output_schemas import DataOutput
+    from backend.core.agents.output_schemas import DataOutput
     from tests.pddl_support import build_element
 
     collapsed = {

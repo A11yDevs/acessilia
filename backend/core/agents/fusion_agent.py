@@ -22,7 +22,7 @@ Tools exposed:
 
 The deterministic methods live here so they can be unit-tested without Agno
 installed; the tool envelopes are only wired into the Agno agent when the
-optional stack is available (see ``backend.core.agno_support.build_agent``).
+optional stack is available (see ``backend.core.agents.agno_support.build_agent``).
 
 Design note (tool envelope vs core): the Agno tool envelopes intentionally do
 NOT serialize ``image_bytes`` — they reconstruct a ``Region`` with
@@ -37,7 +37,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from backend.core.agno_support import build_agent
+from backend.core.agents.agno_support import build_agent
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.line_numbers import extract_line_numbers
 from docstruct.fusion.repetition import collapse as collapse, guard_page

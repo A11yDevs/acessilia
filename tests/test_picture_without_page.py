@@ -21,7 +21,7 @@ import pytest
 from PIL import Image
 
 from backend.core.pipeline import orchestrator as pddl
-from backend.agents.output_schemas import VisionOutput
+from backend.core.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
 from backend.core.pipeline.enrichment.common import _extract_picture_bytes
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions

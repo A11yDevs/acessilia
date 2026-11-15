@@ -22,7 +22,7 @@ import respx
 
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.handlers import inspection as inspection_handlers
-from backend.agents.output_schemas import PageInspectionOutput
+from backend.core.agents.output_schemas import PageInspectionOutput
 from backend.config.settings import settings
 from backend.core.manifest.builder import (
     UNSTRUCTURED_PAGE_OBLIGATION_KIND,
@@ -301,8 +301,8 @@ def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
 
     from agno.run.base import RunStatus
 
-    from backend.agents import vision_agent
-    from backend.agents.output_schemas import PAGE_INSPECTION_INSTRUCTION
+    from backend.core.agents import vision_agent
+    from backend.core.agents.output_schemas import PAGE_INSPECTION_INSTRUCTION
 
     seen = {}
 
@@ -337,7 +337,7 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
 
     from agno.run.base import RunStatus
 
-    from backend.agents import vision_agent
+    from backend.core.agents import vision_agent
 
     class FakeAgent:
         def __init__(self, **kwargs):

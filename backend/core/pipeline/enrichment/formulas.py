@@ -10,10 +10,8 @@ whole page, and an outage of ``math.recognize`` is paid once per document.
 Moved verbatim from the PDDL orchestrator once ADR-0017 was accepted (#402,
 phase 3, step 6).
 
-Like every module of ``backend/core`` that asks an agent (the vision or the
-data agent), this one imports ``backend.agents``. The dependency is transient:
-step 2 of ADR-0016's roadmap gathers the agents into the core before its
-boundary test (step 5) refuses imports of ``backend`` from outside the core.
+The agents it asks (the vision or the data agent) live in the core, in
+``backend.core.agents`` (ADR-0016, step 2).
 """
 
 from __future__ import annotations
@@ -28,9 +26,9 @@ from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 from docstruct.text.equations import preserve_equation_number, split_equation_number
 from docstruct.text.latex import has_latex_markup, latex_text_agreement
 
-from backend.agents.output_schemas import VisionOutput
-from backend.agents.provider_breaker import ProviderBreaker
-from backend.agents.vision_agent import VisionAgent
+from backend.core.agents.output_schemas import VisionOutput
+from backend.core.agents.provider_breaker import ProviderBreaker
+from backend.core.agents.vision_agent import VisionAgent
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,

@@ -10,7 +10,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
 ### 2. Strategy & Model Abstraction for AI (Agno)
-- Implementation: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py) (`get_agno_model()`)
+- Implementation: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model()`)
 - Strategies:
   - Ollama (local open-weights models like LLaVA/Qwen-VL)
   - OpenRouter (cloud API models like Claude/GPT-4o)
@@ -18,8 +18,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 ### 3. Multi-Agent Specialization
 - Implementation:
-  - [backend/agents/vision_agent.py](../backend/agents/vision_agent.py) (`VisionAgent` - Agno LLM visual alt-text & audio descriptions)
-  - [backend/agents/data_agent.py](../backend/agents/data_agent.py) (`DataAgent` - Agno LLM tables & math formulas)
+  - [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py) (`VisionAgent` - Agno LLM visual alt-text & audio descriptions)
+  - [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py) (`DataAgent` - Agno LLM tables & math formulas)
 - Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
 
 ### 4. Export Adapters & Renderers

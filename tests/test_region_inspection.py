@@ -14,7 +14,7 @@ import fitz
 import pytest
 
 from backend.core.pipeline.handlers import inspection as inspection_handlers
-from backend.agents.output_schemas import VisionOutput
+from backend.core.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import BoundingBox, PageDescriptor, ProcessingManifest, Provenance
 from tests.pddl_support import (
     build_element as _element,

@@ -25,8 +25,8 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Objetivo: escolher o nível de descrição — `detalhado`, `medio` (alias `normal`), `baixo` ou `ocr`.
 - Implementação:
   - comandos: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
-  - prompts por modo: [backend/ai/prompts](../backend/ai/prompts)
-  - aplicação no processamento: [backend/agents/vision_agent.py](../backend/agents/vision_agent.py)
+  - prompts por modo: [backend/core/agents/prompts](../backend/core/agents/prompts)
+  - aplicação no processamento: [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py)
 
 ## UC-03 Consultar status e cancelar
 - Ator principal: Usuário final.
@@ -47,7 +47,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Objetivo: verificar a disponibilidade do backend de IA e dos recursos locais.
 - Implementação:
   - comando /health: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
-  - cliente do backend de IA: [backend/ai/models/ai_client.py](../backend/ai/models/ai_client.py)
+  - cliente do backend de IA: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py)
 
 ## UC-06 Submeter feedback
 - Ator principal: Usuário final.

@@ -5,7 +5,7 @@ from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_PROMPT_FILE_NOT_FOUND
 from backend.core.logger import logger
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "ai" / "prompts"
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 MODE_MAP = {
     "detalhado": "detalhado.md",

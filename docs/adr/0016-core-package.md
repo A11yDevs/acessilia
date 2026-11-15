@@ -134,8 +134,8 @@ Proposed: option 2.
   |---|---|
   | `backend/core/{manifest,planning,execution}` | `acessilia_core.{manifest,planning,execution}` |
   | `backend/core/pipeline` (the orchestrator was `backend/agents/pddl_orchestrator.py` until #402's step 6 moved it; `backend/pipeline` gathered there in step 2) | `acessilia_core.pipeline` |
-  | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents` | `acessilia_core.agents` |
-  | `backend/core/toolbox`, `backend/core/logger.py`, `backend/core/formula_tools.py` (gathered from `backend/tools` in step 2; its prompt loading moves with the agents) | `acessilia_core.toolbox` and helpers |
+  | `backend/core/agents` (gathered in step 2 from `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai` and `backend/core/agno_support.py`, with the prompt loading of `backend/tools`) | `acessilia_core.agents` |
+  | `backend/core/toolbox`, `backend/core/logger.py`, `backend/core/formula_tools.py` (gathered from `backend/tools` in step 2; its prompt loading went with the agents) | `acessilia_core.toolbox` and helpers |
   | `backend/core/export` (gathered from `backend/export` in step 2; `backend/adapters`, unused, was removed) | `acessilia_core.export` |
   | `backend/core/i18n` (gathered in step 2 from `backend/i18n.py`, `log_messages.py`, `stage_messages.py` and `locales/`) | `acessilia_core.i18n` |
 
@@ -189,8 +189,8 @@ Proposed: option 2.
      |---|---|---|
      | `backend/core/{manifest,planning,execution}` | already in place | `planning/domains/`: the PDDL domains and their descriptions |
      | `backend/pipeline` | `backend/core/pipeline/` (done) | |
-     | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` |
-     | `backend/tools` (Toolbox adapters, formula and code tools, prompt loading, logger) | `backend/core/toolbox/` and helpers (done: the adapters to `backend/core/toolbox/`, `logger` and `formula_tools` to `backend/core/`, the service's `validators`, `access_log_filter` and `filenames` to `backend/services/`; `code_tools`, dead, removed; `prompt_tools` moves with the agents) | |
+     | `backend/agents/{vision_agent,data_agent,output_schemas,provider_breaker,run_helpers}.py`, `backend/ai`, `backend/core/agents`, `backend/core/agno_support.py` | `backend/core/agents/` (done: `ai_client`, `agno_support` and `prompt_tools` with them) | `backend/ai/prompts/` (10 prompts) → `backend/core/agents/prompts/` (done) |
+     | `backend/tools` (Toolbox adapters, formula and code tools, prompt loading, logger) | `backend/core/toolbox/` and helpers (done: the adapters to `backend/core/toolbox/`, `logger` and `formula_tools` to `backend/core/`, the service's `validators`, `access_log_filter` and `filenames` to `backend/services/`; `code_tools`, dead, removed; `prompt_tools` went with the agents) | |
      | `backend/export` (`backend/adapters`: removed, nothing imported it) | `backend/core/export/` (done) | |
      | `backend/i18n.py`, `log_messages.py`, `stage_messages.py` | `backend/core/i18n/` (done) | `backend/locales/` (the `.po` catalogs) → `backend/core/i18n/locales/` |
 

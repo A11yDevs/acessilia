@@ -9,7 +9,7 @@ from agno.run.base import RunStatus
 import pytest
 from pydantic import ValidationError
 
-from backend.agents.output_schemas import (
+from backend.core.agents.output_schemas import (
     DataOutput,
     VisionOutput,
     validate_structured_content,
@@ -315,7 +315,7 @@ def test_all_header_table_keeps_final_row_in_body() -> None:
 
 @pytest.mark.asyncio
 async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) -> None:
-    from backend.agents import vision_agent as vision_module
+    from backend.core.agents import vision_agent as vision_module
 
     captured: dict = {}
 
@@ -356,7 +356,7 @@ TRUNCATED_FORMULA = '{\n  "kind": "formula",\n  "formula_latex": "x = ' + "\\\\t
 
 
 def _scripted_vision_agent(monkeypatch, answers: list[object]):
-    from backend.agents import vision_agent as vision_module
+    from backend.core.agents import vision_agent as vision_module
 
     calls: list[dict] = []
 
@@ -381,7 +381,7 @@ def _scripted_vision_agent(monkeypatch, answers: list[object]):
 
 
 def _context_retry_vision(monkeypatch, answers: list[object]):
-    from backend.agents import vision_agent as vision_module
+    from backend.core.agents import vision_agent as vision_module
 
     calls: list[dict] = []
     model_budgets: list[int | None] = []
@@ -452,7 +452,7 @@ async def test_vision_agent_retries_a_truncated_answer(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_vision_agent_gives_up_after_its_attempts(monkeypatch) -> None:
-    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.core.agents.vision_agent import REGION_ATTEMPTS
     from backend.core.logger import logger
 
     vision_module, calls = _scripted_vision_agent(
@@ -522,7 +522,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
 
     from PIL import Image as PILImage
 
-    from backend.agents.run_helpers import AgentRunError
+    from backend.core.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
     from backend.core.i18n import reset_request_locale, set_request_locale
     from backend.core.logger import logger
@@ -587,7 +587,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
 
 @pytest.mark.asyncio
 async def test_context_retry_does_not_consume_a_region_answer_attempt(monkeypatch, fake_toolbox_render):
-    from backend.agents.run_helpers import AgentRunError
+    from backend.core.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
 
     vision_module, calls, budgets = _context_retry_vision(
@@ -618,7 +618,7 @@ async def test_context_retry_does_not_consume_a_region_answer_attempt(monkeypatc
 async def test_context_overflow_is_critical_only_after_the_smaller_request_fails(
     monkeypatch, fake_toolbox_render,
 ):
-    from backend.agents.run_helpers import AgentRunError
+    from backend.core.agents.run_helpers import AgentRunError
     from backend.config.settings import settings
     from backend.core.i18n import reset_request_locale, set_request_locale
     from backend.core.logger import logger
@@ -703,7 +703,7 @@ async def test_context_overflow_from_the_run_status_is_recovered(
 async def test_page_inspection_recovers_with_the_whole_page_budget(
     monkeypatch, fake_toolbox_render
 ):
-    from backend.agents.output_schemas import PageInspectionOutput
+    from backend.core.agents.output_schemas import PageInspectionOutput
     from backend.config.settings import settings
 
     vision_module, calls, budgets = _context_retry_vision(
@@ -782,7 +782,7 @@ TRUNCATED_IN_THE_DESCRIPTION = (
 
 @pytest.mark.asyncio
 async def test_a_description_cut_off_in_a_later_field_is_salvaged(monkeypatch) -> None:
-    from backend.agents.vision_agent import REGION_ATTEMPTS, SALVAGE_WARNING
+    from backend.core.agents.vision_agent import REGION_ATTEMPTS, SALVAGE_WARNING
 
     vision_module, calls = _scripted_vision_agent(
         monkeypatch, [TRUNCATED_IN_A_LATER_FIELD] * REGION_ATTEMPTS
@@ -807,7 +807,7 @@ async def test_a_description_cut_off_in_a_later_field_is_salvaged(monkeypatch) -
 
 @pytest.mark.asyncio
 async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -> None:
-    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.core.agents.vision_agent import REGION_ATTEMPTS
 
     vision_module, _ = _scripted_vision_agent(
         monkeypatch, [TRUNCATED_IN_THE_DESCRIPTION] * REGION_ATTEMPTS
@@ -824,7 +824,7 @@ async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -
 
 
 def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
-    from backend.agents.vision_agent import (
+    from backend.core.agents.vision_agent import (
         DESCRIPTION_CHARS_PER_TOKEN,
         _truncate_description,
     )
@@ -855,7 +855,7 @@ def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
 
 
 def test_a_description_within_the_region_budget_is_kept_whole() -> None:
-    from backend.agents.vision_agent import _truncate_description
+    from backend.core.agents.vision_agent import _truncate_description
     from backend.config.settings import settings
 
     output = VisionOutput(
@@ -894,7 +894,7 @@ async def test_a_region_on_the_general_budget_is_never_truncated(monkeypatch) ->
 
 @pytest.mark.asyncio
 async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
-    from backend.agents.vision_agent import REGION_ATTEMPTS, _RATE_LIMIT_RETRIES
+    from backend.core.agents.vision_agent import REGION_ATTEMPTS, _RATE_LIMIT_RETRIES
 
     class RateLimited(Exception):
         status_code = 429
@@ -920,7 +920,7 @@ async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> No
     """The HTTP timeout is per read; a call that never answers must still end."""
     import time
 
-    from backend.agents import vision_agent as vision_module
+    from backend.core.agents import vision_agent as vision_module
     from backend.config.settings import settings
 
     class HangingAgent:
@@ -949,7 +949,7 @@ async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> No
 @pytest.mark.asyncio
 async def test_a_provider_timeout_is_not_rewritten_as_the_deadline(monkeypatch) -> None:
     """A call that raises TimeoutError itself finishes; only an expiry is ours."""
-    from backend.agents import vision_agent as vision_module
+    from backend.core.agents import vision_agent as vision_module
     from backend.config.settings import settings
 
     class ProviderTimeoutAgent:
@@ -990,7 +990,7 @@ async def test_a_call_that_times_out_is_tried_once_more(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_a_call_that_keeps_timing_out_reports_the_error(monkeypatch) -> None:
-    from backend.agents.vision_agent import _TIMEOUT_RETRIES
+    from backend.core.agents.vision_agent import _TIMEOUT_RETRIES
     from backend.config.settings import settings
 
     vision_module, calls = _scripted_vision_agent(
@@ -1010,7 +1010,7 @@ async def test_a_call_that_keeps_timing_out_reports_the_error(monkeypatch) -> No
 
 @pytest.mark.asyncio
 async def test_a_rate_limit_budget_exhausted_degrades_the_region(monkeypatch) -> None:
-    from backend.agents.vision_agent import _RATE_LIMIT_RETRIES
+    from backend.core.agents.vision_agent import _RATE_LIMIT_RETRIES
 
     class RateLimited(Exception):
         status_code = 429
@@ -1122,7 +1122,7 @@ async def test_a_truncated_description_is_not_cached(monkeypatch, tmp_path) -> N
 
 @pytest.mark.asyncio
 async def test_a_salvaged_description_is_not_cached(monkeypatch, tmp_path) -> None:
-    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.core.agents.vision_agent import REGION_ATTEMPTS
     from backend.config.settings import settings
     from backend.services import cache as cache_module
 
@@ -1142,7 +1142,7 @@ async def test_a_salvaged_description_is_not_cached(monkeypatch, tmp_path) -> No
 
 
 def test_the_region_cache_key_varies_with_what_the_answer_depends_on(monkeypatch) -> None:
-    from backend.agents.vision_agent import _region_cache_extra
+    from backend.core.agents.vision_agent import _region_cache_extra
     from backend.config.settings import settings
     from backend.core.i18n import reset_request_locale, set_request_locale
 
@@ -1232,7 +1232,7 @@ async def test_the_token_budget_of_each_vision_call(monkeypatch, call, answer, b
 )
 async def test_an_answer_malformed_before_its_end_is_not_salvaged(monkeypatch, answer) -> None:
     """Only a cut answer is salvaged; a malformed one would be kept as a fragment."""
-    from backend.agents.vision_agent import REGION_ATTEMPTS
+    from backend.core.agents.vision_agent import REGION_ATTEMPTS
 
     vision_module, _ = _scripted_vision_agent(monkeypatch, [answer] * REGION_ATTEMPTS)
 
@@ -1243,7 +1243,7 @@ async def test_an_answer_malformed_before_its_end_is_not_salvaged(monkeypatch, a
 
 @pytest.mark.asyncio
 async def test_inspect_page_retries_a_truncated_answer(monkeypatch) -> None:
-    from backend.agents.output_schemas import PageInspectionOutput
+    from backend.core.agents.output_schemas import PageInspectionOutput
 
     truncated = '{\n  "kind": "content",\n  "description": "' + "a " * 200
     blank = {"kind": "blank", "language": "und", "confidence": 0.9}
@@ -1258,7 +1258,7 @@ async def test_inspect_page_retries_a_truncated_answer(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) -> None:
-    from backend.agents import data_agent as data_module
+    from backend.core.agents import data_agent as data_module
 
     class FakeAgent:
         def __init__(self, **_kwargs):
@@ -1288,7 +1288,7 @@ async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) 
 
 @pytest.mark.asyncio
 async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> None:
-    from backend.agents import data_agent as data_module
+    from backend.core.agents import data_agent as data_module
 
     captured: dict[str, object] = {}
 
@@ -1335,7 +1335,7 @@ def test_run_content_raises_when_the_run_failed() -> None:
     """Agno reports provider errors as a run with status=error, not an exception."""
     from agno.run.base import RunStatus
 
-    from backend.agents.run_helpers import AgentRunError, run_content
+    from backend.core.agents.run_helpers import AgentRunError, run_content
 
     failed = type("Run", (), {"status": RunStatus.error, "content": "Invalid API Key"})()
     with pytest.raises(AgentRunError, match="Invalid API Key"):
@@ -1363,7 +1363,7 @@ async def test_failed_run_is_logged_with_its_real_cause(monkeypatch, agent_modul
 
     from backend.core.logger import logger
 
-    module = importlib.import_module(f"backend.agents.{agent_module}")
+    module = importlib.import_module(f"backend.core.agents.{agent_module}")
 
     class FakeAgent:
         def __init__(self, **_kwargs):
@@ -1401,7 +1401,7 @@ def _assembled_prompt(monkeypatch, classification: str) -> str:
     """The prompt describe_region sends for ``classification``, prompt files included."""
     import asyncio
 
-    from backend.agents import vision_agent as vision_module
+    from backend.core.agents import vision_agent as vision_module
     from backend.config.settings import settings
 
     sent = []
@@ -1423,8 +1423,8 @@ def _assembled_prompt(monkeypatch, classification: str) -> str:
 )
 def test_a_picture_or_page_prompt_carries_the_chemistry_rules(monkeypatch, classification):
     """006.pdf slides 25-26: drawn molecules came back as LaTeX formulas."""
-    from backend.agents.output_schemas import VISION_SCHEMA_INSTRUCTION
-    from backend.tools.prompt_tools import load_chemistry_prompt
+    from backend.core.agents.output_schemas import VISION_SCHEMA_INSTRUCTION
+    from backend.core.agents.prompt_tools import load_chemistry_prompt
 
     chemistry = load_chemistry_prompt()
     prompt = _assembled_prompt(monkeypatch, classification)
@@ -1437,6 +1437,6 @@ def test_a_picture_or_page_prompt_carries_the_chemistry_rules(monkeypatch, class
 def test_a_formula_prompt_stays_without_the_chemistry_rules(monkeypatch):
     # Its answer is only kept as a formula, and the data agent shares it with a
     # schema that has no description.
-    from backend.tools.prompt_tools import load_chemistry_prompt
+    from backend.core.agents.prompt_tools import load_chemistry_prompt
 
     assert load_chemistry_prompt() not in _assembled_prompt(monkeypatch, "formula")

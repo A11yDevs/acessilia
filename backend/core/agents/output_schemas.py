@@ -7,7 +7,7 @@ from typing import Any, Literal, TypeVar
 from agno.run.base import RunStatus
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from backend.agents.run_helpers import RunIncompleteError, run_content
+from backend.core.agents.run_helpers import RunIncompleteError, run_content
 
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "

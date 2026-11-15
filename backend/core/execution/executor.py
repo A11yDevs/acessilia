@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
 
-from backend.core.agno_support import require_workflow_classes
+from backend.core.agents.agno_support import require_workflow_classes
 from backend.core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
     EXE_DRY_RUN_SIMULATED,
