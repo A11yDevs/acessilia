@@ -163,6 +163,7 @@ python -m pytest -q tests/test_data_migration.py \
   tests/test_download_token_service.py tests/test_cleanup_service.py
 ```
 
+Before the migration, these tests were run in the project's test container.
 For the current CI test gate and production-image smoke checks, see the
 [constitution's testing strategy](constitution.md#3-architectural-quality-rules).
 

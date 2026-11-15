@@ -2,8 +2,8 @@
 
 Você também pode ler esta documentação em **inglês**: [English](testing.md).
 
-O projeto tem cerca de 4.700 testes: aproximadamente 3.000 non-E2E no core,
-1.272 em `libs/docstruct` e 450 em `libs/sdk`. Rodar tudo depois de cada pequena
+Na verificação de 2026-11-15, o projeto tem 5.098 testes: 3.313 sem E2E no core,
+1.278 em `libs/docstruct` e 507 em `libs/sdk`. Rodar tudo depois de cada pequena
 edição é caro, tanto localmente quanto na CI. Este guia explica como a suíte está
 organizada, quais comandos usar em cada etapa do ciclo editar–testar–corrigir e
 quais técnicas tornam o ciclo mais rápido sem enfraquecer o gate de regressão. As
@@ -416,8 +416,9 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 - **`uv`** é necessário ([documentação](https://docs.astral.sh/uv/)). Rode os
   comandos a partir da raiz do repositório. As bibliotecas são pacotes separados
   e são chamadas com `uv run --extra dev pytest` em seus diretórios.
-- `uv sync --extra dev` instala o `pytest-xdist` e as dependências usadas pelos
-  alvos do Makefile e pela CI.
+- Rode `uv lock --check`, depois `uv sync --locked --extra dev` para instalar
+  o `pytest-xdist` e as dependências usadas pelos alvos do Makefile e pelo CI
+  a partir do lock versionado da raiz.
 
 ## Escopo e trabalhos relacionados
 

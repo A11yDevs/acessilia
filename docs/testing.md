@@ -2,10 +2,10 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](testing.pt-br.md).
 
-The project has about 4,700 tests: roughly 3,000 non-E2E tests in the core,
-1,272 in `libs/docstruct` and 450 in `libs/sdk`. Running all of them after every
-small edit is expensive, both locally and in CI. This guide explains how the
-suite is organized, which commands to use in each part of the edit–test–fix
+As verified on 2026-11-15, the project has 5,098 tests: 3,313 non-E2E tests in
+the core, 1,278 in `libs/docstruct` and 507 in `libs/sdk`. Running all of them
+after every small edit is expensive, both locally and in CI. This guide explains
+how the suite is organized, which commands to use in each part of the edit–test–fix
 loop, and which techniques make the loop faster without weakening the full
 regression gate. The changes came from issue
 [#448](https://github.com/A11yDevs/acessilia/issues/448).
@@ -408,8 +408,9 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 - **`uv`** is required ([docs](https://docs.astral.sh/uv/)). Run the commands
   from the repository root. The libraries are separate packages and are invoked
   with `uv run --extra dev pytest` from their own directories.
-- `uv sync --extra dev` installs `pytest-xdist` and the dependencies used by
-  the Make targets and CI.
+- Run `uv lock --check`, then `uv sync --locked --extra dev` to install
+  `pytest-xdist` and the dependencies used by the Make targets and CI from the
+  committed root lock.
 
 ## Scope and related work
 

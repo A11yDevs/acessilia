@@ -60,11 +60,11 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
    - **Gate de CI:** antes do merge, os testes unitários, de regressão, contrato
      e integração aplicáveis devem passar em [.github/workflows/ci.yml](../.github/workflows/ci.yml).
      O CI usa Python 3.11, verifica o `uv.lock` da raiz com `uv lock --check` e
-     o instala com `uv sync --locked --extra dev`. Executa as suítes do core
-     sem E2E, da docstruct e do SDK nesse ambiente da raiz e rejeita testes
-     pulados inesperadamente. Jobs adicionais de isolamento instalam docstruct
-     e SDK a partir dos próprios lockfiles verificados, com `--no-editable`, e
-     executam suas suítes.
+     instala o ambiente a partir dele com `uv sync --locked --extra dev`.
+     Executa as suítes do core sem E2E, da docstruct e do SDK nesse ambiente da
+     raiz e rejeita testes pulados inesperadamente. Jobs adicionais de isolamento
+     instalam docstruct e SDK a partir dos próprios lockfiles verificados, com
+     `--no-editable`, e executam suas suítes.
    - **E2E:** testes marcados como `e2e` exigem uma Toolbox ou API do Core em
      execução, conforme o caso, e rodam separadamente do gate regular de merge.
      O job condicional de E2E em [.github/workflows/scheduled-tests.yml](../.github/workflows/scheduled-tests.yml)

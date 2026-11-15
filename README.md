@@ -41,7 +41,8 @@ Main endpoints (`/api/v1`):
 The repository pins Python 3.11 in `.python-version`, the same version CI and the Docker image use. `uv` reads that file, and downloads the interpreter if needed.
 
 ```bash
-uv sync
+uv lock --check
+uv sync --locked
 cp .env.example .env   # configure the keys (AI, SMTP, Telegram)
 ```
 
@@ -88,13 +89,14 @@ Full documentation — where the i18n files live, how to add a new string, how t
 Install the development dependencies:
 
 ```bash
-uv sync --extra dev
+uv lock --check
+uv sync --locked --extra dev
 ```
 
-Run the full suite from `tests/`:
+Run the non-E2E core, docstruct and SDK suites:
 
 ```bash
-uv run pytest
+make test-all
 ```
 
 GitHub Actions repeats this validation on Python 3.11 for every pull request targeting `main`, `develop`, or `release/**`. Failures, errors, and skipped tests are all rejected. See the [contribution guide](CONTRIBUTING.md) to set up the environment and learn the review flow.
@@ -108,7 +110,8 @@ The [`docs/notebooks/`](docs/notebooks/) directory contains Jupyter notebooks th
 To run the notebooks:
 
 ```bash
-uv sync --extra dev
+uv lock --check
+uv sync --locked --extra dev
 uv run --with jupyter jupyter notebook docs/notebooks/
 ```
 
@@ -163,7 +166,7 @@ python scripts/benchmark_pipelines.py tests/fixtures/tutorials/java-oo-3pgs.pdf 
 1. Fork the repository.
 2. Create a feature branch.
 3. Write tests for new functionality.
-4. Run `uv run pytest` and fix any failures, errors, or skipped tests.
+4. Run `make test-all` and fix any failures, errors, or skipped tests.
 5. Open a pull request.
 
 Detailed rules live in [CONTRIBUTING.md](CONTRIBUTING.md).
