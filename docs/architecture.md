@@ -152,6 +152,6 @@ The AgentOS runtime is not part of `ENABLED_INTERFACES`; it is started separatel
 
 ## Key Architectural Decisions
 
-1. **Interface-independent domain:** the domain packages — `backend/agents`, `ai`, `core`, `pipeline`, `export`, `services` and `tools` — have no dependency on interface frameworks (no aiogram, no FastAPI). The single exception is `backend/api`, which is the FastAPI layer that exposes the domain over HTTP; everything in `frontend/` is a client of that API. Keeping the boundary there means a new interface never requires touching the domain.
+1. **Interface-independent domain:** the domain packages — `backend/core` (manifest, planning, execution, pipeline, agents, Toolbox adapters, export and i18n), `backend/services`, `backend/config` and `backend/agents` (the job state) — have no dependency on interface frameworks (no aiogram, no FastAPI). The single exception is `backend/api`, which is the FastAPI layer that exposes the domain over HTTP; everything in `frontend/` is a client of that API. Keeping the boundary there means a new interface never requires touching the domain.
 2. **Modular Multi-Agent Architecture:** Separates structural reading, visual description, data formatting, and text editing into distinct agents.
 3. **Canonical Document Source of Truth:** All renderers consume the validated canonical document schema to guarantee screen reader compatibility.

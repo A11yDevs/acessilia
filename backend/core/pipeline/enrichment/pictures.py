@@ -8,10 +8,8 @@ try may fix.
 Moved from the PDDL orchestrator (#402, phase 3, step 6): the code verbatim,
 with the docstring of ``_inject_full_page_picture`` translated from Portuguese.
 
-Like every module of ``backend/core`` that asks an agent (the vision or the
-data agent), this one imports ``backend.agents``. The dependency is transient:
-step 2 of ADR-0016's roadmap gathers the agents into the core before its
-boundary test (step 5) refuses imports of ``backend`` from outside the core.
+The agents it asks (the vision or the data agent) live in the core, in
+``backend.core.agents`` (ADR-0016, step 2).
 """
 
 from __future__ import annotations

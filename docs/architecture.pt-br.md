@@ -152,6 +152,6 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 
 ## Decisões Arquiteturais Principais
 
-1. **Domínio independente de interface:** os pacotes de domínio — `backend/agents`, `ai`, `core`, `pipeline`, `export`, `services` e `tools` — não têm dependência de frameworks de interface (sem aiogram, sem FastAPI). A única exceção é `backend/api`, que é a camada FastAPI que expõe o domínio via HTTP; tudo em `frontend/` é um cliente dessa API. Manter a fronteira ali significa que uma nova interface nunca exige tocar no domínio.
+1. **Domínio independente de interface:** os pacotes de domínio — `backend/core` (manifesto, planejamento, execução, pipeline, agentes, adaptadores da Toolbox, exportação e i18n), `backend/services`, `backend/config` e `backend/agents` (o estado dos jobs) — não têm dependência de frameworks de interface (sem aiogram, sem FastAPI). A única exceção é `backend/api`, que é a camada FastAPI que expõe o domínio via HTTP; tudo em `frontend/` é um cliente dessa API. Manter a fronteira ali significa que uma nova interface nunca exige tocar no domínio.
 2. **Arquitetura Multiagente Modular:** Separa leitura estrutural, descrição visual, formatação de dados e edição de texto em agentes distintos.
 3. **Documento Canônico Fonte da Verdade:** Todos os renderizadores consomem o esquema do documento canônico validado para garantir compatibilidade com leitores de tela.

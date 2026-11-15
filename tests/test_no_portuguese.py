@@ -337,3 +337,13 @@ def test_exempt_paths_still_exist() -> None:
         assert path.exists(), f"Exempt path {path} no longer exists"
     for rel in EXEMPT_FILES:
         assert (REPO_ROOT / rel).exists(), f"Exempt file {rel} no longer exists"
+
+
+def test_exempt_strings_name_existing_files() -> None:
+    """A string exemption bound to a missing file exempts nothing; remove it.
+
+    48 entries named prompt modules that never existed until ADR-0016's
+    step 2 removed them; this keeps the list honest, like the allowlist.
+    """
+    missing = sorted({rel for rel, _ in EXEMPT_STRINGS if not (REPO_ROOT / rel).is_file()})
+    assert not missing, f"EXEMPT_STRINGS entries for files that do not exist: {missing}"

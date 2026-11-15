@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](constitution.md)
 
-- **Versão:** 2.0.6 (2026-11-09). Veja no [histórico de alterações](#9-histórico-de-alterações)
+- **Versão:** 2.0.7 (2026-11-14). Veja no [histórico de alterações](#9-histórico-de-alterações)
   como as versões são numeradas.
 
 ## 1. Propósito
@@ -230,6 +230,9 @@ As versões seguem `MAJOR.MINOR.PATCH`:
 
 O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
 
+- **2.0.7 (2026-11-14):** a seção 4.3 passa a citar
+  `backend/core/agents/prompts` para os prompts dos modos, que o passo 2 da
+  ADR-0016 moveu de `backend/ai/prompts`. Nenhum princípio muda.
 - **2.0.6 (2026-11-09):** o "Verificado por" da P5 passa a citar os testes que
   agora existem para o `artifact/reference@1` (#185). Nenhum princípio muda.
 - **2.0.5 (2026-11-09):** a seção 4.3 passa a citar `docstruct.profiles`
