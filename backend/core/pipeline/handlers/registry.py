@@ -117,12 +117,15 @@ def bind_config(registry: MethodRegistry, config: CoreConfig) -> MethodRegistry:
 
     A handler that declares ``config`` gets the run's ``CoreConfig`` bound;
     the others are registered as they are, so the executor keeps calling
-    every handler as ``handler(manifest, obligation_id)``. The given
-    registry is left unchanged.
+    every handler as ``handler(manifest, obligation_id)``. The copy keeps the
+    registration order, and the given registry is left unchanged.
+
+    The convention is the parameter's name: a handler opts in by declaring
+    ``*, config: CoreConfig`` (the handlers that read the run's
+    configuration do).
     """
     bound = MethodRegistry()
-    for method in registry.names():
-        handler = registry.get(method)
+    for method, handler in registry.items():
         bound.register(method, partial(handler, config=config) if takes_config(handler) else handler)
     return bound
 
