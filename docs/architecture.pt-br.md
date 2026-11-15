@@ -24,6 +24,33 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 - [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): inicializador central `get_agno_model()` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) com base nas configurações de ambiente.
 - [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): carregador de prompt e resolutor de templates sobre os prompts em [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
+**Deadline de chamada do DataAgent (#276, etapa 1).** Cada chamada de
+`process_region` aguarda `Agent.run` por até `DATA_AGENT_TIMEOUT_SECONDS + 30`
+segundos. O cliente HTTP continua usando `DATA_AGENT_TIMEOUT_SECONDS`; a margem
+adicional limita a espera assíncrona mesmo se o provider mantiver o timeout de
+leitura HTTP sendo reiniciado ao enviar bytes aos poucos. Com
+`AI_CLIENT=toolbox`, o timeout também inclui a espera por uma vaga no gateway
+VLM, por isso deve comportar essa fila (veja a
+[ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)).
+
+Nos clientes OpenRouter e Toolbox compatíveis com OpenAI, os retries implícitos
+estão desativados (`max_retries=0`): as duas tentativas adicionais do SDK OpenAI
+são removidas. Ollama não consome essa opção e mantém sua política de retries
+existente. Uma falha transitória de transporte retorna `None` pelo caminho
+existente de degradação com registro em log. Respostas bem-sucedidas continuam
+passando pela validação de saída estruturada e do tipo da região. As releituras
+de tabela (`_TABLE_REREAD_ATTEMPTS`) e a passagem `_retry_failed` mantêm suas próprias
+políticas; o deadline limita uma chamada de modelo, não toda a tabela ou o
+documento.
+
+Uma espera expirada não interrompe a chamada síncrona. A thread, a conexão e o
+Agent/cliente de modelo da chamada continuam ocupados até o provider terminar
+ou o processo ser interrompido. As chamadas ainda usam o executor padrão do
+event loop, e um chamador síncrono com `asyncio.run()` pode esperar por esse
+executor no fechamento do loop. Isolar as chamadas Vision/Data, limitar a
+admissão e definir o ciclo de vida do executor ficam para a segunda etapa da
+#276, após a revisão da etapa 1.
+
 #### 0.3. Serviços de Infraestrutura (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): cache de texto por hash de arquivo em `var/temp/cache`.
 - [backend/services/history_service.py](../backend/services/history_service.py): persistência SQLite (modo WAL) para conversões e logs de auditoria, em `var/data/history.db`.

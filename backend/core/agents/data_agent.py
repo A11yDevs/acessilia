@@ -1,4 +1,15 @@
-"""DataAgent: validated extraction of tables and mathematical formulas."""
+"""DataAgent: validated extraction of tables and mathematical formulas.
+
+Each call has a hard deadline and no implicit OpenAI SDK retries. A transient
+transport error follows the existing degradation path; the table stage's
+reread and retry-pass budgets remain separate from this per-call bound.
+
+Abandoning the await does not stop the thread: it retains its connection and
+per-call Agent/model client until the provider finishes or the process stops.
+Calls still use the event loop's default executor, whose shutdown (including
+``asyncio.run``) may wait for those threads. Dedicated execution and bounded
+admission are the second step of #276.
+"""
 
 import asyncio
 
@@ -11,6 +22,7 @@ from backend.core.i18n.log_messages import (
 from backend.core.logger import logger
 from backend.core.agents.prompt_tools import load_region_prompt
 from backend.core.agents.ai_client import get_agno_model
+from backend.core.agents.model_call_policy import CALL_DEADLINE_GRACE_SECONDS
 from backend.config.settings import settings
 from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
@@ -67,6 +79,7 @@ class DataAgent:
                 )
             )
 
+            timeout_seconds = settings.data_agent_timeout_seconds
             agent = Agent(
                 name="DataAgent",
                 model=get_agno_model(
@@ -75,7 +88,8 @@ class DataAgent:
                         if classification == "table"
                         else None
                     ),
-                    timeout_seconds=settings.data_agent_timeout_seconds,
+                    timeout_seconds=timeout_seconds,
+                    max_retries=0,
                 ),
                 output_schema=DataOutput,
                 telemetry=False,
@@ -87,7 +101,10 @@ class DataAgent:
                     images=[Image(content=image_bytes)],
                 )
 
-            response = await asyncio.to_thread(_run_data)
+            deadline = timeout_seconds + CALL_DEADLINE_GRACE_SECONDS
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_run_data), timeout=deadline
+            )
             result = validate_structured_run(response, DataOutput)
             if result.kind != classification:
                 raise ValueError(
