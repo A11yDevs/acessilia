@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.agents.agno_support import build_agent
-from backend.core.config import DocumentConfig, FusionConfig
+from backend.core.config import DocumentConfig, FusionConfig, ToolboxConfig
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -49,6 +49,7 @@ class InformationalStructuralAgent:
             language=language,
             document=config.document,
             fusion=config.fusion,
+            toolbox=config.toolbox,
         )
         return manifest.model_dump(mode="json", by_alias=True)
 
@@ -58,6 +59,7 @@ class InformationalStructuralAgent:
         *,
         document: DocumentConfig,
         fusion: FusionConfig,
+        toolbox: ToolboxConfig,
         language: str = "pt-BR",
         presentation: bool = False,
     ) -> ProcessingManifest:
@@ -67,10 +69,11 @@ class InformationalStructuralAgent:
         dual-provider fusion, which compares running text across pages) and
         structured slide by slide. ``document`` is the run's configuration
         of the slide options and the legacy Unicode repair; ``fusion``, of the
-        dual extraction and the page judge's budget.
+        dual extraction and the page judge's budget; ``toolbox``, of the
+        extraction's Toolbox options.
         """
         extraction = self.extractor.extract(
-            source_path, fusion=fusion, dual_fusion=not presentation
+            source_path, fusion=fusion, toolbox=toolbox, dual_fusion=not presentation
         )
         return build_processing_manifest(
             source_path,

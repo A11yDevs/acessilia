@@ -194,13 +194,47 @@ PENDING_READS: dict[str, set[str]] = {}
 #: Modules of a group still moving that already read no setting at all. The
 #: toolbox group moves in three pull requests (planning gate, switches, client
 #: factory); "toolbox" joins MOVED_GROUPS with the last one.
-SETTINGS_FREE = {"backend/core/planning/toolbox_gate.py"}
+SETTINGS_FREE = {
+    "backend/core/export/pandoc_exporter.py",
+    "backend/core/pipeline/enrichment/formulas.py",
+    "backend/core/pipeline/fusion.py",
+    "backend/core/pipeline/preflight.py",
+    "backend/core/planning/toolbox_gate.py",
+    "backend/core/toolbox/media_inspect.py",
+    "backend/core/toolbox/pdf_ua_audit.py",
+    "backend/core/toolbox/text_spans.py",
+}
+
+#: Settings of the toolbox group already moved, until the whole group is in
+#: MOVED_GROUPS: the planning gate's (toolbox PR 1, #548), then the switches
+#: and the extractor's options (toolbox PR 2).
+MOVED_TOOLBOX_SETTINGS = {
+    "toolbox_availability_gate",
+    "toolbox_catalog_refresh_seconds",
+    "toolbox_catalog_stale_seconds",
+    "toolbox_extraction_timeout_seconds",
+    "toolbox_media_inspect_enabled",
+    "toolbox_pdf_validate_enabled",
+    "toolbox_use_artifact_store",
+    "toolbox_use_remote_cache",
+}
 
 
 def test_the_settings_free_modules_read_no_setting() -> None:
     found = {rel: _scan(ROOT / rel) for rel in sorted(SETTINGS_FREE)}
 
     assert not {rel: scan for rel, scan in found.items() if scan[0] or scan[1]}
+
+
+def test_the_moved_toolbox_settings_are_not_read() -> None:
+    assert MOVED_TOOLBOX_SETTINGS <= set(FIELD_SETTINGS.values())
+    found = {
+        path.relative_to(ROOT).as_posix(): sorted(_scan(path)[0] & MOVED_TOOLBOX_SETTINGS)
+        for path in sorted(CORE.rglob("*.py"))
+        if _scan(path)[0] & MOVED_TOOLBOX_SETTINGS
+    }
+
+    assert not found, f"backend/core reads moved Toolbox settings again: {found}"
 
 
 def test_the_moved_groups_are_not_read_from_settings() -> None:
@@ -560,6 +594,24 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
         ("backend.core.planning.toolbox_gate:evaluate", "config"),
+        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "toolbox"),
+        (
+            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "toolbox",
+        ),
+        ("backend.core.pipeline.fusion:extract_fused", "toolbox"),
+        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "toolbox"),
+        ("backend.core.toolbox.media_inspect:inspect_source_media", "toolbox"),
+        ("backend.core.toolbox.pdf_ua_audit:audit_pdf_ua", "toolbox"),
+        ("backend.core.toolbox.text_spans:fetch_text_spans", "toolbox"),
+        ("backend.core.export.exporters.docx_exporter:export_docx", "toolbox"),
+        ("backend.core.export.exporters.pdf_exporter:export_pdf_ua", "toolbox"),
+        ("backend.core.export.pandoc_exporter:toolbox_export_docx", "toolbox"),
+        ("backend.core.export.pandoc_exporter:toolbox_export_pdf_ua", "toolbox"),
+        (
+            "backend.core.pipeline.handlers.fusion:_handle_single_provider_method",
+            "config",
+        ),
         ("backend.core.agents.vision_agent:VisionAgent.__init__", "region_cache"),
         ("backend.core.pipeline.enrichment.common:_retry_failed", "delay_seconds"),
         ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "vision"),
@@ -597,3 +649,28 @@ def test_the_run_config_parameters_are_required(function, parameter) -> None:
 
     assert signature.default is inspect.Parameter.empty
     assert signature.kind is inspect.Parameter.KEYWORD_ONLY
+
+
+@pytest.mark.parametrize(
+    ("function", "parameter"),
+    [
+        ("backend.core.pipeline.preflight:_inspect_media", "toolbox"),
+        ("backend.core.pipeline.enrichment.inline_math:_TextSpanReader.__init__", "toolbox"),
+        ("backend.core.pipeline.enrichment.inline_math:_mark_inline_math", "text_spans"),
+        ("backend.core.pipeline.enrichment.inline_math:_mark_table_inline_math", "text_spans"),
+    ],
+)
+def test_the_internal_run_parameters_have_no_default(function, parameter) -> None:
+    """Positional in these internal helpers, but never defaulted: the run's
+    ``ToolboxConfig``, and the inline math steps' reader, which they no longer
+    build themselves.
+    """
+    import importlib
+    import inspect
+
+    module_name, qualname = function.split(":")
+    target = importlib.import_module(module_name)
+    for part in qualname.split("."):
+        target = getattr(target, part)
+
+    assert inspect.signature(target).parameters[parameter].default is inspect.Parameter.empty

@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from tests.core_config_support import export_config
+from tests.core_config_support import export_config, toolbox_config
 from backend.core.export.exporters.txt_exporter import export_txt
 from backend.core.export.exporters.docx_exporter import export_docx
 from backend.core.export.exporters.pdf_exporter import export_pdf_ua
@@ -18,7 +18,7 @@ def test_export_txt():
 def test_export_docx_renders_on_the_toolbox(monkeypatch):
     calls = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         calls.append(lang)
         output_path.write_bytes(b"PK\x03\x04")
         return {}
@@ -26,7 +26,7 @@ def test_export_docx_renders_on_the_toolbox(monkeypatch):
     monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "test.docx"
-        result = export_docx("# Titulo\n\nParagrafo.", out, "test.docx", export=export_config())
+        result = export_docx("# Titulo\n\nParagrafo.", out, "test.docx", export=export_config(), toolbox=toolbox_config())
         assert result.read_bytes() == b"PK\x03\x04"
         assert calls == ["pt-BR"]
 
@@ -54,7 +54,7 @@ def test_export_pdf_ua_calls_accessible_exporter(monkeypatch):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "test.pdf_ua.pdf"
-        result = export_pdf_ua("Texto exemplo", out, "test.pdf", export=export_config())
+        result = export_pdf_ua("Texto exemplo", out, "test.pdf", export=export_config(), toolbox=toolbox_config())
         assert result.exists()
         assert called["format_name"] == "pdf_ua"
         assert called["profile_name"] == "pdf_ua"

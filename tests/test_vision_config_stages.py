@@ -18,7 +18,7 @@ from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.pipeline.enrichment import formulas as formula_stage
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import document_config, vision_config
+from tests.core_config_support import document_config, toolbox_config, vision_config
 from tests.pddl_support import build_element, build_manifest, install_formula_recognizer
 
 #: Values unlike the service's defaults, so a stage that falls back on them fails.
@@ -109,7 +109,8 @@ async def test_the_formula_recognition_reads_its_vision_config(monkeypatch) -> N
     manifest = build_manifest([build_element("f-1", "formula")], [])
 
     await formula_stage._enrich_formula_latex(
-        manifest, Path("doc.pdf"), mode="medio", document=document_config(), vision=VISION
+        manifest, Path("doc.pdf"), mode="medio", document=document_config(), vision=VISION,
+        toolbox=toolbox_config(),
     )
 
     assert seen == {"region_cache": [True], "threshold": [4], "slots": [3], "delay": []}

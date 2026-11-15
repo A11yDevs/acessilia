@@ -18,8 +18,7 @@ from docstruct.export.filters import strip_internal_audit_blocks
 from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.pandoc_ast import degrade_math_to_text
 
-from backend.config.settings import settings
-from backend.core.config import ExportConfig
+from backend.core.config import ExportConfig, ToolboxConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from backend.core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
@@ -43,7 +42,7 @@ DEFAULT_EXPORT_LANG = "pt-BR"
 
 
 def _toolbox_export(
-    client_cls: Any, ast: dict[str, Any], output_path: Path, *, lang: str
+    client_cls: Any, ast: dict[str, Any], output_path: Path, *, lang: str, toolbox: ToolboxConfig
 ) -> dict[str, Any]:
     """Render ``ast`` on the Toolbox with ``client_cls`` and write it to ``output_path``.
 
@@ -62,7 +61,7 @@ def _toolbox_export(
                 ast,
                 output_path,
                 lang=lang,
-                use_remote_cache=settings.toolbox_use_remote_cache,
+                use_remote_cache=toolbox.use_remote_cache,
             )
         finally:
             await client.close()
@@ -82,25 +81,30 @@ def _toolbox_export(
 
 
 def toolbox_export_pdf_ua(
-    ast: dict[str, Any], output_path: Path, *, lang: str = "pt-BR"
+    ast: dict[str, Any], output_path: Path, *, toolbox: ToolboxConfig, lang: str = "pt-BR"
 ) -> dict[str, Any]:
     """Render ``ast`` as PDF/UA on the Toolbox; returns the ``artifact/pdf-export@1`` document."""
     from acessilia_sdk.toolbox.clients import ToolboxPdfUaClient
 
-    return _toolbox_export(ToolboxPdfUaClient, ast, output_path, lang=lang)
+    return _toolbox_export(ToolboxPdfUaClient, ast, output_path, lang=lang, toolbox=toolbox)
 
 
 def toolbox_export_docx(
-    ast: dict[str, Any], output_path: Path, *, lang: str = "pt-BR"
+    ast: dict[str, Any], output_path: Path, *, toolbox: ToolboxConfig, lang: str = "pt-BR"
 ) -> dict[str, Any]:
     """Render ``ast`` as DOCX on the Toolbox; returns the ``artifact/docx-export@1`` document."""
     from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 
-    return _toolbox_export(ToolboxDocxClient, ast, output_path, lang=lang)
+    return _toolbox_export(ToolboxDocxClient, ast, output_path, lang=lang, toolbox=toolbox)
 
 
 def _render_docx(
-    ast: dict[str, Any], output_path: Path, *, enabled: bool, lang: str = DEFAULT_EXPORT_LANG
+    ast: dict[str, Any],
+    output_path: Path,
+    *,
+    enabled: bool,
+    toolbox: ToolboxConfig,
+    lang: str = DEFAULT_EXPORT_LANG,
 ) -> Path:
     """Renders DOCX on the Toolbox, which pins Pandoc in its image.
 
@@ -115,13 +119,18 @@ def _render_docx(
     if not enabled:
         raise RuntimeError(t(MSG_DOCX_DISABLED))
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    toolbox_export_docx(ast, output_path, lang=lang)
+    toolbox_export_docx(ast, output_path, lang=lang, toolbox=toolbox)
     logger.info(t(LOG_DOCX_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
 
 
 def _render_pdf_ua(
-    ast: dict[str, Any], output_path: Path, *, enabled: bool, lang: str = DEFAULT_EXPORT_LANG
+    ast: dict[str, Any],
+    output_path: Path,
+    *,
+    enabled: bool,
+    toolbox: ToolboxConfig,
+    lang: str = DEFAULT_EXPORT_LANG,
 ) -> Path:
     """Renders PDF/UA on the Toolbox, which pins Pandoc and TeX Live in its image.
 
@@ -148,7 +157,7 @@ def _render_pdf_ua(
     from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
     output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        toolbox_export_pdf_ua(ast, output_path, lang=lang)
+        toolbox_export_pdf_ua(ast, output_path, lang=lang, toolbox=toolbox)
     except ToolboxInvalidInput as exc:
         # ToolboxInvalidInput means the request reached a healthy renderer and
         # the AST itself is the problem — but not every rejection is about
@@ -164,7 +173,7 @@ def _render_pdf_ua(
         # is a deterministic degradation, not a failover — the formulas go as
         # literal text, the way the HTML and TXT renderers already show them.
         logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=exc))
-        toolbox_export_pdf_ua(degraded, output_path, lang=lang)
+        toolbox_export_pdf_ua(degraded, output_path, lang=lang, toolbox=toolbox)
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
 
@@ -177,6 +186,7 @@ def export_accessible_document(
     title: str | None = None,
     profile_name: str | None = None,
     export: ExportConfig | None = None,
+    toolbox: ToolboxConfig | None = None,
 ) -> Path:
     """Exports a canonical document (or raw markdown/text) to the named format.
 
@@ -187,6 +197,7 @@ def export_accessible_document(
         title (str | None): Document title override; when None the localized default title from MSG_DEFAULT_ACCESSIBLE_TITLE is used.
         profile_name (str | None): Export verbosity profile applied to block filtering and validation; falls back to format_name when None.
         export (ExportConfig | None): The run's export configuration; required for "docx" and "pdf_ua", whose Toolbox rendering it enables.
+        toolbox (ToolboxConfig | None): The run's Toolbox configuration; required for "docx" and "pdf_ua", which the Toolbox renders.
 
     Returns:
         Path: The output_path where the formatted document was written.
@@ -194,7 +205,7 @@ def export_accessible_document(
     Raises:
         ValueError: When the deterministic audit reports BLOCKER findings, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
         RuntimeError: When format_name is "pdf_ua" or "docx" and the run's ExportConfig disables it.
-        TypeError: When format_name is "pdf_ua" or "docx" and no ExportConfig is given.
+        TypeError: When format_name is "pdf_ua" or "docx" and no ExportConfig or ToolboxConfig is given.
         acessilia_sdk.toolbox.errors.ToolboxError: When format_name is "pdf_ua" or "docx" and the Toolbox cannot render or deliver the file.
     """
     document = _ensure_document(
@@ -221,10 +232,14 @@ def export_accessible_document(
     lang = filtered.get("language") or DEFAULT_EXPORT_LANG
     if format_name == "docx":
         enabled = _export_config(export, format_name).toolbox_docx_enabled
-        return _render_docx(ast, output_path, enabled=enabled, lang=lang)
+        return _render_docx(
+            ast, output_path, enabled=enabled, toolbox=_toolbox_config(toolbox, format_name), lang=lang
+        )
     if format_name == "pdf_ua":
         enabled = _export_config(export, format_name).toolbox_pdf_ua_enabled
-        return _render_pdf_ua(ast, output_path, enabled=enabled, lang=lang)
+        return _render_pdf_ua(
+            ast, output_path, enabled=enabled, toolbox=_toolbox_config(toolbox, format_name), lang=lang
+        )
     if format_name == "txt":
         from backend.core.export.renderers.txt_renderer import render_txt
 
@@ -237,6 +252,13 @@ def _export_config(export: ExportConfig | None, format_name: str) -> ExportConfi
     if export is None:
         raise TypeError(f"exporting {format_name} needs the run's ExportConfig")
     return export
+
+
+def _toolbox_config(toolbox: ToolboxConfig | None, format_name: str) -> ToolboxConfig:
+    """The run's ``ToolboxConfig``, which a Toolbox-rendered format cannot do without."""
+    if toolbox is None:
+        raise TypeError(f"exporting {format_name} needs the run's ToolboxConfig")
+    return toolbox
 
 
 def _ensure_document(

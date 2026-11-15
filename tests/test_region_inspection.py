@@ -299,7 +299,7 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
     orchestrator = _orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=lambda *args, **kwargs: manifest)
 
-    async def no_media(*args):
+    async def no_media(*args, **kwargs):
         return None
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", no_media)

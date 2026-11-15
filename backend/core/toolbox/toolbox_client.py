@@ -124,13 +124,8 @@ TOOLBOX_FIELDS_STILL_IN_SETTINGS = (
     "timeout_seconds",
     "retries",
     "retry_backoff_seconds",
-    "extraction_timeout_seconds",
     "providers",
     "timeouts",
-    "use_remote_cache",
-    "use_artifact_store",
-    "media_inspect_enabled",
-    "pdf_validate_enabled",
 )
 
 

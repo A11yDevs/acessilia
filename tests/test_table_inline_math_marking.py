@@ -9,7 +9,7 @@ import pytest
 
 from backend.core.pipeline.enrichment import inline_math as inline_math_stage
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
-from tests.core_config_support import document_config
+from tests.core_config_support import document_config, toolbox_config
 from tests.pddl_support import build_element, build_manifest
 
 HEIGHT = 792.0
@@ -89,7 +89,7 @@ def _manifest():
 def spans(monkeypatch):
     calls = []
 
-    async def fetch(source_path, pages, *, artifact_id=None, client=None):
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
         calls.append(pages)
         return {1: {"page_number": 1, "width": 612.0, "height": HEIGHT, "rotation": 0,
                     "lines": [{"bbox": [0, 0, 0, 0], "spans": line} for line in [PARAGRAPH, *LINES]]}}
@@ -102,7 +102,11 @@ def _run(manifest, text_spans=None, detection="fonts"):
     document = document_config(inline_math_detection=detection)
     return asyncio.run(
         inline_math_stage._mark_table_inline_math(
-            manifest, Path("/tmp/amostra.pdf"), document, text_spans
+            manifest,
+            Path("/tmp/amostra.pdf"),
+            document,
+            text_spans
+            or inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"), toolbox_config()),
         )
     )
 
@@ -146,7 +150,7 @@ def test_a_marked_table_is_not_marked_again(spans):
 
 def test_the_prose_and_table_steps_fetch_a_page_once(spans):
     manifest = _manifest()
-    reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
+    reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"), toolbox=toolbox_config())
 
     asyncio.run(
         inline_math_stage._mark_inline_math(
@@ -171,7 +175,7 @@ def test_an_unavailable_capability_is_asked_once(monkeypatch, spans):
 
     monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", failing)
     manifest = _manifest()
-    reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
+    reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"), toolbox=toolbox_config())
 
     asyncio.run(
         inline_math_stage._mark_inline_math(
@@ -226,7 +230,7 @@ def test_an_unclaimed_slash_is_not_composed_inside_a_marked_cell(spans):
 
 
 def test_a_slash_on_a_tables_second_page_is_claimed_there(monkeypatch, spans):
-    async def fetch(source_path, pages, *, artifact_id=None, client=None):
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
         # Page 1 holds the table's first rows, set as plain text.
         first = [_span("rows", "CMR12", 11.96, (180.0, 700.0, 210.0, 712.0), 709.0)]
         return {

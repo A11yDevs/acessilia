@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
-from tests.core_config_support import core_config
+from tests.core_config_support import core_config, toolbox_config
 import pytest
 
 from tests.core_config_support import fusion_config
@@ -115,9 +115,10 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: secondary,
     )
-    result = ToolboxManifestExtractor(client=primary, use_artifact_store=False).extract(
+    result = ToolboxManifestExtractor(client=primary).extract(
         source,
         fusion=fusion_config(mode="dual"),
+        toolbox=toolbox_config(use_artifact_store=False),
     )
     assert result.configuration["fusion"]["status"] == "degraded"
     assert result.configuration["fusion"]["failed_providers"] == ["mineru"]
@@ -137,9 +138,11 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
         extract_structure=AsyncMock(return_value=deepcopy(SAMPLE_TOOLBOX_RESPONSE)),
     )
 
-    extracted = ToolboxManifestExtractor(
-        client=primary, use_artifact_store=False
-    ).extract(source, fusion=fusion_config(mode="dual", secondary_provider="docling"))
+    extracted = ToolboxManifestExtractor(client=primary).extract(
+        source,
+        fusion=fusion_config(mode="dual", secondary_provider="docling"),
+        toolbox=toolbox_config(use_artifact_store=False),
+    )
 
     assert extracted.configuration["fusion"]["status"] == "skipped"
     assert extracted.configuration["fusion"]["reason"] == "identical-providers"
@@ -412,7 +415,7 @@ def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
     policy = FusionPolicy(align_tau=0.4)
     manifest.extractor.configuration['fusion_policy'] = asdict(policy)
     seen = []
-    def extract(path, *, artifact_id=None, policy=None, secondary_provider=None):
+    def extract(path, *, artifact_id=None, policy=None, secondary_provider=None, toolbox=None):
         seen.append(policy)
         return _dual_payload()
     monkeypatch.setattr(fusion_handlers, '_run_extract_fused', extract)
@@ -440,7 +443,7 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
     manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original)
     manifest.extractor.configuration['fusion_policy'] = asdict(original)
     calls = []
-    def extract(path, *, artifact_id=None, policy=None, secondary_provider=None):
+    def extract(path, *, artifact_id=None, policy=None, secondary_provider=None, toolbox=None):
         calls.append(policy)
         return payload
     monkeypatch.setattr(fusion_handlers, '_run_extract_fused', extract)

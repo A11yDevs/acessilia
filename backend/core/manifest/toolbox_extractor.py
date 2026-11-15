@@ -18,7 +18,7 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 from backend.config.settings import settings
-from backend.core.config import FusionConfig
+from backend.core.config import FusionConfig, ToolboxConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
@@ -73,8 +73,6 @@ class ToolboxManifestExtractor:
         client: ToolboxStructureClient | None = None,
         artifact_client: ToolboxArtifactClient | None = None,
         enable_ocr: bool = True,
-        use_artifact_store: bool | None = None,
-        use_remote_cache: bool | None = None,
         fusion_policy: FusionPolicy | None = None,
     ) -> None:
         # Clients passed in are reused and left open. Otherwise each extraction
@@ -85,34 +83,34 @@ class ToolboxManifestExtractor:
         self.enable_ocr = enable_ocr
         # Policy for FUSION_MODE=dual; None keeps the fusion stack's default.
         self.fusion_policy = fusion_policy
-        self.use_artifact_store = (
-            use_artifact_store
-            if use_artifact_store is not None
-            else settings.toolbox_use_artifact_store
-        )
-        self.use_remote_cache = (
-            use_remote_cache
-            if use_remote_cache is not None
-            else settings.toolbox_use_remote_cache
-        )
 
     def extract(
-        self, source_path: Path, *, fusion: FusionConfig, dual_fusion: bool = True
+        self,
+        source_path: Path,
+        *,
+        fusion: FusionConfig,
+        toolbox: ToolboxConfig,
+        dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         """Extract a document's structure using the Toolbox (synchronous).
 
         Runs the asynchronous HTTP calls via asyncio.run() on a separate thread,
         compatible with the existing flow that calls extract() inside
         asyncio.to_thread(). ``fusion`` is the run's ``FusionConfig`` (mode,
-        secondary provider, page routes). With ``dual_fusion=False`` the
+        secondary provider, page routes), and ``toolbox`` its ``ToolboxConfig``
+        (the artifact store, the Toolbox cache, the extraction timeout). With
+        ``dual_fusion=False`` the
         secondary provider is not called even in dual mode (a presentation).
         """
-        timeout = max(1, settings.toolbox_extraction_timeout_seconds)
+        timeout = max(1, toolbox.extraction_timeout_seconds)
         try:
             return asyncio.run(
                 asyncio.wait_for(
                     self._extract_async(
-                        source_path, fusion_config=fusion, dual_fusion=dual_fusion
+                        source_path,
+                        fusion_config=fusion,
+                        toolbox_config=toolbox,
+                        dual_fusion=dual_fusion,
                     ),
                     timeout=timeout,
                 )
@@ -147,7 +145,12 @@ class ToolboxManifestExtractor:
             operation_registry.finish(task_id, operation.operation_id)
 
     async def _extract_async(
-        self, source_path: Path, *, fusion_config: FusionConfig, dual_fusion: bool = True
+        self,
+        source_path: Path,
+        *,
+        fusion_config: FusionConfig,
+        toolbox_config: ToolboxConfig,
+        dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient)
         artifacts = self._artifact_client
@@ -156,12 +159,16 @@ class ToolboxManifestExtractor:
             # uses the actual upload client, which may differ from an injected
             # structure client even when each has only one endpoint.
             structure_urls = (
-                artifact_endpoint_urls(structure) if self.use_artifact_store else set()
+                artifact_endpoint_urls(structure) if toolbox_config.use_artifact_store else set()
             )
-            if artifacts is None and self.use_artifact_store and len(structure_urls) <= 1:
+            if (
+                artifacts is None
+                and toolbox_config.use_artifact_store
+                and len(structure_urls) <= 1
+            ):
                 artifacts = make_toolbox_client(ToolboxArtifactClient)
             use_artifact_store = (
-                self.use_artifact_store
+                toolbox_config.use_artifact_store
                 and artifacts is not None
                 and len(structure_urls | artifact_endpoint_urls(artifacts)) <= 1
             )
@@ -169,6 +176,7 @@ class ToolboxManifestExtractor:
                 structure, artifacts, source_path,
                 use_artifact_store=use_artifact_store,
                 fusion_config=fusion_config,
+                toolbox_config=toolbox_config,
                 dual_fusion=dual_fusion,
             )
         finally:
@@ -185,6 +193,7 @@ class ToolboxManifestExtractor:
         *,
         use_artifact_store: bool,
         fusion_config: FusionConfig,
+        toolbox_config: ToolboxConfig,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
@@ -196,7 +205,7 @@ class ToolboxManifestExtractor:
 
         artifact_id: str | None = None
         upload_error: str | None = None
-        if self.use_artifact_store and not use_artifact_store:
+        if toolbox_config.use_artifact_store and not use_artifact_store:
             logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
         if use_artifact_store and artifacts is not None:
             try:
@@ -228,7 +237,7 @@ class ToolboxManifestExtractor:
                     file_path=None if artifact_id else source_path,
                     artifact_id=artifact_id,
                     language="pt-BR",
-                    use_remote_cache=self.use_remote_cache,
+                    use_remote_cache=toolbox_config.use_remote_cache,
                 )
         except ToolboxError as exc:
             if not dual_enabled or not _provider_failure(exc):
@@ -277,7 +286,7 @@ class ToolboxManifestExtractor:
                             file_path=None if secondary_artifact_id else source_path,
                             artifact_id=secondary_artifact_id,
                             language="pt-BR",
-                            use_remote_cache=self.use_remote_cache,
+                            use_remote_cache=toolbox_config.use_remote_cache,
                         )
                 except ToolboxError as exc:
                     # With the primary's result in hand the comparison is only
@@ -385,7 +394,7 @@ class ToolboxManifestExtractor:
                 ),
                 "use_artifact_store": use_artifact_store,
                 **({"artifact_upload_error": upload_error} if upload_error else {}),
-                "use_remote_cache": self.use_remote_cache,
+                "use_remote_cache": toolbox_config.use_remote_cache,
                 "artifact_id": artifact_id,
                 "cache_key": cache_key,
             },

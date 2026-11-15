@@ -24,6 +24,7 @@ from backend.core.i18n.log_messages import (
 )
 from backend.core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from tests.conftest import COMPLIANT_PDF_UA_REPORT
+from tests.core_config_support import toolbox_config
 
 
 def _rule(clause: str, test_number: int, failed_checks: int, description: str = "A rule") -> dict:
@@ -117,19 +118,18 @@ def test_a_negative_cap_is_refused_at_startup(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_no_audit_when_validation_is_disabled(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_validate_enabled", False)
+async def test_no_audit_when_validation_is_disabled(tmp_path):
 
     class Unused:
         async def validate(self, **_kwargs):
-            pytest.fail("validated with TOOLBOX_PDF_VALIDATE_ENABLED=false")
+            pytest.fail("validated with pdf_validate_enabled=False")
 
-    assert await audit_pdf_ua(tmp_path / "doc.pdf_ua.pdf", client=Unused()) is None
+    toolbox = toolbox_config(pdf_validate_enabled=False)
+    assert await audit_pdf_ua(tmp_path / "doc.pdf_ua.pdf", client=Unused(), toolbox=toolbox) is None
 
 
 @pytest.mark.asyncio
-async def test_the_audit_validates_against_pdf_ua_1(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_pdf_validate_enabled", True)
+async def test_the_audit_validates_against_pdf_ua_1(tmp_path):
     calls = []
 
     class Client:
@@ -139,9 +139,11 @@ async def test_the_audit_validates_against_pdf_ua_1(monkeypatch, tmp_path):
 
     pdf = tmp_path / "doc.pdf_ua.pdf"
 
-    assert await audit_pdf_ua(pdf, client=Client()) == COMPLIANT_PDF_UA_REPORT
+    toolbox = toolbox_config(pdf_validate_enabled=True, use_remote_cache=False)
+    assert await audit_pdf_ua(pdf, client=Client(), toolbox=toolbox) == COMPLIANT_PDF_UA_REPORT
     [call] = calls
     assert call["file_path"] == pdf and call["profile"] == "ua1"
+    assert call["use_remote_cache"] is False
 
 
 @pytest.mark.asyncio
@@ -150,14 +152,16 @@ async def test_the_worker_packages_the_report(monkeypatch, tmp_path):
 
     report = _non_compliant(_rule("7.1", 11, 1))
 
-    async def audit(_pdf_path, **_kwargs):
+    async def audit(_pdf_path, **kwargs):
+        assert kwargs["toolbox"] == toolbox_config()
         return report
 
     monkeypatch.setattr(worker, "audit_pdf_ua", audit)
     executor = worker.JobExecutor()
     try:
         lines, path = await executor._audit_pdf_ua(
-            "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json"
+            "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
+            toolbox_config(),
         )
     finally:
         executor._executor.shutdown(wait=True)
@@ -177,7 +181,8 @@ async def test_a_failed_audit_does_not_fail_the_job(monkeypatch, tmp_path):
     executor = worker.JobExecutor()
     try:
         lines, path = await executor._audit_pdf_ua(
-            "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json"
+            "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
+            toolbox_config(),
         )
     finally:
         executor._executor.shutdown(wait=True)
@@ -222,7 +227,8 @@ async def _run_audit_step(tmp_path, task_id: str = "task") -> tuple[list[str], P
     executor = worker.JobExecutor()
     try:
         return await executor._audit_pdf_ua(
-            task_id, tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json"
+            task_id, tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
+            toolbox_config(),
         )
     finally:
         executor._executor.shutdown(wait=True)

@@ -231,7 +231,10 @@ Proposed: option 2.
      group moves in three pull requests: the planning gate and its
      catalogue (done; the catalogue cache is shared by runs with the same
      endpoint, key and timings), then the switches and the extractor's
-     options, then the client factory and its callers. The method
+     options (done: media inspection, PDF validation, remote cache, artifact
+     store, extraction timeout, and the primary and math providers; each
+     helper that calls the client factory takes the run's `ToolboxConfig`),
+     then the client factory and its callers. The method
      handlers that read the config declare a `config` parameter (the fusion
      handler and the region and page inspection handlers), and each run
      binds its config to them (`bind_config`) on a copy of the registry.

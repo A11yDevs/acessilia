@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests.core_config_support import export_config
+from tests.core_config_support import export_config, toolbox_config
 from backend.core.pipeline.payload import _manifest_pages_to_payload
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.schema import validate_manifest
@@ -67,13 +67,13 @@ def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path
     # DOCX renders on the Toolbox: check the table reaches the AST it receives.
     sent = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         sent.append(ast)
         output_path.write_bytes(b"PK\x03\x04")
         return {}
 
     monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
-    export_docx(canonical, tmp_path / "sample.docx", export=export_config())
+    export_docx(canonical, tmp_path / "sample.docx", export=export_config(), toolbox=toolbox_config())
     [ast] = sent
     [table] = [block for block in ast["blocks"] if block["t"] == "Table"]
     rendered = json.dumps(table, ensure_ascii=False)

@@ -3,7 +3,7 @@
 import hashlib
 from pathlib import Path
 
-from tests.core_config_support import core_config
+from tests.core_config_support import core_config, toolbox_config
 import pytest
 
 from backend.config.settings import settings
@@ -143,7 +143,7 @@ async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
             }}
 
     monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
-    result = await extract_fused("doc.pdf", primary_provider="docling", secondary_provider="mineru")
+    result = await extract_fused("doc.pdf", primary_provider="docling", secondary_provider="mineru", toolbox=toolbox_config())
     elements = result["document"]["elements"]
     assert {element["page_number"] for element in elements} == {1, 2}
     assert all("one" in element["text"] for element in elements if element["page_number"] == 1)

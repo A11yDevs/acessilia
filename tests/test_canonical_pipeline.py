@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import backend.core.i18n as i8n
-from tests.core_config_support import export_config
+from tests.core_config_support import export_config, toolbox_config
 from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.validators import validate_canonical_document
@@ -359,7 +359,7 @@ def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
     from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
 
-    def toolbox_down(ast, output_path, *, lang):
+    def toolbox_down(ast, output_path, *, lang, toolbox):
         raise ToolboxProviderUnavailable("pdf-ua-render offline")
 
     monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_down)
@@ -373,6 +373,7 @@ def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
                 format_name="pdf_ua",
                 title="Titulo",
                 export=export_config(),
+                toolbox=toolbox_config(),
             )
 
 

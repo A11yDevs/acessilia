@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.agents.agno_support import build_agent
+from backend.core.config import ToolboxConfig
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.line_numbers import extract_line_numbers
 from docstruct.fusion.repetition import collapse as collapse, guard_page
@@ -98,6 +99,7 @@ class FusionAgent:
         *,
         language: str = "pt-BR",
         secondary_provider: str,
+        toolbox: ToolboxConfig,
         primary_provider: str | None = None,
     ) -> dict[str, Any]:
         """Merge two toolbox providers into a single fused payload.
@@ -114,6 +116,7 @@ class FusionAgent:
                 language=language,
                 primary_provider=primary_provider,
                 secondary_provider=secondary_provider,
+                toolbox=toolbox,
             )
         )
 
@@ -269,18 +272,18 @@ class FusionAgent:
         Returns:
             dict: Payload fundido com ``document.elements`` e ``fusion_stats``.
         """
-        if secondary_provider is None:
-            # The Agno tool has no run to take a config from: the bridge of
-            # ADR-0016's step 3 reads it from the settings until the last
-            # step-3 pull request gives the agent its configuration.
-            from backend.config.core_config import core_config_from_settings
+        # The Agno tool has no run to take a config from: the bridge of
+        # ADR-0016's step 3 reads it from the settings until the last step-3
+        # pull request gives the agent its configuration.
+        from backend.config.core_config import core_config_from_settings
 
-            secondary_provider = core_config_from_settings().fusion.secondary_provider
+        config = core_config_from_settings()
         return self.process_fuse_providers(
             Path(document_path),
             language=language,
             primary_provider=primary_provider,
-            secondary_provider=secondary_provider,
+            secondary_provider=secondary_provider or config.fusion.secondary_provider,
+            toolbox=config.toolbox,
         )
 
     def audit_document(

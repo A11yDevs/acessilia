@@ -23,7 +23,7 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxInvalidInput,
     ToolboxTimeout,
 )
-from tests.core_config_support import export_config
+from tests.core_config_support import export_config, toolbox_config
 from backend.config.settings import settings
 from backend.core.export import pandoc_exporter
 from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
@@ -92,13 +92,14 @@ def _export_pdf_ua(tmp_path: Path, *, enabled: bool = True) -> Path:
         format_name="pdf_ua",
         title="Relatório",
         export=export_config(toolbox_pdf_ua_enabled=enabled),
+        toolbox=toolbox_config(),
     )
 
 
 def test_exporter_renders_on_the_toolbox(monkeypatch, tmp_path):
     calls = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         calls.append((ast, lang))
         output_path.write_bytes(PDF)
         return {"artifact_id": PDF_ID}
@@ -123,7 +124,7 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(
     monkeypatch, tmp_path, error
 ):
 
-    def failing_toolbox(ast, output_path, *, lang):
+    def failing_toolbox(ast, output_path, *, lang, toolbox):
         raise error
 
     monkeypatch.setattr(
@@ -149,7 +150,7 @@ def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
 def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
     langs = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         langs.append(lang)
         output_path.write_bytes(PDF)
         return {}
@@ -163,6 +164,7 @@ def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
     pandoc_exporter.export_accessible_document(
         document, tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", title="Report",
         export=export_config(),
+        toolbox=toolbox_config(),
     )
 
     assert langs == ["en-US"]
@@ -220,7 +222,7 @@ def test_sync_wrapper_runs_without_an_event_loop(respx_mock, monkeypatch, tmp_pa
         return_value=httpx.Response(200, content=PDF)
     )
 
-    document = toolbox_export_pdf_ua(AST, tmp_path / "doc.pdf")
+    document = toolbox_export_pdf_ua(AST, tmp_path / "doc.pdf", toolbox=toolbox_config())
 
     assert document["artifact_id"] == PDF_ID
     assert (tmp_path / "doc.pdf").read_bytes() == PDF
@@ -235,7 +237,6 @@ def test_sync_wrapper_forwards_the_remote_cache_setting(
 
     monkeypatch.setattr(settings, "toolbox_base_url", BASE_URL)
     monkeypatch.setattr(settings, "toolbox_base_urls", "")
-    monkeypatch.setattr(settings, "toolbox_use_remote_cache", use_remote_cache)
     execute = respx_mock.post(EXECUTE_URL).mock(
         return_value=httpx.Response(200, json=envelope())
     )
@@ -243,7 +244,9 @@ def test_sync_wrapper_forwards_the_remote_cache_setting(
         return_value=httpx.Response(200, content=PDF)
     )
 
-    toolbox_export_pdf_ua(AST, tmp_path / "doc.pdf")
+    toolbox_export_pdf_ua(
+        AST, tmp_path / "doc.pdf", toolbox=toolbox_config(use_remote_cache=use_remote_cache)
+    )
 
     body = execute.calls.last.request.content
     assert (b'name="no_cache"' in body) is (not use_remote_cache)
@@ -291,6 +294,7 @@ def _export_math_document(tmp_path: Path) -> Path:
         format_name="pdf_ua",
         title="Report",
         export=export_config(),
+        toolbox=toolbox_config(),
     )
 
 
@@ -302,7 +306,7 @@ def test_a_math_rejection_degrades_to_text_and_retries_once(monkeypatch, tmp_pat
     as literal text, and one block no longer loses the whole PDF."""
     calls = []
 
-    def fake_toolbox(ast, output_path, *, lang):
+    def fake_toolbox(ast, output_path, *, lang, toolbox):
         calls.append(ast)
         if len(calls) == 1:
             raise ToolboxInvalidInput(
@@ -344,7 +348,7 @@ def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
     outage or a contract drift does not — retrying would only add latency."""
     calls = []
 
-    def failing_toolbox(ast, output_path, *, lang):
+    def failing_toolbox(ast, output_path, *, lang, toolbox):
         calls.append(ast)
         raise error
 
@@ -363,7 +367,7 @@ def test_a_second_rejection_propagates(monkeypatch, tmp_path):
     that is a real failure, not another degradation to attempt."""
     calls = []
 
-    def failing_toolbox(ast, output_path, *, lang):
+    def failing_toolbox(ast, output_path, *, lang, toolbox):
         calls.append(ast)
         raise ToolboxInvalidInput(f"pandoc failed (attempt {len(calls)})")
 
@@ -385,7 +389,7 @@ def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
     request — double the latency of a 42-page render for the same rejection."""
     calls = []
 
-    def failing_toolbox(ast, output_path, *, lang):
+    def failing_toolbox(ast, output_path, *, lang, toolbox):
         calls.append(ast)
         raise ToolboxInvalidInput("pandoc failed")
 
@@ -400,6 +404,7 @@ def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
             format_name="pdf_ua",
             title="Report",
             export=export_config(),
+            toolbox=toolbox_config(),
         )
 
     assert len(calls) == 1
@@ -418,4 +423,12 @@ def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
     with pytest.raises(TypeError, match="ExportConfig"):
         pandoc_exporter.export_accessible_document(
             "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua"
+        )
+
+
+def test_the_format_needs_the_run_toolbox_config(tmp_path):
+    """No fallback to the settings: a Toolbox format without a ``ToolboxConfig`` is a programming error."""
+    with pytest.raises(TypeError, match="ToolboxConfig"):
+        pandoc_exporter.export_accessible_document(
+            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", export=export_config()
         )

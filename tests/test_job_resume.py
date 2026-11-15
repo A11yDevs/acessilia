@@ -176,7 +176,7 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
     counts = {"inspect": 0, "extract": 0, "enrich": 0}
     crash = {"armed": True}
 
-    async def inspect(path):
+    async def inspect(path, _toolbox):
         counts["inspect"] += 1
         return None, {}
 
@@ -229,7 +229,7 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
     manifest = _sample_manifest()
     counts = {"inspect": 0}
 
-    async def inspect(_path):
+    async def inspect(_path, _toolbox):
         counts["inspect"] += 1
         return None, {}
 
@@ -518,7 +518,7 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         handler_calls.append(obligation_id)
         return MethodResult(success=True, validated=True)
 
-    async def inspect(_path):
+    async def inspect(_path, _toolbox):
         return None, {}
 
     async def enrich(*_args, **_kwargs):

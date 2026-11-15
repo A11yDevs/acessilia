@@ -13,6 +13,7 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
 from backend.config.core_config import core_config_from_settings
+from backend.core.config import ToolboxConfig
 from backend.config.settings import settings
 from backend.services import job_checkpoint, shutdown
 from backend.services.job_store import load_record, save_status, pending_records
@@ -313,7 +314,7 @@ class JobExecutor:
         return path
 
     async def _audit_pdf_ua(
-        self, task_id: str, pdf_path: Path, report_path: Path
+        self, task_id: str, pdf_path: Path, report_path: Path, toolbox: ToolboxConfig
     ) -> tuple[list[str], Path | None]:
         """veraPDF audit of the PDF/UA: the e-mail lines and the packaged report.
 
@@ -326,7 +327,7 @@ class JobExecutor:
         """
         state_manager.atualizar(task_id, etapa=t(STAGE_AUDITING_PDF_UA), progresso=0.94)
         try:
-            report = await _until_cancelled(task_id, audit_pdf_ua(pdf_path))
+            report = await _until_cancelled(task_id, audit_pdf_ua(pdf_path, toolbox=toolbox))
             if report is None:
                 return [], None
             lines = summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules)
@@ -434,9 +435,11 @@ class JobExecutor:
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []
             optional_errors: list[str] = []
-            # One snapshot of the export settings for the whole job: the skip
-            # decisions below and the exporters read the same values.
-            export = core_config_from_settings().export
+            # One snapshot of the export and Toolbox settings for the whole
+            # job: the skip decisions below, the exporters and the audit read
+            # the same values.
+            job_config = core_config_from_settings()
+            export, toolbox = job_config.export, job_config.toolbox
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_TXT), progresso=0.85)
             txt_path = out_dir / f"{base}.txt"
@@ -481,7 +484,7 @@ class JobExecutor:
                 enabled=export.toolbox_docx_enabled,
                 stage=STAGE_EXPORTING_DOCX,
                 progress=0.92,
-                export_fn=functools.partial(export_docx, export=export),
+                export_fn=functools.partial(export_docx, export=export, toolbox=toolbox),
                 canonical=delivered,
                 path=out_dir / f"{base}.docx",
                 filename=job.filename,
@@ -498,7 +501,7 @@ class JobExecutor:
                 enabled=export.toolbox_pdf_ua_enabled,
                 stage=STAGE_EXPORTING_PDF_UA,
                 progress=0.93,
-                export_fn=functools.partial(export_pdf_ua, export=export),
+                export_fn=functools.partial(export_pdf_ua, export=export, toolbox=toolbox),
                 canonical=delivered,
                 path=out_dir / f"{base}.pdf_ua.pdf",
                 filename=job.filename,
@@ -514,7 +517,7 @@ class JobExecutor:
                 if not isinstance(pdf_ua_path, Path):
                     return [], None
                 return await self._audit_pdf_ua(
-                    task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json"
+                    task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json", toolbox
                 )
 
             async def mp3() -> Path | None:

@@ -30,7 +30,7 @@ from docstruct.text.negation_overlay import (
     is_detached_overlay,
 )
 
-from backend.core.config import DocumentConfig
+from backend.core.config import DocumentConfig, ToolboxConfig
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -56,9 +56,12 @@ class _TextSpanReader:
     from the Toolbox once, and a capability that failed is not asked again.
     """
 
-    def __init__(self, manifest: ProcessingManifest, source_path: Path) -> None:
+    def __init__(
+        self, manifest: ProcessingManifest, source_path: Path, toolbox: ToolboxConfig
+    ) -> None:
         self._manifest = manifest
         self._source_path = source_path
+        self._toolbox = toolbox
         self._pages: dict[int, dict[str, Any]] = {}
         self._failed = False
 
@@ -76,7 +79,10 @@ class _TextSpanReader:
             try:
                 self._pages.update(
                     await fetch_text_spans(
-                        self._source_path, missing, artifact_id=_source_artifact_id(self._manifest)
+                        self._source_path,
+                        missing,
+                        toolbox=self._toolbox,
+                        artifact_id=_source_artifact_id(self._manifest),
                     )
                 )
             except ToolboxError as exc:
@@ -109,7 +115,7 @@ async def _mark_inline_math(
     manifest: ProcessingManifest,
     source_path: Path,
     document: DocumentConfig,
-    text_spans: _TextSpanReader | None = None,
+    text_spans: _TextSpanReader,
 ) -> dict[str, int]:
     """Write the inline math of PDF prose as ``$…$``, from the text layer's fonts (#265).
 
@@ -142,7 +148,7 @@ async def _mark_inline_math(
     pages = _boxed_pages(candidates)
     if not pages:
         return counts
-    spans = await (text_spans or _TextSpanReader(manifest, source_path)).pages(pages)
+    spans = await text_spans.pages(pages)
     if spans is None:
         return counts
 
@@ -176,7 +182,7 @@ async def _mark_table_inline_math(
     manifest: ProcessingManifest,
     source_path: Path,
     document: DocumentConfig,
-    text_spans: _TextSpanReader | None = None,
+    text_spans: _TextSpanReader,
 ) -> dict[str, int]:
     """Write the inline math of PDF table cells as ``$…$`` (#260).
 
@@ -201,7 +207,7 @@ async def _mark_table_inline_math(
     pages = _boxed_pages(tables)
     if not pages:
         return counts
-    spans = await (text_spans or _TextSpanReader(manifest, source_path)).pages(pages)
+    spans = await text_spans.pages(pages)
     if spans is None:
         return counts
 

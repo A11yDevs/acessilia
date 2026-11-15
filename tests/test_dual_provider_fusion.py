@@ -1,12 +1,14 @@
 """Tests for the dual-provider-fusion PDDL method handler."""
 from __future__ import annotations
 
+from dataclasses import replace
+
 import json
 from datetime import datetime, timezone
 from importlib.util import find_spec
 from pathlib import Path
 
-from tests.core_config_support import core_config
+from tests.core_config_support import core_config, toolbox_config
 import pytest
 
 from backend.core.pipeline.handlers.registry import bind_config
@@ -185,15 +187,30 @@ def _forbid_toolbox(monkeypatch):
     monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", fail)
 
 
+def _provider(name):
+    """A run whose configured extraction provider is ``name``, whatever the settings say."""
+    return replace(core_config(), toolbox=toolbox_config(providers={"toolbox_provider": name}))
+
+
+def test_single_provider_follows_the_run_config_not_the_settings(tmp_path, monkeypatch):
+    manifest = _make_manifest(tmp_path)
+    manifest.extractor.configuration["toolbox_provider"] = "other-provider"
+    monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
+    _forbid_toolbox(monkeypatch)
+
+    result = _handle_single_provider_method(manifest, "o-fuse", config=_provider("other-provider"))
+
+    assert result.success is True, result.message
+
+
 def test_single_provider_accepts_the_manifest_extraction_without_the_toolbox(
     tmp_path, monkeypatch
 ):
     manifest = _make_manifest(tmp_path)
     manifest.extractor.configuration["toolbox_provider"] = "docling"
-    monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
     _forbid_toolbox(monkeypatch)
 
-    result = _handle_single_provider_method(manifest, "o-fuse")
+    result = _handle_single_provider_method(manifest, "o-fuse", config=_provider("docling"))
 
     assert result.success is True
     assert result.validated is True
@@ -214,10 +231,9 @@ def test_single_provider_rejects_an_extraction_it_cannot_vouch_for(
     manifest = _make_manifest(tmp_path)
     if recorded is not None:
         manifest.extractor.configuration["toolbox_provider"] = recorded
-    monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
     _forbid_toolbox(monkeypatch)
 
-    result = _handle_single_provider_method(manifest, "o-fuse")
+    result = _handle_single_provider_method(manifest, "o-fuse", config=_provider("docling"))
 
     assert result.success is False
     assert result.validated is False

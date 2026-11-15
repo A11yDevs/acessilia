@@ -5,7 +5,7 @@ import pytest
 
 from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
-from tests.core_config_support import document_config, vision_config
+from tests.core_config_support import document_config, toolbox_config, vision_config
 from backend.core.pipeline.handlers import review as review_handlers
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.pipeline.elements import _element_to_block
@@ -56,7 +56,7 @@ async def test_drawing_is_reclassified_and_description_is_not_requested_twice(mo
         pytest.fail("A drawing must never reach mathematical recognition")
 
     install_formula_recognizer(monkeypatch, unexpected)
-    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config())
+    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config())
     await picture_stage._enrich_picture_descriptions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config())
     element = manifest.elements[0]
     assert element.type == "picture"
@@ -82,7 +82,7 @@ async def test_mathematical_formula_still_uses_math_recognize(monkeypatch):
     install_formula_recognizer(monkeypatch, recognize)
     breaker = pddl.ProviderBreaker(3)
     await formula_stage._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config())
-    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config())
+    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config())
     assert manifest.elements[0].type == "formula"
     assert manifest.elements[0].text == r"x=\frac{a}{b}"
     assert recognized == [b"crop"]
@@ -103,7 +103,7 @@ async def test_unresolved_classification_keeps_source_and_requires_review(monkey
     install_formula_recognizer(monkeypatch, unexpected)
     breaker = pddl.ProviderBreaker(3)
     await formula_stage._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config())
-    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config())
+    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config())
     assert manifest.elements[0].text == "original text"
     classification = manifest.elements[0].metadata["formula_classification"]
     assert (classification["status"], classification["reason"]) == (
@@ -166,6 +166,7 @@ async def test_a_classification_without_an_answer_keeps_the_formula_path(monkeyp
     await formula_stage._enrich_formula_latex(
         manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=pddl.ProviderBreaker(3),
         vision=vision_config(),
+        toolbox=toolbox_config(),
     )
     assert recognized == [b"crop"]
 
@@ -239,7 +240,7 @@ async def test_the_recognition_fallback_records_its_own_reclassification(monkeyp
     install_vision(monkeypatch, VisionOutput(
         kind="description", description="A benzene ring.", language="en", confidence=0.7,
     ))
-    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config())
+    await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config())
 
     element = manifest.elements[0]
     assert element.type == "picture"

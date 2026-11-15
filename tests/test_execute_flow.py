@@ -26,7 +26,7 @@ def _recorders(monkeypatch):
             calls.append((name, source.name, tuple(args), dict(kwargs)))
         return step
 
-    async def inspect(path):
+    async def inspect(path, *, toolbox):
         calls.append(("inspect", path.name, (), {}))
         return None
 
@@ -86,6 +86,43 @@ async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, t
 
 
 @pytest.mark.asyncio
+async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_path) -> None:
+    """ADR-0016 step 3, toolbox PR 2: media inspection, extraction, text spans, formulas."""
+    from dataclasses import replace
+
+    from tests.core_config_support import toolbox_config
+
+    config = replace(core_config(), toolbox=toolbox_config(use_remote_cache=False, media_inspect_enabled=False))
+    calls = _recorders(monkeypatch)
+    inspected = []
+
+    async def inspect(path, *, toolbox):
+        inspected.append(toolbox)
+        return None
+
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
+    manifest = build_manifest([build_element("h", "heading", text="Titulo")], [])
+    processed = []
+
+    def process(*_args, **kwargs):
+        processed.append(kwargs["toolbox"])
+        return manifest
+
+    orchestrator = build_orchestrator(max_replans=1)
+    orchestrator.config = config
+    orchestrator.information_structural = SimpleNamespace(process=process)
+
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+
+    by_name = {call[0]: call for call in calls}
+    assert inspected == [config.toolbox]
+    assert processed == [config.toolbox]
+    assert by_name["_enrich_formula_latex"][3]["toolbox"] is config.toolbox
+    assert by_name["_mark_inline_math"][2][1]._toolbox is config.toolbox
+    assert manifest.extractor.configuration["media_inspection"] == "disabled"
+
+
+@pytest.mark.asyncio
 async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tmp_path) -> None:
     """Runs share the stages, not their config: each stage call sees its own run's."""
     import asyncio
@@ -99,7 +136,7 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
     async def no_step(*_args, **_kwargs):
         return None
 
-    async def inspect(path):
+    async def inspect(path, *, toolbox):
         return None
 
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions",

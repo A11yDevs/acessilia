@@ -15,6 +15,7 @@ from acessilia_sdk.toolbox.clients.pdf import TEXT_SPANS_MAX_PAGES, ToolboxPdfCl
 from acessilia_sdk.toolbox.errors import ToolboxError
 
 from backend.core.toolbox import text_spans
+from tests.core_config_support import toolbox_config
 
 
 class _FakeSpansClient(ToolboxPdfClient):
@@ -48,13 +49,15 @@ def owned(monkeypatch):
         return client
 
     monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", make)
-    from backend.config.settings import settings
-    monkeypatch.setattr(settings, "toolbox_use_remote_cache", False)
     return client, made
 
 
 def _fetch(pages, **kwargs):
-    return asyncio.run(text_spans.fetch_text_spans(Path("/tmp/a.pdf"), pages, **kwargs))
+    return asyncio.run(
+        text_spans.fetch_text_spans(
+            Path("/tmp/a.pdf"), pages, **kwargs, toolbox=toolbox_config(use_remote_cache=False)
+        )
+    )
 
 
 def test_pages_are_asked_sorted_once_each_in_batches(owned) -> None:

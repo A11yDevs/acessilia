@@ -14,6 +14,7 @@ import pytest
 from backend.core.toolbox import media_inspect
 from backend.core.toolbox.media_inspect import inspect_source_media
 from backend.core.pipeline import preflight as pipeline_preflight
+from tests.core_config_support import toolbox_config
 
 IMAGE = Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg"
 INSPECTION = {
@@ -41,17 +42,16 @@ class RecordingClient:
 
 
 @pytest.fixture
-def enabled(monkeypatch):
-    from backend.config import settings as settings_module
-
-    monkeypatch.setattr(settings_module.settings, "toolbox_media_inspect_enabled", True)
+def enabled():
+    """A run whose Toolbox config turns the inspection on."""
+    return toolbox_config(media_inspect_enabled=True)
 
 
 @pytest.mark.asyncio
 async def test_returns_the_toolbox_document(enabled) -> None:
     client = RecordingClient()
 
-    result = await inspect_source_media(IMAGE, client=client)
+    result = await inspect_source_media(IMAGE, client=client, toolbox=enabled)
 
     assert result == INSPECTION
     assert client.calls[0]["file_path"] == IMAGE.resolve()
@@ -67,24 +67,22 @@ async def test_owned_client_is_closed_after_a_failure(enabled, monkeypatch) -> N
     monkeypatch.setattr(toolbox_client, "make_toolbox_client", lambda _cls: client)
 
     with pytest.raises(ToolboxError):
-        await inspect_source_media(IMAGE)
+        await inspect_source_media(IMAGE, toolbox=enabled)
 
     assert client.closed is True
 
 
 @pytest.mark.asyncio
 async def test_disabled_skips_without_calling_the_toolbox(monkeypatch) -> None:
-    from backend.config import settings as settings_module
     from backend.core.toolbox import toolbox_client
-
-    monkeypatch.setattr(settings_module.settings, "toolbox_media_inspect_enabled", False)
 
     def fail(_cls):
         raise AssertionError("the Toolbox must not be called when disabled")
 
     monkeypatch.setattr(toolbox_client, "make_toolbox_client", fail)
 
-    assert await inspect_source_media(IMAGE) is None
+    toolbox = toolbox_config(media_inspect_enabled=False)
+    assert await inspect_source_media(IMAGE, toolbox=toolbox) is None
 
 
 @pytest.mark.asyncio
@@ -94,26 +92,19 @@ async def test_toolbox_failure_propagates(enabled) -> None:
     client = RecordingClient(error=ToolboxContractViolation("invalid response"))
 
     with pytest.raises(ToolboxContractViolation):
-        await inspect_source_media(IMAGE, client=client)
+        await inspect_source_media(IMAGE, client=client, toolbox=enabled)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("setting", "explicit", "expected"),
-    [(True, None, True), (False, None, False), (True, False, False), (False, True, True)],
-)
-async def test_forwards_the_remote_cache_choice(
-    enabled, monkeypatch, setting, explicit, expected
-) -> None:
-    """TOOLBOX_USE_REMOTE_CACHE applies unless the caller passes its own choice."""
-    from backend.config import settings as settings_module
-
-    monkeypatch.setattr(settings_module.settings, "toolbox_use_remote_cache", setting)
+@pytest.mark.parametrize("use_remote_cache", [True, False])
+async def test_forwards_the_remote_cache_choice(use_remote_cache) -> None:
+    """The run's ``ToolboxConfig.use_remote_cache`` reaches the client."""
     client = RecordingClient()
+    toolbox = toolbox_config(media_inspect_enabled=True, use_remote_cache=use_remote_cache)
 
-    await inspect_source_media(IMAGE, client=client, use_remote_cache=explicit)
+    await inspect_source_media(IMAGE, client=client, toolbox=toolbox)
 
-    assert client.calls[0]["use_remote_cache"] is expected
+    assert client.calls[0]["use_remote_cache"] is use_remote_cache
 
 
 @pytest.mark.asyncio
@@ -125,12 +116,12 @@ async def test_a_missing_document_is_a_contract_violation(enabled) -> None:
     client.result = None
 
     with pytest.raises(ToolboxContractViolation):
-        await inspect_source_media(IMAGE, client=client)
+        await inspect_source_media(IMAGE, client=client, toolbox=enabled)
 
 
 @pytest.mark.asyncio
 async def test_returns_none_for_missing_file(enabled) -> None:
-    assert await inspect_source_media(Path("/tmp/does-not-exist.png")) is None
+    assert await inspect_source_media(Path("/tmp/does-not-exist.png"), toolbox=enabled) is None
 
 
 def test_local_fallback_is_gone() -> None:
@@ -150,16 +141,17 @@ def test_local_fallback_is_gone() -> None:
 async def test_orchestrator_records_the_inspection_status(
     monkeypatch, returned, enabled_setting, status
 ) -> None:
-    from backend.config import settings as settings_module
+    toolbox = toolbox_config(media_inspect_enabled=enabled_setting)
+    received = []
 
-    async def fake(_path):
+    async def fake(_path, *, toolbox):
+        received.append(toolbox)
         return returned
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", fake)
-    monkeypatch.setattr(
-        settings_module.settings, "toolbox_media_inspect_enabled", enabled_setting
-    )
-    result, configuration = await pipeline_preflight._inspect_media(IMAGE)
+    result, configuration = await pipeline_preflight._inspect_media(IMAGE, toolbox=toolbox)
+
+    assert received == [toolbox]
 
     assert result == returned
     assert configuration == {"media_inspection": status}
@@ -179,13 +171,13 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
     """Any exception degrades the step, not only a ToolboxError."""
     from backend.core.toolbox.toolbox_client import ToolboxError
 
-    async def fail(_path):
+    async def fail(_path, *, toolbox):
         if error == "toolbox":
             raise ToolboxError("toolbox down")
         raise ValueError("bad config")
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", fail)
-    result, configuration = await pipeline_preflight._inspect_media(IMAGE)
+    result, configuration = await pipeline_preflight._inspect_media(IMAGE, toolbox=toolbox_config())
 
     assert result is None
     assert configuration == {
@@ -198,13 +190,13 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
 async def test_orchestrator_does_not_swallow_cancellation(monkeypatch) -> None:
     import asyncio
 
-    async def cancelled(_path):
+    async def cancelled(_path, *, toolbox):
         raise asyncio.CancelledError
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", cancelled)
 
     with pytest.raises(asyncio.CancelledError):
-        await pipeline_preflight._inspect_media(IMAGE)
+        await pipeline_preflight._inspect_media(IMAGE, toolbox=toolbox_config())
 
 
 @pytest.mark.parametrize(

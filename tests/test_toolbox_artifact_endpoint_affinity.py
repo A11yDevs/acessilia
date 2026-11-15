@@ -12,7 +12,7 @@ import respx
 from acessilia_sdk.toolbox import ToolboxArtifactNotFound
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
-from tests.core_config_support import fusion_config
+from tests.core_config_support import fusion_config, toolbox_config
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
 
 A = "http://toolbox-a.test"
@@ -136,7 +136,6 @@ async def test_direct_file_extraction_does_not_require_shared_artifact_storage(
     extractor = ToolboxManifestExtractor(
         client=structure,
         artifact_client=artifacts,
-        use_artifact_store=use_artifact_store,
     )
 
     def extract(request: httpx.Request) -> httpx.Response:
@@ -176,7 +175,12 @@ async def test_direct_file_extraction_does_not_require_shared_artifact_storage(
             execute_b = router.post(B + f"/v1/capabilities/{CAPABILITY}:execute").mock(
                 side_effect=extract
             )
-            result = await extractor._extract_async(source, dual_fusion=False, fusion_config=fusion_config())
+            result = await extractor._extract_async(
+                source,
+                dual_fusion=False,
+                fusion_config=fusion_config(),
+                toolbox_config=toolbox_config(use_artifact_store=use_artifact_store),
+            )
             assert result.document["status"] == "succeeded"
             assert result.artifact_id is None
             assert not upload_a.called and not upload_b.called

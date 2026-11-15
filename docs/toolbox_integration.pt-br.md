@@ -318,8 +318,9 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
 - **Cliente:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
 - **Wrapper no core:** `backend/core/toolbox/media_inspect.py` (`inspect_source_media`)
-  chama só a Toolbox; não há fallback local (ADR-0003, F3 da #150). Com
-  `TOOLBOX_MEDIA_INSPECT_ENABLED=false` ele devolve `None` sem chamar a Toolbox,
+  chama só a Toolbox; não há fallback local (ADR-0003, F3 da #150). Ele recebe
+  a `ToolboxConfig` da execução: com `media_inspect_enabled` falso
+  (`TOOLBOX_MEDIA_INSPECT_ENABLED=false`), devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
 - **Integração:** o `backend/core/pipeline/preflight.py` (`_inspect_media`, que o
   `PddlAccessibilityOrchestrator.execute()` roda primeiro) chama `inspect_source_media()` **antes** da extração e usa três sinais:

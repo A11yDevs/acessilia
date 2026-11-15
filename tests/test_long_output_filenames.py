@@ -11,6 +11,7 @@ from backend.api import worker
 from backend.api.app import create_app
 from backend.api.limiter import limiter
 from backend.api.routes import jobs
+from backend.config.core_config import core_config_from_settings
 from backend.config.settings import settings
 from backend.services import download_token_service, queue_service
 
@@ -38,7 +39,11 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
     monkeypatch.setattr(worker, "registrar_conversao", AsyncMock())
     monkeypatch.setattr(worker, "finalizar_conversao", AsyncMock())
 
+    toolboxes = []
+
     def export(document, path, *args, **kwargs):
+        if "toolbox" in kwargs:
+            toolboxes.append(kwargs["toolbox"])
         path.write_bytes(b"audit output")
         return path
 
@@ -48,9 +53,8 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
     for name in ("export_txt", "export_accessible_document", "export_drbench_md", "export_docx", "export_pdf_ua"):
         monkeypatch.setattr(worker, name, export)
     monkeypatch.setattr(worker, "export_mp3", audio)
-    monkeypatch.setattr(worker, "audit_pdf_ua", AsyncMock(return_value={
-        "compliant": True, "profile": "ua1", "failures": [],
-    }))
+    audit = AsyncMock(return_value={"compliant": True, "profile": "ua1", "failures": []})
+    monkeypatch.setattr(worker, "audit_pdf_ua", audit)
     filename = stem + ".pdf"
     try:
         async with httpx.AsyncClient(
@@ -83,6 +87,11 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
                         assert archive.testzip() is None
                         assert len(archive.namelist()) == 6
                         assert all(len(name.encode("utf-8")) <= 255 for name in archive.namelist())
+            # The DOCX and PDF/UA exports and the audit share the job's one snapshot.
+            [(_, audit_kwargs)] = [(c.args, c.kwargs) for c in audit.call_args_list]
+            assert len(toolboxes) == 2
+            assert all(toolbox is audit_kwargs["toolbox"] for toolbox in toolboxes)
+            assert audit_kwargs["toolbox"] == core_config_from_settings().toolbox
     finally:
         executor._executor.shutdown(wait=True)
         if download_token_service._connection is not None:

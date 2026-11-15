@@ -65,7 +65,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         config = core_config_from_settings()
         manifest = agent.process(
-            source, language=args.language, document=config.document, fusion=config.fusion
+            source,
+            language=args.language,
+            document=config.document,
+            fusion=config.fusion,
+            toolbox=config.toolbox,
         )
         payload = manifest.model_dump(mode="json", by_alias=True)
         errors = validate_manifest(payload, args.schema.resolve())
