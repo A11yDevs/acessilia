@@ -17,6 +17,7 @@ import pytest
 
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
+from tests.core_config_support import export_config
 from backend.config.settings import settings
 from backend.core.export import pandoc_exporter
 from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
@@ -32,9 +33,12 @@ AST = {
 }
 
 
-def _export_docx(tmp_path: Path, document: str | dict = "# Relatório\n\nParágrafo.\n") -> Path:
+def _export_docx(
+    tmp_path: Path, document: str | dict = "# Relatório\n\nParágrafo.\n", *, enabled: bool = True
+) -> Path:
     return pandoc_exporter.export_accessible_document(
-        document, tmp_path / "doc.docx", format_name="docx", title="Relatório"
+        document, tmp_path / "doc.docx", format_name="docx", title="Relatório",
+        export=export_config(toolbox_docx_enabled=enabled),
     )
 
 
@@ -48,7 +52,6 @@ def test_client_uses_the_docx_timeout_and_provider(monkeypatch):
 
 
 def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
     calls = []
 
     def fake_toolbox(ast, output_path, *, lang):
@@ -69,7 +72,6 @@ def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, t
 
 
 def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
 
     def toolbox_down(ast, output_path, *, lang):
         raise ToolboxProviderUnavailable("docx renderer offline")
@@ -84,7 +86,6 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_
 def test_numbered_equation_reaches_docx_renderer_without_unsupported_tag(monkeypatch, tmp_path):
     from docstruct.canonical import build_canonical_document
 
-    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
     calls = []
 
     def render(ast, output_path, *, lang):
@@ -102,7 +103,6 @@ def test_numbered_equation_reaches_docx_renderer_without_unsupported_tag(monkeyp
 
 
 def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_docx_enabled", False)
 
     def toolbox_must_not_run(*args, **kwargs):
         raise AssertionError("the Toolbox ran while DOCX is disabled")
@@ -112,7 +112,7 @@ def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
     )
 
     with pytest.raises(RuntimeError, match="TOOLBOX_DOCX_ENABLED=false"):
-        _export_docx(tmp_path)
+        _export_docx(tmp_path, enabled=False)
 
 
 @pytest.mark.parametrize(
@@ -145,7 +145,6 @@ def test_the_python_docx_renderer_is_gone():
 
 
 def test_the_destination_directory_is_created(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
 
     def fake_toolbox(ast, output_path, *, lang):
         assert output_path.parent.is_dir()
@@ -154,7 +153,8 @@ def test_the_destination_directory_is_created(monkeypatch, tmp_path):
 
     monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     output = pandoc_exporter.export_accessible_document(
-        "# Relatório\n", tmp_path / "missing" / "doc.docx", format_name="docx"
+        "# Relatório\n", tmp_path / "missing" / "doc.docx", format_name="docx",
+        export=export_config(),
     )
     assert output.read_bytes() == DOCX
 
@@ -194,7 +194,6 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
     """build_pandoc_ast is shared with PDF/UA: a math macro the renderers must
     not compile (\write18, \input, ...) goes as text in every Pandoc-rendered
     format, not only where LaTeX runs."""
-    monkeypatch.setattr(settings, "toolbox_docx_enabled", True)
     captured = []
 
     def fake_toolbox(ast, output_path, *, lang):
@@ -221,7 +220,8 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
     }
 
     pandoc_exporter.export_accessible_document(
-        document, tmp_path / "doc.docx", format_name="docx", title="Report"
+        document, tmp_path / "doc.docx", format_name="docx", title="Report",
+        export=export_config(),
     )
 
     ast, = captured

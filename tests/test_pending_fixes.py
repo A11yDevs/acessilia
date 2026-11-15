@@ -208,7 +208,7 @@ async def test_email_delivery_status_does_not_lose_download(
     def export(document, destination, *a, **kw):
         destination.write_text("output")
 
-    async def audio(text, destination, **kw):
+    async def audio(text, destination, voice, **kw):
         destination.write_bytes(b"audio")
 
     async def confirmation(*a):
@@ -260,7 +260,7 @@ async def test_result_email_reports_open_obligations_of_a_delivered_document(
     def export(document, destination, *a, **kw):
         destination.write_text("output")
 
-    async def audio(text, destination, **kw):
+    async def audio(text, destination, voice, **kw):
         destination.write_bytes(b"audio")
 
     async def confirmation(*a):

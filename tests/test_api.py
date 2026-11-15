@@ -932,7 +932,7 @@ async def test_job_executor_keeps_original_filename_in_status(
     def write_file(_canonical, destination, _filename=None, **_kwargs):
         destination.write_text("conteudo", encoding="utf-8")
 
-    async def write_mp3(_text, destination, **_kwargs):
+    async def write_mp3(_text, destination, _voice, **_kwargs):
         destination.write_bytes(b"audio")
 
     async def fake_token(*args, **kwargs):
@@ -990,6 +990,7 @@ async def test_job_executor_reports_optional_export_failure(
     docx_disabled = failed_format == "DOCX disabled"
     monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", not pdf_ua_disabled)
     monkeypatch.setattr(settings, "toolbox_docx_enabled", not docx_disabled)
+    monkeypatch.setattr(settings, "tts_voice", "pt-BR-AntonioNeural")
     if pdf_ua_disabled or docx_disabled:
         failed_format = None
 
@@ -1010,19 +1011,22 @@ async def test_job_executor_reports_optional_export_failure(
     async def fail_mp3(*args, **kwargs):
         raise RuntimeError("tts offline")
 
-    def fail_pdf_ua(_canonical, destination, _filename):
+    def fail_pdf_ua(_canonical, destination, _filename, **_kwargs):
         from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
         destination.write_bytes(b"partial pdf")
         raise ToolboxProviderUnavailable("pdf-ua-render unavailable")
 
-    def fail_docx(_canonical, destination, _filename):
+    def fail_docx(_canonical, destination, _filename, **_kwargs):
         from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
         destination.write_bytes(b"partial docx")
         raise ToolboxProviderUnavailable("docx renderer unavailable")
 
-    async def write_mp3(_text, destination, **_kwargs):
+    voices: list[str] = []
+
+    async def write_mp3(_text, destination, voice, **_kwargs):
+        voices.append(voice)
         destination.write_bytes(b"audio")
 
     registered_formats = []
@@ -1043,8 +1047,17 @@ async def test_job_executor_reports_optional_export_failure(
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_drbench_md", write_file)
-    monkeypatch.setattr("backend.api.worker.export_docx", write_file)
-    monkeypatch.setattr("backend.api.worker.export_pdf_ua", write_file)
+    toolbox_exports: dict[str, object] = {}
+
+    def toolbox_export(name):
+        def export(canonical, destination, filename=None, **kwargs):
+            toolbox_exports[name] = kwargs.get("export")
+            return write_file(canonical, destination, filename)
+
+        return export
+
+    monkeypatch.setattr("backend.api.worker.export_docx", toolbox_export("docx"))
+    monkeypatch.setattr("backend.api.worker.export_pdf_ua", toolbox_export("pdf_ua"))
     monkeypatch.setattr("backend.api.worker.export_accessible_document", write_file)
     if failed_format == "PDF/UA":
         monkeypatch.setattr("backend.api.worker.export_pdf_ua", fail_pdf_ua)
@@ -1095,6 +1108,17 @@ async def test_job_executor_reports_optional_export_failure(
 
     if failed_format == "MP3":
         assert not (output_dir / "audio.mp3").exists()
+    else:
+        # The job's export config carries the configured voice to the exporter.
+        assert voices == ["pt-BR-AntonioNeural"]
+    # The Toolbox formats that ran got the job's export config, with the
+    # setting that let them run.
+    if "docx" in toolbox_exports:
+        assert toolbox_exports["docx"].toolbox_docx_enabled is True
+    if "pdf_ua" in toolbox_exports:
+        assert toolbox_exports["pdf_ua"].toolbox_pdf_ua_enabled is True
+    assert ("docx" in toolbox_exports) is (not docx_disabled and failed_format != "DOCX")
+    assert ("pdf_ua" in toolbox_exports) is (not pdf_ua_disabled and failed_format != "PDF/UA")
     pdf_ua_produced = failed_format != "PDF/UA" and not pdf_ua_disabled
     if not pdf_ua_produced:
         assert not (output_dir / "audio.pdf_ua.pdf").exists()

@@ -600,6 +600,7 @@ def pdf_text(path: Path) -> str:
 
 async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, Path | None]:
     """Run the core on ``pdf`` and write the canonical document, TXT and PDF/UA."""
+    from backend.config.core_config import core_config_from_settings
     from backend.core.export.exporters.pdf_exporter import export_pdf_ua
     from backend.core.export.exporters.txt_exporter import export_txt
     from backend.service import process
@@ -613,7 +614,7 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
     pdf_ua_path = None
     if pdf_ua:
         pdf_ua_path = out / f"{pdf.stem}.pdf_ua.pdf"
-        export_pdf_ua(canonical, pdf_ua_path, pdf.name)
+        export_pdf_ua(canonical, pdf_ua_path, pdf.name, export=core_config_from_settings().export)
     return canonical_path, txt_path, pdf_ua_path
 
 

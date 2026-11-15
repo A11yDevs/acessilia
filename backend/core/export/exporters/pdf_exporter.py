@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+from backend.core.config import ExportConfig
 from backend.core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
 from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.i18n import t
@@ -14,6 +15,8 @@ def export_pdf_ua(
     text: str | dict[str, Any],
     output_path: Path,
     title: str | None = None,
+    *,
+    export: ExportConfig,
 ) -> Path:
     """Export a canonical document (or raw markdown/text) to an accessible PDF/UA document.
 
@@ -21,6 +24,7 @@ def export_pdf_ua(
         text (str | dict): Raw markdown/text or a canonical document mapping to export.
         output_path (Path): Destination file path for the rendered PDF/UA.
         title (str | None): Document title override; when None the localized default title is used.
+        export (ExportConfig): The run's export configuration, which enables the Toolbox rendering.
 
     Returns:
         Path: The output_path where the PDF/UA was written.
@@ -31,6 +35,7 @@ def export_pdf_ua(
         format_name="pdf_ua",
         title=title or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
         profile_name="pdf_ua",
+        export=export,
     )
     logger.debug(t(LOG_PDF_UA_EXPORTED).format(output_path=output_path))
     return result

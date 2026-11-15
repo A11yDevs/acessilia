@@ -10,6 +10,7 @@ from typing import Any
 
 from docstruct.export.markers import wrap_object_markers
 
+from backend.core.config import ExportConfig
 from backend.core.i18n import t
 
 #: Canonical English msgid for the marker word of a described picture.
@@ -29,14 +30,15 @@ def object_marker_labels() -> dict[str, str]:
     }
 
 
-def with_object_markers(document: dict[str, Any], enabled: bool | None) -> dict[str, Any]:
+def with_object_markers(
+    document: dict[str, Any], enabled: bool | None, export: ExportConfig
+) -> dict[str, Any]:
     """``document`` with its objects enclosed in markers when ``enabled``.
 
-    ``enabled`` is the job's own choice; None falls back to
-    OBJECT_MARKERS_ENABLED. The document is returned unchanged when off.
+    ``enabled`` is the job's own choice; None falls back to the run's
+    ``ExportConfig.object_markers_enabled``. The document is returned
+    unchanged when off.
     """
-    from backend.config.settings import settings
-
     if enabled is None:
-        enabled = settings.object_markers_enabled
+        enabled = export.object_markers_enabled
     return wrap_object_markers(document, object_marker_labels()) if enabled else document

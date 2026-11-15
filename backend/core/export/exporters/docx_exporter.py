@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+from backend.core.config import ExportConfig
 from backend.core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
 from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.i18n import t
@@ -14,6 +15,8 @@ def export_docx(
     text: str | dict[str, Any],
     output_path: Path,
     filename: str = "",
+    *,
+    export: ExportConfig,
 ) -> Path:
     """Export a canonical document (or raw markdown/text) to a Word .docx file.
 
@@ -21,6 +24,7 @@ def export_docx(
         text (str | dict): Raw markdown/text or a canonical document mapping to export.
         output_path (Path): Destination file path for the rendered .docx output.
         filename (str): Optional document title/filename hint; when empty the localized default title is used (default "").
+        export (ExportConfig): The run's export configuration, which enables the Toolbox rendering.
 
     Returns:
         Path: The output_path where the .docx file was written.
@@ -31,6 +35,7 @@ def export_docx(
         format_name="docx",
         title=filename or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
         profile_name="docx",
+        export=export,
     )
     logger.debug(t(LOG_DOCX_EXPORTED).format(output_path=output_path))
     return result
