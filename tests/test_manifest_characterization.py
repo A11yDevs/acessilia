@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from docstruct.geometry import is_bottom_left
 from docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL
 
 from backend.core import i18n
@@ -32,7 +33,6 @@ from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
     Provenance,
-    is_bottom_left,
 )
 from backend.core.manifest.toolbox_extractor import ToolboxExtraction
 

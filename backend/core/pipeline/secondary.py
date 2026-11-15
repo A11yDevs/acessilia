@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from docstruct.fusion.similarity import ordered_box, pair_block
+from docstruct.geometry import is_bottom_left
 
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import (
@@ -29,7 +30,6 @@ from backend.core.manifest.builder import (
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
-    is_bottom_left,
 )
 from backend.core.i18n import t
 from backend.core.pipeline.handlers.messages import (

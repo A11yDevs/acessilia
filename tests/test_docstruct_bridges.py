@@ -111,10 +111,13 @@ def _is_pure_docstruct_reexport(tree: ast.Module) -> bool:
         node for node in tree.body
         if not (isinstance(node, (ast.Import, ast.ImportFrom)) or _is_docstring(node) or _is_all(node))
     ]
-    return bool(imports) and not others and all(
-        isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == "docstruct"
-        for node in imports
-    )
+    return bool(imports) and not others and all(_imports_only_docstruct(node) for node in imports)
+
+
+def _imports_only_docstruct(node: ast.Import | ast.ImportFrom) -> bool:
+    if isinstance(node, ast.ImportFrom):
+        return node.level == 0 and (node.module or "").split(".")[0] == "docstruct"
+    return all(alias.name.split(".")[0] == "docstruct" for alias in node.names)
 
 
 def test_no_module_is_a_pure_docstruct_reexport() -> None:
@@ -150,6 +153,29 @@ def test_the_reexport_check_finds_a_shim() -> None:
     assert _is_pure_docstruct_reexport(annotated)
     assert _is_pure_docstruct_reexport(extended)
     assert not _is_pure_docstruct_reexport(adapter)
+
+
+@pytest.mark.parametrize("imports", [
+    "import docstruct",
+    "import docstruct.geometry",
+    "import docstruct.geometry as geometry",
+    "import docstruct.geometry, docstruct.placeholders as placeholders",
+    "import docstruct.geometry as geometry\nfrom docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL",
+])
+@pytest.mark.parametrize("docstring", ["", '\"\"\"Core migrated to docstruct.\"\"\"\n'])
+def test_the_reexport_check_finds_module_imports(imports, docstring) -> None:
+    assert _is_pure_docstruct_reexport(ast.parse(docstring + imports))
+
+
+@pytest.mark.parametrize("source", [
+    "import docstruct.geometry, os",
+    "import docstruct.geometry\nfrom pathlib import Path",
+    "import docstruct_extra",
+    "from .docstruct import geometry",
+    "from docstruct.geometry import is_bottom_left\ndef core_adapter():\n    return is_bottom_left(None, 1, 0)",
+])
+def test_the_reexport_check_keeps_adapters_and_other_imports(source) -> None:
+    assert not _is_pure_docstruct_reexport(ast.parse(source))
 
 
 def test_every_registered_bridge_is_an_adapter() -> None:
@@ -236,3 +262,10 @@ def test_the_builder_does_not_re_export_the_placeholder_label() -> None:
 
     assert not hasattr(builder, "UNSTRUCTURED_PAGE_LABEL")
     assert builder._UNSTRUCTURED_PAGE_LABEL is docstruct.placeholders.UNSTRUCTURED_PAGE_LABEL
+
+
+def test_manifest_models_do_not_re_export_geometry() -> None:
+    """Geometry callers import docstruct directly (#191, step 3)."""
+    from backend.core.manifest import models
+
+    assert not hasattr(models, "is_bottom_left")

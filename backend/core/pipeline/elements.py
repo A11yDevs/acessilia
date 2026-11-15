@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from docstruct.blocks.lists import (
     marker_numbering,
 )
+from docstruct.geometry import is_bottom_left
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
@@ -25,7 +26,6 @@ from docstruct.text.code_reflow import normalize_code_text
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
-    is_bottom_left,
 )
 from backend.core.i18n import t
 
