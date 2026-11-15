@@ -111,13 +111,16 @@ CALL_DEADLINE_GRACE_SECONDS = 30
 class VisionAgent:
     """Processes visual regions and produces accessible audio descriptions."""
 
-    def __init__(self, mode: str = "medio") -> None:
+    def __init__(self, mode: str = "medio", *, region_cache: bool) -> None:
         """Create a vision agent with a default prompting mode.
 
         Args:
             mode (str): Prompting mode name whose system prompt is loaded at construction (default "medio").
+            region_cache (bool): Whether region descriptions are read from and
+                stored in the cache (``VisionConfig.region_cache_enabled``).
         """
         self.mode = mode
+        self.region_cache = region_cache
         self.system_prompt = load_system_prompt(mode)
 
     async def describe_region(
@@ -187,7 +190,7 @@ class VisionAgent:
             max_tokens,
             context_retry_max_tokens=context_retry_max_tokens,
         )
-        if settings.vision_region_cache_enabled:
+        if self.region_cache:
             cached = await get_cached_bytes(
                 image_bytes, extra=cache_extra, ttl=VISION_CACHE_TTL_SECONDS
             )
@@ -245,7 +248,7 @@ class VisionAgent:
                 region_type=classification,
                 limit_tokens=max_tokens,
             )
-        if settings.vision_region_cache_enabled and _cacheable(output, truncated):
+        if self.region_cache and _cacheable(output, truncated):
             await set_cache_bytes(
                 image_bytes, output.model_dump(mode="json"), extra=cache_extra
             )

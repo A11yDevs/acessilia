@@ -9,6 +9,7 @@ import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from backend.core.pipeline.enrichment import tables as table_stage
+from tests.core_config_support import vision_config
 
 isolated_runtime = runtime_fixture
 
@@ -194,7 +195,6 @@ def test_a_run_the_vision_model_failed_is_not_cacheable(elements, failures):
 
 def _enrich_tables(monkeypatch, table, *, image, reading):
     from backend.core.pipeline import orchestrator as pddl
-    from backend.config.settings import settings
     from tests.pddl_support import build_manifest
 
     class FakeDataAgent:
@@ -204,12 +204,11 @@ def _enrich_tables(monkeypatch, table, *, image, reading):
     async def run_inline(function, *args):
         return function(*args)
 
-    monkeypatch.setattr(settings, "table_visual_review", True)
     monkeypatch.setattr(table_stage, "DataAgent", FakeDataAgent)
     monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args: (image, 1))
     monkeypatch.setattr(pddl.asyncio, "to_thread", run_inline)
     manifest = build_manifest([table], [])
-    asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/deck.pdf")))
+    asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/deck.pdf"), vision=vision_config(table_visual_review=True)))
     return _payload(manifest)
 
 

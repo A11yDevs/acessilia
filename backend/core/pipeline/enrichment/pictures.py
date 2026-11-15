@@ -29,6 +29,7 @@ from docstruct.placeholders import (
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.vision_agent import VisionAgent
+from backend.core.config import VisionConfig
 from backend.core.manifest.builder import (
     _derive_processing_needs,
     is_unstructured_page_placeholder,
@@ -88,21 +89,20 @@ async def _enrich_picture_descriptions(
     source_file: Path,
     *,
     mode: str,
+    vision: VisionConfig,
     media_inspection: dict[str, Any] | None = None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
-    from backend.config.settings import settings
-
     _inject_full_page_picture(manifest, media_inspection)
 
     pictures = _pictures_to_describe(manifest)
     if not pictures:
         return
 
-    vision = VisionAgent(mode=mode)
-    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
+    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled)
+    breaker = breaker or ProviderBreaker(vision.breaker_threshold)
     total_pages = len(manifest.pages)
 
     # Descriptions are independent, so they run concurrently, bounded by
@@ -113,7 +113,7 @@ async def _enrich_picture_descriptions(
     # (the API's status persistence, the Telegram progress message), and even
     # serialized the emission order may vary with completion, so nothing here
     # promises FIFO delivery.
-    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
+    slots = asyncio.Semaphore(max(1, vision.concurrency))
     progress_lock = asyncio.Lock()
 
     async def _describe_one(position: int, element: ManifestElement) -> bool:
@@ -151,7 +151,7 @@ async def _enrich_picture_descriptions(
                 return False
 
             errors: list[str] = []
-            vision_output = await vision.describe_region(
+            vision_output = await agent.describe_region(
                 image_bytes=image_bytes,
                 # A whole presentation slide gets the page prompt and budget.
                 classification=(
@@ -203,6 +203,7 @@ async def _enrich_picture_descriptions(
         describe_one,
         kind="pictures",
         breaker=breaker,
+        delay_seconds=vision.retry_pass_delay_seconds,
     )
 
     if enriched:

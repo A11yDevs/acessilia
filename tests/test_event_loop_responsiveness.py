@@ -62,7 +62,7 @@ async def _assert_event_loop_is_responsive(
 async def test_vision_inference_does_not_block_event_loop(monkeypatch):
     monkeypatch.setattr("backend.core.agents.vision_agent.Agent", _BlockingAgent)
     monkeypatch.setattr("backend.core.agents.vision_agent.get_agno_model", lambda **_kwargs: object())
-    agent = VisionAgent()
+    agent = VisionAgent(region_cache=False)
 
     await _assert_event_loop_is_responsive(
         lambda: agent.describe_region(b"image", "embedded_image"),

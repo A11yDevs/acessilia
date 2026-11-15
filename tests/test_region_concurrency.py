@@ -14,21 +14,19 @@ import pytest
 
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from backend.config.settings import settings
 from tests.pddl_support import (
     build_element as _element,
 )
 from tests.pddl_support import (
     build_manifest as _manifest,
 )
+from tests.core_config_support import vision_config
 
 
 @pytest.mark.asyncio
 async def test_picture_descriptions_run_bounded_and_concurrently(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setattr(settings, "vision_concurrency", 2)
-
     manifest = _manifest(
         [_element(f"pic-{index}", "picture") for index in range(1, 5)],
         [],
@@ -53,7 +51,7 @@ async def test_picture_descriptions_run_bounded_and_concurrently(
         )
 
     class FakeVision:
-        def __init__(self, mode: str) -> None:
+        def __init__(self, mode: str, *, region_cache) -> None:
             self.mode = mode
 
         async def describe_region(self, **kwargs):
@@ -69,7 +67,7 @@ async def test_picture_descriptions_run_bounded_and_concurrently(
         "backend.core.pipeline.enrichment.pictures._extract_picture_bytes", fake_extract
     )
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(concurrency=2))
 
     # Two ran at once, never three: the semaphore bounds the provider load.
     assert peak == 2

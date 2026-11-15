@@ -185,7 +185,7 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 
 #: The groups the core now receives from its caller: none of their settings
 #: may be read again. Each step-3 pull request adds the group it moves.
-MOVED_GROUPS = {"document", "export", "fusion"}
+MOVED_GROUPS = {"document", "export", "fusion", "vision"}
 
 #: Reads of a moved group's setting that wait for another group's pull
 #: request, by file. The planning gate's requirement table reads the fusion
@@ -552,6 +552,24 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
             "fusion",
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
+        ("backend.core.agents.vision_agent:VisionAgent.__init__", "region_cache"),
+        ("backend.core.pipeline.enrichment.common:_retry_failed", "delay_seconds"),
+        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "vision"),
+        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "vision"),
+        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "vision"),
+        ("backend.core.pipeline.enrichment.tables:_enrich_table_structures", "vision"),
+        ("backend.core.pipeline.enrichment.tables:_tables_to_read", "visual_review"),
+        ("backend.core.pipeline.handlers.inspection:_render_source_page", "dpi"),
+        ("backend.core.pipeline.handlers.inspection:_inspect_region", "region_cache"),
+        ("backend.core.pipeline.handlers.inspection:_inspect_page", "region_cache"),
+        (
+            "backend.core.pipeline.handlers.inspection:_handle_pymupdf_region_method",
+            "config",
+        ),
+        (
+            "backend.core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
+            "config",
+        ),
     ],
 )
 def test_the_run_config_parameters_are_required(function, parameter) -> None:

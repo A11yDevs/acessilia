@@ -15,17 +15,10 @@ import pytest
 
 from backend.core.agents.output_schemas import DataOutput
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
-from backend.config.settings import settings
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
 from backend.core.pipeline.enrichment import tables as table_stage
-
-
-@pytest.fixture(autouse=True)
-def _review_on(monkeypatch):
-    """The review is on by default; a ``TABLE_VISUAL_REVIEW`` in the
-    environment must not decide these tests."""
-    monkeypatch.setattr(settings, "table_visual_review", True)
+from tests.core_config_support import vision_config
 
 
 def _ast(rows: list[list[str]]) -> dict:
@@ -66,7 +59,7 @@ def _reading(rows: list[list[str]]) -> DataOutput:
     )
 
 
-def _run(monkeypatch, rows, reading, image=b"image"):
+def _run(monkeypatch, rows, reading, image=b"image", review=True):
     """Enrich a table read as ``rows``; ``reading`` answers every call, or each
     call in turn when it is a list."""
     from backend.core.pipeline import orchestrator as pddl_module
@@ -88,7 +81,7 @@ def _run(monkeypatch, rows, reading, image=b"image"):
     monkeypatch.setattr(table_stage, "DataAgent", FakeDataAgent)
     monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args: (image, 1))
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
-    asyncio.run(_enrich_table_structures(manifest, Path("/tmp/deck.pdf")))
+    asyncio.run(_enrich_table_structures(manifest, Path("/tmp/deck.pdf"), vision=vision_config(table_visual_review=review)))
     return table, calls
 
 
@@ -178,10 +171,8 @@ def test_a_table_read_well_is_not_read_again(monkeypatch):
     assert "table_review" not in table.metadata
 
 
-def test_the_review_is_off_with_its_setting(monkeypatch):
-    monkeypatch.setattr(settings, "table_visual_review", False)
-
-    table, calls = _run(monkeypatch, COLLAPSED, _reading([["a"]]))
+def test_the_review_is_off_when_its_config_says_so(monkeypatch):
+    table, calls = _run(monkeypatch, COLLAPSED, _reading([["a"]]), review=False)
 
     assert calls == []
     assert table.metadata["table_ast"] == _ast(COLLAPSED)

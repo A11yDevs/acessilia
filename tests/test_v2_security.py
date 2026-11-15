@@ -11,6 +11,7 @@ from backend.api.worker import ApiJob, recover_pending_jobs
 from backend.config.settings import settings
 from backend.services.job_store import load_record, save_request, save_status
 from backend.services.queue_service import UnifiedQueue
+from tests.core_config_support import vision_config
 
 
 @pytest.fixture
@@ -135,10 +136,10 @@ async def test_ocr_text_is_not_a_visual_description(monkeypatch, description):
         "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *args: (b"image", 1),
     )
-    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal")
+    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal", vision=vision_config())
     assert Vision.calls == 1
     assert picture.metadata["vision_description_complete"] is True
-    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal")
+    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal", vision=vision_config())
     assert Vision.calls == 1
 
 

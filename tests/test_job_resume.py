@@ -24,6 +24,7 @@ from backend.services import job_checkpoint
 from backend.services.operation_context import task_context
 from backend.services.operation_registry import OperationRegistry
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
+from tests.core_config_support import vision_config
 
 
 @pytest.fixture
@@ -683,7 +684,6 @@ async def test_a_completed_picture_is_checkpointed_during_the_stage(
         ],
         [],
     )
-    monkeypatch.setattr(settings, "vision_concurrency", 1)
     monkeypatch.setattr(
         picture_stage,
         "_extract_picture_bytes",
@@ -717,7 +717,8 @@ async def test_a_completed_picture_is_checkpointed_during_the_stage(
 
     task = asyncio.create_task(
         picture_stage._enrich_picture_descriptions(
-            manifest, Path("doc.pdf"), mode="medio", on_progress=save
+            manifest, Path("doc.pdf"), mode="medio", on_progress=save,
+            vision=vision_config(concurrency=1),
         )
     )
     try:

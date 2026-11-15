@@ -29,6 +29,7 @@ from backend.core.manifest.models import (
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.enrichment import tables as table_stage
+from tests.core_config_support import vision_config
 
 
 def _sample_manifest() -> ProcessingManifest:
@@ -704,6 +705,7 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
         _enrich_table_structures(
             manifest,
             Path("/tmp/amostra.pdf"),
+            vision=vision_config(),
         )
     )
 
@@ -771,6 +773,7 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
             manifest,
             Path("/tmp/amostra.pdf"),
             mode="medio",
+            vision=vision_config(),
         )
     )
 
@@ -905,6 +908,7 @@ def test_standalone_image_injects_full_page_picture_for_vision(
             Path("/tmp/planisferio_politico.jpg"),
             mode="medio",
             media_inspection=media_inspection,
+            vision=vision_config(),
         )
     )
 

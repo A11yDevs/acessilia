@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.pipeline import orchestrator as pddl
+from tests.core_config_support import core_config
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline import preflight as pipeline_preflight
 
@@ -36,10 +37,11 @@ def _recorders(monkeypatch):
     return calls
 
 
-async def _run(monkeypatch, tmp_path, **kwargs):
+async def _run(monkeypatch, tmp_path, *, config=None, **kwargs):
     calls = _recorders(monkeypatch)
     manifest = build_manifest([build_element("h", "heading", text="Titulo")], [])
     orchestrator = build_orchestrator(max_replans=1)
+    orchestrator.config = config
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
     statuses: list[str] = []
 
@@ -67,6 +69,20 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     assert "media_inspection" in by_name["_enrich_picture_descriptions"][3]
     assert all(call[1] == "doc.pdf" for call in calls)
     assert manifest.extractor.configuration["region_inspection_mode"] == "avancado"
+
+
+@pytest.mark.asyncio
+async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, tmp_path) -> None:
+    """ADR-0016 step 3: the run's ``VisionConfig``, not the settings, reaches each stage."""
+    config = core_config(vision={"breaker_threshold": 7, "concurrency": 3})
+
+    _, calls, _, _ = await _run(monkeypatch, tmp_path, config=config)
+
+    by_name = {call[0]: call[3] for call in calls}
+    stages = ("_classify_formula_regions", "_enrich_picture_descriptions",
+              "_enrich_formula_latex", "_enrich_table_structures")
+    assert all(by_name[name]["vision"] is config.vision for name in stages)
+    assert by_name["_enrich_table_structures"]["breaker"].threshold == 7
 
 
 @pytest.mark.asyncio
