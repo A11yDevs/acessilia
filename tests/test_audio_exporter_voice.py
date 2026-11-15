@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 from pathlib import Path
 from typing import ClassVar
 
@@ -45,7 +46,8 @@ async def test_export_uses_the_given_voice(fake_tts, tmp_path):
     assert fake_tts.voices == ["pt-BR-AntonioNeural"]
 
 
-@pytest.mark.asyncio
-async def test_the_voice_is_required(fake_tts, tmp_path):
-    with pytest.raises(TypeError):
-        await audio_exporter.export_mp3("Olá.", tmp_path / "out.mp3")  # type: ignore[call-arg]
+def test_the_voice_is_required():
+    """No default: the caller passes the run's voice (``ExportConfig.tts_voice``)."""
+    voice = inspect.signature(audio_exporter.export_mp3).parameters["voice"]
+
+    assert voice.default is inspect.Parameter.empty

@@ -233,3 +233,19 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
         if isinstance(inline, dict) and inline.get("t") == "Math"
     ]
     assert not maths
+
+
+def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
+    """No fallback to the settings: DOCX without an ``ExportConfig`` is a programming error."""
+
+    def toolbox_must_not_run(*args, **kwargs):
+        raise AssertionError("the Toolbox ran without an export config")
+
+    monkeypatch.setattr(
+        "backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
+    )
+
+    with pytest.raises(TypeError, match="ExportConfig"):
+        pandoc_exporter.export_accessible_document(
+            "# Report\n", tmp_path / "doc.docx", format_name="docx"
+        )

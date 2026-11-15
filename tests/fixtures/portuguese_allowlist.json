@@ -127,7 +127,7 @@
     "tests/test_agno_executor.py": 3,
     "tests/test_api.py": 4,
     "tests/test_api_client.py": 2,
-    "tests/test_audio_exporter_voice.py": 2,
+    "tests/test_audio_exporter_voice.py": 1,
     "tests/test_audit_validation.py": 1,
     "tests/test_canonical_pipeline.py": 6,
     "tests/test_docs_pr125.py": 7,

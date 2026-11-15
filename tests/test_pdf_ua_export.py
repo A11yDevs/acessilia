@@ -403,3 +403,19 @@ def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
         )
 
     assert len(calls) == 1
+
+
+def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
+    """No fallback to the settings: PDF/UA without an ``ExportConfig`` is a programming error."""
+
+    def toolbox_must_not_run(*args, **kwargs):
+        raise AssertionError("the Toolbox ran without an export config")
+
+    monkeypatch.setattr(
+        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
+    )
+
+    with pytest.raises(TypeError, match="ExportConfig"):
+        pandoc_exporter.export_accessible_document(
+            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua"
+        )
