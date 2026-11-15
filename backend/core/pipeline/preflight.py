@@ -5,7 +5,8 @@
 (``MAX_PAGES``) is checked twice: early, on a PDF page count the remote parser
 verified, and authoritatively on the manifest after extraction. Both raise
 ``DocumentTooLargeError``, a job-level failure. Moved verbatim from the PDDL
-orchestrator (#402, phase 3, step 6).
+orchestrator (#402, phase 3, step 6). The limit comes from the run's
+``DocumentConfig`` (ADR-0016, step 3).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from backend.core.config import DocumentConfig
 from backend.core.manifest.models import (
     ProcessingManifest,
 )
@@ -31,7 +33,7 @@ class DocumentTooLargeError(ValueError):
     """The document has more pages than ``MAX_PAGES`` (job-level failure)."""
 
 
-def _check_page_count(page_count: int) -> None:
+def _check_page_count(page_count: int, document: DocumentConfig) -> None:
     """Reject an oversized document as a whole with a user-facing message.
 
     A verified PDF count may be checked before costly extraction. The
@@ -42,17 +44,17 @@ def _check_page_count(page_count: int) -> None:
     Raises:
         DocumentTooLargeError: When the page count exceeds MAX_PAGES.
     """
-    from backend.config.settings import settings
-
-    if page_count > settings.max_pages:
+    if page_count > document.max_pages:
         raise DocumentTooLargeError(
             t(STAGE_DOCUMENT_TOO_MANY_PAGES).format(
-                page_count=page_count, max_pages=settings.max_pages
+                page_count=page_count, max_pages=document.max_pages
             )
         )
 
 
-def _check_page_limit_before_extraction(inspection: dict[str, Any] | None) -> None:
+def _check_page_limit_before_extraction(
+    inspection: dict[str, Any] | None, document: DocumentConfig
+) -> None:
     """Reject only PDF counts verified by the existing remote PDF parser.
 
     Scanned content streams, unknown counts and non-PDF formats are not a
@@ -68,12 +70,12 @@ def _check_page_limit_before_extraction(inspection: dict[str, Any] | None) -> No
         and type(count) is int
         and count > 0
     ):
-        _check_page_count(count)
+        _check_page_count(count, document)
 
 
-def _check_page_limit(manifest: ProcessingManifest) -> None:
+def _check_page_limit(manifest: ProcessingManifest, document: DocumentConfig) -> None:
     """Authoritative limit after extraction, including formats without preflight."""
-    _check_page_count(len(manifest.pages))
+    _check_page_count(len(manifest.pages), document)
 
 
 async def _inspect_media(

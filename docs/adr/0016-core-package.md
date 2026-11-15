@@ -218,6 +218,11 @@ Proposed: option 2.
      moved whole to `backend/core/toolbox/` in step 2, their SDK split left for
      later as well.
   3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
+     In progress: `backend/core/config.py` defines `CoreConfig` as frozen
+     groups (Toolbox, models, vision, fusion, document, export, paths), the
+     service builds it in `backend/config/core_config.py`, and the
+     orchestrator builds one per run until every stage takes its group. The
+     page limit was the first stage.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:

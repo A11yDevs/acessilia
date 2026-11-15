@@ -221,7 +221,11 @@ Proposta: a opção 2.
      da Toolbox foram inteiros para o `backend/core/toolbox/` no passo 2, também
      com a divisão com o SDK deixada para depois.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
-     vez.
+     vez. Em andamento: o `backend/core/config.py` define o `CoreConfig` como
+     grupos congelados (Toolbox, modelos, visão, fusão, documento, exportação,
+     caminhos), o serviço o monta em `backend/config/core_config.py`, e o
+     orquestrador monta um por execução até que cada etapa receba o seu grupo.
+     O limite de páginas foi a primeira etapa.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:

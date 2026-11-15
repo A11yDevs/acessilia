@@ -17,7 +17,7 @@ import pytest
 
 from backend.core import i18n
 from backend.core.pipeline import orchestrator as pddl
-from backend.config.settings import settings
+from tests.core_config_support import core_config
 from tests.pddl_support import build_orchestrator
 from backend.core.pipeline import preflight as pipeline_preflight
 
@@ -30,8 +30,14 @@ TOOLBOX_INSPECTION = json.loads(
 )
 
 
-def _orchestrator_with_pages(count: int):
+def _limit(max_pages: int):
+    """The run's document limits, with ``max_pages`` replaced."""
+    return core_config(document={"max_pages": max_pages})
+
+
+def _orchestrator_with_pages(count: int, max_pages: int):
     orchestrator = build_orchestrator()
+    orchestrator.config = _limit(max_pages)
     manifest = SimpleNamespace(pages=[object()] * count)
     orchestrator.information_structural = SimpleNamespace(
         process=lambda *args, **kwargs: manifest
@@ -58,9 +64,8 @@ def _record_steps(monkeypatch) -> list[str]:
 
 @pytest.mark.asyncio
 async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "max_pages", 2)
     calls = _record_steps(monkeypatch)
-    orchestrator = _orchestrator_with_pages(3)
+    orchestrator = _orchestrator_with_pages(3, max_pages=2)
 
     # Pinned, so the expected English message holds on a pt_BR machine too.
     token = i18n.set_request_locale("en_US")
@@ -75,9 +80,10 @@ async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatc
 
 
 @pytest.mark.parametrize("count", [1, 2])
-def test_documents_up_to_the_limit_pass(monkeypatch, count):
-    monkeypatch.setattr(settings, "max_pages", 2)
-    pipeline_preflight._check_page_limit(SimpleNamespace(pages=[object()] * count))
+def test_documents_up_to_the_limit_pass(count):
+    pipeline_preflight._check_page_limit(
+        SimpleNamespace(pages=[object()] * count), _limit(2).document
+    )
 
 
 def test_max_pages_is_read_from_the_environment(monkeypatch):
@@ -98,9 +104,8 @@ def test_a_non_positive_max_pages_is_refused_at_startup(monkeypatch, value):
 
 @pytest.mark.asyncio
 async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "max_pages", 50)
     _record_steps(monkeypatch)
-    orchestrator = _orchestrator_with_pages(120)
+    orchestrator = _orchestrator_with_pages(120, max_pages=50)
 
     token = i18n.set_request_locale("pt_BR")
     try:
@@ -116,11 +121,11 @@ async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path
 async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(monkeypatch, tmp_path):
     from unittest.mock import Mock
 
-    monkeypatch.setattr(settings, "max_pages", 2)
     async def inspect(*args, **kwargs):
         return {"is_pdf": True, "page_count": 3, "page_count_source": "pymupdf"}
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     orchestrator = build_orchestrator()
+    orchestrator.config = _limit(2)
     process = Mock(side_effect=AssertionError("expensive extraction was called"))
     orchestrator.information_structural = SimpleNamespace(process=process)
     with pytest.raises(pipeline_preflight.DocumentTooLargeError):
@@ -134,21 +139,21 @@ async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(
     {"is_pdf": True, "page_count": "100", "page_count_source": "pymupdf"},
     {"is_pdf": True, "page_count": True, "page_count_source": "pymupdf"},
 ])
-def test_unreliable_preflight_does_not_reject(monkeypatch, inspection):
-    monkeypatch.setattr(settings, "max_pages", 2)
-    pipeline_preflight._check_page_limit_before_extraction(inspection)
+def test_unreliable_preflight_does_not_reject(inspection):
+    pipeline_preflight._check_page_limit_before_extraction(inspection, _limit(2).document)
 
 
-def test_verified_pdf_at_limit_passes_preflight(monkeypatch):
-    monkeypatch.setattr(settings, "max_pages", 2)
-    pipeline_preflight._check_page_limit_before_extraction({"is_pdf": True, "page_count": 2, "page_count_source": "pymupdf"})
+def test_verified_pdf_at_limit_passes_preflight():
+    pipeline_preflight._check_page_limit_before_extraction(
+        {"is_pdf": True, "page_count": 2, "page_count_source": "pymupdf"}, _limit(2).document
+    )
 
 
 @pytest.mark.parametrize("max_pages,rejected", [(2, True), (3, False)])
-def test_preflight_reads_the_toolbox_inspection_document(monkeypatch, max_pages, rejected):
-    monkeypatch.setattr(settings, "max_pages", max_pages)
+def test_preflight_reads_the_toolbox_inspection_document(max_pages, rejected):
+    document = _limit(max_pages).document
     if rejected:
         with pytest.raises(pipeline_preflight.DocumentTooLargeError):
-            pipeline_preflight._check_page_limit_before_extraction(TOOLBOX_INSPECTION)
+            pipeline_preflight._check_page_limit_before_extraction(TOOLBOX_INSPECTION, document)
     else:
-        pipeline_preflight._check_page_limit_before_extraction(TOOLBOX_INSPECTION)
+        pipeline_preflight._check_page_limit_before_extraction(TOOLBOX_INSPECTION, document)
