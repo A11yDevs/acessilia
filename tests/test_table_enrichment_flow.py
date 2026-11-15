@@ -14,10 +14,10 @@ import pytest
 
 from backend.core.pipeline import orchestrator as pddl
 from backend.core.agents.output_schemas import DataOutput
-from backend.config.settings import settings
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest
 from backend.core.pipeline.enrichment import tables as table_stage
+from tests.core_config_support import vision_config
 
 
 def _reading(rows, *, warnings=()):
@@ -31,9 +31,6 @@ def _reading(rows, *, warnings=()):
 
 @pytest.fixture
 def run(monkeypatch):
-    monkeypatch.setattr(settings, "table_visual_review", True)
-    monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 0)
-
     def go(elements, answers, *, crops=None, pages=1, breaker=None):
         calls = []
 
@@ -52,7 +49,9 @@ def run(monkeypatch):
         monkeypatch.setattr(pddl.asyncio, "to_thread", run_inline)
         manifest = build_manifest(elements, [])
         manifest.pages = [PageDescriptor(page_number=n, width=600.0, height=800.0, element_ids=[]) for n in range(1, pages + 1)]
-        asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/doc.pdf"), breaker=breaker))
+        asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/doc.pdf"), breaker=breaker,
+            vision=vision_config(table_visual_review=True, retry_pass_delay_seconds=0),
+        ))
         return manifest, calls
 
     return go

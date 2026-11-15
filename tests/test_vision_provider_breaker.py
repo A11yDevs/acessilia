@@ -18,11 +18,10 @@ import pytest
 from backend.core.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline.enrichment.formulas import _enrich_formula_latex
-from tests.core_config_support import document_config
+from tests.core_config_support import document_config, vision_config
 from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.config.settings import settings
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
 from tests.pddl_support import install_formula_recognizer
@@ -57,11 +56,9 @@ _TABLE = DataOutput(
 )
 
 
-@pytest.fixture(autouse=True)
-def _one_call_at_a_time(monkeypatch):
+def _serial(**fields):
     """Serial calls, so the order of failures and answers is the script's."""
-    monkeypatch.setattr(settings, "vision_concurrency", 1)
-    monkeypatch.setattr(settings, "vision_breaker_threshold", 2)
+    return vision_config(**({"concurrency": 1, "breaker_threshold": 2} | fields))
 
 
 def _vision(monkeypatch, answers, failure: str = "TimeoutError: no answer"):
@@ -69,7 +66,7 @@ def _vision(monkeypatch, answers, failure: str = "TimeoutError: no answer"):
     calls = []
 
     class FakeVision:
-        def __init__(self, mode: str) -> None:
+        def __init__(self, mode: str, *, region_cache) -> None:
             self.mode = mode
 
         async def describe_region(self, *, errors=None, **kwargs):
@@ -143,7 +140,7 @@ async def test_pictures_the_provider_failed_are_described_on_the_second_pass(
     calls = _vision(monkeypatch, [_DESCRIPTION, None, None, _DESCRIPTION, _DESCRIPTION])
     manifest = _pictures(3)
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=_serial())
 
     assert len(calls) == 5
     assert all(p.metadata.get("vision_description_complete") for p in manifest.elements)
@@ -157,7 +154,7 @@ async def test_a_provider_that_stays_down_costs_the_threshold_and_one_probe(
     calls = _vision(monkeypatch, [None] * 10)
     manifest = _pictures(5)
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=_serial())
 
     # Two failures open the breaker; the second pass probes once and stops.
     assert len(calls) == 3
@@ -175,7 +172,7 @@ async def test_an_empty_answer_is_asked_again_but_does_not_open_the_breaker(
     calls = _vision(monkeypatch, [_EMPTY, _EMPTY, _EMPTY, _DESCRIPTION, _DESCRIPTION, _EMPTY])
     manifest = _pictures(3)
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=_serial())
 
     # Every picture reached the model on both passes: an empty answer is an answer.
     assert len(calls) == 6
@@ -190,12 +187,13 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_tables(monkeypatch, tm
     data_calls = _data(monkeypatch, [_TABLE] * 3)
     pictures = _pictures(2)
     tables = _manifest([_element("t-1", "table", text="")], [])
-    breaker = ProviderBreaker(settings.vision_breaker_threshold)
+    breaker = ProviderBreaker(_serial().breaker_threshold)
 
     await _enrich_picture_descriptions(
-        pictures, tmp_path / "doc.pdf", mode="medio", breaker=breaker
+        pictures, tmp_path / "doc.pdf", mode="medio", breaker=breaker,
+        vision=_serial(),
     )
-    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), breaker=breaker)
+    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), breaker=breaker, vision=_serial())
 
     # The table's second pass is the probe, and the provider answers it.
     assert len(data_calls) == 1
@@ -213,7 +211,7 @@ async def test_a_table_the_provider_failed_is_read_on_the_second_pass(monkeypatc
     data_calls = _data(monkeypatch, [None, _TABLE])
     tables = _manifest([_element("t-1", "table", text="")], [])
 
-    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"))
+    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), vision=_serial())
 
     assert len(data_calls) == 2
     assert "table_read_failure" not in tables.elements[0].metadata
@@ -263,7 +261,7 @@ async def test_an_unused_answer_on_the_second_pass_is_not_left_as_a_failure(
     )
     tables = _manifest([_element("t-1", "table", text="")], [])
 
-    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"))
+    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), vision=_serial())
 
     assert len(data_calls) == 2
     assert "table_read_failure" not in tables.elements[0].metadata
@@ -282,7 +280,6 @@ async def test_a_refused_reading_on_the_second_pass_clears_the_failure_and_sums_
         [["Country", "Capital", "Currency"], ["Japan", "Tokyo", "Yen"]]
     )
     # A threshold this test does not reach, so the reads are all made.
-    monkeypatch.setattr(settings, "vision_breaker_threshold", 10)
     data_calls = _data(
         monkeypatch, [None, None, None, not_the_table, not_the_table, not_the_table]
     )
@@ -294,7 +291,7 @@ async def test_a_refused_reading_on_the_second_pass_clears_the_failure_and_sums_
         [_element("t-1", "table", metadata={"table_ast": _COLLAPSED_AST})], []
     )
 
-    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"))
+    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), vision=_serial(breaker_threshold=10))
 
     assert len(data_calls) == 6
     table = tables.elements[0]
@@ -320,11 +317,11 @@ async def test_a_table_skipped_by_the_breaker_is_not_cropped(monkeypatch, tmp_pa
     tables = _manifest(
         [_element(f"t-{n}", "table", text="") for n in range(1, 4)], []
     )
-    breaker = ProviderBreaker(settings.vision_breaker_threshold)
+    breaker = ProviderBreaker(_serial().breaker_threshold)
     breaker.record(False)
     breaker.record(False)
 
-    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), breaker=breaker)
+    await _enrich_table_structures(tables, Path(tmp_path / "doc.pdf"), breaker=breaker, vision=_serial())
 
     # First pass: skipped before the crop. Second pass: the probe is the
     # only call made, and its failure reopens the breaker for the rest.
@@ -354,11 +351,12 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
     )
     pictures = _manifest([_element("pic-1", "picture"), _element("pic-2", "picture")], [])
     formulas = _manifest([_element("formula-1", "formula")], [])
-    breaker = ProviderBreaker(settings.vision_breaker_threshold)
+    breaker = ProviderBreaker(_serial().breaker_threshold)
 
-    await _enrich_picture_descriptions(pictures, tmp_path / "doc.pdf", mode="medio", breaker=breaker)
+    await _enrich_picture_descriptions(pictures, tmp_path / "doc.pdf", mode="medio", breaker=breaker, vision=_serial())
     await _enrich_formula_latex(
-        formulas, tmp_path / "doc.pdf", mode="medio", document=document_config(), breaker=breaker
+        formulas, tmp_path / "doc.pdf", mode="medio", document=document_config(), breaker=breaker,
+        vision=_serial(),
     )
 
     # Pictures: two failures to open the breaker, one probe through it. The
@@ -380,13 +378,12 @@ async def test_the_second_pass_waits_the_configured_delay(monkeypatch, tmp_path)
     monkeypatch.setattr(
         enrichment_common, "asyncio", SimpleNamespace(**(vars(asyncio) | {"sleep": record_sleep}))
     )
-    monkeypatch.setattr(settings, "vision_retry_pass_delay_seconds", 5)
     calls = _vision(monkeypatch, [_DESCRIPTION, None, _DESCRIPTION])
     manifest = _pictures(2)
 
     unrelated_sleep = asyncio.create_task(asyncio.sleep(0))
     try:
-        await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+        await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=_serial(retry_pass_delay_seconds=5))
     finally:
         await unrelated_sleep
 
@@ -404,7 +401,7 @@ async def test_validation_failures_open_the_breaker_too(monkeypatch, tmp_path):
     calls = _vision(monkeypatch, [None] * 10, failure="ValidationError after 2 tries")
     manifest = _pictures(2)
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio")
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=_serial())
 
     assert len(calls) == 3  # two failures open the breaker, the second pass probes once
     details = [(p.metadata.get("vision_failure_detail") or "") for p in manifest.elements]

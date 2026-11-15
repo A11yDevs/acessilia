@@ -83,7 +83,12 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class VisionConfig:
-    """How the enrichment stages call the vision model."""
+    """How the enrichment stages call the vision model.
+
+    ``concurrency`` bounds the calls of one stage of one run: each stage
+    builds its own semaphore. Runs at once add up (the service's queue runs
+    one job at a time); a limit per provider shared across runs is #547.
+    """
 
     concurrency: int
     breaker_threshold: int

@@ -24,6 +24,7 @@ from tests.pddl_support import (
 )
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight
+from tests.core_config_support import core_config
 
 
 @pytest.fixture
@@ -54,14 +55,16 @@ def inspection(monkeypatch, tmp_path, fake_toolbox_render):
     response = VisionOutput(kind="description", description="A map", language="en", confidence=0.9)
 
     class Vision:
-        def __init__(self, mode):
+        def __init__(self, mode, *, region_cache):
             self.mode = mode
+            Vision.region_caches.append(region_cache)
 
         async def describe_region(self, **kwargs):
             calls.append(kwargs)
             return Vision.response
 
     Vision.response = response
+    Vision.region_caches = []
     monkeypatch.setattr(inspection_handlers, "VisionAgent", Vision)
     return manifest, calls, Vision
 
@@ -105,11 +108,23 @@ def test_real_region_inspection_updates_output_and_records_evidence(inspection, 
     assert ("x^2" if kind == "formula" else "A map") in payload["text"]
 
 
+@pytest.mark.parametrize("enabled", [True, False])
+def test_the_region_cache_follows_the_run_config(inspection, enabled):
+    manifest, _, vision = inspection
+
+    result = inspection_handlers._handle_pymupdf_region_method(
+        manifest, "o-1", config=core_config(vision={"region_cache_enabled": enabled})
+    )
+
+    assert result.success, result.message
+    assert vision.region_caches == [enabled]
+
+
 @pytest.mark.parametrize("crop", [True, "missing.png", {"path": "missing.png"}])
 def test_provider_crop_metadata_never_bypasses_inspection(inspection, crop):
     manifest, calls, _ = inspection
     manifest.elements[0].metadata["region_crop"] = crop
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert result.success
     assert len(calls) == 1
     assert Path(manifest.elements[0].metadata["region_crop"]).is_file()
@@ -145,7 +160,7 @@ def test_invalid_source_or_region_fails_without_model_call(inspection, failure):
         elif failure == "origin":
             bbox.coord_origin = "UNKNOWN"
     before = manifest.model_dump_json()
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     assert not result.validated
     assert not calls
@@ -159,7 +174,7 @@ def test_failed_or_invalid_model_result_does_not_certify_inspection(inspection, 
     manifest, calls, vision = inspection
     vision.response = response
     before = manifest.model_dump()
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     assert not result.artifacts
     assert calls
@@ -181,7 +196,7 @@ def test_bottom_left_coordinates_render_same_region(inspection):
 def test_page_without_bbox_can_be_inspected_as_full_page(inspection):
     manifest, calls, _ = inspection
     manifest.elements[0].provenance = []
-    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1").success
+    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config()).success
     image = fitz.Pixmap(calls[0]["image_bytes"])
     assert image.width >= 200 * 160 / 72
 
@@ -195,7 +210,7 @@ def test_all_targets_must_validate_before_mutating_manifest(inspection):
     manifest.elements.append(second)
     manifest.obligations[0].target_ids.append(second.id)
     original = manifest.model_dump()
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     assert not result.artifacts
     assert len(calls) == 1
@@ -210,7 +225,7 @@ def test_artifact_failure_cannot_certify_or_mutate_inspection(inspection, monkey
         raise OSError("Simulated disk failure")
 
     monkeypatch.setattr(inspection_handlers, "_save_region_artifact", fail)
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     assert not result.artifacts
     assert calls
@@ -226,7 +241,7 @@ def test_a_render_over_the_pixel_limit_fails_the_method(inspection, fake_toolbox
     manifest.source.path = str(source)
     manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     manifest.elements[0].provenance = []
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     # The core has no pixel guard of its own: the Toolbox refuses (HTTP 400)
     # and the refusal reaches the method as a capability error.
@@ -239,7 +254,7 @@ def test_an_element_without_a_page_is_inspected_only_in_a_one_page_document(insp
     manifest, calls, _ = inspection
     manifest.elements[0].provenance = []
     manifest.elements[0].page_number = None
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     assert "Region page is missing or out of range" in result.message
     assert not calls
@@ -249,7 +264,7 @@ def test_a_page_beyond_the_document_is_refused_by_the_toolbox(inspection, fake_t
     manifest, calls, _ = inspection
     manifest.elements[0].provenance[0].page_number = 3
     manifest.elements[0].page_number = 3
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1")
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
     assert "out of range" in result.message
     assert fake_toolbox_render.requests[0]["parameters"]["page_number"] == 3
@@ -267,7 +282,7 @@ def test_the_stored_source_is_referenced_only_when_it_is_this_document(
     fake_toolbox_render.sources[stored] = (source.read_bytes(), "application/pdf")
     manifest.extractor.configuration["artifact_id"] = stored
 
-    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1").success
+    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config()).success
 
     [request] = fake_toolbox_render.requests
     assert request["artifact_id"] == (stored if same_document else None)

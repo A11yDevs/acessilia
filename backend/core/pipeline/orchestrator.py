@@ -443,19 +443,18 @@ class PddlAccessibilityOrchestrator:
         # Pictures, formulas and tables reach the vision provider from the
         # same pipeline, so one that went down does not get called again for
         # every remaining object.
-        from backend.config.settings import settings
-
-        breaker = ProviderBreaker(settings.vision_breaker_threshold)
+        breaker = ProviderBreaker(config.vision.breaker_threshold)
         progress = _EnrichmentCheckpoint(current_task_id(), manifest).save
         await _classify_formula_regions(
-            manifest, source_path, mode=effective_mode, breaker=breaker,
-            on_progress=progress,
+            manifest, source_path, mode=effective_mode, vision=config.vision,
+            breaker=breaker, on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         await _enrich_picture_descriptions(
             manifest,
             source_path,
             mode=effective_mode,
+            vision=config.vision,
             media_inspection=media_inspection,
             status_callback=status_callback,
             breaker=breaker,
@@ -470,6 +469,7 @@ class PddlAccessibilityOrchestrator:
             source_path,
             mode=effective_mode,
             document=config.document,
+            vision=config.vision,
             status_callback=status_callback,
             breaker=breaker,
             on_progress=progress,
@@ -481,6 +481,7 @@ class PddlAccessibilityOrchestrator:
         await _enrich_table_structures(
             manifest,
             file_path.resolve(),
+            vision=config.vision,
             status_callback=status_callback,
             breaker=breaker,
             on_progress=progress,

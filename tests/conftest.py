@@ -15,8 +15,10 @@ def _vision_cache_stays_out_of_tests(monkeypatch):
 
     The cache is keyed on the image bytes, and several tests script identical
     inputs with different answers; a shared cache directory would leak one
-    test's answer into another. Tests that exercise the cache re-enable it and
-    point ``backend.services.cache.CACHE_DIR`` at their own ``tmp_path``.
+    test's answer into another. A config built from the settings
+    (``tests/core_config_support.py``) inherits the switch; tests that
+    exercise the cache build their agent with ``region_cache=True`` and point
+    ``backend.services.cache.CACHE_DIR`` at their own ``tmp_path``.
     """
     from backend.config.settings import settings
 

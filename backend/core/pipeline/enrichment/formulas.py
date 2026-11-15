@@ -29,7 +29,7 @@ from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.vision_agent import VisionAgent
-from backend.core.config import DocumentConfig
+from backend.core.config import DocumentConfig, VisionConfig
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,
@@ -179,6 +179,7 @@ async def _classify_formula_regions(
     source_file: Path,
     *,
     mode: str,
+    vision: VisionConfig,
     breaker: ProviderBreaker,
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
@@ -192,8 +193,6 @@ async def _classify_formula_regions(
     takes the formula path it took before this check, whose vision fallback
     can still reclassify it.
     """
-    from backend.config.settings import settings
-
     if manifest.source.media_type not in RENDER_MEDIA_TYPES:
         return
     candidates = [
@@ -204,8 +203,8 @@ async def _classify_formula_regions(
     ]
     if not candidates:
         return
-    slots = asyncio.Semaphore(max(1, settings.vision_concurrency))
-    vision = VisionAgent(mode=mode)
+    slots = asyncio.Semaphore(max(1, vision.concurrency))
+    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled)
     progress_lock = asyncio.Lock()
 
     async def classify(element: ManifestElement) -> None:
@@ -222,7 +221,7 @@ async def _classify_formula_regions(
                 )
                 if image:
                     reason = "model_failed"
-                    output = await vision.describe_region(
+                    output = await agent.describe_region(
                         image_bytes=image, classification="formula_candidate",
                         page_num=page, total_pages=len(manifest.pages), mode=mode,
                         full_budget=True, errors=errors,
@@ -270,6 +269,7 @@ async def _enrich_formula_latex(
     *,
     mode: str,
     document: DocumentConfig,
+    vision: VisionConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -325,7 +325,7 @@ async def _enrich_formula_latex(
     ``method`` or ``method#rank`` strings.
 
     Crops are independent, so they run concurrently, bounded by
-    ``VISION_CONCURRENCY`` for the same reason as the picture descriptions:
+    ``VisionConfig.concurrency`` for the same reason as the picture descriptions:
     the vision fallback shares that provider budget. An outage is still paid
     once per document: the first ``MathCapabilityUnavailable`` sets a flag the
     remaining formulas read before calling recognition, and the probe itself
@@ -371,9 +371,9 @@ async def _enrich_formula_latex(
         source_file=source_file,
         mode=mode,
         status_callback=status_callback,
-        vision=VisionAgent(mode=mode),
-        breaker=breaker or ProviderBreaker(settings.vision_breaker_threshold),
-        slots=asyncio.Semaphore(max(1, settings.vision_concurrency)),
+        vision=VisionAgent(mode=mode, region_cache=vision.region_cache_enabled),
+        breaker=breaker or ProviderBreaker(vision.breaker_threshold),
+        slots=asyncio.Semaphore(max(1, vision.concurrency)),
         total=len(formulas),
         recognize_provider=recognize_provider,
         agreement_min=document.formula_text_agreement_min,

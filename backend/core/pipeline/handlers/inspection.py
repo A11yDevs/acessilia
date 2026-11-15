@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from backend.core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from backend.core.agents.vision_agent import VisionAgent
+from backend.core.config import CoreConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import (
     is_unstructured_page_placeholder,
@@ -90,9 +91,11 @@ def _render_inspection_region(
     return page.image, number or 1, list(page.clip)
 
 
-def _inspect_region(image: bytes, number: int, total_pages: int, mode: str) -> VisionOutput | None:
+def _inspect_region(
+    image: bytes, number: int, total_pages: int, mode: str, *, region_cache: bool
+) -> VisionOutput | None:
     async def inspect():
-        return await VisionAgent(mode=mode).describe_region(
+        return await VisionAgent(mode=mode, region_cache=region_cache).describe_region(
             image_bytes=image, classification="embedded_image", page_num=number,
             total_pages=total_pages, mode=mode, full_budget=True,
         )
@@ -128,7 +131,9 @@ def _save_region_artifact(content: bytes, scope: str, kind: str, suffix: str, me
     )
 
 
-def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: str) -> MethodResult:
+def _handle_pymupdf_region_method(
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
+) -> MethodResult:
     """Inspect real source pixels and update targets only after every result validates."""
     elements = _target_elements(manifest, obligation_id)
     if not elements:
@@ -156,6 +161,7 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
             output = _inspect_region(
                 image, number, max(len(manifest.pages), number),
                 str(manifest.extractor.configuration.get("region_inspection_mode", "medio")),
+                region_cache=config.vision.region_cache_enabled,
             )
             if not isinstance(output, VisionOutput):
                 raise ValueError(f"Region inspection failed for {element.id}")
@@ -212,29 +218,29 @@ def _handle_pymupdf_region_method(manifest: ProcessingManifest, obligation_id: s
 
 
 def _render_source_page(
-    source: Path, media_type: str, number: int, artifact_id: str | None = None
+    source: Path, media_type: str, number: int, artifact_id: str | None = None, *, dpi: int
 ) -> bytes:
     """The PNG of page ``number`` of a PDF, PNG or JPEG input, rendered by the Toolbox."""
-    from backend.config.settings import settings
-
     return _toolbox_render(
-        source, number, media_type=media_type, dpi=settings.pdf_split_dpi,
+        source, number, media_type=media_type, dpi=dpi,
         artifact_id=artifact_id,
     ).image
 
 
-def _inspect_page(image: bytes, number: int, total_pages: int, mode: str) -> PageInspectionOutput:
+def _inspect_page(
+    image: bytes, number: int, total_pages: int, mode: str, *, region_cache: bool
+) -> PageInspectionOutput:
     from acessilia_sdk.runtime import run_sync
 
     return run_sync(
-        VisionAgent(mode=mode).inspect_page(
+        VisionAgent(mode=mode, region_cache=region_cache).inspect_page(
             image_bytes=image, page_num=number, total_pages=total_pages
         )
     )
 
 
 def _handle_vision_page_inspection_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Look at a page the extractor left empty: describe it, or accept it as blank.
 
@@ -265,9 +271,13 @@ def _handle_vision_page_inspection_method(
         for element in elements:
             number = element.page_number or 1
             image = _render_source_page(
-                source, manifest.source.media_type, number, _source_artifact_id(manifest)
+                source, manifest.source.media_type, number, _source_artifact_id(manifest),
+                dpi=config.vision.pdf_split_dpi,
             )
-            output = _inspect_page(image, number, total_pages, mode)
+            output = _inspect_page(
+                image, number, total_pages, mode,
+                region_cache=config.vision.region_cache_enabled,
+            )
             if not isinstance(output, PageInspectionOutput):
                 raise TypeError("Page inspection returned no structured output")
             inspected.append((element, number, image, output))

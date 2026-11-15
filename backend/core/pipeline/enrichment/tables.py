@@ -30,6 +30,7 @@ from docstruct.tables.text_rows import rows_from_visual_table_text
 from backend.core.agents.data_agent import DataAgent
 from backend.core.agents.output_schemas import DataOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
+from backend.core.config import VisionConfig
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -65,18 +66,19 @@ async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
     *,
+    vision: VisionConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
-    from backend.config.settings import settings
-
-    table_elements, garbled = _tables_to_read(manifest)
+    table_elements, garbled = _tables_to_read(
+        manifest, visual_review=vision.table_visual_review
+    )
     if not table_elements:
         return
 
     data_agent = DataAgent()
-    breaker = breaker or ProviderBreaker(settings.vision_breaker_threshold)
+    breaker = breaker or ProviderBreaker(vision.breaker_threshold)
 
     async def read_one(position: int, element: ManifestElement) -> bool:
         """Read one table from its image, or keep it as it is; True when enriched."""
@@ -157,24 +159,25 @@ async def _enrich_table_structures(
         read_and_notify,
         kind="tables",
         breaker=breaker,
+        delay_seconds=vision.retry_pass_delay_seconds,
     )
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
 
 
-def _tables_to_read(manifest: ProcessingManifest) -> tuple[list[ManifestElement], dict[str, str]]:
+def _tables_to_read(
+    manifest: ProcessingManifest, *, visual_review: bool
+) -> tuple[list[ManifestElement], dict[str, str]]:
     """The tables to read from their image, and why each misread one is read again.
 
-    A table without a usable structure is read. With ``TABLE_VISUAL_REVIEW``,
-    so is a table read in the wrong shape (rows collapsed into one, cells
-    doubled): it has structure but not the right one, and ``garbled`` maps
-    its id to the reason (``table_garble_reason``).
+    A table without a usable structure is read. With ``visual_review``
+    (``VisionConfig.table_visual_review``), so is a table read in the wrong shape (rows
+    collapsed into one, cells doubled): it has structure but not the right
+    one, and ``garbled`` maps its id to the reason (``table_garble_reason``).
     """
-    from backend.config.settings import settings
-
     garbled: dict[str, str] = {}
-    if settings.table_visual_review:
+    if visual_review:
         for element in manifest.elements:
             if element.type == "table" and _table_element_has_structured_content(element):
                 reason = table_garble_reason(

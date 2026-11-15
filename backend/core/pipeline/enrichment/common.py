@@ -50,6 +50,7 @@ async def _retry_failed(
     *,
     kind: str,
     breaker: ProviderBreaker,
+    delay_seconds: int,
 ) -> int:
     """Try once more, one at a time, what a vision stage left without a
     usable answer: the calls the model failed, and the pictures it answered
@@ -58,14 +59,13 @@ async def _retry_failed(
     A provider that failed for a while (006.pdf v5 lost every picture after
     slide 10) may be back after a wait. The breaker lets the first try through
     even when open, and a failure of it opens the breaker again, so a provider
-    that is still down costs one call, not one per object. Returns how many
-    objects the pass enriched.
+    that is still down costs one call, not one per object. The pass waits
+    ``delay_seconds`` first (``VisionConfig.retry_pass_delay_seconds``).
+    Returns how many objects the pass enriched.
     """
-    from backend.config.settings import settings
-
     if not failed:
         return 0
-    delay = max(0, settings.vision_retry_pass_delay_seconds)
+    delay = max(0, delay_seconds)
     kind_msgids = (
         LOG_PDDL_VISION_RETRY_PASS_PICTURES
         if kind == "pictures"
