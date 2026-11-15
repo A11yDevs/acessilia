@@ -15,6 +15,7 @@ from acessilia_sdk.toolbox import OperationCancelResult, ToolboxOperationClient
 from backend.config.settings import settings
 from backend.services.operation_registry import operation_registry
 from backend.core.logger import logger
+from backend.config.core_config import core_config_from_settings
 from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 
@@ -34,7 +35,9 @@ async def cancel_task_operations(task_id: str) -> str:
 
     timeout = max(0.1, float(settings.toolbox_cancel_timeout_seconds))
     try:
-        client = make_toolbox_client(ToolboxOperationClient)
+        client = make_toolbox_client(
+            ToolboxOperationClient, core_config_from_settings().toolbox
+        )
     except Exception as exc:  # noqa: BLE001 - cancellation must never fail the job
         logger.warning(
             "Toolbox cancellation is not configured for task {}: {}", task_id, exc

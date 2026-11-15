@@ -32,13 +32,6 @@ BUILDER = ROOT / "backend" / "config" / "core_config.py"
 #: start-up. The last step-3 pull request decides how they reach the core.
 PROCESS_SETUP_KEYS = {"log_level", "logs_dir", "i18n_locales_active"}
 
-#: Keys the core reads through ``getattr(settings, key)`` over these tables.
-DYNAMIC_KEYS = set(PROVIDER_DEFAULTS) | set(TIMEOUT_KEYS)
-
-#: The one module allowed a non-literal ``getattr(settings, ...)``: the SDK
-#: client configuration, over the provider and timeout tables.
-DYNAMIC_READERS = {"backend/core/toolbox/toolbox_client.py"}
-
 #: Which setting fills each field, written out so that a swapped pair fails.
 FIELD_SETTINGS: dict[str, str] = {
     "toolbox.base_url": "toolbox_base_url",
@@ -101,10 +94,11 @@ SETTINGS_MODULE = "backend.config.settings"
 def _scan(path: Path, rel: str | None = None) -> tuple[set[str], list[str]]:
     """The settings ``path`` reads, and the reads the scan cannot name.
 
-    Reads are ``settings.<key>``, ``getattr(settings, "<key>")`` and, in
-    ``DYNAMIC_READERS`` only, ``getattr(settings, key)`` over the tables. Any
-    other ``getattr(settings, ...)``, or a binding of the settings under
-    another name, is unnamed: the scan could not tell which key it reads.
+    Reads are ``settings.<key>`` and ``getattr(settings, "<key>")``. Any other
+    ``getattr(settings, ...)``, or a binding of the settings under another
+    name, is unnamed: the scan could not tell which key it reads. (The client
+    binding read the provider and timeout tables that way until the toolbox
+    group moved, ADR-0016 step 3.)
     """
     rel = rel or path.relative_to(ROOT).as_posix()
     keys: set[str] = set()
@@ -124,8 +118,6 @@ def _scan(path: Path, rel: str | None = None) -> tuple[set[str], list[str]]:
             name = node.args[1] if len(node.args) > 1 else None
             if isinstance(name, ast.Constant) and isinstance(name.value, str):
                 keys.add(name.value)
-            elif rel in DYNAMIC_READERS:
-                keys |= DYNAMIC_KEYS
             else:
                 unnamed.append(f"{rel}:{node.lineno} {ast.unparse(node)}")
         elif isinstance(node, ast.ImportFrom) and node.module == SETTINGS_MODULE:
@@ -185,57 +177,19 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 
 #: The groups the core now receives from its caller: none of their settings
 #: may be read again. Each step-3 pull request adds the group it moves.
-MOVED_GROUPS = {"document", "export", "fusion", "vision"}
+MOVED_GROUPS = {"document", "export", "fusion", "toolbox", "vision"}
 
 #: Reads of a moved group's setting that wait for another group's pull
-#: request, by file. Empty since the planning gate took the run's config.
-PENDING_READS: dict[str, set[str]] = {}
-
-#: Modules of a group still moving that already read no setting at all. The
-#: toolbox group moves in three pull requests (planning gate, switches, client
-#: factory); "toolbox" joins MOVED_GROUPS with the last one.
-SETTINGS_FREE = {
-    "backend/core/export/pandoc_exporter.py",
-    "backend/core/pipeline/enrichment/formulas.py",
-    "backend/core/pipeline/fusion.py",
-    "backend/core/pipeline/preflight.py",
-    "backend/core/planning/toolbox_gate.py",
-    "backend/core/toolbox/media_inspect.py",
-    "backend/core/toolbox/pdf_ua_audit.py",
-    "backend/core/toolbox/text_spans.py",
+#: request, by file. The model client sends the agents' VLM chats to the
+#: Toolbox (``AI_CLIENT=toolbox``) with the Toolbox's endpoint and key; it
+#: moves with the models group, which gives it the run's ``ToolboxConfig``.
+PENDING_READS: dict[str, set[str]] = {
+    "backend/core/agents/ai_client.py": {
+        "toolbox_api_key",
+        "toolbox_base_url",
+        "toolbox_base_urls",
+    },
 }
-
-#: Settings of the toolbox group already moved, until the whole group is in
-#: MOVED_GROUPS: the planning gate's (toolbox PR 1, #548), then the switches
-#: and the extractor's options (toolbox PR 2).
-MOVED_TOOLBOX_SETTINGS = {
-    "toolbox_availability_gate",
-    "toolbox_catalog_refresh_seconds",
-    "toolbox_catalog_stale_seconds",
-    "toolbox_extraction_timeout_seconds",
-    "toolbox_media_inspect_enabled",
-    "toolbox_pdf_validate_enabled",
-    "toolbox_use_artifact_store",
-    "toolbox_use_remote_cache",
-}
-
-
-def test_the_settings_free_modules_read_no_setting() -> None:
-    found = {rel: _scan(ROOT / rel) for rel in sorted(SETTINGS_FREE)}
-
-    assert not {rel: scan for rel, scan in found.items() if scan[0] or scan[1]}
-
-
-def test_the_moved_toolbox_settings_are_not_read() -> None:
-    assert MOVED_TOOLBOX_SETTINGS <= set(FIELD_SETTINGS.values())
-    found = {
-        path.relative_to(ROOT).as_posix(): sorted(_scan(path)[0] & MOVED_TOOLBOX_SETTINGS)
-        for path in sorted(CORE.rglob("*.py"))
-        if _scan(path)[0] & MOVED_TOOLBOX_SETTINGS
-    }
-
-    assert not found, f"backend/core reads moved Toolbox settings again: {found}"
-
 
 def test_the_moved_groups_are_not_read_from_settings() -> None:
     moved = {
@@ -594,6 +548,28 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
         ("backend.core.planning.toolbox_gate:evaluate", "config"),
+        ("backend.core.pipeline.toolbox:_toolbox_render", "toolbox"),
+        ("backend.core.pipeline.toolbox:_toolbox_formula_crop", "toolbox"),
+        ("backend.core.pipeline.enrichment.common:_extract_picture_bytes", "toolbox"),
+        ("backend.core.pipeline.enrichment.formulas:_formula_recognition_crop", "toolbox"),
+        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "toolbox"),
+        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "toolbox"),
+        ("backend.core.pipeline.enrichment.tables:_enrich_table_structures", "toolbox"),
+        ("backend.core.pipeline.judge:_render_page_png", "toolbox"),
+        ("backend.core.pipeline.judge:_judge_page", "toolbox"),
+        ("backend.core.pipeline.judge:_judge_one_page", "toolbox"),
+        ("backend.core.pipeline.handlers.inspection:_render_inspection_region", "toolbox"),
+        ("backend.core.pipeline.handlers.inspection:_render_source_page", "toolbox"),
+        ("backend.core.pipeline.handlers.inspection:_inspect_region", "toolbox"),
+        ("backend.core.pipeline.handlers.inspection:_inspect_page", "toolbox"),
+        ("backend.core.agents.vision_agent:VisionAgent.__init__", "toolbox"),
+        ("backend.core.toolbox.vision_payload:downscale_image", "toolbox"),
+        ("backend.core.toolbox.toolbox_math_tools:toolbox_recognize_formula", "toolbox"),
+        ("backend.core.toolbox.toolbox_math_tools:toolbox_convert_latex", "toolbox"),
+        ("backend.core.toolbox.toolbox_math_tools:toolbox_verbalize_latex", "toolbox"),
+        ("backend.core.pipeline.handlers.formula:_handle_mathml_method", "config"),
+        ("backend.core.pipeline.handlers.formula:_handle_latex_verbalizer_method", "config"),
+        ("backend.core.pipeline.handlers.judge:_handle_vlm_pairwise_judge_method", "config"),
         ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "toolbox"),
         (
             "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
@@ -655,6 +631,16 @@ def test_the_run_config_parameters_are_required(function, parameter) -> None:
     ("function", "parameter"),
     [
         ("backend.core.pipeline.preflight:_inspect_media", "toolbox"),
+        ("backend.core.toolbox.toolbox_client:make_toolbox_client", "toolbox"),
+        ("backend.core.toolbox.toolbox_client:toolbox_client_config", "toolbox"),
+        ("backend.core.toolbox.toolbox_client:toolbox_endpoints", "toolbox"),
+        ("backend.core.toolbox.toolbox_client:toolbox_vlm_endpoint", "toolbox"),
+        ("backend.core.pipeline.toolbox:_render_client", "toolbox"),
+        ("backend.core.pipeline.fusion:_structure_client", "toolbox"),
+        ("backend.core.pipeline.canonical_builder:latex_to_mathml", "toolbox"),
+        ("backend.core.pipeline.canonical_builder:verbalize_latex", "toolbox"),
+        ("backend.core.pipeline.canonical_builder:verbalize_inline_latex", "toolbox"),
+        ("backend.core.pipeline.canonical_builder:_ToolboxMathEnricher.__init__", "toolbox"),
         ("backend.core.pipeline.enrichment.inline_math:_TextSpanReader.__init__", "toolbox"),
         ("backend.core.pipeline.enrichment.inline_math:_mark_inline_math", "text_spans"),
         ("backend.core.pipeline.enrichment.inline_math:_mark_table_inline_math", "text_spans"),

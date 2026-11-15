@@ -94,9 +94,9 @@ def _blocks_to_text(blocks: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def _structure_client(provider: str) -> ToolboxStructureClient:
-    """A structure-extraction client for ``provider``, configured from settings."""
-    return make_toolbox_client(ToolboxStructureClient, provider=provider)
+def _structure_client(provider: str, toolbox: ToolboxConfig) -> ToolboxStructureClient:
+    """A structure-extraction client for ``provider``, configured from the run's ``toolbox``."""
+    return make_toolbox_client(ToolboxStructureClient, toolbox, provider=provider)
 
 
 async def extract_fused(
@@ -137,7 +137,7 @@ async def extract_fused(
     failures: dict[str, Exception] = {}
 
     async def _extract(provider: str) -> dict | None:
-        client = _structure_client(provider)
+        client = _structure_client(provider, toolbox)
         try:
             if artifact_id:
                 try:

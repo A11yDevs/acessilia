@@ -12,6 +12,7 @@ from typing import Any
 
 from docstruct.export.markdown import bare_latex
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.pipeline.canonical_builder import (
     build_canonical_document,
     sanitize_canonical_document,
@@ -38,6 +39,7 @@ def payload_to_canonical(result: dict[str, Any]) -> dict[str, Any]:
     }
     document = build_canonical_document(
         payload,
+        toolbox=core_config_from_settings().toolbox,
         title=_PLACEHOLDER_TITLE,
         language=result.get("language") or "en",
         verbosity="detailed",

@@ -1,7 +1,8 @@
 """DOCX export through the Toolbox (document.export.docx) from the core.
 
 The client itself is tested in ``libs/sdk/tests/clients/test_docx.py``.
-These tests cover how the core builds it from ``settings`` and the exporter,
+These tests cover how the core builds it from the run's ``ToolboxConfig`` and
+the exporter,
 which renders DOCX only on the Toolbox, with no local fallback
 (docs/adr/0003).
 """
@@ -47,7 +48,7 @@ def test_client_uses_the_docx_timeout_and_provider(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_timeout_seconds", 3600)
     monkeypatch.setattr(settings, "toolbox_docx_timeout_seconds", 240)
     monkeypatch.setattr(settings, "toolbox_docx_provider", "pandoc-docx")
-    client = make_toolbox_client(ToolboxDocxClient)
+    client = make_toolbox_client(ToolboxDocxClient, toolbox_config())
     assert client.timeout_seconds == 240
     assert client.provider == "pandoc-docx"
 
@@ -61,7 +62,7 @@ def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, t
         return {"artifact_id": DOCX_ID}
 
     monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
-    document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report")
+    document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report", toolbox=toolbox_config())
     document["language"] = "en-US"
 
     output = _export_docx(tmp_path, document)
@@ -250,7 +251,8 @@ def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
 
     with pytest.raises(TypeError, match="ExportConfig"):
         pandoc_exporter.export_accessible_document(
-            "# Report\n", tmp_path / "doc.docx", format_name="docx"
+            "# Report\n", tmp_path / "doc.docx", format_name="docx",
+            toolbox=toolbox_config(),
         )
 
 
@@ -258,5 +260,5 @@ def test_the_format_needs_the_run_toolbox_config(tmp_path):
     """No fallback to the settings: a Toolbox format without a ``ToolboxConfig`` is a programming error."""
     with pytest.raises(TypeError, match="ToolboxConfig"):
         pandoc_exporter.export_accessible_document(
-            "# Report\n", tmp_path / "doc.docx", format_name="docx", export=export_config()
+            "# Report\n", tmp_path / "doc.docx", format_name="docx", export=export_config(),
         )

@@ -53,7 +53,7 @@ async def inspect_source_media(
     from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     owned_client = client is None
-    inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient)
+    inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient, toolbox)
     try:
         result = await inspect_client.inspect(
             file_path=source_path,

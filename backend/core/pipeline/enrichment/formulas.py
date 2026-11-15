@@ -73,6 +73,7 @@ def _formula_recognition_crop(
     *,
     artifact_id: str | None = None,
     media_type: str | None = None,
+    toolbox: ToolboxConfig,
 ) -> tuple[bytes | None, int]:
     """Crop to feed the formula recognizer, or ``None`` when there is no usable box.
 
@@ -105,6 +106,7 @@ def _formula_recognition_crop(
             provenance.bbox if provenance is not None else None,
             media_type=media_type,
             artifact_id=artifact_id,
+            toolbox=toolbox,
         )
     except Exception as exc:
         # A DOCX has no page to render, and the Toolbox may refuse the box;
@@ -180,6 +182,7 @@ async def _classify_formula_regions(
     *,
     mode: str,
     vision: VisionConfig,
+    toolbox: ToolboxConfig,
     breaker: ProviderBreaker,
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
@@ -204,7 +207,7 @@ async def _classify_formula_regions(
     if not candidates:
         return
     slots = asyncio.Semaphore(max(1, vision.concurrency))
-    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled)
+    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox)
     progress_lock = asyncio.Lock()
 
     async def classify(element: ManifestElement) -> None:
@@ -218,6 +221,7 @@ async def _classify_formula_regions(
                     _formula_recognition_crop, source_file, element,
                     artifact_id=_source_artifact_id(manifest),
                     media_type=manifest.source.media_type,
+                    toolbox=toolbox,
                 )
                 if image:
                     reason = "model_failed"
@@ -370,11 +374,12 @@ async def _enrich_formula_latex(
         source_file=source_file,
         mode=mode,
         status_callback=status_callback,
-        vision=VisionAgent(mode=mode, region_cache=vision.region_cache_enabled),
+        vision=VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox),
         breaker=breaker or ProviderBreaker(vision.breaker_threshold),
         slots=asyncio.Semaphore(max(1, vision.concurrency)),
         total=len(formulas),
         recognize_provider=recognize_provider,
+        toolbox=toolbox,
         agreement_min=document.formula_text_agreement_min,
         on_progress=on_progress,
     )
@@ -415,6 +420,7 @@ class _FormulaEnrichment:
         slots: asyncio.Semaphore,
         total: int,
         recognize_provider: str,
+        toolbox: ToolboxConfig,
         agreement_min: float,
         on_progress: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
@@ -427,12 +433,13 @@ class _FormulaEnrichment:
         self.slots = slots
         self.total = total
         self.recognize_provider = recognize_provider
+        self.toolbox = toolbox
         self.agreement_min = agreement_min
         self.on_progress = on_progress
         self.total_pages = len(manifest.pages)
         self.artifact_id = _source_artifact_id(manifest)
         self.progress_lock = asyncio.Lock()
-        self.recognizer = _MathRecognizer()
+        self.recognizer = _MathRecognizer(toolbox)
         #: Crops ``math.recognize`` answered without LaTeX, outside an outage.
         self.empty_answers = 0
 
@@ -463,6 +470,7 @@ class _FormulaEnrichment:
                 element,
                 artifact_id=self.artifact_id,
                 media_type=self.manifest.source.media_type,
+                toolbox=self.toolbox,
             )
             if not image_bytes:
                 return False
@@ -527,7 +535,8 @@ class _MathRecognizer:
     turns ``available`` off for the rest of the document.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, toolbox: ToolboxConfig) -> None:
+        self.toolbox = toolbox
         self.available = True
         self._probe = asyncio.Lock()
         self._ready = asyncio.Event()
@@ -538,6 +547,7 @@ class _MathRecognizer:
             return await run_blocking(
                 toolbox_recognize_formula,
                 image_bytes,
+                toolbox=self.toolbox,
                 raise_on_unavailable=True,
             )
         except MathCapabilityUnavailable as exc:

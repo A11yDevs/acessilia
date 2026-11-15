@@ -228,7 +228,7 @@ def enforce_with_two_endpoints(monkeypatch):
 async def _extract(tmp_path) -> None:
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"%PDF-1.4\n")
-    client = make_toolbox_client(ToolboxStructureClient)
+    client = make_toolbox_client(ToolboxStructureClient, toolbox_config())
     try:
         await client.extract_structure(file_path=source)
     finally:
@@ -298,3 +298,84 @@ async def test_an_admitted_method_executes_on_the_deployment_that_was_checked(
     assert primary and secondary == []
     assert execute_on_primary.called
     assert not execute_on_secondary.called
+
+
+# A run whose ToolboxConfig is unlike the settings (ADR-0016 step 3, toolbox
+# PR 3): the catalogue the gate reads and every call the clients make use the
+# run's deployment, key, provider and retries. The settings point at a
+# deployment nothing routes, so a client that read them would fail the test.
+
+ELSEWHERE = "http://settings-only.test"
+
+
+@pytest.fixture
+def run_unlike_the_settings(monkeypatch):
+    from dataclasses import replace
+
+    monkeypatch.setattr(settings, "toolbox_base_url", ELSEWHERE)
+    monkeypatch.setattr(settings, "toolbox_base_urls", "")
+    monkeypatch.setattr(settings, "toolbox_api_key", "settings-key")
+    monkeypatch.setattr(settings, "toolbox_provider", "settings-provider")
+    monkeypatch.setattr(settings, "toolbox_retries", 3)
+    return replace(
+        core_config(),
+        toolbox=toolbox_config(
+            base_url=PRIMARY,
+            base_urls=f"{PRIMARY},{SECONDARY}",
+            api_key="run-key",
+            retries=0,
+            availability_gate="enforce",
+            providers={"toolbox_provider": "docling"},
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_gate_and_the_clients_follow_a_run_config_unlike_the_settings(
+    run_unlike_the_settings, tmp_path
+) -> None:
+    config = run_unlike_the_settings
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF-1.4\n")
+    with respx.mock(assert_all_called=False) as router:
+        catalogue = _serve(router, PRIMARY)
+        execute = router.post(f"{PRIMARY}{EXTRACT_ON}").mock(
+            return_value=httpx.Response(400, json={"detail": "rejected"})
+        )
+        decision = await toolbox_gate.decide(_single_provider_manifest(), config)
+        client = make_toolbox_client(ToolboxStructureClient, config.toolbox)
+        try:
+            with pytest.raises(ToolboxCapabilityError):
+                await client.extract_structure(file_path=source)
+        finally:
+            await client.close()
+
+    assert decision.blocked == {}
+    assert catalogue and all(r.headers["Authorization"] == "Bearer run-key" for r in catalogue)
+    # One call (retries=0), on the run's primary, with its key and provider.
+    [call] = execute.calls
+    assert call.request.headers["Authorization"] == "Bearer run-key"
+    assert b"docling" in call.request.content and b"settings-provider" not in call.request.content
+
+
+def test_the_client_configuration_is_the_run_config(run_unlike_the_settings) -> None:
+    from acessilia_sdk.toolbox.clients import ToolboxDocxClient
+
+    from backend.core.toolbox.toolbox_client import toolbox_client_config
+
+    toolbox = replace_timeouts(run_unlike_the_settings.toolbox)
+    sdk = toolbox_client_config(toolbox)
+
+    assert [endpoint.base_url for endpoint in sdk.endpoints] == [PRIMARY, SECONDARY]
+    assert sdk.api_key == "run-key"
+    assert sdk.retries == 0
+    assert sdk.providers["toolbox_provider"] == "docling"
+    assert sdk.timeouts[ToolboxDocxClient.timeout_key] == 7
+
+
+def replace_timeouts(toolbox):
+    from dataclasses import replace
+
+    from acessilia_sdk.toolbox.clients import ToolboxDocxClient
+
+    return replace(toolbox, timeouts={**toolbox.timeouts, ToolboxDocxClient.timeout_key: 7})

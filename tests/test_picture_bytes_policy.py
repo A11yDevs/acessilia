@@ -23,6 +23,7 @@ from docstruct.geometry.boxes import best_effort_clip
 from backend.core.manifest.models import BoundingBox, Provenance
 from tests.pddl_support import build_element
 from backend.core.pipeline.enrichment import common as enrichment_common
+from tests.core_config_support import toolbox_config
 
 
 def _picture(box=None, origin="TOPLEFT", page=2, src=None):
@@ -56,7 +57,7 @@ class _Renders:
 
 
 def _extract(element, **kwargs):
-    return enrichment_common._extract_picture_bytes(Path("doc.pdf"), element, kwargs.pop("fallback", None), **kwargs)
+    return enrichment_common._extract_picture_bytes(Path("doc.pdf"), element, kwargs.pop("fallback", None), **kwargs, toolbox=toolbox_config())
 
 
 def test_a_boxed_picture_is_its_crop(monkeypatch) -> None:

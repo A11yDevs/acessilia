@@ -1,7 +1,8 @@
 """PDF/UA export through the Toolbox (document.export.pdf_ua) from the core.
 
 The client itself is tested in ``libs/sdk/tests/clients/test_pdf_ua.py``.
-These tests cover how the core builds it from ``settings`` and the exporter,
+These tests cover how the core builds it from the run's ``ToolboxConfig`` and
+the exporter,
 which renders PDF/UA only on the Toolbox, with no local fallback
 (docs/adr/0003).
 """
@@ -62,8 +63,8 @@ def envelope(artifact_id: str = PDF_ID, **document_overrides) -> dict:
 def test_client_uses_the_pdf_ua_timeout_not_the_shared_one(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_timeout_seconds", 3600)
     monkeypatch.setattr(settings, "toolbox_pdf_ua_timeout_seconds", 300)
-    assert make_toolbox_client(ToolboxPdfUaClient).timeout_seconds == 300
-    assert make_toolbox_client(ToolboxPdfUaClient, timeout_seconds=30).timeout_seconds == 30
+    assert make_toolbox_client(ToolboxPdfUaClient, toolbox_config()).timeout_seconds == 300
+    assert make_toolbox_client(ToolboxPdfUaClient, toolbox_config(), timeout_seconds=30).timeout_seconds == 30
 
 
 def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
@@ -72,7 +73,7 @@ def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
 
     markdown = "# Relatório\n\nParágrafo.\n"
     first, second = (
-        build_pandoc_ast(_ensure_document(markdown, title="Relatório")) for _ in range(2)
+        build_pandoc_ast(_ensure_document(markdown, title="Relatório", toolbox=toolbox_config())) for _ in range(2)
     )
     # The canonical document carries a random id; the AST embeds it.
     assert first["source_document"]["id"] != second["source_document"]["id"]
@@ -158,7 +159,7 @@ def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
     )
-    document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report")
+    document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report", toolbox=toolbox_config())
     document["language"] = "en-US"
 
     pandoc_exporter.export_accessible_document(
@@ -422,7 +423,8 @@ def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
 
     with pytest.raises(TypeError, match="ExportConfig"):
         pandoc_exporter.export_accessible_document(
-            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua"
+            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua",
+            toolbox=toolbox_config(),
         )
 
 
@@ -430,5 +432,5 @@ def test_the_format_needs_the_run_toolbox_config(tmp_path):
     """No fallback to the settings: a Toolbox format without a ``ToolboxConfig`` is a programming error."""
     with pytest.raises(TypeError, match="ToolboxConfig"):
         pandoc_exporter.export_accessible_document(
-            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", export=export_config()
+            "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", export=export_config(),
         )

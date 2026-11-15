@@ -30,7 +30,7 @@ def test_a_jpeg_source_is_rendered(fake_toolbox_render, tmp_path) -> None:
     image = tmp_path / "scan.jpg"
     image.write_bytes(_jpeg())
 
-    assert inspection_handlers._render_source_page(image, "image/jpeg", 1, dpi=160).startswith(b"\x89PNG")
+    assert inspection_handlers._render_source_page(image, "image/jpeg", 1, dpi=160, toolbox=toolbox_config()).startswith(b"\x89PNG")
     assert fake_toolbox_render.requests[-1]["media_type"] == "image/jpeg"
 
 
@@ -40,7 +40,7 @@ def test_other_rasters_are_refused_before_any_request(fake_toolbox_render, tmp_p
     image.write_bytes(b"raster")
 
     with pytest.raises(ValueError, match=f"renders PDF, PNG and JPEG inputs, not {media_type}"):
-        inspection_handlers._render_source_page(image, media_type, 1, dpi=160)
+        inspection_handlers._render_source_page(image, media_type, 1, dpi=160, toolbox=toolbox_config())
     assert not fake_toolbox_render.requests
 
 
@@ -73,7 +73,7 @@ async def test_the_formula_steps_skip_a_source_the_toolbox_cannot_render(monkeyp
     manifest = _formula_manifest(media_type)
     breaker = pddl.ProviderBreaker(3)
 
-    await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker, vision=vision_config())
+    await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config())
     await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config())
 
     assert crops == []
@@ -87,6 +87,6 @@ async def test_the_formula_classification_asks_for_a_crop_of_a_renderable_source
     manifest = _formula_manifest(media_type)
 
     await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio",
-                                                  breaker=pddl.ProviderBreaker(3), vision=vision_config())
+                                                  breaker=pddl.ProviderBreaker(3), vision=vision_config(), toolbox=toolbox_config())
 
     assert len(crops) == 1

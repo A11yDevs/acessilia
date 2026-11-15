@@ -16,6 +16,7 @@ from backend.core.toolbox.toolbox_math_tools import (
     toolbox_recognize_formula,
     toolbox_verbalize_latex,
 )
+from tests.core_config_support import toolbox_config
 
 TOOLBOX_URL = settings.toolbox_base_url.rstrip("/")
 
@@ -50,7 +51,7 @@ class TestMathTools:
         )
         route.return_value = httpx.Response(200, json=SAMPLE_MATH_CONVERT_RESPONSE)
 
-        result = toolbox_convert_latex("E = mc^2", direction="latex-to-mathml")
+        result = toolbox_convert_latex("E = mc^2", direction="latex-to-mathml", toolbox=toolbox_config())
         assert "<math>" in result
 
     @respx.mock
@@ -62,7 +63,7 @@ class TestMathTools:
             })
         )
 
-        assert toolbox_convert_latex("<math/>", direction="mathml-to-latex") == "E = mc^2"
+        assert toolbox_convert_latex("<math/>", direction="mathml-to-latex", toolbox=toolbox_config()) == "E = mc^2"
         assert b"mathml-to-latex" in route.calls.last.request.content
 
     @respx.mock
@@ -88,7 +89,7 @@ class TestMathTools:
         )
         call = toolbox_convert_latex if capability == "convert" else toolbox_verbalize_latex
         with pytest.raises(MathCapabilityUnavailable) as excinfo:
-            call("x")
+            call("x", toolbox=toolbox_config())
         assert excinfo.value.capability == f"math.{capability}"
         assert excinfo.value.reason == "ToolboxContractViolation"
 
@@ -97,7 +98,7 @@ class TestMathTools:
         """Toolbox unavailable → an error, never a silent local fallback (ADR-0007)."""
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         with pytest.raises(MathCapabilityUnavailable) as excinfo:
-            toolbox_convert_latex("E = mc^2")
+            toolbox_convert_latex("E = mc^2", toolbox=toolbox_config())
         assert excinfo.value.capability == "math.convert"
         assert excinfo.value.reason == "ToolboxProviderUnavailable"
 
@@ -109,7 +110,7 @@ class TestMathTools:
                 400, json={"code": "invalid_input", "message": "invalid_latex: MissingCloseBrace"}
             )
         )
-        assert toolbox_convert_latex(r"\frac{a}{") == ""
+        assert toolbox_convert_latex(r"\frac{a}{", toolbox=toolbox_config()) == ""
 
     @respx.mock
     def test_verbalize_success(self):
@@ -118,14 +119,14 @@ class TestMathTools:
         )
         route.return_value = httpx.Response(200, json=SAMPLE_MATH_VERBALIZE_RESPONSE)
 
-        result = toolbox_verbalize_latex("E = mc^2", language="pt-BR")
+        result = toolbox_verbalize_latex("E = mc^2", language="pt-BR", toolbox=toolbox_config())
         assert "elevado" in result
 
     @respx.mock
     def test_verbalize_unavailable_is_explicit(self):
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         with pytest.raises(MathCapabilityUnavailable) as excinfo:
-            toolbox_verbalize_latex("E = mc^2")
+            toolbox_verbalize_latex("E = mc^2", toolbox=toolbox_config())
         assert excinfo.value.capability == "math.verbalize"
 
     @respx.mock
@@ -133,13 +134,13 @@ class TestMathTools:
         respx.post(f"{TOOLBOX_URL}/v1/capabilities/math.verbalize:execute").mock(
             return_value=httpx.Response(400, json={"code": "invalid_input", "message": "x"})
         )
-        assert toolbox_verbalize_latex(r"\frac{a}{") == ""
+        assert toolbox_verbalize_latex(r"\frac{a}{", toolbox=toolbox_config()) == ""
 
     @respx.mock
     def test_recognize_fallback(self):
         """Invalid image → empty list (Toolbox offline)."""
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
-        result = toolbox_recognize_formula(b"not-a-real-image")
+        result = toolbox_recognize_formula(b"not-a-real-image", toolbox=toolbox_config())
         assert result == []
 
     @respx.mock
@@ -147,7 +148,7 @@ class TestMathTools:
         """Batch callers opt into the error so an outage costs one timeout."""
         respx.route().mock(side_effect=httpx.ConnectError("synthetic offline provider"))
         with pytest.raises(MathCapabilityUnavailable) as excinfo:
-            toolbox_recognize_formula(b"not-a-real-image", raise_on_unavailable=True)
+            toolbox_recognize_formula(b"not-a-real-image", raise_on_unavailable=True, toolbox=toolbox_config())
         assert excinfo.value.capability == "math.recognize"
         assert excinfo.value.reason == "ToolboxProviderUnavailable"
 
@@ -163,7 +164,7 @@ class TestMathTools:
             })
         )
         # The SDK step ranks the candidates: a missing confidence is None.
-        assert toolbox_recognize_formula(b"png", raise_on_unavailable=True) == [
+        assert toolbox_recognize_formula(b"png", raise_on_unavailable=True, toolbox=toolbox_config()) == [
             {"latex": r"\frac{1}{2}a t^{2}", "bbox": [0, 0, 438, 78], "confidence": None}
         ]
 
@@ -179,7 +180,7 @@ class TestMathTools:
                 "document": {"formulas": formulas, "formula_count": 1, "raw_text": "x2"},
             })
         )
-        assert toolbox_recognize_formula(b"png") == formulas
+        assert toolbox_recognize_formula(b"png", toolbox=toolbox_config()) == formulas
 
     @respx.mock
     def test_recognize_returns_the_candidates_ranked_and_bare(self):
@@ -197,7 +198,7 @@ class TestMathTools:
                 ]},
             })
         )
-        assert toolbox_recognize_formula(b"png") == [
+        assert toolbox_recognize_formula(b"png", toolbox=toolbox_config()) == [
             {"latex": "b", "confidence": 0.9, "page": 1},
             {"latex": "a", "confidence": 0.4, "page": 1},
             {"latex": "c", "confidence": None},
@@ -216,18 +217,18 @@ class TestRecognizeUnexpectedErrors:
     def test_an_unusable_toolbox_url_is_raised(self, monkeypatch, raise_on_unavailable):
         monkeypatch.setattr(settings, "toolbox_base_urls", "not-a-url")
         with pytest.raises(ValueError, match="absolute http"):
-            toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable)
+            toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable, toolbox=toolbox_config())
 
     @pytest.mark.parametrize("raise_on_unavailable", [False, True])
     def test_a_bug_is_raised(self, monkeypatch, raise_on_unavailable):
         from backend.core.toolbox import toolbox_math_tools
 
-        async def broken(image_bytes):
+        async def broken(image_bytes, toolbox):
             raise TypeError("a bug in the call")
 
         monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
         with pytest.raises(TypeError, match="a bug in the call"):
-            toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable)
+            toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable, toolbox=toolbox_config())
 
 
 if __name__ == "__main__":

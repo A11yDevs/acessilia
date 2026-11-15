@@ -28,6 +28,7 @@ from acessilia_sdk.toolbox.clients import (
 )
 from backend.core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.toolbox.clients.math import recognized_formulas
+from tests.core_config_support import toolbox_config
 
 TOOLBOX_BASE_URL = os.getenv("TOOLBOX_BASE_URL", "").strip()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -89,28 +90,28 @@ def _make_formula_image() -> bytes:
 
 @pytest_asyncio.fixture
 async def layout_client() -> ToolboxLayoutClient:
-    client = make_toolbox_client(ToolboxLayoutClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+    client = make_toolbox_client(ToolboxLayoutClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
     yield client
     await client.close()
 
 
 @pytest_asyncio.fixture
 async def pdf_client() -> ToolboxPdfClient:
-    client = make_toolbox_client(ToolboxPdfClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+    client = make_toolbox_client(ToolboxPdfClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
     yield client
     await client.close()
 
 
 @pytest_asyncio.fixture
 async def math_client() -> ToolboxMathClient:
-    client = make_toolbox_client(ToolboxMathClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
+    client = make_toolbox_client(ToolboxMathClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
     yield client
     await client.close()
 
 
 @pytest_asyncio.fixture
 async def ocr_client() -> ToolboxOcrClient:
-    client = make_toolbox_client(ToolboxOcrClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
+    client = make_toolbox_client(ToolboxOcrClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=300)
     yield client
     await client.close()
 
@@ -336,8 +337,8 @@ class TestWorkflowE2E:
     @pytest.mark.e2e
     @pytest.mark.asyncio
     async def test_pdf_split_then_render_first_page(self) -> None:
-        pdf_client = make_toolbox_client(ToolboxPdfClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
-        layout_client = make_toolbox_client(ToolboxLayoutClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+        pdf_client = make_toolbox_client(ToolboxPdfClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+        layout_client = make_toolbox_client(ToolboxLayoutClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
         try:
             pdf = _get_pdf()
 
@@ -359,7 +360,7 @@ class TestWorkflowE2E:
     @pytest.mark.e2e
     @pytest.mark.asyncio
     async def test_math_convert_then_verbalize(self) -> None:
-        math_client = make_toolbox_client(ToolboxMathClient, base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
+        math_client = make_toolbox_client(ToolboxMathClient, toolbox_config(), base_url=TOOLBOX_BASE_URL, timeout_seconds=120)
         try:
             convert_result = await math_client.convert(
                 r"\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}",
@@ -400,10 +401,10 @@ class TestStructureClientE2E:
         from docstruct.export.txt import document_to_txt_lines
 
         structure = make_toolbox_client(
-            ToolboxStructureClient, base_url=TOOLBOX_BASE_URL,
+            ToolboxStructureClient, toolbox_config(), base_url=TOOLBOX_BASE_URL,
             provider="docling", timeout_seconds=300,
         )
-        docx = make_toolbox_client(ToolboxDocxClient, base_url=TOOLBOX_BASE_URL)
+        docx = make_toolbox_client(ToolboxDocxClient, toolbox_config(), base_url=TOOLBOX_BASE_URL)
         try:
             pdf = FIXTURES_DIR / "tutorials" / "java-oo-3pgs.pdf"
             assert pdf.is_file()
@@ -422,7 +423,8 @@ class TestStructureClientE2E:
                 for page in pages
             ]
             canonical = build_canonical_document(
-                {"pages": prose_pages}, title="java-oo-3pgs"
+                {"pages": prose_pages}, title="java-oo-3pgs",
+                toolbox=toolbox_config(),
             )
             txt = "\n".join(document_to_txt_lines(canonical))
             assert "CAPÍTULO 9" in txt

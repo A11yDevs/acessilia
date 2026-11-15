@@ -29,7 +29,7 @@ from docstruct.placeholders import (
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.vision_agent import VisionAgent
-from backend.core.config import VisionConfig
+from backend.core.config import ToolboxConfig, VisionConfig
 from backend.core.manifest.builder import (
     _derive_processing_needs,
     is_unstructured_page_placeholder,
@@ -90,6 +90,7 @@ async def _enrich_picture_descriptions(
     *,
     mode: str,
     vision: VisionConfig,
+    toolbox: ToolboxConfig,
     media_inspection: dict[str, Any] | None = None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
@@ -101,7 +102,7 @@ async def _enrich_picture_descriptions(
     if not pictures:
         return
 
-    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled)
+    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox)
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
     total_pages = len(manifest.pages)
 
@@ -142,6 +143,7 @@ async def _enrich_picture_descriptions(
                 fallback_page_number,
                 _source_artifact_id(manifest),
                 manifest.source.media_type,
+                toolbox=toolbox,
             )
             if not image_bytes:
                 _record_vision_failure(

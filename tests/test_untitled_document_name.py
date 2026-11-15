@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
+from tests.core_config_support import toolbox_config
 
 isolated_runtime = runtime_fixture
 
@@ -122,7 +123,7 @@ async def test_the_worker_passes_the_uploaded_name_to_the_pipeline(
         if manager.obter(task_id) is None:
             manager.criar_tarefa(stored, task_id=task_id)
         from backend.core.pipeline.canonical_builder import build_canonical_document
-        return build_canonical_document(_untitled_payload(), title="51-pages")
+        return build_canonical_document(_untitled_payload(), title="51-pages", toolbox=toolbox_config())
 
     monkeypatch.setattr("backend.service.process", fake_process)
 

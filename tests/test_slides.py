@@ -369,9 +369,9 @@ async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypat
             )
 
     monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
-    monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda _s, element, page, *_a: (b"png", page))
+    monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda _s, element, page, *_a, **_k: (b"png", page))
 
-    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config())
+    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config())
 
     # Slide 3 is one picture of the whole slide; slide 2 keeps an embedded one.
     assert classifications == {3: "full_page_image", 2: "embedded_image"}
@@ -429,7 +429,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
         if block["type"] == "heading"
     ]
     assert t(MSG_SLIDE_HEADING_WITH_TITLE).format(number=2, total=3, title="Results") in texts
-    canonical = build_canonical_document(payload)
+    canonical = build_canonical_document(payload, toolbox=toolbox_config())
     # One H1, then H2 per slide: the canonical document is valid.
     assert not validate_canonical_document(canonical)
 
@@ -595,7 +595,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     from backend.core.pipeline.payload import _manifest_pages_to_payload
 
     class FailingVision:
-        def __init__(self, mode: str, *, region_cache) -> None:
+        def __init__(self, mode: str, *, region_cache, toolbox) -> None:
             pass
 
         async def describe_region(self, *, errors=None, **kwargs):
@@ -616,7 +616,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     extracted["text"] = "Scale diagram"
     manifest = _build_edited(source, extraction)
 
-    await _enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config())
+    await _enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config())
 
     [picture] = [e for e in manifest.elements if e.id == "e-6"]
     assert picture.metadata["vision_failure_reason"] == "model_failed"

@@ -9,10 +9,11 @@ from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.sections import section_body_blocks
 from docstruct.validation import validate_canonical_document
+from tests.core_config_support import toolbox_config
 
 
 def _legacy_document(field="text", nested=False):
-    document = build_canonical_document("# Heading\n\nBody content.")
+    document = build_canonical_document("# Heading\n\nBody content.", toolbox=toolbox_config())
     sections = document["sections"]
     if nested:
         child = deepcopy(sections[0])

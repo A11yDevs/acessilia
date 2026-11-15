@@ -6,7 +6,7 @@
 
 Diagrama: [remote_failover_sequence.puml](remote_failover_sequence.puml). Esta página o descreve em texto. O comportamento está em `libs/sdk/src/acessilia_sdk/toolbox/client.py`; as decisões são a [ADR-0003](../adr/0003-remote-only-operational-capabilities.pt-br.md) e a [ADR-0006](../adr/0006-availability-and-failover.pt-br.md).
 
-1. **O core pede uma capacidade ao SDK**, por exemplo `math.convert`. O cliente do SDK vem do `make_toolbox_client`, configurado a partir das settings do core.
+1. **O core pede uma capacidade ao SDK**, por exemplo `math.convert`. O cliente do SDK vem do `make_toolbox_client`, configurado a partir da `ToolboxConfig` da execução.
 2. **O endpoint 1 é o `TOOLBOX_BASE_URL`, normalmente um balanceador** na frente de réplicas da Toolbox sem estado, que compartilham MinIO e Valkey ([ADR-0006](../adr/0006-availability-and-failover.pt-br.md); as réplicas e seu armazenamento são implantados a partir do repositório acessilia-toolbox, não deste). A disponibilidade vem dessas réplicas. O SDK envia a requisição sem consultar o catálogo antes.
 3. **As retentativas acontecem no mesmo endpoint.** Timeout, erro de rede ou `503`/`504` são repetidos até `TOOLBOX_RETRIES` vezes, esperando `TOOLBOX_RETRY_BACKOFF_SECONDS` × 2ⁿ, com jitter, entre as tentativas. Uma requisição repetida pode rodar duas vezes na Toolbox, então o cliente do SDK só admite retentativas para capacidades idempotentes.
 4. **Qualquer outro erro sobe na hora:** um `4xx`, outro `5xx` como `500` ou `502`, ou uma violação de contrato. O SDK o trata como resposta de uma Toolbox alcançável, que seria igual em qualquer endpoint, então não há retentativa nem failover.

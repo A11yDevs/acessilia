@@ -17,14 +17,14 @@ from backend.core.agents.output_schemas import VisionOutput
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest, build_obligation
 from backend.core.pipeline.enrichment import pictures as picture_stage
-from tests.core_config_support import vision_config
+from tests.core_config_support import toolbox_config, vision_config
 
 
 class Vision:
     calls: ClassVar[list[dict]] = []
     answers: ClassVar[dict] = {}
 
-    def __init__(self, mode: str, *, region_cache) -> None:
+    def __init__(self, mode: str, *, region_cache, toolbox) -> None:
         pass
 
     async def describe_region(self, *, image_bytes, errors=None, **kwargs):
@@ -41,7 +41,7 @@ def fakes(monkeypatch):
     monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
     crops: dict = {}
 
-    def crop(source, element, fallback, artifact_id, media_type):
+    def crop(source, element, fallback, artifact_id, media_type, *, toolbox):
         return crops.get(element.id, (element.id.encode(), element.page_number or fallback or 1))
 
     monkeypatch.setattr(picture_stage, "_extract_picture_bytes", crop)
@@ -61,6 +61,7 @@ def _manifest(elements, pages=2):
 async def _run(manifest, **kwargs):
     await picture_stage._enrich_picture_descriptions(manifest, Path("doc.pdf"), mode="medio", **kwargs,
         vision=vision_config(retry_pass_delay_seconds=0),
+        toolbox=toolbox_config(),
     )
 
 

@@ -261,7 +261,7 @@ missing input file, `--parameters` that is not a JSON object).
    retry rules. Export the client from `acessilia_sdk.toolbox.clients` and test
    it in `tests/clients/` with an explicit `base_url`.
 3. In the core, build it with `backend.core.toolbox.toolbox_client.make_toolbox_client`,
-   which passes the configuration from `settings`.
+   which passes the run's `ToolboxConfig`.
 
 ## Tests
 

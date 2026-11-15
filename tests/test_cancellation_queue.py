@@ -11,6 +11,7 @@ from backend.services.blocking import run_blocking
 from backend.services.queue_service import QueueItem, UnifiedQueue
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from tests.test_pending_fixes import stop_queue
+from tests.core_config_support import toolbox_config
 
 isolated_runtime = runtime_fixture
 
@@ -45,7 +46,7 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
         if kwargs["task_id"] == "next":
             from backend.core.pipeline.canonical_builder import build_canonical_document
             advanced.set()
-            return build_canonical_document("Next document.", title="Next")
+            return build_canonical_document("Next document.", title="Next", toolbox=toolbox_config())
         await run_blocking(extract)
         pytest.fail("Cancelled extraction must not publish a result")
 

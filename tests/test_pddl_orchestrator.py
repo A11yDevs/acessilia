@@ -29,7 +29,7 @@ from backend.core.manifest.models import (
 from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
 from backend.core.pipeline.enrichment import pictures as picture_stage
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import vision_config
+from tests.core_config_support import toolbox_config, vision_config
 
 
 def _sample_manifest() -> ProcessingManifest:
@@ -209,6 +209,7 @@ def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
     canonical = build_canonical_document(
         payload, title="Test", source_name="sample.pdf", source_path="/tmp/sample.pdf",
         metadata=payload["canonical_metadata"], technical_warnings=payload["technical_warnings"],
+        toolbox=toolbox_config(),
     )
     assert expected in str(canonical)
 
@@ -236,6 +237,7 @@ def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
         source_path="/tmp/amostra.pdf",
         metadata=payload["canonical_metadata"],
         technical_warnings=payload["technical_warnings"],
+        toolbox=toolbox_config(),
     )
 
     assert canonical["sections"]
@@ -270,6 +272,7 @@ def test_build_pddl_structured_payload_reports_the_toolbox_gate_decision():
         source_path="/tmp/amostra.pdf",
         metadata=payload["canonical_metadata"],
         technical_warnings=payload["technical_warnings"],
+        toolbox=toolbox_config(),
     )
     assert canonical["metadata"]["pddl_toolbox_availability"] == decision
 
@@ -693,11 +696,11 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
     monkeypatch.setattr(
         table_stage,
         "_extract_picture_bytes",
-        lambda *_args: (b"image", 1),
+        lambda *_args, **_kwargs: (b"image", 1),
     )
 
-    async def run_inline(function, *args):
-        return function(*args)
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
 
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
 
@@ -706,6 +709,7 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
             manifest,
             Path("/tmp/amostra.pdf"),
             vision=vision_config(),
+            toolbox=toolbox_config(),
         )
     )
 
@@ -760,11 +764,11 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
     monkeypatch.setattr(
         picture_stage,
         "_extract_picture_bytes",
-        lambda *_args: (b"image", 1),
+        lambda *_args, **_kwargs: (b"image", 1),
     )
 
-    async def run_inline(function, *args):
-        return function(*args)
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
 
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
 
@@ -774,6 +778,7 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
             Path("/tmp/amostra.pdf"),
             mode="medio",
             vision=vision_config(),
+            toolbox=toolbox_config(),
         )
     )
 
@@ -811,11 +816,11 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
     monkeypatch.setattr(
         canonical_builder,
         "toolbox_convert_latex",
-        lambda latex: converted.append(latex) or "<math><mi>E</mi></math>",
+        lambda latex, **_kw: converted.append(latex) or "<math><mi>E</mi></math>",
     )
-    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", lambda latex: "E")
+    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", lambda latex, **_kw: "E")
 
-    document = build_canonical_document(payload)
+    document = build_canonical_document(payload, toolbox=toolbox_config())
     canonical_formula = document["sections"][0]["blocks"][0]
     assert canonical_formula["type"] == "math"
     assert canonical_formula["text"] == r"E=mc^2"
@@ -894,11 +899,11 @@ def test_standalone_image_injects_full_page_picture_for_vision(
     monkeypatch.setattr(
         picture_stage,
         "_extract_picture_bytes",
-        lambda *_args: (b"image", 1),
+        lambda *_args, **_kwargs: (b"image", 1),
     )
 
-    async def run_inline(function, *args):
-        return function(*args)
+    async def run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
 
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
 
@@ -909,6 +914,7 @@ def test_standalone_image_injects_full_page_picture_for_vision(
             mode="medio",
             media_inspection=media_inspection,
             vision=vision_config(),
+            toolbox=toolbox_config(),
         )
     )
 

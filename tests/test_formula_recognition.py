@@ -72,7 +72,7 @@ class FakeVision:
     calls: ClassVar[list[dict]] = []
     output: ClassVar[VisionOutput | None] = None
 
-    def __init__(self, mode: str, *, region_cache) -> None:
+    def __init__(self, mode: str, *, region_cache, toolbox) -> None:
         self.mode = mode
 
     async def describe_region(self, **kwargs):

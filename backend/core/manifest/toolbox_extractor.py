@@ -152,7 +152,7 @@ class ToolboxManifestExtractor:
         toolbox_config: ToolboxConfig,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
-        structure = self._client or make_toolbox_client(ToolboxStructureClient)
+        structure = self._client or make_toolbox_client(ToolboxStructureClient, toolbox_config)
         artifacts = self._artifact_client
         try:
             # Inspect each primary/upload client's URLs once. The final policy
@@ -166,7 +166,7 @@ class ToolboxManifestExtractor:
                 and toolbox_config.use_artifact_store
                 and len(structure_urls) <= 1
             ):
-                artifacts = make_toolbox_client(ToolboxArtifactClient)
+                artifacts = make_toolbox_client(ToolboxArtifactClient, toolbox_config)
             use_artifact_store = (
                 toolbox_config.use_artifact_store
                 and artifacts is not None
@@ -269,7 +269,7 @@ class ToolboxManifestExtractor:
                 )
 
                 secondary_client = make_toolbox_client(
-                    ToolboxStructureClient, provider=secondary_provider
+                    ToolboxStructureClient, toolbox_config, provider=secondary_provider
                 )
                 try:
                     secondary_artifact_id = (

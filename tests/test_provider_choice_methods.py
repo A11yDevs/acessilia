@@ -41,6 +41,7 @@ from backend.core.pipeline.handlers.fusion import (
 )
 from backend.core.pipeline.handlers.order import _handle_skeleton_order_method
 from backend.core.planning.planner_agent import PlannerAgent
+from tests.core_config_support import core_config, toolbox_config
 
 NOW = datetime(2026, 10, 16, tzinfo=timezone.utc)
 W, H = 600.0, 800.0
@@ -529,7 +530,7 @@ class TestVlmPairwiseJudge:
     def _fake_judge(self, monkeypatch, p_b, document=None):
         seen = {}
 
-        def judge(image, candidate_a, candidate_b):
+        def judge(image, candidate_a, candidate_b, *, toolbox):
             seen.update(image=image, a=candidate_a, b=candidate_b)
             if document is not None:
                 return {"document": document}
@@ -544,7 +545,7 @@ class TestVlmPairwiseJudge:
         manifest = self._manifest(tmp_path)
         seen = self._fake_judge(monkeypatch, 0.1)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert result.success and result.validated
         assert seen["image"].startswith(b"\x89PNG")
@@ -575,7 +576,7 @@ class TestVlmPairwiseJudge:
         manifest = self._routed_manifest(tmp_path)
         seen = self._fake_judge(monkeypatch, p_b)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert seen["a"] == self.TEXT + " (mineru)" and seen["b"] == self.TEXT
         judgement = manifest.elements[0].metadata["page_judgement"]
@@ -598,7 +599,7 @@ class TestVlmPairwiseJudge:
         manifest.elements[0].metadata["provider"] = "mineru"
         seen = self._fake_judge(monkeypatch, 0.1)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success and not result.validated
         assert not seen
@@ -610,7 +611,7 @@ class TestVlmPairwiseJudge:
         manifest = self._manifest(tmp_path)
         self._fake_judge(monkeypatch, 0.9)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success
         assert "pB=0.90" in result.message
@@ -623,12 +624,12 @@ class TestVlmPairwiseJudge:
 
         manifest = self._manifest(tmp_path)
 
-        def down(*_args):
+        def down(*_args, **_kwargs):
             raise ToolboxProviderUnavailable("VLM offline")
 
         monkeypatch.setattr("backend.core.pipeline.judge._judge_page", down)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success
         assert "indisponível" in result.message
@@ -646,7 +647,7 @@ class TestVlmPairwiseJudge:
         manifest = self._manifest(tmp_path)
         self._fake_judge(monkeypatch, None, document=document)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success and not result.validated
         assert "pB válido" in result.message
@@ -660,7 +661,7 @@ class TestVlmPairwiseJudge:
         manifest = self._manifest(tmp_path, secondary=self.TEXT)
         seen = self._fake_judge(monkeypatch, 0.9)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert result.success and result.validated
         assert not seen
@@ -682,7 +683,7 @@ class TestVlmPairwiseJudge:
 
         monkeypatch.setattr("backend.core.pipeline.judge._render_page_png", broken)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success and not result.validated
         assert result.message.endswith(" 1 n\u00e3o p\u00f4de ser renderizada: broken source")
@@ -701,7 +702,7 @@ class TestVlmPairwiseJudge:
         monkeypatch.setattr("backend.core.pipeline.judge._render_page_png", lambda *a, **k: b"\x89PNG")
         calls = []
 
-        def judge(image, candidate_a, candidate_b):
+        def judge(image, candidate_a, candidate_b, *, toolbox):
             calls.append(candidate_a)
             return {"document": {"pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7, "model": "m"}}
 
@@ -713,7 +714,7 @@ class TestVlmPairwiseJudge:
                 {"type": "paragraph", "text": manifest.elements[1].text}]}, secondary.sizes), None),
         )
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert result.success and result.validated
         assert result.message.startswith("Juiz VLM confirma a p")
@@ -730,7 +731,7 @@ class TestVlmPairwiseJudge:
         manifest = self._manifest(tmp_path, secondary="")
         seen = self._fake_judge(monkeypatch, 0.1)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success
         assert "Sem páginas com as duas transcrições" in result.message
@@ -742,12 +743,12 @@ class TestVlmPairwiseJudge:
 
         manifest = self._manifest(tmp_path)
 
-        def rejected(*_args):
+        def rejected(*_args, **_kwargs):
             raise ToolboxAuthenticationError("401")
 
         monkeypatch.setattr("backend.core.pipeline.judge._judge_page", rejected)
 
-        result = _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert not result.success
         assert "recusou" in result.message and "ToolboxAuthenticationError" in result.message
@@ -765,7 +766,7 @@ class TestVlmPairwiseJudge:
         monkeypatch.setattr("backend.core.pipeline.judge._judge_page", broken)
 
         with pytest.raises(TypeError):
-            _handle_vlm_pairwise_judge_method(manifest, "o-1")
+            _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
     @pytest.mark.slow
     @pytest.mark.timeout(300)  # CPU-heavy: 60-80s under xdist; headroom over 180s
@@ -779,7 +780,7 @@ class TestVlmPairwiseJudge:
         )
         self._fake_judge(monkeypatch, 0.1)
 
-        _handle_vlm_pairwise_judge_method(manifest, "o-1")
+        _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
         assert manifest.elements[0].metadata["page_judgement"]["truncated"] is True
 
@@ -802,7 +803,7 @@ class TestVlmPairwiseJudge:
 
         from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
 
-        def fake_factory(client_cls, **overrides):
+        def fake_factory(client_cls, _toolbox, **overrides):
             calls["client_cls"] = client_cls
             return FakeClient()
 
@@ -810,7 +811,7 @@ class TestVlmPairwiseJudge:
             "backend.core.toolbox.toolbox_client.make_toolbox_client", fake_factory
         )
 
-        result = _judge_page(b"\x89PNG-fake", "A", "B")
+        result = _judge_page(b"\x89PNG-fake", "A", "B", toolbox=toolbox_config())
 
         assert result == {"document": {"pB": 0.3}}
         assert calls["bytes"] == b"\x89PNG-fake" and calls["suffix"] == ".png"
@@ -827,5 +828,5 @@ class TestVlmPairwiseJudge:
         )
 
         self._manifest(tmp_path)
-        pixmap = fitz.Pixmap(_render_page_png(tmp_path / "doc.pdf", 1))
+        pixmap = fitz.Pixmap(_render_page_png(tmp_path / "doc.pdf", 1, toolbox=toolbox_config()))
         assert max(pixmap.width, pixmap.height) <= _JUDGE_PAGE_MAX_SIDE

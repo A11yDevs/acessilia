@@ -9,6 +9,7 @@ import re
 from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
 
+from backend.core.config import ToolboxConfig
 from backend.config.settings import settings
 from backend.core.i18n import active_locale, t
 from backend.core.i18n.log_messages import (
@@ -97,16 +98,21 @@ RETRY_INSTRUCTION = (
 class VisionAgent:
     """Processes visual regions and produces accessible audio descriptions."""
 
-    def __init__(self, mode: str = "medio", *, region_cache: bool) -> None:
+    def __init__(
+        self, mode: str = "medio", *, region_cache: bool, toolbox: ToolboxConfig
+    ) -> None:
         """Create a vision agent with a default prompting mode.
 
         Args:
             mode (str): Prompting mode name whose system prompt is loaded at construction (default "medio").
             region_cache (bool): Whether region descriptions are read from and
                 stored in the cache (``VisionConfig.region_cache_enabled``).
+            toolbox (ToolboxConfig): The run's Toolbox, which renders a smaller
+                image when the model rejects one for its context.
         """
         self.mode = mode
         self.region_cache = region_cache
+        self.toolbox = toolbox
         self.system_prompt = load_system_prompt(mode)
 
     async def describe_region(
@@ -189,7 +195,7 @@ class VisionAgent:
         try:
             output = await _run_with_retry(
                 prompt, image_bytes, VisionOutput, page_num=page_num, label=classification,
-                max_tokens=max_tokens,
+                toolbox=self.toolbox, max_tokens=max_tokens,
             )
         except Exception as error:
             salvaged = (
@@ -257,7 +263,8 @@ class VisionAgent:
             f"\n\n{PAGE_INSPECTION_INSTRUCTION}"
         )
         return await _run_with_retry(
-            prompt, image_bytes, PageInspectionOutput, page_num=page_num, label="page_inspection"
+            prompt, image_bytes, PageInspectionOutput, page_num=page_num, label="page_inspection",
+            toolbox=self.toolbox,
         )
 
 
@@ -268,6 +275,7 @@ async def _run_with_retry(
     *,
     page_num: int,
     label: str,
+    toolbox: ToolboxConfig,
     max_tokens: int | None = None,
 ) -> OutputModel:
     """Ask the vision model for ``schema``, retrying answers that fail validation.
@@ -295,7 +303,7 @@ async def _run_with_retry(
             or not _is_context_overflow(error)
         ):
             return False
-        smaller_image = await _downscale_image(image_bytes)
+        smaller_image = await _downscale_image(image_bytes, toolbox)
         if smaller_image is None:
             return False
 
@@ -452,8 +460,8 @@ def _is_context_overflow(error: BaseException) -> bool:
     return bool(_CONTEXT_OVERFLOW_PATTERN.search(str(error)))
 
 
-async def _downscale_image(image_bytes: bytes) -> bytes | None:
-    return await downscale_image(image_bytes, _CONTEXT_RETRY_IMAGE_SCALE)
+async def _downscale_image(image_bytes: bytes, toolbox: ToolboxConfig) -> bytes | None:
+    return await downscale_image(image_bytes, _CONTEXT_RETRY_IMAGE_SCALE, toolbox=toolbox)
 
 
 def _is_whole_page(label: str) -> bool:

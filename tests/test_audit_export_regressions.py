@@ -20,6 +20,7 @@ from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from tests.test_region_inspection import inspection as inspection
+from tests.core_config_support import toolbox_config
 
 
 @pytest.mark.parametrize("levels, finding", [([2, 3], MSG_MISSING_FIRST_H1), ([1, 1], MSG_MULTIPLE_H1), ([0, 2], MSG_MISSING_FIRST_H1), ([1, 7], MSG_MISSING_FIRST_H1)])
@@ -39,9 +40,9 @@ def test_complete_plan_repairs_invalid_heading_sequence(tmp_path, levels, findin
         file_path=tmp_path / "headings.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
-    canonical = build_canonical_document(payload)
+    canonical = build_canonical_document(payload, toolbox=toolbox_config())
     assert not validate_canonical_document(canonical)
-    export_accessible_document(canonical, tmp_path / "result.txt", format_name="txt")
+    export_accessible_document(canonical, tmp_path / "result.txt", format_name="txt", toolbox=toolbox_config())
     assert (tmp_path / "result.txt").is_file()
 
 
@@ -56,7 +57,7 @@ def test_region_png_is_embedded_in_exported_html(inspection, tmp_path):
         file_path=Path(manifest.source.path), manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
-    canonical = build_canonical_document(payload)
+    canonical = build_canonical_document(payload, toolbox=toolbox_config())
     html = document_to_html(canonical, profile="html")
     encoded = re.search(r'src="data:image/png;base64,([^" ]+)"', html).group(1)
     assert base64.b64decode(encoded, validate=True) == Path(updated.elements[0].metadata["region_crop"]).read_bytes()
@@ -67,7 +68,7 @@ def test_accessibility_audit_accepts_existing_alternative_text():
     canonical = build_canonical_document({"pages": [{"blocks": [
         {"id": "picture", "type": "image", "alt_text": "A black square", "metadata": {}},
         {"id": "body", "type": "paragraph", "text": "Body content"},
-    ]}]})
+    ]}]}, toolbox=toolbox_config())
     assert 'alt="A black square"' in document_to_html(canonical, profile="html")
     warnings = audit_canonical_document(canonical)["WARNING"]
     assert not any(message == MSG_IMAGE_MISSING_ALT for message, _ in warnings)
@@ -92,7 +93,7 @@ def test_duplicate_top_level_titles_are_repaired(types, tmp_path):
         file_path=tmp_path / "headings.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
-    assert not validate_canonical_document(build_canonical_document(payload))
+    assert not validate_canonical_document(build_canonical_document(payload, toolbox=toolbox_config()))
 
 
 @pytest.mark.parametrize("alt", ["", "   "])
@@ -101,6 +102,6 @@ def test_audit_still_warns_when_rendered_alternative_is_empty(alt):
         {"id": "picture", "type": "image", "alt_text": alt,
          "metadata": {"alt": "Unused legacy text"}},
         {"id": "body", "type": "paragraph", "text": "Body content"},
-    ]}]})
+    ]}]}, toolbox=toolbox_config())
     assert any(message == MSG_IMAGE_MISSING_ALT
                for message, _ in audit_canonical_document(canonical)["WARNING"])

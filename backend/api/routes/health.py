@@ -14,6 +14,7 @@ from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
+from backend.config.core_config import core_config_from_settings
 from backend.core.toolbox.toolbox_client import toolbox_endpoints, toolbox_vlm_endpoint
 
 router = APIRouter(tags=["health"])
@@ -30,7 +31,7 @@ async def ready() -> JSONResponse:
     providers = {settings.toolbox_provider}
     if settings.fusion_mode == "dual":
         providers.add(settings.fusion_secondary_provider)
-    for endpoint in toolbox_endpoints():
+    for endpoint in toolbox_endpoints(core_config_from_settings().toolbox):
         for provider in sorted(providers):
             if not await vlm_provider_healthy(
                 endpoint,
@@ -109,7 +110,7 @@ def _update_check_is_stale(last_check: str, now: datetime | None = None) -> bool
 async def _check_model_reachable() -> bool:
     if settings.ai_client == "toolbox":
         return await vlm_provider_healthy(
-            toolbox_vlm_endpoint(),
+            toolbox_vlm_endpoint(core_config_from_settings().toolbox),
             settings.toolbox_vlm_provider,
             api_key=settings.toolbox_api_key,
             timeout_seconds=TOOLBOX_VLM_HEALTH_TIMEOUT_SECONDS,

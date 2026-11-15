@@ -17,7 +17,6 @@ import pytest
 
 from acessilia_sdk.toolbox import snapshot_from_payloads
 from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
-from backend.config.settings import settings
 from backend.core.planning import toolbox_gate
 from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import (
@@ -327,57 +326,3 @@ def test_the_least_recently_used_cache_goes_past_the_bound(monkeypatch) -> None:
     assert len(toolbox_gate._caches) == 2
     assert cache("a") is a
     assert cache("b") is not b
-
-
-@pytest.mark.asyncio
-async def test_a_run_config_the_clients_would_not_follow_is_refused(monkeypatch, tmp_path) -> None:
-    """Until the client factory takes the run's config (toolbox PR 3).
-
-    The review's case: the settings say ``docling`` and the run's config
-    ``other-provider``. The gate would check ``other-provider`` while the
-    clients and the single-provider handler use ``docling``.
-    """
-    monkeypatch.setattr(settings, "toolbox_provider", "docling")
-    orchestrator = _orchestrator()
-    orchestrator.config = replace(
-        _config(), toolbox=toolbox_config(providers={"toolbox_provider": "other-provider"})
-    )
-
-    with pytest.raises(ValueError, match="providers"):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
-
-
-@pytest.mark.parametrize(
-    "fields",
-    [
-        {"availability_gate": "off"},
-        {"catalog_refresh_seconds": 1},
-        {"catalog_stale_seconds": 1},
-        # Moved by toolbox PR 2: each reader takes the run's ToolboxConfig.
-        {"use_remote_cache": False},
-        {"use_artifact_store": False},
-        {"extraction_timeout_seconds": 1},
-        {"media_inspect_enabled": False},
-        {"pdf_validate_enabled": False},
-    ],
-)
-def test_the_fields_the_clients_no_longer_read_may_differ_from_the_settings(fields) -> None:
-    from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
-
-    refuse_toolbox_unlike_the_clients(toolbox_config(**fields), toolbox_config())
-
-
-@pytest.mark.parametrize(
-    "fields",
-    [
-        {"base_url": "http://elsewhere.test"},
-        {"api_key": "another-key"},
-        {"retries": 99},
-        {"providers": {"toolbox_pdf_provider": "another-pdf"}},
-    ],
-)
-def test_the_fields_the_clients_read_must_match_the_settings(fields) -> None:
-    from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
-
-    with pytest.raises(ValueError, match=next(iter(fields))):
-        refuse_toolbox_unlike_the_clients(toolbox_config(**fields), toolbox_config())

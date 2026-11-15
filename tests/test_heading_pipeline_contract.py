@@ -15,6 +15,7 @@ from tests.pddl_support import (
     build_manifest as _manifest,
     build_orchestrator as _orchestrator,
 )
+from tests.core_config_support import toolbox_config
 
 
 @pytest.mark.parametrize("levels", [[1, 4, 5], [1, 3, 4], [1, 4, 5, 6]])
@@ -39,7 +40,7 @@ def test_heading_repairs_do_not_leave_new_gaps(levels, reverse, tmp_path):
         file_path=tmp_path / "headings.pdf", manifest=updated, plan=plan,
         planner_backend="internal", execution_report=report, comparison=None,
     )
-    assert not validate_canonical_document(build_canonical_document(payload))
+    assert not validate_canonical_document(build_canonical_document(payload, toolbox=toolbox_config()))
 
 
 def test_title_is_heading_predecessor_when_deriving_repairs():
@@ -57,7 +58,7 @@ def test_title_is_heading_predecessor_when_deriving_repairs():
 ])
 def test_section_heading_levels_are_validated(levels, finding):
     # The builder normalizes levels, so the invalid sequence is written directly.
-    canonical = build_canonical_document("Body content.")
+    canonical = build_canonical_document("Body content.", toolbox=toolbox_config())
     canonical["sections"] = [
         {"id": f"h{i}", "title": f"Heading {i}", "level": level,
          "blocks": [], "children": []}
@@ -70,7 +71,7 @@ def test_section_heading_levels_are_validated(levels, finding):
 
 
 def test_legacy_explicit_heading_is_not_counted_twice():
-    document = build_canonical_document("# Heading\n\nBody content.")
+    document = build_canonical_document("# Heading\n\nBody content.", toolbox=toolbox_config())
     section = document["sections"][0]
     section["blocks"].insert(0, {"id": "legacy-title", "type": "heading", "level": 1, "text": section["title"]})
     assert not validate_canonical_document(document)
@@ -88,7 +89,7 @@ def test_builder_normalizes_heading_levels_for_the_audit(levels, expected):
     canonical = build_canonical_document({"pages": [{"blocks": [
         {"id": f"h{i}", "type": "heading", "level": level, "text": f"Heading {i}"}
         for i, level in enumerate(levels)
-    ]}]})
+    ]}]}, toolbox=toolbox_config())
 
     found: list[int] = []
 
@@ -112,7 +113,7 @@ def test_builder_stores_levels_as_int_and_keeps_only_changed_originals():
         {"id": "h1", "type": "heading", "level": "2", "text": "Heading 1"},
         {"id": "h2", "type": "heading", "level": "1", "text": "Heading 2"},
         {"id": "h3", "type": "heading", "level": "x", "text": "Heading 3"},
-    ]}]})
+    ]}]}, toolbox=toolbox_config())
 
     sections = [canonical["sections"][0], *canonical["sections"][0]["children"]]
     assert [section["level"] for section in sections] == [1, 2, 2, 2]

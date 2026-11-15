@@ -37,6 +37,7 @@ from tests.pddl_support import (
     build_obligation as _obligation,
     build_orchestrator as _orchestrator,
 )
+from tests.core_config_support import core_config
 
 LOCALES = ("en_US", "pt_BR")
 
@@ -410,7 +411,7 @@ class TestHandlerMessagesFollowTheLocale:
         elements, obligation = _formula_success(1)
         manifest = _manifest(elements, [obligation])
 
-        result = _handle_mathml_method(manifest, "o-1")
+        result = _handle_mathml_method(manifest, "o-1", config=core_config())
 
         assert result.success is False
         assert "ToolboxProviderUnavailable" in (result.message or "")

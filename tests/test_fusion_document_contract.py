@@ -128,7 +128,7 @@ async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
     from backend.core.pipeline.fusion import extract_fused
 
     class Client:
-        def __init__(self, provider):
+        def __init__(self, provider, _toolbox):
             self.provider = provider
 
         async def close(self):

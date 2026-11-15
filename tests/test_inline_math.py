@@ -9,6 +9,7 @@ from docstruct.canonical import _enrich_math_blocks, build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.text.math_spans import split_inline_math
+from tests.core_config_support import toolbox_config
 
 MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>t</mi></math>'
 
@@ -70,7 +71,7 @@ def test_enrichment_converts_each_span_once_per_document():
     second = {"id": "b2", "type": "list", "items": ["vale $s(t)$"], "metadata": {}}
     enricher = _Enricher()
 
-    _enrich_math_blocks(_document(first, second)["sections"], enricher)
+    _enrich_math_blocks(_document(first, second)["sections"], enricher, )
 
     assert first["metadata"]["inline_math"] == [
         {"source": "s(t)", "latex": "s(t)", "mathml": MATHML, "speech": "s de t"}
@@ -82,7 +83,7 @@ def test_enrichment_converts_each_span_once_per_document():
 def test_enrichment_without_spans_leaves_the_block_alone():
     block = _paragraph("no formulas, R$ 10,00")
 
-    _enrich_math_blocks(_document(block)["sections"], _Enricher())
+    _enrich_math_blocks(_document(block)["sections"], _Enricher(), )
 
     assert "inline_math" not in block["metadata"]
 
@@ -177,9 +178,9 @@ def test_txt_without_speech_drops_the_delimiters():
 
 
 def test_backend_inline_speech_has_no_formula_label(monkeypatch):
-    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", lambda latex: " s de t ")
+    monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", lambda latex, **_kw: " s de t ")
 
-    assert canonical_builder.verbalize_inline_latex("s(t)") == "s de t"
+    assert canonical_builder.verbalize_inline_latex("s(t)", toolbox=toolbox_config()) == "s de t"
 
 
 class _PerFormulaEnricher:
@@ -243,7 +244,7 @@ class _DuckEnricher:
 def test_an_enricher_without_inline_speech_still_converts():
     block = {"id": "b1", "type": "paragraph", "text": "seja $x$", "metadata": None}
 
-    _enrich_math_blocks(_document(block)["sections"], _DuckEnricher())
+    _enrich_math_blocks(_document(block)["sections"], _DuckEnricher(), )
 
     assert block["metadata"]["inline_math"] == [{"source": "x", "latex": "x", "mathml": MATHML}]
 

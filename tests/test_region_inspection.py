@@ -24,7 +24,7 @@ from tests.pddl_support import (
 )
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config
+from tests.core_config_support import core_config, toolbox_config
 
 
 @pytest.fixture
@@ -55,9 +55,10 @@ def inspection(monkeypatch, tmp_path, fake_toolbox_render):
     response = VisionOutput(kind="description", description="A map", language="en", confidence=0.9)
 
     class Vision:
-        def __init__(self, mode, *, region_cache):
+        def __init__(self, mode, *, region_cache, toolbox):
             self.mode = mode
             Vision.region_caches.append(region_cache)
+            Vision.toolboxes.append(toolbox)
 
         async def describe_region(self, **kwargs):
             calls.append(kwargs)
@@ -65,6 +66,7 @@ def inspection(monkeypatch, tmp_path, fake_toolbox_render):
 
     Vision.response = response
     Vision.region_caches = []
+    Vision.toolboxes = []
     monkeypatch.setattr(inspection_handlers, "VisionAgent", Vision)
     return manifest, calls, Vision
 
@@ -118,6 +120,27 @@ def test_the_region_cache_follows_the_run_config(inspection, enabled):
 
     assert result.success, result.message
     assert vision.region_caches == [enabled]
+
+
+def test_the_region_is_rendered_and_inspected_with_the_run_toolbox(inspection, monkeypatch):
+    from dataclasses import replace
+
+    manifest, _, vision = inspection
+    run = replace(core_config(), toolbox=toolbox_config(retries=7))
+    rendered = []
+    render = inspection_handlers._render_inspection_region
+
+    def recording_render(*args, toolbox, **kwargs):
+        rendered.append(toolbox)
+        return render(*args, toolbox=toolbox, **kwargs)
+
+    monkeypatch.setattr(inspection_handlers, "_render_inspection_region", recording_render)
+
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=run)
+
+    assert result.success, result.message
+    assert rendered == [run.toolbox] and rendered[0] is run.toolbox
+    assert vision.toolboxes == [run.toolbox] and vision.toolboxes[0] is run.toolbox
 
 
 @pytest.mark.parametrize("crop", [True, "missing.png", {"path": "missing.png"}])
@@ -185,10 +208,10 @@ def test_bottom_left_coordinates_render_same_region(inspection):
     manifest, _, _ = inspection
     source = Path(manifest.source.path)
     element = manifest.elements[0]
-    top_left, _, _ = inspection_handlers._render_inspection_region(source, element)
+    top_left, _, _ = inspection_handlers._render_inspection_region(source, element, toolbox=toolbox_config())
     bbox = element.provenance[0].bbox
     bbox.top, bbox.bottom, bbox.coord_origin = 80, 30, "BOTTOMLEFT"
-    bottom_left, _, rectangle = inspection_handlers._render_inspection_region(source, element)
+    bottom_left, _, rectangle = inspection_handlers._render_inspection_region(source, element, toolbox=toolbox_config())
     assert top_left == bottom_left
     assert rectangle == [10, 20, 90, 70]
 
@@ -345,11 +368,11 @@ def test_rotated_picture_provenance_renders_only_source_region(
         bottom=expected.y1 if origin == "TOPLEFT" else height-expected.y1,
         coord_origin=origin,
     ))]
-    rendered, number, rectangle = inspection_handlers._render_inspection_region(source, element)
+    rendered, number, rectangle = inspection_handlers._render_inspection_region(source, element, toolbox=toolbox_config())
     assert number == 1
     assert rectangle == pytest.approx(list(expected))
     assert _pixels(rendered) == _pixels(expected_png)
-    enriched, number = enrichment_common._extract_picture_bytes(source, element, 1)
+    enriched, number = enrichment_common._extract_picture_bytes(source, element, 1, toolbox=toolbox_config())
     assert _pixels(enriched) == _pixels(expected_png)
     assert max(fitz.Pixmap(rendered).samples) == 0  # black picture, no white page margin
 
@@ -381,7 +404,7 @@ def test_a_picture_box_that_is_not_a_picture_falls_back_to_the_page(
 ):
     source = _one_page_pdf(tmp_path / "doc.pdf")
 
-    image, number = enrichment_common._extract_picture_bytes(source, _picture(*box), 1)
+    image, number = enrichment_common._extract_picture_bytes(source, _picture(*box), 1, toolbox=toolbox_config())
 
     assert number == 1
     assert fitz.Pixmap(image).width >= 200 * 160 / 72  # the whole page
@@ -392,7 +415,7 @@ def test_a_picture_box_that_is_not_a_picture_falls_back_to_the_page(
 def test_a_non_finite_picture_box_renders_the_page_once(tmp_path, fake_toolbox_render):
     source = _one_page_pdf(tmp_path / "doc.pdf")
 
-    image, _ = enrichment_common._extract_picture_bytes(source, _picture(10, float("nan"), 90, 60), 1)
+    image, _ = enrichment_common._extract_picture_bytes(source, _picture(10, float("nan"), 90, 60), 1, toolbox=toolbox_config())
 
     assert image is not None
     [parameters] = fake_toolbox_render.parameters
@@ -411,5 +434,5 @@ def test_an_unavailable_toolbox_is_not_retried_as_a_page(tmp_path, monkeypatch):
     monkeypatch.setattr(enrichment_common, "_toolbox_render", unavailable)
     source = _one_page_pdf(tmp_path / "doc.pdf")
 
-    assert enrichment_common._extract_picture_bytes(source, _picture(10, 10, 90, 60), 1) == (None, 1)
+    assert enrichment_common._extract_picture_bytes(source, _picture(10, 10, 90, 60), 1, toolbox=toolbox_config()) == (None, 1)
     assert attempts == [(10.0, 10.0, 90.0, 60.0)]

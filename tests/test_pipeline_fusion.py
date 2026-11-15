@@ -251,7 +251,7 @@ class _FakeClientFactory:
     def __init__(self, extract_fn):
         self.extract_fn = extract_fn
 
-    def __call__(self, provider: str = "docling", **kw):
+    def __call__(self, provider: str = "docling", _toolbox=None, **kw):
         return _FakeClient(provider, self.extract_fn)
 
 
@@ -276,7 +276,7 @@ class _RecordingToolbox:
         self.missing_artifact = missing_artifact
         self.calls: list[tuple[str, str | None, object]] = []
 
-    def __call__(self, provider: str = "docling", **kw):
+    def __call__(self, provider: str = "docling", _toolbox=None, **kw):
         return _RecordingClient(self, provider)
 
 
@@ -351,7 +351,7 @@ async def test_extract_fused_forwards_the_remote_cache_setting(
     seen: list[object] = []
 
     class Client:
-        def __init__(self, provider):
+        def __init__(self, provider, _toolbox):
             self.provider = provider
 
         async def extract_structure(self, *args, **kwargs):
@@ -377,7 +377,7 @@ async def test_extract_fused_takes_the_primary_provider_from_the_run_config(monk
     providers: list[str] = []
 
     class Client:
-        def __init__(self, provider):
+        def __init__(self, provider, _toolbox):
             providers.append(provider)
 
         async def extract_structure(self, *args, **kwargs):

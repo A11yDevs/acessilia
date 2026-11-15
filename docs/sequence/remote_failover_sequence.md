@@ -4,7 +4,7 @@
 
 Diagram: [remote_failover_sequence.puml](remote_failover_sequence.puml). This page describes it in text. The behaviour is in `libs/sdk/src/acessilia_sdk/toolbox/client.py`; the decisions are [ADR-0003](../adr/0003-remote-only-operational-capabilities.md) and [ADR-0006](../adr/0006-availability-and-failover.md).
 
-1. **The core asks the SDK for a capability**, for example `math.convert`. The SDK client comes from `make_toolbox_client`, configured from the core's settings.
+1. **The core asks the SDK for a capability**, for example `math.convert`. The SDK client comes from `make_toolbox_client`, configured from the run's `ToolboxConfig`.
 2. **Endpoint 1 is `TOOLBOX_BASE_URL`, normally a load balancer** in front of stateless Toolbox replicas that share MinIO and Valkey ([ADR-0006](../adr/0006-availability-and-failover.md); the replicas and their storage are deployed from the acessilia-toolbox repository, not from this one). Availability comes from those replicas. The SDK sends the request without checking the catalogue first.
 3. **Retries happen on the same endpoint.** A timeout, a network error or a `503`/`504` is retried up to `TOOLBOX_RETRIES` times, waiting `TOOLBOX_RETRY_BACKOFF_SECONDS` × 2ⁿ with jitter between attempts. A retried request may run twice on the Toolbox, so the SDK client allows retries only for idempotent capabilities.
 4. **Any other error is raised at once:** a `4xx`, another `5xx` such as `500` or `502`, or a contract violation. The SDK treats it as an answer from a reachable Toolbox, which would be the same on every endpoint, so it is neither retried nor failed over.

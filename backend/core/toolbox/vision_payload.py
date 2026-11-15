@@ -9,6 +9,7 @@ from pathlib import Path
 from acessilia_sdk.toolbox import ToolboxError
 from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
+from backend.core.config import ToolboxConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
 from backend.core.logger import logger
@@ -45,7 +46,9 @@ def _image_size(payload: bytes) -> tuple[int, int, str] | None:
     return None
 
 
-async def downscale_image(payload: bytes, scale: float = 0.5) -> bytes | None:
+async def downscale_image(
+    payload: bytes, scale: float = 0.5, *, toolbox: ToolboxConfig
+) -> bytes | None:
     """``payload`` rendered by the Toolbox with its longest side times ``scale``.
 
     ``None`` when the image is not a PNG/JPEG whose size can be read, when it
@@ -61,7 +64,7 @@ async def downscale_image(payload: bytes, scale: float = 0.5) -> bytes | None:
         return None
     client = None
     try:
-        client = make_toolbox_client(ToolboxPdfClient)
+        client = make_toolbox_client(ToolboxPdfClient, toolbox)
         with tempfile.TemporaryDirectory(prefix="vision-context-") as directory:
             source = Path(directory) / f"region{suffix}"
             source.write_bytes(payload)
