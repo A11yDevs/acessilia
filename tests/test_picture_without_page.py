@@ -31,7 +31,7 @@ from backend.core.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import vision_config
+from tests.core_config_support import toolbox_config, vision_config
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -76,7 +76,7 @@ def _fake_vision(monkeypatch, answer=_DESCRIPTION):
     calls = []
 
     class FakeVision:
-        def __init__(self, mode: str, *, region_cache) -> None:
+        def __init__(self, mode: str, *, region_cache, toolbox) -> None:
             self.mode = mode
 
         async def describe_region(self, *, errors=None, **kwargs):
@@ -98,6 +98,7 @@ def test_a_pageless_picture_is_read_from_its_embedded_image(
     image, page = _extract_picture_bytes(
         tmp_path / "qa_word.docx", _pageless_picture(src=_data_uri(png)), None,
         media_type=DOCX,
+        toolbox=toolbox_config(),
     )
 
     assert image == png
@@ -110,7 +111,8 @@ def test_a_pageless_picture_without_an_embedded_image_has_no_bytes(
     fake_toolbox_render, tmp_path
 ):
     image, page = _extract_picture_bytes(
-        tmp_path / "qa_word.docx", _pageless_picture(), None, media_type=DOCX
+        tmp_path / "qa_word.docx", _pageless_picture(), None, media_type=DOCX,
+        toolbox=toolbox_config(),
     )
 
     assert (image, page) == (None, 0)
@@ -135,6 +137,7 @@ def test_only_an_embedded_raster_image_is_decoded(fake_toolbox_render, tmp_path,
     image, page = _extract_picture_bytes(
         tmp_path / "qa_pagina.html", _pageless_picture(src=src), None,
         media_type="text/html",
+        toolbox=toolbox_config(),
     )
 
     assert (image, page) == (None, 0)
@@ -149,6 +152,7 @@ def test_an_embedded_image_above_the_size_bound_is_not_decoded(
     image, _ = _extract_picture_bytes(
         tmp_path / "qa_word.docx", _pageless_picture(src=_data_uri(b"x" * 64)), None,
         media_type=DOCX,
+        toolbox=toolbox_config(),
     )
 
     assert image is None
@@ -164,6 +168,7 @@ def test_the_size_bound_applies_to_the_decoded_bytes(
     image, _ = _extract_picture_bytes(
         tmp_path / "qa_word.docx", _pageless_picture(src=_data_uri(b"x" * size)), None,
         media_type=DOCX,
+        toolbox=toolbox_config(),
     )
 
     assert (image is not None) is accepted
@@ -174,6 +179,7 @@ def test_the_data_uri_prefix_is_case_insensitive(fake_toolbox_render, tmp_path):
 
     image, _ = _extract_picture_bytes(
         tmp_path / "qa_word.docx", _pageless_picture(src=src), None, media_type=DOCX,
+        toolbox=toolbox_config(),
     )
 
     assert image == _png()
@@ -193,6 +199,7 @@ async def test_a_docx_picture_with_an_embedded_image_is_described(
     await _enrich_picture_descriptions(
         manifest, tmp_path / "qa_word.docx", mode="medio",
         vision=vision_config(),
+        toolbox=toolbox_config(),
     )
 
     picture = manifest.elements[0]
@@ -226,6 +233,7 @@ async def test_a_pageless_picture_without_an_image_is_not_sent_to_the_model(
     await _enrich_picture_descriptions(
         manifest, tmp_path / "qa_word.docx", mode="medio",
         vision=vision_config(),
+        toolbox=toolbox_config(),
     )
 
     picture = manifest.elements[0]
@@ -250,7 +258,7 @@ async def test_a_paged_picture_whose_crop_failed_is_still_a_crop_failure(
     )
     manifest = build_manifest([build_element("pic-1", "picture")], [])
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config())
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config())
 
     assert manifest.elements[0].metadata["vision_failure_reason"] == "crop_unavailable"
 

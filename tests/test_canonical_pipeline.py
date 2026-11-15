@@ -36,6 +36,7 @@ def test_build_canonical_document_creates_sections_and_ids():
     document = build_canonical_document(
         "# Titulo\n\nParagrafo com **negrito**.\n\n- Item 1\n- Item 2",
         title="Titulo",
+        toolbox=toolbox_config(),
     )
 
     assert document["title"] == "Titulo"
@@ -65,7 +66,7 @@ def test_build_canonical_document_accepts_structured_payload():
         ],
     }
 
-    document = build_canonical_document(payload, title="Titulo")
+    document = build_canonical_document(payload, title="Titulo", toolbox=toolbox_config())
 
     assert document["metadata"]["page_count"] == 2
     assert document["metadata"]["mode"] == "normal"
@@ -94,7 +95,7 @@ def test_build_canonical_document_prefers_composed_heading_title_over_filename()
         ],
     }
 
-    document = build_canonical_document(payload, title="java-oo-3pgs")
+    document = build_canonical_document(payload, title="java-oo-3pgs", toolbox=toolbox_config())
 
     assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
 
@@ -147,7 +148,7 @@ def test_build_canonical_document_normalizes_docling_tabs_in_prose():
         ],
     }
 
-    document = build_canonical_document(payload, title="java-oo-3pgs")
+    document = build_canonical_document(payload, title="java-oo-3pgs", toolbox=toolbox_config())
 
     # Document title and section titles
     assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
@@ -234,7 +235,7 @@ def test_build_canonical_document_creates_fallback_for_non_textual_payload():
         ],
     }
 
-    document = build_canonical_document(payload, title="sunset-skyline")
+    document = build_canonical_document(payload, title="sunset-skyline", toolbox=toolbox_config())
 
     assert document["sections"]
     first_section = document["sections"][0]
@@ -262,12 +263,14 @@ def test_export_accessible_document_txt_and_html():
             txt_path,
             format_name="txt",
             title="Titulo",
+            toolbox=toolbox_config(),
         )
         html_result = export_accessible_document(
             "# Titulo\n\nParagrafo simples.",
             html_path,
             format_name="html",
             title="Titulo",
+            toolbox=toolbox_config(),
         )
 
         assert txt_result.read_text(encoding="utf-8") == ("Titulo\nParagrafo simples.")
@@ -306,6 +309,7 @@ def test_export_accessible_document_sanitizes_legacy_canonical_dict():
             txt_path,
             format_name="txt",
             title="Titulo",
+            toolbox=toolbox_config(),
         )
 
         content = result.read_text(encoding="utf-8")
@@ -343,6 +347,7 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
             txt_path,
             format_name="txt",
             title="Titulo",
+            toolbox=toolbox_config(),
         )
 
         content = result.read_text(encoding="utf-8")
@@ -403,7 +408,8 @@ def test_export_accessible_document_html_preserves_mixed_header_cells():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output = export_accessible_document(
-            document, Path(tmpdir) / "saida.html", format_name="html"
+            document, Path(tmpdir) / "saida.html", format_name="html",
+            toolbox=toolbox_config(),
         )
         html = output.read_text(encoding="utf-8")
 
@@ -431,7 +437,8 @@ def test_export_accessible_document_html_keeps_legacy_column_headers():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output = export_accessible_document(
-            document, Path(tmpdir) / "saida.html", format_name="html"
+            document, Path(tmpdir) / "saida.html", format_name="html",
+            toolbox=toolbox_config(),
         )
         html = output.read_text(encoding="utf-8")
 
@@ -466,7 +473,8 @@ def test_export_accessible_document_html_renders_long_image_description():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output = export_accessible_document(
-            document, Path(tmpdir) / "saida.html", format_name="html"
+            document, Path(tmpdir) / "saida.html", format_name="html",
+            toolbox=toolbox_config(),
         )
         html = output.read_text(encoding="utf-8")
 

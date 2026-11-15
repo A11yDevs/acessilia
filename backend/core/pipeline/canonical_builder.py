@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
+from backend.core.config import ToolboxConfig
 from backend.core.i18n import t
 from backend.core.formula_tools import label_spoken_formula, normalize_latex
 from backend.core.logger import logger
@@ -31,19 +32,19 @@ from docstruct.canonical import (  # noqa: F401
 )
 
 
-def latex_to_mathml(latex: str) -> str:
+def latex_to_mathml(latex: str, toolbox: ToolboxConfig) -> str:
     """MathML of a normalized formula via ``math.convert`` ('' if rejected)."""
-    return toolbox_convert_latex(latex)
+    return toolbox_convert_latex(latex, toolbox=toolbox)
 
 
-def verbalize_latex(latex: str) -> str:
+def verbalize_latex(latex: str, toolbox: ToolboxConfig) -> str:
     """Labelled pt-BR speech of a formula via ``math.verbalize`` ('' if rejected)."""
-    return label_spoken_formula(toolbox_verbalize_latex(latex))
+    return label_spoken_formula(toolbox_verbalize_latex(latex, toolbox=toolbox))
 
 
-def verbalize_inline_latex(latex: str) -> str:
+def verbalize_inline_latex(latex: str, toolbox: ToolboxConfig) -> str:
     """pt-BR speech of a formula inside a sentence, without the formula label."""
-    return toolbox_verbalize_latex(latex).strip()
+    return toolbox_verbalize_latex(latex, toolbox=toolbox).strip()
 
 
 class _ToolboxMathEnricher(MathEnricher):
@@ -60,7 +61,8 @@ class _ToolboxMathEnricher(MathEnricher):
     ``ToolboxError``, so anything else is a bug and deliberately fails the build.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, toolbox: ToolboxConfig) -> None:
+        self.toolbox = toolbox
         self.unavailable: dict[str, str] = {}
         self.rejected: dict[str, int] = {}
 
@@ -82,7 +84,7 @@ class _ToolboxMathEnricher(MathEnricher):
         if not latex or capability in self.unavailable:
             return ""
         try:
-            result = function(latex)
+            result = function(latex, self.toolbox)
         except MathCapabilityUnavailable as exc:
             logger.warning(
                 "{} unavailable; formulas keep their LaTeX ({})", exc.capability, exc
@@ -115,10 +117,21 @@ def _backend_id_factory() -> str:
     return f"doc-{uuid4().hex[:12]}"
 
 
-def build_canonical_document(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    """Build a canonical document (uuid ids + formula enrichment, as before)."""
+def build_canonical_document(
+    *args: Any, toolbox: ToolboxConfig | None = None, **kwargs: Any
+) -> dict[str, Any]:
+    """Build a canonical document (uuid ids + formula enrichment, as before).
+
+    The formulas are enriched on the Toolbox of the run's ``toolbox``, which
+    is required unless the caller gives its own ``math_enricher``.
+
+    Raises:
+        TypeError: When neither ``toolbox`` nor ``math_enricher`` is given.
+    """
     if "math_enricher" not in kwargs:
-        kwargs["math_enricher"] = _ToolboxMathEnricher()
+        if toolbox is None:
+            raise TypeError("building a canonical document needs the run's ToolboxConfig")
+        kwargs["math_enricher"] = _ToolboxMathEnricher(toolbox)
     enricher = kwargs["math_enricher"]
     kwargs.setdefault("id_factory", _backend_id_factory)
     document = _lib_build(*args, **kwargs)
@@ -133,7 +146,7 @@ def sanitize_canonical_document(document: dict[str, Any]) -> dict[str, Any]:
     return _lib_sanitize(document)
 
 
-def _enrich_math_blocks(sections: list[dict[str, Any]]) -> None:
+def _enrich_math_blocks(sections: list[dict[str, Any]], toolbox: ToolboxConfig) -> None:
     """Historical internal hook: enriches with the backend enricher.
 
     For tests only: the enricher's unavailability and rejection warnings are
@@ -142,4 +155,4 @@ def _enrich_math_blocks(sections: list[dict[str, Any]]) -> None:
     """
     from docstruct.canonical import _enrich_math_blocks as _lib_enrich
 
-    _lib_enrich(sections, _ToolboxMathEnricher())
+    _lib_enrich(sections, _ToolboxMathEnricher(toolbox))

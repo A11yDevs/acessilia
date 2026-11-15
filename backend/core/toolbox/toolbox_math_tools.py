@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.config import ToolboxConfig
 from backend.core.logger import logger
 from acessilia_sdk.toolbox import ToolboxError, ToolboxInvalidInput
 from acessilia_sdk.toolbox.clients import ToolboxMathClient
@@ -26,12 +27,13 @@ from backend.core.toolbox.toolbox_client import make_toolbox_client
 
 
 def toolbox_recognize_formula(
-    image_bytes: bytes, *, raise_on_unavailable: bool = False
+    image_bytes: bytes, *, toolbox: ToolboxConfig, raise_on_unavailable: bool = False
 ) -> list[dict[str, Any]]:
     """Recognize mathematical formulas in an image: the SDK's ``recognize_formula``.
 
     Args:
         image_bytes: PNG/JPEG image bytes containing a formula.
+        toolbox: The run's Toolbox configuration.
         raise_on_unavailable: Raise ``MathCapabilityUnavailable`` when the
             capability cannot serve the request, instead of returning an empty
             list. Callers processing many crops use it to stop after one
@@ -53,7 +55,7 @@ def toolbox_recognize_formula(
     would hide it (P6).
     """
     try:
-        return run_sync(_recognize_formula_async(image_bytes))
+        return run_sync(_recognize_formula_async(image_bytes, toolbox))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the image ({})", RECOGNIZE_CAPABILITY, exc)
         return []
@@ -64,8 +66,10 @@ def toolbox_recognize_formula(
         return []
 
 
-async def _recognize_formula_async(image_bytes: bytes) -> list[dict[str, Any]]:
-    client = make_toolbox_client(ToolboxMathClient)
+async def _recognize_formula_async(
+    image_bytes: bytes, toolbox: ToolboxConfig
+) -> list[dict[str, Any]]:
+    client = make_toolbox_client(ToolboxMathClient, toolbox)
     try:
         return (await recognize_formula(client, image_bytes)).candidates
     finally:
@@ -106,12 +110,15 @@ MSG_SPEECH_REJECTED: str = (
 )
 
 
-def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str:
+def toolbox_convert_latex(
+    latex: str, direction: str = "latex-to-mathml", *, toolbox: ToolboxConfig
+) -> str:
     """Convert LaTeX to MathML (or MathML to LaTeX): the SDK's ``convert_formula``.
 
     Args:
         latex: LaTeX expression, or MathML for ``mathml-to-latex``.
         direction: ``latex-to-mathml`` or ``mathml-to-latex``.
+        toolbox: The run's Toolbox configuration.
 
     Returns:
         The converted expression, or ``""`` when the Toolbox rejected the
@@ -121,7 +128,7 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
         MathCapabilityUnavailable: the capability could not serve the request.
     """
     try:
-        return run_sync(_convert_latex_async(latex, direction))
+        return run_sync(_convert_latex_async(latex, direction, toolbox))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the input ({}): {!r}", CONVERT_CAPABILITY, exc, latex)
         return ""
@@ -129,20 +136,23 @@ def toolbox_convert_latex(latex: str, direction: str = "latex-to-mathml") -> str
         raise MathCapabilityUnavailable(CONVERT_CAPABILITY, exc) from exc
 
 
-async def _convert_latex_async(latex: str, direction: str) -> str:
-    client = make_toolbox_client(ToolboxMathClient)
+async def _convert_latex_async(latex: str, direction: str, toolbox: ToolboxConfig) -> str:
+    client = make_toolbox_client(ToolboxMathClient, toolbox)
     try:
         return (await convert_formula(client, latex, direction=direction)).text
     finally:
         await client.close()
 
 
-def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
+def toolbox_verbalize_latex(
+    latex: str, language: str = "pt-BR", *, toolbox: ToolboxConfig
+) -> str:
     """Speak a LaTeX expression (pt-BR): the SDK's ``verbalize_formula``.
 
     Args:
         latex: LaTeX expression.
         language: Target language; ``math.verbalize@1`` speaks pt-BR only.
+        toolbox: The run's Toolbox configuration.
 
     Returns:
         The spoken text, or ``""`` when the Toolbox rejected the input.
@@ -151,7 +161,7 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
         MathCapabilityUnavailable: the capability could not serve the request.
     """
     try:
-        return run_sync(_verbalize_latex_async(latex, language))
+        return run_sync(_verbalize_latex_async(latex, language, toolbox))
     except ToolboxInvalidInput as exc:
         logger.info("{} rejected the input ({}): {!r}", VERBALIZE_CAPABILITY, exc, latex)
         return ""
@@ -159,8 +169,8 @@ def toolbox_verbalize_latex(latex: str, language: str = "pt-BR") -> str:
         raise MathCapabilityUnavailable(VERBALIZE_CAPABILITY, exc) from exc
 
 
-async def _verbalize_latex_async(latex: str, language: str) -> str:
-    client = make_toolbox_client(ToolboxMathClient)
+async def _verbalize_latex_async(latex: str, language: str, toolbox: ToolboxConfig) -> str:
+    client = make_toolbox_client(ToolboxMathClient, toolbox)
     try:
         return (await verbalize_formula(client, latex, language=language)).text
     finally:

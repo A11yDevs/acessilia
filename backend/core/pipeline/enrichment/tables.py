@@ -30,7 +30,7 @@ from docstruct.tables.text_rows import rows_from_visual_table_text
 from backend.core.agents.data_agent import DataAgent
 from backend.core.agents.output_schemas import DataOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.config import VisionConfig
+from backend.core.config import ToolboxConfig, VisionConfig
 from backend.core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -67,6 +67,7 @@ async def _enrich_table_structures(
     source_file: Path,
     *,
     vision: VisionConfig,
+    toolbox: ToolboxConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -120,6 +121,7 @@ async def _enrich_table_structures(
             fallback_page_number,
             _source_artifact_id(manifest),
             manifest.source.media_type,
+            toolbox=toolbox,
         )
         if not image_bytes:
             _record_table_read_failure(element, "crop_unavailable")

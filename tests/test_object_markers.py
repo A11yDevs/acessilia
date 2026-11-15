@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 
-from tests.core_config_support import export_config
+from tests.core_config_support import export_config, toolbox_config
 from backend.api import worker
 from backend.api.app import create_app
 from backend.config.settings import settings
@@ -71,7 +71,8 @@ def test_a_delivered_format_carries_the_markers_around_each_object(tmp_path, for
     marked = with_object_markers(_canonical(), True, export_config())
 
     path = export_accessible_document(
-        marked, tmp_path / f"deck.{format_name}", format_name=format_name, title="Deck"
+        marked, tmp_path / f"deck.{format_name}", format_name=format_name, title="Deck",
+        toolbox=toolbox_config(),
     )
 
     text = path.read_text(encoding="utf-8")

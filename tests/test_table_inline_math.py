@@ -81,7 +81,7 @@ def test_enrichment_converts_the_cells_spans_on_the_block():
     block = _table()
     enricher = _Enricher()
 
-    _enrich_math_blocks(_document(block)["sections"], enricher)
+    _enrich_math_blocks(_document(block)["sections"], enricher, )
 
     sources = [entry["source"] for entry in block["metadata"]["inline_math"]]
     assert sources == [r"h \neq 0", FRACTION, "-0{,}0833"]

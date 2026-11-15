@@ -130,7 +130,7 @@ async def test_unexpected_error_is_propagated_without_retry(monkeypatch, source)
     calls = Counter()
 
     class Client:
-        def __init__(self, provider):
+        def __init__(self, provider, _toolbox):
             self.provider = provider
 
         async def close(self):

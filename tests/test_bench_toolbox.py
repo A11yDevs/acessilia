@@ -23,6 +23,7 @@ from acessilia_sdk.toolbox import (
 )
 from acessilia_sdk.toolbox.capabilities import provider_default
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient, ToolboxStructureClient
+from backend.config.core_config import core_config_from_settings
 from backend.config.settings import Settings, settings
 from backend.core.toolbox import toolbox_client
 from scripts.bench import toolbox
@@ -219,9 +220,9 @@ async def test_the_harness_configures_clients_like_the_core(
         monkeypatch.delenv(variable, raising=False)
     for variable, value in environment.items():
         monkeypatch.setenv(variable, value)
-    monkeypatch.setattr(toolbox_client, "settings", Settings())
-
-    core = toolbox_client.make_toolbox_client(client_cls)
+    core = toolbox_client.make_toolbox_client(
+        client_cls, core_config_from_settings(Settings()).toolbox
+    )
     harness = make_client(client_cls, toolbox.client_config())
     try:
         assert _shape(harness) == _shape(core)

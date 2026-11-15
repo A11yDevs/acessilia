@@ -100,6 +100,7 @@ async def _run_pddl(file_path: Path, tmpdir: Path) -> dict[str, Any]:
 
     canonical = build_canonical_document(
         structured,
+        toolbox=core_config_from_settings().toolbox,
         title=file_path.stem,
         language="pt-BR",
         verbosity=verbosity_for_mode("normal"),

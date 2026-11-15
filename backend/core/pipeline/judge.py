@@ -18,6 +18,7 @@ from typing import Any
 
 from acessilia_sdk.toolbox.clients.adjudicate import page_judgement_probability
 
+from backend.core.config import ToolboxConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
     ManifestElement,
@@ -47,6 +48,8 @@ def _render_page_png(
     page_number: int,
     artifact_id: str | None = None,
     media_type: str | None = None,
+    *,
+    toolbox: ToolboxConfig,
 ) -> bytes:
     """Page ``page_number`` (1-based) of a PDF, PNG or JPEG as PNG, rendered by the Toolbox.
 
@@ -59,10 +62,13 @@ def _render_page_png(
         dpi=144,
         max_side=_JUDGE_PAGE_MAX_SIDE,
         artifact_id=artifact_id,
+        toolbox=toolbox,
     ).image
 
 
-def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, Any]:
+def _judge_page(
+    image: bytes, candidate_a: str, candidate_b: str, *, toolbox: ToolboxConfig
+) -> dict[str, Any]:
     """Call document.adjudicate.page through the Toolbox (sync wrapper)."""
     import tempfile
 
@@ -72,7 +78,7 @@ def _judge_page(image: bytes, candidate_a: str, candidate_b: str) -> dict[str, A
     from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     async def call(path: Path) -> dict[str, Any]:
-        client = make_toolbox_client(ToolboxAdjudicateClient)
+        client = make_toolbox_client(ToolboxAdjudicateClient, toolbox)
         try:
             result = await client.judge_page(candidate_a, candidate_b, file_path=path)
         finally:
@@ -153,6 +159,8 @@ def _judge_one_page(
     other: str,
     primary_md: str,
     secondary_md: str,
+    *,
+    toolbox: ToolboxConfig,
 ) -> tuple[dict[str, Any] | None, MethodResult | None]:
     """Render a page, ask the judge, and read its answer: ``(judgement, failure)``.
 
@@ -175,6 +183,7 @@ def _judge_one_page(
             page_number,
             _source_artifact_id(manifest),
             manifest.source.media_type,
+            toolbox=toolbox,
         )
     except Exception as exc:  # noqa: BLE001 - rendering a broken source
         return None, MethodResult(
@@ -193,7 +202,7 @@ def _judge_one_page(
         )
     logger.info("vlm-pairwise-judge: judging page {}", page_number)
     try:
-        result = _judge_page(image, primary_md, secondary_md)
+        result = _judge_page(image, primary_md, secondary_md, toolbox=toolbox)
     except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
         return None, MethodResult(
             success=False,

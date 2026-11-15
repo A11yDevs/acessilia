@@ -1,8 +1,8 @@
 """The core's binding to the Toolbox render: the source artifact and ``pdf.render@2``.
 
 ``_source_artifact_id`` decides whether the extractor's stored source can be
-referenced instead of uploaded; ``_toolbox_render`` binds the core's settings
-to ``ToolboxPdfClient.render``, and ``_toolbox_formula_crop`` to the SDK's
+referenced instead of uploaded; ``_toolbox_render`` binds the run's
+``ToolboxConfig`` to ``ToolboxPdfClient.render``, and ``_toolbox_formula_crop`` to the SDK's
 ``crop_formula_region`` (ADR-0017, #470 phase 3). The pipeline also accepts
 TIFF, BMP, GIF and WebP, which ``pdf.render@2`` does not open
 (``RENDER_MEDIA_TYPES``), and there is no local fallback (ADR-0003).
@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 
+from backend.core.config import ToolboxConfig
 from backend.core.manifest.models import (
     ProcessingManifest,
 )
@@ -59,6 +60,7 @@ def _toolbox_render(
     clip: tuple[float, float, float, float] | None = None,
     clip_origin: ClipOrigin = "TOPLEFT",
     artifact_id: str | None = None,
+    toolbox: ToolboxConfig,
 ) -> RenderedPage:
     """Render a page (or a region of it) on the Toolbox with ``pdf.render@2``.
 
@@ -77,7 +79,7 @@ def _toolbox_render(
     _check_renderable(source, media_type)
 
     async def render():
-        client = _render_client(artifact_id)
+        client = _render_client(artifact_id, toolbox)
         try:
             return await client.render(
                 file_path=source,
@@ -114,8 +116,8 @@ def _check_renderable(source: Path, media_type: str | None) -> None:
         )
 
 
-def _render_client(artifact_id: str | None):
-    """A ``ToolboxPdfClient`` from the core's settings.
+def _render_client(artifact_id: str | None, toolbox: ToolboxConfig):
+    """A ``ToolboxPdfClient`` from the run's ``toolbox``.
 
     With ``artifact_id``, a source the Toolbox no longer stores is sent again.
     """
@@ -124,7 +126,7 @@ def _render_client(artifact_id: str | None):
     from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     return make_toolbox_client(
-        ToolboxPdfClient, resend_file_on_missing_artifact=artifact_id is not None
+        ToolboxPdfClient, toolbox, resend_file_on_missing_artifact=artifact_id is not None
     )
 
 
@@ -135,8 +137,9 @@ def _toolbox_formula_crop(
     *,
     media_type: str | None = None,
     artifact_id: str | None = None,
+    toolbox: ToolboxConfig,
 ) -> FormulaCrop:
-    """The SDK's ``crop_formula_region`` with the core's settings.
+    """The SDK's ``crop_formula_region`` with the run's ``toolbox``.
 
     A box that cannot be used is no crop, silently and for any source, as
     before the operation existed: it is checked before the source. The source
@@ -155,7 +158,7 @@ def _toolbox_formula_crop(
     _check_renderable(source, media_type)
 
     async def crop() -> FormulaCrop:
-        client = _render_client(artifact_id)
+        client = _render_client(artifact_id, toolbox)
         try:
             return await crop_formula_region(
                 client, source, page_number=page_number, box=box, artifact_id=artifact_id

@@ -55,7 +55,7 @@ def _toolbox_export(
     from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     async def export() -> dict[str, Any]:
-        client = make_toolbox_client(client_cls)
+        client = make_toolbox_client(client_cls, toolbox)
         try:
             return await client.export(
                 ast,
@@ -197,7 +197,7 @@ def export_accessible_document(
         title (str | None): Document title override; when None the localized default title from MSG_DEFAULT_ACCESSIBLE_TITLE is used.
         profile_name (str | None): Export verbosity profile applied to block filtering and validation; falls back to format_name when None.
         export (ExportConfig | None): The run's export configuration; required for "docx" and "pdf_ua", whose Toolbox rendering it enables.
-        toolbox (ToolboxConfig | None): The run's Toolbox configuration; required for "docx" and "pdf_ua", which the Toolbox renders.
+        toolbox (ToolboxConfig | None): The run's Toolbox configuration; required for "docx" and "pdf_ua", which the Toolbox renders, and for text, whose formulas it enriches.
 
     Returns:
         Path: The output_path where the formatted document was written.
@@ -205,11 +205,11 @@ def export_accessible_document(
     Raises:
         ValueError: When the deterministic audit reports BLOCKER findings, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
         RuntimeError: When format_name is "pdf_ua" or "docx" and the run's ExportConfig disables it.
-        TypeError: When format_name is "pdf_ua" or "docx" and no ExportConfig or ToolboxConfig is given.
+        TypeError: When format_name is "pdf_ua" or "docx" and no ExportConfig or ToolboxConfig is given, or when text is given without a ToolboxConfig (its formulas are enriched on the Toolbox).
         acessilia_sdk.toolbox.errors.ToolboxError: When format_name is "pdf_ua" or "docx" and the Toolbox cannot render or deliver the file.
     """
     document = _ensure_document(
-        source_text_or_document, title=title or t(MSG_DEFAULT_ACCESSIBLE_TITLE)
+        source_text_or_document, title=title or t(MSG_DEFAULT_ACCESSIBLE_TITLE), toolbox=toolbox
     )
 
     # Deterministic structural audit before any rendering takes place.
@@ -265,6 +265,7 @@ def _ensure_document(
     source_text_or_document: str | dict[str, Any],
     *,
     title: str,
+    toolbox: ToolboxConfig | None,
 ) -> dict[str, Any]:
     """Normalizes the export input into a sanitized canonical document mapping.
 
@@ -277,4 +278,4 @@ def _ensure_document(
     """
     if isinstance(source_text_or_document, dict):
         return sanitize_canonical_document(source_text_or_document)
-    return build_canonical_document(source_text_or_document, title=title)
+    return build_canonical_document(source_text_or_document, title=title, toolbox=toolbox)

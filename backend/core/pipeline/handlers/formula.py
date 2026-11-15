@@ -17,6 +17,7 @@ from docstruct.text.implicit_products import (
 )
 from docstruct.text.math_spans import block_prose, inline_math_sources
 
+from backend.core.config import CoreConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
     ProcessingManifest,
@@ -66,7 +67,7 @@ def _implicit_product_variables(manifest: ProcessingManifest) -> frozenset[str]:
 
 
 def _handle_mathml_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Convert the target formulas' LaTeX to MathML (metadata.mathml) via math.convert.
 
@@ -81,7 +82,7 @@ def _handle_mathml_method(
     for element in elements:
         latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
         try:
-            mathml = toolbox_convert_latex(latex) if latex else ""
+            mathml = toolbox_convert_latex(latex, toolbox=config.toolbox) if latex else ""
         except MathCapabilityUnavailable as exc:
             logger.warning("Handler mathml: {}", exc)
             return MethodResult(
@@ -108,7 +109,7 @@ def _handle_mathml_method(
 
 
 def _handle_latex_verbalizer_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Generate the pt-BR verbalization of the formulas (metadata.verbalization) via math.verbalize.
 
@@ -123,7 +124,11 @@ def _handle_latex_verbalizer_method(
     for element in elements:
         latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
         try:
-            spoken = label_spoken_formula(toolbox_verbalize_latex(latex)) if latex else ""
+            spoken = (
+                label_spoken_formula(toolbox_verbalize_latex(latex, toolbox=config.toolbox))
+                if latex
+                else ""
+            )
         except MathCapabilityUnavailable as exc:
             logger.warning("Handler latex-verbalizer: {}", exc)
             return MethodResult(

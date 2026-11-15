@@ -597,7 +597,7 @@ def test_cancel_reports_a_requested_remote_cancellation(client, monkeypatch):
         async def close(self):
             return None
 
-    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls: Client())
+    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls, _toolbox: Client())
     try:
         response = client.post(f"/api/v1/jobs/{task_id}/cancel")
         assert response.status_code == 200

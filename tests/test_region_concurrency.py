@@ -20,7 +20,7 @@ from tests.pddl_support import (
 from tests.pddl_support import (
     build_manifest as _manifest,
 )
-from tests.core_config_support import vision_config
+from tests.core_config_support import toolbox_config, vision_config
 
 
 @pytest.mark.asyncio
@@ -51,7 +51,7 @@ async def test_picture_descriptions_run_bounded_and_concurrently(
         )
 
     class FakeVision:
-        def __init__(self, mode: str, *, region_cache) -> None:
+        def __init__(self, mode: str, *, region_cache, toolbox) -> None:
             self.mode = mode
 
         async def describe_region(self, **kwargs):
@@ -67,7 +67,7 @@ async def test_picture_descriptions_run_bounded_and_concurrently(
         "backend.core.pipeline.enrichment.pictures._extract_picture_bytes", fake_extract
     )
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(concurrency=2))
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(concurrency=2), toolbox=toolbox_config())
 
     # Two ran at once, never three: the semaphore bounds the provider load.
     assert peak == 2

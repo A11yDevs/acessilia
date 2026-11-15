@@ -2,9 +2,9 @@
 
 The transport, the capability registry, the per-capability clients and the
 client factory live in the SDK (``libs/sdk``, package ``acessilia_sdk``). This
-module maps the core's ``settings`` onto the SDK's
-:class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
-(:func:`toolbox_client_config`, constitution 3.2), states the endpoint rule
+module maps the run's :class:`~backend.core.config.ToolboxConfig` onto the
+SDK's :class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
+(:func:`toolbox_client_config`, constitution 3.2; ADR-0016 step 3), states the endpoint rule
 both the clients and the planning gate follow (:func:`endpoints_from`), and
 keeps the names other modules import from here.
 """
@@ -38,7 +38,6 @@ from acessilia_sdk.toolbox import (
 )
 from acessilia_sdk.toolbox import clients as _sdk_clients
 from acessilia_sdk.toolbox.transport import media_type_for as _media_type
-from backend.config.settings import settings
 from backend.core.config import ToolboxConfig
 from backend.core.logger import logger
 
@@ -56,19 +55,19 @@ def endpoints_from(base_urls: str, base_url: str) -> tuple[ToolboxEndpoint, ...]
     return parse_endpoints(base_urls.strip() or base_url)
 
 
-def toolbox_endpoints() -> tuple[ToolboxEndpoint, ...]:
-    """The Toolbox endpoints configured for the capability clients (:func:`endpoints_from`)."""
-    return endpoints_from(settings.toolbox_base_urls, settings.toolbox_base_url)
+def toolbox_endpoints(toolbox: ToolboxConfig) -> tuple[ToolboxEndpoint, ...]:
+    """The Toolbox endpoints of ``toolbox`` for the capability clients (:func:`endpoints_from`)."""
+    return endpoints_from(toolbox.base_urls, toolbox.base_url)
 
 
-def toolbox_vlm_endpoint() -> ToolboxEndpoint:
+def toolbox_vlm_endpoint(toolbox: ToolboxConfig) -> ToolboxEndpoint:
     """The endpoint that receives the agents' VLM chats with ``AI_CLIENT=toolbox``.
 
     The first of :func:`toolbox_endpoints`: an Agno model takes one base URL,
     so these chats do not fail over (docs/adr/0012). The health route probes
     this same endpoint, so it reports what the agents will meet.
     """
-    return toolbox_endpoints()[0]
+    return toolbox_endpoints(toolbox)[0]
 
 
 def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
@@ -81,7 +80,7 @@ def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
 
 
 #: The ``timeout_key`` of every SDK client that has its own timeout (the
-#: exports): each names a ``settings`` attribute.
+#: exports): the keys of ``ToolboxConfig.timeouts``, each named after a setting.
 TIMEOUT_KEYS: frozenset[str] = frozenset(
     value.timeout_key
     for value in vars(_sdk_clients).values()
@@ -91,72 +90,36 @@ TIMEOUT_KEYS: frozenset[str] = frozenset(
 )
 
 
-def toolbox_client_config() -> ToolboxClientConfig:
-    """The SDK client configuration, read from the core's ``settings``.
+def toolbox_client_config(toolbox: ToolboxConfig) -> ToolboxClientConfig:
+    """The SDK client configuration of the run's ``toolbox``.
 
-    Read on every call, so a changed setting (or a test's monkeypatch) applies
-    to the next client. Providers come from the ``TOOLBOX_*_PROVIDER``
-    settings named by ``PROVIDER_DEFAULTS``, and export timeouts from the
-    settings named by each client's ``timeout_key``.
+    Providers come from ``toolbox.providers``, keyed like
+    ``PROVIDER_DEFAULTS``, and export timeouts from ``toolbox.timeouts``,
+    keyed by each client's ``timeout_key``.
     """
     return ToolboxClientConfig(
-        endpoints=toolbox_endpoints(),
-        api_key=settings.toolbox_api_key,
-        timeout_seconds=settings.toolbox_timeout_seconds,
-        retries=settings.toolbox_retries,
-        retry_backoff_seconds=settings.toolbox_retry_backoff_seconds,
-        providers={key: getattr(settings, key) for key in PROVIDER_DEFAULTS},
-        timeouts={key: getattr(settings, key) for key in TIMEOUT_KEYS},
+        endpoints=toolbox_endpoints(toolbox),
+        api_key=toolbox.api_key,
+        timeout_seconds=toolbox.timeout_seconds,
+        retries=toolbox.retries,
+        retry_backoff_seconds=toolbox.retry_backoff_seconds,
+        providers=dict(toolbox.providers),
+        timeouts=dict(toolbox.timeouts),
         on_failover=_log_failover,
     )
 
 
-#: ``ToolboxConfig`` fields the Toolbox clients and handlers still read from
-#: ``settings`` (ADR-0016, step 3, toolbox PRs 2 and 3). The planning gate
-#: reads the run's config; a run whose config differs from the settings here
-#: would be admitted by the gate for a deployment, key or provider its calls
-#: do not use. Each toolbox PR removes the fields it moves, and the last one
-#: removes this check.
-TOOLBOX_FIELDS_STILL_IN_SETTINGS = (
-    "base_url",
-    "base_urls",
-    "api_key",
-    "timeout_seconds",
-    "retries",
-    "retry_backoff_seconds",
-    "providers",
-    "timeouts",
-)
-
-
-def refuse_toolbox_unlike_the_clients(toolbox: ToolboxConfig, clients: ToolboxConfig) -> None:
-    """Refuse a run's ``toolbox`` that the clients would not follow.
-
-    ``clients`` is the ``ToolboxConfig`` built from the settings the clients
-    still read. Raises ``ValueError`` naming the fields that differ.
-    """
-    differ = [
-        name
-        for name in TOOLBOX_FIELDS_STILL_IN_SETTINGS
-        if getattr(toolbox, name) != getattr(clients, name)
-    ]
-    if differ:
-        raise ValueError(
-            "The run's ToolboxConfig differs from the settings the Toolbox clients "
-            f"still read, in {', '.join(differ)}; until ADR-0016's toolbox group is "
-            "moved, pass these through the settings."
-        )
-
-
-def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
-    """Build an SDK capability client configured from the core's ``settings``.
+def make_toolbox_client(
+    client_cls: type[ClientT], toolbox: ToolboxConfig, **overrides: Any
+) -> ClientT:
+    """Build an SDK capability client configured from the run's ``toolbox``.
 
     Delegates to :func:`acessilia_sdk.toolbox.make_client` with
-    :func:`toolbox_client_config`. The provider comes from the ``settings``
-    attribute named by the class's ``provider_key``, so ``TOOLBOX_*_PROVIDER``
-    overrides keep working; clients without a provider key (artifacts,
-    datasets) get none. ``overrides`` win over settings; ``None`` values are
-    ignored, and passing ``base_url`` replaces the configured endpoints.
+    :func:`toolbox_client_config`. The provider is the one ``toolbox.providers``
+    names for the class's ``provider_key``; clients without a provider key
+    (artifacts, datasets) get none. ``overrides`` win over the config;
+    ``None`` values are ignored, and passing ``base_url`` replaces the
+    configured endpoints.
 
     Every client retries timeouts and unavailable instances on the same
     endpoint, with backoff (``TOOLBOX_RETRIES``/``TOOLBOX_RETRY_BACKOFF_SECONDS``),
@@ -164,10 +127,12 @@ def make_toolbox_client(client_cls: type[ClientT], **overrides: Any) -> ClientT:
     only. The SDK decides per call from its registry (#406): a call to a
     non-idempotent capability (``dataset.sample``) gets one attempt.
     """
-    return make_client(client_cls, toolbox_client_config(), **overrides)
+    return make_client(client_cls, toolbox_client_config(toolbox), **overrides)
 
 
 __all__ = [
+    "PROVIDER_DEFAULTS",
+    "TIMEOUT_KEYS",
     "ToolboxArtifactNotFound",
     "ToolboxAuthenticationError",
     "ToolboxCapabilityClient",
@@ -182,7 +147,6 @@ __all__ = [
     "endpoints_from",
     "execute_capability",
     "make_toolbox_client",
-    "refuse_toolbox_unlike_the_clients",
     "require_capability",
     "toolbox_client_config",
     "toolbox_endpoints",

@@ -17,12 +17,13 @@ from backend.core.formula_tools import label_spoken_formula, normalize_latex
 from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from backend.core.pipeline.handlers import formula as formula_handlers
+from tests.core_config_support import core_config, toolbox_config
 
 FAKE_MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>E</mi></math>'
 
 
 def _unavailable(capability):
-    def call(latex):
+    def call(latex, **_kwargs):
         call.calls.append(latex)
         raise MathCapabilityUnavailable(capability, ToolboxProviderUnavailable("offline"))
 
@@ -37,11 +38,11 @@ def toolbox_math(monkeypatch):
 
     calls = {"convert": [], "verbalize": []}
 
-    def convert(latex, direction="latex-to-mathml"):
+    def convert(latex, direction="latex-to-mathml", *, toolbox):
         calls["convert"].append(latex)
         return FAKE_MATHML
 
-    def verbalize(latex, language="pt-BR"):
+    def verbalize(latex, language="pt-BR", *, toolbox):
         calls["verbalize"].append(latex)
         return "maiúscula e é igual a, m c ao quadrado"
 
@@ -89,8 +90,8 @@ def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
     sections = [{"blocks": [{"type": "paragraph", "text": "Texto"}],
                  "children": [{"blocks": [{"type": "code", "text": "x=1"}]}]}]
     before = deepcopy(sections)
-    canonical_builder._enrich_math_blocks(sections)
-    canonical_builder._enrich_math_blocks([])
+    canonical_builder._enrich_math_blocks(sections, toolbox=toolbox_config())
+    canonical_builder._enrich_math_blocks([], toolbox=toolbox_config())
     assert sections == before
 
 
@@ -99,14 +100,14 @@ def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
 
     calls = []
 
-    def convert(latex):
+    def convert(latex, _toolbox):
         calls.append(latex)
         return ""
 
     monkeypatch.setattr(canonical_builder, "latex_to_mathml", convert)
     block = {"type": "math", "text": "$x=1$", "alt_text": "Descrição existente"}
     sections = [{"blocks": [], "children": [{"blocks": [block]}]}]
-    canonical_builder._enrich_math_blocks(sections)
+    canonical_builder._enrich_math_blocks(sections, toolbox=toolbox_config())
     assert calls == ["x=1"]
     assert block == {"type": "math", "text": "x=1", "alt_text": "Descrição existente"}
 
@@ -115,7 +116,8 @@ def test_canonical_document_enriches_math_blocks(toolbox_math):
     from backend.core.pipeline.canonical_builder import build_canonical_document
 
     document = build_canonical_document(
-        "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física"
+        "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física",
+        toolbox=toolbox_config(),
     )
     assert validate_canonical_document(document) == []
 
@@ -138,8 +140,8 @@ def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
     """LaTeX que a Toolbox rejeita fica sem MathML; o documento conta as fórmulas."""
     from backend.core.pipeline import canonical_builder
 
-    monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", lambda latex: "")
-    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$")
+    monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", lambda latex, **_kw: "")
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$", toolbox=toolbox_config())
     block = document["sections"][0]["blocks"][0]
     assert block["text"] == "x=1"
     assert "mathml" not in block.get("metadata", {})
@@ -160,7 +162,7 @@ def test_unavailable_capabilities_are_reported_once(monkeypatch):
     monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", convert)
     monkeypatch.setattr(canonical_builder, "toolbox_verbalize_latex", verbalize)
 
-    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$\n\n$z=3$")
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$\n\n$z=3$", toolbox=toolbox_config())
 
     math_blocks = [
         b for section in document["sections"] for b in section.get("blocks", [])
@@ -204,7 +206,7 @@ def test_an_answer_outside_the_contract_turns_the_capability_off_for_the_documen
         200, json={"status": "succeeded", "document": {"verbalized": "x igual a 1"}}
     ))
 
-    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$")
+    document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$", toolbox=toolbox_config())
 
     blocks = [b for s in document["sections"] for b in s.get("blocks", []) if b.get("type") == "math"]
     assert convert.call_count == 1
@@ -224,7 +226,7 @@ def test_an_answer_outside_the_contract_fails_the_mathml_handler(respx_mock):
     convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
     manifest = _manifest_with_formulas("x=1", "y=2")
 
-    result = _handle_mathml_method(manifest, "o-f")
+    result = _handle_mathml_method(manifest, "o-f", config=core_config())
 
     assert not result.success
     assert "ToolboxContractViolation" in result.message
@@ -346,7 +348,7 @@ def test_pddl_mathml_handler_enriches_formula_element(toolbox_math):
     from backend.core.pipeline.handlers.formula import _handle_mathml_method
 
     manifest = _manifest_with_formula()
-    result = _handle_mathml_method(manifest, "o-f")
+    result = _handle_mathml_method(manifest, "o-f", config=core_config())
 
     assert result.success
     assert toolbox_math["convert"] == ["E=mc^2"]
@@ -357,7 +359,7 @@ def test_pddl_latex_verbalizer_handler(toolbox_math):
     from backend.core.pipeline.handlers.formula import _handle_latex_verbalizer_method
 
     manifest = _manifest_with_formula()
-    result = _handle_latex_verbalizer_method(manifest, "o-f")
+    result = _handle_latex_verbalizer_method(manifest, "o-f", config=core_config())
 
     assert result.success
     assert manifest.elements[0].metadata["verbalization"] == (
@@ -377,7 +379,7 @@ def test_pddl_handlers_fail_explicitly_when_capability_unavailable(
 ):
     monkeypatch.setattr(formula_handlers, patched, _unavailable(capability))
     manifest = _manifest_with_formula()
-    result = getattr(formula_handlers, handler)(manifest, "o-f")
+    result = getattr(formula_handlers, handler)(manifest, "o-f", config=core_config())
 
     assert not result.success
     assert capability in result.message
@@ -385,8 +387,8 @@ def test_pddl_handlers_fail_explicitly_when_capability_unavailable(
 
 
 def test_pddl_mathml_handler_rejected_formula_is_partial(monkeypatch, toolbox_math):
-    monkeypatch.setattr(formula_handlers, "toolbox_convert_latex", lambda latex: "")
-    result = formula_handlers._handle_mathml_method(_manifest_with_formula(), "o-f")
+    monkeypatch.setattr(formula_handlers, "toolbox_convert_latex", lambda latex, **_kw: "")
+    result = formula_handlers._handle_mathml_method(_manifest_with_formula(), "o-f", config=core_config())
 
     assert not result.success
     assert "0/1" in result.message
@@ -396,7 +398,7 @@ def test_pddl_handlers_fail_for_unknown_obligation():
     from backend.core.pipeline.handlers.formula import _handle_mathml_method
 
     manifest = _manifest_with_formula()
-    result = _handle_mathml_method(manifest, "o-inexistente")
+    result = _handle_mathml_method(manifest, "o-inexistente", config=core_config())
 
     assert not result.success
 
@@ -494,7 +496,7 @@ def test_pddl_handlers_send_a_variable_product_as_a_product(toolbox_math, handle
     texts = (r"h \neq 0", r"\frac{h(12 + 6h + h^2)}{h}", r"s(t) = t^3")
     manifest = _manifest_with_formulas(*texts)
 
-    assert getattr(formula_handlers, handler)(manifest, "o-f").success
+    assert getattr(formula_handlers, handler)(manifest, "o-f", config=core_config()).success
 
     assert toolbox_math[capability] == [
         r"h \neq 0", r"\frac{h" + IT + r"(12 + 6h + h^2)}{h}", r"s(t) = t^3"
@@ -517,7 +519,7 @@ def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math)
         ]
     }
 
-    document = build_canonical_document(payload, title="t")
+    document = build_canonical_document(payload, title="t", toolbox=toolbox_config())
 
     sent = toolbox_math["convert"] + toolbox_math["verbalize"]
     assert "h" + IT + "(1 + h)" in sent and "s(t)" in sent
@@ -573,5 +575,5 @@ def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, ha
     assert implicit_product_variables(_math_sources([{'blocks': blocks}])) == expected
     assert formula_handlers._implicit_product_variables(manifest) == expected
     assert manifest == before
-    assert getattr(formula_handlers, handler)(manifest, 'o-f').success
+    assert getattr(formula_handlers, handler)(manifest, 'o-f', config=core_config()).success
     assert toolbox_math[capability] == ['h' + (IT if expected else '') + '(1+h)']

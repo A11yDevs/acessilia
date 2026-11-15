@@ -11,6 +11,7 @@ import pytest
 from backend.core.agents.data_agent import DataAgent
 from backend.core.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.agents.vision_agent import VisionAgent
+from tests.core_config_support import toolbox_config
 
 
 BLOCK_SECONDS = 0.2
@@ -62,7 +63,7 @@ async def _assert_event_loop_is_responsive(
 async def test_vision_inference_does_not_block_event_loop(monkeypatch):
     monkeypatch.setattr("backend.core.agents.vision_agent.Agent", _BlockingAgent)
     monkeypatch.setattr("backend.core.agents.vision_agent.get_agno_model", lambda **_kwargs: object())
-    agent = VisionAgent(region_cache=False)
+    agent = VisionAgent(region_cache=False, toolbox=toolbox_config())
 
     await _assert_event_loop_is_responsive(
         lambda: agent.describe_region(b"image", "embedded_image"),

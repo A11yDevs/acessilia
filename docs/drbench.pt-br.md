@@ -100,9 +100,11 @@ A árvore canônica de cada provider pode ser inspecionada lado a lado:
 ```python
 from scripts.bench.core import payload_to_canonical
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.config.core_config import core_config_from_settings
 from backend.core.toolbox.toolbox_client import make_toolbox_client
 
-client = make_toolbox_client(ToolboxStructureClient, provider="mineru")  # ou "docling"
+toolbox = core_config_from_settings().toolbox
+client = make_toolbox_client(ToolboxStructureClient, toolbox, provider="mineru")  # ou "docling"
 try:
     result = await client.extract_structure(file_path=page_image)
 finally:

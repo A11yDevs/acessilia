@@ -226,16 +226,18 @@ class Toolbox<X>Client(ToolboxCapabilityClient):
         )
 ```
 
-**3. Criá-lo no core** com `make_toolbox_client` (`backend/core/toolbox/toolbox_client.py`).
-Ela preenche os endpoints, o provider (do atributo do `settings` indicado por
-`provider_key`), o timeout, a chave de API e um hook que registra os failovers
-no log; argumentos nomeados os sobrescrevem:
+**3. Criá-lo no core** com `make_toolbox_client` (`backend/core/toolbox/toolbox_client.py`)
+e a `ToolboxConfig` da execução (passo 3 da ADR-0016). Ela preenche os
+endpoints, o provider que a config indica para o `provider_key`, o timeout, a
+chave de API e um hook que registra os failovers no log; argumentos nomeados
+os sobrescrevem. O core nunca cria um cliente a partir do `settings`: a função
+que chama a capacidade recebe a `toolbox` da execução e a repassa.
 
 ```python
 from acessilia_sdk.toolbox.clients import Toolbox<X>Client
 from backend.core.toolbox.toolbox_client import make_toolbox_client
 
-client = make_toolbox_client(Toolbox<X>Client)
+client = make_toolbox_client(Toolbox<X>Client, toolbox)
 try:
     result = await client.run(file_path=path)
 finally:
@@ -508,7 +510,7 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes, failover, artefatos e hierarquia de exceções (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — um cliente por família de capacidades; `layout.py` é o modelo do Cenário B
-- `backend/core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir do settings do core) e os tipos de erro reexportados
+- `backend/core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir da `ToolboxConfig` da execução) e os tipos de erro reexportados
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — extração de estrutura, armazenamento de artefatos e as rotas de datasets
 - `backend/core/toolbox/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
 - `backend/core/toolbox/media_inspect.py`, `backend/core/toolbox/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK

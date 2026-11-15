@@ -17,7 +17,7 @@ from backend.core.agents.output_schemas import DataOutput
 from backend.core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import vision_config
+from tests.core_config_support import toolbox_config, vision_config
 
 
 def _reading(rows, *, warnings=()):
@@ -40,17 +40,18 @@ def run(monkeypatch):
                 queue = answers.setdefault("_queue", list(answers.get("all", [])))
                 return queue.pop(0) if queue else None
 
-        async def run_inline(function, *args):
-            return function(*args)
+        async def run_inline(function, *args, **kwargs):
+            return function(*args, **kwargs)
 
         monkeypatch.setattr(table_stage, "DataAgent", Agent)
         monkeypatch.setattr(table_stage, "_extract_picture_bytes",
-                            lambda source, element, fallback, *rest: (crops or {}).get(element.id, (b"img", fallback or 1)))
+                            lambda source, element, fallback, *rest, **_kwargs: (crops or {}).get(element.id, (b"img", fallback or 1)))
         monkeypatch.setattr(pddl.asyncio, "to_thread", run_inline)
         manifest = build_manifest(elements, [])
         manifest.pages = [PageDescriptor(page_number=n, width=600.0, height=800.0, element_ids=[]) for n in range(1, pages + 1)]
         asyncio.run(table_stage._enrich_table_structures(manifest, Path("/tmp/doc.pdf"), breaker=breaker,
             vision=vision_config(table_visual_review=True, retry_pass_delay_seconds=0),
+            toolbox=toolbox_config(),
         ))
         return manifest, calls
 

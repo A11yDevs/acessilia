@@ -4,6 +4,7 @@ import pytest
 
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
+from tests.core_config_support import toolbox_config
 
 
 def test_build_pandoc_ast_emits_table_node_from_table_ast():
@@ -353,7 +354,7 @@ def test_text_before_the_first_heading_gets_no_empty_header():
         {"id": "line-2", "type": "paragraph", "text": "Department of Mathematics"},
         {"id": "title", "type": "heading", "level": 1, "text": "Calculus 1"},
         {"id": "body", "type": "paragraph", "text": "Body."},
-    ]}]})
+    ]}]}, toolbox=toolbox_config())
 
     preamble = canonical["sections"][0]
     assert preamble["title"] == ""
@@ -375,7 +376,7 @@ def test_a_document_without_headings_gets_no_header():
         {"id": "first", "type": "paragraph", "text": "First"},
         {"id": "second", "type": "paragraph", "text": "Second"},
         {"id": "third", "type": "paragraph", "text": "Third"},
-    ]}]})
+    ]}]}, toolbox=toolbox_config())
 
     assert len(canonical["sections"]) == 1
     blocks = build_pandoc_ast(canonical)["blocks"]

@@ -45,7 +45,7 @@ def _record(monkeypatch, stage) -> dict[str, list]:
         monkeypatch.setattr(stage, "_tables_to_read", record_tables)
 
     class Vision:
-        def __init__(self, mode, *, region_cache):
+        def __init__(self, mode, *, region_cache, toolbox):
             seen["region_cache"].append(region_cache)
 
         async def describe_region(self, **_kwargs):
@@ -77,11 +77,12 @@ def _record(monkeypatch, stage) -> dict[str, list]:
 @pytest.mark.asyncio
 async def test_the_picture_stage_reads_its_vision_config(monkeypatch) -> None:
     seen = _record(monkeypatch, picture_stage)
-    monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda *_args: (b"png", 1))
+    monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda *_args, **_kwargs: (b"png", 1))
     manifest = build_manifest([build_element("pic-1", "picture")], [])
 
     await picture_stage._enrich_picture_descriptions(
-        manifest, Path("doc.pdf"), mode="medio", vision=VISION
+        manifest, Path("doc.pdf"), mode="medio", vision=VISION,
+        toolbox=toolbox_config(),
     )
 
     assert seen == {"region_cache": [True], "threshold": [4], "slots": [3], "delay": [6]}
@@ -94,7 +95,8 @@ async def test_the_formula_classification_reads_its_vision_config(monkeypatch) -
     manifest = build_manifest([build_element("f-1", "formula", text="x")], [])
 
     await formula_stage._classify_formula_regions(
-        manifest, Path("doc.pdf"), mode="medio", vision=VISION, breaker=ProviderBreaker(1)
+        manifest, Path("doc.pdf"), mode="medio", vision=VISION, breaker=ProviderBreaker(1),
+        toolbox=toolbox_config(),
     )
 
     assert seen["region_cache"] == [True]
@@ -125,10 +127,10 @@ async def test_the_table_stage_reads_its_vision_config(monkeypatch) -> None:
             return None
 
     monkeypatch.setattr(table_stage, "DataAgent", Data)
-    monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args: (b"png", 1))
+    monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args, **_kwargs: (b"png", 1))
     manifest = build_manifest([build_element("t-1", "table", text="")], [])
 
-    await table_stage._enrich_table_structures(manifest, Path("doc.pdf"), vision=VISION)
+    await table_stage._enrich_table_structures(manifest, Path("doc.pdf"), vision=VISION, toolbox=toolbox_config())
 
     assert seen["threshold"] == [4]
     assert seen["delay"] == [6]

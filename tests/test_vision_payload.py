@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 
 from backend.core.toolbox.vision_payload import downscale_image
+from tests.core_config_support import toolbox_config
 
 
 @pytest.mark.asyncio
@@ -14,7 +15,7 @@ async def test_context_recovery_resizes_raster_images_on_the_toolbox(format_name
     source = BytesIO()
     Image.new("RGB", (400, 240), "white").save(source, format=format_name)
 
-    result = await downscale_image(source.getvalue())
+    result = await downscale_image(source.getvalue(), toolbox=toolbox_config())
 
     with Image.open(BytesIO(result)) as image:
         assert image.size == (200, 120)
@@ -26,8 +27,8 @@ async def test_invalid_or_unshrinkable_images_do_not_call_the_toolbox(fake_toolb
     source = BytesIO()
     Image.new("RGB", (1, 1), "white").save(source, format="PNG")
 
-    assert await downscale_image(b"not an image") is None
-    assert await downscale_image(source.getvalue()) is None
+    assert await downscale_image(b"not an image", toolbox=toolbox_config()) is None
+    assert await downscale_image(source.getvalue(), toolbox=toolbox_config()) is None
     assert fake_toolbox_render.requests == []
 
 
@@ -46,11 +47,11 @@ async def test_a_toolbox_failure_returns_none_and_closes_the_client(monkeypatch)
         async def close(self):
             closed.append(True)
 
-    monkeypatch.setattr(vision_payload, "make_toolbox_client", lambda _cls: FailingClient())
+    monkeypatch.setattr(vision_payload, "make_toolbox_client", lambda _cls, _toolbox: FailingClient())
     source = BytesIO()
     Image.new("RGB", (400, 240), "white").save(source, format="PNG")
 
-    assert await downscale_image(source.getvalue()) is None
+    assert await downscale_image(source.getvalue(), toolbox=toolbox_config()) is None
     assert closed == [True]
 
 
@@ -58,11 +59,11 @@ async def test_a_toolbox_failure_returns_none_and_closes_the_client(monkeypatch)
 async def test_a_client_that_cannot_be_built_returns_none(monkeypatch):
     from backend.core.toolbox import vision_payload
 
-    def invalid_configuration(_cls):
+    def invalid_configuration(_cls, _toolbox):
         raise ValueError("Toolbox base_url must be an absolute http(s) URL")
 
     monkeypatch.setattr(vision_payload, "make_toolbox_client", invalid_configuration)
     source = BytesIO()
     Image.new("RGB", (400, 240), "white").save(source, format="PNG")
 
-    assert await downscale_image(source.getvalue()) is None
+    assert await downscale_image(source.getvalue(), toolbox=toolbox_config()) is None

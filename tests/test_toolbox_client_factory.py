@@ -13,6 +13,7 @@ from acessilia_sdk.toolbox.clients import (
 from backend.config.settings import settings
 from backend.core.toolbox import toolbox_client
 from backend.core.toolbox.toolbox_client import make_toolbox_client, toolbox_endpoints
+from tests.core_config_support import toolbox_config
 
 PRIMARY = "http://toolbox-a.test"
 SECONDARY = "http://toolbox-b.test"
@@ -29,7 +30,7 @@ def toolbox_settings(monkeypatch):
 def test_takes_endpoint_provider_key_and_timeout_from_settings(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_ocr_provider", "mineru-ocr")
 
-    client = make_toolbox_client(ToolboxOcrClient)
+    client = make_toolbox_client(ToolboxOcrClient, toolbox_config())
 
     assert client.endpoints == (ToolboxEndpoint(PRIMARY),)
     assert client.provider == "mineru-ocr"
@@ -40,22 +41,22 @@ def test_takes_endpoint_provider_key_and_timeout_from_settings(monkeypatch):
 def test_base_urls_list_independent_deployments(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY}, {SECONDARY}")
 
-    assert [e.base_url for e in toolbox_endpoints()] == [PRIMARY, SECONDARY]
-    assert len(make_toolbox_client(ToolboxOcrClient).endpoints) == 2
+    assert [e.base_url for e in toolbox_endpoints(toolbox_config())] == [PRIMARY, SECONDARY]
+    assert len(make_toolbox_client(ToolboxOcrClient, toolbox_config()).endpoints) == 2
 
 
 def test_base_urls_take_precedence_over_base_url(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_base_url", "http://balancer.test")
     monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},{SECONDARY}")
 
-    assert [e.base_url for e in toolbox_endpoints()] == [PRIMARY, SECONDARY]
+    assert [e.base_url for e in toolbox_endpoints(toolbox_config())] == [PRIMARY, SECONDARY]
 
 
 @pytest.mark.parametrize("blank", ["", "   ", "\t"])
 def test_a_blank_list_falls_back_to_base_url(monkeypatch, blank):
     monkeypatch.setattr(settings, "toolbox_base_urls", blank)
 
-    assert toolbox_endpoints() == (ToolboxEndpoint(PRIMARY),)
+    assert toolbox_endpoints(toolbox_config()) == (ToolboxEndpoint(PRIMARY),)
 
 
 @pytest.mark.parametrize(
@@ -65,19 +66,19 @@ def test_a_port_httpx_cannot_use_is_a_value_error(monkeypatch, base_url):
     monkeypatch.setattr(settings, "toolbox_base_url", base_url)
 
     with pytest.raises(ValueError, match="port between 0 and 65535"):
-        toolbox_endpoints()
+        toolbox_endpoints(toolbox_config())
 
 
 def test_a_malformed_entry_in_the_list_fails_loudly(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_base_urls", f"{PRIMARY},localhost:8002")
 
     with pytest.raises(ValueError, match="absolute http"):
-        toolbox_endpoints()
+        toolbox_endpoints(toolbox_config())
 
 
 def test_overrides_win_and_none_is_ignored():
     client = make_toolbox_client(
-        ToolboxOcrClient, base_url=SECONDARY, provider=None, timeout_seconds=5
+        ToolboxOcrClient, toolbox_config(), base_url=SECONDARY, provider=None, timeout_seconds=5
     )
 
     assert client.endpoints == (ToolboxEndpoint(SECONDARY, "core-key"),)
@@ -88,13 +89,13 @@ def test_overrides_win_and_none_is_ignored():
 def test_math_transform_provider_comes_from_settings(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_math_provider", "custom-math")
 
-    assert make_toolbox_client(ToolboxMathClient).transform_provider == "custom-math"
+    assert make_toolbox_client(ToolboxMathClient, toolbox_config()).transform_provider == "custom-math"
 
 
 def test_pdf_ua_uses_its_own_timeout(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_pdf_ua_timeout_seconds", 300)
 
-    assert make_toolbox_client(ToolboxPdfUaClient).timeout_seconds == 300
+    assert make_toolbox_client(ToolboxPdfUaClient, toolbox_config()).timeout_seconds == 300
 
 
 def test_failovers_are_logged(monkeypatch):
@@ -102,7 +103,7 @@ def test_failovers_are_logged(monkeypatch):
     monkeypatch.setattr(
         toolbox_client.logger, "warning", lambda *args: warnings.append(args)
     )
-    client = make_toolbox_client(ToolboxOcrClient)
+    client = make_toolbox_client(ToolboxOcrClient, toolbox_config())
 
     client.on_failover(ToolboxEndpoint(PRIMARY), ToolboxTimeout("slow"))
 
@@ -115,17 +116,17 @@ def test_a_malformed_base_url_fails_loudly(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_base_url", "localhost:8002")
 
     with pytest.raises(ValueError, match="absolute http"):
-        make_toolbox_client(ToolboxOcrClient)
+        make_toolbox_client(ToolboxOcrClient, toolbox_config())
 
 
 def test_retries_come_from_settings(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_retries", 3)
     monkeypatch.setattr(settings, "toolbox_retry_backoff_seconds", 0.25)
 
-    client = make_toolbox_client(ToolboxOcrClient)
+    client = make_toolbox_client(ToolboxOcrClient, toolbox_config())
 
     assert (client.retries, client.retry_backoff_seconds) == (3, 0.25)
-    assert make_toolbox_client(ToolboxOcrClient, retries=0).retries == 0
+    assert make_toolbox_client(ToolboxOcrClient, toolbox_config(), retries=0).retries == 0
 
 
 # ── Parity with the factory before the move to the SDK (#402, step 1) ──────
@@ -152,7 +153,7 @@ CLIENT_CLASSES = sorted(
 
 def _legacy_kwargs(client_cls, **overrides):
     kwargs = {
-        "endpoints": toolbox_endpoints(),
+        "endpoints": toolbox_endpoints(toolbox_config()),
         "provider": (
             getattr(settings, client_cls.provider_key) if client_cls.provider_key else None
         ),
@@ -221,7 +222,7 @@ def test_the_sdk_factory_builds_the_client_the_core_used_to_build(
     for key, value in values.items():
         monkeypatch.setattr(settings, key, value)
 
-    built = make_toolbox_client(client_cls, **overrides)
+    built = make_toolbox_client(client_cls, toolbox_config(), **overrides)
     reference = client_cls(**_legacy_kwargs(client_cls, **overrides))
 
     assert _observable(built) == _observable(reference)
@@ -243,11 +244,11 @@ def test_every_provider_key_and_timeout_key_is_a_setting():
 
 def test_the_config_is_read_from_settings_on_every_call(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_retries", 2)
-    before = toolbox_client.toolbox_client_config()
+    before = toolbox_client.toolbox_client_config(toolbox_config())
     monkeypatch.setattr(settings, "toolbox_retries", 4)
 
     assert before.retries == 2
-    assert toolbox_client.toolbox_client_config().retries == 4
+    assert toolbox_client.toolbox_client_config(toolbox_config()).retries == 4
 
 
 def test_run_sync_is_imported_from_the_sdk_not_re_exported_here():

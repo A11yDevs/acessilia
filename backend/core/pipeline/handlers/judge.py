@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.config import CoreConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
     ProcessingManifest,
@@ -29,7 +30,7 @@ from backend.core.pipeline.secondary import (
 
 
 def _handle_vlm_pairwise_judge_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Pairwise VLM judge between the two providers' pages.
 
@@ -71,7 +72,8 @@ def _handle_vlm_pairwise_judge_method(
             }
             continue
         judgement, failure = _judge_one_page(
-            manifest, page_number, content, other, primary_md, secondary_md
+            manifest, page_number, content, other, primary_md, secondary_md,
+            toolbox=config.toolbox,
         )
         if failure is not None:
             return failure

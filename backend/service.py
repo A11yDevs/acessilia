@@ -9,6 +9,7 @@ from docstruct.profiles import verbosity_for_mode
 from docstruct.text.paragraphs import merge_broken_paragraphs
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.config.core_config import core_config_from_settings
 from backend.config.settings import settings
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
@@ -221,6 +222,7 @@ async def process(
             canonical_metadata, technical_warnings = _canonical_details(cached)
             canonical_document = build_canonical_document(
                 cached,
+                toolbox=core_config_from_settings().toolbox,
                 title=Path(shown_name).stem,
                 language="pt-BR",
                 verbosity=verbosity_for_mode(mode),
@@ -314,6 +316,7 @@ async def process(
 
         canonical_document = build_canonical_document(
             processed_result,
+            toolbox=core_config_from_settings().toolbox,
             title=Path(shown_name).stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),

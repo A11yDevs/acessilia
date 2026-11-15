@@ -234,7 +234,9 @@ Proposed: option 2.
      options (done: media inspection, PDF validation, remote cache, artifact
      store, extraction timeout, and the primary and math providers; each
      helper that calls the client factory takes the run's `ToolboxConfig`),
-     then the client factory and its callers. The method
+     then the client factory and its callers (done:
+     `make_toolbox_client(cls, toolbox)`; the model client's VLM endpoint and
+     key wait for the models group). The method
      handlers that read the config declare a `config` parameter (the fusion
      handler and the region and page inspection handlers), and each run
      binds its config to them (`bind_config`) on a copy of the registry.

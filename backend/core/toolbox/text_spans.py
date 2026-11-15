@@ -34,7 +34,7 @@ async def fetch_text_spans(
 
     owned_client = client is None
     spans_client = client or make_toolbox_client(
-        ToolboxPdfClient, resend_file_on_missing_artifact=artifact_id is not None
+        ToolboxPdfClient, toolbox, resend_file_on_missing_artifact=artifact_id is not None
     )
     try:
         return await spans_client.text_spans_by_page(

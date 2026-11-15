@@ -54,7 +54,7 @@ def test_cancel_summarizes_each_outcome(monkeypatch, result, expected):
     operation_registry.clear("task-1")
     operation = operation_registry.begin("task-1", "primary")
     client = _Client({operation.operation_id: result})
-    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls: client)
+    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls, _toolbox: client)
 
     assert asyncio.run(remote_cancellation.cancel_task_operations("task-1")) == expected
     assert client.calls == [operation.operation_id]
@@ -71,7 +71,7 @@ def test_a_failed_request_does_not_raise(monkeypatch):
             raise RuntimeError("connection reset")
 
     client = Client({})
-    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls: client)
+    monkeypatch.setattr(remote_cancellation, "make_toolbox_client", lambda _cls, _toolbox: client)
 
     assert asyncio.run(remote_cancellation.cancel_task_operations("task-1")) == "failed"
     assert client.closed is True

@@ -55,7 +55,7 @@ async def audit_pdf_ua(
     from backend.core.toolbox.toolbox_client import make_toolbox_client
 
     owned_client = client is None
-    validate_client = client or make_toolbox_client(ToolboxPdfValidateClient)
+    validate_client = client or make_toolbox_client(ToolboxPdfValidateClient, toolbox)
     try:
         report = await validate_client.validate(
             file_path=pdf_path,

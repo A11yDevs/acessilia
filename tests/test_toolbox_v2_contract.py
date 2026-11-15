@@ -48,7 +48,8 @@ def test_toolbox_contract_retains_order_tables_and_math_through_exports(tmp_path
     ]
     pages = _manifest_pages_to_payload(manifest)
     canonical = build_canonical_document(
-        {"pages": pages, "text": "synthetic"}, language="en-US"
+        {"pages": pages, "text": "synthetic"}, language="en-US",
+        toolbox=toolbox_config(),
     )
     assert validate_canonical_document(canonical) == []
     blocks = [block for section in canonical["sections"] for block in section["blocks"]]

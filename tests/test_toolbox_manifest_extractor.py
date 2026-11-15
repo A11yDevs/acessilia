@@ -199,7 +199,7 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
 
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
-        lambda client_cls, **kwargs: secondary_client,
+        lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
     result = ToolboxManifestExtractor(
         client=mock_client,
@@ -260,7 +260,7 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
     secondary_client.extract_structure.return_value = secondary_response
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
-        lambda client_cls, **kwargs: secondary_client,
+        lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 
     result = ToolboxManifestExtractor(
@@ -314,7 +314,7 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
     )
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
-        lambda client_cls, **kwargs: secondary_client,
+        lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
     seen: dict = {}
 
@@ -349,7 +349,7 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
     )
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
-        lambda client_cls, **kwargs: secondary_client,
+        lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 
     result = ToolboxManifestExtractor(
@@ -379,7 +379,7 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     )
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
-        lambda client_cls, **kwargs: secondary_client,
+        lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 
     result = ToolboxManifestExtractor(
@@ -412,7 +412,7 @@ def test_extract_builds_and_closes_its_own_clients(monkeypatch):
     """
     built: list = []
 
-    def factory(client_cls, **kwargs):
+    def factory(client_cls, _toolbox, **kwargs):
         client = AsyncMock(spec=client_cls)
         client.base_url = "http://localhost:8002"
         client.provider = "docling"
@@ -442,7 +442,7 @@ def test_multi_endpoint_extraction_builds_no_artifact_upload_client(monkeypatch)
 
     built = []
 
-    def factory(client_cls, **kwargs):
+    def factory(client_cls, _toolbox, **kwargs):
         assert client_cls is ToolboxStructureClient
         client = AsyncMock(spec=client_cls)
         client.base_url = "http://toolbox-a.test"
@@ -486,12 +486,12 @@ def test_created_upload_client_must_share_the_structure_endpoint(
     factory = Mock(return_value=mock_artifact_client)
     monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
 
+    toolbox = toolbox_config(use_artifact_store=True)
     result = ToolboxManifestExtractor(client=mock_client).extract(
-        FIXTURE_PDF, dual_fusion=False,
-        fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True)
+        FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox
     )
 
-    factory.assert_called_once_with(ToolboxArtifactClient)
+    factory.assert_called_once_with(ToolboxArtifactClient, toolbox)
     same_deployment = artifact_url == "http://toolbox-a.test"
     if same_deployment:
         mock_artifact_client.upload.assert_awaited_once_with(FIXTURE_PDF.resolve())
@@ -523,7 +523,7 @@ def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
     secondary.extract_structure.return_value = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client",
-        lambda client_cls, **kwargs: secondary,
+        lambda client_cls, _toolbox, **kwargs: secondary,
     )
     result = ToolboxManifestExtractor(
         client=mock_client,
@@ -886,7 +886,7 @@ def test_cancelling_during_upload_refuses_the_next_operation(
             return None
 
     monkeypatch.setattr(
-        remote_cancellation, "make_toolbox_client", lambda _cls: CancelClient()
+        remote_cancellation, "make_toolbox_client", lambda _cls, _toolbox: CancelClient()
     )
     extractor = ToolboxManifestExtractor(
         client=mock_client,

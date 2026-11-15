@@ -18,6 +18,7 @@ from backend.core.pipeline.enrichment.common import (
     _extract_picture_bytes,
 )
 from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from tests.core_config_support import toolbox_config
 
 
 def _picture(width: int, height: int) -> ManifestElement:
@@ -51,7 +52,8 @@ def test_a_large_standalone_image_is_rendered_below_the_pixel_limit(
     Image.new("RGB", (width, height), "white").save(source, "JPEG")
 
     image, page = _extract_picture_bytes(
-        source, _picture(width, height), 1, media_type="image/jpeg"
+        source, _picture(width, height), 1, media_type="image/jpeg",
+        toolbox=toolbox_config(),
     )
 
     assert page == 1

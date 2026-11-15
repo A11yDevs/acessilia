@@ -148,7 +148,8 @@ def install_formula_recognizer(monkeypatch, answer) -> None:
 
     from backend.core.pipeline.enrichment import formulas as formula_stage
 
-    def recognize(image, **kwargs):
+    def recognize(image, *, toolbox, **kwargs):
+        # The stand-in requires the run's ToolboxConfig, as the real function does.
         return ranked_latex_candidates(answer(image, **kwargs))
 
     monkeypatch.setattr(formula_stage, "toolbox_recognize_formula", recognize)

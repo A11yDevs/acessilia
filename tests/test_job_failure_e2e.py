@@ -22,6 +22,7 @@ from backend.config.settings import settings
 from backend.core.i18n import t
 from backend.core.i18n.stage_messages import STAGE_ANALYZING_STRUCTURAL
 from backend.core.toolbox.toolbox_client import toolbox_endpoints
+from tests.core_config_support import toolbox_config
 
 FAILURES_DIR = Path(__file__).resolve().parent / "fixtures" / "failures"
 
@@ -33,7 +34,7 @@ FAILURE_FIXTURES = ("empty.pdf", "not-a-pdf.pdf", "truncated.pdf")
 def require_toolbox():
     """Skip unless a Toolbox answers, so a down service cannot pass this suite."""
     try:
-        endpoints = toolbox_endpoints()
+        endpoints = toolbox_endpoints(toolbox_config())
     except ValueError:
         pytest.skip("no Toolbox configured; set TOOLBOX_BASE_URL to run the e2e suite")
     for endpoint in endpoints:

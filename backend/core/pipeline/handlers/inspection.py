@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 
 from backend.core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from backend.core.agents.vision_agent import VisionAgent
-from backend.core.config import CoreConfig
+from backend.core.config import CoreConfig, ToolboxConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import (
     is_unstructured_page_placeholder,
@@ -55,6 +55,7 @@ def _render_inspection_region(
     *,
     media_type: str | None = None,
     artifact_id: str | None = None,
+    toolbox: ToolboxConfig,
 ) -> tuple[bytes, int, list[float]]:
     """Render only the requested, validated source region on the Toolbox.
 
@@ -84,7 +85,7 @@ def _render_inspection_region(
         clip, origin = values, bbox.coord_origin
     page = _toolbox_render(
         source, number or 1, media_type=media_type, dpi=160, clip=clip,
-        clip_origin=origin, artifact_id=artifact_id,
+        clip_origin=origin, artifact_id=artifact_id, toolbox=toolbox,
     )
     if number is None and page.page_count != 1:
         raise ValueError("Region page is missing or out of range")
@@ -92,10 +93,17 @@ def _render_inspection_region(
 
 
 def _inspect_region(
-    image: bytes, number: int, total_pages: int, mode: str, *, region_cache: bool
+    image: bytes,
+    number: int,
+    total_pages: int,
+    mode: str,
+    *,
+    region_cache: bool,
+    toolbox: ToolboxConfig,
 ) -> VisionOutput | None:
     async def inspect():
-        return await VisionAgent(mode=mode, region_cache=region_cache).describe_region(
+        agent = VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox)
+        return await agent.describe_region(
             image_bytes=image, classification="embedded_image", page_num=number,
             total_pages=total_pages, mode=mode, full_budget=True,
         )
@@ -152,6 +160,7 @@ def _handle_pymupdf_region_method(
                 element,
                 media_type=manifest.source.media_type,
                 artifact_id=_source_artifact_id(manifest),
+                toolbox=config.toolbox,
             )
             declared_pages = {
                 page.page_number for page in manifest.pages if element.id in page.element_ids
@@ -162,6 +171,7 @@ def _handle_pymupdf_region_method(
                 image, number, max(len(manifest.pages), number),
                 str(manifest.extractor.configuration.get("region_inspection_mode", "medio")),
                 region_cache=config.vision.region_cache_enabled,
+                toolbox=config.toolbox,
             )
             if not isinstance(output, VisionOutput):
                 raise ValueError(f"Region inspection failed for {element.id}")
@@ -218,22 +228,34 @@ def _handle_pymupdf_region_method(
 
 
 def _render_source_page(
-    source: Path, media_type: str, number: int, artifact_id: str | None = None, *, dpi: int
+    source: Path,
+    media_type: str,
+    number: int,
+    artifact_id: str | None = None,
+    *,
+    dpi: int,
+    toolbox: ToolboxConfig,
 ) -> bytes:
     """The PNG of page ``number`` of a PDF, PNG or JPEG input, rendered by the Toolbox."""
     return _toolbox_render(
         source, number, media_type=media_type, dpi=dpi,
-        artifact_id=artifact_id,
+        artifact_id=artifact_id, toolbox=toolbox,
     ).image
 
 
 def _inspect_page(
-    image: bytes, number: int, total_pages: int, mode: str, *, region_cache: bool
+    image: bytes,
+    number: int,
+    total_pages: int,
+    mode: str,
+    *,
+    region_cache: bool,
+    toolbox: ToolboxConfig,
 ) -> PageInspectionOutput:
     from acessilia_sdk.runtime import run_sync
 
     return run_sync(
-        VisionAgent(mode=mode, region_cache=region_cache).inspect_page(
+        VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox).inspect_page(
             image_bytes=image, page_num=number, total_pages=total_pages
         )
     )
@@ -273,10 +295,12 @@ def _handle_vision_page_inspection_method(
             image = _render_source_page(
                 source, manifest.source.media_type, number, _source_artifact_id(manifest),
                 dpi=config.vision.pdf_split_dpi,
+                toolbox=config.toolbox,
             )
             output = _inspect_page(
                 image, number, total_pages, mode,
                 region_cache=config.vision.region_cache_enabled,
+                toolbox=config.toolbox,
             )
             if not isinstance(output, PageInspectionOutput):
                 raise TypeError("Page inspection returned no structured output")

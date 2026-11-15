@@ -64,7 +64,7 @@ async def test_owned_client_is_closed_after_a_failure(enabled, monkeypatch) -> N
     from backend.core.toolbox.toolbox_client import ToolboxError
 
     client = RecordingClient(error=ToolboxError("down"))
-    monkeypatch.setattr(toolbox_client, "make_toolbox_client", lambda _cls: client)
+    monkeypatch.setattr(toolbox_client, "make_toolbox_client", lambda _cls, _toolbox: client)
 
     with pytest.raises(ToolboxError):
         await inspect_source_media(IMAGE, toolbox=enabled)

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip
 
+from backend.core.config import ToolboxConfig
 from backend.core.manifest.models import (
     ManifestElement,
 )
@@ -108,6 +109,8 @@ def _extract_picture_bytes(
     fallback_page_number: int | None,
     artifact_id: str | None = None,
     media_type: str | None = None,
+    *,
+    toolbox: ToolboxConfig,
 ) -> tuple[bytes | None, int]:
     """The picture's box rendered by the Toolbox, or its whole page.
 
@@ -139,7 +142,7 @@ def _extract_picture_bytes(
         return _toolbox_render(
             source_file, page_number, media_type=media_type, dpi=160,
             max_side=_PICTURE_MAX_SIDE, clip=clip,
-            clip_origin=origin, artifact_id=artifact_id,
+            clip_origin=origin, artifact_id=artifact_id, toolbox=toolbox,
         )
 
     clip, origin = best_effort_clip(provenance.bbox if provenance is not None else None)

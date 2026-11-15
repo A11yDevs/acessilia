@@ -93,6 +93,28 @@ def _dual_payload() -> dict:
     }
 
 
+@pytest.mark.parametrize("with_policy", [False, True], ids=["default-policy", "manifest-policy"])
+def test_fusion_handler_extracts_with_the_run_toolbox(tmp_path, monkeypatch, with_policy):
+    from dataclasses import asdict
+
+    from docstruct.policy import FusionPolicy
+
+    manifest = _make_manifest(tmp_path)
+    if with_policy:
+        manifest.extractor.configuration["fusion_policy"] = asdict(FusionPolicy())
+    run = replace(core_config(), toolbox=toolbox_config(retries=7))
+    seen = []
+
+    async def _fake_extract_fused(*args, toolbox, **kwargs):
+        seen.append(toolbox)
+        return _dual_payload()
+
+    monkeypatch.setattr("backend.core.pipeline.fusion.extract_fused", _fake_extract_fused)
+
+    assert _handle_dual_provider_fusion_method(manifest, "o-fuse", config=run).success
+    assert seen == [run.toolbox] and seen[0] is run.toolbox
+
+
 def test_fusion_handler_returns_artifact_in_method_result(tmp_path, monkeypatch):
     manifest = _make_manifest(tmp_path)
 

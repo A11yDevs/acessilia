@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
@@ -184,6 +185,7 @@ async def _run_toolbox(
 
     canonical = build_canonical_document(
         structured,
+        toolbox=core_config_from_settings().toolbox,
         title=file_path.stem,
         language="pt-BR",
         verbosity=verbosity_for_mode(mode),
@@ -227,6 +229,7 @@ async def _run_toolbox(
 
     canonical = build_canonical_document(
         structured,
+        toolbox=core_config_from_settings().toolbox,
         title=file_path.stem,
         language="pt-BR",
         verbosity=verbosity_for_mode(mode),

@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.validators import validate_canonical_document
 from backend.core.export.renderers.html_renderer import _render_block as render_html
@@ -49,9 +50,10 @@ def main() -> None:
     print("|---|---|---|---|---|---|---|---|")
 
     problems: list[str] = []
+    toolbox = core_config_from_settings().toolbox
     for name, text, expect_math in CASES:
         start = time.time()
-        doc = build_canonical_document(f"# Doc\n\n{text}\n", title="Doc")
+        doc = build_canonical_document(f"# Doc\n\n{text}\n", title="Doc", toolbox=toolbox)
         errors = validate_canonical_document(doc)
         blocks = [
             b

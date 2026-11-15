@@ -10,7 +10,7 @@ from backend.core.export.exporters.pdf_exporter import export_pdf_ua
 def test_export_txt():
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "test.txt"
-        result = export_txt("Hello world", out)
+        result = export_txt("Hello world", out, toolbox=toolbox_config())
         assert result.exists()
         assert result.read_text(encoding="utf-8") == "Hello world"
 
@@ -34,7 +34,7 @@ def test_export_docx_renders_on_the_toolbox(monkeypatch):
 def test_export_txt_empty():
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "empty.txt"
-        result = export_txt("Conteudo minimo", out)
+        result = export_txt("Conteudo minimo", out, toolbox=toolbox_config())
         assert result.exists()
 
 

@@ -44,7 +44,7 @@ def owned(monkeypatch):
     made: list[tuple] = []
     client = _FakeSpansClient()
 
-    def make(cls, **kwargs):
+    def make(cls, _toolbox, **kwargs):
         made.append((cls.__name__, kwargs))
         return client
 
@@ -102,7 +102,7 @@ def test_without_an_artifact_the_file_is_not_resent(owned) -> None:
 
 def test_an_owned_client_is_closed_when_a_batch_fails(monkeypatch, owned) -> None:
     client = _FakeSpansClient(fail_on_call=2)
-    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", lambda cls, **kw: client)
+    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", lambda cls, _toolbox, **kw: client)
 
     with pytest.raises(ToolboxError):
         _fetch(list(range(1, TEXT_SPANS_MAX_PAGES + 2)))
@@ -127,6 +127,6 @@ def test_a_page_repeated_in_a_later_answer_replaces_the_earlier(monkeypatch, own
             return document
 
     client = Repeating()
-    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", lambda cls, **kw: client)
+    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", lambda cls, _toolbox, **kw: client)
 
     assert _fetch(list(range(1, TEXT_SPANS_MAX_PAGES + 2)))[1]["call"] == 2

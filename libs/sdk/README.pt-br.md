@@ -267,7 +267,7 @@ não é um objeto JSON).
    failover e retry. Exportar o cliente em `acessilia_sdk.toolbox.clients` e
    testá-lo em `tests/clients/` com um `base_url` explícito.
 3. No core, criá-lo com `backend.core.toolbox.toolbox_client.make_toolbox_client`, que
-   repassa a configuração do `settings`.
+   repassa a `ToolboxConfig` da execução.
 
 ## Testes
 
