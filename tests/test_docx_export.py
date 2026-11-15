@@ -1,7 +1,8 @@
 """DOCX export through the Toolbox (document.export.docx) from the core.
 
 The client itself is tested in ``libs/sdk/tests/clients/test_docx.py``.
-These tests cover how the core builds it from ``settings`` and the exporter,
+These tests cover how the core builds it from the run's ``ToolboxConfig`` and
+the exporter,
 which renders DOCX only on the Toolbox, with no local fallback
 (docs/adr/0003).
 """

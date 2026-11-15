@@ -236,10 +236,12 @@ Proposed: option 2.
      helper that calls the client factory takes the run's `ToolboxConfig`),
      then the client factory and its callers (done:
      `make_toolbox_client(cls, toolbox)`; the model client's VLM endpoint and
-     key wait for the models group). The method
-     handlers that read the config declare a `config` parameter (the fusion
-     handler and the region and page inspection handlers), and each run
-     binds its config to them (`bind_config`) on a copy of the registry.
+     key wait for the models group). The method handlers that read the
+     config declare a `config` parameter (the dual-provider and
+     single-provider fusion handlers, the region and page inspection
+     handlers, the `mathml` and `latex-verbalizer` formula handlers, and the
+     VLM judge's), and each run binds its config to them (`bind_config`) on
+     a copy of the registry.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:

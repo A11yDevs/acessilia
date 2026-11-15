@@ -1,4 +1,4 @@
-"""make_toolbox_client: SDK capability clients configured from the core settings."""
+"""make_toolbox_client: SDK capability clients configured from the run's ToolboxConfig."""
 
 from __future__ import annotations
 
@@ -242,13 +242,12 @@ def test_every_provider_key_and_timeout_key_is_a_setting():
         assert hasattr(settings, key), key
 
 
-def test_the_config_is_read_from_settings_on_every_call(monkeypatch):
-    monkeypatch.setattr(settings, "toolbox_retries", 2)
-    before = toolbox_client.toolbox_client_config(toolbox_config())
-    monkeypatch.setattr(settings, "toolbox_retries", 4)
+def test_each_client_config_follows_the_toolbox_config_it_is_given():
+    """No state between calls: two runs with different configs get their own."""
+    first = toolbox_client.toolbox_client_config(toolbox_config(retries=2))
+    second = toolbox_client.toolbox_client_config(toolbox_config(retries=4))
 
-    assert before.retries == 2
-    assert toolbox_client.toolbox_client_config(toolbox_config()).retries == 4
+    assert (first.retries, second.retries) == (2, 4)
 
 
 def test_run_sync_is_imported_from_the_sdk_not_re_exported_here():

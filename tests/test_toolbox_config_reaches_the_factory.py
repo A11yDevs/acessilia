@@ -129,12 +129,13 @@ HELPERS = [
 def test_the_helper_builds_its_client_from_the_run_config(
     received, run_toolbox, tmp_path, helper
 ) -> None:
+    # The recorder stops the call. Most helpers let it through; some wrap it
+    # (a task group) or log it and go on (the picture crop): only an error
+    # that is not the recorder's fails the test.
     try:
         _call(run_toolbox, tmp_path)[helper]()
-    except Built:
-        pass
-    except BaseException as error:  # noqa: BLE001 - a group or a wrapped error
-        if "Built" not in repr(error) and not _built_inside(error):
+    except Exception as error:
+        if not _built_inside(error):
             raise
 
     assert received, f"{helper} built no client"

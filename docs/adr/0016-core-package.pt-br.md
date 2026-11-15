@@ -241,9 +241,11 @@ Proposta: a opção 2.
      `ToolboxConfig` da execução), depois a fábrica de clientes e quem a
      chama (feito: `make_toolbox_client(cls, toolbox)`; o endpoint e a chave
      da VLM do cliente de modelo esperam o grupo dos modelos). Os handlers de
-     método que leem a config declaram um parâmetro `config` (o handler de
-     fusão e os de inspeção de região e de página), e cada execução vincula
-     a sua config a eles (`bind_config`) numa cópia do registro.
+     método que leem a config declaram um parâmetro `config` (os handlers
+     de fusão de dois providers e de provider único, os de inspeção de
+     região e de página, os de fórmula, `mathml` e `latex-verbalizer`, e o
+     do juiz VLM), e cada execução vincula a sua config a eles
+     (`bind_config`) numa cópia do registro.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:
