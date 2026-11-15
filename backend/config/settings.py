@@ -99,6 +99,13 @@ class Settings:
     data_agent_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("DATA_AGENT_TIMEOUT_SECONDS", "3600"))
     )
+    # Process-wide model execution capacity, independent of transient loops.
+    model_call_workers: int = field(
+        default_factory=lambda: int(os.getenv("MODEL_CALL_WORKERS", "4"))
+    )
+    model_call_max_pending: int = field(
+        default_factory=lambda: int(os.getenv("MODEL_CALL_MAX_PENDING", "4"))
+    )
     vision_region_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("VISION_REGION_MAX_TOKENS", "2000"))
     )

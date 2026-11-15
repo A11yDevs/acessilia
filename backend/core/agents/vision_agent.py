@@ -34,7 +34,8 @@ from backend.core.agents.prompt_tools import (
     load_system_prompt,
 )
 from backend.core.agents.ai_client import active_model_name, get_agno_model
-from backend.core.agents.model_call_policy import CALL_DEADLINE_GRACE_SECONDS
+from backend.core.agents.model_call_policy import model_call_deadline
+from backend.core.agents.model_calls import ModelCallRunner, current_model_calls
 from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
 from backend.core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
@@ -104,6 +105,7 @@ class VisionAgent:
         region_cache: bool,
         toolbox: ToolboxConfig,
         models: ModelConfig,
+        model_calls: ModelCallRunner | None = None,
     ) -> None:
         """Create a vision agent with a default prompting mode.
 
@@ -113,10 +115,13 @@ class VisionAgent:
                 stored in the cache (``VisionConfig.region_cache_enabled``).
             toolbox (ToolboxConfig): The run's Toolbox, which renders a smaller
                 image when the model rejects one for its context.
+            model_calls (ModelCallRunner | None): The application-owned runner;
+                when omitted, the application supplies it through the current scope.
             models (ModelConfig): The run's model client, budgets and call
                 timeout.
         """
         self.mode = mode
+        self.model_calls = model_calls if model_calls is not None else current_model_calls()
         self.region_cache = region_cache
         self.toolbox = toolbox
         self.models = models
@@ -206,6 +211,7 @@ class VisionAgent:
             output = await _run_with_retry(
                 prompt, image_bytes, VisionOutput, page_num=page_num, label=classification,
                 toolbox=self.toolbox, models=self.models, max_tokens=max_tokens,
+                model_calls=self.model_calls,
             )
         except Exception as error:
             salvaged = (
@@ -275,6 +281,7 @@ class VisionAgent:
         return await _run_with_retry(
             prompt, image_bytes, PageInspectionOutput, page_num=page_num, label="page_inspection",
             toolbox=self.toolbox, models=self.models,
+            model_calls=self.model_calls,
         )
 
 
@@ -286,6 +293,7 @@ async def _run_with_retry(
     page_num: int,
     label: str,
     toolbox: ToolboxConfig,
+    model_calls: ModelCallRunner,
     models: ModelConfig,
     max_tokens: int | None = None,
 ) -> OutputModel:
@@ -364,18 +372,14 @@ async def _run_with_retry(
         run = functools.partial(
             agent.run, input=attempt_prompt, images=[Image(content=image_bytes)]
         )
-        deadline = models.model_call_timeout_seconds + CALL_DEADLINE_GRACE_SECONDS
-        call = asyncio.ensure_future(asyncio.to_thread(run))
         try:
-            response = await asyncio.wait_for(call, timeout=deadline)
-        except TimeoutError as error:
-            # ``wait_for`` cancels the awaited task on expiry; a provider's own
-            # TimeoutError leaves it finished, so only that case is ours.
-            timeout = (
-                TimeoutError(f"no answer within the {deadline}s call deadline")
-                if call.cancelled()
-                else error
+            response = await model_calls.run(
+                run, timeout=model_call_deadline(models.model_call_timeout_seconds),
+                label=f"VisionAgent/{label}/page-{page_num}",
             )
+        except TimeoutError as error:
+            # The runner distinguishes its deadline from a provider's own
+            # TimeoutError; both retain the existing retry budget here.
             if timeout_retries < _TIMEOUT_RETRIES:
                 timeout_retries += 1
                 attempt -= 1  # a stalled provider says nothing about the answer
@@ -385,13 +389,11 @@ async def _run_with_retry(
                         type=label,
                         retry=timeout_retries,
                         retries=_TIMEOUT_RETRIES,
-                        error=timeout,
+                        error=error,
                     )
                 )
                 continue
-            if timeout is error:
-                raise
-            raise timeout from error
+            raise
         except Exception as error:
             if await retry_after_context_overflow(error):
                 continue

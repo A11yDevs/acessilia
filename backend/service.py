@@ -44,6 +44,8 @@ from backend.core.i18n.stage_messages import (
     STAGE_PROCESSING_WITH_AI,
 )
 from backend.services.operation_context import task_context
+from backend.core.agents.model_calls import model_call_scope
+from backend.services.model_calls import get_model_calls
 from backend.services.operation_registry import operation_registry
 from backend.services import shutdown
 from backend.core.logger import logger
@@ -267,7 +269,7 @@ async def process(
             )
         state_manager.verificar_cancelamento(task_id)
 
-        with task_context(task_id):
+        with task_context(task_id), model_call_scope(get_model_calls()):
             try:
                 resultado = await agente.execute(
                     file_path,

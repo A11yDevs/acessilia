@@ -120,6 +120,13 @@ from backend.core.i18n.log_messages import (
     LOG_CACHE_DEBUG_SET,
     LOG_CACHE_HIT,
     LOG_CACHE_SAVE_FAILED,
+    LOG_MODEL_CALL_STATE,
+    LOG_MODEL_CALL_ABANDONED,
+    LOG_MODEL_CALL_EXPIRED,
+    LOG_MODEL_CALL_REJECTED,
+    MSG_MODEL_CALL_CLOSED,
+    MSG_MODEL_CALL_FULL,
+    MSG_MODEL_CALL_DEADLINE,
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
@@ -917,6 +924,13 @@ MESSAGES: tuple[str, ...] = (
     LOG_PIPELINE_ERROR,
     LOG_PROMPT_FILE_NOT_FOUND,
     LOG_DATA_AGENT_PROMPT_NOT_FOUND,
+    LOG_MODEL_CALL_STATE,
+    LOG_MODEL_CALL_ABANDONED,
+    LOG_MODEL_CALL_EXPIRED,
+    LOG_MODEL_CALL_REJECTED,
+    MSG_MODEL_CALL_CLOSED,
+    MSG_MODEL_CALL_FULL,
+    MSG_MODEL_CALL_DEADLINE,
     LOG_DATA_AGENT_PROCESSING_REGION,
     LOG_DATA_AGENT_REGION_ERROR,
     LOG_VISION_AGENT_CONTEXT_RETRY,
@@ -1977,6 +1991,23 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_DATA_AGENT_REGION_ERROR: (
             "[página {page_num}] DataAgent erro na região {type}: {error} | Traceback:\n{tb}"
         ),
+        LOG_MODEL_CALL_STATE: (
+            "[chamadas-modelo] {event}: {label}; ativas={active}, pendentes={pending}, "
+            "abandonadas={abandoned}, espera_fila={queue_wait:.3f}s, execução={execution:.3f}s"
+        ),
+        LOG_MODEL_CALL_REJECTED: (
+            "[chamadas-modelo] Rejeitada {label}; ativas={active}, pendentes={pending}, rejeições={rejections}"
+        ),
+        LOG_MODEL_CALL_EXPIRED: (
+            "[chamadas-modelo] Prazo expirado para {label}; ativas={active}, pendentes={pending}, "
+            "expirações={expirations}, espera_fila={queue_wait:.3f}s"
+        ),
+        LOG_MODEL_CALL_ABANDONED: (
+            "[chamadas-modelo] Abandonada {label}; ativas={active}, pendentes={pending}, abandonadas={abandoned}"
+        ),
+        MSG_MODEL_CALL_CLOSED: "Executor de chamadas de modelo fechado",
+        MSG_MODEL_CALL_FULL: "Capacidade de execução de chamadas de modelo esgotada",
+        MSG_MODEL_CALL_DEADLINE: "Sem resposta do modelo dentro do prazo de {seconds}s da chamada",
         LOG_VISION_AGENT_SENDING_REGION: (
             "[página {page_num}] Enviando região para visão ({size} bytes, tipo={type})"
         ),

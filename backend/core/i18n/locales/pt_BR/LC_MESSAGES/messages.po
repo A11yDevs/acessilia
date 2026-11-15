@@ -1784,6 +1784,52 @@ msgstr ""
 "fallback"
 
 #, python-brace-format
+msgid ""
+"[model-calls] {event}: {label}; active={active}, pending={pending}, "
+"abandoned={abandoned}, queue_wait={queue_wait:.3f}s, "
+"execution={execution:.3f}s"
+msgstr ""
+"[chamadas-modelo] {event}: {label}; ativas={active}, pendentes={pending},"
+" abandonadas={abandoned}, espera_fila={queue_wait:.3f}s, "
+"execução={execution:.3f}s"
+
+#, python-brace-format
+msgid ""
+"[model-calls] Abandoned {label}; active={active}, pending={pending}, "
+"abandoned={abandoned}"
+msgstr ""
+"[chamadas-modelo] Abandonada {label}; ativas={active}, "
+"pendentes={pending}, abandonadas={abandoned}"
+
+#, python-brace-format
+msgid ""
+"[model-calls] Deadline expired for {label}; active={active}, "
+"pending={pending}, expirations={expirations}, "
+"queue_wait={queue_wait:.3f}s"
+msgstr ""
+"[chamadas-modelo] Prazo expirado para {label}; ativas={active}, "
+"pendentes={pending}, expirações={expirations}, "
+"espera_fila={queue_wait:.3f}s"
+
+#, python-brace-format
+msgid ""
+"[model-calls] Rejected {label}; active={active}, pending={pending}, "
+"rejections={rejections}"
+msgstr ""
+"[chamadas-modelo] Rejeitada {label}; ativas={active}, "
+"pendentes={pending}, rejeições={rejections}"
+
+msgid "Model-call executor is closed"
+msgstr "Executor de chamadas de modelo fechado"
+
+msgid "Model-call execution capacity is full"
+msgstr "Capacidade de execução de chamadas de modelo esgotada"
+
+#, python-brace-format
+msgid "No model answer within the {seconds}s call deadline"
+msgstr "Sem resposta do modelo dentro do prazo de {seconds}s da chamada"
+
+#, python-brace-format
 msgid "[page {page_num}] DataAgent processing region ({size} bytes, type={type})"
 msgstr ""
 "[página {page_num}] DataAgent processando região ({size} bytes, "

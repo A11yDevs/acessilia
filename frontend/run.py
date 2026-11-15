@@ -119,7 +119,11 @@ async def startup():
         sys.exit(1)
 
     logger.info(t(LOG_STARTING_INTERFACES).format(interfaces=settings.enabled_interfaces))
-    await asyncio.gather(*tasks)
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        from backend.services.model_calls import shutdown_model_calls
+        shutdown_model_calls()
 
 
 if __name__ == "__main__":

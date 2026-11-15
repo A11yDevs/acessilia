@@ -345,6 +345,24 @@ LOG_DATA_AGENT_PROCESSING_REGION: str = (
 LOG_DATA_AGENT_REGION_ERROR: str = (
     "[page {page_num}] DataAgent error in region {type}: {error} | Traceback:\n{tb}"
 )
+#: Model executor operational signals; labels identify the agent/region, never its content.
+LOG_MODEL_CALL_STATE: str = (
+    "[model-calls] {event}: {label}; active={active}, pending={pending}, "
+    "abandoned={abandoned}, queue_wait={queue_wait:.3f}s, execution={execution:.3f}s"
+)
+LOG_MODEL_CALL_REJECTED: str = (
+    "[model-calls] Rejected {label}; active={active}, pending={pending}, rejections={rejections}"
+)
+LOG_MODEL_CALL_EXPIRED: str = (
+    "[model-calls] Deadline expired for {label}; active={active}, pending={pending}, "
+    "expirations={expirations}, queue_wait={queue_wait:.3f}s"
+)
+LOG_MODEL_CALL_ABANDONED: str = (
+    "[model-calls] Abandoned {label}; active={active}, pending={pending}, abandoned={abandoned}"
+)
+MSG_MODEL_CALL_FULL: str = "Model-call execution capacity is full"
+MSG_MODEL_CALL_CLOSED: str = "Model-call executor is closed"
+MSG_MODEL_CALL_DEADLINE: str = "No model answer within the {seconds}s call deadline"
 #: Debug logged by the vision agent just before it sends a region image to the vision model; {page_num} is the page number, {size} the region image size in bytes, {type} the region classification.
 LOG_VISION_AGENT_SENDING_REGION: str = (
     "[page {page_num}] Sending region to vision ({size} bytes, type={type})"

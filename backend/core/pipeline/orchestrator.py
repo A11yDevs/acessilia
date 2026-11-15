@@ -87,6 +87,8 @@ from backend.core.pipeline.enrichment.formulas import (
     _enrich_formula_latex,
 )
 from backend.core.pipeline.handlers.registry import bind_config, build_method_registry
+from backend.core.pipeline.model_calls import with_model_calls
+from backend.core.agents.model_calls import ModelCallRunner
 
 
 class StructuralExtractionError(RuntimeError):
@@ -128,8 +130,10 @@ class PddlAccessibilityOrchestrator:
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
         config: CoreConfig | None = None,
+        model_calls: ModelCallRunner | None = None,
     ) -> None:
         self.config = config
+        self.model_calls = model_calls
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
@@ -184,6 +188,7 @@ class PddlAccessibilityOrchestrator:
     def _build_executor() -> ExecutorAgent:
         return ExecutorAgent(build_method_registry(), domain=DomainBundle.load())
 
+    @with_model_calls
     async def execute(
         self,
         file_path: Path,

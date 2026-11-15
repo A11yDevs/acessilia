@@ -36,6 +36,7 @@ ones here instead of restating them.
 | [0018](0018-core-uses-sdk-public-api.md) | The core uses only the SDK's public API | Proposed |
 | [0019](0019-operation-identifiers-and-cancellation.md) | Operation identifiers and remote cancellation | Accepted |
 | [0020](0020-job-resumption-and-operation-journal.md) | Resuming a job from its durable checkpoint | Accepted |
+| [0021](0021-bounded-model-call-execution.md) | Bounded model-call execution owned by the application | Accepted |
 
 ## Process
 

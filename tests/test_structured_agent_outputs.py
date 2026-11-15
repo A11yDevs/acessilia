@@ -336,12 +336,8 @@ async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) 
             }
             return type("Response", (), {"content": content})()
 
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
-
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
     monkeypatch.setattr(vision_module, "get_agno_model", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
 
     result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image"
@@ -373,19 +369,15 @@ def _scripted_vision_agent(monkeypatch, answers: list[object]):
                 raise answer
             return type("Response", (), {"content": answer})()
 
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
-
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
     monkeypatch.setattr(vision_module, "get_agno_model", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
     return vision_module, calls
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("call", ["describe_region", "inspect_page"])
 async def test_each_vision_call_takes_its_model_and_deadline_from_the_agent_models(
-    monkeypatch, call
+    monkeypatch, model_calls, call
 ) -> None:
     """The agent's ``ModelConfig`` (distinct values, not the settings') reaches the
     model factory and bounds the call."""
@@ -394,16 +386,16 @@ async def test_each_vision_call_takes_its_model_and_deadline_from_the_agent_mode
     )
     models = model_config(model_call_timeout_seconds=17)
     built, deadlines = [], []
-    wait_for = vision_module.asyncio.wait_for
+    run = model_calls.run
 
-    async def capture_deadline(task, *, timeout):
+    async def capture_deadline(function, *, timeout, label):
         deadlines.append(timeout)
-        return await wait_for(task, timeout=timeout)
+        return await run(function, timeout=timeout, label=label)
 
     monkeypatch.setattr(
         vision_module, "get_agno_model", lambda m, _t, **_k: built.append(m) or object()
     )
-    monkeypatch.setattr(vision_module.asyncio, "wait_for", capture_deadline)
+    monkeypatch.setattr(model_calls, "run", capture_deadline)
     agent = vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=models)
 
     if call == "describe_region":
@@ -412,7 +404,7 @@ async def test_each_vision_call_takes_its_model_and_deadline_from_the_agent_mode
         await agent.inspect_page(b"image", page_num=1, total_pages=1)
 
     assert built and all(m is models for m in built)
-    assert deadlines == [17 + vision_module.CALL_DEADLINE_GRACE_SECONDS]
+    assert deadlines == [vision_module.model_call_deadline(17)]
 
 
 def _context_retry_vision(monkeypatch, answers: list[object]):
@@ -439,12 +431,8 @@ def _context_retry_vision(monkeypatch, answers: list[object]):
         model_budgets.append(kwargs["max_tokens"])
         return object()
 
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
-
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
     monkeypatch.setattr(vision_module, "get_agno_model", fake_model)
-    monkeypatch.setattr(vision_module.asyncio, "to_thread", run_inline)
     return vision_module, calls, model_budgets
 
 
@@ -971,31 +959,41 @@ async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> None:
     """The HTTP timeout is per read; a call that never answers must still end."""
-    import time
+    import asyncio
+    import threading
 
     from backend.core.agents import vision_agent as vision_module
+    from backend.core.agents import model_call_policy
     from backend.config.settings import settings
+
+    started, release, finished = threading.Event(), threading.Event(), threading.Event()
 
     class HangingAgent:
         def __init__(self, **_kwargs):
             pass
 
         def run(self, **_kwargs):
-            time.sleep(1)
-            raise AssertionError("the caller should already have given up")
+            started.set()
+            try:
+                release.wait()
+                raise AssertionError("the caller should already have given up")
+            finally:
+                finished.set()
 
     monkeypatch.setattr(vision_module, "Agent", HangingAgent)
     monkeypatch.setattr(vision_module, "get_agno_model", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(settings, "model_call_timeout_seconds", 0)
-    monkeypatch.setattr(vision_module, "CALL_DEADLINE_GRACE_SECONDS", 0.05)
+    monkeypatch.setattr(model_call_policy, "CALL_DEADLINE_GRACE_SECONDS", 0.05)
 
-    started = time.monotonic()
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    call = asyncio.create_task(vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config(model_call_timeout_seconds=0)).describe_region(
         b"image", "full_page_image", page_num=14
-    )
-
-    assert result is None
-    assert time.monotonic() - started < 2
+    ))
+    try:
+        assert await asyncio.wait_for(call, 2) is None
+        assert started.is_set() and not finished.is_set()
+    finally:
+        release.set()
+        call.cancel()
+        await asyncio.gather(call, return_exceptions=True)
 
 
 @pytest.mark.asyncio
@@ -1329,13 +1327,9 @@ async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) 
             )
             return type("Response", (), {"content": content})()
 
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
-
     monkeypatch.setattr(data_module, "Agent", FakeAgent)
     monkeypatch.setattr(data_module, "get_agno_model", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
-    monkeypatch.setattr(data_module.asyncio, "to_thread", run_inline)
 
     result = await data_module.DataAgent(models=model_config(), toolbox=toolbox_config()).process_region(b"image", "table")
 
@@ -1343,18 +1337,18 @@ async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) 
 
 
 @pytest.mark.asyncio
-async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> None:
+async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch, model_calls) -> None:
     import asyncio
 
     from backend.core.agents import data_agent as data_module
 
     captured: dict[str, object] = {}
     deadlines: list[float] = []
-    wait_for = asyncio.wait_for
+    run = model_calls.run
 
-    async def capture_deadline(call, *, timeout):
+    async def capture_deadline(call, *, timeout, label):
         deadlines.append(timeout)
-        return await wait_for(call, timeout=timeout)
+        return await run(call, timeout=timeout, label=label)
 
     class FakeAgent:
         def __init__(self, **kwargs):
@@ -1369,9 +1363,6 @@ async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> No
             )
             return type("Response", (), {"content": content})()
 
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
-
     monkeypatch.setattr(data_module, "Agent", FakeAgent)
     monkeypatch.setattr(
         data_module,
@@ -1379,8 +1370,7 @@ async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch) -> No
         lambda *_args, **kwargs: (captured.update(model_kwargs=kwargs) or object()),
     )
     monkeypatch.setattr(data_module, "load_region_prompt", lambda _key: "prompt")
-    monkeypatch.setattr(data_module.asyncio, "to_thread", run_inline)
-    monkeypatch.setattr(data_module.asyncio, "wait_for", capture_deadline)
+    monkeypatch.setattr(model_calls, "run", capture_deadline)
     models = model_config(data_agent_max_tokens=8191, data_agent_timeout_seconds=3599)
 
     result = await data_module.DataAgent(models=models, toolbox=toolbox_config()).process_region(
@@ -1440,12 +1430,8 @@ async def test_failed_run_is_logged_with_its_real_cause(monkeypatch, agent_modul
         def run(self, **_kwargs):
             return type("Run", (), {"status": RunStatus.error, "content": "Invalid API Key"})()
 
-    async def run_inline(function, *args, **kwargs):
-        return function(*args, **kwargs)
-
     monkeypatch.setattr(module, "Agent", FakeAgent)
     monkeypatch.setattr(module, "get_agno_model", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(module.asyncio, "to_thread", run_inline)
     if agent_module == "data_agent":
         monkeypatch.setattr(module, "load_region_prompt", lambda _key: "prompt")
 

@@ -12,6 +12,7 @@ import pytest_asyncio
 from tests.core_config_support import model_config, toolbox_config
 
 from backend.core.agents import data_agent as data_module
+from backend.core.agents import model_call_policy
 
 
 async def _wait_for_event(event: Event) -> None:
@@ -56,7 +57,7 @@ async def blocked_model(monkeypatch):
 async def test_deadline_degrades_while_the_model_is_still_blocked(
     monkeypatch, blocked_model, classification
 ):
-    monkeypatch.setattr(data_module, "CALL_DEADLINE_GRACE_SECONDS", 0.1)
+    monkeypatch.setattr(model_call_policy, "CALL_DEADLINE_GRACE_SECONDS", 0.1)
     validation = Mock(wraps=data_module.validate_structured_run)
     monkeypatch.setattr(data_module, "validate_structured_run", validation)
     messages: list[str] = []
@@ -70,7 +71,7 @@ async def test_deadline_degrades_while_the_model_is_still_blocked(
         assert not blocked_model.release.is_set()
         assert not blocked_model.finished.is_set()
         validation.assert_not_called()
-        assert any("TimeoutError" in message for message in messages)
+        assert any("ModelCallTimeout" in message for message in messages)
 
         blocked_model.release.set()
         await _wait_for_event(blocked_model.finished)

@@ -43,13 +43,57 @@ de tabela (`_TABLE_REREAD_ATTEMPTS`) e a passagem `_retry_failed` mantêm suas p
 políticas; o deadline limita uma chamada de modelo, não toda a tabela ou o
 documento.
 
-Uma espera expirada não interrompe a chamada síncrona. A thread, a conexão e o
-Agent/cliente de modelo da chamada continuam ocupados até o provider terminar
-ou o processo ser interrompido. As chamadas ainda usam o executor padrão do
-event loop, e um chamador síncrono com `asyncio.run()` pode esperar por esse
-executor no fechamento do loop. Isolar as chamadas Vision/Data, limitar a
-admissão e definir o ciclo de vida do executor ficam para a segunda etapa da
-#276, após a revisão da etapa 1.
+**Execução compartilhada de modelos (#276, etapa 2).** VisionAgent e DataAgent
+recebem por composição a interface `ModelCallRunner` do core. A aplicação é
+dona da implementação, `backend.services.model_calls.ModelCallExecutor`,
+independentemente dos event loops. O serviço fornece um runner por meio de
+`model_call_scope` para cada documento; chamadores também podem passar
+`model_calls` a um agente ou ao orquestrador PDDL. A ponte legada do orquestrador
+obtém o executor do processo mantido pelo serviço quando nenhuma dependência ou
+escopo é fornecido, como sua ponte transitória de CoreConfig (ADR-0016). Os
+agentes não leem configurações de capacidade de execução. Os agentes Agno
+separados do chat AgentOS ficam fora desse caminho de execução.
+
+`MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers entre jobs e loops
+transitórios; `MODEL_CALL_MAX_PENDING` (padrão 4) limita chamadas adicionais em
+espera. São configurações do processo, não valores de CoreConfig por execução.
+Somente reservas de workers chegam ao ThreadPoolExecutor. Chamadas pendentes
+ficam numa fila FIFO limitada que remove prontamente as closures canceladas ou
+expiradas; uma chamada pendente não pode iniciar inferência após ser abandonada.
+A saturação gera `ModelCallRejected` explícito e segue a degradação existente do
+agente. Com capacidade pendente zero, cada worker ocupado conta imediatamente
+para a saturação.
+
+O deadline por tentativa inclui a espera na fila local e a execução; com a
+Toolbox inclui também a espera por uma vaga no gateway. `VISION_CONCURRENCY`
+continua limitando uma etapa de um documento, e a Toolbox é dona independente
+das vagas do provider. Dimensione os workers do Core para a capacidade desse
+gateway e mantenha o timeout do modelo suficiente para esperas legítimas. As
+releituras de tabela e o retry de timeout do VisionAgent continuam separados do
+mecanismo de execução.
+
+Cada submissão copia suas ContextVars, incluindo o locale da requisição. Os
+handlers síncronos de região/página preservam esse contexto na ponte de loops
+transitórios. `run_blocking`, cache e extração estrutural mantêm seus executores
+e políticas de cancelamento atuais. Logs localizados registram saturação,
+expiração do prazo, abandono, tempo de fila e duração da execução. `snapshot()`
+expõe reservas de workers ativas, chamadas pendentes/abandonadas, rejeições e
+expirações para observabilidade (#385), sem registrar imagens ou prompts.
+
+Uma chamada expirada/cancelada já em execução retém sua reserva, thread,
+conexão e Agent/cliente até o provider terminar. O resultado tardio é descartado.
+`asyncio.run()` nunca aguarda esse pool da aplicação. O shutdown da API/CLI
+usa `close(wait=False)` para fechar a admissão, remover pendências e acordar
+chamadores pendentes e ativos com `ModelCallRejected`. As threads dos providers
+ativos continuam, retêm suas reservas até terminar e têm seus resultados tardios
+descartados. O fechamento não mata
+threads nem garante o término imediato do processo: Python ainda aguarda as
+threads do executor ao sair. Um provider que nunca retorna pode exigir
+interrupção externa do processo. Outro ciclo de vida da aplicação no mesmo
+processo não pode substituir um pool fechado enquanto houver workers
+abandonados; chamadas são rejeitadas até eles terminarem. Usuários independentes
+criam e fecham seu runner explicitamente. Veja a
+[ADR-0021](adr/0021-bounded-model-call-execution.pt-br.md).
 
 #### 0.3. Serviços de Infraestrutura (`backend/services/`)
 - [backend/services/cache.py](../backend/services/cache.py): cache de texto por hash de arquivo em `var/temp/cache`.
