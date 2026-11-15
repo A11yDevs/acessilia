@@ -9,7 +9,7 @@ Você também pode ler esta documentação em **inglês**: [English](0012-agents
 
 ## Contexto
 
-Os agentes do core (VisionAgent, DataAgent e os agentes do AgentOS) conversam com um modelo de visão por um modelo Agno construído por `get_agno_model()` (`backend/ai/models/ai_client.py`). Até agora o modelo era o Ollama ou um servidor compatível com OpenAI acessado como OpenRouter, e o core guardava o endereço e a chave desse servidor.
+Os agentes do core (VisionAgent, DataAgent e os agentes do AgentOS) conversam com um modelo de visão por um modelo Agno construído por `get_agno_model(models, toolbox)` (`backend/core/agents/ai_client.py`; desde o passo 3 da ADR-0016, ele recebe a `ModelConfig` e a `ToolboxConfig` da execução). Até agora o modelo era o Ollama ou um servidor compatível com OpenAI acessado como OpenRouter, e o core guardava o endereço e a chave desse servidor.
 
 Na homologação, `OPENROUTER_BASE_URL` apontava direto para o llama-server que também atende as capacidades VLM da própria Toolbox (`document.ocr.page`, `document.adjudicate.*`, `table.recognize`). O servidor tem duas vagas paralelas, num host só com CPU. As chamadas do core e as da Toolbox, cada uma limitada do seu lado, juntas passaram dessas vagas e travaram o servidor.
 

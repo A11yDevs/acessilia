@@ -32,8 +32,11 @@ closures can therefore retain images, agents and clients.
 - Keep prompts, schemas and retry/degradation policies in the agents/pipeline.
   General blocking work keeps its executor and cancellation semantics. Core
   synchronous inspection bridges preserve request context in their helper thread.
-- API/CLI shutdown closes admission and pending work without joining model
-  threads. Do not replace a closed owner while its workers remain. Neither
+- API/CLI shutdown closes admission, discards pending work and wakes pending
+  and active awaiters with `ModelCallRejected`, without joining model threads.
+  Active provider threads continue, retain their reservations until completion
+  and have their late results discarded. Do not replace a closed owner while
+  its workers remain. Neither
   `shutdown(wait=False)` nor closing a loop kills threads or guarantees immediate
   interpreter exit: Python still joins them. A permanently stalled provider may
   require external process termination.

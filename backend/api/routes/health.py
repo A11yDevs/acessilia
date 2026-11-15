@@ -131,7 +131,7 @@ async def _check_model_reachable() -> bool:
 @router.get("/health", response_model=HealthResponse)
 @limiter.limit("30/minute")
 async def health(request: Request):
-    model_name = active_model_name()
+    model_name = active_model_name(core_config_from_settings().models)
     staging = _read_staging_status()
     ghcr_latest = _staging_str(staging, "latest_digest")
     running_digest = _staging_str(staging, "running_digest") or settings.image_digest

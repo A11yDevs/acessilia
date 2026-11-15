@@ -18,7 +18,7 @@ from backend.core.pipeline.enrichment.tables import _enrich_table_structures
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import toolbox_config, vision_config
+from tests.core_config_support import model_config, toolbox_config, vision_config
 
 
 def _ast(rows: list[list[str]]) -> dict:
@@ -69,6 +69,9 @@ def _run(monkeypatch, rows, reading, image=b"image", review=True):
     calls = []
 
     class FakeDataAgent:
+        def __init__(self, **_kwargs):
+            pass
+
         async def process_region(self, **kwargs):
             calls.append(kwargs)
             if isinstance(reading, list):
@@ -81,7 +84,7 @@ def _run(monkeypatch, rows, reading, image=b"image", review=True):
     monkeypatch.setattr(table_stage, "DataAgent", FakeDataAgent)
     monkeypatch.setattr(table_stage, "_extract_picture_bytes", lambda *_args, **_kwargs: (image, 1))
     monkeypatch.setattr(pddl_module.asyncio, "to_thread", run_inline)
-    asyncio.run(_enrich_table_structures(manifest, Path("/tmp/deck.pdf"), vision=vision_config(table_visual_review=review), toolbox=toolbox_config()))
+    asyncio.run(_enrich_table_structures(manifest, Path("/tmp/deck.pdf"), vision=vision_config(table_visual_review=review), toolbox=toolbox_config(), models=model_config()))
     return table, calls
 
 

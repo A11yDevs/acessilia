@@ -6,9 +6,11 @@ once rather than leaving unbounded cancelled items in the executor's queue.
 Running abandoned calls retain capacity until their thread exits. No event
 loop owns this executor; asyncio.run() never joins it on loop shutdown.
 
-close(wait=False) rejects new work and discards pending calls, but cannot kill
-threads or guarantee immediate interpreter exit. Python still joins executor
-threads at exit. The service must be stopped externally if a provider never
+close(wait=False) rejects new work, discards pending calls and wakes active
+awaiters with ModelCallRejected. Active provider threads continue; their late
+results are discarded and their reservations remain held until they finish.
+Closing cannot kill threads or guarantee immediate interpreter exit. Python
+still joins executor threads at exit. The service must be stopped externally if a provider never
 returns. A closed process owner is replaced only after its workers finish.
 """
 
@@ -159,6 +161,10 @@ class ModelCallExecutor:
             try:
                 value = call()
             except BaseException as error:
+                # A worker is an exception-transfer boundary, like
+                # concurrent.futures: even SystemExit/CancelledError must reach
+                # the awaiter. Otherwise its result stays unresolved until the
+                # deadline. This does not suppress the provider's exception.
                 failure = error
             completed = True
         finally:

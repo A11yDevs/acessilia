@@ -10,7 +10,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
 ### 2. Estratégia e Abstração de Modelo para IA (Agno)
-- Implementação: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model()`)
+- Implementação: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model(models, toolbox)`, a partir da `ModelConfig` e da `ToolboxConfig` da execução)
 - Estratégias:
   - Ollama (modelos locais de pesos abertos como LLaVA/Qwen-VL)
   - OpenRouter (modelos de API em nuvem como Claude/GPT-4o)

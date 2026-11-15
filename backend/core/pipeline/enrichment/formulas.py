@@ -29,7 +29,7 @@ from docstruct.text.latex import has_latex_markup, latex_text_agreement
 from backend.core.agents.output_schemas import VisionOutput
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.agents.vision_agent import VisionAgent
-from backend.core.config import DocumentConfig, ToolboxConfig, VisionConfig
+from backend.core.config import DocumentConfig, ModelConfig, ToolboxConfig, VisionConfig
 from backend.core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,
@@ -183,6 +183,7 @@ async def _classify_formula_regions(
     mode: str,
     vision: VisionConfig,
     toolbox: ToolboxConfig,
+    models: ModelConfig,
     breaker: ProviderBreaker,
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
@@ -207,7 +208,7 @@ async def _classify_formula_regions(
     if not candidates:
         return
     slots = asyncio.Semaphore(max(1, vision.concurrency))
-    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox)
+    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox, models=models)
     progress_lock = asyncio.Lock()
 
     async def classify(element: ManifestElement) -> None:
@@ -275,6 +276,7 @@ async def _enrich_formula_latex(
     document: DocumentConfig,
     vision: VisionConfig,
     toolbox: ToolboxConfig,
+    models: ModelConfig,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -374,7 +376,7 @@ async def _enrich_formula_latex(
         source_file=source_file,
         mode=mode,
         status_callback=status_callback,
-        vision=VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox),
+        vision=VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox, models=models),
         breaker=breaker or ProviderBreaker(vision.breaker_threshold),
         slots=asyncio.Semaphore(max(1, vision.concurrency)),
         total=len(formulas),

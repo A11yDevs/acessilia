@@ -11,7 +11,7 @@ import pytest
 from backend.core.agents.data_agent import DataAgent
 from backend.core.agents.output_schemas import DataOutput, VisionOutput
 from backend.core.agents.vision_agent import VisionAgent
-from tests.core_config_support import toolbox_config
+from tests.core_config_support import model_config, toolbox_config
 
 
 BLOCK_SECONDS = 0.2
@@ -62,8 +62,8 @@ async def _assert_event_loop_is_responsive(
 @pytest.mark.asyncio
 async def test_vision_inference_does_not_block_event_loop(monkeypatch):
     monkeypatch.setattr("backend.core.agents.vision_agent.Agent", _BlockingAgent)
-    monkeypatch.setattr("backend.core.agents.vision_agent.get_agno_model", lambda **_kwargs: object())
-    agent = VisionAgent(region_cache=False, toolbox=toolbox_config())
+    monkeypatch.setattr("backend.core.agents.vision_agent.get_agno_model", lambda *_args, **_kwargs: object())
+    agent = VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config())
 
     await _assert_event_loop_is_responsive(
         lambda: agent.describe_region(b"image", "embedded_image"),
@@ -74,9 +74,9 @@ async def test_vision_inference_does_not_block_event_loop(monkeypatch):
 @pytest.mark.asyncio
 async def test_data_inference_does_not_block_event_loop(monkeypatch):
     monkeypatch.setattr("backend.core.agents.data_agent.Agent", _BlockingAgent)
-    monkeypatch.setattr("backend.core.agents.data_agent.get_agno_model", lambda **_kwargs: object())
+    monkeypatch.setattr("backend.core.agents.data_agent.get_agno_model", lambda *_args, **_kwargs: object())
     monkeypatch.setattr("backend.core.agents.data_agent.load_region_prompt", lambda _key: "prompt")
-    agent = DataAgent()
+    agent = DataAgent(models=model_config(), toolbox=toolbox_config())
 
     await _assert_event_loop_is_responsive(
         lambda: agent.process_region(b"image", "table"),

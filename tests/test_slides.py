@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from tests.core_config_support import fusion_config, toolbox_config, vision_config
+from tests.core_config_support import fusion_config, model_config, toolbox_config, vision_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.slides import is_slide_heading
@@ -371,7 +371,7 @@ async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypat
     monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
     monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda _s, element, page, *_a, **_k: (b"png", page))
 
-    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config())
+    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
 
     # Slide 3 is one picture of the whole slide; slide 2 keeps an embedded one.
     assert classifications == {3: "full_page_image", 2: "embedded_image"}
@@ -595,7 +595,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     from backend.core.pipeline.payload import _manifest_pages_to_payload
 
     class FailingVision:
-        def __init__(self, mode: str, *, region_cache, toolbox) -> None:
+        def __init__(self, mode: str, *, region_cache, toolbox, models) -> None:
             pass
 
         async def describe_region(self, *, errors=None, **kwargs):
@@ -616,7 +616,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     extracted["text"] = "Scale diagram"
     manifest = _build_edited(source, extraction)
 
-    await _enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config())
+    await _enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
 
     [picture] = [e for e in manifest.elements if e.id == "e-6"]
     assert picture.metadata["vision_failure_reason"] == "model_failed"

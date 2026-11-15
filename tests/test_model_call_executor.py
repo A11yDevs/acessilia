@@ -8,17 +8,23 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.agents.model_calls import ModelCallRejected, ModelCallTimeout, model_call_scope
+from backend.core.agents.model_calls import (
+    ModelCallRejected, ModelCallTimeout, current_model_calls, model_call_scope,
+)
 from backend.core.i18n import active_locale, reset_request_locale, set_request_locale
 from backend.services.blocking import run_blocking
 from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
-from tests.core_config_support import toolbox_config
+from tests.core_config_support import model_config, toolbox_config
 
 
 async def until(predicate):
     async with asyncio.timeout(2):
         while not predicate():
             await asyncio.sleep(0.001)
+
+
+async def drained(runner):
+    await until(lambda: runner.snapshot()["active"] == 0)
 
 
 class Blocked:
@@ -67,11 +73,11 @@ async def test_running_deadline_retains_capacity_and_default_executor_stays_avai
         assert await asyncio.wait_for(run_blocking(lambda: "independent"), 2) == "independent"
         pending.cancel()
         with pytest.raises(asyncio.CancelledError):
-            await pending
+            await asyncio.wait_for(pending, 2)
     finally:
         blocked.release.set()
         await asyncio.gather(call, return_exceptions=True)
-        await until(lambda: runner.snapshot()["active"] == 0)
+        await drained(runner)
     assert await runner.run(lambda: "reused", timeout=1, label="reused") == "reused"
 
 
@@ -101,7 +107,7 @@ async def test_pending_calls_are_removed_and_never_start_late(runner, cancel):
         if pending is not None:
             pending.cancel()
         await asyncio.gather(active, *([pending] if pending else []), return_exceptions=True)
-        await until(lambda: runner.snapshot()["active"] == 0)
+        await drained(runner)
     assert executed == []
 
 
@@ -165,7 +171,7 @@ async def test_running_cancellation_propagates_and_late_result_is_discarded(runn
     finally:
         blocked.release.set()
         await asyncio.gather(call, return_exceptions=True)
-        await until(lambda: runner.snapshot()["active"] == 0)
+        await drained(runner)
     assert call.cancelled()
 
 
@@ -214,6 +220,62 @@ async def test_provider_timeout_keeps_its_original_exception(runner):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [SystemExit, KeyboardInterrupt, asyncio.CancelledError])
+async def test_worker_transfers_base_exceptions_to_the_awaiter(runner, error_type):
+    def fail():
+        raise error_type("provider interrupted")
+
+    with pytest.raises(error_type, match="provider interrupted"):
+        await runner.run(fail, timeout=1, label="interrupted")
+    assert runner.snapshot()["active"] == runner.snapshot()["expirations"] == 0
+    assert await runner.run(lambda: "reused", timeout=1, label="reused") == "reused"
+
+
+def test_process_installs_and_restores_model_call_scope_without_test_context(
+    monkeypatch, tmp_path, runner,
+):
+    """A fresh Context bypasses the autouse scope, as a real service entry does."""
+    from backend import service
+    from backend.core.agents.data_agent import DataAgent
+    from backend.core.agents.vision_agent import VisionAgent
+
+    source = tmp_path / "input.txt"
+    source.write_text("content")
+    observed = []
+
+    async def execute(*_args, **_kwargs):
+        observed.append(current_model_calls())
+        models, toolbox = model_config(), toolbox_config()
+        assert DataAgent(models=models, toolbox=toolbox).model_calls is runner
+        assert VisionAgent(models=models, toolbox=toolbox, region_cache=False).model_calls is runner
+        assert await current_model_calls().run(lambda: "model result", timeout=1, label="service") == "model result"
+        return "Accessible content"
+
+    async def noop(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
+    monkeypatch.setattr(service, "get_model_calls", lambda: runner)
+    for name in ("get_cached", "set_cache", "registrar_conversao"):
+        monkeypatch.setattr(service, name, noop)
+    monkeypatch.setattr(service, "_salvar_json_canonico", lambda *_args: None)
+    monkeypatch.setattr(service.state_manager, "obter", lambda *_args: object())
+    monkeypatch.setattr(service.state_manager, "atualizar", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service.state_manager, "verificar_cancelamento", lambda *_args: None)
+
+    async def request():
+        with pytest.raises(RuntimeError, match="runner must be supplied"):
+            current_model_calls()
+        result = await service.process(source, task_id="scope-wiring")
+        assert result["source"]["name"] == source.name
+        with pytest.raises(RuntimeError, match="runner must be supplied"):
+            current_model_calls()
+
+    contextvars.Context().run(asyncio.run, request())
+    assert observed == [runner]
+
+
+@pytest.mark.asyncio
 async def test_close_discards_pending_work_without_joining_running_provider(runner):
     blocked = Blocked()
     executed = []
@@ -244,16 +306,15 @@ async def test_close_discards_pending_work_without_joining_running_provider(runn
 ])
 def test_sync_call_returns_while_provider_stays_blocked(monkeypatch, runner, agent_kind, nested):
     from backend.core.agents import data_agent, vision_agent, model_call_policy
-    from backend.config.settings import settings
     from backend.core.pipeline.handlers.inspection import _inspect_page, _inspect_region
 
     blocked = Blocked(SimpleNamespace(content=None))
     for module in (data_agent, vision_agent):
         monkeypatch.setattr(module, "Agent", lambda **_kwargs: SimpleNamespace(run=blocked))
-        monkeypatch.setattr(module, "get_agno_model", lambda **_kwargs: object())
+        monkeypatch.setattr(module, "get_agno_model", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(data_agent, "load_region_prompt", lambda _key: "prompt")
-    monkeypatch.setattr(settings, "data_agent_timeout_seconds", 0)
-    monkeypatch.setattr(settings, "model_call_timeout_seconds", 0)
+    models = model_config(data_agent_timeout_seconds=0, model_call_timeout_seconds=0)
+    toolbox = toolbox_config()
     monkeypatch.setattr(model_call_policy, "CALL_DEADLINE_GRACE_SECONDS", 0.05)
     # The VisionAgent retries once; allow the second attempt to remain pending
     # and expire behind the first, still-blocked attempt.
@@ -263,14 +324,14 @@ def test_sync_call_returns_while_provider_stays_blocked(monkeypatch, runner, age
 
     def invoke():
         if agent_kind == "data":
-            results.append(asyncio.run(data_agent.DataAgent(model_calls=runner).process_region(b"image", "table")))
+            results.append(asyncio.run(data_agent.DataAgent(models=models, toolbox=toolbox, model_calls=runner).process_region(b"image", "table")))
         elif agent_kind == "vision":
-            results.append(asyncio.run(vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config(), model_calls=runner).describe_region(b"image", "embedded_image")))
+            results.append(asyncio.run(vision_agent.VisionAgent(region_cache=False, toolbox=toolbox, models=models, model_calls=runner).describe_region(b"image", "embedded_image")))
         elif agent_kind == "region-handler":
-            results.append(_inspect_region(b"image", 1, 1, "medio", region_cache=False, toolbox=toolbox_config()))
+            results.append(_inspect_region(b"image", 1, 1, "medio", region_cache=False, toolbox=toolbox, models=models))
         else:
             try:
-                _inspect_page(b"image", 1, 1, "medio", region_cache=False, toolbox=toolbox_config())
+                _inspect_page(b"image", 1, 1, "medio", region_cache=False, toolbox=toolbox, models=models)
             except ModelCallTimeout:
                 results.append(None)
 
@@ -347,7 +408,7 @@ async def test_process_owner_does_not_replace_a_closed_pool_with_abandoned_threa
         assert owner.get_model_calls() is runner
         assert not blocked.finished.is_set()
         with pytest.raises(ModelCallRejected):
-            await active
+            await asyncio.wait_for(active, 2)
         blocked.release.set()
         await until(lambda: runner.snapshot()["active"] == 0)
         replacement = owner.get_model_calls()

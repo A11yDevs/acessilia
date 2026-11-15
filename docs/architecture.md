@@ -21,7 +21,7 @@ The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/D
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): in-memory task state machine with cooperative cancellation support (the service's job state; it stays outside the core).
 
 #### 0.2. AI Client Integration (`backend/core/agents/ai_client.py`)
-- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): central `get_agno_model()` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) based on environment settings.
+- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): central `get_agno_model(models, toolbox)` initializer that instantiates Agno Model wrappers for Ollama, OpenRouter or the Toolbox VLM gateway (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.md)) from the run's `ModelConfig` and `ToolboxConfig` ([ADR-0016](adr/0016-core-package.md), step 3).
 - [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): prompt loader and template resolver over the prompts in [backend/core/agents/prompts/](../backend/core/agents/prompts/).
 
 **DataAgent call deadline (#276, step 1).** Each `process_region` call awaits
@@ -78,8 +78,10 @@ for observability (#385), without logging image/prompt content.
 An expired/cancelled running call still retains its reservation, thread,
 connection and per-call Agent/model client until the provider finishes. Its late
 result is discarded. `asyncio.run()` never joins this application-owned pool.
-API/CLI shutdown closes admission, removes pending work and uses
-`close(wait=False)`. That does not kill threads or guarantee immediate process
+API/CLI shutdown uses `close(wait=False)` to close admission, remove pending work
+and wake pending and active awaiters with `ModelCallRejected`. Active provider
+threads continue, retain their reservations until they finish, and have their
+late results discarded. Closing does not kill threads or guarantee immediate process
 termination: Python still joins executor threads at interpreter exit. A provider
 that never returns may require external process termination. A subsequent
 application lifecycle in the same process cannot replace a closed pool while

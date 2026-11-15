@@ -39,7 +39,7 @@ from docstruct.placeholders import is_placeholder_visual
 from tests.pddl_support import build_element, build_manifest
 from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config, toolbox_config
+from tests.core_config_support import core_config, model_config, toolbox_config
 
 NOW = datetime(2026, 10, 19, tzinfo=timezone.utc)
 PNG = b"\x89PNG\r\n\x1a\nfake-page"
@@ -188,10 +188,11 @@ def _answer(monkeypatch, output=None, error=None, options=None):
     calls = []
     options = {} if options is None else options
 
-    def inspect(image, number, total_pages, mode, *, region_cache, toolbox):
+    def inspect(image, number, total_pages, mode, *, region_cache, toolbox, models):
         calls.append((image, number, total_pages))
         options["region_cache"] = region_cache
         options.setdefault("toolboxes", []).append(toolbox)
+        options.setdefault("models", []).append(models)
         if error:
             raise error
         return output
@@ -246,6 +247,7 @@ def test_the_page_is_rendered_and_inspected_as_the_run_config_says(
     config = core_config(
         vision={"pdf_split_dpi": 123, "region_cache_enabled": enabled},
         toolbox={"retries": 7},
+        models={"openrouter_max_tokens": 7},
     )
 
     result = inspection_handlers._handle_vision_page_inspection_method(
@@ -254,8 +256,10 @@ def test_the_page_is_rendered_and_inspected_as_the_run_config_says(
 
     assert result.success, result.message
     toolboxes = options.pop("toolboxes")
+    models = options.pop("models")
     assert options == {"dpi": 123, "region_cache": enabled}
     assert len(toolboxes) == 2 and all(toolbox is config.toolbox for toolbox in toolboxes)
+    assert models == [config.models] and models[0] is config.models
 
 
 def test_a_blank_page_is_accepted_and_left_out_of_the_document(
@@ -354,10 +358,10 @@ def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
             )
 
     monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_agent, "get_agno_model", lambda **_kwargs: None)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda *_args, **_kwargs: None)
 
     output = asyncio.run(
-        vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config()).inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
+        vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
     )
 
     assert seen["schema"] is PageInspectionOutput
@@ -385,13 +389,13 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
             )
 
     monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
-    monkeypatch.setattr(vision_agent, "get_agno_model", lambda **_kwargs: None)
+    monkeypatch.setattr(vision_agent, "get_agno_model", lambda *_args, **_kwargs: None)
 
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError, match="description is required"):
         asyncio.run(
-            vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config()).inspect_page(image_bytes=PNG, page_num=1, total_pages=1)
+            vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(image_bytes=PNG, page_num=1, total_pages=1)
         )
 
 

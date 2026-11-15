@@ -24,7 +24,6 @@ class ModelCallRejected(RuntimeError):
 class ModelCallRunner(Protocol):
     async def run(self, call: Callable[[], T], *, timeout: float, label: str) -> T:
         """Execute one attempt; cancellation never joins an abandoned thread."""
-        ...
 
 
 _runner: ContextVar[ModelCallRunner | None] = ContextVar("model_call_runner", default=None)

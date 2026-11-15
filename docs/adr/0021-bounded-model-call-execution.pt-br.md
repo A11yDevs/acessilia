@@ -32,8 +32,11 @@ Closures canceladas podem, assim, reter imagens, agentes e clientes.
 - Preserve prompts, schemas e políticas de retry/degradação nos agentes/pipeline.
   Trabalho bloqueante geral mantém executor e semântica de cancelamento. Pontes
   síncronas de inspeção do core preservam o contexto na thread auxiliar.
-- O shutdown da API/CLI fecha admissão e pendências sem aguardar threads de
-  modelo. Não substitua um executor fechado enquanto seus workers permanecerem.
+- O shutdown da API/CLI fecha admissão, descarta pendências e acorda chamadores
+  pendentes e ativos com `ModelCallRejected`, sem aguardar threads de modelo.
+  As threads dos providers ativos continuam, retêm suas reservas até terminar e
+  têm seus resultados tardios descartados. Não substitua um executor fechado
+  enquanto seus workers permanecerem.
   Nem `shutdown(wait=False)` nem fechar um loop mata threads ou garante saída
   imediata do interpretador: Python ainda as aguarda. Um provider permanentemente
   travado pode exigir interrupção externa do processo.

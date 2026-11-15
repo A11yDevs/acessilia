@@ -24,7 +24,7 @@ from tests.pddl_support import (
 )
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config, toolbox_config
+from tests.core_config_support import core_config, model_config, toolbox_config
 
 
 @pytest.fixture
@@ -55,10 +55,11 @@ def inspection(monkeypatch, tmp_path, fake_toolbox_render):
     response = VisionOutput(kind="description", description="A map", language="en", confidence=0.9)
 
     class Vision:
-        def __init__(self, mode, *, region_cache, toolbox):
+        def __init__(self, mode, *, region_cache, toolbox, models):
             self.mode = mode
             Vision.region_caches.append(region_cache)
             Vision.toolboxes.append(toolbox)
+            Vision.models.append(models)
 
         async def describe_region(self, **kwargs):
             calls.append(kwargs)
@@ -67,6 +68,7 @@ def inspection(monkeypatch, tmp_path, fake_toolbox_render):
     Vision.response = response
     Vision.region_caches = []
     Vision.toolboxes = []
+    Vision.models = []
     monkeypatch.setattr(inspection_handlers, "VisionAgent", Vision)
     return manifest, calls, Vision
 
@@ -126,7 +128,7 @@ def test_the_region_is_rendered_and_inspected_with_the_run_toolbox(inspection, m
     from dataclasses import replace
 
     manifest, _, vision = inspection
-    run = replace(core_config(), toolbox=toolbox_config(retries=7))
+    run = replace(core_config(), toolbox=toolbox_config(retries=7), models=model_config())
     rendered = []
     render = inspection_handlers._render_inspection_region
 
@@ -141,6 +143,7 @@ def test_the_region_is_rendered_and_inspected_with_the_run_toolbox(inspection, m
     assert result.success, result.message
     assert rendered == [run.toolbox] and rendered[0] is run.toolbox
     assert vision.toolboxes == [run.toolbox] and vision.toolboxes[0] is run.toolbox
+    assert vision.models == [run.models] and vision.models[0] is run.models
 
 
 @pytest.mark.parametrize("crop", [True, "missing.png", {"path": "missing.png"}])

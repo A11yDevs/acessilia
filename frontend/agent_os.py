@@ -22,6 +22,7 @@ from agno.db.sqlite import SqliteDb
 from agno.media import Image  # noqa: F401  (available for multimodal tests in the panel)
 from agno.os import AgentOS
 
+from backend.config.core_config import core_config_from_settings
 from backend.core.agents.ai_client import get_agno_model
 from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
@@ -38,6 +39,10 @@ from frontend.web.messages import (
     WEB_AGENT_OS_DESCRIPTION,
     WEB_AGENT_VISION_DESCRIPTION,
 )
+
+# The service's configuration (ADR-0016, step 3): the model client takes the
+# model and Toolbox groups explicitly, as the pipeline's agents do.
+_config = core_config_from_settings()
 
 # Session/memory database of the AgentOS (kept in the project data directory).
 _db_file = settings.data_dir / "agentos.db"
@@ -72,7 +77,9 @@ vision_agent = Agent(
     name="VisionAgent",
     # Chat answers may legitimately run long on a local Ollama; keep the
     # historical REQUEST_TIMEOUT ceiling instead of the tighter model default.
-    model=get_agno_model(timeout_seconds=settings.request_timeout),
+    model=get_agno_model(
+        _config.models, _config.toolbox, timeout_seconds=settings.request_timeout
+    ),
     instructions=f"{load_system_prompt('medio')}\n\n{VISION_SCHEMA_INSTRUCTION}",
     output_schema=VisionOutput,
     db=_db,
@@ -83,7 +90,9 @@ vision_agent = Agent(
 
 data_agent = Agent(
     name="DataAgent",
-    model=get_agno_model(timeout_seconds=settings.request_timeout),
+    model=get_agno_model(
+        _config.models, _config.toolbox, timeout_seconds=settings.request_timeout
+    ),
     instructions=f"{_build_data_instructions()}\n\n{DATA_SCHEMA_INSTRUCTION}",
     output_schema=DataOutput,
     db=_db,

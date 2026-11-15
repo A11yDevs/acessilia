@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 
 from backend.core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from backend.core.agents.vision_agent import VisionAgent
-from backend.core.config import CoreConfig, ToolboxConfig
+from backend.core.config import CoreConfig, ModelConfig, ToolboxConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.builder import (
     is_unstructured_page_placeholder,
@@ -101,9 +101,12 @@ def _inspect_region(
     *,
     region_cache: bool,
     toolbox: ToolboxConfig,
+    models: ModelConfig,
 ) -> VisionOutput | None:
     async def inspect():
-        agent = VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox)
+        agent = VisionAgent(
+            mode=mode, region_cache=region_cache, toolbox=toolbox, models=models
+        )
         return await agent.describe_region(
             image_bytes=image, classification="embedded_image", page_num=number,
             total_pages=total_pages, mode=mode, full_budget=True,
@@ -179,6 +182,7 @@ def _handle_pymupdf_region_method(
                 str(manifest.extractor.configuration.get("region_inspection_mode", "medio")),
                 region_cache=config.vision.region_cache_enabled,
                 toolbox=config.toolbox,
+                models=config.models,
             )
             if not isinstance(output, VisionOutput):
                 raise ValueError(f"Region inspection failed for {element.id}")
@@ -258,9 +262,12 @@ def _inspect_page(
     *,
     region_cache: bool,
     toolbox: ToolboxConfig,
+    models: ModelConfig,
 ) -> PageInspectionOutput:
     return _run_inspection(
-        VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox).inspect_page(
+        VisionAgent(
+            mode=mode, region_cache=region_cache, toolbox=toolbox, models=models
+        ).inspect_page(
             image_bytes=image, page_num=number, total_pages=total_pages
         )
     )
@@ -306,6 +313,7 @@ def _handle_vision_page_inspection_method(
                 image, number, total_pages, mode,
                 region_cache=config.vision.region_cache_enabled,
                 toolbox=config.toolbox,
+                models=config.models,
             )
             if not isinstance(output, PageInspectionOutput):
                 raise TypeError("Page inspection returned no structured output")
