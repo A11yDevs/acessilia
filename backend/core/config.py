@@ -23,6 +23,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,8 @@ class ToolboxConfig:
 
     ``providers`` and ``timeouts`` are keyed by the SDK clients'
     ``provider_key`` and ``timeout_key`` (for example ``toolbox_pdf_provider``,
-    ``toolbox_docx_timeout_seconds``).
+    ``toolbox_docx_timeout_seconds``), and are read-only copies of the
+    mappings given.
     """
 
     base_url: str
@@ -50,6 +52,12 @@ class ToolboxConfig:
     catalog_stale_seconds: int
     media_inspect_enabled: bool
     pdf_validate_enabled: bool
+
+    def __post_init__(self) -> None:
+        # Read-only whatever the caller passes: a frozen dataclass alone would
+        # keep a caller's dict, which it could still change.
+        object.__setattr__(self, "providers", MappingProxyType(dict(self.providers)))
+        object.__setattr__(self, "timeouts", MappingProxyType(dict(self.timeouts)))
 
 
 @dataclass(frozen=True)

@@ -35,26 +35,128 @@ PROCESS_SETUP_KEYS = {"log_level", "logs_dir", "i18n_locales_active"}
 #: Keys the core reads through ``getattr(settings, key)`` over these tables.
 DYNAMIC_KEYS = set(PROVIDER_DEFAULTS) | set(TIMEOUT_KEYS)
 
+#: The one module allowed a non-literal ``getattr(settings, ...)``: the SDK
+#: client configuration, over the provider and timeout tables.
+DYNAMIC_READERS = {"backend/core/toolbox/toolbox_client.py"}
 
-def _settings_reads(path: Path, name: str) -> set[str]:
-    """The attributes of ``name`` that ``path`` reads, imports inside functions included."""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    return {
-        node.attr
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Attribute)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == name
-    }
+#: Which setting fills each field, written out so that a swapped pair fails.
+FIELD_SETTINGS: dict[str, str] = {
+    "toolbox.base_url": "toolbox_base_url",
+    "toolbox.base_urls": "toolbox_base_urls",
+    "toolbox.api_key": "toolbox_api_key",
+    "toolbox.timeout_seconds": "toolbox_timeout_seconds",
+    "toolbox.retries": "toolbox_retries",
+    "toolbox.retry_backoff_seconds": "toolbox_retry_backoff_seconds",
+    "toolbox.extraction_timeout_seconds": "toolbox_extraction_timeout_seconds",
+    "toolbox.use_remote_cache": "toolbox_use_remote_cache",
+    "toolbox.use_artifact_store": "toolbox_use_artifact_store",
+    "toolbox.availability_gate": "toolbox_availability_gate",
+    "toolbox.catalog_refresh_seconds": "toolbox_catalog_refresh_seconds",
+    "toolbox.catalog_stale_seconds": "toolbox_catalog_stale_seconds",
+    "toolbox.media_inspect_enabled": "toolbox_media_inspect_enabled",
+    "toolbox.pdf_validate_enabled": "toolbox_pdf_validate_enabled",
+    "models.ai_client": "ai_client",
+    "models.ollama_base_url": "ollama_base_url",
+    "models.ollama_model": "ollama_model",
+    "models.ollama_api_key": "ollama_api_key",
+    "models.openrouter_base_url": "openrouter_base_url",
+    "models.openrouter_model": "openrouter_model",
+    "models.openrouter_api_key": "openrouter_api_key",
+    "models.openrouter_site_url": "openrouter_site_url",
+    "models.openrouter_app_name": "openrouter_app_name",
+    "models.openrouter_max_tokens": "openrouter_max_tokens",
+    "models.toolbox_vlm_provider": "toolbox_vlm_provider",
+    "models.model_call_timeout_seconds": "model_call_timeout_seconds",
+    "models.vision_region_max_tokens": "vision_region_max_tokens",
+    "models.data_agent_max_tokens": "data_agent_max_tokens",
+    "models.data_agent_timeout_seconds": "data_agent_timeout_seconds",
+    "vision.concurrency": "vision_concurrency",
+    "vision.breaker_threshold": "vision_breaker_threshold",
+    "vision.region_cache_enabled": "vision_region_cache_enabled",
+    "vision.retry_pass_delay_seconds": "vision_retry_pass_delay_seconds",
+    "vision.table_visual_review": "table_visual_review",
+    "vision.pdf_split_dpi": "pdf_split_dpi",
+    "fusion.mode": "fusion_mode",
+    "fusion.secondary_provider": "fusion_secondary_provider",
+    "fusion.apply_page_routes": "fusion_apply_page_routes",
+    "fusion.judge_max_pages": "fusion_judge_max_pages",
+    "document.max_pages": "max_pages",
+    "document.legacy_unicode_repair": "legacy_unicode_repair",
+    "document.inline_math_detection": "inline_math_detection",
+    "document.formula_text_agreement_min": "formula_text_agreement_min",
+    "document.slide_visual_coverage": "slide_visual_coverage",
+    "document.slide_fold_figure_labels": "slide_fold_figure_labels",
+    "export.tts_voice": "tts_voice",
+    "export.object_markers_enabled": "object_markers_enabled",
+    "export.toolbox_docx_enabled": "toolbox_docx_enabled",
+    "export.toolbox_pdf_ua_enabled": "toolbox_pdf_ua_enabled",
+    "paths.data_dir": "data_dir",
+    **{f"toolbox.providers[{key}]": key for key in PROVIDER_DEFAULTS},
+    **{f"toolbox.timeouts[{key}]": key for key in TIMEOUT_KEYS},
+}
+
+SETTINGS_MODULE = "backend.config.settings"
 
 
-def _core_reads() -> set[str]:
+def _scan(path: Path, rel: str | None = None) -> tuple[set[str], list[str]]:
+    """The settings ``path`` reads, and the reads the scan cannot name.
+
+    Reads are ``settings.<key>``, ``getattr(settings, "<key>")`` and, in
+    ``DYNAMIC_READERS`` only, ``getattr(settings, key)`` over the tables. Any
+    other ``getattr(settings, ...)``, or a binding of the settings under
+    another name, is unnamed: the scan could not tell which key it reads.
+    """
+    rel = rel or path.relative_to(ROOT).as_posix()
     keys: set[str] = set()
-    for path in CORE.rglob("*.py"):
-        keys |= _settings_reads(path, "settings")
-        if "getattr(settings, key)" in path.read_text(encoding="utf-8"):
-            keys |= DYNAMIC_KEYS
-    return keys
+    unnamed: list[str] = []
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            if node.value.id == "settings":
+                keys.add(node.attr)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+            and node.args
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "settings"
+        ):
+            name = node.args[1] if len(node.args) > 1 else None
+            if isinstance(name, ast.Constant) and isinstance(name.value, str):
+                keys.add(name.value)
+            elif rel in DYNAMIC_READERS:
+                keys |= DYNAMIC_KEYS
+            else:
+                unnamed.append(f"{rel}:{node.lineno} {ast.unparse(node)}")
+        elif isinstance(node, ast.ImportFrom) and node.module == SETTINGS_MODULE:
+            unnamed += [
+                f"{rel}:{node.lineno} settings bound as {alias.asname}"
+                for alias in node.names
+                if alias.name == "settings" and alias.asname not in (None, "settings")
+            ]
+        elif isinstance(node, ast.ImportFrom) and node.module == "backend.config":
+            unnamed += [
+                f"{rel}:{node.lineno} imports the settings module"
+                for alias in node.names
+                if alias.name == "settings"
+            ]
+        elif isinstance(node, ast.Import):
+            unnamed += [
+                f"{rel}:{node.lineno} imports the settings module"
+                for alias in node.names
+                if alias.name == SETTINGS_MODULE
+            ]
+    return keys, unnamed
+
+
+def _core_reads() -> tuple[set[str], list[str]]:
+    keys: set[str] = set()
+    unnamed: list[str] = []
+    for path in sorted(CORE.rglob("*.py")):
+        found, hidden = _scan(path)
+        keys |= found
+        unnamed += hidden
+    return keys, unnamed
 
 
 def _leaves(config: CoreConfig) -> dict[str, object]:
@@ -74,22 +176,63 @@ def _leaves(config: CoreConfig) -> dict[str, object]:
 
 def test_the_builder_covers_every_setting_the_core_reads() -> None:
     """A stage that starts reading a new key must get a field for it."""
-    built = _settings_reads(BUILDER, "s") | DYNAMIC_KEYS
-    missing = sorted(_core_reads() - built - PROCESS_SETUP_KEYS)
+    keys, unnamed = _core_reads()
+    missing = sorted(keys - set(FIELD_SETTINGS.values()) - PROCESS_SETUP_KEYS)
 
+    assert not unnamed, "settings reads the scan cannot name:\n" + "\n".join(unnamed)
     assert not missing, f"settings read by backend/core with no CoreConfig field: {missing}"
 
 
-def test_each_field_takes_its_own_setting() -> None:
-    """Every field holds the value of a distinct setting, none left behind."""
-    keys = sorted(_settings_reads(BUILDER, "s") | DYNAMIC_KEYS)
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from backend.config.settings import settings\nx = settings.bot_token\n",
+        "from backend.config.settings import settings\nx = getattr(settings, 'bot_token')\n",
+    ],
+)
+def test_the_scan_names_the_key_of_a_read(tmp_path, source) -> None:
+    probe = tmp_path / "probe.py"
+    probe.write_text(source, encoding="utf-8")
+
+    assert _scan(probe, "backend/core/probe.py") == ({"bot_token"}, [])
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from backend.config.settings import settings as app\nx = app.bot_token\n",
+        "from backend.config import settings\nx = settings.settings.bot_token\n",
+        "import backend.config.settings\n",
+        "from backend.config.settings import settings\nname = 'bot_token'\nx = getattr(settings, name)\n",
+    ],
+)
+def test_the_scan_reports_a_read_it_cannot_name(tmp_path, source) -> None:
+    probe = tmp_path / "probe.py"
+    probe.write_text(source, encoding="utf-8")
+
+    assert _scan(probe, "backend/core/probe.py")[1]
+
+
+def test_each_field_takes_its_setting() -> None:
+    """Every field holds the value of the setting the table names for it."""
     distinct = copy.copy(settings_module.settings)
-    for index, key in enumerate(keys):
-        object.__setattr__(distinct, key, f"value-{index}")
+    for key in set(FIELD_SETTINGS.values()):
+        object.__setattr__(distinct, key, f"value-of-{key}")
 
     leaves = _leaves(core_config_from_settings(distinct))
 
-    assert sorted(leaves.values()) == sorted(f"value-{index}" for index in range(len(keys)))
+    assert leaves == {path: f"value-of-{key}" for path, key in FIELD_SETTINGS.items()}
+
+
+def test_a_caller_mapping_is_copied_read_only() -> None:
+    providers = {"toolbox_provider": "docling"}
+    base = core_config_from_settings().toolbox
+    toolbox = dataclasses.replace(base, providers=providers)
+    providers["toolbox_provider"] = "other"
+
+    assert toolbox.providers["toolbox_provider"] == "docling"
+    with pytest.raises(TypeError):
+        toolbox.providers["toolbox_provider"] = "other"  # type: ignore[index]
 
 
 def test_the_configuration_is_frozen() -> None:
@@ -124,7 +267,7 @@ def test_the_config_module_imports_only_the_standard_library() -> None:
         for alias in node.names
     }
 
-    assert imported <= {"__future__", "collections", "dataclasses", "pathlib"}
+    assert imported <= {"__future__", "collections", "dataclasses", "pathlib", "types"}
 
 
 def _over_the_limit(monkeypatch, pages: int) -> object:

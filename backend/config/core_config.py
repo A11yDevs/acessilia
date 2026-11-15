@@ -8,8 +8,6 @@ test's monkeypatch).
 
 from __future__ import annotations
 
-from types import MappingProxyType
-
 from backend.config.settings import Settings, settings as default_settings
 from backend.core.config import (
     CoreConfig,
@@ -36,8 +34,8 @@ def core_config_from_settings(settings: Settings | None = None) -> CoreConfig:
             retries=s.toolbox_retries,
             retry_backoff_seconds=s.toolbox_retry_backoff_seconds,
             extraction_timeout_seconds=s.toolbox_extraction_timeout_seconds,
-            providers=MappingProxyType({key: getattr(s, key) for key in sorted(PROVIDER_DEFAULTS)}),
-            timeouts=MappingProxyType({key: getattr(s, key) for key in sorted(TIMEOUT_KEYS)}),
+            providers={key: getattr(s, key) for key in sorted(PROVIDER_DEFAULTS)},
+            timeouts={key: getattr(s, key) for key in sorted(TIMEOUT_KEYS)},
             use_remote_cache=s.toolbox_use_remote_cache,
             use_artifact_store=s.toolbox_use_artifact_store,
             availability_gate=s.toolbox_availability_gate,

@@ -109,6 +109,10 @@ class PddlAccessibilityOrchestrator:
             - "toolbox" — ToolboxManifestExtractor (remote via Acessilia Toolbox)
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
             Defaults to "toolbox".
+        max_replans (int): How many times a run plans again when the executor reports `replan-required`; negative values count as 0; defaults to 2.
+        config (CoreConfig | None): The run's configuration (ADR-0016, step 3).
+            When None, the bridge builds one from ``settings`` at the start of
+            each run; defaults to None.
     """
 
     def __init__(
