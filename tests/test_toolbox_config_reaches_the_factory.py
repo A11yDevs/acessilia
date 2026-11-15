@@ -15,7 +15,7 @@ import fitz
 import pytest
 
 from backend.core.toolbox import toolbox_client
-from tests.core_config_support import fusion_config, toolbox_config
+from tests.core_config_support import fusion_config, paths_config, toolbox_config
 from tests.pddl_support import build_element
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -114,7 +114,8 @@ def _call(run_toolbox, tmp_path):
             fusion.extract_fused(FIXTURE_PDF, secondary_provider="mineru", toolbox=run_toolbox)
         ),
         "extraction": lambda: ToolboxManifestExtractor().extract(
-            FIXTURE_PDF, fusion=fusion_config(), toolbox=run_toolbox
+            FIXTURE_PDF, fusion=fusion_config(), toolbox=run_toolbox,
+            paths=paths_config(),
         ),
     }
 

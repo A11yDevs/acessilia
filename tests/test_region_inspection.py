@@ -146,6 +146,20 @@ def test_the_region_is_rendered_and_inspected_with_the_run_toolbox(inspection, m
     assert vision.models == [run.models] and vision.models[0] is run.models
 
 
+def test_the_region_evidence_is_written_under_the_run_data_dir(inspection, tmp_path):
+    """ADR-0016 step 3 (paths): the run's ``data_dir``, not the settings'."""
+    from dataclasses import replace
+
+    manifest, _, _ = inspection
+    run_dir = tmp_path / "run-data"
+    run = replace(core_config(), paths=replace(core_config().paths, data_dir=run_dir))
+
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=run)
+
+    assert result.success, result.message
+    assert result.artifacts and all(run_dir in Path(a.path).parents for a in result.artifacts)
+
+
 @pytest.mark.parametrize("crop", [True, "missing.png", {"path": "missing.png"}])
 def test_provider_crop_metadata_never_bypasses_inspection(inspection, crop):
     manifest, calls, _ = inspection

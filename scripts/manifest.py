@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
             document=config.document,
             fusion=config.fusion,
             toolbox=config.toolbox,
+            paths=config.paths,
         )
         payload = manifest.model_dump(mode="json", by_alias=True)
         errors = validate_manifest(payload, args.schema.resolve())

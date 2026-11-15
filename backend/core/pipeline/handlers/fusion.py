@@ -447,6 +447,7 @@ def _handle_dual_provider_fusion_method(
         payload,
         obligation_id,
         kind="fusion-payload",
+        data_dir=config.paths.data_dir,
     )
 
     manifest.elements = elements
@@ -536,9 +537,10 @@ def _persist_fusion_payload(
     obligation_id: str,
     *,
     kind: str,
+    data_dir: Path,
 ) -> Artifact:
-    """Write the payload atomically, addressed by its manifest scope and content."""
-    from backend.config.settings import settings
+    """Write the payload atomically, addressed by its manifest scope and content,
+    under the run's ``data_dir``."""
 
     content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     digest = hashlib.sha256(content).hexdigest()
@@ -546,7 +548,7 @@ def _persist_fusion_payload(
         manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
         manifest.revision, obligation_id,
     ]).encode()).hexdigest()
-    output_path = settings.data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
+    output_path = data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:

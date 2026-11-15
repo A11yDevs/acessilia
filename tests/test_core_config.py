@@ -177,7 +177,7 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 
 #: The groups the core now receives from its caller: none of their settings
 #: may be read again. Each step-3 pull request adds the group it moves.
-MOVED_GROUPS = {"document", "export", "fusion", "models", "toolbox", "vision"}
+MOVED_GROUPS = {"document", "export", "fusion", "models", "paths", "toolbox", "vision"}
 
 #: Reads of a moved group's setting that wait for another group's pull
 #: request, by file. Empty since the model client took the run's
@@ -541,6 +541,15 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
         ("backend.core.planning.toolbox_gate:evaluate", "config"),
+        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "paths"),
+        (
+            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "paths",
+        ),
+        ("backend.core.manifest.toolbox_extractor:_persist_fusion_reuse", "data_dir"),
+        ("backend.core.manifest.toolbox_extractor:_persist_secondary_extraction", "data_dir"),
+        ("backend.core.pipeline.handlers.fusion:_persist_fusion_payload", "data_dir"),
+        ("backend.core.pipeline.handlers.inspection:_save_region_artifact", "data_dir"),
         ("backend.core.agents.vision_agent:VisionAgent.__init__", "models"),
         ("backend.core.agents.data_agent:DataAgent.__init__", "models"),
         ("backend.core.agents.data_agent:DataAgent.__init__", "toolbox"),

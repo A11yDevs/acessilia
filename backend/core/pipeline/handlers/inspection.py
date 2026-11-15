@@ -128,11 +128,12 @@ def _run_inspection(coro):
         return pool.submit(context.run, asyncio.run, coro).result()
 
 
-def _save_region_artifact(content: bytes, scope: str, kind: str, suffix: str, media_type: str) -> Artifact:
-    from backend.config.settings import settings
-
+def _save_region_artifact(
+    content: bytes, scope: str, kind: str, suffix: str, media_type: str, *, data_dir: Path
+) -> Artifact:
+    """Write ``content`` atomically under the run's ``data_dir``, named by its digest."""
     digest = hashlib.sha256(content).hexdigest()
-    path = settings.data_dir / "artifacts" / "regions" / scope / f"{digest}.{suffix}"
+    path = data_dir / "artifacts" / "regions" / scope / f"{digest}.{suffix}"
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
@@ -198,7 +199,10 @@ def _handle_pymupdf_region_method(
             scope = hashlib.sha256(json.dumps([
                 manifest.manifest_id, manifest.source.sha256, manifest.revision, obligation_id, element.id,
             ]).encode()).hexdigest()
-            crop = _save_region_artifact(image, scope, "region-crop", "png", "image/png")
+            data_dir = config.paths.data_dir
+            crop = _save_region_artifact(
+                image, scope, "region-crop", "png", "image/png", data_dir=data_dir
+            )
             evidence = {
                 "source_sha256": manifest.source.sha256, "element_id": element.id,
                 "page_number": number, "bbox": rectangle, "crop_sha256": crop.sha256,
@@ -206,7 +210,7 @@ def _handle_pymupdf_region_method(
             }
             record = _save_region_artifact(
                 json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode(),
-                scope, "region-inspection", "json", "application/json",
+                scope, "region-inspection", "json", "application/json", data_dir=data_dir,
             )
             replacement = element.model_copy(deep=True)
             replacement.metadata.update(
@@ -327,7 +331,10 @@ def _handle_vision_page_inspection_method(
                 manifest.manifest_id, manifest.source.sha256, manifest.revision,
                 obligation_id, element.id,
             ]).encode()).hexdigest()
-            page_image = _save_region_artifact(image, scope, "page-render", "png", "image/png")
+            data_dir = config.paths.data_dir
+            page_image = _save_region_artifact(
+                image, scope, "page-render", "png", "image/png", data_dir=data_dir
+            )
             record = _save_region_artifact(
                 json.dumps(
                     {
@@ -340,7 +347,7 @@ def _handle_vision_page_inspection_method(
                     ensure_ascii=False,
                     sort_keys=True,
                 ).encode(),
-                scope, "page-inspection", "json", "application/json",
+                scope, "page-inspection", "json", "application/json", data_dir=data_dir,
             )
             artifacts.extend([page_image, record])
             replacement = element.model_copy(deep=True)

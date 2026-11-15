@@ -181,6 +181,7 @@ def _run_manifest(
         document=config.document,
         fusion=config.fusion,
         toolbox=config.toolbox,
+        paths=config.paths,
     )
     payload = manifest.model_dump(mode="json", by_alias=True)
     errors = validate_manifest(payload, DEFAULT_MANIFEST_SCHEMA)
