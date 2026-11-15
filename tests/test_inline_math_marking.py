@@ -9,6 +9,7 @@ import pytest
 from backend.core.pipeline.enrichment import inline_math as inline_math_stage
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
+from tests.core_config_support import document_config
 
 HEIGHT = 792.0
 
@@ -64,13 +65,14 @@ def spans(monkeypatch):
         return {1: _page(PARAGRAPH_LINE, DISPLAY_LINE)}
 
     monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
-    from backend.config.settings import settings
-    monkeypatch.setattr(settings, "inline_math_detection", "fonts")
     return calls
 
 
-def _run(manifest):
-    return asyncio.run(inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf")))
+def _run(manifest, detection="fonts"):
+    document = document_config(inline_math_detection=detection)
+    return asyncio.run(
+        inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), document)
+    )
 
 
 def test_prose_gets_its_inline_math_and_formulas_are_left_alone(spans):
@@ -111,12 +113,9 @@ def test_an_unavailable_capability_leaves_the_text(monkeypatch, spans):
 
 
 def test_off_does_not_call_the_toolbox(monkeypatch, spans):
-    from backend.config.settings import settings
-
-    monkeypatch.setattr(settings, "inline_math_detection", "off")
     manifest = _manifest()
 
-    _run(manifest)
+    _run(manifest, detection="off")
 
     assert spans == []
     assert manifest.elements[0].text == "inicial ´ e s 0 ∈ R , h = 0"

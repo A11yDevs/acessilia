@@ -221,8 +221,10 @@ Proposed: option 2.
      In progress: `backend/core/config.py` defines `CoreConfig` as frozen
      groups (Toolbox, models, vision, fusion, document, export, paths), the
      service builds it in `backend/config/core_config.py`, and the
-     orchestrator builds one per run until every stage takes its group. The
-     page limit was the first stage.
+     orchestrator builds one per run until every stage takes its group. Moved
+     so far: the `document` group (the page limit first, then inline math,
+     the legacy Unicode repair, the slide options and the formula agreement
+     threshold).
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:

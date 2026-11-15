@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from backend.core.pipeline.handlers import text as text_handlers
 from backend.core.pipeline import payload as pipeline_payload
-from backend.config.settings import settings
 from backend.core.manifest.builder import _derive_v23_processing_needs
 from backend.core.manifest.models import BoundingBox, Observation, Obligation, Provenance
 from backend.core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
@@ -41,18 +40,18 @@ def _kinds(obligations) -> set[str]:
 
 class TestManifestEmission:
     def test_off_emits_nothing(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "off")
         observations, obligations = _derive_v23_processing_needs(
-            [_element(BRASILIA)]
+            [_element(BRASILIA)],
+            legacy_unicode_repair="off",
         )
 
         assert observations == []
         assert obligations == []
 
     def test_detect_emits_an_observation_without_an_obligation(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "detect")
         observations, obligations = _derive_v23_processing_needs(
-            [_element(BRASILIA)]
+            [_element(BRASILIA)],
+            legacy_unicode_repair="detect",
         )
 
         assert [item.kind for item in observations] == [
@@ -62,9 +61,9 @@ class TestManifestEmission:
         assert observations[0].evidence["dotless"] == 1
 
     def test_repair_emits_the_deterministic_obligation(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         observations, obligations = _derive_v23_processing_needs(
-            [_element(BRASILIA)]
+            [_element(BRASILIA)],
+            legacy_unicode_repair="repair",
         )
 
         assert len(obligations) == 1
@@ -75,17 +74,15 @@ class TestManifestEmission:
         assert observations[0].evidence["combining_marks"] == 1
 
     def test_repair_does_not_change_the_text_while_deriving(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         element = _element(BRASILIA)
 
-        _derive_v23_processing_needs([element])
+        _derive_v23_processing_needs([element], legacy_unicode_repair="repair")
 
         assert element.text == BRASILIA
 
     def test_spacing_only_emits_and_repairs(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         element = _element(SPACING_CALCULO)
-        observations, obligations = _derive_v23_processing_needs([element])
+        observations, obligations = _derive_v23_processing_needs([element], legacy_unicode_repair="repair")
 
         assert "repair-legacy-unicode" in _kinds(obligations)
         assert observations[0].evidence["spacing_diacritics"] == 1
@@ -99,32 +96,31 @@ class TestManifestEmission:
         assert element.text == "C\u00e1lculo"
 
     def test_invalid_mode_falls_back_to_off(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "banana")
         observations, obligations = _derive_v23_processing_needs(
-            [_element(BRASILIA)]
+            [_element(BRASILIA)],
+            legacy_unicode_repair="banana",
         )
 
         assert observations == []
         assert obligations == []
 
     def test_formula_is_not_a_target(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         observations, obligations = _derive_v23_processing_needs(
-            [_element(BRASILIA, "formula")]
+            [_element(BRASILIA, "formula")],
+            legacy_unicode_repair="repair",
         )
 
         assert "repair-legacy-unicode" not in _kinds(obligations)
 
     def test_page_header_is_a_target(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         observations, obligations = _derive_v23_processing_needs(
-            [_element(SPACING_CALCULO, "page_header")]
+            [_element(SPACING_CALCULO, "page_header")],
+            legacy_unicode_repair="repair",
         )
 
         assert "repair-legacy-unicode" in _kinds(obligations)
 
     def test_table_cells_are_a_target(self, monkeypatch):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
         table = build_element(
             "element-table",
             "table",
@@ -132,7 +128,7 @@ class TestManifestEmission:
                 "table_ast": {"body": [{"cells": [{"text": SPACING_CALCULO}]}]}
             },
         )
-        observations, obligations = _derive_v23_processing_needs([table])
+        observations, obligations = _derive_v23_processing_needs([table], legacy_unicode_repair="repair")
 
         assert "repair-legacy-unicode" in _kinds(obligations)
         assert observations[0].evidence["spacing_word_internal"] == 1
@@ -369,8 +365,7 @@ class TestDetectModeTechnicalWarning:
 
     @staticmethod
     def _payload(tmp_path, monkeypatch, *, mode: str):
-        monkeypatch.setattr(settings, "legacy_unicode_repair", mode)
-        observations, obligations = _derive_v23_processing_needs([_element(BRASILIA)])
+        observations, obligations = _derive_v23_processing_needs([_element(BRASILIA)], legacy_unicode_repair=mode)
         manifest = build_manifest([_element(BRASILIA)], obligations)
         manifest.observations = observations
         orchestrator = build_orchestrator()

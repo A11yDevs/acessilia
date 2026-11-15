@@ -183,6 +183,22 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
     assert not missing, f"settings read by backend/core with no CoreConfig field: {missing}"
 
 
+#: The groups the core now receives from its caller: none of their settings
+#: may be read again. Each step-3 pull request adds the group it moves.
+MOVED_GROUPS = {"document"}
+
+
+def test_the_moved_groups_are_not_read_from_settings() -> None:
+    keys, _ = _core_reads()
+    moved = {
+        setting
+        for path, setting in FIELD_SETTINGS.items()
+        if path.split(".", 1)[0] in MOVED_GROUPS
+    }
+
+    assert not sorted(keys & moved), "backend/core reads moved settings again"
+
+
 @pytest.mark.parametrize(
     "source",
     [

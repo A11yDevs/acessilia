@@ -9,6 +9,7 @@ import pytest
 
 from backend.core.pipeline.enrichment import inline_math as inline_math_stage
 from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from tests.core_config_support import document_config
 from tests.pddl_support import build_element, build_manifest
 
 HEIGHT = 792.0
@@ -94,14 +95,15 @@ def spans(monkeypatch):
                     "lines": [{"bbox": [0, 0, 0, 0], "spans": line} for line in [PARAGRAPH, *LINES]]}}
 
     monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
-    from backend.config.settings import settings
-    monkeypatch.setattr(settings, "inline_math_detection", "fonts")
     return calls
 
 
-def _run(manifest, text_spans=None):
+def _run(manifest, text_spans=None, detection="fonts"):
+    document = document_config(inline_math_detection=detection)
     return asyncio.run(
-        inline_math_stage._mark_table_inline_math(manifest, Path("/tmp/amostra.pdf"), text_spans)
+        inline_math_stage._mark_table_inline_math(
+            manifest, Path("/tmp/amostra.pdf"), document, text_spans
+        )
     )
 
 
@@ -146,7 +148,11 @@ def test_the_prose_and_table_steps_fetch_a_page_once(spans):
     manifest = _manifest()
     reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
 
-    asyncio.run(inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), reader))
+    asyncio.run(
+        inline_math_stage._mark_inline_math(
+            manifest, Path("/tmp/amostra.pdf"), document_config(inline_math_detection="fonts"), reader
+        )
+    )
     _run(manifest, reader)
 
     assert manifest.elements[0].text == "then $x$"
@@ -167,7 +173,11 @@ def test_an_unavailable_capability_is_asked_once(monkeypatch, spans):
     manifest = _manifest()
     reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"))
 
-    asyncio.run(inline_math_stage._mark_inline_math(manifest, Path("/tmp/amostra.pdf"), reader))
+    asyncio.run(
+        inline_math_stage._mark_inline_math(
+            manifest, Path("/tmp/amostra.pdf"), document_config(inline_math_detection="fonts"), reader
+        )
+    )
     assert _run(manifest, reader)["marked"] == 0
 
     assert len(calls) == 1
@@ -176,12 +186,9 @@ def test_an_unavailable_capability_is_asked_once(monkeypatch, spans):
 
 
 def test_off_does_not_call_the_toolbox(monkeypatch, spans):
-    from backend.config.settings import settings
-
-    monkeypatch.setattr(settings, "inline_math_detection", "off")
     manifest = _manifest()
 
-    _run(manifest)
+    _run(manifest, detection="off")
 
     assert spans == []
     assert _texts(manifest.elements[1])[0] == "h = 0"

@@ -15,6 +15,7 @@ import pytest
 
 from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline.enrichment import formulas as formula_stage
+from tests.core_config_support import document_config
 from backend.core.pipeline.handlers import inspection as inspection_handlers
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
@@ -73,7 +74,7 @@ async def test_the_formula_steps_skip_a_source_the_toolbox_cannot_render(monkeyp
     breaker = pddl.ProviderBreaker(3)
 
     await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker)
-    await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", breaker=breaker)
+    await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", document=document_config(), breaker=breaker)
 
     assert crops == []
     assert manifest.elements[0].text == "placeholder"
