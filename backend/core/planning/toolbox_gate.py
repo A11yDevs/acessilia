@@ -20,6 +20,7 @@ SDK allowlist is never made available.
 from __future__ import annotations
 
 import hashlib
+import secrets
 from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -186,6 +187,11 @@ async def _fetch(toolbox: ToolboxConfig) -> CatalogSnapshot:
 #: one; the bound only stops a process that sees many from keeping them all.
 CATALOG_CACHES_MAX = 8
 
+#: The API key's digest in a cache key: a salt per process, and enough rounds
+#: for a key derivation (the digest is computed once per document).
+_CREDENTIAL_SALT = secrets.token_bytes(16)
+_CREDENTIAL_ROUNDS = 10_000
+
 #: One cache per catalogue source and timing, least recently used first.
 _caches: OrderedDict[tuple[str, str, int, int], CatalogCache] = OrderedDict()
 
@@ -196,14 +202,18 @@ def _source_key(toolbox: ToolboxConfig) -> tuple[str, str, int, int]:
     The endpoint is the normalized primary, the only one the catalogue is
     read from, so equivalent spellings share a cache; an unusable URL keys on
     its text, and its cache records the error. The API key enters as a
-    digest, so the key of the table holds no credential (the cache's reader
-    still needs it, and goes with the entry).
+    salted PBKDF2 digest with a salt drawn per process, so the key of the
+    table holds no credential and its digest means nothing outside the
+    process (the cache's reader still needs the key, and goes with the
+    entry).
     """
     try:
         endpoint = endpoints_from(toolbox.base_urls, toolbox.base_url)[0].base_url
     except ValueError:
         endpoint = f"unusable:{toolbox.base_urls}|{toolbox.base_url}"
-    credential = hashlib.sha256(toolbox.api_key.encode("utf-8")).hexdigest()
+    credential = hashlib.pbkdf2_hmac(
+        "sha256", toolbox.api_key.encode("utf-8"), _CREDENTIAL_SALT, _CREDENTIAL_ROUNDS
+    ).hex()
     return (
         endpoint,
         credential,

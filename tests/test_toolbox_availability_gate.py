@@ -354,7 +354,7 @@ async def test_a_run_config_the_clients_would_not_follow_is_refused(monkeypatch,
 def test_the_fields_only_the_gate_reads_may_differ_from_the_settings(fields) -> None:
     from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
 
-    refuse_toolbox_unlike_the_clients(toolbox_config(**fields))
+    refuse_toolbox_unlike_the_clients(toolbox_config(**fields), toolbox_config())
 
 
 @pytest.mark.parametrize(
@@ -370,4 +370,4 @@ def test_the_fields_the_clients_read_must_match_the_settings(fields) -> None:
     from backend.core.toolbox.toolbox_client import refuse_toolbox_unlike_the_clients
 
     with pytest.raises(ValueError, match=next(iter(fields))):
-        refuse_toolbox_unlike_the_clients(toolbox_config(**fields))
+        refuse_toolbox_unlike_the_clients(toolbox_config(**fields), toolbox_config())

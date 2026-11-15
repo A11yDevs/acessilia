@@ -134,14 +134,12 @@ TOOLBOX_FIELDS_STILL_IN_SETTINGS = (
 )
 
 
-def refuse_toolbox_unlike_the_clients(toolbox: ToolboxConfig) -> None:
-    """Refuse a run's ``toolbox`` that the clients, still on ``settings``, would not follow.
+def refuse_toolbox_unlike_the_clients(toolbox: ToolboxConfig, clients: ToolboxConfig) -> None:
+    """Refuse a run's ``toolbox`` that the clients would not follow.
 
-    Raises ``ValueError`` naming the fields that differ.
+    ``clients`` is the ``ToolboxConfig`` built from the settings the clients
+    still read. Raises ``ValueError`` naming the fields that differ.
     """
-    from backend.config.core_config import core_config_from_settings
-
-    clients = core_config_from_settings().toolbox
     differ = [
         name
         for name in TOOLBOX_FIELDS_STILL_IN_SETTINGS

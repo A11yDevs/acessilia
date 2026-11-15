@@ -167,7 +167,7 @@ class PddlAccessibilityOrchestrator:
         from backend.config.core_config import core_config_from_settings
 
         if self.config is not None:
-            refuse_toolbox_unlike_the_clients(self.config.toolbox)
+            refuse_toolbox_unlike_the_clients(self.config.toolbox, core_config_from_settings().toolbox)
             return self.config
         return core_config_from_settings()
 
