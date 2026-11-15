@@ -174,8 +174,9 @@ def _run_manifest(
     agent = InformationalStructuralAgent(
         ToolboxManifestExtractor(enable_ocr=not no_ocr)
     )
+    config = core_config_from_settings()
     manifest = agent.process(
-        document.resolve(), language=language, document=core_config_from_settings().document
+        document.resolve(), language=language, document=config.document, fusion=config.fusion
     )
     payload = manifest.model_dump(mode="json", by_alias=True)
     errors = validate_manifest(payload, DEFAULT_MANIFEST_SCHEMA)

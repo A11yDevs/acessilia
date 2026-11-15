@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from tests.core_config_support import fusion_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.slides import is_slide_heading
@@ -328,7 +329,6 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
         SAMPLE_TOOLBOX_RESPONSE,
     )
 
-    monkeypatch.setattr(settings, "fusion_mode", "dual")
     client = AsyncMock(spec=ToolboxStructureClient)
     client.provider = "docling"
     client.base_url = "http://localhost:8002"
@@ -342,7 +342,8 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
     )
 
     result = ToolboxManifestExtractor(client=client, use_artifact_store=False).extract(
-        FIXTURE_PDF, dual_fusion=False
+        FIXTURE_PDF, dual_fusion=False,
+        fusion=fusion_config(mode="dual"),
     )
 
     assert "fusion_evidence" not in result.document

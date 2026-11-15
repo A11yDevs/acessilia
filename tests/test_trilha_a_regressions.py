@@ -8,8 +8,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
+from tests.core_config_support import core_config
 import pytest
 
+from tests.core_config_support import fusion_config
 from backend.config.settings import settings
 from backend.core.pipeline.handlers import fusion as fusion_handlers
 from backend.services.cache import options_cache_key, processing_cache_configuration
@@ -100,7 +102,6 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
 
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"%PDF")
-    monkeypatch.setattr(settings, "fusion_mode", "dual")
     primary = SimpleNamespace(
         provider="docling",
         base_url="http://toolbox",
@@ -115,7 +116,8 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
         lambda *a, **k: secondary,
     )
     result = ToolboxManifestExtractor(client=primary, use_artifact_store=False).extract(
-        source
+        source,
+        fusion=fusion_config(mode="dual"),
     )
     assert result.configuration["fusion"]["status"] == "degraded"
     assert result.configuration["fusion"]["failed_providers"] == ["mineru"]
@@ -129,8 +131,6 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
 
     source = tmp_path / "doc.pdf"
     source.write_bytes(b"%PDF")
-    monkeypatch.setattr(settings, "fusion_mode", "dual")
-    monkeypatch.setattr(settings, "fusion_secondary_provider", "docling")
     primary = SimpleNamespace(
         provider="docling",
         base_url="http://toolbox",
@@ -139,7 +139,7 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
 
     extracted = ToolboxManifestExtractor(
         client=primary, use_artifact_store=False
-    ).extract(source)
+    ).extract(source, fusion=fusion_config(mode="dual", secondary_provider="docling"))
 
     assert extracted.configuration["fusion"]["status"] == "skipped"
     assert extracted.configuration["fusion"]["reason"] == "identical-providers"
@@ -251,7 +251,7 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
         return payload
 
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", extract)
-    result = fusion_handlers._handle_dual_provider_fusion_method(manifest, "o-fuse")
+    result = fusion_handlers._handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
     assert result.success
     assert calls == ([True] if corrupt else [])
 
@@ -412,12 +412,12 @@ def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
     policy = FusionPolicy(align_tau=0.4)
     manifest.extractor.configuration['fusion_policy'] = asdict(policy)
     seen = []
-    def extract(path, *, artifact_id=None, policy=None):
+    def extract(path, *, artifact_id=None, policy=None, secondary_provider=None):
         seen.append(policy)
         return _dual_payload()
     monkeypatch.setattr(fusion_handlers, '_run_extract_fused', extract)
     monkeypatch.setattr(settings, 'data_dir', tmp_path)
-    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse', config=core_config()).success
     assert seen == [policy]
 
 
@@ -440,12 +440,12 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
     manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original)
     manifest.extractor.configuration['fusion_policy'] = asdict(original)
     calls = []
-    def extract(path, *, artifact_id=None, policy=None):
+    def extract(path, *, artifact_id=None, policy=None, secondary_provider=None):
         calls.append(policy)
         return payload
     monkeypatch.setattr(fusion_handlers, '_run_extract_fused', extract)
-    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse', config=core_config()).success
     assert not calls
     manifest.extractor.configuration['fusion_policy'] = asdict(changed)
-    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse').success
+    assert fusion_handlers._handle_dual_provider_fusion_method(manifest, 'o-fuse', config=core_config()).success
     assert calls == [changed]

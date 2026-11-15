@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import pytest
 
+from tests.core_config_support import core_config
+from backend.core.pipeline.handlers.registry import bind_config
 from backend.core.pipeline.handlers.registry import METHOD_HANDLERS
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers import content as content_handlers
@@ -121,6 +123,7 @@ class TestRegistryCoverage:
         marking obligations satisfied while nothing had been processed.
         """
         executor = PddlAccessibilityOrchestrator._build_executor()
+        executor.registry = bind_config(executor.registry, core_config())
         manifest = _manifest([_element("el-1", "picture")], [])
 
         results = [
@@ -763,9 +766,10 @@ class TestEveryHandlerIsCallable:
             monkeypatch.setattr(
                 "backend.config.settings.settings.toolbox_provider", "docling"
             )
-        handler = METHOD_HANDLERS.get(
-            method, PddlAccessibilityOrchestrator._build_executor().registry.get(method)
-        )
+        # The registry of a run: a handler that takes the config gets it.
+        handler = bind_config(
+            PddlAccessibilityOrchestrator._build_executor().registry, core_config()
+        ).get(method)
 
         result = handler(manifest, "o-1")
 

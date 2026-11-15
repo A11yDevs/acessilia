@@ -26,8 +26,10 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import httpx
+from tests.core_config_support import core_config
 import pytest
 
+from backend.core.pipeline.handlers.registry import bind_config
 from backend.core.i18n import reset_request_locale, set_request_locale
 from acessilia_sdk.toolbox.transport import auth_headers
 
@@ -135,7 +137,7 @@ def test_handler_returns_artifact_in_method_result(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
-    result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert result.success is True
     assert result.validated is True
@@ -162,7 +164,7 @@ def test_handler_fails_when_single_provider(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
-    result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert result.success is False
     assert result.validated is False
@@ -187,7 +189,7 @@ async def test_handler_inside_running_event_loop_without_warning(
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+        result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert result.success is True
     assert result.validated is True
@@ -210,7 +212,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     registry.register(
         "dual-provider-fusion", _handle_dual_provider_fusion_method
     )
-    updated, report = ExecutorAgent(registry).execute(plan, manifest)
+    updated, report = ExecutorAgent(bind_config(registry, core_config())).execute(plan, manifest)
 
     assert report.status == "completed"
     fused = next(item for item in updated.obligations if item.id == "o-fuse")
@@ -284,7 +286,7 @@ async def test_extract_fused_against_real_toolbox():
     from backend.core.pipeline.fusion import extract_fused
 
     pdf = _get_small_pdf()
-    payload = await extract_fused(pdf)
+    payload = await extract_fused(pdf, secondary_provider="mineru")
 
     assert payload.get("status") == "succeeded"
     provider = str(payload.get("provider") or "")
@@ -304,7 +306,7 @@ async def test_fusion_handler_with_real_toolbox(tmp_path):
     pdf = _get_small_pdf()
     manifest = _make_manifest(tmp_path, source_path=pdf)
 
-    result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert result.success is True, result.message
     assert result.validated is True
@@ -331,7 +333,7 @@ def test_fusion_executor_e2e_with_real_toolbox(tmp_path):
     registry.register(
         "dual-provider-fusion", _handle_dual_provider_fusion_method
     )
-    updated, report = ExecutorAgent(registry).execute(plan, manifest)
+    updated, report = ExecutorAgent(bind_config(registry, core_config())).execute(plan, manifest)
 
     assert report.status == "completed", report.status
     fused = next(item for item in updated.obligations if item.id == "o-fuse")

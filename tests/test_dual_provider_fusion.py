@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from importlib.util import find_spec
 from pathlib import Path
 
+from tests.core_config_support import core_config
 import pytest
 
+from backend.core.pipeline.handlers.registry import bind_config
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers.common import _missing_obligation
 from backend.core.i18n import reset_request_locale, set_request_locale
@@ -98,7 +100,7 @@ def test_fusion_handler_returns_artifact_in_method_result(tmp_path, monkeypatch)
     monkeypatch.setattr(
         "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
-    result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert result.success is True
     assert result.validated is True
@@ -124,7 +126,7 @@ def test_fusion_handler_fails_when_payload_not_succeeded(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
-    result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert result.success is False
     assert result.validated is False
@@ -141,7 +143,7 @@ def test_fusion_handler_fails_on_unknown_obligation(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
-    result = _handle_dual_provider_fusion_method(manifest, "o-inexistente")
+    result = _handle_dual_provider_fusion_method(manifest, "o-inexistente", config=core_config())
 
     # The contract: the same failed, unvalidated result without artifacts that
     # every handler returns for an unknown obligation.
@@ -164,7 +166,7 @@ def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
     )
     token = set_request_locale("en_US")
     try:
-        result = _handle_dual_provider_fusion_method(manifest, "o-fuse")
+        result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
     finally:
         reset_request_locale(token)
 
@@ -241,6 +243,7 @@ def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
     manifest.extractor.configuration["toolbox_provider"] = "docling"
     monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
     executor = PddlAccessibilityOrchestrator._build_executor()
+    executor.registry = bind_config(executor.registry, core_config())
 
     _, first_plan = PlannerAgent().plan(manifest, selected_roots=["o-fuse"])
     after_first, first_report = executor.execute(
@@ -283,7 +286,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     registry.register(
         "dual-provider-fusion", _handle_dual_provider_fusion_method
     )
-    updated, report = ExecutorAgent(registry).execute(plan, manifest)
+    updated, report = ExecutorAgent(bind_config(registry, core_config())).execute(plan, manifest)
 
     assert report.status == "completed"
     fused = next(item for item in updated.obligations if item.id == "o-fuse")
@@ -320,7 +323,7 @@ def test_dual_fusion_reuses_the_extractor_artifact_of_this_source(
     monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
     seen: dict[str, object] = {}
 
-    def fake_run(path, *, artifact_id=None):
+    def fake_run(path, *, artifact_id=None, **_):
         seen["artifact_id"] = artifact_id
         return {"status": "failed"}
 
@@ -328,6 +331,6 @@ def test_dual_fusion_reuses_the_extractor_artifact_of_this_source(
         "backend.core.pipeline.handlers.fusion._run_extract_fused", fake_run
     )
 
-    _handle_dual_provider_fusion_method(manifest, "o-fuse")
+    _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
     assert seen["artifact_id"] == reused

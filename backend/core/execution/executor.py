@@ -97,6 +97,10 @@ class MethodRegistry:
     def names(self) -> list[str]:
         return sorted(self._handlers)
 
+    def items(self) -> list[tuple[str, MethodHandler]]:
+        """Each method and its handler, in registration order."""
+        return list(self._handlers.items())
+
 
 @dataclass
 class _ExecutionState:

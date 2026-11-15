@@ -23,7 +23,7 @@ from backend.services.blocking import run_blocking
 from backend.services import job_checkpoint
 from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.config import CoreConfig, DocumentConfig
+from backend.core.config import CoreConfig, DocumentConfig, FusionConfig
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import (
     ExecutionResume,
@@ -86,7 +86,7 @@ from backend.core.pipeline.enrichment.formulas import (
     _classify_formula_regions,
     _enrich_formula_latex,
 )
-from backend.core.pipeline.handlers.registry import build_method_registry
+from backend.core.pipeline.handlers.registry import bind_config, build_method_registry
 
 
 class StructuralExtractionError(RuntimeError):
@@ -170,6 +170,16 @@ class PddlAccessibilityOrchestrator:
 
         return core_config_from_settings()
 
+    def _run_executor(self, config: CoreConfig) -> ExecutorAgent:
+        """The executor of one run: its handlers that take ``config`` get the run's.
+
+        Built from ``self.executor``'s registry, so a handler registered on it
+        (a test's, for example) runs as well; that registry is left unchanged.
+        """
+        return ExecutorAgent(
+            bind_config(self.executor.registry, config), domain=self.executor.domain
+        )
+
     @staticmethod
     def _build_executor() -> ExecutorAgent:
         return ExecutorAgent(build_method_registry(), domain=DomainBundle.load())
@@ -190,6 +200,7 @@ class PddlAccessibilityOrchestrator:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
         config = self._run_config()
+        executor = self._run_executor(config)
         source_path = file_path.resolve()
         # Inside a job this id names the checkpoints; a benchmark or the CLI
         # calls the orchestrator without one and keeps the old behaviour.
@@ -218,7 +229,9 @@ class PddlAccessibilityOrchestrator:
         else:
             if status_callback:
                 await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-            manifest = await self._extract_structure(source_path, presentation, config.document)
+            manifest = await self._extract_structure(
+                source_path, presentation, config.document, config.fusion
+            )
         _check_page_limit(manifest, config.document)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
         manifest.extractor.configuration.update(media_configuration)
@@ -302,6 +315,7 @@ class PddlAccessibilityOrchestrator:
             task_id,
             status_callback,
             loop,
+            executor=executor,
         )
         manifest, execution_report, plan, comparison = await self._replan_until_done(
             manifest,
@@ -315,6 +329,7 @@ class PddlAccessibilityOrchestrator:
             planning_manifest=planning_manifest,
             availability=availability,
             replans=replans,
+            executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
 
@@ -340,8 +355,10 @@ class PddlAccessibilityOrchestrator:
         task_id: str | None,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         loop: asyncio.AbstractEventLoop,
+        *,
+        executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
-        """Execute ``plan``, continuing from ``execution_state`` when it exists."""
+        """Execute ``plan`` with the run's ``executor``, continuing from ``execution_state`` when it exists."""
         resume = None
         if execution_state is not None:
             resume = ExecutionResume(
@@ -358,7 +375,7 @@ class PddlAccessibilityOrchestrator:
             else None
         )
         return await run_blocking(
-            self.executor.execute,
+            executor.execute,
             plan,
             planning_manifest,
             dry_run=self.execute_dry_run,
@@ -368,7 +385,11 @@ class PddlAccessibilityOrchestrator:
         )
 
     async def _extract_structure(
-        self, source_path: Path, presentation: bool, document: DocumentConfig
+        self,
+        source_path: Path,
+        presentation: bool,
+        document: DocumentConfig,
+        fusion: FusionConfig,
     ) -> ProcessingManifest:
         """The document's manifest from ``document.structure.extract``.
 
@@ -382,6 +403,7 @@ class PddlAccessibilityOrchestrator:
                 language="pt-BR",
                 presentation=presentation,
                 document=document,
+                fusion=fusion,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local
@@ -493,6 +515,7 @@ class PddlAccessibilityOrchestrator:
         planning_manifest: ProcessingManifest,
         availability: Any,
         replans: int,
+        executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
         """Plan and execute again while the report asks for it, up to ``max_replans``.
 
@@ -550,6 +573,7 @@ class PddlAccessibilityOrchestrator:
                 task_id,
                 status_callback,
                 loop,
+                executor=executor,
             )
         return manifest, execution_report, plan, comparison
 

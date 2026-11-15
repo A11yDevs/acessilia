@@ -18,6 +18,7 @@ from acessilia_sdk.toolbox import (
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
 from backend.config.settings import settings
+from backend.core.config import FusionConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
@@ -95,19 +96,24 @@ class ToolboxManifestExtractor:
             else settings.toolbox_use_remote_cache
         )
 
-    def extract(self, source_path: Path, *, dual_fusion: bool = True) -> ToolboxExtraction:
+    def extract(
+        self, source_path: Path, *, fusion: FusionConfig, dual_fusion: bool = True
+    ) -> ToolboxExtraction:
         """Extract a document's structure using the Toolbox (synchronous).
 
         Runs the asynchronous HTTP calls via asyncio.run() on a separate thread,
         compatible with the existing flow that calls extract() inside
-        asyncio.to_thread(). With ``dual_fusion=False`` the secondary provider
-        is not called even in FUSION_MODE=dual (a presentation).
+        asyncio.to_thread(). ``fusion`` is the run's ``FusionConfig`` (mode,
+        secondary provider, page routes). With ``dual_fusion=False`` the
+        secondary provider is not called even in dual mode (a presentation).
         """
         timeout = max(1, settings.toolbox_extraction_timeout_seconds)
         try:
             return asyncio.run(
                 asyncio.wait_for(
-                    self._extract_async(source_path, dual_fusion=dual_fusion),
+                    self._extract_async(
+                        source_path, fusion_config=fusion, dual_fusion=dual_fusion
+                    ),
                     timeout=timeout,
                 )
             )
@@ -141,7 +147,7 @@ class ToolboxManifestExtractor:
             operation_registry.finish(task_id, operation.operation_id)
 
     async def _extract_async(
-        self, source_path: Path, *, dual_fusion: bool = True
+        self, source_path: Path, *, fusion_config: FusionConfig, dual_fusion: bool = True
     ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient)
         artifacts = self._artifact_client
@@ -162,6 +168,7 @@ class ToolboxManifestExtractor:
             return await self._extract_with(
                 structure, artifacts, source_path,
                 use_artifact_store=use_artifact_store,
+                fusion_config=fusion_config,
                 dual_fusion=dual_fusion,
             )
         finally:
@@ -177,6 +184,7 @@ class ToolboxManifestExtractor:
         source_path: Path,
         *,
         use_artifact_store: bool,
+        fusion_config: FusionConfig,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
@@ -210,9 +218,9 @@ class ToolboxManifestExtractor:
         final_provider = structure.provider
         final_base_url = structure.base_url
         dual_enabled = (
-            settings.fusion_mode == "dual"
+            fusion_config.mode == "dual"
             and dual_fusion
-            and settings.fusion_secondary_provider != structure.provider
+            and fusion_config.secondary_provider != structure.provider
         )
         try:
             with self._remote_operation("primary"):
@@ -233,8 +241,8 @@ class ToolboxManifestExtractor:
                     provider=structure.provider, error=type(exc).__name__
                 )
             )
-        if settings.fusion_mode == "dual" and dual_fusion:
-            secondary_provider = settings.fusion_secondary_provider
+        if fusion_config.mode == "dual" and dual_fusion:
+            secondary_provider = fusion_config.secondary_provider
             if secondary_provider == structure.provider:
                 result = {**result, "fusion": {
                     "status": "skipped", "providers": [structure.provider],
@@ -325,7 +333,7 @@ class ToolboxManifestExtractor:
                             source_path, fusion, self.fusion_policy
                         )
                         replaced: dict[int, list[dict[str, Any]]] = {}
-                        if settings.fusion_apply_page_routes:
+                        if fusion_config.apply_page_routes:
                             result, replaced = apply_page_routes(
                                 result,
                                 secondary_result,

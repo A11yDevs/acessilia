@@ -13,8 +13,11 @@ method-handler pair.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
+from functools import partial
 
+from backend.core.config import CoreConfig
 from backend.core.execution.executor import MethodRegistry
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import ProcessingManifest
@@ -101,4 +104,30 @@ def build_method_registry() -> MethodRegistry:
     return registry
 
 
-__all__ = ["METHOD_HANDLERS", "build_method_registry"]
+def takes_config(handler: Callable[..., MethodResult]) -> bool:
+    """Whether ``handler`` declares a ``config`` parameter for the run's ``CoreConfig``."""
+    try:
+        return "config" in inspect.signature(handler).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def bind_config(registry: MethodRegistry, config: CoreConfig) -> MethodRegistry:
+    """The registry of one run (ADR-0016, step 3).
+
+    A handler that declares ``config`` gets the run's ``CoreConfig`` bound;
+    the others are registered as they are, so the executor keeps calling
+    every handler as ``handler(manifest, obligation_id)``. The copy keeps the
+    registration order, and the given registry is left unchanged.
+
+    The convention is the parameter's name: a handler opts in by declaring
+    ``*, config: CoreConfig`` (the handlers that read the run's
+    configuration do).
+    """
+    bound = MethodRegistry()
+    for method, handler in registry.items():
+        bound.register(method, partial(handler, config=config) if takes_config(handler) else handler)
+    return bound
+
+
+__all__ = ["METHOD_HANDLERS", "bind_config", "build_method_registry", "takes_config"]

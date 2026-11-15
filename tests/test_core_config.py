@@ -185,18 +185,42 @@ def test_the_builder_covers_every_setting_the_core_reads() -> None:
 
 #: The groups the core now receives from its caller: none of their settings
 #: may be read again. Each step-3 pull request adds the group it moves.
-MOVED_GROUPS = {"document", "export"}
+MOVED_GROUPS = {"document", "export", "fusion"}
+
+#: Reads of a moved group's setting that wait for another group's pull
+#: request, by file. The planning gate's requirement table reads the fusion
+#: secondary provider among the Toolbox providers; it moves whole with the
+#: toolbox group.
+PENDING_READS: dict[str, set[str]] = {
+    "backend/core/planning/toolbox_gate.py": {"fusion_secondary_provider"},
+}
 
 
 def test_the_moved_groups_are_not_read_from_settings() -> None:
-    keys, _ = _core_reads()
     moved = {
         setting
         for path, setting in FIELD_SETTINGS.items()
         if path.split(".", 1)[0] in MOVED_GROUPS
     }
+    found = {}
+    for path in sorted(CORE.rglob("*.py")):
+        rel = path.relative_to(ROOT).as_posix()
+        reads = (_scan(path)[0] & moved) - PENDING_READS.get(rel, set())
+        if reads:
+            found[rel] = sorted(reads)
 
-    assert not sorted(keys & moved), "backend/core reads moved settings again"
+    assert not found, f"backend/core reads moved settings again: {found}"
+
+
+def test_the_pending_reads_are_still_pending() -> None:
+    """An entry goes once its file stops reading the setting."""
+    stale = {
+        rel: sorted(keys - _scan(ROOT / rel)[0])
+        for rel, keys in PENDING_READS.items()
+        if keys - _scan(ROOT / rel)[0]
+    }
+
+    assert not stale, f"remove these PENDING_READS entries: {stale}"
 
 
 @pytest.mark.parametrize(
@@ -315,3 +339,235 @@ async def test_a_given_config_wins_over_the_settings(monkeypatch, tmp_path) -> N
 
     with pytest.raises(pipeline_preflight.DocumentTooLargeError):
         await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+
+
+def test_bind_config_gives_the_run_config_to_the_handlers_that_take_it() -> None:
+    from backend.core.execution.executor import MethodRegistry
+    from backend.core.pipeline.handlers.registry import bind_config
+
+    received = []
+
+    def with_config(manifest, obligation_id, *, config):
+        received.append(config)
+
+    def without_config(manifest, obligation_id):
+        received.append("plain")
+
+    registry = MethodRegistry()
+    registry.register("with", with_config)
+    registry.register("without", without_config)
+    first, second = core_config(), core_config(fusion={"secondary_provider": "x"})
+
+    bound = bind_config(registry, first)
+    bound.get("with")(None, "o")
+    bound.get("without")(None, "o")
+    bind_config(bound, second).get("with")(None, "o")
+
+    assert received == [first, "plain", second]
+    assert registry.get("with") is with_config, "the given registry is left unchanged"
+    assert [method for method, _ in bound.items()] == ["with", "without"]
+
+
+def test_bind_config_keeps_the_registration_order() -> None:
+    from backend.core.execution.executor import MethodRegistry
+    from backend.core.pipeline.handlers.registry import bind_config
+
+    registry = MethodRegistry()
+    for method in ("zeta", "alpha", "mu"):
+        registry.register(method, lambda manifest, obligation_id: None)
+
+    bound = bind_config(registry, core_config())
+
+    assert [method for method, _ in bound.items()] == ["zeta", "alpha", "mu"]
+
+
+@pytest.mark.asyncio
+async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
+    monkeypatch, tmp_path
+) -> None:
+    """Through ``execute``: the plan runs on the run's executor, not the unbound one."""
+    from backend.core.pipeline import orchestrator as pddl
+    from tests.pddl_support import build_element, build_manifest
+
+    class Stop(Exception):
+        pass
+
+    async def no_media(*_args, **_kwargs):
+        return None, {}
+
+    async def no_enrichment(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(pddl, "_inspect_media", no_media)
+    for name in (
+        "_classify_formula_regions",
+        "_enrich_picture_descriptions",
+        "_mark_inline_math",
+        "_enrich_formula_latex",
+        "_enrich_table_structures",
+        "_mark_table_inline_math",
+    ):
+        monkeypatch.setattr(pddl, name, no_enrichment)
+    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
+    received = []
+
+    async def run_plan(*_args, executor, **_kwargs):
+        received.append(executor)
+        raise Stop
+
+    orchestrator = build_orchestrator()
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
+    orchestrator.config = core_config(fusion={"secondary_provider": "from-the-run"})
+    monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
+
+    with pytest.raises(Stop):
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+
+    [executor] = received
+    handler = executor.registry.get("dual-provider-fusion")
+    assert executor is not orchestrator.executor
+    assert handler.keywords == {"config": orchestrator.config}
+
+
+def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
+    from backend.core.pipeline import orchestrator as pddl
+    from tests.pddl_support import build_element, build_manifest
+
+    async def no_media(*_args, **_kwargs):
+        return None, {}
+
+    async def no_enrichment(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(pddl, "_inspect_media", no_media)
+    for name in (
+        "_classify_formula_regions",
+        "_enrich_picture_descriptions",
+        "_mark_inline_math",
+        "_enrich_formula_latex",
+        "_enrich_table_structures",
+        "_mark_table_inline_math",
+    ):
+        monkeypatch.setattr(pddl, name, no_enrichment)
+    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_runs_each_get_their_own_config(monkeypatch, tmp_path) -> None:
+    """Two runs at once over one shared registry: each handler sees its own run's config."""
+    import asyncio
+
+    from backend.core.execution.models import MethodResult
+
+    def handler(manifest, obligation_id, *, config):
+        return MethodResult(success=True, validated=True, message=config.fusion.secondary_provider)
+
+    shared = build_orchestrator()
+    shared.executor.registry.register("dual-provider-fusion", handler)
+    seen: dict[str, list[str]] = {"a": [], "b": []}
+
+    class Stop(Exception):
+        pass
+
+    def orchestrator_for(name: str):
+        orchestrator = build_orchestrator()
+        orchestrator.executor = shared.executor  # one registry for both runs
+        orchestrator.config = core_config(fusion={"secondary_provider": f"provider-{name}"})
+        _stub_the_run_before_planning(monkeypatch, orchestrator)
+
+        async def run_plan(*_args, executor, **_kwargs):
+            for _ in range(3):
+                await asyncio.sleep(0)  # let the other run interleave
+                result = await asyncio.to_thread(
+                    executor.registry.get("dual-provider-fusion"), None, "o-fuse"
+                )
+                seen[name].append(result.message)
+            raise Stop
+
+        monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
+        return orchestrator
+
+    runs = [orchestrator_for(name).execute(tmp_path / "doc.pdf", tmp_path) for name in ("a", "b")]
+    results = await asyncio.gather(*runs, return_exceptions=True)
+
+    assert all(isinstance(result, Stop) for result in results)
+    assert seen == {"a": ["provider-a"] * 3, "b": ["provider-b"] * 3}
+    assert shared.executor.registry.get("dual-provider-fusion") is handler
+
+
+@pytest.mark.asyncio
+async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
+    """The new plan of a replan executes on the same bound executor as the first."""
+    import asyncio
+
+    from tests.pddl_support import build_element, build_manifest, build_obligation
+
+    orchestrator = build_orchestrator(max_replans=1)
+    obligation = build_obligation("describe-image", ["p-1"], ["human-review"])
+    obligation.selected = True  # open and selected: a new plan can still satisfy it
+    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [obligation])
+    run_executor = orchestrator._run_executor(core_config())
+    received = []
+
+    async def run_plan(*_args, executor, **_kwargs):
+        received.append(executor)
+        return manifest, SimpleNamespace(replan_required=False, status="completed")
+
+    async def no_save(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
+    monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: ("plan", None))
+    monkeypatch.setattr("backend.core.pipeline.orchestrator._save_plan", no_save)
+
+    await orchestrator._replan_until_done(
+        manifest,
+        SimpleNamespace(replan_required=True, status="replan-required"),
+        "first-plan",
+        None,
+        [],
+        None,
+        asyncio.get_running_loop(),
+        task_id=None,
+        planning_manifest=manifest,
+        availability=None,
+        replans=0,
+        executor=run_executor,
+    )
+
+    assert received == [run_executor]
+
+
+@pytest.mark.parametrize(
+    ("function", "parameter"),
+    [
+        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "fusion"),
+        (
+            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "document",
+        ),
+        (
+            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "fusion",
+        ),
+        ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
+    ],
+)
+def test_the_run_config_parameters_are_required(function, parameter) -> None:
+    """Required keywords, with no default a caller could fall back on.
+
+    Checked on the signature, so a missing argument is a ``TypeError`` at the
+    call without calling with too few arguments here.
+    """
+    import importlib
+    import inspect
+
+    module_name, qualname = function.split(":")
+    target = importlib.import_module(module_name)
+    for part in qualname.split("."):
+        target = getattr(target, part)
+    signature = inspect.signature(target).parameters[parameter]
+
+    assert signature.default is inspect.Parameter.empty
+    assert signature.kind is inspect.Parameter.KEYWORD_ONLY

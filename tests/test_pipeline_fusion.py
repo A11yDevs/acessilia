@@ -69,7 +69,7 @@ class TestExtractFused:
             "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        result = await extract_fused("arquivo.pdf")
+        result = await extract_fused("arquivo.pdf", secondary_provider="mineru")
         # retorno é exatamente o payload do secundário (sem fusão)
         assert result["document"]["elements"][0]["text"] == "só mineru"
 
@@ -85,7 +85,7 @@ class TestExtractFused:
         from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
         with pytest.raises(ToolboxProviderUnavailable):
-            await extract_fused("arquivo.pdf")
+            await extract_fused("arquivo.pdf", secondary_provider="mineru")
 
     @pytest.mark.asyncio
     async def test_unexpected_provider_error_is_not_hidden(self, monkeypatch):
@@ -98,7 +98,7 @@ class TestExtractFused:
         )
 
         with pytest.raises(FileNotFoundError, match="arquivo ausente"):
-            await extract_fused("arquivo.pdf")
+            await extract_fused("arquivo.pdf", secondary_provider="mineru")
 
     @pytest.mark.asyncio
     async def test_basic_fusion(self, monkeypatch):
@@ -119,7 +119,7 @@ class TestExtractFused:
             "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        result = await extract_fused("arquivo.pdf")
+        result = await extract_fused("arquivo.pdf", secondary_provider="mineru")
         assert result["status"] == "succeeded"
         assert "docling+mineru" in result["provider"]
         texts = [e["text"] for e in result["document"]["elements"]]
@@ -148,7 +148,7 @@ class TestExtractFused:
             "backend.core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        result = await extract_fused("arquivo.pdf")
+        result = await extract_fused("arquivo.pdf", secondary_provider="mineru")
         texts = [e["text"] for e in result["document"]["elements"]]
         assert texts.index("A") < texts.index("B")
 
@@ -166,7 +166,7 @@ class TestExtractFused:
         )
         monkeypatch.setattr("backend.core.pipeline.fusion.merge_blocks", fake_merge_blocks)
 
-        result = await extract_fused("arquivo.pdf")
+        result = await extract_fused("arquivo.pdf", secondary_provider="mineru")
 
         assert result["document"]["elements"][0]["text"].strip() == "observacao"
         assert (
@@ -198,7 +198,7 @@ class TestExtractFused:
         )
         monkeypatch.setattr("backend.core.pipeline.fusion.merge_blocks", fake_merge_blocks)
 
-        result = await extract_fused("arquivo.pdf")
+        result = await extract_fused("arquivo.pdf", secondary_provider="mineru")
 
         _, page_cut, _ = guard_page("\n\n".join(blocks), "observacao", "observacao")
         assert page_cut == 0
@@ -233,7 +233,7 @@ class TestExtractFused:
         )
         monkeypatch.setattr("backend.core.pipeline.fusion.merge_blocks", fake_merge_blocks)
 
-        result = await extract_fused("arquivo.pdf")
+        result = await extract_fused("arquivo.pdf", secondary_provider="mineru")
         pages = result["fusion_evidence"]["pages"]
 
         assert [page["page_number"] for page in pages] == [1, 2]
@@ -363,6 +363,6 @@ async def test_extract_fused_forwards_the_remote_cache_setting(
 
     monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
 
-    await extract_fused("arquivo.pdf", artifact_id=artifact_id)
+    await extract_fused("arquivo.pdf", artifact_id=artifact_id, secondary_provider="mineru")
 
     assert seen == [use_remote_cache, use_remote_cache]
