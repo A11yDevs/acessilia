@@ -6,7 +6,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.core.i18n import t
-from docstruct.geometry.boxes import is_bottom_left  # noqa: F401  (re-exported)
 from backend.core.i18n.log_messages import MSG_PLANNER_NOT_STARTED, MSG_TIMESTAMPS_MIXED_TIMEZONES
 from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
     MSG_CHAR_RANGE_REVERSED,
