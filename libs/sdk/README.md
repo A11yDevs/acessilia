@@ -240,6 +240,17 @@ invalid arguments, checked before any request (an endpoint URL the HTTP client
 cannot use, an unknown or `rest` capability for `run`, a malformed id, a
 missing input file, `--parameters` that is not a JSON object).
 
+## Generated result bindings
+
+`ArtifactReference` is currently the only generated result model. The
+[consumed-schema inventory](../../docs/sdk-result-bindings.md) maps all
+selected capability outputs to their SDK/core readers, distinguishes
+operational bindings from docstruct's canonical types and binary descriptors,
+and records the staged scope of #213, missing Toolbox contracts and the
+immutable-snapshot refresh workflow. Review that scope before adding schemas
+to `MODELS` and `SDK_MODEL_SCHEMAS`; a published schema alone does not select
+a capability or change a client's return type.
+
 ## Adding a capability
 
 1. Select it in `_CAPABILITIES` with `_selected(id, version, label,
