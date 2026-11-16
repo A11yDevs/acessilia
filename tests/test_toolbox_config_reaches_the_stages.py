@@ -9,6 +9,8 @@ settings. The run's config is a distinct object, so only identity passes.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -189,10 +191,10 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
     manifest = build_manifest([build_element("h", "heading", text="Title")], [])
     orchestrator = build_orchestrator(max_replans=1)
-    orchestrator.config = replace(core_config(), toolbox=RUN)
+    run_config = replace(core_config(), toolbox=RUN)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
 
-    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
 
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
                  "_enrich_formula_latex", "_enrich_table_structures"):

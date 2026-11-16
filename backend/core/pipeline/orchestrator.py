@@ -87,8 +87,7 @@ from backend.core.pipeline.enrichment.formulas import (
     _enrich_formula_latex,
 )
 from backend.core.pipeline.handlers.registry import bind_config, build_method_registry
-from backend.core.pipeline.model_calls import with_model_calls
-from backend.core.agents.model_calls import ModelCallRunner
+from backend.core.agents.model_calls import ModelCallRunner, model_call_scope
 
 
 class StructuralExtractionError(RuntimeError):
@@ -112,9 +111,6 @@ class PddlAccessibilityOrchestrator:
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
             Defaults to "toolbox".
         max_replans (int): How many times a run plans again when the executor reports `replan-required`; negative values count as 0; defaults to 2.
-        config (CoreConfig | None): The run's configuration (ADR-0016, step 3).
-            When None, the bridge builds one from ``settings`` at the start of
-            each run; defaults to None.
     """
 
     def __init__(
@@ -129,11 +125,7 @@ class PddlAccessibilityOrchestrator:
         enable_ocr: bool = True,
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
-        config: CoreConfig | None = None,
-        model_calls: ModelCallRunner | None = None,
     ) -> None:
-        self.config = config
-        self.model_calls = model_calls
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
@@ -161,19 +153,6 @@ class PddlAccessibilityOrchestrator:
         self.planner = PlannerAgent()
         self.executor = self._build_executor()
 
-    def _run_config(self) -> CoreConfig:
-        """The configuration of one run: the one given, or one built from ``settings`` now.
-
-        The bridge of ADR-0016's step 3: every stage takes its group, but a
-        caller that passes no config still gets the settings of the run's
-        start. The last step-3 pull request makes the config required.
-        """
-        if self.config is not None:
-            return self.config
-        from backend.config.core_config import core_config_from_settings
-
-        return core_config_from_settings()
-
     def _run_executor(self, config: CoreConfig) -> ExecutorAgent:
         """The executor of one run: its handlers that take ``config`` get the run's.
 
@@ -188,7 +167,6 @@ class PddlAccessibilityOrchestrator:
     def _build_executor() -> ExecutorAgent:
         return ExecutorAgent(build_method_registry(), domain=DomainBundle.load())
 
-    @with_model_calls
     async def execute(
         self,
         file_path: Path,
@@ -198,13 +176,45 @@ class PddlAccessibilityOrchestrator:
         structured_output: bool = False,
         custom_prompt: str | None = None,
         thinking_mode: bool = False,
+        *,
+        config: CoreConfig,
+        model_calls: ModelCallRunner,
+    ) -> str | dict[str, Any]:
+        """Run the pipeline on one document with the run's ``config`` and ``model_calls``.
+
+        Both are required (ADR-0016 step 3, ADR-0021): nothing in a run falls
+        back to the settings or the service's executor, and one orchestrator
+        serves runs with different configurations.
+        """
+        with model_call_scope(model_calls):
+            return await self._execute(
+                file_path,
+                tmpdir,
+                status_callback,
+                mode,
+                structured_output,
+                custom_prompt,
+                thinking_mode,
+                config=config,
+            )
+
+    async def _execute(
+        self,
+        file_path: Path,
+        tmpdir: Path,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        mode: str | None,
+        structured_output: bool,
+        custom_prompt: str | None,
+        thinking_mode: bool,
+        *,
+        config: CoreConfig,
     ) -> str | dict[str, Any]:
         effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
-        config = self._run_config()
         executor = self._run_executor(config)
         source_path = file_path.resolve()
         # Inside a job this id names the checkpoints; a benchmark or the CLI

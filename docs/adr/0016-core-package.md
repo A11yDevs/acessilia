@@ -241,13 +241,18 @@ Proposed: option 2.
      the stages and the inspection handlers. The `paths` group closes the
      groups: the extractor's fusion evidence and the fusion and inspection
      handlers' artifacts are written under the run's `PathsConfig.data_dir`, so
-     the core reads no setting of a run; only the process setup (the logger and
-     the catalogs) is left for the last step-3 pull request. The method
-     handlers that read the config declare a `config` parameter (the
-     dual-provider and single-provider fusion handlers, the region and page
-     inspection handlers, the `mathml` and `latex-verbalizer` formula handlers,
-     and the VLM judge's), and each run binds its config to them
-     (`bind_config`) on a copy of the registry.
+     the core reads no setting of a run; and the configuration groups are done.
+     A run then requires its config and its model-call runner (`execute(...,
+     config=, model_calls=)`), the service builds one config per job and the
+     worker's exports and audit reuse it, and the Agno tools without a run take
+     the config their agent was built with: the bridges are gone. Left for step
+     3: the processing cache key and the fusion reuse built from the run's
+     config (#544), and the process setup (the logger and the catalogs) passed
+     at process start. The method handlers that read the config declare a
+     `config` parameter (the dual-provider and single-provider fusion handlers,
+     the region and page inspection handlers, the `mathml` and
+     `latex-verbalizer` formula handlers, and the VLM judge's), and each run
+     binds its config to them (`bind_config`) on a copy of the registry.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:

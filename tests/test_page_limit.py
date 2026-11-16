@@ -9,6 +9,8 @@ limit; nothing is planned or described.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,9 +37,8 @@ def _limit(max_pages: int):
     return core_config(document={"max_pages": max_pages})
 
 
-def _orchestrator_with_pages(count: int, max_pages: int):
+def _orchestrator_with_pages(count: int):
     orchestrator = build_orchestrator()
-    orchestrator.config = _limit(max_pages)
     manifest = SimpleNamespace(pages=[object()] * count)
     orchestrator.information_structural = SimpleNamespace(
         process=lambda *args, **kwargs: manifest
@@ -65,13 +66,13 @@ def _record_steps(monkeypatch) -> list[str]:
 @pytest.mark.asyncio
 async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatch, tmp_path):
     calls = _record_steps(monkeypatch)
-    orchestrator = _orchestrator_with_pages(3, max_pages=2)
+    orchestrator = _orchestrator_with_pages(3)
 
     # Pinned, so the expected English message holds on a pt_BR machine too.
     token = i18n.set_request_locale("en_US")
     try:
         with pytest.raises(pipeline_preflight.DocumentTooLargeError) as info:
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=_limit(2), model_calls=current_model_calls())
     finally:
         i18n.reset_request_locale(token)
 
@@ -105,12 +106,12 @@ def test_a_non_positive_max_pages_is_refused_at_startup(monkeypatch, value):
 @pytest.mark.asyncio
 async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path):
     _record_steps(monkeypatch)
-    orchestrator = _orchestrator_with_pages(120, max_pages=50)
+    orchestrator = _orchestrator_with_pages(120)
 
     token = i18n.set_request_locale("pt_BR")
     try:
         with pytest.raises(pipeline_preflight.DocumentTooLargeError) as info:
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=_limit(50), model_calls=current_model_calls())
     finally:
         i18n.reset_request_locale(token)
 
@@ -125,11 +126,11 @@ async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(
         return {"is_pdf": True, "page_count": 3, "page_count_source": "pymupdf"}
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     orchestrator = build_orchestrator()
-    orchestrator.config = _limit(2)
+    run_config = _limit(2)
     process = Mock(side_effect=AssertionError("expensive extraction was called"))
     orchestrator.information_structural = SimpleNamespace(process=process)
     with pytest.raises(pipeline_preflight.DocumentTooLargeError):
-        await orchestrator.execute(tmp_path / "large.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "large.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
     process.assert_not_called()
 
 

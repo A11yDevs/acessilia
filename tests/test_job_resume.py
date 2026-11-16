@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import asyncio
 import threading
 from pathlib import Path
@@ -24,7 +26,7 @@ from backend.services import job_checkpoint
 from backend.services.operation_context import task_context
 from backend.services.operation_registry import OperationRegistry
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
-from tests.core_config_support import model_config, toolbox_config, vision_config
+from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
 
 
 @pytest.fixture
@@ -208,7 +210,7 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
 
     with task_context("resume-task"):
         with pytest.raises(RuntimeError, match="died during enrichment"):
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True)
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
 
         assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_MEDIA) is not None
         assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_MANIFEST) is not None
@@ -216,7 +218,8 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
 
         crash["armed"] = False
         result = await orchestrator.execute(
-            tmp_path / "doc.pdf", tmp_path, structured_output=True
+            tmp_path / "doc.pdf", tmp_path, structured_output=True,
+            config=core_config(), model_calls=current_model_calls(),
         )
 
     assert counts == {"inspect": 1, "extract": 1, "enrich": 7}
@@ -253,7 +256,7 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
     )
     orchestrator.information_structural = SimpleNamespace(process=lambda *_a, **_k: manifest)
 
-    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True)
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
 
     assert counts == {"inspect": 1}
     assert not (data_dir / "jobs").exists()
@@ -558,13 +561,15 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         monkeypatch.setattr(job_checkpoint, "save", crash_after_the_first_obligation)
         with pytest.raises(Crash):
             await orchestrator.execute(
-                tmp_path / "doc.pdf", tmp_path, structured_output=True
+                tmp_path / "doc.pdf", tmp_path, structured_output=True,
+                config=core_config(), model_calls=current_model_calls(),
             )
         assert len(handler_calls) == 1
 
         monkeypatch.setattr(job_checkpoint, "save", real_save)
         result = await orchestrator.execute(
-            tmp_path / "doc.pdf", tmp_path, structured_output=True
+            tmp_path / "doc.pdf", tmp_path, structured_output=True,
+            config=core_config(), model_calls=current_model_calls(),
         )
 
     assert len(handler_calls) == 2
@@ -650,7 +655,7 @@ async def test_a_graceful_shutdown_keeps_the_operation_journal(
         await asyncio.Future()
 
     monkeypatch.setattr(service.agente, "execute", blocked)
-    run = asyncio.create_task(service.process(path, task_id="journal-task"))
+    run = asyncio.create_task(service.process(path, task_id="journal-task", config=core_config()))
     try:
         await asyncio.wait_for(started.wait(), 5)
         shutdown.begin_shutdown()

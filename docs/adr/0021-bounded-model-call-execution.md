@@ -43,9 +43,10 @@ closures can therefore retain images, agents and clients.
 - Localized logs and snapshots expose active reservations, pending/abandoned
   calls, rejections, expirations, queue wait and execution duration (#385).
 
-The legacy orchestrator obtains the service owner when none is supplied, like
-its CoreConfig bridge, until ADR-0016 completes. Standalone callers can pass and
-close their own runner. AgentOS chat agents and provider scheduling (#547) remain
+The orchestrator required no runner at first and obtained the service owner
+when none was supplied, like its CoreConfig bridge. ADR-0016's step 3 removed
+both: `execute(..., config=, model_calls=)` requires the run's runner.
+Standalone callers can pass and close their own runner. AgentOS chat agents and provider scheduling (#547) remain
 outside this execution path. See the [architecture](../architecture.md).
 
 ## Consequences and verification

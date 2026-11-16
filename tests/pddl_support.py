@@ -125,7 +125,6 @@ def build_orchestrator(*, max_replans: int = 0) -> PddlAccessibilityOrchestrator
     executor = PddlAccessibilityOrchestrator._build_executor()
     executor.registry = bind_config(executor.registry, core_config())
     orchestrator.executor = executor
-    orchestrator.config = None  # the run builds it from settings (ADR-0016, step 3)
     orchestrator.planner_backend = "internal"
     orchestrator.preferred_plan = "internal"
     orchestrator.fast_downward = None

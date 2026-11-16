@@ -7,6 +7,8 @@ out of the plan and fails closed without a catalogue.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 from collections import OrderedDict
 
 import json
@@ -255,13 +257,13 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
         monkeypatch.setattr(pddl, name, no_step)
     monkeypatch.setattr(toolbox_gate, "decide", decide)
     orchestrator = _orchestrator()
-    orchestrator.config = _config(gate="enforce")
+    run_config = _config(gate="enforce")
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: _fuse_manifest())
 
     with pytest.raises(Stop):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
 
-    assert received == [orchestrator.config]
+    assert received == [run_config]
 
 
 def test_a_checkpoint_without_the_mode_gets_the_mode_of_the_run() -> None:

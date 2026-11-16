@@ -9,7 +9,7 @@ from docstruct.profiles import verbosity_for_mode
 from docstruct.text.paragraphs import merge_broken_paragraphs
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.config.core_config import core_config_from_settings
+from backend.core.config import CoreConfig
 from backend.config.settings import settings
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
@@ -44,7 +44,6 @@ from backend.core.i18n.stage_messages import (
     STAGE_PROCESSING_WITH_AI,
 )
 from backend.services.operation_context import task_context
-from backend.core.agents.model_calls import model_call_scope
 from backend.services.model_calls import get_model_calls
 from backend.services.operation_registry import operation_registry
 from backend.services import shutdown
@@ -159,8 +158,14 @@ async def process(
     task_id: str | None = None,
     display_filename: str | None = None,
     resumed: bool = False,
+    *,
+    config: CoreConfig,
 ) -> dict[str, Any]:
     """Process one document and return its canonical document.
+
+    ``config`` is the job's ``CoreConfig``, built once by the caller at the
+    job's start (ADR-0016, step 3): the pipeline, the canonical build and,
+    in the worker, the exports and the audit read the same values.
 
     ``display_filename`` is the name the user uploaded. The API stores the
     upload under a random name (``<uuid>.pdf``), so without it a document
@@ -224,7 +229,7 @@ async def process(
             canonical_metadata, technical_warnings = _canonical_details(cached)
             canonical_document = build_canonical_document(
                 cached,
-                toolbox=core_config_from_settings().toolbox,
+                toolbox=config.toolbox,
                 title=Path(shown_name).stem,
                 language="pt-BR",
                 verbosity=verbosity_for_mode(mode),
@@ -269,7 +274,7 @@ async def process(
             )
         state_manager.verificar_cancelamento(task_id)
 
-        with task_context(task_id), model_call_scope(get_model_calls()):
+        with task_context(task_id):
             try:
                 resultado = await agente.execute(
                     file_path,
@@ -279,6 +284,8 @@ async def process(
                     structured_output=True,
                     custom_prompt=custom_prompt,
                     thinking_mode=thinking_mode,
+                    config=config,
+                    model_calls=get_model_calls(),
                 )
             except Exception:
                 # A cancellation that arrives while the extraction thread is
@@ -318,7 +325,7 @@ async def process(
 
         canonical_document = build_canonical_document(
             processed_result,
-            toolbox=core_config_from_settings().toolbox,
+            toolbox=config.toolbox,
             title=Path(shown_name).stem,
             language="pt-BR",
             verbosity=verbosity_for_mode(mode),

@@ -5,6 +5,7 @@ Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
 """
 
 import hashlib
+from backend.core.agents.model_calls import current_model_calls
 from backend.core.pipeline import payload as pipeline_payload
 import json
 from pathlib import Path
@@ -346,6 +347,7 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", no_media)
     result = await orchestrator.execute(
         Path(manifest.source.path), tmp_path, mode="baixo", structured_output=True,
+        config=core_config(), model_calls=current_model_calls(),
     )
     assert result["canonical_metadata"]["pddl_execution_status"] == "completed"
     assert "A map" in result["text"]

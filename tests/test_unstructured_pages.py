@@ -9,6 +9,8 @@ accepted and left out of the document, and any failure fails the method.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import base64
 from backend.core.pipeline import payload as pipeline_payload
 import hashlib
@@ -547,7 +549,7 @@ def _run(monkeypatch, tmp_path, manifest, *, max_replans=0):
     import asyncio
 
     return asyncio.run(
-        orchestrator.execute(Path(manifest.source.path), tmp_path, structured_output=True)
+        orchestrator.execute(Path(manifest.source.path), tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
     )
 
 

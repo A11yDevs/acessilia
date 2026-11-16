@@ -7,6 +7,8 @@ its own observations and obligations.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -237,12 +239,12 @@ async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monk
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
     orchestrator = build_orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=process)
-    orchestrator.config = core_config(document={"legacy_unicode_repair": "repair"})
+    run_config = core_config(document={"legacy_unicode_repair": "repair"})
 
     with pytest.raises(Stop):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
 
-    assert received == [(orchestrator.config.document, orchestrator.config.fusion)]
+    assert received == [(run_config.document, run_config.fusion)]
 
 
 def test_process_passes_the_run_fusion_config_to_the_extractor_and_the_builder(

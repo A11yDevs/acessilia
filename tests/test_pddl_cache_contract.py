@@ -9,7 +9,7 @@ import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from backend.core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import model_config, toolbox_config, vision_config
+from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
 
 isolated_runtime = runtime_fixture
 
@@ -68,7 +68,7 @@ async def test_live_processing_rejects_incompatible_cached_execution(
     monkeypatch.setattr(service, "set_cache", forbidden)
     monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
     with pytest.raises(RuntimeError, match="Live validation"):
-        await service.process(source, task_id="live-from-cache")
+        await service.process(source, task_id="live-from-cache", config=core_config())
     assert calls == [True]
 
 
@@ -96,7 +96,7 @@ async def test_degraded_processing_is_not_cached(
     monkeypatch.setattr(service, "get_cached", no_cache)
     monkeypatch.setattr(service, "set_cache", record)
     monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
-    await service.process(source, task_id=f"degraded-{cacheable}")
+    await service.process(source, task_id=f"degraded-{cacheable}", config=core_config())
     assert cached == ([True] if cacheable else [])
 
 
@@ -129,7 +129,7 @@ async def test_cached_entry_with_failed_media_inspection_is_ignored(
     monkeypatch.setattr(service, "get_cached", degraded_cache)
     monkeypatch.setattr(service, "set_cache", record)
     monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
-    await service.process(source, task_id="degraded-from-cache")
+    await service.process(source, task_id="degraded-from-cache", config=core_config())
     assert calls == [True]
 
 
@@ -300,7 +300,7 @@ async def test_cached_degraded_entry_is_ignored(
     monkeypatch.setattr(service, "set_cache", record)
     monkeypatch.setattr(service, "drop_cache", drop)
     monkeypatch.setattr(service, "agente", SimpleNamespace(execute=execute))
-    await service.process(source, task_id=f"visual-failures-from-cache-{rerun_cacheable}")
+    await service.process(source, task_id=f"visual-failures-from-cache-{rerun_cacheable}", config=core_config())
     assert calls == [True]
     assert cached == ([True] if rerun_cacheable else [])
     assert dropped == ([] if rerun_cacheable else [True])

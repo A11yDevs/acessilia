@@ -4,6 +4,7 @@ import pytest
 
 import asyncio
 from pathlib import Path
+from tests.core_config_support import core_config
 
 
 def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
@@ -71,8 +72,8 @@ def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_pa
     )
 
     async def process_both():
-        first_result = await service.process(first, task_id="first-task")
-        second_result = await service.process(second, task_id="second-task")
+        first_result = await service.process(first, task_id="first-task", config=core_config())
+        second_result = await service.process(second, task_id="second-task", config=core_config())
         return first_result, second_result
 
     first_result, second_result = asyncio.run(process_both())

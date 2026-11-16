@@ -43,9 +43,10 @@ Closures canceladas podem, assim, reter imagens, agentes e clientes.
 - Logs localizados e snapshots expõem reservas ativas, chamadas pendentes ou
   abandonadas, rejeições, expirações, espera em fila e duração de execução (#385).
 
-O orquestrador legado obtém o executor do serviço quando nenhum é fornecido,
-como sua ponte de CoreConfig, até a conclusão da ADR-0016. Chamadores
-independentes podem passar e fechar seu runner. Os agentes do chat AgentOS e o
+No começo, o orquestrador não exigia um runner e obtinha o executor do serviço
+quando nenhum era fornecido, como sua ponte de CoreConfig. O passo 3 da
+ADR-0016 removeu as duas: `execute(..., config=, model_calls=)` exige o runner
+da execução. Chamadores independentes podem passar e fechar seu runner. Os agentes do chat AgentOS e o
 escalonamento de providers (#547) ficam fora desse caminho. Veja a
 [arquitetura](../architecture.pt-br.md).
 

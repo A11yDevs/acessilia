@@ -10,13 +10,14 @@ No field has a default: a value the core uses comes from the caller, so the
 service's settings stay the one place where defaults live. Tests build a
 config from those settings and replace the fields they exercise.
 
-Step 3 moved the stages group by group, and every group is now moved: no
-stage reads ``settings``. Until the last step-3 pull request, the orchestrator
-still builds a config from ``settings`` at the start of each run when none is
-given (the bridge), and so do the Agno tools that have no run. The logger's and
-the catalogs' settings (``LOG_LEVEL``, ``LOGS_DIR``, ``I18N_LOCALES_ACTIVE``) are
-process setup, not part of a run; the last step-3 pull request decides how
-they reach the core.
+Step 3 moved the stages group by group. A run requires its config and its
+model-call runner (``PddlAccessibilityOrchestrator.execute(..., config=,
+model_calls=)``), the service builds
+one per job, and an Agno tool without a run takes the config its agent was
+built with: nothing in a run falls back to ``settings``. The logger's and the
+catalogs' settings (``LOG_LEVEL``, ``LOGS_DIR``, ``I18N_LOCALES_ACTIVE``) are
+process setup, not part of a run; a later step-3 pull request passes them at
+process start.
 """
 
 from __future__ import annotations

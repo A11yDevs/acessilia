@@ -605,7 +605,8 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
     from backend.core.export.exporters.txt_exporter import export_txt
     from backend.service import process
 
-    canonical = await process(pdf)
+    config = core_config_from_settings()
+    canonical = await process(pdf, config=config)
     out.mkdir(parents=True, exist_ok=True)
     canonical_path = out / "canonical.json"
     canonical_path.write_text(json.dumps(canonical, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -614,7 +615,6 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
     pdf_ua_path = None
     if pdf_ua:
         pdf_ua_path = out / f"{pdf.stem}.pdf_ua.pdf"
-        config = core_config_from_settings()
         export_pdf_ua(
             canonical, pdf_ua_path, pdf.name, export=config.export, toolbox=config.toolbox
         )

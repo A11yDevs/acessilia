@@ -1,5 +1,6 @@
 """Long upload names must survive export, ZIP packaging and download."""
 
+import copy
 import io
 import zipfile
 from unittest.mock import AsyncMock
@@ -35,13 +36,30 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
     monkeypatch.setattr(jobs, "unified_queue", queue)
     executor = worker.JobExecutor()
     monkeypatch.setattr(jobs, "job_executor", executor)
-    monkeypatch.setattr(service, "process", AsyncMock(return_value={"title": "Audit"}))
+    job_configs = []
+
+    async def process(*_args, config, **_kwargs):
+        # The settings change while the job runs; the exports must still use
+        # the job's config, built at its start (ADR-0016 step 3).
+        job_configs.append(config)
+        monkeypatch.setattr(settings, "toolbox_docx_enabled", False)
+        monkeypatch.setattr(settings, "toolbox_api_key", "changed-mid-job")
+        # The worker's view of the settings moves DATA_DIR (the job store
+        # and the download tokens keep theirs, as they are not the job's).
+        changed = copy.copy(settings)
+        changed.data_dir = tmp_path / "changed-mid-job"
+        monkeypatch.setattr(worker, "settings", changed)
+        return {"title": "Audit"}
+
+    monkeypatch.setattr(service, "process", process)
     monkeypatch.setattr(worker, "registrar_conversao", AsyncMock())
     monkeypatch.setattr(worker, "finalizar_conversao", AsyncMock())
 
     toolboxes = []
+    exported = []
 
     def export(document, path, *args, **kwargs):
+        exported.append(path)
         if "toolbox" in kwargs:
             toolboxes.append(kwargs["toolbox"])
         path.write_bytes(b"audit output")
@@ -91,7 +109,14 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
             [(_, audit_kwargs)] = [(c.args, c.kwargs) for c in audit.call_args_list]
             assert len(toolboxes) == 2
             assert all(toolbox is audit_kwargs["toolbox"] for toolbox in toolboxes)
-            assert audit_kwargs["toolbox"] == core_config_from_settings().toolbox
+            [job_config] = job_configs
+            assert audit_kwargs["toolbox"] is job_config.toolbox
+            assert core_config_from_settings().toolbox.api_key == "changed-mid-job"
+            # The outputs go under the job's data_dir, not the one set mid-job.
+            assert exported and all(
+                job_config.paths.data_dir in path.parents for path in exported
+            )
+            assert not (tmp_path / "changed-mid-job" / "output").exists()
     finally:
         executor._executor.shutdown(wait=True)
         if download_token_service._connection is not None:
