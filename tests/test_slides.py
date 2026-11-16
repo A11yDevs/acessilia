@@ -6,12 +6,14 @@ assertions hold under any supported server locale.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import copy
 from datetime import UTC, datetime
 
 import pytest
 
-from tests.core_config_support import fusion_config, model_config, paths_config, toolbox_config, vision_config
+from tests.core_config_support import core_config, fusion_config, model_config, paths_config, toolbox_config, vision_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.slides import is_slide_heading
@@ -414,7 +416,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
 
-    payload = await orchestrator.execute(source, tmp_path, structured_output=True)
+    payload = await orchestrator.execute(source, tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
 
     assert calls == ["media.inspect", ("extract", True)]
     assert payload["canonical_metadata"]["pddl_media_inspection"] == {

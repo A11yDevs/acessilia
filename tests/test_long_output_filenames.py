@@ -35,7 +35,17 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
     monkeypatch.setattr(jobs, "unified_queue", queue)
     executor = worker.JobExecutor()
     monkeypatch.setattr(jobs, "job_executor", executor)
-    monkeypatch.setattr(service, "process", AsyncMock(return_value={"title": "Audit"}))
+    job_configs = []
+
+    async def process(*_args, config, **_kwargs):
+        # The settings change while the job runs; the exports must still use
+        # the job's config, built at its start (ADR-0016 step 3).
+        job_configs.append(config)
+        monkeypatch.setattr(settings, "toolbox_docx_enabled", False)
+        monkeypatch.setattr(settings, "toolbox_api_key", "changed-mid-job")
+        return {"title": "Audit"}
+
+    monkeypatch.setattr(service, "process", process)
     monkeypatch.setattr(worker, "registrar_conversao", AsyncMock())
     monkeypatch.setattr(worker, "finalizar_conversao", AsyncMock())
 
@@ -91,7 +101,9 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
             [(_, audit_kwargs)] = [(c.args, c.kwargs) for c in audit.call_args_list]
             assert len(toolboxes) == 2
             assert all(toolbox is audit_kwargs["toolbox"] for toolbox in toolboxes)
-            assert audit_kwargs["toolbox"] == core_config_from_settings().toolbox
+            [job_config] = job_configs
+            assert audit_kwargs["toolbox"] is job_config.toolbox
+            assert core_config_from_settings().toolbox.api_key == "changed-mid-job"
     finally:
         executor._executor.shutdown(wait=True)
         if download_token_service._connection is not None:

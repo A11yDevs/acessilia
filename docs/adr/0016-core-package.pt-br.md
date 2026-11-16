@@ -246,13 +246,19 @@ Proposta: a opção 2.
      inspeção. O grupo `paths` fecha os grupos: a evidência de fusão do
      extrator e os artefatos dos handlers de fusão e de inspeção são gravados
      no `PathsConfig.data_dir` da execução, então o core não lê nenhuma
-     configuração de uma execução; só a preparação do processo (o logger e os
-     catálogos) fica para o último pull request do passo 3. Os handlers de
-     método que leem a config declaram um parâmetro `config` (os handlers de
-     fusão de dois providers e de provider único, os de inspeção de região e de
-     página, os de fórmula, `mathml` e `latex-verbalizer`, e o do juiz VLM), e
-     cada execução vincula a sua config a eles (`bind_config`) numa cópia do
-     registro.
+     configuração de uma execução; e os grupos de configuração estão feitos.
+     Depois, uma execução exige a sua config e o seu runner de chamadas de
+     modelo (`execute(..., config=, model_calls=)`), o serviço monta uma config
+     por job e as exportações e a auditoria do worker a reutilizam, e as
+     ferramentas Agno sem execução recebem a config com que o agente foi
+     construído: as pontes saíram. Falta no passo 3: a chave do cache de
+     processamento e o reaproveitamento da fusão montados a partir da config da
+     execução (#544), e a preparação do processo (o logger e os catálogos)
+     passada no início do processo. Os handlers de método que leem a config
+     declaram um parâmetro `config` (os handlers de fusão de dois providers e
+     de provider único, os de inspeção de região e de página, os de fórmula,
+     `mathml` e `latex-verbalizer`, e o do juiz VLM), e cada execução vincula a
+     sua config a eles (`bind_config`) numa cópia do registro.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:

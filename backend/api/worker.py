@@ -408,6 +408,10 @@ class JobExecutor:
 
             from backend.service import process
 
+            # One CoreConfig for the whole job, built at its start (ADR-0016,
+            # step 3): the pipeline, the exports and the audit read the same
+            # values, even if the settings change while the job runs.
+            job_config = core_config_from_settings()
             canonical = await process(
                 job.file_path,
                 status_callback=status_callback,
@@ -417,6 +421,7 @@ class JobExecutor:
                 task_id=task_id,
                 display_filename=job.filename,
                 resumed=resumed,
+                config=job_config,
             )
             state_manager.verificar_cancelamento(task_id)
 
@@ -435,10 +440,8 @@ class JobExecutor:
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []
             optional_errors: list[str] = []
-            # One snapshot of the export and Toolbox settings for the whole
-            # job: the skip decisions below, the exporters and the audit read
-            # the same values.
-            job_config = core_config_from_settings()
+            # The job's config: the skip decisions below, the exporters and
+            # the audit read the values the pipeline ran with.
             export, toolbox = job_config.export, job_config.toolbox
 
             state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_TXT), progresso=0.85)

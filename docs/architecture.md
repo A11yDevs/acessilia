@@ -44,11 +44,12 @@ the deadline bounds one model call, not the whole table or document.
 **Shared model execution (#276, step 2).** VisionAgent and DataAgent receive the
 core's `ModelCallRunner` port by composition. The application owns its
 implementation, `backend.services.model_calls.ModelCallExecutor`, independently
-of event loops. The service supplies one runner through `model_call_scope` for
-each document; callers can also pass `model_calls` to an agent or the PDDL
-orchestrator. The orchestrator's legacy bridge obtains the service's process
-owner when no dependency/scope is supplied, like its transitional CoreConfig
-bridge (ADR-0016). Agents read no execution-capacity settings. AgentOS's separate
+of event loops. Each run receives its runner explicitly:
+`PddlAccessibilityOrchestrator.execute(..., config=, model_calls=)` requires
+both the run's `CoreConfig` and the runner, and opens the runner's
+`model_call_scope` for the agents it builds (ADR-0016, step 3). Nothing falls
+back to the service's process owner or settings. Agents read no
+execution-capacity settings. AgentOS's separate
 Agno chat agents are outside this execution path.
 
 `MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and

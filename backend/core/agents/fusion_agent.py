@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.agents.agno_support import build_agent
-from backend.core.config import ToolboxConfig
+from backend.core.config import CoreConfig, ToolboxConfig
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.line_numbers import extract_line_numbers
 from docstruct.fusion.repetition import collapse as collapse, guard_page
@@ -63,7 +63,12 @@ class FusionAgent:
         self,
         *,
         model: Any | None = None,
+        config: CoreConfig | None = None,
     ) -> None:
+        """``config`` is the ``CoreConfig`` the ``fuse_providers`` tool runs
+        with; the handlers use the deterministic ``process_*`` methods, which
+        need none."""
+        self.config = config
         self.agent = build_agent(
             name="Agente de Fusão",
             instructions=(
@@ -272,12 +277,11 @@ class FusionAgent:
         Returns:
             dict: Payload fundido com ``document.elements`` e ``fusion_stats``.
         """
-        # The Agno tool has no run to take a config from: the bridge of
-        # ADR-0016's step 3 reads it from the settings until the last step-3
-        # pull request gives the agent its configuration.
-        from backend.config.core_config import core_config_from_settings
-
-        config = core_config_from_settings()
+        if self.config is None:
+            raise RuntimeError(
+                "the fuse_providers tool needs the agent built with config= (ADR-0016, step 3)"
+            )
+        config = self.config
         return self.process_fuse_providers(
             Path(document_path),
             language=language,

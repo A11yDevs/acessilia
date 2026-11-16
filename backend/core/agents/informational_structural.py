@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.agents.agno_support import build_agent
-from backend.core.config import DocumentConfig, FusionConfig, PathsConfig, ToolboxConfig
+from backend.core.config import CoreConfig, DocumentConfig, FusionConfig, PathsConfig, ToolboxConfig
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -18,8 +18,12 @@ class InformationalStructuralAgent:
         extractor: Any | None = None,
         *,
         model: Any | None = None,
+        config: CoreConfig | None = None,
     ) -> None:
+        """``config`` is the ``CoreConfig`` the Agno tool runs with; the
+        pipeline calls :meth:`process` with its run's groups instead."""
         self.extractor = extractor or ToolboxManifestExtractor()
+        self.config = config
         self.agent = build_agent(
             name="Agente Informacional-Estrutural",
             instructions=(
@@ -38,12 +42,7 @@ class InformationalStructuralAgent:
         language: str = "pt-BR",
     ) -> dict:
         """Extrai um documento e retorna seu manifesto de processamento."""
-        # The Agno tool has no run to take a config from: the bridge of
-        # ADR-0016's step 3 builds one from the settings until the last
-        # step-3 pull request gives the agent its configuration.
-        from backend.config.core_config import core_config_from_settings
-
-        config = core_config_from_settings()
+        config = _tool_config(self.config, "extract_processing_manifest")
         manifest = self.process(
             Path(document_path),
             language=language,
@@ -90,3 +89,12 @@ class InformationalStructuralAgent:
             legacy_unicode_repair=document.legacy_unicode_repair,
             fusion_judge_max_pages=fusion.judge_max_pages,
         )
+
+
+def _tool_config(config: CoreConfig | None, tool: str) -> CoreConfig:
+    """The agent's ``CoreConfig``, which its Agno tool cannot run without."""
+    if config is None:
+        raise RuntimeError(
+            f"the {tool} tool needs the agent built with config= (ADR-0016, step 3)"
+        )
+    return config

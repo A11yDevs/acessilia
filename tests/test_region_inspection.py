@@ -1,3 +1,4 @@
+from backend.core.agents.model_calls import current_model_calls
 """Real page rendering and plan execution with a simulated structured vision response.
 
 Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
@@ -346,6 +347,7 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", no_media)
     result = await orchestrator.execute(
         Path(manifest.source.path), tmp_path, mode="baixo", structured_output=True,
+        config=core_config(), model_calls=current_model_calls(),
     )
     assert result["canonical_metadata"]["pddl_execution_status"] == "completed"
     assert "A map" in result["text"]

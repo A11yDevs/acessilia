@@ -13,6 +13,8 @@ with the generic alt text and a pending human review instead of failing.
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import base64
 import io
 from types import SimpleNamespace
@@ -31,7 +33,7 @@ from backend.core.i18n import t
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline.enrichment import common as enrichment_common
 from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import model_config, toolbox_config, vision_config
+from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
@@ -302,7 +304,8 @@ async def _run(manifest, monkeypatch, tmp_path):
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     return await orchestrator.execute(
-        tmp_path / "qa_word.docx", tmp_path, structured_output=True
+        tmp_path / "qa_word.docx", tmp_path, structured_output=True,
+        config=core_config(), model_calls=current_model_calls(),
     )
 
 

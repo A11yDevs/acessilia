@@ -1,3 +1,4 @@
+from backend.core.agents.model_calls import current_model_calls
 """An obligation that no automatic method satisfies must not block the others.
 
 Staging regression: with PDDL running live, `refine-reading-order` exhausted its
@@ -22,6 +23,7 @@ from backend.core.i18n.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STA
 from backend.core.logger import logger
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from backend.core.pipeline import preflight as pipeline_preflight
+from tests.core_config_support import core_config
 
 
 def _failing(_manifest, _obligation_id):
@@ -101,7 +103,8 @@ async def _run(orchestrator, manifest, monkeypatch, tmp_path):
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     return await orchestrator.execute(
-        tmp_path / "doc.pdf", tmp_path, structured_output=True
+        tmp_path / "doc.pdf", tmp_path, structured_output=True,
+        config=core_config(), model_calls=current_model_calls(),
     )
 
 

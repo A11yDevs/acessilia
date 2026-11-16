@@ -22,6 +22,7 @@ from backend.core.logger import logger
 pytest.importorskip("fastapi.testclient")
 
 from backend.api.app import app  # noqa: E402
+from tests.core_config_support import core_config
 
 
 @pytest.fixture(scope="session")
@@ -903,7 +904,7 @@ async def test_process_preserves_existing_cancelled_state(api_paths):
     assert state_manager.cancelar(task_id)
 
     with pytest.raises(TaskCancelledError):
-        await service.process(input_path, task_id=task_id)
+        await service.process(input_path, task_id=task_id, config=core_config())
 
     task = state_manager.obter(task_id)
     assert task is not None
@@ -1275,7 +1276,7 @@ async def test_a_timeout_after_cancellation_is_reported_as_cancellation(
     monkeypatch.setattr(service, "finalizar_conversao", AsyncMock())
 
     with pytest.raises(TaskCancelledError):
-        await service.process(source, task_id=task_id)
+        await service.process(source, task_id=task_id, config=core_config())
 
     task = state_manager.obter(task_id)
     assert task is not None

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
-from tests.core_config_support import toolbox_config
+from tests.core_config_support import core_config, toolbox_config
 
 isolated_runtime = runtime_fixture
 
@@ -54,7 +54,8 @@ async def test_untitled_document_takes_the_uploaded_name(
     _patch_pipeline(monkeypatch, cached=_untitled_payload() if from_cache else None)
 
     document = await service.process(
-        source, task_id=f"untitled-{from_cache}", display_filename=UPLOADED
+        source, task_id=f"untitled-{from_cache}", display_filename=UPLOADED,
+        config=core_config(),
     )
 
     assert document["title"] == "51-pages"
@@ -82,7 +83,8 @@ async def test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name(
     _patch_pipeline(monkeypatch)
 
     document = await service.process(
-        source, task_id="untitled-path", display_filename=filename
+        source, task_id="untitled-path", display_filename=filename,
+        config=core_config(),
     )
 
     assert document["title"] == "relat\u00f3rio"
@@ -100,7 +102,7 @@ async def test_without_an_uploaded_name_the_file_name_is_still_the_fallback(
     source.write_bytes(b"%PDF")
     _patch_pipeline(monkeypatch)
 
-    document = await service.process(source, task_id="untitled-local")
+    document = await service.process(source, task_id="untitled-local", config=core_config())
 
     assert document["title"] == "relatorio-local"
 
@@ -166,3 +168,31 @@ async def test_api_keeps_only_the_uploaded_basename(isolated_runtime, filename):
     stored_name = Path(record['request']['file_path']).name
     assert stored_name != record['request']['filename']
     assert stored_name.endswith('.pdf')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("from_cache", [False, True], ids=["processed", "cache-hit"])
+async def test_the_canonical_build_takes_the_job_toolbox_config(
+    isolated_runtime, monkeypatch, tmp_path, from_cache
+):
+    """ADR-0016 step 3: the formulas are enriched on the job's Toolbox, on both paths."""
+    from backend import service
+
+    source = tmp_path / STORED
+    source.write_bytes(b"%PDF")
+    _patch_pipeline(monkeypatch, cached=_untitled_payload() if from_cache else None)
+    build = service.build_canonical_document
+    toolboxes = []
+
+    def recording_build(*args, toolbox, **kwargs):
+        toolboxes.append(toolbox)
+        return build(*args, toolbox=toolbox, **kwargs)
+
+    monkeypatch.setattr(service, "build_canonical_document", recording_build)
+    job_config = core_config(toolbox={"retries": 7})
+
+    await service.process(
+        source, task_id=f"toolbox-{from_cache}", display_filename=UPLOADED, config=job_config,
+    )
+
+    assert toolboxes == [job_config.toolbox] and toolboxes[0] is job_config.toolbox

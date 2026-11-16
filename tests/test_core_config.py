@@ -9,6 +9,8 @@ ends, the orchestrator (and the Agno tools without a run) still build one from
 
 from __future__ import annotations
 
+from backend.core.agents.model_calls import current_model_calls
+
 import ast
 import copy
 import dataclasses
@@ -311,23 +313,24 @@ def _over_the_limit(monkeypatch, pages: int) -> object:
 
 
 @pytest.mark.asyncio
-async def test_a_run_without_a_config_reads_the_settings_of_its_start(monkeypatch, tmp_path) -> None:
-    """The bridge: built per run, so a setting changed after construction applies."""
+async def test_a_run_needs_its_config_and_model_call_runner(monkeypatch, tmp_path) -> None:
+    """No bridge: a run without either is a ``TypeError``, not the settings'."""
     orchestrator = _over_the_limit(monkeypatch, pages=3)
-    monkeypatch.setattr(settings_module.settings, "max_pages", 2)
 
-    with pytest.raises(pipeline_preflight.DocumentTooLargeError):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+    with pytest.raises(TypeError, match="config"):
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, model_calls=current_model_calls())
+    with pytest.raises(TypeError, match="model_calls"):
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=core_config())
 
 
 @pytest.mark.asyncio
 async def test_a_given_config_wins_over_the_settings(monkeypatch, tmp_path) -> None:
     orchestrator = _over_the_limit(monkeypatch, pages=3)
-    orchestrator.config = core_config(document={"max_pages": 2})
+    run_config = core_config(document={"max_pages": 2})
     monkeypatch.setattr(settings_module.settings, "max_pages", 50)
 
     with pytest.raises(pipeline_preflight.DocumentTooLargeError):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
 
 
 def test_bind_config_gives_the_run_config_to_the_handlers_that_take_it() -> None:
@@ -406,16 +409,16 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
 
     orchestrator = build_orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
-    orchestrator.config = core_config(fusion={"secondary_provider": "from-the-run"})
+    run_config = core_config(fusion={"secondary_provider": "from-the-run"})
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
 
     with pytest.raises(Stop):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path)
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
 
     [executor] = received
     handler = executor.registry.get("dual-provider-fusion")
     assert executor is not orchestrator.executor
-    assert handler.keywords == {"config": orchestrator.config}
+    assert handler.keywords == {"config": run_config}
 
 
 def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
@@ -462,7 +465,6 @@ async def test_concurrent_runs_each_get_their_own_config(monkeypatch, tmp_path) 
     def orchestrator_for(name: str):
         orchestrator = build_orchestrator()
         orchestrator.executor = shared.executor  # one registry for both runs
-        orchestrator.config = core_config(fusion={"secondary_provider": f"provider-{name}"})
         _stub_the_run_before_planning(monkeypatch, orchestrator)
 
         async def run_plan(*_args, executor, **_kwargs):
@@ -477,7 +479,14 @@ async def test_concurrent_runs_each_get_their_own_config(monkeypatch, tmp_path) 
         monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
         return orchestrator
 
-    runs = [orchestrator_for(name).execute(tmp_path / "doc.pdf", tmp_path) for name in ("a", "b")]
+    runs = [
+        orchestrator_for(name).execute(
+            tmp_path / "doc.pdf", tmp_path,
+            config=core_config(fusion={"secondary_provider": f"provider-{name}"}),
+            model_calls=current_model_calls(),
+        )
+        for name in ("a", "b")
+    ]
     results = await asyncio.gather(*runs, return_exceptions=True)
 
     assert all(isinstance(result, Stop) for result in results)
@@ -542,6 +551,9 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ),
         ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
         ("backend.core.planning.toolbox_gate:evaluate", "config"),
+        ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "config"),
+        ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "model_calls"),
+        ("backend.service:process", "config"),
         ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "paths"),
         (
             "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
@@ -702,13 +714,21 @@ CALLERS_CHECKED = {
 
 CALLER_ROOTS = ("backend", "frontend", "scripts")
 
-#: Methods with generic names (``extract``, ``process``), checked only on the
-#: calls that pass ``fusion=``, which no other ``extract``/``process`` takes:
-#: the extractor's and the structural agent's (review of #557).
+#: Methods with generic names, checked only on the calls that pass a keyword
+#: no other method of that name takes: ``fusion=`` for the extractor's
+#: ``extract`` and the structural agent's ``process`` (review of #557), and
+#: ``structured_output=`` for the orchestrator's ``execute``.
 METHOD_CALLERS_CHECKED = {
-    "extract": "backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract",
+    "extract": (
+        "backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "fusion"
+    ),
     "process": (
-        "backend.core.agents.informational_structural:InformationalStructuralAgent.process"
+        "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+        "fusion",
+    ),
+    "execute": (
+        "backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute",
+        "structured_output",
     ),
 }
 
@@ -729,7 +749,8 @@ def test_every_caller_passes_the_run_configuration() -> None:
 
     signatures = {name: inspect.signature(_resolve(target)) for name, target in CALLERS_CHECKED.items()}
     methods = {
-        name: inspect.signature(_resolve(target)) for name, target in METHOD_CALLERS_CHECKED.items()
+        name: (inspect.signature(_resolve(target)), marker)
+        for name, (target, marker) in METHOD_CALLERS_CHECKED.items()
     }
     unbound = []
     for root in CALLER_ROOTS:
@@ -742,9 +763,9 @@ def test_every_caller_passes_the_run_configuration() -> None:
                 name = func.id if isinstance(func, ast.Name) else (
                     func.attr if isinstance(func, ast.Attribute) else None
                 )
-                passes_fusion = any(keyword.arg == "fusion" for keyword in node.keywords)
-                if name in methods and isinstance(func, ast.Attribute) and passes_fusion:
-                    signature, receiver = methods[name], [func.value]
+                keywords = {keyword.arg for keyword in node.keywords}
+                if name in methods and isinstance(func, ast.Attribute) and methods[name][1] in keywords:
+                    signature, receiver = methods[name][0], [func.value]
                 elif name in signatures:
                     signature, receiver = signatures[name], []
                 else:
@@ -781,7 +802,7 @@ def test_the_caller_scan_sees_a_call_that_leaves_out_the_config() -> None:
 def test_the_caller_scan_sees_a_method_call_that_leaves_out_the_paths() -> None:
     import inspect
 
-    signature = inspect.signature(_resolve(METHOD_CALLERS_CHECKED["process"]))
+    signature = inspect.signature(_resolve(METHOD_CALLERS_CHECKED["process"][0]))
     [call] = [
         node for node in ast.walk(ast.parse(
             "agent.process(source, document=d, fusion=f, toolbox=t)"
@@ -791,3 +812,45 @@ def test_the_caller_scan_sees_a_method_call_that_leaves_out_the_paths() -> None:
 
     with pytest.raises(TypeError, match="paths"):
         signature.bind(call.func.value, *call.args, **{k.arg: k.value for k in call.keywords})
+
+
+def test_the_agno_tools_refuse_to_run_without_their_agent_config(tmp_path) -> None:
+    """No bridge: an Agno tool without a run takes the config its agent was built with."""
+    from backend.core.agents.fusion_agent import FusionAgent
+    from backend.core.agents.informational_structural import InformationalStructuralAgent
+
+    with pytest.raises(RuntimeError, match="config="):
+        InformationalStructuralAgent(extractor=object()).extract_processing_manifest(
+            str(tmp_path / "doc.pdf")
+        )
+    with pytest.raises(RuntimeError, match="config="):
+        FusionAgent().fuse_providers(str(tmp_path / "doc.pdf"))
+
+
+def test_the_agno_tools_run_with_their_agent_config(monkeypatch, tmp_path) -> None:
+    from backend.core.agents.fusion_agent import FusionAgent
+    from backend.core.agents.informational_structural import InformationalStructuralAgent
+
+    config = core_config(fusion={"secondary_provider": "from-the-agent"})
+    seen = {}
+
+    def process(self, _path, **groups):
+        seen["process"] = groups
+        return SimpleNamespace(model_dump=lambda **_k: {})
+
+    def fuse(self, _path, **options):
+        seen["fuse"] = options
+        return {}
+
+    monkeypatch.setattr(InformationalStructuralAgent, "process", process)
+    monkeypatch.setattr(FusionAgent, "process_fuse_providers", fuse)
+
+    InformationalStructuralAgent(extractor=object(), config=config).extract_processing_manifest(
+        str(tmp_path / "doc.pdf")
+    )
+    FusionAgent(config=config).fuse_providers(str(tmp_path / "doc.pdf"))
+
+    assert all(seen["process"][name] is getattr(config, name)
+               for name in ("document", "fusion", "toolbox", "paths"))
+    assert seen["fuse"]["secondary_provider"] == "from-the-agent"
+    assert seen["fuse"]["toolbox"] is config.toolbox

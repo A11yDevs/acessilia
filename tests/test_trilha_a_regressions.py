@@ -364,10 +364,10 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
 
     agent = Agent()
     monkeypatch.setattr(service, "agente", agent)
-    await service.process(source, task_id="first-submission")
+    await service.process(source, task_id="first-submission", config=core_config())
     assert len(list(cache.CACHE_DIR.glob("*.json"))) == (expected_calls == 1)
-    await service.process(source, task_id="second-submission")
-    await service.process(source, task_id="third-submission")
+    await service.process(source, task_id="second-submission", config=core_config())
+    await service.process(source, task_id="third-submission", config=core_config())
     assert agent.calls == expected_calls
     assert len(list(cache.CACHE_DIR.glob("*.json"))) == 1
 

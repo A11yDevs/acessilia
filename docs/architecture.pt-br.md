@@ -46,12 +46,12 @@ documento.
 **Execução compartilhada de modelos (#276, etapa 2).** VisionAgent e DataAgent
 recebem por composição a interface `ModelCallRunner` do core. A aplicação é
 dona da implementação, `backend.services.model_calls.ModelCallExecutor`,
-independentemente dos event loops. O serviço fornece um runner por meio de
-`model_call_scope` para cada documento; chamadores também podem passar
-`model_calls` a um agente ou ao orquestrador PDDL. A ponte legada do orquestrador
-obtém o executor do processo mantido pelo serviço quando nenhuma dependência ou
-escopo é fornecido, como sua ponte transitória de CoreConfig (ADR-0016). Os
-agentes não leem configurações de capacidade de execução. Os agentes Agno
+independentemente dos event loops. Cada execução recebe o seu runner
+explicitamente: `PddlAccessibilityOrchestrator.execute(..., config=,
+model_calls=)` exige o `CoreConfig` da execução e o runner, e abre o
+`model_call_scope` do runner para os agentes que constrói (passo 3 da
+ADR-0016). Nada recorre ao executor do processo mantido pelo serviço nem às
+configurações. Os agentes não leem configurações de capacidade de execução. Os agentes Agno
 separados do chat AgentOS ficam fora desse caminho de execução.
 
 `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers entre jobs e loops

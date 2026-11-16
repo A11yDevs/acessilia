@@ -14,7 +14,7 @@ from backend.core.agents.model_calls import (
 from backend.core.i18n import active_locale, reset_request_locale, set_request_locale
 from backend.services.blocking import run_blocking
 from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
-from tests.core_config_support import model_config, toolbox_config
+from tests.core_config_support import core_config, model_config, toolbox_config
 
 
 async def until(predicate):
@@ -231,24 +231,16 @@ async def test_worker_transfers_base_exceptions_to_the_awaiter(runner, error_typ
     assert await runner.run(lambda: "reused", timeout=1, label="reused") == "reused"
 
 
-def test_process_installs_and_restores_model_call_scope_without_test_context(
-    monkeypatch, tmp_path, runner,
-):
-    """A fresh Context bypasses the autouse scope, as a real service entry does."""
+def test_process_gives_the_run_its_runner_and_the_job_config(monkeypatch, tmp_path, runner):
+    """The service passes both explicitly (ADR-0016 step 3): no scope, no settings."""
     from backend import service
-    from backend.core.agents.data_agent import DataAgent
-    from backend.core.agents.vision_agent import VisionAgent
 
     source = tmp_path / "input.txt"
     source.write_text("content")
-    observed = []
+    received = {}
 
-    async def execute(*_args, **_kwargs):
-        observed.append(current_model_calls())
-        models, toolbox = model_config(), toolbox_config()
-        assert DataAgent(models=models, toolbox=toolbox).model_calls is runner
-        assert VisionAgent(models=models, toolbox=toolbox, region_cache=False).model_calls is runner
-        assert await current_model_calls().run(lambda: "model result", timeout=1, label="service") == "model result"
+    async def execute(*_args, config, model_calls, **_kwargs):
+        received.update(config=config, model_calls=model_calls)
         return "Accessible content"
 
     async def noop(*_args, **_kwargs):
@@ -262,16 +254,62 @@ def test_process_installs_and_restores_model_call_scope_without_test_context(
     monkeypatch.setattr(service.state_manager, "obter", lambda *_args: object())
     monkeypatch.setattr(service.state_manager, "atualizar", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(service.state_manager, "verificar_cancelamento", lambda *_args: None)
+    job_config = core_config()
+
+    async def request():
+        result = await service.process(source, task_id="scope-wiring", config=job_config)
+        assert result["source"]["name"] == source.name
+
+    contextvars.Context().run(asyncio.run, request())
+
+    assert received["config"] is job_config
+    assert received["model_calls"] is runner
+
+
+def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path, runner):
+    """A fresh Context bypasses the autouse scope, as a real service entry does."""
+    from types import SimpleNamespace as Namespace
+
+    from backend.core.agents.data_agent import DataAgent
+    from backend.core.agents.vision_agent import VisionAgent
+    from backend.core.pipeline import orchestrator as pddl
+    from backend.core.pipeline import preflight
+    from tests.pddl_support import build_element, build_manifest, build_orchestrator
+
+    observed = []
+
+    class Stop(Exception):
+        pass
+
+    async def stage(*_args, **_kwargs):
+        observed.append(current_model_calls())
+        models, toolbox = model_config(), toolbox_config()
+        assert DataAgent(models=models, toolbox=toolbox).model_calls is runner
+        assert VisionAgent(models=models, toolbox=toolbox, region_cache=False).model_calls is runner
+        raise Stop
+
+    async def no_inspection(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(pddl, "_classify_formula_regions", stage)
+    monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
+    orchestrator = build_orchestrator()
+    manifest = build_manifest([build_element("h", "heading", text="Title")], [])
+    orchestrator.information_structural = Namespace(process=lambda *a, **k: manifest)
 
     async def request():
         with pytest.raises(RuntimeError, match="runner must be supplied"):
             current_model_calls()
-        result = await service.process(source, task_id="scope-wiring")
-        assert result["source"]["name"] == source.name
+        with pytest.raises(Stop):
+            await orchestrator.execute(
+                tmp_path / "doc.pdf", tmp_path, config=core_config(), model_calls=runner
+            )
         with pytest.raises(RuntimeError, match="runner must be supplied"):
             current_model_calls()
 
     contextvars.Context().run(asyncio.run, request())
+
+    assert observed == [runner]
     assert observed == [runner]
 
 

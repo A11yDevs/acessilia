@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.core_config_support import core_config
 
 
 @pytest.mark.asyncio
@@ -57,8 +58,8 @@ async def test_cached_submission_is_recorded_in_history(tmp_path, monkeypatch, r
     monkeypatch.setattr(service, "set_cache", set_in_memory)
     monkeypatch.setattr(service, "_salvar_json_canonico", lambda *_args: None)
 
-    await service.process(first)
-    await service.process(second)
+    await service.process(first, config=core_config())
+    await service.process(second, config=core_config())
 
     rows = await history_service.listar_historico(10)
     assert agent.calls == 1
