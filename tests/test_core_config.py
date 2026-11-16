@@ -2,9 +2,10 @@
 
 ``CoreConfig`` holds every value the core reads from its caller, grouped by
 responsibility; ``core_config_from_settings`` builds it from the service's
-settings. Every group is moved and no stage reads ``settings``; until step 3
-ends, the orchestrator (and the Agno tools without a run) still build one from
-``settings`` when given none.
+settings. A run requires its config and its model-call runner
+(``execute(..., config=, model_calls=)``), and an Agno tool without a run
+requires the config its agent was built with: nothing falls back to
+``settings``.
 """
 
 from __future__ import annotations
@@ -732,6 +733,27 @@ METHOD_CALLERS_CHECKED = {
     ),
 }
 
+#: ``service.process`` (review of #559): a call ``service.process(...)``, or a
+#: bare ``process(...)`` in a module that imports it from ``backend.service``.
+SERVICE_PROCESS = "backend.service:process"
+
+#: Receivers that are the orchestrator, whatever the call passes: the
+#: service's ``agente`` and any name ending in ``orchestrator`` (review of #559).
+def _is_orchestrator(receiver: ast.AST) -> bool:
+    if isinstance(receiver, ast.Name):
+        return receiver.id == "agente" or receiver.id.endswith("orchestrator")
+    if isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Name):
+        return receiver.func.id in {"PddlAccessibilityOrchestrator", "build_orchestrator"}
+    return False
+
+
+def _imports_service_process(tree: ast.AST) -> bool:
+    return any(
+        isinstance(node, ast.ImportFrom) and node.module == "backend.service"
+        and any(alias.name == "process" and alias.asname is None for alias in node.names)
+        for node in ast.walk(tree)
+    )
+
 
 def _resolve(target: str):
     import importlib
@@ -752,10 +774,12 @@ def test_every_caller_passes_the_run_configuration() -> None:
         name: (inspect.signature(_resolve(target)), marker)
         for name, (target, marker) in METHOD_CALLERS_CHECKED.items()
     }
+    service_process = inspect.signature(_resolve(SERVICE_PROCESS))
     unbound = []
     for root in CALLER_ROOTS:
         for path in sorted((ROOT / root).rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"))
+            imports_process = _imports_service_process(tree)
             for node in ast.walk(tree):
                 if not isinstance(node, ast.Call):
                     continue
@@ -764,7 +788,16 @@ def test_every_caller_passes_the_run_configuration() -> None:
                     func.attr if isinstance(func, ast.Attribute) else None
                 )
                 keywords = {keyword.arg for keyword in node.keywords}
-                if name in methods and isinstance(func, ast.Attribute) and methods[name][1] in keywords:
+                if name == "process" and (
+                    (isinstance(func, ast.Name) and imports_process)
+                    or (isinstance(func, ast.Attribute)
+                        and isinstance(func.value, ast.Name) and func.value.id == "service")
+                ):
+                    signature, receiver = service_process, []
+                elif name in methods and isinstance(func, ast.Attribute) and (
+                    methods[name][1] in keywords
+                    or (name == "execute" and _is_orchestrator(func.value))
+                ):
                     signature, receiver = methods[name][0], [func.value]
                 elif name in signatures:
                     signature, receiver = signatures[name], []
@@ -854,3 +887,19 @@ def test_the_agno_tools_run_with_their_agent_config(monkeypatch, tmp_path) -> No
                for name in ("document", "fusion", "toolbox", "paths"))
     assert seen["fuse"]["secondary_provider"] == "from-the-agent"
     assert seen["fuse"]["toolbox"] is config.toolbox
+
+
+def test_the_caller_scan_matches_the_orchestrator_by_its_receiver() -> None:
+    """``agente.execute(path, tmp)``, without ``structured_output=``, is still seen."""
+    import inspect
+
+    signature = inspect.signature(_resolve(METHOD_CALLERS_CHECKED["execute"][0]))
+    [call] = [
+        node for node in ast.walk(ast.parse("agente.execute(path, tmp)"))
+        if isinstance(node, ast.Call)
+    ]
+
+    assert _is_orchestrator(call.func.value)
+    assert not _is_orchestrator(ast.parse("connection").body[0].value)
+    with pytest.raises(TypeError, match="config"):
+        signature.bind(call.func.value, *call.args)

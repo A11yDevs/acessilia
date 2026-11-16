@@ -1,7 +1,7 @@
-from backend.core.agents.model_calls import current_model_calls
 """Regressions for description provenance, table certification and failed plans."""
 
 from types import SimpleNamespace
+from backend.core.agents.model_calls import current_model_calls
 from backend.core.pipeline import payload as pipeline_payload
 
 import pytest

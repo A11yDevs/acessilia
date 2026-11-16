@@ -161,13 +161,38 @@ async def test_the_worker_packages_the_report(monkeypatch, tmp_path):
     try:
         lines, path = await executor._audit_pdf_ua(
             "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
-            toolbox_config(),
+            toolbox_config(), settings.pdf_ua_audit_max_rules,
         )
     finally:
         executor._executor.shutdown(wait=True)
 
     assert json.loads(path.read_text(encoding="utf-8")) == report
     assert lines == summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules)
+
+
+@pytest.mark.asyncio
+async def test_the_summary_takes_the_job_limit_not_the_settings(monkeypatch, tmp_path):
+    """The limit the worker took at the job's start (ADR-0016 step 3 review)."""
+    from backend.api import worker
+
+    report = _non_compliant(_rule("7.1", 11, 1), _rule("7.2", 3, 1), _rule("7.3", 2, 1))
+
+    async def audit(_pdf_path, **_kwargs):
+        return report
+
+    monkeypatch.setattr(worker, "audit_pdf_ua", audit)
+    monkeypatch.setattr(settings, "pdf_ua_audit_max_rules", 3)
+    executor = worker.JobExecutor()
+    try:
+        lines, _ = await executor._audit_pdf_ua(
+            "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
+            toolbox_config(), 1,
+        )
+    finally:
+        executor._executor.shutdown(wait=True)
+
+    assert lines == summarize_audit(report, max_rules=1)
+    assert lines != summarize_audit(report, max_rules=3)
 
 
 @pytest.mark.asyncio
@@ -182,7 +207,7 @@ async def test_a_failed_audit_does_not_fail_the_job(monkeypatch, tmp_path):
     try:
         lines, path = await executor._audit_pdf_ua(
             "task", tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
-            toolbox_config(),
+            toolbox_config(), settings.pdf_ua_audit_max_rules,
         )
     finally:
         executor._executor.shutdown(wait=True)
@@ -228,7 +253,7 @@ async def _run_audit_step(tmp_path, task_id: str = "task") -> tuple[list[str], P
     try:
         return await executor._audit_pdf_ua(
             task_id, tmp_path / "doc.pdf_ua.pdf", tmp_path / "doc.pdf_ua.verapdf.json",
-            toolbox_config(),
+            toolbox_config(), settings.pdf_ua_audit_max_rules,
         )
     finally:
         executor._executor.shutdown(wait=True)

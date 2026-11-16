@@ -310,7 +310,6 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
     contextvars.Context().run(asyncio.run, request())
 
     assert observed == [runner]
-    assert observed == [runner]
 
 
 @pytest.mark.asyncio

@@ -314,7 +314,12 @@ class JobExecutor:
         return path
 
     async def _audit_pdf_ua(
-        self, task_id: str, pdf_path: Path, report_path: Path, toolbox: ToolboxConfig
+        self,
+        task_id: str,
+        pdf_path: Path,
+        report_path: Path,
+        toolbox: ToolboxConfig,
+        max_rules: int,
     ) -> tuple[list[str], Path | None]:
         """veraPDF audit of the PDF/UA: the e-mail lines and the packaged report.
 
@@ -323,14 +328,15 @@ class JobExecutor:
         the full cause carries internal Toolbox endpoints and goes to the log.
         That covers a report the e-mail cannot summarize and a report that
         cannot be written, not only a Toolbox failure. A user cancel ends the
-        wait at once.
+        wait at once. ``toolbox`` and ``max_rules`` (``PDF_UA_AUDIT_MAX_RULES``)
+        are the job's, taken at its start.
         """
         state_manager.atualizar(task_id, etapa=t(STAGE_AUDITING_PDF_UA), progresso=0.94)
         try:
             report = await _until_cancelled(task_id, audit_pdf_ua(pdf_path, toolbox=toolbox))
             if report is None:
                 return [], None
-            lines = summarize_audit(report, max_rules=settings.pdf_ua_audit_max_rules)
+            lines = summarize_audit(report, max_rules=max_rules)
             await run_blocking(
                 report_path.write_text,
                 json.dumps(report, ensure_ascii=False, indent=2),
@@ -410,8 +416,10 @@ class JobExecutor:
 
             # One CoreConfig for the whole job, built at its start (ADR-0016,
             # step 3): the pipeline, the exports and the audit read the same
-            # values, even if the settings change while the job runs.
+            # values, even if the settings change while the job runs. The
+            # audit's e-mail summary limit is the service's, taken now too.
             job_config = core_config_from_settings()
+            audit_max_rules = settings.pdf_ua_audit_max_rules
             canonical = await process(
                 job.file_path,
                 status_callback=status_callback,
@@ -436,7 +444,7 @@ class JobExecutor:
             state_manager.atualizar(task_id, status="processing")
 
             base = output_stem(job.filename)
-            out_dir = job.output_dir or (settings.data_dir / "output" / task_id)
+            out_dir = job.output_dir or (job_config.paths.data_dir / "output" / task_id)
             out_dir.mkdir(parents=True, exist_ok=True)
             completed_formats: list[str] = []
             optional_errors: list[str] = []
@@ -520,7 +528,8 @@ class JobExecutor:
                 if not isinstance(pdf_ua_path, Path):
                     return [], None
                 return await self._audit_pdf_ua(
-                    task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json", toolbox
+                    task_id, pdf_ua_path, out_dir / f"{base}.pdf_ua.verapdf.json", toolbox,
+                    audit_max_rules,
                 )
 
             async def mp3() -> Path | None:

@@ -10,8 +10,9 @@ No field has a default: a value the core uses comes from the caller, so the
 service's settings stay the one place where defaults live. Tests build a
 config from those settings and replace the fields they exercise.
 
-Step 3 moved the stages group by group. A run requires its config
-(``PddlAccessibilityOrchestrator.execute(..., config=)``), the service builds
+Step 3 moved the stages group by group. A run requires its config and its
+model-call runner (``PddlAccessibilityOrchestrator.execute(..., config=,
+model_calls=)``), the service builds
 one per job, and an Agno tool without a run takes the config its agent was
 built with: nothing in a run falls back to ``settings``. The logger's and the
 catalogs' settings (``LOG_LEVEL``, ``LOGS_DIR``, ``I18N_LOCALES_ACTIVE``) are

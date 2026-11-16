@@ -1,4 +1,3 @@
-from backend.core.agents.model_calls import current_model_calls
 """An obligation that no automatic method satisfies must not block the others.
 
 Staging regression: with PDDL running live, `refine-reading-order` exhausted its
@@ -12,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from backend.core.agents.model_calls import current_model_calls
 from backend.core.pipeline import orchestrator as pddl
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.execution.models import MethodResult

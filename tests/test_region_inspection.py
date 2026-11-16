@@ -1,4 +1,3 @@
-from backend.core.agents.model_calls import current_model_calls
 """Real page rendering and plan execution with a simulated structured vision response.
 
 Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
@@ -6,6 +5,7 @@ Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
 """
 
 import hashlib
+from backend.core.agents.model_calls import current_model_calls
 from backend.core.pipeline import payload as pipeline_payload
 import json
 from pathlib import Path

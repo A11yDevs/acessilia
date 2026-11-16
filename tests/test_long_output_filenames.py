@@ -1,5 +1,6 @@
 """Long upload names must survive export, ZIP packaging and download."""
 
+import copy
 import io
 import zipfile
 from unittest.mock import AsyncMock
@@ -43,6 +44,11 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
         job_configs.append(config)
         monkeypatch.setattr(settings, "toolbox_docx_enabled", False)
         monkeypatch.setattr(settings, "toolbox_api_key", "changed-mid-job")
+        # The worker's view of the settings moves DATA_DIR (the job store
+        # and the download tokens keep theirs, as they are not the job's).
+        changed = copy.copy(settings)
+        changed.data_dir = tmp_path / "changed-mid-job"
+        monkeypatch.setattr(worker, "settings", changed)
         return {"title": "Audit"}
 
     monkeypatch.setattr(service, "process", process)
@@ -50,8 +56,10 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
     monkeypatch.setattr(worker, "finalizar_conversao", AsyncMock())
 
     toolboxes = []
+    exported = []
 
     def export(document, path, *args, **kwargs):
+        exported.append(path)
         if "toolbox" in kwargs:
             toolboxes.append(kwargs["toolbox"])
         path.write_bytes(b"audit output")
@@ -104,6 +112,11 @@ async def test_long_filename_can_be_exported_and_downloaded(tmp_path, monkeypatc
             [job_config] = job_configs
             assert audit_kwargs["toolbox"] is job_config.toolbox
             assert core_config_from_settings().toolbox.api_key == "changed-mid-job"
+            # The outputs go under the job's data_dir, not the one set mid-job.
+            assert exported and all(
+                job_config.paths.data_dir in path.parents for path in exported
+            )
+            assert not (tmp_path / "changed-mid-job" / "output").exists()
     finally:
         executor._executor.shutdown(wait=True)
         if download_token_service._connection is not None:
