@@ -59,11 +59,16 @@ def _tree(relative: str) -> ast.Module:
 
 
 def _docstruct_imports(tree: ast.Module) -> bool:
-    return any(
-        isinstance(node, ast.ImportFrom)
-        and (node.module or "").split(".")[0] == "docstruct"
-        for node in tree.body
-    )
+    return any("docstruct" in _import_roots(node) for node in tree.body)
+
+
+def _import_roots(node: ast.stmt) -> tuple[str, ...]:
+    """Top-level packages named by absolute imports, independent of aliases."""
+    if isinstance(node, ast.Import):
+        return tuple(alias.name.split(".")[0] for alias in node.names)
+    if isinstance(node, ast.ImportFrom) and node.level == 0:
+        return ((node.module or "").split(".")[0],)
+    return ()
 
 
 def _is_docstring(node: ast.stmt) -> bool:
@@ -99,6 +104,24 @@ def test_bridge_imports_from_docstruct(module: str) -> None:
     assert _docstruct_imports(_tree(module))
 
 
+@pytest.mark.parametrize("source,expected", [
+    ("from docstruct.geometry import is_bottom_left", True),
+    ("from docstruct.geometry import is_bottom_left as bottom_left", True),
+    ("import docstruct", True),
+    ("import docstruct.geometry as geometry", True),
+    ("import os, docstruct.geometry as geometry", True),
+    ("from __future__ import annotations\nimport docstruct.geometry", True),
+    ("from .docstruct import geometry", False),
+    ("from ..docstruct.geometry import is_bottom_left", False),
+    ("from . import docstruct", False),
+    ("import docstruct_extra", False),
+    ("from pathlib import Path", False),
+    ("def adapter():\n    pass", False),
+])
+def test_adapter_import_check_recognizes_only_absolute_docstruct(source, expected) -> None:
+    assert _docstruct_imports(ast.parse(source)) is expected
+
+
 def _is_pure_docstruct_reexport(tree: ast.Module) -> bool:
     """A module of docstruct imports and nothing else (docstring, ``__all__`` and
     ``from __future__`` aside): a re-export bridge."""
@@ -115,9 +138,8 @@ def _is_pure_docstruct_reexport(tree: ast.Module) -> bool:
 
 
 def _imports_only_docstruct(node: ast.Import | ast.ImportFrom) -> bool:
-    if isinstance(node, ast.ImportFrom):
-        return node.level == 0 and (node.module or "").split(".")[0] == "docstruct"
-    return all(alias.name.split(".")[0] == "docstruct" for alias in node.names)
+    roots = _import_roots(node)
+    return bool(roots) and all(root == "docstruct" for root in roots)
 
 
 def test_no_module_is_a_pure_docstruct_reexport() -> None:
