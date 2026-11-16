@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 import asyncio
@@ -210,7 +212,7 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
 
     with task_context("resume-task"):
         with pytest.raises(RuntimeError, match="died during enrichment"):
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
 
         assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_MEDIA) is not None
         assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_MANIFEST) is not None
@@ -219,7 +221,7 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         crash["armed"] = False
         result = await orchestrator.execute(
             tmp_path / "doc.pdf", tmp_path, structured_output=True,
-            config=core_config(), model_calls=current_model_calls(),
+            config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
         )
 
     assert counts == {"inspect": 1, "extract": 1, "enrich": 7}
@@ -256,7 +258,7 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
     )
     orchestrator.information_structural = SimpleNamespace(process=lambda *_a, **_k: manifest)
 
-    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
 
     assert counts == {"inspect": 1}
     assert not (data_dir / "jobs").exists()
@@ -562,14 +564,14 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         with pytest.raises(Crash):
             await orchestrator.execute(
                 tmp_path / "doc.pdf", tmp_path, structured_output=True,
-                config=core_config(), model_calls=current_model_calls(),
+                config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
             )
         assert len(handler_calls) == 1
 
         monkeypatch.setattr(job_checkpoint, "save", real_save)
         result = await orchestrator.execute(
             tmp_path / "doc.pdf", tmp_path, structured_output=True,
-            config=core_config(), model_calls=current_model_calls(),
+            config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
         )
 
     assert len(handler_calls) == 2
@@ -725,7 +727,7 @@ async def test_a_completed_picture_is_checkpointed_during_the_stage(
             manifest, Path("doc.pdf"), mode="medio", on_progress=save,
             vision=vision_config(concurrency=1),
             toolbox=toolbox_config(),
-            models=model_config(),
+            models=model_config(), region_cache=None
         )
     )
     try:

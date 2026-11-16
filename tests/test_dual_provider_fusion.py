@@ -11,7 +11,8 @@ from pathlib import Path
 from tests.core_config_support import core_config, toolbox_config
 import pytest
 
-from backend.core.pipeline.handlers.registry import bind_config
+from backend.core.pipeline.handlers.registry import bind_run
+from backend.core.ports import RunPorts
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers.common import _missing_obligation
 from backend.core.i18n import reset_request_locale, set_request_locale
@@ -299,7 +300,7 @@ def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
     manifest.extractor.configuration["toolbox_provider"] = "docling"
     monkeypatch.setattr("backend.config.settings.settings.toolbox_provider", "docling")
     executor = PddlAccessibilityOrchestrator._build_executor()
-    executor.registry = bind_config(executor.registry, core_config())
+    executor.registry = bind_run(executor.registry, core_config(), RunPorts.none())
 
     _, first_plan = PlannerAgent().plan(manifest, selected_roots=["o-fuse"])
     after_first, first_report = executor.execute(
@@ -342,7 +343,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     registry.register(
         "dual-provider-fusion", _handle_dual_provider_fusion_method
     )
-    updated, report = ExecutorAgent(bind_config(registry, core_config())).execute(plan, manifest)
+    updated, report = ExecutorAgent(bind_run(registry, core_config(), RunPorts.none())).execute(plan, manifest)
 
     assert report.status == "completed"
     fused = next(item for item in updated.obligations if item.id == "o-fuse")

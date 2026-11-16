@@ -45,7 +45,8 @@ closures can therefore retain images, agents and clients.
 
 The orchestrator required no runner at first and obtained the service owner
 when none was supplied, like its CoreConfig bridge. ADR-0016's step 3 removed
-both: `execute(..., config=, model_calls=)` requires the run's runner.
+both: `execute(..., config=, model_calls=)` requires the run's runner
+(ADR-0016's step 4 then added the required `ports=`).
 Standalone callers can pass and close their own runner. AgentOS chat agents and provider scheduling (#547) remain
 outside this execution path. See the [architecture](../architecture.md).
 

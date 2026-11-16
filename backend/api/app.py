@@ -38,7 +38,7 @@ async def _lifespan(app: FastAPI):
         setup_process()
         from backend.services.model_calls import get_model_calls, shutdown_model_calls
         get_model_calls()
-        from backend.services.blocking import run_blocking
+        from backend.core.blocking import run_blocking
         from backend.services.history_service import limpar_orfas
         await run_blocking(limpar_orfas)
         from backend.api.worker import recover_pending_jobs

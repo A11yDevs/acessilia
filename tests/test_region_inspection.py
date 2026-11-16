@@ -5,8 +5,6 @@ Regions are rendered by the Toolbox (``pdf.render@2``); the fake in
 """
 
 import hashlib
-from backend.core.agents.model_calls import current_model_calls
-from backend.core.pipeline import payload as pipeline_payload
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,18 +12,32 @@ from types import SimpleNamespace
 import fitz
 import pytest
 
-from backend.core.pipeline.handlers import inspection as inspection_handlers
+from backend.core.agents.model_calls import current_model_calls
 from backend.core.agents.output_schemas import VisionOutput
-from backend.core.manifest.models import BoundingBox, PageDescriptor, ProcessingManifest, Provenance
+from backend.core.manifest.models import (
+    BoundingBox,
+    PageDescriptor,
+    ProcessingManifest,
+    Provenance,
+)
+from backend.core.pipeline import payload as pipeline_payload
+from backend.core.pipeline import preflight as pipeline_preflight
+from backend.core.pipeline.enrichment import common as enrichment_common
+from backend.core.pipeline.handlers import inspection as inspection_handlers
+from backend.core.ports import NoRegionCache, RunPorts
+from tests.core_config_support import core_config, model_config, toolbox_config
 from tests.pddl_support import (
     build_element as _element,
+)
+from tests.pddl_support import (
     build_manifest as _manifest,
+)
+from tests.pddl_support import (
     build_obligation as _obligation,
+)
+from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
-from backend.core.pipeline.enrichment import common as enrichment_common
-from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config, model_config, toolbox_config
 
 
 @pytest.fixture
@@ -117,12 +129,15 @@ def test_real_region_inspection_updates_output_and_records_evidence(inspection, 
 def test_the_region_cache_follows_the_run_config(inspection, enabled):
     manifest, _, vision = inspection
 
+    cache = NoRegionCache()
+
     result = inspection_handlers._handle_pymupdf_region_method(
-        manifest, "o-1", config=core_config(vision={"region_cache_enabled": enabled})
+        manifest, "o-1", config=core_config(vision={"region_cache_enabled": enabled}),
+        ports=RunPorts(region_cache=cache),
     )
 
     assert result.success, result.message
-    assert vision.region_caches == [enabled]
+    assert vision.region_caches == [cache if enabled else None]
 
 
 def test_the_region_is_rendered_and_inspected_with_the_run_toolbox(inspection, monkeypatch):
@@ -139,7 +154,7 @@ def test_the_region_is_rendered_and_inspected_with_the_run_toolbox(inspection, m
 
     monkeypatch.setattr(inspection_handlers, "_render_inspection_region", recording_render)
 
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=run)
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=run, ports=RunPorts.none())
 
     assert result.success, result.message
     assert rendered == [run.toolbox] and rendered[0] is run.toolbox
@@ -155,7 +170,7 @@ def test_the_region_evidence_is_written_under_the_run_data_dir(inspection, tmp_p
     run_dir = tmp_path / "run-data"
     run = replace(core_config(), paths=replace(core_config().paths, data_dir=run_dir))
 
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=run)
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=run, ports=RunPorts.none())
 
     assert result.success, result.message
     assert result.artifacts and all(run_dir in Path(a.path).parents for a in result.artifacts)
@@ -165,7 +180,7 @@ def test_the_region_evidence_is_written_under_the_run_data_dir(inspection, tmp_p
 def test_provider_crop_metadata_never_bypasses_inspection(inspection, crop):
     manifest, calls, _ = inspection
     manifest.elements[0].metadata["region_crop"] = crop
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert result.success
     assert len(calls) == 1
     assert Path(manifest.elements[0].metadata["region_crop"]).is_file()
@@ -201,7 +216,7 @@ def test_invalid_source_or_region_fails_without_model_call(inspection, failure):
         elif failure == "origin":
             bbox.coord_origin = "UNKNOWN"
     before = manifest.model_dump_json()
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     assert not result.validated
     assert not calls
@@ -215,7 +230,7 @@ def test_failed_or_invalid_model_result_does_not_certify_inspection(inspection, 
     manifest, calls, vision = inspection
     vision.response = response
     before = manifest.model_dump()
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     assert not result.artifacts
     assert calls
@@ -237,7 +252,7 @@ def test_bottom_left_coordinates_render_same_region(inspection):
 def test_page_without_bbox_can_be_inspected_as_full_page(inspection):
     manifest, calls, _ = inspection
     manifest.elements[0].provenance = []
-    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config()).success
+    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none()).success
     image = fitz.Pixmap(calls[0]["image_bytes"])
     assert image.width >= 200 * 160 / 72
 
@@ -251,7 +266,7 @@ def test_all_targets_must_validate_before_mutating_manifest(inspection):
     manifest.elements.append(second)
     manifest.obligations[0].target_ids.append(second.id)
     original = manifest.model_dump()
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     assert not result.artifacts
     assert len(calls) == 1
@@ -266,7 +281,7 @@ def test_artifact_failure_cannot_certify_or_mutate_inspection(inspection, monkey
         raise OSError("Simulated disk failure")
 
     monkeypatch.setattr(inspection_handlers, "_save_region_artifact", fail)
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     assert "OSError: Simulated disk failure" in result.message
     assert not result.artifacts
@@ -283,7 +298,7 @@ def test_a_render_over_the_pixel_limit_fails_the_method(inspection, fake_toolbox
     manifest.source.path = str(source)
     manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     manifest.elements[0].provenance = []
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     # The core has no pixel guard of its own: the Toolbox refuses (HTTP 400)
     # and the refusal reaches the method as a capability error.
@@ -296,7 +311,7 @@ def test_an_element_without_a_page_is_inspected_only_in_a_one_page_document(insp
     manifest, calls, _ = inspection
     manifest.elements[0].provenance = []
     manifest.elements[0].page_number = None
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     assert "Region page is missing or out of range" in result.message
     assert not calls
@@ -306,7 +321,7 @@ def test_a_page_beyond_the_document_is_refused_by_the_toolbox(inspection, fake_t
     manifest, calls, _ = inspection
     manifest.elements[0].provenance[0].page_number = 3
     manifest.elements[0].page_number = 3
-    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
+    result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none())
     assert not result.success
     assert "out of range" in result.message
     assert fake_toolbox_render.requests[0]["parameters"]["page_number"] == 3
@@ -324,7 +339,7 @@ def test_the_stored_source_is_referenced_only_when_it_is_this_document(
     fake_toolbox_render.sources[stored] = (source.read_bytes(), "application/pdf")
     manifest.extractor.configuration["artifact_id"] = stored
 
-    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config()).success
+    assert inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config(), ports=RunPorts.none()).success
 
     [request] = fake_toolbox_render.requests
     assert request["artifact_id"] == (stored if same_document else None)
@@ -347,7 +362,7 @@ async def test_complete_orchestration_uses_region_method_and_requested_mode(insp
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", no_media)
     result = await orchestrator.execute(
         Path(manifest.source.path), tmp_path, mode="baixo", structured_output=True,
-        config=core_config(), model_calls=current_model_calls(),
+        config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
     )
     assert result["canonical_metadata"]["pddl_execution_status"] == "completed"
     assert "A map" in result["text"]

@@ -11,7 +11,7 @@ from backend.core.logger import logger
 from backend.agents.state_manager import state_manager
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 from backend.services.download_token_service import (
     TOKEN_EXPIRY_DAYS,
     limpar_tokens_expirados,

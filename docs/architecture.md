@@ -45,8 +45,9 @@ the deadline bounds one model call, not the whole table or document.
 core's `ModelCallRunner` port by composition. The application owns its
 implementation, `backend.services.model_calls.ModelCallExecutor`, independently
 of event loops. Each run receives its runner explicitly:
-`PddlAccessibilityOrchestrator.execute(..., config=, model_calls=)` requires
-both the run's `CoreConfig` and the runner, and opens the runner's
+`PddlAccessibilityOrchestrator.execute(..., config=, model_calls=, ports=)`
+requires the run's `CoreConfig`, the runner and the run's `RunPorts` (ADR-0016,
+step 4), and opens the runner's
 `model_call_scope` for the agents it builds (ADR-0016, step 3). Nothing falls
 back to the service's process owner or settings. Agents read no
 execution-capacity settings. AgentOS's separate
@@ -103,6 +104,7 @@ Standalone users own and close their runner explicitly. See
 #### 0.4. Core Utilities and Toolbox Adapters (`backend/core/`)
 - [backend/core/toolbox/](../backend/core/toolbox/): the core's adapters over the Toolbox, through the SDK (client from the settings, math, media inspection, PDF/UA audit, text spans, vision payload).
 - [backend/core/config.py](../backend/core/config.py): `CoreConfig`, the core's configuration in frozen groups, which the service builds from its settings in [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, step 3).
+- [backend/core/ports.py](../backend/core/ports.py): `RunPorts`, the service state a run reaches (the region cache for now), built by the service for each job in [backend/services/run_ports.py](../backend/services/run_ports.py); `RunPorts.none()` keeps no state (ADR-0016, step 4).
 - [backend/core/logger.py](../backend/core/logger.py): centralized loguru logger setup; the level and the log directory are passed at process start by [backend/config/process_setup.py](../backend/config/process_setup.py), with the offered locales (ADR-0016, step 3).
 - [backend/core/formula_tools.py](../backend/core/formula_tools.py): LaTeX normalization and the spoken-formula label.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.

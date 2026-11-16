@@ -54,7 +54,8 @@ from backend.core.i18n.log_messages import (
     LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
     LOG_PDDL_FORMULAS_RECOGNIZED,
 )
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
+from backend.core.ports import RegionCache
 from backend.core.i18n.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_RECOGNIZING_FORMULA,
@@ -184,6 +185,7 @@ async def _classify_formula_regions(
     vision: VisionConfig,
     toolbox: ToolboxConfig,
     models: ModelConfig,
+    region_cache: RegionCache | None,
     breaker: ProviderBreaker,
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
@@ -208,7 +210,7 @@ async def _classify_formula_regions(
     if not candidates:
         return
     slots = asyncio.Semaphore(max(1, vision.concurrency))
-    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox, models=models)
+    agent = VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox, models=models)
     progress_lock = asyncio.Lock()
 
     async def classify(element: ManifestElement) -> None:
@@ -277,6 +279,7 @@ async def _enrich_formula_latex(
     vision: VisionConfig,
     toolbox: ToolboxConfig,
     models: ModelConfig,
+    region_cache: RegionCache | None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
@@ -376,7 +379,7 @@ async def _enrich_formula_latex(
         source_file=source_file,
         mode=mode,
         status_callback=status_callback,
-        vision=VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox, models=models),
+        vision=VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox, models=models),
         breaker=breaker or ProviderBreaker(vision.breaker_threshold),
         slots=asyncio.Semaphore(max(1, vision.concurrency)),
         total=len(formulas),

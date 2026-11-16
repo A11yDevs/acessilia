@@ -55,7 +55,7 @@ from backend.core.i18n.log_messages import (
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_PDDL_TABLES_ENRICHED,
 )
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 from backend.core.i18n.stage_messages import (
     STAGE_RECOGNIZING_TABLE,
 )

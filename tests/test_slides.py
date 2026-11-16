@@ -6,6 +6,8 @@ assertions hold under any supported server locale.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 import copy
@@ -374,7 +376,7 @@ async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypat
     monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
     monkeypatch.setattr(picture_stage, "_extract_picture_bytes", lambda _s, element, page, *_a, **_k: (b"png", page))
 
-    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await picture_stage._enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     # Slide 3 is one picture of the whole slide; slide 2 keeps an embedded one.
     assert classifications == {3: "full_page_image", 2: "embedded_image"}
@@ -416,7 +418,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
 
-    payload = await orchestrator.execute(source, tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
+    payload = await orchestrator.execute(source, tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
 
     assert calls == ["media.inspect", ("extract", True)]
     assert payload["canonical_metadata"]["pddl_media_inspection"] == {
@@ -619,7 +621,7 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     extracted["text"] = "Scale diagram"
     manifest = _build_edited(source, extraction)
 
-    await _enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await _enrich_picture_descriptions(manifest, source, mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     [picture] = [e for e in manifest.elements if e.id == "e-6"]
     assert picture.metadata["vision_failure_reason"] == "model_failed"

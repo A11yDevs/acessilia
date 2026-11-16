@@ -7,7 +7,7 @@ import pytest
 
 from backend.api import worker
 from backend.services import job_store
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 from backend.services.queue_service import QueueItem, UnifiedQueue
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from tests.test_pending_fixes import stop_queue

@@ -62,7 +62,7 @@ async def _run(manifest, **kwargs):
     await picture_stage._enrich_picture_descriptions(manifest, Path("doc.pdf"), mode="medio", **kwargs,
         vision=vision_config(retry_pass_delay_seconds=0),
         toolbox=toolbox_config(),
-        models=model_config(),
+        models=model_config(), region_cache=None
     )
 
 

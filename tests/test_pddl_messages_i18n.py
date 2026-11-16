@@ -29,7 +29,7 @@ from backend.core.pipeline.handlers.text import (
 )
 from backend.core.pipeline.obligations import _unsatisfied_obligations
 from backend.core.i18n import n, reset_request_locale, set_request_locale
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 
 from tests.pddl_support import (
     build_element as _element,

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from backend.core.pipeline.handlers.registry import bind_config
+from backend.core.pipeline.handlers.registry import bind_run
+from backend.core.ports import RunPorts
 from tests.core_config_support import core_config
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.manifest.models import (
@@ -123,7 +124,7 @@ def build_orchestrator(*, max_replans: int = 0) -> PddlAccessibilityOrchestrator
     # The test's executor has the handlers bound to the service's config, so
     # a test that calls it directly runs them; a run binds its own again.
     executor = PddlAccessibilityOrchestrator._build_executor()
-    executor.registry = bind_config(executor.registry, core_config())
+    executor.registry = bind_run(executor.registry, core_config(), RunPorts.none())
     orchestrator.executor = executor
     orchestrator.planner_backend = "internal"
     orchestrator.preferred_plan = "internal"

@@ -31,7 +31,7 @@ from backend.core.i18n.log_messages import (
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
 )
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.operation_registry import operation_registry
 from backend.services.queue_service import QueueItem, unified_queue

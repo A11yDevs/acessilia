@@ -8,6 +8,8 @@ so only identity passes.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 from dataclasses import replace
@@ -66,7 +68,7 @@ async def test_the_picture_stage_builds_its_agent_with_the_run_models(monkeypatc
 
     await picture_stage._enrich_picture_descriptions(
         build_manifest([build_element("pic-1", "picture")], []), Path("doc.pdf"),
-        mode="medio", vision=VISION, toolbox=TOOLBOX, models=MODELS,
+        mode="medio", vision=VISION, toolbox=TOOLBOX, models=MODELS, region_cache=None
     )
 
     assert seen == [MODELS] and seen[0] is MODELS
@@ -81,12 +83,12 @@ async def test_the_formula_stages_build_their_agents_with_the_run_models(monkeyp
     await formula_stage._classify_formula_regions(
         build_manifest([build_element("f-1", "formula", text="x")], []), Path("doc.pdf"),
         mode="medio", vision=VISION, toolbox=TOOLBOX, models=MODELS,
-        breaker=ProviderBreaker(3),
+        breaker=ProviderBreaker(3), region_cache=None
     )
     await formula_stage._enrich_formula_latex(
         build_manifest([build_element("f-2", "formula")], []), Path("doc.pdf"),
         mode="medio", document=document_config(), vision=VISION, toolbox=TOOLBOX,
-        models=MODELS,
+        models=MODELS, region_cache=None
     )
 
     assert len(seen) == 2 and all(models is MODELS for models in seen)
@@ -122,7 +124,7 @@ def test_the_inspection_helpers_build_their_agent_with_the_run_models(
     _agents(monkeypatch, inspection_handlers, seen=seen)
 
     getattr(inspection_handlers, helper)(
-        b"png", 1, 1, "medio", region_cache=False, toolbox=TOOLBOX, models=MODELS
+        b"png", 1, 1, "medio", region_cache=None, toolbox=TOOLBOX, models=MODELS
     )
 
     assert seen == [MODELS] and seen[0] is MODELS
@@ -156,7 +158,7 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
     run_config = replace(core_config(), models=MODELS)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
 
-    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
     assert all(seen[name] is MODELS for name in stages), seen
 
@@ -182,7 +184,7 @@ async def test_each_agent_builds_its_model_from_its_configs(monkeypatch, agent) 
 
     if agent == "vision":
         await vision_agent.VisionAgent(
-            region_cache=False, toolbox=TOOLBOX, models=MODELS
+            region_cache=None, toolbox=TOOLBOX, models=MODELS
         ).describe_region(b"png", "embedded_image")
     else:
         await data_agent.DataAgent(models=MODELS, toolbox=TOOLBOX).process_region(

@@ -17,10 +17,10 @@ from backend.core.pipeline.payload import (
     records_extraction_degradation,
     records_visual_failures,
 )
+from backend.core.cache_keys import options_cache_key
 from backend.services.cache import (
     drop_cache,
     get_cached,
-    options_cache_key,
     processing_cache_configuration,
     set_cache,
 )
@@ -45,6 +45,7 @@ from backend.core.i18n.stage_messages import (
 )
 from backend.services.operation_context import task_context
 from backend.services.model_calls import get_model_calls
+from backend.services.run_ports import service_run_ports
 from backend.services.operation_registry import operation_registry
 from backend.services import shutdown
 from backend.core.logger import logger
@@ -292,6 +293,7 @@ async def process(
                     thinking_mode=thinking_mode,
                     config=config,
                     model_calls=get_model_calls(),
+                    ports=service_run_ports(),
                 )
             except Exception:
                 # A cancellation that arrives while the extraction thread is

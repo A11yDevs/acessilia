@@ -7,6 +7,8 @@ its own observations and obligations.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 import json
@@ -242,7 +244,7 @@ async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monk
     run_config = core_config(document={"legacy_unicode_repair": "repair"})
 
     with pytest.raises(Stop):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
     assert received == [(run_config.document, run_config.fusion)]
 

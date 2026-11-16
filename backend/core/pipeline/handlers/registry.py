@@ -60,6 +60,7 @@ from backend.core.pipeline.handlers.text import (
     _handle_tailjoin_method,
     _handle_unicode_repair_method,
 )
+from backend.core.ports import RunPorts
 
 #: Method name -> handler.
 METHOD_HANDLERS: dict[str, Callable[[ProcessingManifest, str], MethodResult]] = {
@@ -104,30 +105,36 @@ def build_method_registry() -> MethodRegistry:
     return registry
 
 
-def takes_config(handler: Callable[..., MethodResult]) -> bool:
-    """Whether ``handler`` declares a ``config`` parameter for the run's ``CoreConfig``."""
+#: What a run binds to a handler, by the parameter name the handler declares.
+RUN_PARAMETERS = ("config", "ports")
+
+
+def declares(handler: Callable[..., MethodResult], parameter: str) -> bool:
+    """Whether ``handler`` declares ``parameter`` (one of ``RUN_PARAMETERS``)."""
     try:
-        return "config" in inspect.signature(handler).parameters
+        return parameter in inspect.signature(handler).parameters
     except (TypeError, ValueError):
         return False
 
 
-def bind_config(registry: MethodRegistry, config: CoreConfig) -> MethodRegistry:
-    """The registry of one run (ADR-0016, step 3).
+def bind_run(registry: MethodRegistry, config: CoreConfig, ports: RunPorts) -> MethodRegistry:
+    """The registry of one run (ADR-0016, steps 3 and 4).
 
-    A handler that declares ``config`` gets the run's ``CoreConfig`` bound;
-    the others are registered as they are, so the executor keeps calling
-    every handler as ``handler(manifest, obligation_id)``. The copy keeps the
-    registration order, and the given registry is left unchanged.
+    A handler that declares ``config`` gets the run's ``CoreConfig`` bound,
+    and one that declares ``ports`` gets its ``RunPorts``; the others are
+    registered as they are, so the executor keeps calling every handler as
+    ``handler(manifest, obligation_id)``. The copy keeps the registration
+    order, and the given registry is left unchanged.
 
     The convention is the parameter's name: a handler opts in by declaring
-    ``*, config: CoreConfig`` (the handlers that read the run's
-    configuration do).
+    ``*, config: CoreConfig`` or ``*, ports: RunPorts``.
     """
+    values = {"config": config, "ports": ports}
     bound = MethodRegistry()
     for method, handler in registry.items():
-        bound.register(method, partial(handler, config=config) if takes_config(handler) else handler)
+        given = {name: values[name] for name in RUN_PARAMETERS if declares(handler, name)}
+        bound.register(method, partial(handler, **given) if given else handler)
     return bound
 
 
-__all__ = ["METHOD_HANDLERS", "bind_config", "build_method_registry", "takes_config"]
+__all__ = ["METHOD_HANDLERS", "RUN_PARAMETERS", "bind_run", "build_method_registry", "declares"]

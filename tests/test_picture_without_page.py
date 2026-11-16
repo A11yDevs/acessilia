@@ -13,6 +13,8 @@ with the generic alt text and a pending human review instead of failing.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 import base64
@@ -202,7 +204,7 @@ async def test_a_docx_picture_with_an_embedded_image_is_described(
         manifest, tmp_path / "qa_word.docx", mode="medio",
         vision=vision_config(),
         toolbox=toolbox_config(),
-        models=model_config(),
+        models=model_config(), region_cache=None
     )
 
     picture = manifest.elements[0]
@@ -237,7 +239,7 @@ async def test_a_pageless_picture_without_an_image_is_not_sent_to_the_model(
         manifest, tmp_path / "qa_word.docx", mode="medio",
         vision=vision_config(),
         toolbox=toolbox_config(),
-        models=model_config(),
+        models=model_config(), region_cache=None
     )
 
     picture = manifest.elements[0]
@@ -262,7 +264,7 @@ async def test_a_paged_picture_whose_crop_failed_is_still_a_crop_failure(
     )
     manifest = build_manifest([build_element("pic-1", "picture")], [])
 
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     assert manifest.elements[0].metadata["vision_failure_reason"] == "crop_unavailable"
 
@@ -305,7 +307,7 @@ async def _run(manifest, monkeypatch, tmp_path):
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     return await orchestrator.execute(
         tmp_path / "qa_word.docx", tmp_path, structured_output=True,
-        config=core_config(), model_calls=current_model_calls(),
+        config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
     )
 
 

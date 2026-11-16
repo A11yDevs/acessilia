@@ -136,10 +136,10 @@ async def test_ocr_text_is_not_a_visual_description(monkeypatch, description):
         "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *args, **kwargs: (b"image", 1),
     )
-    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal", vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     assert Vision.calls == 1
     assert picture.metadata["vision_description_complete"] is True
-    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await _enrich_picture_descriptions(manifest, Path("synthetic.pdf"), mode="normal", vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     assert Vision.calls == 1
 
 

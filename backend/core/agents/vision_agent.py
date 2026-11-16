@@ -36,7 +36,8 @@ from backend.core.agents.prompt_tools import (
 from backend.core.agents.ai_client import active_model_name, get_agno_model
 from backend.core.agents.model_call_policy import model_call_deadline
 from backend.core.agents.model_calls import ModelCallRunner, current_model_calls
-from backend.services.cache import get_cached_bytes, options_cache_key, set_cache_bytes
+from backend.core.cache_keys import options_cache_key
+from backend.core.ports import RegionCache
 from backend.core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
@@ -102,7 +103,7 @@ class VisionAgent:
         self,
         mode: str = "medio",
         *,
-        region_cache: bool,
+        region_cache: RegionCache | None,
         toolbox: ToolboxConfig,
         models: ModelConfig,
         model_calls: ModelCallRunner | None = None,
@@ -111,8 +112,9 @@ class VisionAgent:
 
         Args:
             mode (str): Prompting mode name whose system prompt is loaded at construction (default "medio").
-            region_cache (bool): Whether region descriptions are read from and
-                stored in the cache (``VisionConfig.region_cache_enabled``).
+            region_cache (RegionCache | None): The run's region cache, which
+                region descriptions are read from and stored in; ``None`` when
+                the run turns it off (``backend.core.ports.region_cache_for``).
             toolbox (ToolboxConfig): The run's Toolbox, which renders a smaller
                 image when the model rejects one for its context.
             model_calls (ModelCallRunner | None): The application-owned runner;
@@ -197,9 +199,9 @@ class VisionAgent:
             self.models,
             context_retry_max_tokens=context_retry_max_tokens,
         )
-        if self.region_cache:
-            cached = await get_cached_bytes(
-                image_bytes, extra=cache_extra, ttl=VISION_CACHE_TTL_SECONDS
+        if self.region_cache is not None:
+            cached = await self.region_cache.get(
+                image_bytes, cache_extra, ttl_seconds=VISION_CACHE_TTL_SECONDS
             )
             if cached is not None:
                 try:
@@ -256,10 +258,8 @@ class VisionAgent:
                 region_type=classification,
                 limit_tokens=max_tokens,
             )
-        if self.region_cache and _cacheable(output, truncated):
-            await set_cache_bytes(
-                image_bytes, output.model_dump(mode="json"), extra=cache_extra
-            )
+        if self.region_cache is not None and _cacheable(output, truncated):
+            await self.region_cache.put(image_bytes, cache_extra, output.model_dump(mode="json"))
         return output
 
     async def inspect_page(

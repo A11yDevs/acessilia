@@ -1,22 +1,29 @@
 """Regressions for description provenance, table certification and failed plans."""
 
 from types import SimpleNamespace
-from backend.core.agents.model_calls import current_model_calls
-from backend.core.pipeline import payload as pipeline_payload
 
 import pytest
 
+from backend.core.agents.model_calls import current_model_calls
 from backend.core.pipeline import orchestrator as pddl
+from backend.core.pipeline import payload as pipeline_payload
+from backend.core.pipeline import preflight as pipeline_preflight
 from backend.core.pipeline.handlers import content as content_handlers
+from backend.core.ports import RunPorts
+from tests.core_config_support import core_config
 from tests.pddl_support import (
     build_element as _element,
+)
+from tests.pddl_support import (
     build_manifest as _manifest,
+)
+from tests.pddl_support import (
     build_obligation as _obligation,
+)
+from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
-from backend.core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config
 
 isolated_runtime = runtime_fixture
 
@@ -105,7 +112,7 @@ async def test_orchestration_rejects_failed_or_exhausted_plan(monkeypatch, tmp_p
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     with pytest.raises(RuntimeError, match="linearize-table"):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
 
 
 @pytest.mark.asyncio

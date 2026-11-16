@@ -12,18 +12,19 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.agents.model_calls import current_model_calls
-from backend.core.pipeline import orchestrator as pddl
 from backend.core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from backend.core.execution.models import MethodResult
-from backend.core.manifest.builder import _derive_processing_needs
-from backend.core.manifest.models import Obligation
-from backend.core.pipeline.obligations import _unsatisfied_summary
 from backend.core.i18n import t
 from backend.core.i18n.stage_messages import STAGE_PAGE, STAGE_PAGE_UNKNOWN, STAGE_PAGES
 from backend.core.logger import logger
-from tests.pddl_support import build_element, build_manifest, build_orchestrator
+from backend.core.manifest.builder import _derive_processing_needs
+from backend.core.manifest.models import Obligation
+from backend.core.pipeline import orchestrator as pddl
 from backend.core.pipeline import preflight as pipeline_preflight
+from backend.core.pipeline.obligations import _unsatisfied_summary
+from backend.core.ports import RunPorts
 from tests.core_config_support import core_config
+from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 
 def _failing(_manifest, _obligation_id):
@@ -104,7 +105,7 @@ async def _run(orchestrator, manifest, monkeypatch, tmp_path):
     monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
     return await orchestrator.execute(
         tmp_path / "doc.pdf", tmp_path, structured_output=True,
-        config=core_config(), model_calls=current_model_calls(),
+        config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
     )
 
 

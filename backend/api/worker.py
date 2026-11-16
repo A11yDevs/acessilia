@@ -17,7 +17,7 @@ from backend.core.config import ToolboxConfig
 from backend.config.settings import settings
 from backend.services import job_checkpoint, shutdown
 from backend.services.job_store import load_record, save_status, pending_records
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,

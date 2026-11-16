@@ -77,13 +77,20 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
   - `backend.config`: 34 imports, and 59 distinct `settings` keys read at
     107 points. The orchestrator alone reads 12 keys, and the exporters 3.
   - `backend.services`, in four imports, from three places:
-    - `run_blocking` (`blocking.py`);
+    - `run_blocking` (`blocking.py`; moved into the core in step 4);
     - the vision region cache (`get_cached_bytes`, `set_cache_bytes`,
-      `options_cache_key`);
+      `options_cache_key`; in step 4 the core takes it as a port, and
+      `options_cache_key` moved into the core);
     - `processing_cache_configuration` and `_file_hash`, read by the payload
       and the Toolbox extractor (in step 3 the core stopped importing these
       two, which stay in the service: it builds its identities in
       `backend/core/run_identity.py`, #544).
+
+    Imports added after this inventory, and pending in step 4: the job
+    checkpoints (`job_checkpoint`) and the job id (`operation_context`) in
+    the orchestrator, and the registry of remote operations
+    (`operation_registry`, `operation_context`) in the Toolbox extractor.
+    `tests/test_run_ports.py` lists them, and the list only shrinks.
 - **The service reaches the core** from `backend/service.py`
   (`PddlAccessibilityOrchestrator`), from `backend/api/worker.py` (the
   exporters), and from the API and services (the messages and tools).
@@ -118,7 +125,7 @@ Proposed: option 2.
   ```text
   libs/core/src/acessilia_core/
     config.py      # CoreConfig: the core's configuration, explicit
-    ports.py       # protocols the service implements: caches, blocking calls
+    ports.py       # protocols the service implements: caches, checkpoints, operations
     manifest/      # models, schema, builder, Toolbox extractor, slides
     planning/      # domain, planner, PDDL processor, Toolbox gate, comparison
     execution/     # executor, models, messages
@@ -168,10 +175,15 @@ Proposed: option 2.
 - **Configuration is explicit.** The core receives a `CoreConfig` built by its
   caller. The service builds it from its environment, as it builds the SDK's
   `ToolboxClientConfig` today.
-- **The service's state is injected.** The region and processing caches, and
-  the way blocking calls are run, reach the core as arguments that follow the
-  protocols in `acessilia_core.ports`. The core does not own the service's
-  storage.
+- **The service's state is injected.** The region cache, the job
+  checkpoints and the registry of remote operations reach each run as one
+  `RunPorts` object, whose members follow the protocols in
+  `acessilia_core.ports`; the service builds it for the job. The core does
+  not own the service's storage. The processing cache is the service's alone:
+  it wraps the run, and the core only gives it the run's identity
+  (`run_identity`). `run_blocking`, a stateless helper on the standard
+  library, belongs to the core, and the service imports it from there
+  (amended in step 4).
 - **Agno is a required dependency** for now. The agents need it, and so do
   planning and execution: the executor runs every plan as an Agno workflow.
   Making Agno optional would take more than moving the agents into a package
@@ -245,7 +257,7 @@ Proposed: option 2.
      handlers' artifacts are written under the run's `PathsConfig.data_dir`, so
      the core reads no setting of a run; and the configuration groups are done.
      A run then requires its config and its model-call runner (`execute(...,
-     config=, model_calls=)`), the service builds one config per job and the
+     config=, model_calls=)`, and `ports=` since step 4), the service builds one config per job and the
      worker's exports and audit reuse it, and the Agno tools without a run take
      the config their agent was built with: the bridges are gone. The
      processing cache key and the fusion reuse are then built from the run's
@@ -260,9 +272,23 @@ Proposed: option 2.
      that read the config declare a `config` parameter (the dual-provider and
      single-provider fusion handlers, the region and page inspection handlers,
      the `mathml` and `latex-verbalizer` formula handlers, and the VLM
-     judge's), and each run binds its config to them (`bind_config`) on a copy
+     judge's), and each run binds its config to them (`bind_run`) on a copy
      of the registry.
-  4. The caches and `run_blocking` are injected through `ports`.
+  4. The caches and `run_blocking` are injected through `ports`. In
+     progress, in three pull requests:
+     - **The region cache and `run_blocking` (done).** `backend/core/ports.py`
+       defines `RegionCache` and `RunPorts`, with a no-op for runs outside the
+       service (`RunPorts.none()`). `execute(..., ports=)` is required, like
+       `config` and `model_calls`. The stages take the run's region cache, or
+       `None` when its config turns it off, and the handlers that declare
+       `ports` get them (`bind_run`, which replaces `bind_config`). The
+       service implements the port on its file cache (`ContentCache`).
+       `run_blocking` and `options_cache_key` moved into the core.
+     - **The job checkpoints and the job id**, which the orchestrator reads.
+     - **The registry of remote operations**, which the extractor reads.
+
+     A test lists the service modules the core still imports, and the list
+     only shrinks.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:
      - it imports nothing from `backend` outside `backend/core`, and nothing

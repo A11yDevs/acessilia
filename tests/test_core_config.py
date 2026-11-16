@@ -2,8 +2,9 @@
 
 ``CoreConfig`` holds every value the core reads from its caller, grouped by
 responsibility; ``core_config_from_settings`` builds it from the service's
-settings. A run requires its config and its model-call runner
-(``execute(..., config=, model_calls=)``), and an Agno tool without a run
+settings. A run requires its config, its model-call runner and its ports
+(``execute(..., config=, model_calls=, ports=)``; ``tests/test_run_ports.py``
+covers the ports), and an Agno tool without a run
 requires the config its agent was built with: nothing falls back to
 ``settings``.
 """
@@ -24,6 +25,7 @@ from backend.config import settings as settings_module
 from backend.config.core_config import core_config_from_settings
 from backend.core.config import CoreConfig
 from backend.core.pipeline import preflight as pipeline_preflight
+from backend.core.ports import RunPorts
 from backend.core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
 from tests.core_config_support import core_config
 from tests.pddl_support import build_orchestrator
@@ -334,7 +336,7 @@ async def test_a_run_needs_its_config_and_model_call_runner(monkeypatch, tmp_pat
     orchestrator = _over_the_limit(monkeypatch, pages=3)
 
     with pytest.raises(TypeError, match="config"):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, model_calls=current_model_calls(), ports=RunPorts.none())
     with pytest.raises(TypeError, match="model_calls"):
         await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=core_config())
 
@@ -346,12 +348,12 @@ async def test_a_given_config_wins_over_the_settings(monkeypatch, tmp_path) -> N
     monkeypatch.setattr(settings_module.settings, "max_pages", 50)
 
     with pytest.raises(pipeline_preflight.DocumentTooLargeError):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
 
-def test_bind_config_gives_the_run_config_to_the_handlers_that_take_it() -> None:
+def test_bind_run_gives_the_run_config_to_the_handlers_that_take_it() -> None:
     from backend.core.execution.executor import MethodRegistry
-    from backend.core.pipeline.handlers.registry import bind_config
+    from backend.core.pipeline.handlers.registry import bind_run
 
     received = []
 
@@ -366,25 +368,25 @@ def test_bind_config_gives_the_run_config_to_the_handlers_that_take_it() -> None
     registry.register("without", without_config)
     first, second = core_config(), core_config(fusion={"secondary_provider": "x"})
 
-    bound = bind_config(registry, first)
+    bound = bind_run(registry, first, RunPorts.none())
     bound.get("with")(None, "o")
     bound.get("without")(None, "o")
-    bind_config(bound, second).get("with")(None, "o")
+    bind_run(bound, second, RunPorts.none()).get("with")(None, "o")
 
     assert received == [first, "plain", second]
     assert registry.get("with") is with_config, "the given registry is left unchanged"
     assert [method for method, _ in bound.items()] == ["with", "without"]
 
 
-def test_bind_config_keeps_the_registration_order() -> None:
+def test_bind_run_keeps_the_registration_order() -> None:
     from backend.core.execution.executor import MethodRegistry
-    from backend.core.pipeline.handlers.registry import bind_config
+    from backend.core.pipeline.handlers.registry import bind_run
 
     registry = MethodRegistry()
     for method in ("zeta", "alpha", "mu"):
         registry.register(method, lambda manifest, obligation_id: None)
 
-    bound = bind_config(registry, core_config())
+    bound = bind_run(registry, core_config(), RunPorts.none())
 
     assert [method for method, _ in bound.items()] == ["zeta", "alpha", "mu"]
 
@@ -429,7 +431,7 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
 
     with pytest.raises(Stop):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
     [executor] = received
     handler = executor.registry.get("dual-provider-fusion")
@@ -499,7 +501,7 @@ async def test_concurrent_runs_each_get_their_own_config(monkeypatch, tmp_path) 
         orchestrator_for(name).execute(
             tmp_path / "doc.pdf", tmp_path,
             config=core_config(fusion={"secondary_provider": f"provider-{name}"}),
-            model_calls=current_model_calls(),
+            model_calls=current_model_calls(), ports=RunPorts.none()
         )
         for name in ("a", "b")
     ]
@@ -521,7 +523,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
     obligation = build_obligation("describe-image", ["p-1"], ["human-review"])
     obligation.selected = True  # open and selected: a new plan can still satisfy it
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [obligation])
-    run_executor = orchestrator._run_executor(core_config())
+    run_executor = orchestrator._run_executor(core_config(), RunPorts.none())
     received = []
 
     async def run_plan(*_args, executor, **_kwargs):
@@ -569,6 +571,15 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ("backend.core.planning.toolbox_gate:evaluate", "config"),
         ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "config"),
         ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "model_calls"),
+        ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "ports"),
+        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "region_cache"),
+        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "region_cache"),
+        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "region_cache"),
+        ("backend.core.pipeline.handlers.inspection:_handle_pymupdf_region_method", "ports"),
+        (
+            "backend.core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
+            "ports",
+        ),
         ("backend.service:process", "config"),
         ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "paths"),
         (
