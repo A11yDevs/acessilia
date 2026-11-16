@@ -26,20 +26,22 @@ def test_execution_configuration_invalidates_document_cache(monkeypatch, field, 
 
     if field == "pddl_execute_dry_run":
         monkeypatch.setattr(service.settings, field, True)
-    before = service._cache_version()
+    config = core_config()  # the job's, fixed: the service's own setting moves
+    before = service._cache_version(config)
     monkeypatch.setattr(service.settings, field, value)
-    assert service._cache_version() != before
+    assert service._cache_version(config) != before
 
 
 def test_domain_identity_invalidates_document_cache(monkeypatch):
     from backend import service
     from backend.core.planning.domain_bundle import DomainBundle
 
-    before = service._cache_version()
+    config = core_config()  # the job's, fixed: the service's own setting moves
+    before = service._cache_version(config)
     monkeypatch.setattr(DomainBundle, "load", lambda: SimpleNamespace(
         domain_sha256="new-domain", description_sha256="new-description"
     ))
-    assert service._cache_version() != before
+    assert service._cache_version(config) != before
 
 
 @pytest.mark.asyncio
@@ -174,8 +176,20 @@ def _warnings(failures):
         # An empty description is the model's answer and would come back the same.
         ([("picture", {"vision_failure_reason": "empty_description"})], None),
         ([("picture", {"vision_description_complete": True})], None),
+        # Review of #561: a formula the outage left without a classification
+        # or a reading may come out differently (as a picture) on a rerun.
+        ([("formula", {"formula_classification": {"status": "unclassified", "reason": "provider_blocked"}}),
+          ("formula", {"formula_classification": {"status": "unclassified", "reason": "model_failed"}}),
+          ("formula", {"formula_recognition_failure": "recognizer_unavailable"})],
+         {"formulas": {"provider_blocked": 1, "model_failed": 1, "recognizer_unavailable": 1}}),
+        # The model's own answers would come back the same.
+        ([("formula", {"formula_classification": {"status": "unclassified", "reason": "empty_description"}}),
+          ("formula", {"formula_classification": {"status": "unresolved", "reason": "classification_uncertain"}}),
+          ("formula", {"formula_classification": {"status": "math", "reason": None}})],
+         None),
     ],
-    ids=["provider-failed", "placeholders-failed", "empty-description", "all-described"],
+    ids=["provider-failed", "placeholders-failed", "empty-description", "all-described",
+         "formula-outage", "formula-answers"],
 )
 def test_a_run_the_vision_model_failed_is_not_cacheable(elements, failures):
     from tests.pddl_support import build_element, build_manifest

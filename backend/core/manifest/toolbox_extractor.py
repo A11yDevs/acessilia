@@ -17,6 +17,7 @@ from acessilia_sdk.toolbox import (
 )
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
+from backend.core.run_identity import fusion_reuse_identity
 from backend.core.config import FusionConfig, PathsConfig, ToolboxConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
@@ -344,7 +345,8 @@ class ToolboxManifestExtractor:
                             policy=self.fusion_policy,
                         )
                         reuse = _persist_fusion_reuse(
-                            source_path, fusion, self.fusion_policy, data_dir=data_dir
+                            source_path, fusion, self.fusion_policy, data_dir=data_dir,
+                            identity=fusion_reuse_identity(fusion_config, toolbox_config),
                         )
                         replaced: dict[int, list[dict[str, Any]]] = {}
                         if fusion_config.apply_page_routes:
@@ -409,21 +411,33 @@ class ToolboxManifestExtractor:
         )
 
 
+def _source_sha256(source_path: Path) -> str:
+    """The source's SHA-256, read in chunks rather than whole (review of #561)."""
+    with source_path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
 def _persist_fusion_reuse(
     source_path: Path, payload: dict,
     policy: FusionPolicy | None,
     *,
     data_dir: Path,
+    identity: dict,
 ) -> dict:
+    """Store a fused extraction for the dual-provider fusion handler to reuse.
+
+    ``identity`` is the run's :func:`~backend.core.run_identity.fusion_reuse_identity`:
+    the record keeps it as the provenance of the payload (the fusion options,
+    the deployment and providers, the strategy version), and the handler
+    reuses the payload only for a run with the same identity (#544).
+    """
     from dataclasses import asdict
 
     from docstruct.policy import FusionPolicy
 
-    from backend.services.cache import _file_hash, processing_cache_configuration
-
     content = json.dumps({
-        "source_sha256": _file_hash(source_path),
-        "configuration": processing_cache_configuration(),
+        "source_sha256": _source_sha256(source_path),
+        "identity": identity,
         "policy": asdict(policy or FusionPolicy()),
         "payload": payload,
     }, ensure_ascii=False, sort_keys=True).encode("utf-8")

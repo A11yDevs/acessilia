@@ -370,6 +370,8 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
     # formulas: none, the breaker was open before the fallback ever ran.
     assert len(vision_calls) == 3
     assert all(call["classification"] != "formula" for call in vision_calls)
+    # The open breaker left the formula unread: the run is not cached (#544 review).
+    assert formulas.elements[0].metadata["formula_recognition_failure"] == "provider_blocked"
     assert len(recognize_calls) == 1
     assert formulas.elements[0].text is None
 

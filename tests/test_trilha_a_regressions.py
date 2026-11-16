@@ -29,10 +29,10 @@ isolated_runtime = isolated_runtime_fixture
     ],
 )
 def test_cache_tracks_fusion_and_model_revision(monkeypatch, name, value):
-    before = options_cache_key("document", config=processing_cache_configuration())
+    before = options_cache_key("document", config=processing_cache_configuration(core_config()))
     monkeypatch.setattr(settings, name, value, raising=False)
     assert (
-        options_cache_key("document", config=processing_cache_configuration()) != before
+        options_cache_key("document", config=processing_cache_configuration(core_config())) != before
     )
 
 
@@ -227,6 +227,13 @@ def test_pddl_cache_policy(status, open_kind, last_method, expected):
     assert result["canonical_metadata"]["pddl_fusion"]["status"] == "degraded"
 
 
+def _reuse_identity():
+    from backend.core.run_identity import fusion_reuse_identity
+
+    config = core_config()
+    return fusion_reuse_identity(config.fusion, config.toolbox)
+
+
 @pytest.mark.parametrize("corrupt", [False, True, "configuration"])
 def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
     import json
@@ -239,16 +246,14 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
     manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     payload = _dual_payload()
-    ref = _persist_fusion_reuse(source, payload, None, data_dir=paths_config().data_dir)
+    ref = _persist_fusion_reuse(source, payload, None, data_dir=paths_config().data_dir, identity=_reuse_identity())
     manifest.extractor.configuration["fusion_reuse"] = ref
     path = Path(ref["path"])
     record = json.loads(path.read_bytes())
-    assert set(record) == {"source_sha256", "configuration", "policy", "payload"}
+    assert set(record) == {"source_sha256", "identity", "policy", "payload"}
     assert record["payload"] == payload
     if corrupt is True:
         path.write_text("tampered")
-    if corrupt == "configuration":
-        monkeypatch.setattr(settings, "fusion_judge_max_pages", 998)
     calls = []
 
     def extract(*a, **k):
@@ -256,7 +261,9 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
         return payload
 
     monkeypatch.setattr(fusion_handlers, "_run_extract_fused", extract)
-    result = fusion_handlers._handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
+    # A run whose fusion options differ from the stored record's (#544).
+    run = core_config(fusion={"judge_max_pages": 998}) if corrupt == "configuration" else core_config()
+    result = fusion_handlers._handle_dual_provider_fusion_method(manifest, "o-fuse", config=run)
     assert result.success
     assert calls == ([True] if corrupt else [])
 
@@ -399,11 +406,11 @@ def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'data_dir', tmp_path)
     policy = FusionPolicy(align_tau=0.4)
     payload = _dual_payload()
-    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, policy, data_dir=paths_config().data_dir)
+    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, policy, data_dir=paths_config().data_dir, identity=_reuse_identity())
     manifest.extractor.configuration['fusion_policy'] = asdict(policy)
-    assert fusion_handlers._reusable_fusion_payload(manifest) == payload
+    assert fusion_handlers._reusable_fusion_payload(manifest, core_config()) == payload
     manifest.extractor.configuration['fusion_policy'] = asdict(FusionPolicy(align_tau=0.8))
-    assert fusion_handlers._reusable_fusion_payload(manifest) is None
+    assert fusion_handlers._reusable_fusion_payload(manifest, core_config()) is None
 
 
 def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
@@ -442,7 +449,7 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
     original = FusionPolicy(align_tau=0.4)
     changed = FusionPolicy(align_tau=0.8)
     payload = _dual_payload()
-    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original, data_dir=paths_config().data_dir)
+    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original, data_dir=paths_config().data_dir, identity=_reuse_identity())
     manifest.extractor.configuration['fusion_policy'] = asdict(original)
     calls = []
     def extract(path, *, artifact_id=None, policy=None, secondary_provider=None, toolbox=None):

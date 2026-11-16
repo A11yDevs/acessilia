@@ -9,6 +9,7 @@ from typing import Any
 import aiofiles
 import aiofiles.os
 
+from backend.core.config import CoreConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     LOG_CACHE_CLEARED,
@@ -58,28 +59,24 @@ def _cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
-def processing_cache_configuration() -> dict[str, Any]:
-    """Configuration shared by whole-document and page-level result caches."""
-    from backend.config.settings import settings
+#: Service options a processed document depends on, outside the core's
+#: ``CoreConfig``: the engine, the planner and the model revision.
+SERVICE_PROCESSING_SETTINGS = (
+    "pipeline_engine", "fusion_hybrid_provider", "processing_model_revision",
+    "pddl_execute_dry_run", "pddl_max_replans", "pddl_planner_backend",
+    "pddl_preferred_plan", "pddl_fast_downward", "pddl_fast_downward_alias",
+    "pddl_fast_downward_search",
+)
 
-    fields = (
-        "ai_client", "ollama_model", "ollama_base_url", "openrouter_model",
-        "openrouter_base_url", "openrouter_max_tokens", "pipeline_engine",
-        "fusion_mode", "fusion_secondary_provider", "fusion_hybrid_provider",
-        "fusion_apply_page_routes", "fusion_judge_max_pages", "processing_model_revision",
-        "legacy_unicode_repair", "inline_math_detection", "formula_text_agreement_min",
-        "toolbox_base_url", "toolbox_base_urls", "toolbox_vlm_provider",
-        "toolbox_provider", "toolbox_layout_provider",
-        "toolbox_pdf_provider", "toolbox_math_recognize_provider", "toolbox_math_provider",
-        "toolbox_ocr_provider", "toolbox_page_ocr_provider", "toolbox_adjudicate_provider",
-        "toolbox_orientation_provider", "toolbox_media_inspect_provider",
-        "toolbox_media_inspect_enabled", "slide_visual_coverage",
-        "slide_fold_figure_labels", "table_visual_review", "pdf_split_dpi",
-        "pddl_execute_dry_run", "pddl_max_replans", "pddl_planner_backend",
-        "pddl_preferred_plan", "pddl_fast_downward", "pddl_fast_downward_alias",
-        "pddl_fast_downward_search",
-    )
-    configuration = {name: getattr(settings, name) for name in fields}
+
+def processing_cache_configuration(config: CoreConfig) -> dict[str, Any]:
+    """What a processed document depends on: the run's ``config`` (#544) and
+    the service's own options, with the manifest rules and the PDDL domain."""
+    from backend.config.settings import settings
+    from backend.core.run_identity import processing_identity
+
+    configuration: dict[str, Any] = {"core": processing_identity(config)}
+    configuration.update({name: getattr(settings, name) for name in SERVICE_PROCESSING_SETTINGS})
     configuration["manifest_invariant_revision"] = MANIFEST_INVARIANT_REVISION
     from backend.core.planning.domain_bundle import DomainBundle
 

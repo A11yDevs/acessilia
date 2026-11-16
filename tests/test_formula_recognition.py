@@ -147,6 +147,8 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
     assert len(FakeVision.calls) == 1
     assert FakeVision.calls[0]["classification"] == "formula"
     assert FakeVision.calls[0]["full_budget"] is True
+    # Read by the fallback because math.recognize was down: not cached.
+    assert element.metadata["formula_recognition_failure"] == "recognizer_unavailable"
 
 
 def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
@@ -740,6 +742,8 @@ async def test_a_failed_vision_fallback_leaves_the_formula_and_records_nothing(m
     assert element.type == "formula" and element.text is None
     assert "formula_recognition" not in element.metadata
     assert len(FakeVision.calls) == 1
+    # No answer from the model: the run is not cached (#544 review).
+    assert element.metadata["formula_recognition_failure"] == "model_failed"
 
 
 @pytest.mark.asyncio
@@ -755,6 +759,8 @@ async def test_an_uncertain_description_does_not_reclassify(monkeypatch, cropped
     assert element.type == "formula" and element.text is None
     assert "formula_recognition" not in element.metadata
     assert [o.kind for o in manifest.obligations] == ["verbalize-formula"]
+    # An answer, even an uncertain one, is not an outage.
+    assert "formula_recognition_failure" not in element.metadata
 
 
 @pytest.mark.asyncio
@@ -769,3 +775,18 @@ async def test_a_vision_reading_records_its_method_and_confidence(monkeypatch, c
     assert element.text == "x+1"
     assert element.metadata["formula_recognition"] == {"method": "vision", "confidence": 0.6}
     assert "formula_text_layer" not in element.metadata
+
+
+
+@pytest.mark.asyncio
+async def test_a_reading_after_the_outage_clears_its_failure(monkeypatch, cropped):
+    """A resumed run whose recognition succeeds no longer counts the old outage."""
+    manifest = _formula_manifest(metadata={"formula_recognition_failure": "model_failed"})
+    install_formula_recognizer(monkeypatch, lambda image, **kwargs: [{"latex": "x", "confidence": 0.9}])
+
+    await formula_stage._enrich_formula_latex(
+        manifest, Path("/tmp/doc.pdf"), mode="medio", document=document_config(),
+        vision=vision_config(), toolbox=toolbox_config(), models=model_config(),
+    )
+
+    assert "formula_recognition_failure" not in manifest.elements[0].metadata

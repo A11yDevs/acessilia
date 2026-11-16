@@ -223,9 +223,30 @@ _RETRYABLE_VISUAL_FAILURES = frozenset(
     {"crop_unavailable", "image_unavailable", "model_failed"}
 )
 
+#: Why a formula's classification or reading may come out differently on a
+#: rerun (#544 review): the vision model gave no answer, the shared breaker
+#: was open, the crop could not be rendered, or ``math.recognize`` was down.
+#: An answer (``empty_description``, ``classification_uncertain``) would come
+#: back the same and does not count.
+_RETRYABLE_FORMULA_FAILURES = frozenset(
+    {"crop_unavailable", "model_failed", "provider_blocked", "recognizer_unavailable"}
+)
+
+
+def _formula_failure(element: ManifestElement) -> str | None:
+    classification = element.metadata.get("formula_classification") or {}
+    if (
+        classification.get("status") == "unclassified"
+        and classification.get("reason") in _RETRYABLE_FORMULA_FAILURES
+    ):
+        return classification["reason"]
+    reason = element.metadata.get("formula_recognition_failure")
+    return reason if reason in _RETRYABLE_FORMULA_FAILURES else None
+
 
 def _visual_failures(manifest: ProcessingManifest) -> dict[str, dict[str, int]] | None:
-    """Pictures left undescribed and tables left unread, counted by reason.
+    """Pictures left undescribed, tables left unread and formulas left without
+    a classification or a reading by an outage, counted by reason.
 
     A picture counts whatever its type: the vision stage also describes the
     placeholders of a mostly visual document, and an element becomes a
@@ -240,6 +261,9 @@ def _visual_failures(manifest: ProcessingManifest) -> dict[str, dict[str, int]] 
         "tables": Counter(
             reason for element in elements
             if (reason := element.metadata.get("table_read_failure")) in _RETRYABLE_VISUAL_FAILURES
+        ),
+        "formulas": Counter(
+            reason for element in elements if (reason := _formula_failure(element))
         ),
     }
     failures = {kind: dict(by_reason) for kind, by_reason in counts.items() if by_reason}
