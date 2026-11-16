@@ -83,8 +83,9 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
     - o cache de regiões da visão (`get_cached_bytes`, `set_cache_bytes`,
       `options_cache_key`);
     - `processing_cache_configuration` e `_file_hash`, lidos pelo payload e
-      pelo extrator da Toolbox (o passo 3 removeu esses dois: o core monta as
-      suas identidades em `backend/core/run_identity.py`, #544).
+      pelo extrator da Toolbox (no passo 3 o core deixou de importar esses
+      dois, que ficam no serviço: ele monta as suas identidades em
+      `backend/core/run_identity.py`, #544).
 - **O serviço chega ao core** por `backend/service.py`
   (`PddlAccessibilityOrchestrator`), por `backend/api/worker.py` (os
   exportadores) e pela API e pelos serviços (as mensagens e as ferramentas).

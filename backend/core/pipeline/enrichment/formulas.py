@@ -455,7 +455,15 @@ class _FormulaEnrichment:
                     await self.on_progress()
 
     async def enrich_one(self, position: int, element: ManifestElement) -> bool:
-        """Recognize one formula and fold the answer into it; True when filled."""
+        """Recognize one formula and fold the answer into it; True when filled.
+
+        A formula whose reading a provider outage changed records why in
+        ``metadata["formula_recognition_failure"]``: ``recognizer_unavailable``
+        (``math.recognize`` was down) or, when the vision fallback got no
+        answer, ``provider_blocked`` (an open breaker) or ``model_failed``. A
+        run that records one is not cached (#544 review), as for pictures.
+        """
+        element.metadata.pop("formula_recognition_failure", None)
         async with self.slots:
             if self.status_callback:
                 async with self.progress_lock:
@@ -482,6 +490,10 @@ class _FormulaEnrichment:
 
             method = "math.recognize"
             candidates = await self.recognizer.recognize(image_bytes)
+            if not candidates and not self.recognizer.available:
+                # No reading from math.recognize because it was down, not
+                # because it answered without LaTeX.
+                element.metadata["formula_recognition_failure"] = "recognizer_unavailable"
             if not candidates and self.recognizer.available:
                 # An outage already warned once and skips this. An empty list
                 # is usually an answer without LaTeX, which nothing else
@@ -499,9 +511,14 @@ class _FormulaEnrichment:
 
             if not latex:
                 method = "vision"
+                blocked = self.breaker.open
                 output = await _formula_by_vision(
                     self.vision, self.breaker, image_bytes, page_number, self.total_pages, self.mode
                 )
+                if output is None:
+                    element.metadata["formula_recognition_failure"] = (
+                        "provider_blocked" if blocked else "model_failed"
+                    )
                 if (
                     output is not None and output.kind == "description"
                     and output.description.strip() and not output.classification_uncertain

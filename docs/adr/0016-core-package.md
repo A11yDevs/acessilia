@@ -81,8 +81,9 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
     - the vision region cache (`get_cached_bytes`, `set_cache_bytes`,
       `options_cache_key`);
     - `processing_cache_configuration` and `_file_hash`, read by the payload
-      and the Toolbox extractor (step 3 removed these two: the core builds
-      its identities in `backend/core/run_identity.py`, #544).
+      and the Toolbox extractor (in step 3 the core stopped importing these
+      two, which stay in the service: it builds its identities in
+      `backend/core/run_identity.py`, #544).
 - **The service reaches the core** from `backend/service.py`
   (`PddlAccessibilityOrchestrator`), from `backend/api/worker.py` (the
   exporters), and from the API and services (the messages and tools).

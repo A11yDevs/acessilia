@@ -24,7 +24,7 @@ from typing import Any
 from backend.core.config import CoreConfig, FusionConfig, ToolboxConfig
 
 #: Fields that can change the processed document, by ``group.field``.
-#: ``toolbox.providers`` takes part as a whole mapping.
+#: ``toolbox.providers`` takes part through ``PROCESSING_PROVIDERS`` only.
 PROCESSING_FIELDS: frozenset[str] = frozenset({
     "toolbox.base_url",
     "toolbox.base_urls",
@@ -84,6 +84,29 @@ NOT_PROCESSING_FIELDS: dict[str, str] = {
     "paths.data_dir": "where files are written, not what they hold",
 }
 
+#: Toolbox providers the processing calls, by ``ToolboxConfig.providers`` key.
+PROCESSING_PROVIDERS: frozenset[str] = frozenset({
+    "toolbox_provider",
+    "toolbox_layout_provider",
+    "toolbox_pdf_provider",
+    "toolbox_math_recognize_provider",
+    "toolbox_math_provider",
+    "toolbox_ocr_provider",
+    "toolbox_page_ocr_provider",
+    "toolbox_adjudicate_provider",
+    "toolbox_orientation_provider",
+    "toolbox_media_inspect_provider",
+})
+
+#: Toolbox providers the processed document does not depend on, with reasons
+#: (review of #561): changing one must not reprocess a document.
+NOT_PROCESSING_PROVIDERS: dict[str, str] = {
+    "toolbox_docx_provider": "the DOCX export runs after the cache",
+    "toolbox_pdf_ua_provider": "the PDF/UA export runs after the cache",
+    "toolbox_pdf_validate_provider": "the PDF/UA audit runs after the cache",
+    "toolbox_table_provider": "configured, but the core calls no table capability",
+}
+
 #: Bumped when the fused extraction a reuse record holds is built differently,
 #: so records written under the old strategy are not reused.
 FUSION_REUSE_VERSION = "2026-11-16"
@@ -110,7 +133,17 @@ def _json_value(value: Any) -> Any:
 def processing_identity(config: CoreConfig) -> dict[str, Any]:
     """The fields of ``config`` the processed document depends on, JSON-ready."""
     values = config_fields(config)
-    return {name: _json_value(values[name]) for name in sorted(PROCESSING_FIELDS)}
+    identity = {name: _json_value(values[name]) for name in sorted(PROCESSING_FIELDS)}
+    identity["toolbox.providers"] = _processing_providers(config.toolbox)
+    return identity
+
+
+def _processing_providers(toolbox: ToolboxConfig) -> dict[str, str]:
+    return {
+        key: toolbox.providers[key]
+        for key in sorted(PROCESSING_PROVIDERS)
+        if key in toolbox.providers
+    }
 
 
 def fusion_reuse_identity(fusion: FusionConfig, toolbox: ToolboxConfig) -> dict[str, Any]:
@@ -127,7 +160,8 @@ def fusion_reuse_identity(fusion: FusionConfig, toolbox: ToolboxConfig) -> dict[
         "toolbox": {
             "base_url": toolbox.base_url,
             "base_urls": toolbox.base_urls,
-            "providers": _json_value(toolbox.providers),
+            # The fused payload is the structure provider's and the secondary's.
+            "structure_provider": toolbox.providers.get("toolbox_provider", ""),
         },
     }
 
@@ -135,7 +169,9 @@ def fusion_reuse_identity(fusion: FusionConfig, toolbox: ToolboxConfig) -> dict[
 __all__ = [
     "FUSION_REUSE_VERSION",
     "NOT_PROCESSING_FIELDS",
+    "NOT_PROCESSING_PROVIDERS",
     "PROCESSING_FIELDS",
+    "PROCESSING_PROVIDERS",
     "config_fields",
     "fusion_reuse_identity",
     "processing_identity",

@@ -411,6 +411,12 @@ class ToolboxManifestExtractor:
         )
 
 
+def _source_sha256(source_path: Path) -> str:
+    """The source's SHA-256, read in chunks rather than whole (review of #561)."""
+    with source_path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
 def _persist_fusion_reuse(
     source_path: Path, payload: dict,
     policy: FusionPolicy | None,
@@ -430,7 +436,7 @@ def _persist_fusion_reuse(
     from docstruct.policy import FusionPolicy
 
     content = json.dumps({
-        "source_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        "source_sha256": _source_sha256(source_path),
         "identity": identity,
         "policy": asdict(policy or FusionPolicy()),
         "payload": payload,

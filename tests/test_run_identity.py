@@ -12,7 +12,9 @@ import pytest
 from backend.core.run_identity import (
     FUSION_REUSE_VERSION,
     NOT_PROCESSING_FIELDS,
+    NOT_PROCESSING_PROVIDERS,
     PROCESSING_FIELDS,
+    PROCESSING_PROVIDERS,
     config_fields,
     fusion_reuse_identity,
     processing_identity,
@@ -32,7 +34,7 @@ def _changed(value):
     if isinstance(value, Path):
         return value / "elsewhere"
     if isinstance(value, Mapping):
-        return {**value, "added-key": "added-value"}
+        return {**value, "toolbox_provider": f"{value.get('toolbox_provider')}-changed"}
     return f"{value}-changed"
 
 
@@ -49,6 +51,41 @@ def test_every_config_field_is_classified_once() -> None:
     assert not set(PROCESSING_FIELDS) & set(NOT_PROCESSING_FIELDS)
     assert set(ALL_FIELDS) == classified, sorted(set(ALL_FIELDS) ^ classified)
     assert all(reason.strip() for reason in NOT_PROCESSING_FIELDS.values())
+
+
+def test_every_provider_key_is_classified_once() -> None:
+    """A new Toolbox provider must say whether the processed document depends on it."""
+    from acessilia_sdk.toolbox import PROVIDER_DEFAULTS
+
+    classified = set(PROCESSING_PROVIDERS) | set(NOT_PROCESSING_PROVIDERS)
+
+    assert not set(PROCESSING_PROVIDERS) & set(NOT_PROCESSING_PROVIDERS)
+    assert set(PROVIDER_DEFAULTS) == classified, sorted(set(PROVIDER_DEFAULTS) ^ classified)
+
+
+def _with_provider(config, key: str):
+    providers = {**config.toolbox.providers, key: f"{config.toolbox.providers[key]}-changed"}
+    return replace(config, toolbox=replace(config.toolbox, providers=providers))
+
+
+@pytest.mark.parametrize("key", sorted(PROCESSING_PROVIDERS))
+def test_a_processing_provider_changes_the_identity(key) -> None:
+    config = core_config()
+
+    assert processing_identity(_with_provider(config, key)) != processing_identity(config)
+
+
+@pytest.mark.parametrize("key", sorted(NOT_PROCESSING_PROVIDERS))
+def test_an_export_or_unused_provider_changes_neither_identity(key) -> None:
+    """Review of #561: a DOCX/PDF/UA/validation or table provider does not
+    reprocess the document nor re-extract the fusion."""
+    config = core_config()
+    changed = _with_provider(config, key)
+
+    assert processing_identity(changed) == processing_identity(config)
+    assert fusion_reuse_identity(changed.fusion, changed.toolbox) == fusion_reuse_identity(
+        config.fusion, config.toolbox
+    )
 
 
 @pytest.mark.parametrize("name", sorted(PROCESSING_FIELDS))

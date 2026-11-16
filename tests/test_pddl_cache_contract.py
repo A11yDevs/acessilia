@@ -176,8 +176,20 @@ def _warnings(failures):
         # An empty description is the model's answer and would come back the same.
         ([("picture", {"vision_failure_reason": "empty_description"})], None),
         ([("picture", {"vision_description_complete": True})], None),
+        # Review of #561: a formula the outage left without a classification
+        # or a reading may come out differently (as a picture) on a rerun.
+        ([("formula", {"formula_classification": {"status": "unclassified", "reason": "provider_blocked"}}),
+          ("formula", {"formula_classification": {"status": "unclassified", "reason": "model_failed"}}),
+          ("formula", {"formula_recognition_failure": "recognizer_unavailable"})],
+         {"formulas": {"provider_blocked": 1, "model_failed": 1, "recognizer_unavailable": 1}}),
+        # The model's own answers would come back the same.
+        ([("formula", {"formula_classification": {"status": "unclassified", "reason": "empty_description"}}),
+          ("formula", {"formula_classification": {"status": "unresolved", "reason": "classification_uncertain"}}),
+          ("formula", {"formula_classification": {"status": "math", "reason": None}})],
+         None),
     ],
-    ids=["provider-failed", "placeholders-failed", "empty-description", "all-described"],
+    ids=["provider-failed", "placeholders-failed", "empty-description", "all-described",
+         "formula-outage", "formula-answers"],
 )
 def test_a_run_the_vision_model_failed_is_not_cacheable(elements, failures):
     from tests.pddl_support import build_element, build_manifest
