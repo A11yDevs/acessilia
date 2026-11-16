@@ -1,12 +1,20 @@
 import json
 import zipfile
+from pathlib import Path
 
 import pytest
 
 from scripts.bench import __main__ as cli
 from scripts.bench import core
 from scripts.bench.datasets.drdocbench import DrDocBench
-from scripts.bench.report import compare_runs, score_run
+from scripts.bench.report import (
+    _coverage_pair_issues,
+    _identity_pair_issues,
+    _read_windows,
+    compare_runs,
+    score_run,
+)
+from scripts.bench.run_manifest import STRUCTURE_PROTOCOL, _dataset_revision, selection_snapshot
 
 DOC = "0a1b2c3d-0000-4000-8000-000000000001"
 
@@ -93,9 +101,13 @@ def test_score_counts_missing_prediction_as_miss_and_compare_runs(tmp_path):
     preds.mkdir()
     (preds / f"{DOC}_p1.md").write_text("# Page 1\n\nBody 1\n", encoding="utf-8")
 
-    report = score_run(pages, preds, tmp_path / "base")
+    base_run = tmp_path / "base"
+    base_run.mkdir()
+    (base_run / "comparison.json").write_text("stale", encoding="utf-8")
+    report = score_run(pages, preds, base_run)
 
     assert report["pages"] == 2
+    assert not (base_run / "comparison.json").exists()
     rows = [json.loads(line) for line in (tmp_path / "base" / "pages.jsonl").read_text().splitlines()]
     assert rows[0]["text"] == pytest.approx(100.0)
     assert rows[1]["text"] == pytest.approx(0.0)
@@ -144,20 +156,152 @@ def test_cli_resume_skips_existing_predictions(tmp_path, monkeypatch):
     preds = tmp_path / "var" / "drdocbench" / "dev" / "latest" / "predictions"
     preds.mkdir(parents=True)
     (preds / f"{DOC}_p1.md").write_text("kept", encoding="utf-8")
+    for name in ("report.json", "pages.jsonl", "drilldown.csv", "comparison.json"):
+        (preds.parent / name).write_text("stale", encoding="utf-8")
     seen = []
     monkeypatch.setattr(cli.toolbox, "extract_structure",
                         lambda image, provider: seen.append(image.name) or {"document": {"elements": []}})
 
-    assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 0
+    assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 1
     assert seen == ["page_2.jpg"]
     assert (preds / f"{DOC}_p1.md").read_text() == "kept"
     # Resuming keeps the run covering both pages, not only the resumed ones.
     manifest = (preds.parent / "pages.txt").read_text().split()
     assert manifest == [f"{DOC}_p1", f"{DOC}_p2"]
+    run_manifest = json.loads((preds.parent / "run-manifest.json").read_text())
+    assert run_manifest["status"] == "partial"
+    assert run_manifest["items"][f"{DOC}_p1"]["status"] == "legacy_unverified"
+    assert all(not (preds.parent / name).exists() for name in (
+        "report.json", "pages.jsonl", "drilldown.csv", "comparison.json"
+    ))
 
-    # A finished run resumes as a no-op with success.
-    assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 0
+    # A legacy-only no-op remains partial and must not return success.
+    assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 1
     assert seen == ["page_2.jpg"]
+
+
+def test_cli_resume_completed_verified_run_returns_success(tmp_path, monkeypatch):
+    _tree(tmp_path / "data", pages=(1,))
+    run = _stub_toolbox(tmp_path, monkeypatch)
+    data = [
+        "--dataset", "drdocbench", "--root", str(tmp_path / "data"),
+        "--dataset-revision", "a" * 40,
+    ]
+    seen = []
+    monkeypatch.setattr(cli.toolbox, "extract_structure", lambda image, provider: seen.append(image.name) or {
+        "document": {"elements": []}
+    })
+
+    assert cli.main(["run", *data]) == 0
+    assert cli.main(["run", *data, "--resume"]) == 0
+    assert seen == ["page_1.jpg"]
+    saved = json.loads((run / "run-manifest.json").read_text())
+    assert saved["status"] == "completed"
+    assert saved["dataset"]["revision"] == "a" * 40
+    assert saved["dataset"]["revision_source"] == "explicit"
+
+
+def test_cli_run_rejects_input_changed_during_extraction(tmp_path, monkeypatch):
+    _tree(tmp_path / "data", pages=(1,))
+    monkeypatch.setattr(cli, "VAR", tmp_path / "var")
+    image_path = tmp_path / "data" / "MATH" / DOC / "images" / "page_1.jpg"
+
+    def mutate_input(image, provider):
+        image.write_bytes(b"changed")
+        return {"document": {"elements": []}}
+
+    monkeypatch.setattr(cli.toolbox, "extract_structure", mutate_input)
+
+    assert cli.main([
+        "run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"),
+        "--dataset-revision", "a" * 40,
+    ]) == 1
+    run = tmp_path / "var" / "drdocbench" / "dev" / "latest"
+    manifest = json.loads((run / "run-manifest.json").read_text())
+    assert manifest["status"] == "failed"
+    assert manifest["items"][f"{DOC}_p1"]["last_error_type"] == "RuntimeError"
+    assert not (run / "predictions" / f"{DOC}_p1.md").exists()
+
+
+def test_selection_records_input_representation_and_transform_boundary(tmp_path):
+    _tree(tmp_path / "data", pages=(1,))
+    [page] = DrDocBench().pages(tmp_path / "data")
+
+    selection = selection_snapshot([page])
+
+    assert selection["items"][0]["input_representation"] == {
+        "media_type": "image/jpeg",
+        "media_type_source": "filename_extension",
+        "size_bytes": 3,
+    }
+    assert selection["items"][0]["reference_representation"]["media_type"] == "text/markdown"
+    assert STRUCTURE_PROTOCOL["input_representation"] == {
+        "unit": "one dataset page image",
+        "core_transform": "none",
+        "crop": "not_applicable",
+        "toolbox_internal_transform": "not_observed",
+    }
+
+
+def test_comparison_rejects_unknown_dataset_revision():
+    run = {"dataset": {"name": "drdocbench", "split": "dev", "revision": None}}
+
+    issues = _identity_pair_issues(run, run)
+
+    assert "base dataset revision is unavailable" in issues
+    assert "candidate dataset revision is unavailable" in issues
+
+
+def test_comparison_rejects_mutable_dataset_revision_names():
+    run = {
+        "dataset": {
+            "name": "drdocbench",
+            "split": "dev",
+            "revision": "main",
+            "revision_source": "explicit",
+        }
+    }
+
+    issues = _identity_pair_issues(run, run)
+
+    assert "base dataset revision is unavailable" in issues
+    assert "candidate dataset revision is unavailable" in issues
+
+
+def test_dataset_revision_does_not_use_an_ancestor_repository_commit():
+    nested_data = Path(__file__).resolve().parents[1] / "tests"
+
+    assert _dataset_revision(nested_data) is None
+
+
+def test_comparison_rejects_malformed_coverage_without_crashing():
+    malformed = {
+        "coverage": {
+            "expected_item_ids": [{}],
+            "expected_reference_item_ids": [],
+            "scored_reference_item_ids": [],
+            "scorable_by_metric": {
+                "text": {"item_ids": [{}], "expected": 0, "scorable": 0},
+            },
+        },
+        "measurement": {},
+    }
+
+    issues = _coverage_pair_issues(malformed, malformed, [], [])
+
+    assert any("expected item ids is invalid" in issue for issue in issues)
+    assert any("text score rows do not match recorded coverage" in issue for issue in issues)
+
+
+def test_compare_rows_reject_boolean_page_numbers(tmp_path):
+    (tmp_path / "pages.jsonl").write_text(
+        json.dumps({"item_id": "item", "document_id": "doc", "page": True}) + "\n"
+    )
+
+    _windows, rows, issues = _read_windows(tmp_path)
+
+    assert rows == []
+    assert "pages.jsonl has an invalid row at line 1" in issues[0]
 
 
 def _stub_toolbox(tmp_path, monkeypatch):

@@ -625,6 +625,12 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
 
 #: The fields of a formula block that ``compare`` checks.
 FORMULA_FIELDS = ("text", "mathml", "alt_text", "method", "text_agreement", "text_layer", "equation_number")
+PARITY_GATE_PROTOCOL = {
+    "id": "scripts.bench.math_case.parity",
+    "kind": "parity",
+    "version": 1,
+    "vision_differences_in_gate": False,
+}
 #: Fields the core derives from a formula's LaTeX: for a formula a vision model
 #: read, they may differ only when the LaTeX itself differs.
 DERIVED_FORMULA_FIELDS = frozenset({"mathml", "alt_text", "text_agreement", "equation_number"})
@@ -666,12 +672,18 @@ class Comparison:
         def rows(items):
             return [dict(zip(("where", "field", "base", "candidate"), item)) for item in items]
 
-        return {"formulas": self.formulas, "differences": rows(self.differences), "vision": rows(self.vision)}
+        return {
+            "gate": PARITY_GATE_PROTOCOL,
+            "formulas": self.formulas,
+            "differences": rows(self.differences),
+            "vision": rows(self.vision),
+        }
 
     def to_markdown(self) -> str:
         lines = [
             "# Math case: base vs candidate",
             "",
+            "- gate: parity of Core-controlled fields; vision-written differences are diagnostic",
             f"- formulas compared: {self.formulas}",
             f"- differences: **{len(self.differences)}**",
             f"- vision-written differences (may vary between runs): {len(self.vision)}",

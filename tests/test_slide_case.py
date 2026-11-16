@@ -105,7 +105,9 @@ def test_a_wrapped_header_cell_is_found_in_the_stream_order():
     assert both.objects[0].detail == slide_case.STREAM_ORDER_DETAIL
     assert both.summary()["stream_order"] == 1
     assert "| Rows found only in stream order | 1 |" in both.to_markdown()
-    assert "Rows found only in stream order: 0 → 1" in slide_case.compare(layout_only, both)
+    comparison = slide_case.compare(layout_only, both)
+    assert "Gate: diagnostic only" in comparison
+    assert "Rows found only in stream order: 0 → 1" in comparison
 
 
 def test_a_heading_right_after_a_page_break_starts_its_slide():

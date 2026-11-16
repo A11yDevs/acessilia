@@ -356,6 +356,7 @@ def compare(base: Scorecard, candidate: Scorecard) -> str:
     """A per-slide table of what changed, regressions first."""
     a, b = base.slide_scores(), candidate.slide_scores()
     lines = [
+        "Gate: diagnostic only; this comparison does not accept or reject a candidate.",
         f"Base: {base.output}", f"Candidate: {candidate.output}", "",
         f"Objects passed: {base.summary()['objects_passed']} → {candidate.summary()['objects_passed']}",
         f"Rows found only in stream order: {base.summary()['stream_order']} → {candidate.summary()['stream_order']}", "",

@@ -444,8 +444,10 @@ def test_compare_exits_on_differences_only_and_writes_its_report(tmp_path, capsy
     assert math_case.main(["compare", base, vision_only, "--out", str(tmp_path / "v")]) == 0
     assert math_case.main(["compare", base, other, "--out", str(tmp_path / "d")]) == 1
     report = json.loads((tmp_path / "d" / "comparison.json").read_text(encoding="utf-8"))
+    assert report["gate"]["kind"] == "parity"
     assert report["differences"][0]["field"] == "mathml"
     markdown = (tmp_path / "v" / "comparison.md").read_text(encoding="utf-8")
+    assert "gate: parity" in markdown
     assert "differences: **0**" in markdown
     assert "## Vision-written differences" in markdown and "| block 2 (image, p. 1) | alt_text |" in markdown
     assert "differences: **1**" in capsys.readouterr().out

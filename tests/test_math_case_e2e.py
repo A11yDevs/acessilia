@@ -45,6 +45,13 @@ def test_math_reference_case(monkeypatch):
     monkeypatch.setattr(settings, "legacy_unicode_repair", "repair")
     monkeypatch.setattr(settings, "pddl_execute_dry_run", False)
 
+    # Other test modules may import backend.service during collection, which
+    # constructs its module-level orchestrator before these overrides exist.
+    import backend.service as core_service
+
+    monkeypatch.setattr(core_service, "agente", core_service._build_orchestrator())
+    assert core_service.agente.execute_dry_run is False
+
     canonical_path, txt_path, pdf_ua_path = asyncio.run(math_case._process(pdf, OUT, pdf_ua=True))
     card = math_case.score_case(
         rows,
