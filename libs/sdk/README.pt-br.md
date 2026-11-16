@@ -246,6 +246,18 @@ endpoint que o cliente HTTP não aceita, uma capacidade desconhecida ou `rest`
 em `run`, um id malformado, um arquivo de entrada ausente, `--parameters` que
 não é um objeto JSON).
 
+## Bindings de resultados gerados
+
+`ArtifactReference` é atualmente o único modelo de resultado gerado. O
+[inventário de schemas consumidos](../../docs/sdk-result-bindings.pt-br.md)
+mapeia todas as saídas de capacidades selecionadas para seus leitores no
+SDK/core, distingue bindings operacionais dos tipos canônicos da docstruct
+e de descritores binários, e registra o escopo por etapas da #213, contratos
+ausentes da Toolbox e o fluxo de atualização por snapshot imutável.
+Revisar esse escopo antes de acrescentar schemas a `MODELS` e
+`SDK_MODEL_SCHEMAS`; um schema publicado, sozinho, não seleciona uma
+capacidade nem altera o tipo de retorno de um cliente.
+
 ## Adicionar uma capacidade
 
 1. Selecioná-la em `_CAPABILITIES` com `_selected(id, versão, rótulo,
