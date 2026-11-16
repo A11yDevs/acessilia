@@ -223,7 +223,7 @@ Proposta: a opção 2.
      da Toolbox foram inteiros para o `backend/core/toolbox/` no passo 2, também
      com a divisão com o SDK deixada para depois.
   3. As leituras do `settings` são trocadas pelo `CoreConfig`, uma etapa por
-     vez. Em andamento: o `backend/core/config.py` define o `CoreConfig` como
+     vez. Feito: o `backend/core/config.py` define o `CoreConfig` como
      grupos congelados (Toolbox, modelos, visão, fusão, documento, exportação,
      caminhos), o serviço o monta em `backend/config/core_config.py`, e o
      orquestrador monta um por execução até que cada etapa receba o seu grupo.
@@ -257,9 +257,13 @@ Proposta: a opção 2.
      processamento e o reaproveitamento da fusão passam a ser montados a partir
      da config da execução (#544): o `backend/core/run_identity.py` classifica
      cada campo do `CoreConfig` como parte ou não da identidade do documento
-     processado, e o serviço acrescenta as suas opções. Falta no passo 3: a
-     preparação do processo (o logger e os catálogos) passada no início do
-     processo. Os handlers de método que leem a config declaram um parâmetro
+     processado, e o serviço acrescenta as suas opções. Por último, a preparação do
+     processo é passada no início dele: o
+     `backend/config/process_setup.py::setup_process` dá ao logger o
+     `LOG_LEVEL` e o `LOGS_DIR`, e aos catálogos o `I18N_LOCALES_ACTIVE`
+     (`i18n.configure_locales`), então o `backend/core` não lê nenhuma
+     configuração nem importa nada de `backend.config`, o que o
+     `tests/test_core_config.py` confere. Os handlers de método que leem a config declaram um parâmetro
      `config` (os handlers de fusão de dois providers e de provider único, os
      de inspeção de região e de página, os de fórmula, `mathml` e
      `latex-verbalizer`, e o do juiz VLM), e cada execução vincula a sua config

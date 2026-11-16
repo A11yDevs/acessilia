@@ -61,12 +61,16 @@ def test_configure_locales_keeps_the_supported_ones(
     assert i18n.active_locales() == (offered or tuple(i18n.SUPPORTED_LOCALES))
 
 
-def test_a_user_locale_is_negotiated_against_the_configured_locales(unconfigured_locales) -> None:
-    """A bare ``en`` hint does not reach English once only pt_BR is offered."""
+def test_a_user_locale_is_negotiated_against_the_configured_locales(
+    monkeypatch, unconfigured_locales
+) -> None:
+    """A bare ``en`` hint does not reach English once only pt_BR is offered:
+    it falls back to the server locale."""
+    monkeypatch.setattr(i18n, "_active_locale", lambda: "server-locale")
     i18n.configure_locales(("pt_BR",))
 
     assert i18n.locale_for_user("pt") == "pt_BR"
-    assert i18n.locale_for_user("en") == i18n._active_locale()
+    assert i18n.locale_for_user("en") == "server-locale"
 
 
 def test_setting_the_locales_after_startup_does_not_change_them(

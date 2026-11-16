@@ -8,7 +8,8 @@ Telegram bot) calls it first.
 
 from __future__ import annotations
 
-from backend.config.settings import Settings, settings as default_settings
+from backend.config.settings import Settings
+from backend.config.settings import settings as default_settings
 
 
 def setup_process(settings: Settings | None = None) -> None:

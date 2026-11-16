@@ -220,7 +220,7 @@ Proposed: option 2.
      moved whole to `backend/core/toolbox/` in step 2, their SDK split left for
      later as well.
   3. The `settings` reads are replaced by `CoreConfig`, one stage at a time.
-     In progress: `backend/core/config.py` defines `CoreConfig` as frozen
+     Done: `backend/core/config.py` defines `CoreConfig` as frozen
      groups (Toolbox, models, vision, fusion, document, export, paths), the
      service builds it in `backend/config/core_config.py`, and the
      orchestrator builds one per run until every stage takes its group. Moved
@@ -251,8 +251,12 @@ Proposed: option 2.
      processing cache key and the fusion reuse are then built from the run's
      config (#544): `backend/core/run_identity.py` classifies every
      `CoreConfig` field as part of the processed document's identity or not,
-     and the service adds its own options. Left for step 3: the process setup
-     (the logger and the catalogs) passed at process start. The method handlers
+     and the service adds its own options. Last, the process setup is passed at
+     process start: `backend/config/process_setup.py::setup_process` gives
+     the logger `LOG_LEVEL` and `LOGS_DIR` and the catalogs
+     `I18N_LOCALES_ACTIVE` (`i18n.configure_locales`), so `backend/core`
+     reads no settings and imports nothing from `backend.config`, which
+     `tests/test_core_config.py` checks. The method handlers
      that read the config declare a `config` parameter (the dual-provider and
      single-provider fusion handlers, the region and page inspection handlers,
      the `mathml` and `latex-verbalizer` formula handlers, and the VLM
