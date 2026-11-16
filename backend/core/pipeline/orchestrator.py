@@ -23,7 +23,7 @@ from backend.services.blocking import run_blocking
 from backend.services import job_checkpoint
 from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.config import CoreConfig, DocumentConfig, FusionConfig, ToolboxConfig
+from backend.core.config import CoreConfig, DocumentConfig, FusionConfig, PathsConfig, ToolboxConfig
 from backend.core.agents.informational_structural import InformationalStructuralAgent
 from backend.core.execution.executor import (
     ExecutionResume,
@@ -164,9 +164,9 @@ class PddlAccessibilityOrchestrator:
     def _run_config(self) -> CoreConfig:
         """The configuration of one run: the one given, or one built from ``settings`` now.
 
-        The bridge of ADR-0016's step 3: until every stage takes its group,
-        a caller that passes no config gets the settings of the run's start.
-        The last step-3 pull request makes the config required.
+        The bridge of ADR-0016's step 3: every stage takes its group, but a
+        caller that passes no config still gets the settings of the run's
+        start. The last step-3 pull request makes the config required.
         """
         if self.config is not None:
             return self.config
@@ -237,7 +237,8 @@ class PddlAccessibilityOrchestrator:
             if status_callback:
                 await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
             manifest = await self._extract_structure(
-                source_path, presentation, config.document, config.fusion, config.toolbox
+                source_path, presentation, config.document, config.fusion, config.toolbox,
+                config.paths,
             )
         _check_page_limit(manifest, config.document)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
@@ -400,6 +401,7 @@ class PddlAccessibilityOrchestrator:
         document: DocumentConfig,
         fusion: FusionConfig,
         toolbox: ToolboxConfig,
+        paths: PathsConfig,
     ) -> ProcessingManifest:
         """The document's manifest from ``document.structure.extract``.
 
@@ -415,6 +417,7 @@ class PddlAccessibilityOrchestrator:
                 document=document,
                 fusion=fusion,
                 toolbox=toolbox,
+                paths=paths,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local

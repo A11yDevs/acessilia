@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from tests.core_config_support import fusion_config, model_config, toolbox_config, vision_config
+from tests.core_config_support import fusion_config, model_config, paths_config, toolbox_config, vision_config
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.slides import is_slide_heading
@@ -345,6 +345,7 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
         FIXTURE_PDF, dual_fusion=False,
         fusion=fusion_config(mode="dual"),
         toolbox=toolbox_config(use_artifact_store=False),
+        paths=paths_config(),
     )
 
     assert "fusion_evidence" not in result.document

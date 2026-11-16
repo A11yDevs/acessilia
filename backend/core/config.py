@@ -10,10 +10,11 @@ No field has a default: a value the core uses comes from the caller, so the
 service's settings stay the one place where defaults live. Tests build a
 config from those settings and replace the fields they exercise.
 
-Step 3 moves the stages one at a time. Until the last one, the orchestrator
-builds a config from ``settings`` at the start of each run when none is given,
-and the stages not yet moved keep reading ``settings``. The logger's and the
-catalogs' settings (``LOG_LEVEL``, ``LOGS_DIR``, ``I18N_LOCALES_ACTIVE``) are
+Step 3 moved the stages group by group, and every group is now moved: no
+stage reads ``settings``. Until the last step-3 pull request, the orchestrator
+still builds a config from ``settings`` at the start of each run when none is
+given (the bridge), and so do the Agno tools that have no run. The logger's and
+the catalogs' settings (``LOG_LEVEL``, ``LOGS_DIR``, ``I18N_LOCALES_ACTIVE``) are
 process setup, not part of a run; the last step-3 pull request decides how
 they reach the core.
 """

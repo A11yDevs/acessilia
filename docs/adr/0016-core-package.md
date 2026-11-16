@@ -238,12 +238,16 @@ Proposed: option 2.
      `make_toolbox_client(cls, toolbox)`). The `models` group is done too:
      `get_agno_model(models, toolbox)` and `active_model_name(models)`, and
      `VisionAgent` and `DataAgent` take the run's `ModelConfig`, given by
-     the stages and the inspection handlers. The method handlers that read the
-     config declare a `config` parameter (the dual-provider and
-     single-provider fusion handlers, the region and page inspection
-     handlers, the `mathml` and `latex-verbalizer` formula handlers, and the
-     VLM judge's), and each run binds its config to them (`bind_config`) on
-     a copy of the registry.
+     the stages and the inspection handlers. The `paths` group closes the
+     groups: the extractor's fusion evidence and the fusion and inspection
+     handlers' artifacts are written under the run's `PathsConfig.data_dir`, so
+     the core reads no setting of a run; only the process setup (the logger and
+     the catalogs) is left for the last step-3 pull request. The method
+     handlers that read the config declare a `config` parameter (the
+     dual-provider and single-provider fusion handlers, the region and page
+     inspection handlers, the `mathml` and `latex-verbalizer` formula handlers,
+     and the VLM judge's), and each run binds its config to them
+     (`bind_config`) on a copy of the registry.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:

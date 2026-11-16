@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
-from tests.core_config_support import core_config, toolbox_config
+from tests.core_config_support import core_config, paths_config, toolbox_config
 import pytest
 
 from tests.core_config_support import fusion_config
@@ -119,6 +119,7 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
         source,
         fusion=fusion_config(mode="dual"),
         toolbox=toolbox_config(use_artifact_store=False),
+        paths=paths_config(),
     )
     assert result.configuration["fusion"]["status"] == "degraded"
     assert result.configuration["fusion"]["failed_providers"] == ["mineru"]
@@ -142,6 +143,7 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
         source,
         fusion=fusion_config(mode="dual", secondary_provider="docling"),
         toolbox=toolbox_config(use_artifact_store=False),
+        paths=paths_config(),
     )
 
     assert extracted.configuration["fusion"]["status"] == "skipped"
@@ -237,7 +239,7 @@ def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
     manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     payload = _dual_payload()
-    ref = _persist_fusion_reuse(source, payload, None)
+    ref = _persist_fusion_reuse(source, payload, None, data_dir=paths_config().data_dir)
     manifest.extractor.configuration["fusion_reuse"] = ref
     path = Path(ref["path"])
     record = json.loads(path.read_bytes())
@@ -397,7 +399,7 @@ def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'data_dir', tmp_path)
     policy = FusionPolicy(align_tau=0.4)
     payload = _dual_payload()
-    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, policy)
+    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, policy, data_dir=paths_config().data_dir)
     manifest.extractor.configuration['fusion_policy'] = asdict(policy)
     assert fusion_handlers._reusable_fusion_payload(manifest) == payload
     manifest.extractor.configuration['fusion_policy'] = asdict(FusionPolicy(align_tau=0.8))
@@ -440,7 +442,7 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
     original = FusionPolicy(align_tau=0.4)
     changed = FusionPolicy(align_tau=0.8)
     payload = _dual_payload()
-    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original)
+    manifest.extractor.configuration['fusion_reuse'] = _persist_fusion_reuse(source, payload, original, data_dir=paths_config().data_dir)
     manifest.extractor.configuration['fusion_policy'] = asdict(original)
     calls = []
     def extract(path, *, artifact_id=None, policy=None, secondary_provider=None, toolbox=None):

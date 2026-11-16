@@ -79,7 +79,7 @@ Only the groups marked "decompose" or with a docstruct or SDK part are listed. T
   - `_toolbox_render` stays in the core as the adapter over that method. It builds the client with the core's factory (and so the core's configuration), checks that the manifest's media type agrees with the file's extension, and decides to resend the file when the stored artifact is gone. These are core concerns.
   - The set of inputs `pdf.render@2` accepts (`_RENDERABLE_MEDIA_TYPES`: PDF, PNG, JPEG) is contract knowledge, so it moves to the SDK next to the render method, as a constant the adapter checks against: `acessilia_sdk.toolbox.clients.pdf.RENDER_MEDIA_TYPES`.
   - `_source_artifact_id` stays in the core. It reads the manifest (`extractor.configuration["artifact_id"]`) and decides to ignore an id that does not parse or whose digest is not the source's. The parsing it relies on is already the SDK's `ArtifactRef`.
-  - `_save_region_artifact` writes evidence under `settings.data_dir`, so it stays in the core.
+  - `_save_region_artifact` writes evidence under the run's `PathsConfig.data_dir` (ADR-0016 step 3; `settings.data_dir` before), so it stays in the core.
   - `_inspect_region` and `_inspect_page` call `VisionAgent`, so they stay in the core.
   - The two handlers stay in the core.
 - **H: text handlers.** `_tailjoin_position` repeated `docstruct.fusion.tailjoin.page_number_position`, the rule the builder applies to fusion blocks, over manifest elements. It now calls that function through `_FurnitureView`, a read-only view that reads an element's box only when it is page-number furniture, as before. The handlers use `FusionAgent` and stay in the core.

@@ -262,6 +262,22 @@ def test_the_page_is_rendered_and_inspected_as_the_run_config_says(
     assert models == [config.models] and models[0] is config.models
 
 
+def test_the_page_evidence_is_written_under_the_run_data_dir(
+    monkeypatch, source_pdf, isolated_artifacts, tmp_path
+):
+    """ADR-0016 step 3 (paths): the run's ``data_dir``, not the settings'."""
+    manifest, obligation_id, _ = _planned_manifest(source_pdf)
+    _answer(monkeypatch, PageInspectionOutput(kind="blank", language="und", confidence=0.95))
+    run_dir = tmp_path / "run-data"
+
+    result = inspection_handlers._handle_vision_page_inspection_method(
+        manifest, obligation_id, config=core_config(paths={"data_dir": run_dir})
+    )
+
+    assert result.success, result.message
+    assert result.artifacts and all(run_dir in Path(a.path).parents for a in result.artifacts)
+
+
 def test_a_blank_page_is_accepted_and_left_out_of_the_document(
     monkeypatch, source_pdf, isolated_artifacts
 ):

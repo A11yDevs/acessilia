@@ -115,6 +115,24 @@ def test_fusion_handler_extracts_with_the_run_toolbox(tmp_path, monkeypatch, wit
     assert seen == [run.toolbox] and seen[0] is run.toolbox
 
 
+def test_the_fusion_payload_is_written_under_the_run_data_dir(tmp_path, monkeypatch):
+    """ADR-0016 step 3 (paths): the run's ``data_dir``, not the settings'."""
+    manifest = _make_manifest(tmp_path)
+    run_dir = tmp_path / "run-data"
+
+    async def _fake_extract_fused(*args, **kwargs):
+        return _dual_payload()
+
+    monkeypatch.setattr("backend.core.pipeline.fusion.extract_fused", _fake_extract_fused)
+
+    result = _handle_dual_provider_fusion_method(
+        manifest, "o-fuse", config=core_config(paths={"data_dir": run_dir})
+    )
+
+    assert result.success, result.message
+    assert result.artifacts and all(run_dir in Path(a.path).parents for a in result.artifacts)
+
+
 def test_fusion_handler_returns_artifact_in_method_result(tmp_path, monkeypatch):
     manifest = _make_manifest(tmp_path)
 

@@ -106,6 +106,7 @@ async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_p
 
     def process(*_args, **kwargs):
         processed.append(kwargs["toolbox"])
+        processed.append(kwargs["paths"])
         return manifest
 
     orchestrator = build_orchestrator(max_replans=1)
@@ -116,7 +117,8 @@ async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_p
 
     by_name = {call[0]: call for call in calls}
     assert inspected == [config.toolbox]
-    assert processed == [config.toolbox]
+    assert processed == [config.toolbox, config.paths]
+    assert processed[1] is config.paths
     assert by_name["_enrich_formula_latex"][3]["toolbox"] is config.toolbox
     assert by_name["_mark_inline_math"][2][1]._toolbox is config.toolbox
     assert manifest.extractor.configuration["media_inspection"] == "disabled"

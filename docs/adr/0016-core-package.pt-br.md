@@ -243,12 +243,16 @@ Proposta: a opção 2.
      também foi feito: `get_agno_model(models, toolbox)` e
      `active_model_name(models)`, e o `VisionAgent` e o `DataAgent` recebem a
      `ModelConfig` da execução, dada pelas etapas e pelos handlers de
-     inspeção. Os handlers de
-     método que leem a config declaram um parâmetro `config` (os handlers
-     de fusão de dois providers e de provider único, os de inspeção de
-     região e de página, os de fórmula, `mathml` e `latex-verbalizer`, e o
-     do juiz VLM), e cada execução vincula a sua config a eles
-     (`bind_config`) numa cópia do registro.
+     inspeção. O grupo `paths` fecha os grupos: a evidência de fusão do
+     extrator e os artefatos dos handlers de fusão e de inspeção são gravados
+     no `PathsConfig.data_dir` da execução, então o core não lê nenhuma
+     configuração de uma execução; só a preparação do processo (o logger e os
+     catálogos) fica para o último pull request do passo 3. Os handlers de
+     método que leem a config declaram um parâmetro `config` (os handlers de
+     fusão de dois providers e de provider único, os de inspeção de região e de
+     página, os de fórmula, `mathml` e `latex-verbalizer`, e o do juiz VLM), e
+     cada execução vincula a sua config a eles (`bind_config`) numa cópia do
+     registro.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:

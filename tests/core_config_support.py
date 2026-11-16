@@ -16,6 +16,7 @@ from backend.core.config import (
     ExportConfig,
     FusionConfig,
     ModelConfig,
+    PathsConfig,
     ToolboxConfig,
     VisionConfig,
 )
@@ -68,3 +69,8 @@ def toolbox_config(*, providers: dict[str, str] | None = None, **fields: Any) ->
 def model_config(**fields: Any) -> ModelConfig:
     """The service's ``ModelConfig``, with ``fields`` replaced."""
     return core_config(models=fields).models
+
+
+def paths_config(**fields: Any) -> PathsConfig:
+    """The service's ``PathsConfig``, with ``fields`` replaced."""
+    return core_config(paths=fields).paths

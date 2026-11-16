@@ -17,8 +17,7 @@ from acessilia_sdk.toolbox import (
 )
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
-from backend.config.settings import settings
-from backend.core.config import FusionConfig, ToolboxConfig
+from backend.core.config import FusionConfig, PathsConfig, ToolboxConfig
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
@@ -90,6 +89,7 @@ class ToolboxManifestExtractor:
         *,
         fusion: FusionConfig,
         toolbox: ToolboxConfig,
+        paths: PathsConfig,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         """Extract a document's structure using the Toolbox (synchronous).
@@ -98,7 +98,8 @@ class ToolboxManifestExtractor:
         compatible with the existing flow that calls extract() inside
         asyncio.to_thread(). ``fusion`` is the run's ``FusionConfig`` (mode,
         secondary provider, page routes), and ``toolbox`` its ``ToolboxConfig``
-        (the artifact store, the Toolbox cache, the extraction timeout). With
+        (the artifact store, the Toolbox cache, the extraction timeout), and
+        ``paths`` where the fusion evidence is written. With
         ``dual_fusion=False`` the
         secondary provider is not called even in dual mode (a presentation).
         """
@@ -110,6 +111,7 @@ class ToolboxManifestExtractor:
                         source_path,
                         fusion_config=fusion,
                         toolbox_config=toolbox,
+                        data_dir=paths.data_dir,
                         dual_fusion=dual_fusion,
                     ),
                     timeout=timeout,
@@ -150,6 +152,7 @@ class ToolboxManifestExtractor:
         *,
         fusion_config: FusionConfig,
         toolbox_config: ToolboxConfig,
+        data_dir: Path,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient, toolbox_config)
@@ -177,6 +180,7 @@ class ToolboxManifestExtractor:
                 use_artifact_store=use_artifact_store,
                 fusion_config=fusion_config,
                 toolbox_config=toolbox_config,
+                data_dir=data_dir,
                 dual_fusion=dual_fusion,
             )
         finally:
@@ -194,6 +198,7 @@ class ToolboxManifestExtractor:
         use_artifact_store: bool,
         fusion_config: FusionConfig,
         toolbox_config: ToolboxConfig,
+        data_dir: Path,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
@@ -339,7 +344,7 @@ class ToolboxManifestExtractor:
                             policy=self.fusion_policy,
                         )
                         reuse = _persist_fusion_reuse(
-                            source_path, fusion, self.fusion_policy
+                            source_path, fusion, self.fusion_policy, data_dir=data_dir
                         )
                         replaced: dict[int, list[dict[str, Any]]] = {}
                         if fusion_config.apply_page_routes:
@@ -356,7 +361,8 @@ class ToolboxManifestExtractor:
                             "fusion_stats": fusion["fusion_stats"],
                             "fusion_evidence": fusion["fusion_evidence"],
                             "secondary_extraction": _persist_secondary_extraction(
-                                secondary_result, secondary_provider, replaced
+                                secondary_result, secondary_provider, replaced,
+                                data_dir=data_dir,
                             ),
                         }
                 finally:
@@ -406,6 +412,8 @@ class ToolboxManifestExtractor:
 def _persist_fusion_reuse(
     source_path: Path, payload: dict,
     policy: FusionPolicy | None,
+    *,
+    data_dir: Path,
 ) -> dict:
     from dataclasses import asdict
 
@@ -420,7 +428,7 @@ def _persist_fusion_reuse(
         "payload": payload,
     }, ensure_ascii=False, sort_keys=True).encode("utf-8")
     digest = hashlib.sha256(content).hexdigest()
-    path = settings.data_dir / "artifacts" / "fusion" / f"inputs-{digest}.json"
+    path = data_dir / "artifacts" / "fusion" / f"inputs-{digest}.json"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
@@ -446,6 +454,8 @@ def _persist_secondary_extraction(
     payload: dict[str, Any],
     provider: str,
     replaced_primary: dict[int, list[dict[str, Any]]] | None = None,
+    *,
+    data_dir: Path,
 ) -> dict[str, str]:
     """Keep the secondary provider's extraction for the planning methods.
 
@@ -467,7 +477,7 @@ def _persist_secondary_extraction(
         }
     content = json.dumps(record, ensure_ascii=False, sort_keys=True).encode("utf-8")
     digest = hashlib.sha256(content).hexdigest()
-    path = settings.data_dir / "artifacts" / "fusion" / f"secondary-{digest[:16]}.json"
+    path = data_dir / "artifacts" / "fusion" / f"secondary-{digest[:16]}.json"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
