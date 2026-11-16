@@ -45,8 +45,9 @@ the deadline bounds one model call, not the whole table or document.
 core's `ModelCallRunner` port by composition. The application owns its
 implementation, `backend.services.model_calls.ModelCallExecutor`, independently
 of event loops. Each run receives its runner explicitly:
-`PddlAccessibilityOrchestrator.execute(..., config=, model_calls=)` requires
-both the run's `CoreConfig` and the runner, and opens the runner's
+`PddlAccessibilityOrchestrator.execute(..., config=, model_calls=, ports=)`
+requires the run's `CoreConfig`, the runner and the run's `RunPorts` (ADR-0016,
+step 4), and opens the runner's
 `model_call_scope` for the agents it builds (ADR-0016, step 3). Nothing falls
 back to the service's process owner or settings. Agents read no
 execution-capacity settings. AgentOS's separate

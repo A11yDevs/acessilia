@@ -48,7 +48,8 @@ recebem por composição a interface `ModelCallRunner` do core. A aplicação é
 dona da implementação, `backend.services.model_calls.ModelCallExecutor`,
 independentemente dos event loops. Cada execução recebe o seu runner
 explicitamente: `PddlAccessibilityOrchestrator.execute(..., config=,
-model_calls=)` exige o `CoreConfig` da execução e o runner, e abre o
+model_calls=, ports=)` exige o `CoreConfig` da execução, o runner e os
+`RunPorts` da execução (passo 4 da ADR-0016), e abre o
 `model_call_scope` do runner para os agentes que constrói (passo 3 da
 ADR-0016). Nada recorre ao executor do processo mantido pelo serviço nem às
 configurações. Os agentes não leem configurações de capacidade de execução. Os agentes Agno

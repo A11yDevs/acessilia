@@ -3,7 +3,9 @@
 The core does not own the service's state: its caches, its job checkpoints
 and its registry of remote operations live in ``backend/services``. A run
 receives them as ``RunPorts``, built by its caller for that job, so the core
-imports nothing from the service.
+does not import them. The region cache is a port now; the checkpoints and
+the remote operations follow in step 4's next pull requests, and
+``tests/test_run_ports.py`` lists the service imports still pending.
 
 Every port has a no-op implementation here, which ``RunPorts.none()``
 gathers: a script or a test that hosts no service state runs with it.
@@ -27,11 +29,9 @@ class RegionCache(Protocol):
 
     async def get(self, content: bytes, variant: str, *, ttl_seconds: int) -> Any | None:
         """The stored payload, or ``None`` when absent or older than ``ttl_seconds``."""
-        ...
 
     async def put(self, content: bytes, variant: str, payload: Any) -> None:
         """Store ``payload`` (JSON-ready) for ``content`` under ``variant``."""
-        ...
 
 
 class NoRegionCache:

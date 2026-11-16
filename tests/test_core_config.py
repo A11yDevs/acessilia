@@ -2,8 +2,9 @@
 
 ``CoreConfig`` holds every value the core reads from its caller, grouped by
 responsibility; ``core_config_from_settings`` builds it from the service's
-settings. A run requires its config and its model-call runner
-(``execute(..., config=, model_calls=)``), and an Agno tool without a run
+settings. A run requires its config, its model-call runner and its ports
+(``execute(..., config=, model_calls=, ports=)``; ``tests/test_run_ports.py``
+covers the ports), and an Agno tool without a run
 requires the config its agent was built with: nothing falls back to
 ``settings``.
 """

@@ -150,7 +150,7 @@ class ContentCache:
     """The core's ``RegionCache`` port over this cache (ADR-0016, step 4):
     a region image's answers, keyed on its bytes and the core's variant."""
 
-    async def get(self, content: bytes, variant: str, *, ttl_seconds: int) -> Any:
+    async def get(self, content: bytes, variant: str, *, ttl_seconds: int) -> Any | None:
         return await get_cached_bytes(content, extra=variant, ttl=ttl_seconds)
 
     async def put(self, content: bytes, variant: str, payload: Any) -> None:

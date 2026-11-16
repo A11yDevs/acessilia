@@ -79,13 +79,20 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
   - `backend.config`: 34 imports, e 59 chaves diferentes do `settings` lidas
     em 107 pontos. Só o orquestrador lê 12 chaves, e os exportadores, 3.
   - `backend.services`, em quatro imports, vindos de três lugares:
-    - `run_blocking` (`blocking.py`);
+    - `run_blocking` (`blocking.py`; passou para o core no passo 4);
     - o cache de regiões da visão (`get_cached_bytes`, `set_cache_bytes`,
-      `options_cache_key`);
+      `options_cache_key`; no passo 4 o core o recebe como porta, e o
+      `options_cache_key` passou para o core);
     - `processing_cache_configuration` e `_file_hash`, lidos pelo payload e
       pelo extrator da Toolbox (no passo 3 o core deixou de importar esses
       dois, que ficam no serviço: ele monta as suas identidades em
       `backend/core/run_identity.py`, #544).
+
+    Imports acrescentados depois deste inventário, pendentes no passo 4: os
+    checkpoints do job (`job_checkpoint`) e o id do job (`operation_context`)
+    no orquestrador, e o registro de operações remotas (`operation_registry`,
+    `operation_context`) no extrator da Toolbox. O `tests/test_run_ports.py`
+    os lista, e a lista só diminui.
 - **O serviço chega ao core** por `backend/service.py`
   (`PddlAccessibilityOrchestrator`), por `backend/api/worker.py` (os
   exportadores) e pela API e pelos serviços (as mensagens e as ferramentas).
@@ -255,7 +262,8 @@ Proposta: a opção 2.
      no `PathsConfig.data_dir` da execução, então o core não lê nenhuma
      configuração de uma execução; e os grupos de configuração estão feitos.
      Depois, uma execução exige a sua config e o seu runner de chamadas de
-     modelo (`execute(..., config=, model_calls=)`), o serviço monta uma config
+     modelo (`execute(..., config=, model_calls=)`, e `ports=` desde o passo
+     4), o serviço monta uma config
      por job e as exportações e a auditoria do worker a reutilizam, e as
      ferramentas Agno sem execução recebem a config com que o agente foi
      construído: as pontes saíram. Em seguida, a chave do cache de

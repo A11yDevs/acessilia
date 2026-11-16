@@ -46,7 +46,7 @@ Closures canceladas podem, assim, reter imagens, agentes e clientes.
 No começo, o orquestrador não exigia um runner e obtinha o executor do serviço
 quando nenhum era fornecido, como sua ponte de CoreConfig. O passo 3 da
 ADR-0016 removeu as duas: `execute(..., config=, model_calls=)` exige o runner
-da execução. Chamadores independentes podem passar e fechar seu runner. Os agentes do chat AgentOS e o
+da execução (o passo 4 da ADR-0016 depois acrescentou o `ports=` obrigatório). Chamadores independentes podem passar e fechar seu runner. Os agentes do chat AgentOS e o
 escalonamento de providers (#547) ficam fora desse caminho. Veja a
 [arquitetura](../architecture.pt-br.md).
 

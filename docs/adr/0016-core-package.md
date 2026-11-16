@@ -77,13 +77,20 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
   - `backend.config`: 34 imports, and 59 distinct `settings` keys read at
     107 points. The orchestrator alone reads 12 keys, and the exporters 3.
   - `backend.services`, in four imports, from three places:
-    - `run_blocking` (`blocking.py`);
+    - `run_blocking` (`blocking.py`; moved into the core in step 4);
     - the vision region cache (`get_cached_bytes`, `set_cache_bytes`,
-      `options_cache_key`);
+      `options_cache_key`; in step 4 the core takes it as a port, and
+      `options_cache_key` moved into the core);
     - `processing_cache_configuration` and `_file_hash`, read by the payload
       and the Toolbox extractor (in step 3 the core stopped importing these
       two, which stay in the service: it builds its identities in
       `backend/core/run_identity.py`, #544).
+
+    Imports added after this inventory, and pending in step 4: the job
+    checkpoints (`job_checkpoint`) and the job id (`operation_context`) in
+    the orchestrator, and the registry of remote operations
+    (`operation_registry`, `operation_context`) in the Toolbox extractor.
+    `tests/test_run_ports.py` lists them, and the list only shrinks.
 - **The service reaches the core** from `backend/service.py`
   (`PddlAccessibilityOrchestrator`), from `backend/api/worker.py` (the
   exporters), and from the API and services (the messages and tools).
@@ -250,7 +257,7 @@ Proposed: option 2.
      handlers' artifacts are written under the run's `PathsConfig.data_dir`, so
      the core reads no setting of a run; and the configuration groups are done.
      A run then requires its config and its model-call runner (`execute(...,
-     config=, model_calls=)`), the service builds one config per job and the
+     config=, model_calls=)`, and `ports=` since step 4), the service builds one config per job and the
      worker's exports and audit reuse it, and the Agno tools without a run take
      the config their agent was built with: the bridges are gone. The
      processing cache key and the fusion reuse are then built from the run's
