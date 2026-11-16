@@ -81,7 +81,8 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
     - the vision region cache (`get_cached_bytes`, `set_cache_bytes`,
       `options_cache_key`);
     - `processing_cache_configuration` and `_file_hash`, read by the payload
-      and the Toolbox extractor.
+      and the Toolbox extractor (step 3 removed these two: the core builds
+      its identities in `backend/core/run_identity.py`, #544).
 - **The service reaches the core** from `backend/service.py`
   (`PddlAccessibilityOrchestrator`), from `backend/api/worker.py` (the
   exporters), and from the API and services (the messages and tools).
@@ -245,14 +246,17 @@ Proposed: option 2.
      A run then requires its config and its model-call runner (`execute(...,
      config=, model_calls=)`), the service builds one config per job and the
      worker's exports and audit reuse it, and the Agno tools without a run take
-     the config their agent was built with: the bridges are gone. Left for step
-     3: the processing cache key and the fusion reuse built from the run's
-     config (#544), and the process setup (the logger and the catalogs) passed
-     at process start. The method handlers that read the config declare a
-     `config` parameter (the dual-provider and single-provider fusion handlers,
-     the region and page inspection handlers, the `mathml` and
-     `latex-verbalizer` formula handlers, and the VLM judge's), and each run
-     binds its config to them (`bind_config`) on a copy of the registry.
+     the config their agent was built with: the bridges are gone. The
+     processing cache key and the fusion reuse are then built from the run's
+     config (#544): `backend/core/run_identity.py` classifies every
+     `CoreConfig` field as part of the processed document's identity or not,
+     and the service adds its own options. Left for step 3: the process setup
+     (the logger and the catalogs) passed at process start. The method handlers
+     that read the config declare a `config` parameter (the dual-provider and
+     single-provider fusion handlers, the region and page inspection handlers,
+     the `mathml` and `latex-verbalizer` formula handlers, and the VLM
+     judge's), and each run binds its config to them (`bind_config`) on a copy
+     of the registry.
   4. The caches and `run_blocking` are injected through `ports`.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:

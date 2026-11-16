@@ -28,6 +28,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from backend.core.run_identity import fusion_reuse_identity
 from backend.core.config import CoreConfig, ToolboxConfig
 from backend.core.execution.models import MethodResult
 from backend.core.manifest.models import (
@@ -337,12 +338,16 @@ def _run_extract_fused(
         ).result()
 
 
-def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
+def _reusable_fusion_payload(manifest: ProcessingManifest, config: CoreConfig) -> dict | None:
+    """The fused extraction stored for this source, if the run would build it again.
+
+    Reused only when the record's identity is the run's
+    (:func:`~backend.core.run_identity.fusion_reuse_identity`: fusion options,
+    deployment, providers, strategy version) and the policy matches (#544).
+    """
     from dataclasses import asdict
 
     from docstruct.policy import FusionPolicy
-
-    from backend.services.cache import processing_cache_configuration
 
     ref = manifest.extractor.configuration.get("fusion_reuse") or {}
     try:
@@ -357,7 +362,8 @@ def _reusable_fusion_payload(manifest: ProcessingManifest) -> dict | None:
             expected_policy = asdict(FusionPolicy())
         if record.get("policy") != expected_policy:
             return None
-        if json.dumps(record["configuration"], sort_keys=True) != json.dumps(processing_cache_configuration(), sort_keys=True):
+        expected = fusion_reuse_identity(config.fusion, config.toolbox)
+        if json.dumps(record["identity"], sort_keys=True) != json.dumps(expected, sort_keys=True):
             return None
         payload = record["payload"]
         return payload if isinstance(payload, dict) else None
@@ -392,7 +398,7 @@ def _handle_dual_provider_fusion_method(
     # Reuse the document the structure extractor already stored in the Toolbox.
     artifact_id = _source_artifact_id(manifest)
     try:
-        payload = _reusable_fusion_payload(manifest)
+        payload = _reusable_fusion_payload(manifest, config)
         if payload is None:
             from docstruct.policy import FusionPolicy
 

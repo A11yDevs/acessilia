@@ -86,17 +86,23 @@ agente = _build_orchestrator()
 
 
 def _cache_version(
+    config: CoreConfig,
     mode: str = "normal",
     custom_prompt: str | None = None,
     thinking_mode: bool = False,
 ) -> str:
+    """The processing cache's key for a job with ``config`` (#544).
+
+    Built from the job's ``CoreConfig``, so a cached document is reused only
+    by a job that would produce it again.
+    """
     engine = _normalized_engine()
     return options_cache_key(
-        f"{settings.ai_client}-{engine}-v12",
+        f"{config.models.ai_client}-{engine}-v13",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,
-        configuration=processing_cache_configuration(),
+        configuration=processing_cache_configuration(config),
     )
 
 
@@ -196,7 +202,7 @@ async def process(
     )
 
     try:
-        cache_variant = _cache_version(mode, custom_prompt, thinking_mode)
+        cache_variant = _cache_version(config, mode, custom_prompt, thinking_mode)
         cached = await get_cached(file_path, cache_variant)
         if isinstance(cached, dict):
             metadata = cached.get("canonical_metadata")

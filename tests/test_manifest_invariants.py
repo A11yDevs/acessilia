@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from backend.core.i18n import t
+from tests.core_config_support import core_config
 from backend.core.manifest.models import (
     MSG_ELEMENT_UNKNOWN_PAGE,
     MSG_PAGE_DUPLICATE_ELEMENT_IDS,
@@ -125,7 +126,7 @@ def test_the_cache_identity_includes_the_invariant_revision() -> None:
         processing_cache_configuration,
     )
 
-    configuration = processing_cache_configuration()
+    configuration = processing_cache_configuration(core_config())
 
     assert (
         configuration["manifest_invariant_revision"]

@@ -7,6 +7,8 @@ import pytest
 from docstruct.tables.ast import linearize_table_for_text
 from docstruct.export.html import document_to_html
 
+from tests.core_config_support import core_config
+
 
 def test_text_export_merged_cells_have_all_headers():
     table = {"header": [{"cells": [{"text": "AB", "colspan": 2}, {"text": "C"}]}],
@@ -61,25 +63,46 @@ def test_pending_jobs_preserve_insertion_order(monkeypatch, tmp_path):
     assert [r["task_id"] for r in job_store.pending_records()] == ["z-first", "m-second", "a-last"]
 
 
-@pytest.mark.parametrize("field,value", [
-    ("ollama_model", "another-model"), ("ollama_base_url", "http://new.invalid"),
-    ("openrouter_model", "another-model"), ("openrouter_max_tokens", 12),
-    ("toolbox_provider", "another-provider"), ("fusion_mode", "dual"),
+@pytest.mark.parametrize("group,field,value", [
+    ("models", "ollama_model", "another-model"),
+    ("models", "ollama_base_url", "http://new.invalid"),
+    ("models", "openrouter_model", "another-model"),
+    ("models", "openrouter_max_tokens", 12),
+    ("toolbox", "providers", {"toolbox_provider": "another-provider"}),
+    ("fusion", "mode", "dual"),
 ])
-def test_document_cache_changes_with_model_and_provider(monkeypatch, field, value):
+def test_document_cache_changes_with_model_and_provider(group, field, value):
+    """The key follows the job's config (#544)."""
     from backend import service
-    before = service._cache_version()
-    monkeypatch.setattr(service.settings, field, value)
-    assert service._cache_version() != before
-    assert service._cache_version() == service._cache_version()
+
+    base = core_config()
+    if field == "providers":
+        value = {**base.toolbox.providers, **value}
+    changed = core_config(**{group: {field: value}})
+    before = service._cache_version(base)
+    assert service._cache_version(changed) != before
+    assert service._cache_version(changed) == service._cache_version(changed)
 
 
-def test_document_cache_excludes_credentials(monkeypatch):
+def test_document_cache_excludes_credentials():
     from backend import service
-    before = service._cache_version()
-    monkeypatch.setattr(service.settings, "ollama_api_key", "private-secret")
-    monkeypatch.setattr(service.settings, "toolbox_api_key", "private-secret")
-    assert service._cache_version() == before
+    before = service._cache_version(core_config())
+    changed = core_config(
+        models={"ollama_api_key": "private-secret", "openrouter_api_key": "private-secret"},
+        toolbox={"api_key": "private-secret"},
+    )
+    assert service._cache_version(changed) == before
+
+
+def test_the_cache_key_follows_the_job_config_not_the_settings(monkeypatch):
+    """A setting changed after the job's config was built does not move its key."""
+    from backend import service
+
+    config = core_config()
+    before = service._cache_version(config)
+    monkeypatch.setattr(service.settings, "ollama_model", "changed-after-the-job-started")
+    monkeypatch.setattr(service.settings, "fusion_mode", "dual")
+    assert service._cache_version(config) == before
 
 
 @pytest.mark.parametrize("cancel", [False, True])

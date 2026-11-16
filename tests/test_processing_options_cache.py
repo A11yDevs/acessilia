@@ -13,13 +13,14 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
     monkeypatch.setattr(service.settings, "ai_client", "fake")
     monkeypatch.setattr(service.settings, "pipeline_engine", "pddl")
 
-    base = service._cache_version("normal", None, False)
+    config = core_config(models={"ai_client": "fake"})
+    base = service._cache_version(config, "normal", None, False)
 
-    assert "-v12_" in base
-    assert service._cache_version("detailed", None, False) != base
-    assert service._cache_version("normal", "Describe charts", False) != base
-    assert service._cache_version("normal", None, True) != base
-    assert service._cache_version("normal", None, False) == base
+    assert base.startswith("fake-pddl-v13_")
+    assert service._cache_version(config, "detailed", None, False) != base
+    assert service._cache_version(config, "normal", "Describe charts", False) != base
+    assert service._cache_version(config, "normal", None, True) != base
+    assert service._cache_version(config, "normal", None, False) == base
 
 
 def test_cached_payload_rebuilds_current_submission_metadata(monkeypatch, tmp_path):
@@ -120,18 +121,18 @@ async def _async_noop(*_args, **_kwargs):
 def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings
     from backend.services.cache import processing_cache_configuration, options_cache_key
-    before = options_cache_key("document", configuration=processing_cache_configuration())
+    before = options_cache_key("document", configuration=processing_cache_configuration(core_config()))
     value = getattr(settings, name)
     monkeypatch.setattr(settings, name, not value if isinstance(value, bool) else value + 1)
-    assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+    assert options_cache_key("document", configuration=processing_cache_configuration(core_config())) != before
 
 
 def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
     from backend.config.settings import settings
     from backend.services.cache import processing_cache_configuration, options_cache_key
-    before = options_cache_key("document", configuration=processing_cache_configuration())
+    before = options_cache_key("document", configuration=processing_cache_configuration(core_config()))
     monkeypatch.setattr(settings, "toolbox_base_urls", "http://a.test,http://b.test")
-    assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+    assert options_cache_key("document", configuration=processing_cache_configuration(core_config())) != before
 
 
 def test_inline_math_detection_invalidates_processing_cache(monkeypatch):
@@ -140,6 +141,6 @@ def test_inline_math_detection_invalidates_processing_cache(monkeypatch):
     from backend.services.cache import processing_cache_configuration, options_cache_key
 
     monkeypatch.setattr(settings, "inline_math_detection", "fonts")
-    before = options_cache_key("document", configuration=processing_cache_configuration())
+    before = options_cache_key("document", configuration=processing_cache_configuration(core_config()))
     monkeypatch.setattr(settings, "inline_math_detection", "off")
-    assert options_cache_key("document", configuration=processing_cache_configuration()) != before
+    assert options_cache_key("document", configuration=processing_cache_configuration(core_config())) != before

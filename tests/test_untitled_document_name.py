@@ -196,3 +196,26 @@ async def test_the_canonical_build_takes_the_job_toolbox_config(
     )
 
     assert toolboxes == [job_config.toolbox] and toolboxes[0] is job_config.toolbox
+
+
+@pytest.mark.asyncio
+async def test_the_processing_cache_is_keyed_by_the_job_config(isolated_runtime, monkeypatch, tmp_path):
+    """#544: the key a job reads and writes describes its config, not the settings."""
+    from backend import service
+
+    source = tmp_path / STORED
+    source.write_bytes(b"%PDF")
+    _patch_pipeline(monkeypatch)
+    keys = []
+
+    async def get_cached(_path, extra):
+        keys.append(extra)
+        return None
+
+    monkeypatch.setattr(service, "get_cached", get_cached)
+    job_config = core_config(fusion={"secondary_provider": "only-in-the-job-config"})
+
+    await service.process(source, task_id="cache-key", config=job_config)
+
+    assert keys == [service._cache_version(job_config, "normal", None, False)]
+    assert keys[0] != service._cache_version(core_config(), "normal", None, False)

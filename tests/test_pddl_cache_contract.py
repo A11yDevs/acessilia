@@ -26,20 +26,22 @@ def test_execution_configuration_invalidates_document_cache(monkeypatch, field, 
 
     if field == "pddl_execute_dry_run":
         monkeypatch.setattr(service.settings, field, True)
-    before = service._cache_version()
+    config = core_config()  # the job's, fixed: the service's own setting moves
+    before = service._cache_version(config)
     monkeypatch.setattr(service.settings, field, value)
-    assert service._cache_version() != before
+    assert service._cache_version(config) != before
 
 
 def test_domain_identity_invalidates_document_cache(monkeypatch):
     from backend import service
     from backend.core.planning.domain_bundle import DomainBundle
 
-    before = service._cache_version()
+    config = core_config()  # the job's, fixed: the service's own setting moves
+    before = service._cache_version(config)
     monkeypatch.setattr(DomainBundle, "load", lambda: SimpleNamespace(
         domain_sha256="new-domain", description_sha256="new-description"
     ))
-    assert service._cache_version() != before
+    assert service._cache_version(config) != before
 
 
 @pytest.mark.asyncio
