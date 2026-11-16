@@ -22,7 +22,8 @@ from backend.services.cleanup_service import periodic_cleanup
 from backend.services.download_token_service import limpar_tokens_expirados
 from backend.services.queue_service import unified_queue
 from backend.services.access_log_filter import AccessLogFilter
-from backend.core.logger import logger, setup_logger
+from backend.config.process_setup import setup_process
+from backend.core.logger import logger
 
 
 @asynccontextmanager
@@ -34,7 +35,7 @@ async def _lifespan(app: FastAPI):
     # in one process); only the shutdown path sets the signal again.
     reset_shutdown()
     with runtime_lease():
-        setup_logger()
+        setup_process()
         from backend.services.model_calls import get_model_calls, shutdown_model_calls
         get_model_calls()
         from backend.services.blocking import run_blocking

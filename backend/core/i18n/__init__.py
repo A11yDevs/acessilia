@@ -10,7 +10,6 @@ from pathlib import Path
 from babel import negotiate_locale
 from babel.support import Translations
 
-from backend.config.settings import settings
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -73,16 +72,33 @@ def _locales_from_raw(raw_value: str) -> tuple[str, ...]:
     return tuple(seen)
 
 
+#: Locales the process offers remote users, set once at startup by
+#: :func:`configure_locales`; ``None`` until then, which offers every
+#: supported locale.
+_ACTIVE_LOCALES: tuple[str, ...] | None = None
+
+
+def configure_locales(locales: tuple[str, ...] | list[str]) -> None:
+    """Set the locales the process offers remote users (``I18N_LOCALES_ACTIVE``).
+
+    Process setup, not part of a run: the service calls it at startup
+    (``backend/config/process_setup.py``; ADR-0016, step 3), so the core reads
+    no settings. Unsupported entries are dropped; an empty list offers every
+    supported locale, so the bot always has at least one.
+    """
+    global _ACTIVE_LOCALES
+    _ACTIVE_LOCALES = tuple(loc for loc in locales if loc in SUPPORTED_LOCALES) or tuple(
+        SUPPORTED_LOCALES
+    )
+
+
 def active_locales() -> tuple[str, ...]:
-    """Locales the software advertises to remote users, per I18N_LOCALES_ACTIVE in .env.
+    """Locales the software advertises to remote users, as set by :func:`configure_locales`.
 
     Returns:
-        tuple: Locally supported locale identifiers in declared settings order; falls back to :data:`SUPPORTED_LOCALES` when the setting lists no usable entry so the bot always has at least one offered locale.
+        tuple: The configured locales in declared order; every supported locale when the process has not configured them (a script, a test) or configured none usable.
     """
-    locales = settings.i18n_locales_active
-    if not locales:
-        locales = SUPPORTED_LOCALES
-    return tuple(loc for loc in locales if loc in SUPPORTED_LOCALES) or tuple(SUPPORTED_LOCALES)
+    return _ACTIVE_LOCALES if _ACTIVE_LOCALES is not None else tuple(SUPPORTED_LOCALES)
 
 
 def _expand_candidates(raw_values: list[str]) -> list[str]:
