@@ -164,9 +164,9 @@ class PddlAccessibilityOrchestrator:
     def _run_config(self) -> CoreConfig:
         """The configuration of one run: the one given, or one built from ``settings`` now.
 
-        The bridge of ADR-0016's step 3: until every stage takes its group,
-        a caller that passes no config gets the settings of the run's start.
-        The last step-3 pull request makes the config required.
+        The bridge of ADR-0016's step 3: every stage takes its group, but a
+        caller that passes no config still gets the settings of the run's
+        start. The last step-3 pull request makes the config required.
         """
         if self.config is not None:
             return self.config

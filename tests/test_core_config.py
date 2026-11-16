@@ -2,8 +2,9 @@
 
 ``CoreConfig`` holds every value the core reads from its caller, grouped by
 responsibility; ``core_config_from_settings`` builds it from the service's
-settings. Until step 3 ends, the orchestrator builds one per run when it is
-given none, and the stages not yet moved keep reading ``settings``.
+settings. Every group is moved and no stage reads ``settings``; until step 3
+ends, the orchestrator (and the Agno tools without a run) still build one from
+``settings`` when given none.
 """
 
 from __future__ import annotations
@@ -701,6 +702,16 @@ CALLERS_CHECKED = {
 
 CALLER_ROOTS = ("backend", "frontend", "scripts")
 
+#: Methods with generic names (``extract``, ``process``), checked only on the
+#: calls that pass ``fusion=``, which no other ``extract``/``process`` takes:
+#: the extractor's and the structural agent's (review of #557).
+METHOD_CALLERS_CHECKED = {
+    "extract": "backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract",
+    "process": (
+        "backend.core.agents.informational_structural:InformationalStructuralAgent.process"
+    ),
+}
+
 
 def _resolve(target: str):
     import importlib
@@ -717,6 +728,9 @@ def test_every_caller_passes_the_run_configuration() -> None:
     import inspect
 
     signatures = {name: inspect.signature(_resolve(target)) for name, target in CALLERS_CHECKED.items()}
+    methods = {
+        name: inspect.signature(_resolve(target)) for name, target in METHOD_CALLERS_CHECKED.items()
+    }
     unbound = []
     for root in CALLER_ROOTS:
         for path in sorted((ROOT / root).rglob("*.py")):
@@ -728,15 +742,21 @@ def test_every_caller_passes_the_run_configuration() -> None:
                 name = func.id if isinstance(func, ast.Name) else (
                     func.attr if isinstance(func, ast.Attribute) else None
                 )
-                if name not in signatures:
+                passes_fusion = any(keyword.arg == "fusion" for keyword in node.keywords)
+                if name in methods and isinstance(func, ast.Attribute) and passes_fusion:
+                    signature, receiver = methods[name], [func.value]
+                elif name in signatures:
+                    signature, receiver = signatures[name], []
+                else:
                     continue
                 if any(isinstance(arg, ast.Starred) for arg in node.args) or any(
                     keyword.arg is None for keyword in node.keywords
                 ):
                     continue  # a splat: the scan cannot count what it passes
                 try:
-                    signatures[name].bind(
-                        *node.args, **{keyword.arg: keyword.value for keyword in node.keywords}
+                    signature.bind(
+                        *receiver, *node.args,
+                        **{keyword.arg: keyword.value for keyword in node.keywords},
                     )
                 except TypeError as error:
                     rel = path.relative_to(ROOT).as_posix()
@@ -756,3 +776,18 @@ def test_the_caller_scan_sees_a_call_that_leaves_out_the_config() -> None:
 
     with pytest.raises(TypeError):
         signature.bind(*call.args, **{k.arg: k.value for k in call.keywords})
+
+
+def test_the_caller_scan_sees_a_method_call_that_leaves_out_the_paths() -> None:
+    import inspect
+
+    signature = inspect.signature(_resolve(METHOD_CALLERS_CHECKED["process"]))
+    [call] = [
+        node for node in ast.walk(ast.parse(
+            "agent.process(source, document=d, fusion=f, toolbox=t)"
+        ))
+        if isinstance(node, ast.Call)
+    ]
+
+    with pytest.raises(TypeError, match="paths"):
+        signature.bind(call.func.value, *call.args, **{k.arg: k.value for k in call.keywords})

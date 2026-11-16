@@ -261,12 +261,13 @@ def test_artifact_failure_cannot_certify_or_mutate_inspection(inspection, monkey
     manifest, calls, _ = inspection
     original = manifest.model_dump()
 
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise OSError("Simulated disk failure")
 
     monkeypatch.setattr(inspection_handlers, "_save_region_artifact", fail)
     result = inspection_handlers._handle_pymupdf_region_method(manifest, "o-1", config=core_config())
     assert not result.success
+    assert "OSError: Simulated disk failure" in result.message
     assert not result.artifacts
     assert calls
     assert manifest.model_dump() == original

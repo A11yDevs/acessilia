@@ -79,7 +79,7 @@ Só aparecem os grupos marcados para decompor ou com uma parte para o docstruct 
   - `_toolbox_render` fica no core como o adaptador sobre esse método. Ele monta o cliente pela factory do core (e, portanto, com a configuração do core), confere se o tipo de mídia do manifesto bate com a extensão do arquivo e decide reenviar o arquivo quando o artefato armazenado sumiu. Isso é assunto do core.
   - O conjunto de entradas que o `pdf.render@2` aceita (`_RENDERABLE_MEDIA_TYPES`: PDF, PNG, JPEG) é conhecimento de contrato, então vai para o SDK ao lado do método de render, como uma constante que o adaptador confere: `acessilia_sdk.toolbox.clients.pdf.RENDER_MEDIA_TYPES`.
   - `_source_artifact_id` fica no core. Ele lê o manifesto (`extractor.configuration["artifact_id"]`) e decide ignorar um id que não se interpreta ou cujo digest não é o da origem. A interpretação de que ele depende já é o `ArtifactRef` do SDK.
-  - `_save_region_artifact` grava evidência em `settings.data_dir`, então fica no core.
+  - `_save_region_artifact` grava evidência no `PathsConfig.data_dir` da execução (passo 3 da ADR-0016; antes, no `settings.data_dir`), então fica no core.
   - `_inspect_region` e `_inspect_page` chamam o `VisionAgent`, então ficam no core.
   - Os dois handlers ficam no core.
 - **H: handlers de texto.** `_tailjoin_position` repetia, sobre os elementos do manifesto, `docstruct.fusion.tailjoin.page_number_position`, a regra que o builder aplica aos blocos de fusão. Agora chama essa função através de `_FurnitureView`, uma visão somente leitura que lê a caixa de um elemento só quando ele é mobiliário com número de página, como antes. Os handlers usam o `FusionAgent` e ficam no core.
