@@ -32,9 +32,6 @@ ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "backend" / "core"
 BUILDER = ROOT / "backend" / "config" / "core_config.py"
 
-#: Process setup, not part of a run: the logger and the catalogs read them at
-#: start-up. The last step-3 pull request decides how they reach the core.
-PROCESS_SETUP_KEYS = {"log_level", "logs_dir", "i18n_locales_active"}
 
 #: Which setting fills each field, written out so that a swapped pair fails.
 FIELD_SETTINGS: dict[str, str] = {
@@ -170,13 +167,31 @@ def _leaves(config: CoreConfig) -> dict[str, object]:
     return leaves
 
 
-def test_the_builder_covers_every_setting_the_core_reads() -> None:
-    """A stage that starts reading a new key must get a field for it."""
+def test_the_core_reads_no_settings() -> None:
+    """ADR-0016 step 3 is complete: a run takes its CoreConfig, and the process
+    setup (logger, catalogs) is passed at startup. No core module reads a
+    setting, by name or otherwise."""
     keys, unnamed = _core_reads()
-    missing = sorted(keys - set(FIELD_SETTINGS.values()) - PROCESS_SETUP_KEYS)
 
     assert not unnamed, "settings reads the scan cannot name:\n" + "\n".join(unnamed)
-    assert not missing, f"settings read by backend/core with no CoreConfig field: {missing}"
+    assert not keys, f"settings read by backend/core: {sorted(keys)}"
+
+
+def test_the_core_imports_nothing_from_the_service_config() -> None:
+    """No module of ``backend/core`` imports ``backend.config``, inside a
+    function included: the service builds the configuration and passes it."""
+    found = []
+    for path in sorted(CORE.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            modules = (
+                [node.module or ""] if isinstance(node, ast.ImportFrom)
+                else [alias.name for alias in node.names] if isinstance(node, ast.Import)
+                else []
+            )
+            if any(m == "backend.config" or m.startswith("backend.config.") for m in modules):
+                found.append(f"{path.relative_to(ROOT).as_posix()}:{node.lineno}")
+
+    assert not found, "backend/core imports backend.config:\n" + "\n".join(found)
 
 
 #: The groups the core now receives from its caller: none of their settings
@@ -711,6 +726,7 @@ CALLERS_CHECKED = {
     "fetch_text_spans": "backend.core.toolbox.text_spans:fetch_text_spans",
     "export_docx": "backend.core.export.exporters.docx_exporter:export_docx",
     "export_pdf_ua": "backend.core.export.exporters.pdf_exporter:export_pdf_ua",
+    "setup_logger": "backend.core.logger:setup_logger",
 }
 
 CALLER_ROOTS = ("backend", "frontend", "scripts")

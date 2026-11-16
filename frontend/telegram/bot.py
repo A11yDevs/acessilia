@@ -9,7 +9,8 @@ from aiogram.enums import ParseMode
 from frontend.telegram.handlers.start import router as start_router
 from frontend.telegram.handlers.document import router as document_router
 from frontend.telegram.handlers.errors import router as error_router
-from backend.core.logger import setup_logger, logger
+from backend.config.process_setup import setup_process
+from backend.core.logger import logger
 from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
 from backend.core.i18n import t
@@ -95,7 +96,7 @@ def main() -> None:
     Returns:
         None
     """
-    setup_logger()
+    setup_process()
 
     if not settings.bot_token_valid:
         logger.critical(t(LOG_BOT_TOKEN_NOT_CONFIGURED))

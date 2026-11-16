@@ -5,7 +5,8 @@ import subprocess
 import sys
 
 from backend.core.i18n import t
-from backend.core.logger import setup_logger, logger
+from backend.config.process_setup import setup_process
+from backend.core.logger import logger
 from backend.config.settings import settings
 from backend.core.i18n.log_messages import (
     LOG_API_INTERFACE_ENABLED,
@@ -68,7 +69,7 @@ def release_lock() -> None:
 
 
 async def startup():
-    setup_logger()
+    setup_process()
 
     enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]
     tasks = []
