@@ -9,6 +9,8 @@ accepted and left out of the document, and any failure fails the method.
 
 from __future__ import annotations
 
+from backend.core.ports import NoRegionCache, RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 import base64
@@ -221,7 +223,7 @@ def test_a_page_with_content_becomes_a_described_picture(
         ),
     )
 
-    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config())
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config(), ports=RunPorts.none())
 
     assert result.success and result.validated, result.message
     assert calls == [(PNG, 2, 2)]
@@ -252,14 +254,16 @@ def test_the_page_is_rendered_and_inspected_as_the_run_config_says(
         models={"openrouter_max_tokens": 7},
     )
 
+    cache = NoRegionCache()
+
     result = inspection_handlers._handle_vision_page_inspection_method(
-        manifest, obligation_id, config=config
+        manifest, obligation_id, config=config, ports=RunPorts(region_cache=cache)
     )
 
     assert result.success, result.message
     toolboxes = options.pop("toolboxes")
     models = options.pop("models")
-    assert options == {"dpi": 123, "region_cache": enabled}
+    assert options == {"dpi": 123, "region_cache": cache if enabled else None}
     assert len(toolboxes) == 2 and all(toolbox is config.toolbox for toolbox in toolboxes)
     assert models == [config.models] and models[0] is config.models
 
@@ -273,7 +277,7 @@ def test_the_page_evidence_is_written_under_the_run_data_dir(
     run_dir = tmp_path / "run-data"
 
     result = inspection_handlers._handle_vision_page_inspection_method(
-        manifest, obligation_id, config=core_config(paths={"data_dir": run_dir})
+        manifest, obligation_id, config=core_config(paths={"data_dir": run_dir}), ports=RunPorts.none()
     )
 
     assert result.success, result.message
@@ -289,7 +293,7 @@ def test_a_blank_page_is_accepted_and_left_out_of_the_document(
         PageInspectionOutput(kind="blank", language="und", confidence=0.95),
     )
 
-    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config())
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config(), ports=RunPorts.none())
 
     assert result.success and result.validated, result.message
     assert "1 blank" in result.message
@@ -324,7 +328,7 @@ def test_any_failure_fails_the_method_and_changes_nothing(
     before = manifest.model_dump()
     _answer(monkeypatch, error=error)
 
-    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config())
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config(), ports=RunPorts.none())
 
     assert not result.success and not result.validated
     assert str(error) in result.message
@@ -336,7 +340,7 @@ def test_a_changed_source_is_refused(monkeypatch, source_pdf, isolated_artifacts
     source_pdf.write_bytes(b"%PDF-1.4 changed")
     _answer(monkeypatch, PageInspectionOutput(kind="blank", language="und", confidence=1))
 
-    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config())
+    result = inspection_handlers._handle_vision_page_inspection_method(manifest, obligation_id, config=core_config(), ports=RunPorts.none())
 
     assert not result.success and "differs" in result.message
 
@@ -379,7 +383,7 @@ def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
     monkeypatch.setattr(vision_agent, "get_agno_model", lambda *_args, **_kwargs: None)
 
     output = asyncio.run(
-        vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
+        vision_agent.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).inspect_page(image_bytes=PNG, page_num=2, total_pages=3)
     )
 
     assert seen["schema"] is PageInspectionOutput
@@ -413,7 +417,7 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
 
     with pytest.raises(ValidationError, match="description is required"):
         asyncio.run(
-            vision_agent.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(image_bytes=PNG, page_num=1, total_pages=1)
+            vision_agent.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).inspect_page(image_bytes=PNG, page_num=1, total_pages=1)
         )
 
 
@@ -549,7 +553,7 @@ def _run(monkeypatch, tmp_path, manifest, *, max_replans=0):
     import asyncio
 
     return asyncio.run(
-        orchestrator.execute(Path(manifest.source.path), tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls())
+        orchestrator.execute(Path(manifest.source.path), tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
     )
 
 

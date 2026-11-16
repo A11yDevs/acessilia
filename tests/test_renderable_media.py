@@ -73,8 +73,8 @@ async def test_the_formula_steps_skip_a_source_the_toolbox_cannot_render(monkeyp
     manifest = _formula_manifest(media_type)
     breaker = pddl.ProviderBreaker(3)
 
-    await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config())
-    await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
+    await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     assert crops == []
     assert manifest.elements[0].text == "placeholder"
@@ -87,6 +87,6 @@ async def test_the_formula_classification_asks_for_a_crop_of_a_renderable_source
     manifest = _formula_manifest(media_type)
 
     await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio",
-                                                  breaker=pddl.ProviderBreaker(3), vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+                                                  breaker=pddl.ProviderBreaker(3), vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     assert len(crops) == 1

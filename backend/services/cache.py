@@ -85,18 +85,6 @@ def processing_cache_configuration(config: CoreConfig) -> dict[str, Any]:
     return configuration
 
 
-def options_cache_key(prefix: str, **options: Any) -> str:
-    """Build a filesystem-safe cache variant from output-affecting options."""
-    serialized = json.dumps(
-        options,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
-    return f"{prefix}_{digest}"
-
-
 async def get_cached(path: Path, extra: str = "", ttl: int = 3600) -> Any:
     return await _read_cached(_cache_key(path, extra), ttl)
 
@@ -156,6 +144,17 @@ async def drop_cache(path: Path, extra: str = "") -> None:
 async def set_cache_bytes(content: bytes, payload: Any, extra: str = "") -> None:
     """Store a payload for binary content held in memory; see :func:`get_cached_bytes`."""
     await _write_cached(_content_key(content, extra), payload)
+
+
+class ContentCache:
+    """The core's ``RegionCache`` port over this cache (ADR-0016, step 4):
+    a region image's answers, keyed on its bytes and the core's variant."""
+
+    async def get(self, content: bytes, variant: str, *, ttl_seconds: int) -> Any:
+        return await get_cached_bytes(content, extra=variant, ttl=ttl_seconds)
+
+    async def put(self, content: bytes, variant: str, payload: Any) -> None:
+        await set_cache_bytes(content, payload, extra=variant)
 
 
 async def _write_cached(key: str, payload: Any) -> None:

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
 from backend.services import job_checkpoint
 from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
@@ -86,8 +86,9 @@ from backend.core.pipeline.enrichment.formulas import (
     _classify_formula_regions,
     _enrich_formula_latex,
 )
-from backend.core.pipeline.handlers.registry import bind_config, build_method_registry
+from backend.core.pipeline.handlers.registry import bind_run, build_method_registry
 from backend.core.agents.model_calls import ModelCallRunner, model_call_scope
+from backend.core.ports import RunPorts, region_cache_for
 
 
 class StructuralExtractionError(RuntimeError):
@@ -153,14 +154,14 @@ class PddlAccessibilityOrchestrator:
         self.planner = PlannerAgent()
         self.executor = self._build_executor()
 
-    def _run_executor(self, config: CoreConfig) -> ExecutorAgent:
-        """The executor of one run: its handlers that take ``config`` get the run's.
+    def _run_executor(self, config: CoreConfig, ports: RunPorts) -> ExecutorAgent:
+        """The executor of one run: its handlers get the run's ``config`` and ``ports``.
 
         Built from ``self.executor``'s registry, so a handler registered on it
         (a test's, for example) runs as well; that registry is left unchanged.
         """
         return ExecutorAgent(
-            bind_config(self.executor.registry, config), domain=self.executor.domain
+            bind_run(self.executor.registry, config, ports), domain=self.executor.domain
         )
 
     @staticmethod
@@ -179,12 +180,14 @@ class PddlAccessibilityOrchestrator:
         *,
         config: CoreConfig,
         model_calls: ModelCallRunner,
+        ports: RunPorts,
     ) -> str | dict[str, Any]:
-        """Run the pipeline on one document with the run's ``config`` and ``model_calls``.
+        """Run the pipeline on one document with the run's ``config``,
+        ``model_calls`` and ``ports``.
 
-        Both are required (ADR-0016 step 3, ADR-0021): nothing in a run falls
-        back to the settings or the service's executor, and one orchestrator
-        serves runs with different configurations.
+        All are required (ADR-0016 steps 3 and 4, ADR-0021): nothing in a run
+        falls back to the settings, the service's executor or its state, and
+        one orchestrator serves runs with different configurations.
         """
         with model_call_scope(model_calls):
             return await self._execute(
@@ -196,6 +199,7 @@ class PddlAccessibilityOrchestrator:
                 custom_prompt,
                 thinking_mode,
                 config=config,
+                ports=ports,
             )
 
     async def _execute(
@@ -209,13 +213,14 @@ class PddlAccessibilityOrchestrator:
         thinking_mode: bool,
         *,
         config: CoreConfig,
+        ports: RunPorts,
     ) -> str | dict[str, Any]:
         effective_mode = mode or "medio"
 
         if custom_prompt or thinking_mode:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
-        executor = self._run_executor(config)
+        executor = self._run_executor(config, ports)
         source_path = file_path.resolve()
         # Inside a job this id names the checkpoints; a benchmark or the CLI
         # calls the orchestrator without one and keeps the old behaviour.
@@ -272,7 +277,7 @@ class PddlAccessibilityOrchestrator:
         else:
             await self._enrich_before_planning(
                 manifest, file_path, source_path, effective_mode, media_inspection, status_callback,
-                config,
+                config, ports,
             )
             await _save_checkpoint(
                 task_id,
@@ -451,6 +456,7 @@ class PddlAccessibilityOrchestrator:
         media_inspection: dict[str, Any] | None,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         config: CoreConfig,
+        ports: RunPorts,
     ) -> None:
         """Describe pictures, recognize formulas and inline math, read tables.
 
@@ -468,40 +474,29 @@ class PddlAccessibilityOrchestrator:
         # same pipeline, so one that went down does not get called again for
         # every remaining object.
         breaker = ProviderBreaker(config.vision.breaker_threshold)
+        region_cache = region_cache_for(ports, config.vision)
         progress = _EnrichmentCheckpoint(current_task_id(), manifest).save
         await _classify_formula_regions(
             manifest, source_path, mode=effective_mode, vision=config.vision,
-            toolbox=config.toolbox, models=config.models,
+            toolbox=config.toolbox, models=config.models, region_cache=region_cache,
             breaker=breaker, on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         await _enrich_picture_descriptions(
-            manifest,
-            source_path,
-            mode=effective_mode,
-            vision=config.vision,
-            toolbox=config.toolbox,
-            models=config.models,
-            media_inspection=media_inspection,
-            status_callback=status_callback,
-            breaker=breaker,
-            on_progress=progress,
+            manifest, source_path, mode=effective_mode, vision=config.vision,
+            toolbox=config.toolbox, models=config.models, region_cache=region_cache,
+            media_inspection=media_inspection, status_callback=status_callback,
+            breaker=breaker, on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
         text_spans = _TextSpanReader(manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
         await self._checkpoint_enrichment(manifest)
         await _enrich_formula_latex(
-            manifest,
-            source_path,
-            mode=effective_mode,
-            document=config.document,
-            vision=config.vision,
-            toolbox=config.toolbox,
-            models=config.models,
-            status_callback=status_callback,
-            breaker=breaker,
-            on_progress=progress,
+            manifest, source_path, mode=effective_mode, document=config.document,
+            vision=config.vision, toolbox=config.toolbox, models=config.models,
+            region_cache=region_cache, status_callback=status_callback,
+            breaker=breaker, on_progress=progress,
         )
         await self._checkpoint_enrichment(manifest)
 

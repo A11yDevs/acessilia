@@ -783,7 +783,7 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
             mode="medio",
             vision=vision_config(),
             toolbox=toolbox_config(),
-            models=model_config(),
+            models=model_config(), region_cache=None
         )
     )
 
@@ -920,7 +920,7 @@ def test_standalone_image_injects_full_page_picture_for_vision(
             media_inspection=media_inspection,
             vision=vision_config(),
             toolbox=toolbox_config(),
-            models=model_config(),
+            models=model_config(), region_cache=None
         )
     )
 

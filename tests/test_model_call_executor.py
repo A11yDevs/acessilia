@@ -9,10 +9,14 @@ from types import SimpleNamespace
 import pytest
 
 from backend.core.agents.model_calls import (
-    ModelCallRejected, ModelCallTimeout, current_model_calls, model_call_scope,
+    ModelCallRejected,
+    ModelCallTimeout,
+    current_model_calls,
+    model_call_scope,
 )
+from backend.core.blocking import run_blocking
 from backend.core.i18n import active_locale, reset_request_locale, set_request_locale
-from backend.services.blocking import run_blocking
+from backend.core.ports import RunPorts
 from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
 from tests.core_config_support import core_config, model_config, toolbox_config
 
@@ -231,16 +235,17 @@ async def test_worker_transfers_base_exceptions_to_the_awaiter(runner, error_typ
     assert await runner.run(lambda: "reused", timeout=1, label="reused") == "reused"
 
 
-def test_process_gives_the_run_its_runner_and_the_job_config(monkeypatch, tmp_path, runner):
-    """The service passes both explicitly (ADR-0016 step 3): no scope, no settings."""
+def test_process_gives_the_run_its_runner_the_job_config_and_its_ports(monkeypatch, tmp_path, runner):
+    """The service passes all three explicitly (ADR-0016 steps 3 and 4): no
+    scope, no settings, and the region cache is the service's own."""
     from backend import service
 
     source = tmp_path / "input.txt"
     source.write_text("content")
     received = {}
 
-    async def execute(*_args, config, model_calls, **_kwargs):
-        received.update(config=config, model_calls=model_calls)
+    async def execute(*_args, config, model_calls, ports, **_kwargs):
+        received.update(config=config, model_calls=model_calls, ports=ports)
         return "Accessible content"
 
     async def noop(*_args, **_kwargs):
@@ -264,6 +269,9 @@ def test_process_gives_the_run_its_runner_and_the_job_config(monkeypatch, tmp_pa
 
     assert received["config"] is job_config
     assert received["model_calls"] is runner
+    from backend.services.cache import ContentCache
+
+    assert isinstance(received["ports"].region_cache, ContentCache)
 
 
 def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path, runner):
@@ -285,7 +293,7 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
         observed.append(current_model_calls())
         models, toolbox = model_config(), toolbox_config()
         assert DataAgent(models=models, toolbox=toolbox).model_calls is runner
-        assert VisionAgent(models=models, toolbox=toolbox, region_cache=False).model_calls is runner
+        assert VisionAgent(models=models, toolbox=toolbox, region_cache=None).model_calls is runner
         raise Stop
 
     async def no_inspection(*_args, **_kwargs):
@@ -302,7 +310,7 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
             current_model_calls()
         with pytest.raises(Stop):
             await orchestrator.execute(
-                tmp_path / "doc.pdf", tmp_path, config=core_config(), model_calls=runner
+                tmp_path / "doc.pdf", tmp_path, config=core_config(), model_calls=runner, ports=RunPorts.none()
             )
         with pytest.raises(RuntimeError, match="runner must be supplied"):
             current_model_calls()
@@ -342,7 +350,7 @@ async def test_close_discards_pending_work_without_joining_running_provider(runn
     ("page-handler", False), ("region-handler", True), ("page-handler", True),
 ])
 def test_sync_call_returns_while_provider_stays_blocked(monkeypatch, runner, agent_kind, nested):
-    from backend.core.agents import data_agent, vision_agent, model_call_policy
+    from backend.core.agents import data_agent, model_call_policy, vision_agent
     from backend.core.pipeline.handlers.inspection import _inspect_page, _inspect_region
 
     blocked = Blocked(SimpleNamespace(content=None))
@@ -363,12 +371,12 @@ def test_sync_call_returns_while_provider_stays_blocked(monkeypatch, runner, age
         if agent_kind == "data":
             results.append(asyncio.run(data_agent.DataAgent(models=models, toolbox=toolbox, model_calls=runner).process_region(b"image", "table")))
         elif agent_kind == "vision":
-            results.append(asyncio.run(vision_agent.VisionAgent(region_cache=False, toolbox=toolbox, models=models, model_calls=runner).describe_region(b"image", "embedded_image")))
+            results.append(asyncio.run(vision_agent.VisionAgent(region_cache=None, toolbox=toolbox, models=models, model_calls=runner).describe_region(b"image", "embedded_image")))
         elif agent_kind == "region-handler":
-            results.append(_inspect_region(b"image", 1, 1, "medio", region_cache=False, toolbox=toolbox, models=models))
+            results.append(_inspect_region(b"image", 1, 1, "medio", region_cache=None, toolbox=toolbox, models=models))
         else:
             try:
-                _inspect_page(b"image", 1, 1, "medio", region_cache=False, toolbox=toolbox, models=models)
+                _inspect_page(b"image", 1, 1, "medio", region_cache=None, toolbox=toolbox, models=models)
             except ModelCallTimeout:
                 results.append(None)
 

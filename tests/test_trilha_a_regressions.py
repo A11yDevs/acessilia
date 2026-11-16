@@ -14,7 +14,8 @@ import pytest
 from tests.core_config_support import fusion_config
 from backend.config.settings import settings
 from backend.core.pipeline.handlers import fusion as fusion_handlers
-from backend.services.cache import options_cache_key, processing_cache_configuration
+from backend.core.cache_keys import options_cache_key
+from backend.services.cache import processing_cache_configuration
 from tests.test_pending_fixes import isolated_runtime as isolated_runtime_fixture
 
 isolated_runtime = isolated_runtime_fixture

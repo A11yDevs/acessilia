@@ -68,7 +68,7 @@ def _patch(monkeypatch, answer, *, image=b"image-bytes", error=None):
 
 
 async def _enrich(manifest, tmp_path):
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config())
+    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     return manifest.elements[0]
 
 

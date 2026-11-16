@@ -29,7 +29,8 @@ import httpx
 from tests.core_config_support import core_config, toolbox_config
 import pytest
 
-from backend.core.pipeline.handlers.registry import bind_config
+from backend.core.pipeline.handlers.registry import bind_run
+from backend.core.ports import RunPorts
 from backend.core.i18n import reset_request_locale, set_request_locale
 from acessilia_sdk.toolbox.transport import auth_headers
 
@@ -212,7 +213,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
     registry.register(
         "dual-provider-fusion", _handle_dual_provider_fusion_method
     )
-    updated, report = ExecutorAgent(bind_config(registry, core_config())).execute(plan, manifest)
+    updated, report = ExecutorAgent(bind_run(registry, core_config(), RunPorts.none())).execute(plan, manifest)
 
     assert report.status == "completed"
     fused = next(item for item in updated.obligations if item.id == "o-fuse")
@@ -333,7 +334,7 @@ def test_fusion_executor_e2e_with_real_toolbox(tmp_path):
     registry.register(
         "dual-provider-fusion", _handle_dual_provider_fusion_method
     )
-    updated, report = ExecutorAgent(bind_config(registry, core_config())).execute(plan, manifest)
+    updated, report = ExecutorAgent(bind_run(registry, core_config(), RunPorts.none())).execute(plan, manifest)
 
     assert report.status == "completed", report.status
     fused = next(item for item in updated.obligations if item.id == "o-fuse")

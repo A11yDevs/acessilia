@@ -121,7 +121,7 @@ Proposta: a opção 2.
   ```text
   libs/core/src/acessilia_core/
     config.py      # CoreConfig: a configuração do core, explícita
-    ports.py       # protocolos que o serviço implementa: caches, chamadas bloqueantes
+    ports.py       # protocolos que o serviço implementa: caches, checkpoints, operações
     manifest/      # modelos, schema, builder, extrator da Toolbox, slides
     planning/      # domínio, planejador, processador PDDL, porta da Toolbox, comparação
     execution/     # executor, modelos, mensagens
@@ -171,10 +171,15 @@ Proposta: a opção 2.
 - **A configuração é explícita.** O core recebe um `CoreConfig` montado por
   quem o chama. O serviço o monta a partir do seu ambiente, como já monta o
   `ToolboxClientConfig` do SDK.
-- **O estado do serviço é injetado.** Os caches de regiões e de processamento,
-  e a forma de rodar chamadas bloqueantes, chegam ao core como argumentos que
-  seguem os protocolos de `acessilia_core.ports`. O core não é dono do
-  armazenamento do serviço.
+- **O estado do serviço é injetado.** O cache de regiões, os checkpoints do
+  job e o registro de operações remotas chegam a cada execução num único
+  objeto `RunPorts`, cujos membros seguem os protocolos de
+  `acessilia_core.ports`; o serviço o monta para o job. O core não é dono do
+  armazenamento do serviço. O cache de processamento é só do serviço: ele
+  envolve a execução, e o core só lhe dá a identidade da execução
+  (`run_identity`). O `run_blocking`, um auxiliar sem estado feito só com a
+  biblioteca padrão, pertence ao core, e o serviço o importa de lá (emenda
+  do passo 4).
 - **O Agno é uma dependência obrigatória**, por enquanto. Os agentes
   precisam dele, e o planejamento e a execução também: o executor roda todo
   plano como um workflow do Agno. Tornar o Agno opcional exigiria mais do que
@@ -267,8 +272,23 @@ Proposta: a opção 2.
      `config` (os handlers de fusão de dois providers e de provider único, os
      de inspeção de região e de página, os de fórmula, `mathml` e
      `latex-verbalizer`, e o do juiz VLM), e cada execução vincula a sua config
-     a eles (`bind_config`) numa cópia do registro.
-  4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
+     a eles (`bind_run`) numa cópia do registro.
+  4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`. Em
+     andamento, em três pull requests:
+     - **O cache de regiões e o `run_blocking` (feito).** O
+       `backend/core/ports.py` define o `RegionCache` e o `RunPorts`, com um
+       no-op para execuções fora do serviço (`RunPorts.none()`). O
+       `execute(..., ports=)` é obrigatório, como `config` e `model_calls`. As
+       etapas recebem o cache de regiões da execução, ou `None` quando a config
+       o desliga, e os handlers que declaram `ports` os recebem (`bind_run`,
+       que substitui o `bind_config`). O serviço implementa a porta sobre o seu
+       cache em arquivos (`ContentCache`). O `run_blocking` e o
+       `options_cache_key` passaram para o core.
+     - **Os checkpoints do job e o id do job**, que o orquestrador lê.
+     - **O registro de operações remotas**, que o extrator lê.
+
+     Um teste lista os módulos do serviço que o core ainda importa, e a lista
+     só diminui.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:
      - ele não importa nada do `backend` fora do `backend/core`, nem nada do

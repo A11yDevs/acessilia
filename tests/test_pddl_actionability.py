@@ -22,7 +22,8 @@ from __future__ import annotations
 import pytest
 
 from tests.core_config_support import core_config
-from backend.core.pipeline.handlers.registry import bind_config
+from backend.core.pipeline.handlers.registry import bind_run
+from backend.core.ports import RunPorts
 from backend.core.pipeline.handlers.registry import METHOD_HANDLERS
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.handlers import content as content_handlers
@@ -123,7 +124,7 @@ class TestRegistryCoverage:
         marking obligations satisfied while nothing had been processed.
         """
         executor = PddlAccessibilityOrchestrator._build_executor()
-        executor.registry = bind_config(executor.registry, core_config())
+        executor.registry = bind_run(executor.registry, core_config(), RunPorts.none())
         manifest = _manifest([_element("el-1", "picture")], [])
 
         results = [
@@ -767,8 +768,8 @@ class TestEveryHandlerIsCallable:
                 "backend.config.settings.settings.toolbox_provider", "docling"
             )
         # The registry of a run: a handler that takes the config gets it.
-        handler = bind_config(
-            PddlAccessibilityOrchestrator._build_executor().registry, core_config()
+        handler = bind_run(
+            PddlAccessibilityOrchestrator._build_executor().registry, core_config(), RunPorts.none()
         ).get(method)
 
         result = handler(manifest, "o-1")

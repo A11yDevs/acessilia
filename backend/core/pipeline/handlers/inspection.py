@@ -28,6 +28,7 @@ from backend.core.agents.output_schemas import PageInspectionOutput, VisionOutpu
 from backend.core.agents.vision_agent import VisionAgent
 from backend.core.config import CoreConfig, ModelConfig, ToolboxConfig
 from backend.core.execution.models import MethodResult
+from backend.core.ports import RegionCache, RunPorts, region_cache_for
 from backend.core.manifest.builder import (
     is_unstructured_page_placeholder,
 )
@@ -99,7 +100,7 @@ def _inspect_region(
     total_pages: int,
     mode: str,
     *,
-    region_cache: bool,
+    region_cache: RegionCache | None,
     toolbox: ToolboxConfig,
     models: ModelConfig,
 ) -> VisionOutput | None:
@@ -151,7 +152,7 @@ def _save_region_artifact(
 
 
 def _handle_pymupdf_region_method(
-    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig, ports: RunPorts
 ) -> MethodResult:
     """Inspect real source pixels and update targets only after every result validates."""
     elements = _target_elements(manifest, obligation_id)
@@ -181,7 +182,7 @@ def _handle_pymupdf_region_method(
             output = _inspect_region(
                 image, number, max(len(manifest.pages), number),
                 str(manifest.extractor.configuration.get("region_inspection_mode", "medio")),
-                region_cache=config.vision.region_cache_enabled,
+                region_cache=region_cache_for(ports, config.vision),
                 toolbox=config.toolbox,
                 models=config.models,
             )
@@ -264,7 +265,7 @@ def _inspect_page(
     total_pages: int,
     mode: str,
     *,
-    region_cache: bool,
+    region_cache: RegionCache | None,
     toolbox: ToolboxConfig,
     models: ModelConfig,
 ) -> PageInspectionOutput:
@@ -278,7 +279,7 @@ def _inspect_page(
 
 
 def _handle_vision_page_inspection_method(
-    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig, ports: RunPorts
 ) -> MethodResult:
     """Look at a page the extractor left empty: describe it, or accept it as blank.
 
@@ -315,7 +316,7 @@ def _handle_vision_page_inspection_method(
             )
             output = _inspect_page(
                 image, number, total_pages, mode,
-                region_cache=config.vision.region_cache_enabled,
+                region_cache=region_cache_for(ports, config.vision),
                 toolbox=config.toolbox,
                 models=config.models,
             )

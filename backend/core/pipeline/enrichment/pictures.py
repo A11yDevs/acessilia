@@ -56,7 +56,8 @@ from backend.core.i18n.log_messages import (
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_VISION_ELEMENT_DESCRIPTION,
 )
-from backend.services.blocking import run_blocking
+from backend.core.blocking import run_blocking
+from backend.core.ports import RegionCache
 from backend.core.i18n.stage_messages import (
     STAGE_DESCRIBING_IMAGE,
 )
@@ -92,6 +93,7 @@ async def _enrich_picture_descriptions(
     vision: VisionConfig,
     toolbox: ToolboxConfig,
     models: ModelConfig,
+    region_cache: RegionCache | None,
     media_inspection: dict[str, Any] | None = None,
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
@@ -103,7 +105,7 @@ async def _enrich_picture_descriptions(
     if not pictures:
         return
 
-    agent = VisionAgent(mode=mode, region_cache=vision.region_cache_enabled, toolbox=toolbox, models=models)
+    agent = VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox, models=models)
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
     total_pages = len(manifest.pages)
 

@@ -9,6 +9,8 @@ limit; nothing is planned or described.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 import json
@@ -72,7 +74,7 @@ async def test_a_document_over_the_limit_fails_before_any_costly_step(monkeypatc
     token = i18n.set_request_locale("en_US")
     try:
         with pytest.raises(pipeline_preflight.DocumentTooLargeError) as info:
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=_limit(2), model_calls=current_model_calls())
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=_limit(2), model_calls=current_model_calls(), ports=RunPorts.none())
     finally:
         i18n.reset_request_locale(token)
 
@@ -111,7 +113,7 @@ async def test_the_message_is_translated_with_both_numbers(monkeypatch, tmp_path
     token = i18n.set_request_locale("pt_BR")
     try:
         with pytest.raises(pipeline_preflight.DocumentTooLargeError) as info:
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=_limit(50), model_calls=current_model_calls())
+            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=_limit(50), model_calls=current_model_calls(), ports=RunPorts.none())
     finally:
         i18n.reset_request_locale(token)
 
@@ -130,7 +132,7 @@ async def test_verified_pdf_over_limit_is_rejected_before_structural_extraction(
     process = Mock(side_effect=AssertionError("expensive extraction was called"))
     orchestrator.information_structural = SimpleNamespace(process=process)
     with pytest.raises(pipeline_preflight.DocumentTooLargeError):
-        await orchestrator.execute(tmp_path / "large.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "large.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
     process.assert_not_called()
 
 

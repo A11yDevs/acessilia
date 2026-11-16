@@ -120,7 +120,8 @@ async def _async_noop(*_args, **_kwargs):
 )
 def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from backend.config.settings import settings
-    from backend.services.cache import processing_cache_configuration, options_cache_key
+    from backend.core.cache_keys import options_cache_key
+    from backend.services.cache import processing_cache_configuration
     before = options_cache_key("document", configuration=processing_cache_configuration(core_config()))
     value = getattr(settings, name)
     monkeypatch.setattr(settings, name, not value if isinstance(value, bool) else value + 1)
@@ -129,7 +130,8 @@ def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name
 
 def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
     from backend.config.settings import settings
-    from backend.services.cache import processing_cache_configuration, options_cache_key
+    from backend.core.cache_keys import options_cache_key
+    from backend.services.cache import processing_cache_configuration
     before = options_cache_key("document", configuration=processing_cache_configuration(core_config()))
     monkeypatch.setattr(settings, "toolbox_base_urls", "http://a.test,http://b.test")
     assert options_cache_key("document", configuration=processing_cache_configuration(core_config())) != before
@@ -138,7 +140,8 @@ def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):
 def test_inline_math_detection_invalidates_processing_cache(monkeypatch):
     """Turning the detection off must not serve a result that has its $…$ (#265)."""
     from backend.config.settings import settings
-    from backend.services.cache import processing_cache_configuration, options_cache_key
+    from backend.core.cache_keys import options_cache_key
+    from backend.services.cache import processing_cache_configuration
 
     monkeypatch.setattr(settings, "inline_math_detection", "fonts")
     before = options_cache_key("document", configuration=processing_cache_configuration(core_config()))

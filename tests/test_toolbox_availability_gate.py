@@ -7,6 +7,8 @@ out of the plan and fails closed without a catalogue.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 from collections import OrderedDict
@@ -261,7 +263,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: _fuse_manifest())
 
     with pytest.raises(Stop):
-        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
     assert received == [run_config]
 

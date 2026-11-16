@@ -103,6 +103,7 @@ Standalone users own and close their runner explicitly. See
 #### 0.4. Core Utilities and Toolbox Adapters (`backend/core/`)
 - [backend/core/toolbox/](../backend/core/toolbox/): the core's adapters over the Toolbox, through the SDK (client from the settings, math, media inspection, PDF/UA audit, text spans, vision payload).
 - [backend/core/config.py](../backend/core/config.py): `CoreConfig`, the core's configuration in frozen groups, which the service builds from its settings in [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, step 3).
+- [backend/core/ports.py](../backend/core/ports.py): `RunPorts`, the service state a run reaches (the region cache for now), built by the service for each job in [backend/services/run_ports.py](../backend/services/run_ports.py); `RunPorts.none()` keeps no state (ADR-0016, step 4).
 - [backend/core/logger.py](../backend/core/logger.py): centralized loguru logger setup; the level and the log directory are passed at process start by [backend/config/process_setup.py](../backend/config/process_setup.py), with the offered locales (ADR-0016, step 3).
 - [backend/core/formula_tools.py](../backend/core/formula_tools.py): LaTeX normalization and the spoken-formula label.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.

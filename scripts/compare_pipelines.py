@@ -29,6 +29,7 @@ from typing import Any
 
 from backend.config.core_config import core_config_from_settings
 from backend.services.model_calls import get_model_calls
+from backend.services.run_ports import service_run_ports
 from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
@@ -182,6 +183,7 @@ async def _run_toolbox(
         structured_output=True,
         config=core_config_from_settings(),
         model_calls=get_model_calls(),
+        ports=service_run_ports(),
     )
     canonical_metadata = structured.get("canonical_metadata")
     technical_warnings = structured.get("technical_warnings")
@@ -228,6 +230,7 @@ async def _run_toolbox(
         structured_output=True,
         config=core_config_from_settings(),
         model_calls=get_model_calls(),
+        ports=service_run_ports(),
     )
     canonical_metadata = structured.get("canonical_metadata")
     technical_warnings = structured.get("technical_warnings")

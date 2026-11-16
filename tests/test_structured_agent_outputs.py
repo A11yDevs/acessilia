@@ -339,7 +339,7 @@ async def test_vision_agent_requests_and_returns_its_output_schema(monkeypatch) 
     monkeypatch.setattr(vision_module, "Agent", FakeAgent)
     monkeypatch.setattr(vision_module, "get_agno_model", lambda *_args, **_kwargs: object())
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image"
     )
 
@@ -396,7 +396,7 @@ async def test_each_vision_call_takes_its_model_and_deadline_from_the_agent_mode
         vision_module, "get_agno_model", lambda m, _t, **_k: built.append(m) or object()
     )
     monkeypatch.setattr(model_calls, "run", capture_deadline)
-    agent = vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=models)
+    agent = vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=models)
 
     if call == "describe_region":
         await agent.describe_region(b"image", "embedded_image")
@@ -456,7 +456,7 @@ async def test_vision_agent_retries_a_truncated_answer(monkeypatch) -> None:
     infos: list[str] = []
     sink = logger.add(infos.append, level="INFO", format="{message}")
     try:
-        result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+        result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
             b"image", "embedded_image", page_num=25
         )
     finally:
@@ -493,7 +493,7 @@ async def test_vision_agent_gives_up_after_its_attempts(monkeypatch) -> None:
         ),
     ]
     try:
-        result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+        result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
             b"image", "embedded_image", page_num=25
         )
     finally:
@@ -519,7 +519,7 @@ async def test_vision_agent_does_not_retry_a_provider_failure(monkeypatch) -> No
         monkeypatch, [RuntimeError("HTTP 500 from the provider"), VALID_FORMULA]
     )
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=25
     )
 
@@ -581,7 +581,7 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
     # Pinned, so the expected English message holds on a pt_BR machine too.
     token = set_request_locale("en_US")
     try:
-        result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+        result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
             image, "full_page_image", page_num=14, total_pages=14
         )
     finally:
@@ -622,7 +622,7 @@ async def test_context_retry_does_not_consume_a_region_answer_attempt(monkeypatc
     )
     monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         _png_bytes(400, 240), "full_page_image", page_num=14, total_pages=14
     )
 
@@ -659,7 +659,7 @@ async def test_context_overflow_is_critical_only_after_the_smaller_request_fails
     # Pinned, so the expected English message holds on a pt_BR machine too.
     token = set_request_locale("en_US")
     try:
-        result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+        result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
             _png_bytes(400, 240), "full_page_image", page_num=11, total_pages=14
         )
     finally:
@@ -707,7 +707,7 @@ async def test_context_overflow_from_the_run_status_is_recovered(
     )
     monkeypatch.setattr(settings, "vision_region_max_tokens", 1234)
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         _png_bytes(400, 240), "full_page_image", page_num=14, total_pages=14
     )
 
@@ -738,7 +738,7 @@ async def test_page_inspection_recovers_with_the_whole_page_budget(
 
     monkeypatch.setattr(vision_module, "get_agno_model", capture_model)
 
-    output = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(
+    output = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).inspect_page(
         _png_bytes(400, 240), page_num=11, total_pages=14
     )
 
@@ -764,7 +764,7 @@ async def test_a_failed_toolbox_render_lets_the_context_error_stand(monkeypatch)
     critical: list[str] = []
     sink = logger.add(critical.append, level="CRITICAL", format="{message}")
     try:
-        result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+        result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
             _png_bytes(400, 240), "full_page_image", page_num=11, total_pages=14
         )
     finally:
@@ -793,7 +793,7 @@ async def test_the_smaller_image_is_rendered_with_the_agent_toolbox_config(monke
         [_errored_run("error", "Context size has been exceeded."), VALID_FORMULA],
     )
 
-    await vision_module.VisionAgent(region_cache=False, toolbox=run_toolbox, models=model_config()).describe_region(
+    await vision_module.VisionAgent(region_cache=None, toolbox=run_toolbox, models=model_config()).describe_region(
         _png_bytes(400, 240), "full_page_image", page_num=11, total_pages=14
     )
 
@@ -829,7 +829,7 @@ async def test_a_description_cut_off_in_a_later_field_is_salvaged(monkeypatch) -
         monkeypatch, [TRUNCATED_IN_A_LATER_FIELD] * REGION_ATTEMPTS
     )
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=23
     )
 
@@ -854,7 +854,7 @@ async def test_a_looping_description_is_salvaged_without_the_loop(monkeypatch) -
         monkeypatch, [TRUNCATED_IN_THE_DESCRIPTION] * REGION_ATTEMPTS
     )
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=23
     )
 
@@ -923,7 +923,7 @@ async def test_a_region_on_the_general_budget_is_never_truncated(monkeypatch) ->
         [{"kind": "description", "description": description, "language": "en", "confidence": 0.9}],
     )
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", full_budget=True
     )
 
@@ -945,7 +945,7 @@ async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
     )
     monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=7
     )
 
@@ -984,7 +984,7 @@ async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> No
     monkeypatch.setattr(vision_module, "get_agno_model", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(model_call_policy, "CALL_DEADLINE_GRACE_SECONDS", 0.05)
 
-    call = asyncio.create_task(vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config(model_call_timeout_seconds=0)).describe_region(
+    call = asyncio.create_task(vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config(model_call_timeout_seconds=0)).describe_region(
         b"image", "full_page_image", page_num=14
     ))
     try:
@@ -1012,7 +1012,7 @@ async def test_a_provider_timeout_is_not_rewritten_as_the_deadline(monkeypatch) 
     monkeypatch.setattr(vision_module, "get_agno_model", lambda *_args, **_kwargs: object())
 
     with pytest.raises(TimeoutError, match="provider gave up"):
-        await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(b"image", 1, 1)
+        await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).inspect_page(b"image", 1, 1)
 
 
 @pytest.mark.asyncio
@@ -1023,7 +1023,7 @@ async def test_a_call_that_times_out_is_tried_once_more(monkeypatch) -> None:
         monkeypatch, [TimeoutError("provider gave up"), VALID_FORMULA]
     )
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=14
     )
 
@@ -1043,7 +1043,7 @@ async def test_a_call_that_keeps_timing_out_reports_the_error(monkeypatch) -> No
     )
     errors: list[str] = []
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=14, errors=errors
     )
 
@@ -1064,7 +1064,7 @@ async def test_a_rate_limit_budget_exhausted_degrades_the_region(monkeypatch) ->
     )
     monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=7
     )
 
@@ -1083,7 +1083,7 @@ async def test_an_incomplete_run_rejected_as_a_rate_limit_is_retried(monkeypatch
     )
     monkeypatch.setattr(vision_module, "_RATE_LIMIT_RETRY_SECONDS", 0)
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=7
     )
 
@@ -1109,7 +1109,7 @@ async def test_completed_content_mentioning_429_is_not_mistaken_for_a_rate_limit
         ],
     )
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(
         b"image", "embedded_image", page_num=7
     )
 
@@ -1126,8 +1126,8 @@ async def test_an_identical_region_reuses_the_cached_description(monkeypatch, tm
     vision_module, calls = _scripted_vision_agent(monkeypatch, [VALID_FORMULA])
     monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
 
-    first = await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
-    second = await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    first = await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    second = await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
 
     assert isinstance(first, VisionOutput)
     assert second.model_dump(mode="json") == first.model_dump(mode="json")
@@ -1139,17 +1139,17 @@ async def test_an_identical_region_reuses_the_cached_description(monkeypatch, tm
 async def test_an_agent_without_the_region_cache_neither_reads_nor_writes_it(
     monkeypatch, tmp_path
 ) -> None:
-    """``region_cache=False`` asks the model even when an entry is stored, and stores nothing."""
+    """``region_cache=None`` asks the model even when an entry is stored, and stores nothing."""
     from backend.services import cache as cache_module
 
     vision_module, calls = _scripted_vision_agent(monkeypatch, [VALID_FORMULA] * 3)
     cache_dir = tmp_path / "cache"
     monkeypatch.setattr(cache_module, "CACHE_DIR", cache_dir)
 
-    await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
     stored = sorted(cache_dir.rglob("*"))
-    await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
-    await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(b"other", "embedded_image")
+    await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(b"other", "embedded_image")
 
     assert stored
     assert len(calls) == 3
@@ -1172,8 +1172,8 @@ async def test_a_truncated_description_is_not_cached(monkeypatch, tmp_path) -> N
     vision_module, calls = _scripted_vision_agent(monkeypatch, [long_answer, long_answer])
     monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
 
-    first = await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
-    second = await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    first = await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    second = await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
 
     # A truncated answer is degraded: a rerun asks the model again instead of
     # being served the same cut text for the TTL.
@@ -1192,8 +1192,8 @@ async def test_a_salvaged_description_is_not_cached(monkeypatch, tmp_path) -> No
     )
     monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
 
-    first = await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
-    second = await vision_module.VisionAgent(region_cache=True, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    first = await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    second = await vision_module.VisionAgent(region_cache=cache_module.ContentCache(), toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
 
     assert isinstance(first, VisionOutput) and isinstance(second, VisionOutput)
     assert first.warnings and second.warnings
@@ -1263,7 +1263,7 @@ async def test_the_token_budget_of_each_vision_call(monkeypatch, call, answer, b
     )
 
     await call(vision_module.VisionAgent(
-        region_cache=False, toolbox=toolbox_config(),
+        region_cache=None, toolbox=toolbox_config(),
         models=model_config(vision_region_max_tokens=1234),
     ))
 
@@ -1290,7 +1290,7 @@ async def test_an_answer_malformed_before_its_end_is_not_salvaged(monkeypatch, a
 
     vision_module, _ = _scripted_vision_agent(monkeypatch, [answer] * REGION_ATTEMPTS)
 
-    result = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+    result = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
 
     assert result is None
 
@@ -1303,7 +1303,7 @@ async def test_inspect_page_retries_a_truncated_answer(monkeypatch) -> None:
     blank = {"kind": "blank", "language": "und", "confidence": 0.9}
     vision_module, calls = _scripted_vision_agent(monkeypatch, [truncated, blank])
 
-    output = await vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).inspect_page(b"image", page_num=2, total_pages=3)
+    output = await vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).inspect_page(b"image", page_num=2, total_pages=3)
 
     assert isinstance(output, PageInspectionOutput) and output.kind == "blank"
     assert len(calls) == 2
@@ -1439,7 +1439,7 @@ async def test_failed_run_is_logged_with_its_real_cause(monkeypatch, agent_modul
     sink = logger.add(lambda message: messages.append(str(message)), level="CRITICAL")
     try:
         if agent_module == "vision_agent":
-            result = await module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
+            result = await module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", "embedded_image")
         else:
             result = await module.DataAgent(models=model_config(), toolbox=toolbox_config()).process_region(b"image", "table")
     finally:
@@ -1465,7 +1465,7 @@ def _assembled_prompt(monkeypatch, classification: str) -> str:
 
     monkeypatch.setattr(vision_module, "_run_with_retry", capture)
     asyncio.run(
-        vision_module.VisionAgent(region_cache=False, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", classification, page_num=1)
+        vision_module.VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config()).describe_region(b"image", classification, page_num=1)
     )
     return sent[0]
 

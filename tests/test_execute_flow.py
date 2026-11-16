@@ -8,6 +8,8 @@ tests/test_structural_extraction_failure.py cover how a run ends.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 from types import SimpleNamespace
@@ -50,7 +52,7 @@ async def _run(monkeypatch, tmp_path, *, config=None, **kwargs):
     async def status(message):
         statuses.append(message)
 
-    result = await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, status_callback=status, **kwargs, config=run_config, model_calls=current_model_calls())
+    result = await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, status_callback=status, **kwargs, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
     return result, calls, statuses, manifest
 
 
@@ -115,7 +117,7 @@ async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_p
     run_config = config
     orchestrator.information_structural = SimpleNamespace(process=process)
 
-    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
     by_name = {call[0]: call for call in calls}
     assert inspected == [config.toolbox]
@@ -155,7 +157,7 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
         orchestrator = build_orchestrator(max_replans=1)
         run_config = core_config(vision={"breaker_threshold": threshold})
         orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
-        await orchestrator.execute(tmp_path / f"doc-{threshold}.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+        await orchestrator.execute(tmp_path / f"doc-{threshold}.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
         return manifest, run_config.vision
 
     runs = await asyncio.gather(run(3), run(9))
@@ -196,5 +198,5 @@ async def test_custom_instructions_are_refused_before_any_step(monkeypatch, tmp_
     calls = _recorders(monkeypatch)
 
     with pytest.raises(ValueError):
-        await build_orchestrator().execute(tmp_path / "doc.pdf", tmp_path, **kwargs, config=core_config(), model_calls=current_model_calls())
+        await build_orchestrator().execute(tmp_path / "doc.pdf", tmp_path, **kwargs, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
     assert calls == []

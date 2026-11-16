@@ -9,6 +9,8 @@ settings. The run's config is a distinct object, so only identity passes.
 
 from __future__ import annotations
 
+from backend.core.ports import RunPorts
+
 from backend.core.agents.model_calls import current_model_calls
 
 from dataclasses import replace
@@ -55,7 +57,7 @@ async def test_the_picture_stage_gives_its_agent_and_crops_the_run_config(monkey
 
     await picture_stage._enrich_picture_descriptions(
         manifest, Path("doc.pdf"), mode="medio", vision=VISION, toolbox=RUN,
-        models=model_config(),
+        models=model_config(), region_cache=None
     )
 
     assert {kind for kind, _ in seen} == {"agent", "crop"}
@@ -106,7 +108,7 @@ async def test_the_formula_classification_gives_its_agent_and_crops_the_run_conf
     await formula_stage._classify_formula_regions(
         manifest, Path("doc.pdf"), mode="medio", vision=VISION, toolbox=RUN,
         breaker=ProviderBreaker(3),
-        models=model_config(),
+        models=model_config(), region_cache=None
     )
 
     assert {kind for kind, _ in seen} == {"agent", "crop"}
@@ -135,7 +137,7 @@ async def test_the_formula_recognition_gives_its_agent_crops_and_recognizer_the_
     await formula_stage._enrich_formula_latex(
         manifest, Path("doc.pdf"), mode="medio", document=document_config(),
         vision=VISION, toolbox=RUN,
-        models=model_config(),
+        models=model_config(), region_cache=None
     )
 
     assert {kind for kind, _ in seen} == {"agent", "crop", "recognize"}
@@ -194,7 +196,7 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     run_config = replace(core_config(), toolbox=RUN)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
 
-    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls())
+    await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
                  "_enrich_formula_latex", "_enrich_table_structures"):
