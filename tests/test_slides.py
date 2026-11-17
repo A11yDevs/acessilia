@@ -349,7 +349,7 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
         FIXTURE_PDF, dual_fusion=False,
         fusion=fusion_config(mode="dual"),
         toolbox=toolbox_config(use_artifact_store=False),
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
 
     assert "fusion_evidence" not in result.document

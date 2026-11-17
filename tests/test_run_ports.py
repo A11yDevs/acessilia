@@ -16,18 +16,6 @@ from tests.pddl_support import build_orchestrator
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "backend" / "core"
 
-#: Service modules the core still imports, each waiting for its step-4 pull
-#: request. The list only shrinks: a new import from ``backend.services`` fails,
-#: and so does an entry nobody imports any more. Empty, the boundary test of
-#: step 5 can pass.
-PENDING_SERVICE_IMPORTS = {
-    "backend/core/manifest/toolbox_extractor.py": {
-        "backend.services.operation_context",
-        "backend.services.operation_registry",
-    },
-}
-
-
 def _service_imports(path: Path) -> set[str]:
     found = set()
     for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -41,15 +29,17 @@ def _service_imports(path: Path) -> set[str]:
     return found
 
 
-def test_the_core_imports_only_the_pending_service_modules() -> None:
-    """Inside functions included: the caches and ``run_blocking`` are gone."""
+def test_the_core_imports_nothing_from_the_service() -> None:
+    """Inside functions included: the caches, ``run_blocking``, the job
+    checkpoints and the registry of remote operations reach a run as
+    ports, so ``backend/core`` imports nothing from ``backend.services``."""
     found = {
         path.relative_to(ROOT).as_posix(): imports
         for path in sorted(CORE.rglob("*.py"))
         if (imports := _service_imports(path))
     }
 
-    assert found == PENDING_SERVICE_IMPORTS
+    assert found == {}
 
 
 def test_ports_outside_the_service_keep_no_state() -> None:
@@ -121,7 +111,7 @@ async def test_a_run_checkpoints_and_resumes_through_its_port(monkeypatch, tmp_p
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
     checkpoints = MemoryCheckpoints()
-    ports = RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints)
+    ports = RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints, operations=None)
 
     for _ in range(2):
         with pytest.raises(Stop):
@@ -178,7 +168,7 @@ async def test_a_checkpoint_that_cannot_be_written_does_not_fail_the_run(
             await orchestrator.execute(
                 tmp_path / "doc.pdf", tmp_path, config=core_config(),
                 model_calls=current_model_calls(),
-                ports=RunPorts(region_cache=NoRegionCache(), checkpoints=Full("full-job")),
+                ports=RunPorts(region_cache=NoRegionCache(), checkpoints=Full("full-job"), operations=None),
             )
     finally:
         logger.remove(sink)
@@ -232,7 +222,7 @@ async def test_the_no_op_region_cache_never_answers() -> None:
 @pytest.mark.parametrize("enabled", [True, False])
 def test_the_run_config_turns_the_region_cache_on_or_off(enabled) -> None:
     cache = NoRegionCache()
-    ports = RunPorts(region_cache=cache, checkpoints=None)
+    ports = RunPorts(region_cache=cache, checkpoints=None, operations=None)
 
     chosen = region_cache_for(ports, vision_config(region_cache_enabled=enabled))
 
@@ -309,7 +299,7 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
     cache = NoRegionCache()
-    ports = RunPorts(region_cache=cache, checkpoints=None)
+    ports = RunPorts(region_cache=cache, checkpoints=None, operations=None)
 
     with pytest.raises(Stop):
         await orchestrator.execute(
@@ -370,7 +360,7 @@ async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp
         await orchestrator.execute(
             tmp_path / "doc.pdf", tmp_path, config=core_config(),
             model_calls=current_model_calls(),
-            ports=RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints),
+            ports=RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints, operations=None),
         )
 
     # One after the extraction, then one after each enrichment step.
@@ -418,3 +408,163 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
     )
 
     assert seen == [{}], "the new plan starts without the old plan's progress"
+
+
+class MemoryOperations:
+    """A ``RemoteOperations`` that is not the service's registry."""
+
+    def __init__(self, job_id: str = "memory-job", refuse: set[str] | None = None) -> None:
+        self.job_id = job_id
+        self.refuse = refuse or set()
+        self.events: list[tuple[str, str]] = []
+
+    def begin(self, kind):
+        if kind in self.refuse:
+            raise RuntimeError(f"job cancelled before {kind}")
+        operation_id = f"{kind}-id"
+        self.events.append(("begin", operation_id))
+        return operation_id
+
+    def finish(self, operation_id):
+        self.events.append(("finish", operation_id))
+
+
+def _extractor(seen, *, fail_primary=False):
+    from unittest.mock import AsyncMock
+
+    from acessilia_sdk.toolbox.clients import (
+        ToolboxArtifactClient,
+        ToolboxStructureClient,
+    )
+    from acessilia_sdk.toolbox.operation import current_operation
+
+    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
+
+    def labelled(kind, answer):
+        async def call(*_args, **_kwargs):
+            context = current_operation()
+            seen.append((kind, context and (context.task_id, context.operation_id)))
+            if kind == "primary" and fail_primary:
+                raise RuntimeError("primary failed")
+            return answer
+
+        return call
+
+    structure = AsyncMock(spec=ToolboxStructureClient)
+    structure.base_url, structure.provider = "http://toolbox.test", "docling"
+    structure.extract_structure = AsyncMock(side_effect=labelled("primary", SAMPLE_TOOLBOX_RESPONSE))
+    artifacts = AsyncMock(spec=ToolboxArtifactClient)
+    artifacts.upload = AsyncMock(side_effect=labelled("upload", "sha256:abc"))
+    return ToolboxManifestExtractor(client=structure, artifact_client=artifacts)
+
+
+def _extract(extractor, operations):
+    from tests.core_config_support import fusion_config, paths_config, toolbox_config
+    from tests.test_toolbox_manifest_extractor import FIXTURE_PDF
+
+    return extractor.extract(
+        FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True),
+        paths=paths_config(), operations=operations,
+    )
+
+
+def test_the_extractor_registers_and_labels_each_call_through_its_port() -> None:
+    """Any ``RemoteOperations`` works: each call is registered, labelled with
+    the job and its operation id, and finished."""
+    seen: list = []
+    operations = MemoryOperations("job-ops")
+
+    _extract(_extractor(seen), operations)
+
+    assert seen == [("upload", ("job-ops", "upload-id")), ("primary", ("job-ops", "primary-id"))]
+    assert operations.events == [
+        ("begin", "upload-id"), ("finish", "upload-id"),
+        ("begin", "primary-id"), ("finish", "primary-id"),
+    ]
+
+
+def test_an_extraction_outside_a_job_is_neither_registered_nor_labelled() -> None:
+    seen: list = []
+
+    _extract(_extractor(seen), None)
+
+    assert seen == [("upload", None), ("primary", None)]
+
+
+def test_a_failed_call_is_still_finished() -> None:
+    seen: list = []
+    operations = MemoryOperations()
+
+    with pytest.raises(RuntimeError, match="primary failed"):
+        _extract(_extractor(seen, fail_primary=True), operations)
+
+    assert operations.events[-1] == ("finish", "primary-id")
+
+
+def test_a_refused_operation_never_reaches_the_toolbox() -> None:
+    """A job being cancelled refuses the next call before it starts."""
+    seen: list = []
+    operations = MemoryOperations(refuse={"primary"})
+
+    with pytest.raises(RuntimeError, match="cancelled before primary"):
+        _extract(_extractor(seen), operations)
+
+    assert [kind for kind, _ in seen] == ["upload"]
+
+
+@pytest.mark.asyncio
+async def test_a_run_gives_its_operations_to_the_extraction(monkeypatch, tmp_path) -> None:
+    counts = {"inspect": 0, "extract": 0}
+    orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
+    received = []
+    process = orchestrator.information_structural.process
+
+    def recording(*args, operations, **kwargs):
+        received.append(operations)
+        return process(*args, **kwargs)
+
+    orchestrator.information_structural = SimpleNamespace(process=recording)
+    operations = MemoryOperations()
+
+    with pytest.raises(Stop):
+        await orchestrator.execute(
+            tmp_path / "doc.pdf", tmp_path, config=core_config(),
+            model_calls=current_model_calls(),
+            ports=RunPorts(region_cache=NoRegionCache(), checkpoints=None, operations=operations),
+        )
+
+    assert received == [operations] and received[0] is operations
+
+
+def test_the_service_operations_are_bound_to_the_job() -> None:
+    from backend.services.operation_registry import JobOperations, OperationRegistry
+    from backend.services.run_ports import service_run_ports
+
+    registry = OperationRegistry()
+    operations = JobOperations("job-ops", registry)
+
+    operation_id = operations.begin("primary")
+
+    assert [op.operation_id for op in registry.active("job-ops")] == [operation_id]
+    assert registry.active("other-job") == []
+    operations.finish(operation_id)
+    assert registry.active("job-ops") == []
+    registry.clear("job-ops")
+    assert service_run_ports("job-ops").operations.job_id == "job-ops"
+    assert service_run_ports().operations is None
+
+
+def test_the_service_operations_refuse_a_cancelled_job() -> None:
+    from backend.services.operation_registry import (
+        JobOperations,
+        OperationRegistry,
+        RemoteOperationCancelled,
+    )
+
+    registry = OperationRegistry()
+    registry.cancel_task("job-cancelled")
+
+    with pytest.raises(RemoteOperationCancelled):
+        JobOperations("job-cancelled", registry).begin("upload")
+    registry.clear("job-cancelled")

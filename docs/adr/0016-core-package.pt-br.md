@@ -92,8 +92,9 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
     (`job_checkpoint`) e o id do job (`operation_context`) no orquestrador,
     que passam pela porta `JobCheckpoints` no passo 4, e o registro de
     operações remotas (`operation_registry`, `operation_context`) no extrator
-    da Toolbox, ainda pendente. O `tests/test_run_ports.py` lista os
-    pendentes, e a lista só diminui.
+    da Toolbox, que passa pela porta `RemoteOperations` no passo 4. Desde
+    então o core não importa nada de `backend.services`, o que o
+    `tests/test_run_ports.py` confere.
 - **O serviço chega ao core** por `backend/service.py`
   (`PddlAccessibilityOrchestrator`), por `backend/api/worker.py` (os
   exportadores) e pela API e pelos serviços (as mensagens e as ferramentas).
@@ -282,8 +283,8 @@ Proposta: a opção 2.
      de inspeção de região e de página, os de fórmula, `mathml` e
      `latex-verbalizer`, e o do juiz VLM), e cada execução vincula a sua config
      a eles (`bind_run`) numa cópia do registro.
-  4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`. Em
-     andamento, em três pull requests:
+  4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
+     Feito, em três pull requests:
      - **O cache de regiões e o `run_blocking` (feito).** O
        `backend/core/ports.py` define o `RegionCache` e o `RunPorts`, com um
        no-op para execuções fora do serviço (`RunPorts.none()`). O
@@ -299,10 +300,16 @@ Proposta: a opção 2.
        que não grava nem retoma nada. Os nomes das fases são do core
        (`CHECKPOINT_PHASES`). O serviço vincula o `FileJobCheckpoints` ao id
        da tarefa do job, e o orquestrador não lê mais o id do job.
-     - **O registro de operações remotas**, que o extrator lê.
+     - **O registro de operações remotas (feito).** O `RunPorts.operations`
+       é o `RemoteOperations` do job (`begin` de uma chamada de um
+       `OperationKind`, `finish` dela, e o `job_id` que a rotula), ou `None`
+       fora de um job, cujas chamadas não são registradas nem rotuladas. A
+       execução o passa ao extrator; o serviço vincula o `JobOperations` ao id
+       da tarefa. Nada mais lê o id do job de uma variável de contexto, então
+       o `backend/services/operation_context.py` saiu.
 
-     Um teste lista os módulos do serviço que o core ainda importa, e a lista
-     só diminui.
+     O core não importa nada de `backend.services`, incluindo os imports
+     dentro de funções, o que o `tests/test_run_ports.py` confere.
   5. **Um teste de fronteira** confere o `backend/core/`, incluindo os imports
      dentro de funções:
      - ele não importa nada do `backend` fora do `backend/core`, nem nada do

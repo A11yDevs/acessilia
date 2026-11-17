@@ -93,6 +93,7 @@ from backend.core.ports import (
     PHASE_MEDIA,
     PHASE_PLAN,
     JobCheckpoints,
+    RemoteOperations,
     RunPorts,
     region_cache_for,
 )
@@ -260,7 +261,7 @@ class PddlAccessibilityOrchestrator:
                 await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
             manifest = await self._extract_structure(
                 source_path, presentation, config.document, config.fusion, config.toolbox,
-                config.paths,
+                config.paths, ports.operations,
             )
         _check_page_limit(manifest, config.document)
         manifest.extractor.configuration["region_inspection_mode"] = effective_mode
@@ -424,6 +425,7 @@ class PddlAccessibilityOrchestrator:
         fusion: FusionConfig,
         toolbox: ToolboxConfig,
         paths: PathsConfig,
+        operations: RemoteOperations | None,
     ) -> ProcessingManifest:
         """The document's manifest from ``document.structure.extract``.
 
@@ -432,14 +434,9 @@ class PddlAccessibilityOrchestrator:
         """
         try:
             return await run_blocking(
-                self.information_structural.process,
-                source_path,
-                language="pt-BR",
-                presentation=presentation,
-                document=document,
-                fusion=fusion,
-                toolbox=toolbox,
-                paths=paths,
+                self.information_structural.process, source_path, language="pt-BR",
+                presentation=presentation, document=document, fusion=fusion,
+                toolbox=toolbox, paths=paths, operations=operations,
             )
         except ToolboxError as exc:
             # The SDK already retried and failed over; there is no local

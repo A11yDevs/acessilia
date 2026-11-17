@@ -8,6 +8,7 @@ from backend.core.config import CoreConfig, DocumentConfig, FusionConfig, PathsC
 from backend.core.manifest.builder import build_processing_manifest
 from backend.core.manifest.models import ProcessingManifest
 from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+from backend.core.ports import RemoteOperations
 
 
 class InformationalStructuralAgent:
@@ -50,6 +51,7 @@ class InformationalStructuralAgent:
             fusion=config.fusion,
             toolbox=config.toolbox,
             paths=config.paths,
+            operations=None,  # an Agno tool runs outside a job
         )
         return manifest.model_dump(mode="json", by_alias=True)
 
@@ -61,6 +63,7 @@ class InformationalStructuralAgent:
         fusion: FusionConfig,
         toolbox: ToolboxConfig,
         paths: PathsConfig,
+        operations: RemoteOperations | None,
         language: str = "pt-BR",
         presentation: bool = False,
     ) -> ProcessingManifest:
@@ -72,11 +75,12 @@ class InformationalStructuralAgent:
         of the slide options and the legacy Unicode repair; ``fusion``, of the
         dual extraction and the page judge's budget; ``toolbox``, of the
         extraction's Toolbox options; ``paths``, of where its fusion evidence
-        is written.
+        is written; ``operations``, the job's registry of remote calls
+        (``None`` outside a job).
         """
         extraction = self.extractor.extract(
             source_path, fusion=fusion, toolbox=toolbox, paths=paths,
-            dual_fusion=not presentation,
+            operations=operations, dual_fusion=not presentation,
         )
         return build_processing_manifest(
             source_path,

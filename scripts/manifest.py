@@ -71,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             fusion=config.fusion,
             toolbox=config.toolbox,
             paths=config.paths,
+            operations=None,  # a script runs outside a job
         )
         payload = manifest.model_dump(mode="json", by_alias=True)
         errors = validate_manifest(payload, args.schema.resolve())
