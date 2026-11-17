@@ -305,8 +305,12 @@ Proposta: a opção 2.
        `OperationKind`, `finish` dela, e o `job_id` que a rotula), ou `None`
        fora de um job, cujas chamadas não são registradas nem rotuladas. A
        execução o passa ao extrator; o serviço vincula o `JobOperations` ao id
-       da tarefa. Nada mais lê o id do job de uma variável de contexto, então
-       o `backend/services/operation_context.py` saiu.
+       da tarefa. O core e o serviço não leem mais o id do job da variável de
+       contexto do serviço, então o `backend/services/operation_context.py`
+       (`task_context`, `current_task_id`) saiu. O SDK mantém a sua: o
+       extrator abre o `operation_context(job_id, operation_id)` em volta de
+       cada chamada, e os clientes a leem por `current_operation()` para
+       enviar os cabeçalhos da ADR-0019.
 
      O core não importa nada de `backend.services`, incluindo os imports
      dentro de funções, o que o `tests/test_run_ports.py` confere.

@@ -297,9 +297,13 @@ Proposed: option 2.
        `OperationKind`, `finish` it, and the `job_id` that labels it), or
        `None` outside a job, whose calls are neither registered nor
        labelled. The run passes it to the extractor; the service binds
-       `JobOperations` to the task id. Nothing reads the job id from a
-       context variable any more, so `backend/services/operation_context.py`
-       is gone.
+       `JobOperations` to the task id. The core and the service no longer
+       read the job id from the service's context variable, so
+       `backend/services/operation_context.py` (`task_context`,
+       `current_task_id`) is gone. The SDK keeps its own: the extractor
+       opens `operation_context(job_id, operation_id)` around each call, and
+       the clients read it through `current_operation()` to send the
+       ADR-0019 headers.
 
      The core imports nothing from `backend.services`, inside functions
      included, which `tests/test_run_ports.py` checks.
