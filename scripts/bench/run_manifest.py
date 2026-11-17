@@ -7,6 +7,7 @@ claim to capture the Core's full pipeline.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.metadata
 import json
@@ -14,6 +15,7 @@ import mimetypes
 import os
 import platform
 import subprocess
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -84,6 +86,36 @@ STRUCTURE_PROTOCOL = {
         ],
     },
 }
+
+
+class RunInUseError(RuntimeError):
+    """Another process is running or scoring the same benchmark round."""
+
+
+@contextmanager
+def lock_run_directory(run_dir: Path):
+    """Hold an exclusive lease over the manifest and its artifacts."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    # Keep the lock file in place so every process locks the same inode.
+    # The OS releases the lock when the handle closes, including after a crash.
+    with (run_dir / ".run.lock").open("a+b") as lock:
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if not isinstance(exc, BlockingIOError) and not (
+                os.name == "nt" and exc.errno == errno.EACCES
+            ):
+                raise
+            raise RunInUseError(f"Run is already in use: {run_dir}") from exc
+        yield
 
 
 def digest(value: object) -> str:

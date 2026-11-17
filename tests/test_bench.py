@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -16,7 +19,15 @@ from scripts.bench.report import (
     compare_run_report,
     score_run,
 )
-from scripts.bench.run_manifest import STRUCTURE_PROTOCOL, _dataset_revision, digest, selection_snapshot
+from scripts.bench.run_manifest import (
+    STRUCTURE_PROTOCOL,
+    _dataset_revision,
+    completed_artifacts_are_valid,
+    digest,
+    load_run_manifest,
+    lock_run_directory,
+    selection_snapshot,
+)
 
 DOC = "0a1b2c3d-0000-4000-8000-000000000001"
 
@@ -94,6 +105,49 @@ def test_submission_requires_every_page(tmp_path):
     rows = [json.loads(line) for line in
             zipfile.ZipFile(zip_path).read("predictions.jsonl").decode().splitlines()]
     assert rows[0] == {"subject": "MATH", "document_id": DOC, "page": 1, "markdown": "one"}
+
+
+def test_submit_blocks_run_until_zip_is_written(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "data"
+    _tree(root)
+    run_dir = _stub_toolbox(tmp_path, monkeypatch)
+    args = ["--dataset", "drdocbench", "--root", str(root)]
+    assert cli.main(["run", *args]) == 0
+    zip_path = run_dir / "submission" / "submission.zip"
+
+    with lock_run_directory(run_dir):
+        assert cli.main(["submit", *args]) == 1
+    assert "Run is already in use" in capsys.readouterr().err
+    assert not zip_path.exists()
+
+    read_text = Path.read_text
+    write_entry = zipfile.ZipFile.writestr
+
+    def read_prediction(path, *read_args, **read_kwargs):
+        result = read_text(path, *read_args, **read_kwargs)
+        if path == run_dir / "predictions" / f"{DOC}_p1.md":
+            assert cli.main(["run", *args]) == 1
+            assert "Run is already in use" in capsys.readouterr().err
+        return result
+
+    def write_prediction_entry(archive, *write_args, **write_kwargs):
+        assert cli.main(["run", *args]) == 1
+        assert "Run is already in use" in capsys.readouterr().err
+        return write_entry(archive, *write_args, **write_kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "read_text", read_prediction)
+        patch.setattr(zipfile.ZipFile, "writestr", write_prediction_entry)
+        assert cli.main(["submit", *args]) == 0
+
+    with zipfile.ZipFile(zip_path) as submission:
+        rows = [json.loads(line) for line in submission.read("predictions.jsonl").splitlines()]
+    assert [row["page"] for row in rows] == [1, 2]
+    assert [row["markdown"] for row in rows] == [
+        read_text(run_dir / "predictions" / f"{DOC}_p{page}.md", encoding="utf-8")
+        for page in (1, 2)
+    ]
+    assert cli.main(["run", *args]) == 0
 
 
 def test_score_counts_missing_prediction_as_miss_and_compare_runs(tmp_path):
@@ -190,6 +244,49 @@ def test_cli_resume_skips_existing_predictions(tmp_path, monkeypatch):
     # A legacy-only no-op remains partial and must not return success.
     assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data"), "--resume"]) == 1
     assert seen == ["page_2.jpg"]
+
+
+def test_cli_rejects_concurrent_run_and_score_before_touching_artifacts(tmp_path, monkeypatch):
+    root = tmp_path / "data"
+    _tree(root, pages=(1,))
+    run = _stub_toolbox(tmp_path, monkeypatch)
+    data = ["--dataset", "drdocbench", "--root", str(root)]
+    write_bytes = cli.atomic_write_bytes
+    child_cli = """
+from scripts.bench import __main__ as cli
+cli.toolbox.extract_structure = lambda *args: {
+    "document": {"elements": [{"type": "text", "text": "Other process"}]}
+}
+raise SystemExit(cli.main())
+"""
+
+    def try_competing_processes(path, payload):
+        write_bytes(path, payload)
+        if path.suffix != ".md":
+            return
+        for command in (["run", "--resume"], ["run"], ["score"]):
+            result = subprocess.run(
+                [sys.executable, "-c", child_cli, *command, *data],
+                env={**os.environ, "BENCH_VAR": str(cli.VAR)},
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            assert result.returncode == 1, result.stdout + result.stderr
+            assert "Run is already in use" in result.stderr
+        assert not (run / "report.json").exists()
+
+    monkeypatch.setattr(cli, "atomic_write_bytes", try_competing_processes)
+    assert cli.main(["run", "--resume", *data]) == 0
+
+    manifest = load_run_manifest(run)
+    assert manifest["status"] == "completed"
+    item_id = f"{DOC}_p1"
+    assert completed_artifacts_are_valid(
+        run / "predictions", manifest["items"][item_id], item_id, require_raw_payload=False
+    )
+    assert cli.main(["run", "--resume", *data]) == 0
+    assert cli.main(["score", *data]) == 0
 
 
 def test_cli_resume_completed_verified_run_returns_success(tmp_path, monkeypatch):
@@ -442,6 +539,47 @@ def test_compare_prints_strict_json(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out, parse_constant=lambda c: pytest.fail(f"non-JSON {c}"))
     assert out["metric_deltas"] == {}
     assert out["tune_delta"] is None and out["holdout_delta"] is None
+
+
+def test_compare_blocks_run_and_score_until_report_is_published(tmp_path, monkeypatch, capsys):
+    root = tmp_path / "data"
+    _tree(root, pages=(1,))
+    candidate = _stub_toolbox(tmp_path, monkeypatch)
+    base = candidate.with_name("base")
+    data = ["--dataset", "drdocbench", "--root", str(root)]
+    run_args = [*data, "--dataset-revision", "a" * 40]
+    for run in (base, candidate):
+        assert cli.main(["run", *run_args, "--run", run.name]) == 0
+        assert cli.main(["score", *data, "--run", run.name]) == 0
+    compare = ["compare", str(base), str(candidate)]
+    comparison_path = candidate / "comparison.json"
+    capsys.readouterr()
+
+    with lock_run_directory(candidate):
+        assert cli.main(compare) == 1
+    assert "Run is already in use" in capsys.readouterr().err
+    assert not comparison_path.exists()
+
+    write_json = cli.atomic_write_json
+
+    def try_replacing_runs_before_write(path, report):
+        assert path == comparison_path
+        assert report["compatibility"]["compatible"]
+        for run in (base, candidate):
+            for command, args in (("run", run_args), ("score", data)):
+                assert cli.main([command, *args, "--run", run.name]) == 1
+                assert "Run is already in use" in capsys.readouterr().err
+            assert (run / "report.json").exists()
+        write_json(path, report)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(cli, "atomic_write_json", try_replacing_runs_before_write)
+        assert cli.main(compare) == 1  # Identical predictions do not pass the improvement gate.
+    assert json.loads(comparison_path.read_text())["compatibility"]["compatible"]
+
+    # Once comparison has published, a fresh run can replace and invalidate its artifacts.
+    assert cli.main(["run", *run_args]) == 0
+    assert not comparison_path.exists()
 
 
 def test_comparison_applies_gate_only_to_matching_verified_scores(tmp_path, monkeypatch):

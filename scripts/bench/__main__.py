@@ -18,11 +18,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import shutil
 import sys
 import time
+from contextlib import ExitStack
 from pathlib import Path
 
 from docstruct.export.markdown import document_to_markdown
@@ -33,9 +33,11 @@ from scripts.bench.report import (
     SELECTION_IDS_FILE,
     compare_run_report,
     invalidate_score_artifacts,
+    json_safe,
     score_run,
 )
 from scripts.bench.run_manifest import (
+    RunInUseError,
     atomic_write_bytes,
     atomic_write_json,
     atomic_write_text,
@@ -44,6 +46,7 @@ from scripts.bench.run_manifest import (
     completed_toolbox_identity,
     is_pinned_revision,
     load_run_manifest,
+    lock_run_directory,
     merge_toolbox_identity,
     sha256_file,
     toolbox_provenance_identity,
@@ -95,11 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         if not is_pinned_revision(args.dataset_revision):
             parser.error("--dataset-revision must be a full commit SHA")
     if args.command == "compare":
-        report = compare_run_report(args.base, args.candidate)
-        atomic_write_json(args.candidate / "comparison.json", report)
-        verdict = report["verdict"]
-        print(json.dumps(_finite(verdict), indent=2, allow_nan=False))
-        return 0 if verdict["accepted"] else 1
+        return _compare(args.base, args.candidate)
 
     if not _is_path_segment(args.split):
         parser.error("--split must be a single directory name")
@@ -127,40 +126,65 @@ def main(argv: list[str] | None = None) -> int:
             if args.sample < 1:
                 parser.error("--sample must be at least 1")
             pages = pages[: args.sample]
-        return _run(
-            pages,
-            run_dir,
-            args.provider,
-            args.save_raw,
-            dataset=args.dataset,
-            split=args.split,
-            root=root,
-            resume=args.resume,
-            dataset_revision=args.dataset_revision,
-        )
-    if args.command == "score":
-        try:
-            run_manifest = load_run_manifest(run_dir)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            print(f"Invalid run manifest ({type(exc).__name__}) in {run_dir}", file=sys.stderr)
-            return 1
-        if run_manifest is not None:
-            selection = run_manifest.get("selection", {}).get("items", [])
-            selected = {item.get("item_id") for item in selection if isinstance(item, dict)}
+    try:
+        with lock_run_directory(run_dir):
+            if args.command == "submit":
+                zip_path = dataset.build_submission(pages, predictions, run_dir / "submission")
+                print(f"Submission ready: {zip_path}")
+                return 0
+            if args.command == "score":
+                return _score(pages, run_dir, root)
+            return _run(
+                pages,
+                run_dir,
+                args.provider,
+                args.save_raw,
+                dataset=args.dataset,
+                split=args.split,
+                root=root,
+                resume=args.resume,
+                dataset_revision=args.dataset_revision,
+            )
+    except RunInUseError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+
+
+def _compare(base: Path, candidate: Path) -> int:
+    try:
+        with ExitStack() as locks:
+            for run_dir in sorted({base.resolve(), candidate.resolve()}):
+                locks.enter_context(lock_run_directory(run_dir))
+            report = compare_run_report(base, candidate)
+            atomic_write_json(candidate / "comparison.json", report)
+    except RunInUseError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    verdict = report["verdict"]
+    print(json.dumps(verdict, indent=2, allow_nan=False))
+    return 0 if verdict["accepted"] else 1
+
+
+def _score(pages, run_dir: Path, root: Path) -> int:
+    try:
+        run_manifest = load_run_manifest(run_dir)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"Invalid run manifest ({type(exc).__name__}) in {run_dir}", file=sys.stderr)
+        return 1
+    if run_manifest is not None:
+        selection = run_manifest.get("selection", {}).get("items", [])
+        selected = {item.get("item_id") for item in selection if isinstance(item, dict)}
+        pages = [p for p in pages if p.item_id in selected]
+    else:
+        manifest = run_dir / SELECTION_IDS_FILE
+        if manifest.exists():
+            selected = set(manifest.read_text(encoding="utf-8").split())
             pages = [p for p in pages if p.item_id in selected]
-        else:
-            manifest = run_dir / SELECTION_IDS_FILE
-            if manifest.exists():
-                selected = set(manifest.read_text(encoding="utf-8").split())
-                pages = [p for p in pages if p.item_id in selected]
-        report = score_run(pages, predictions, run_dir)
-        print(json.dumps(_finite(report), indent=2, allow_nan=False))
-        if not report["pages"]:
-            print(f"No page of the run has ground truth under {root}", file=sys.stderr)
-            return 1
-        return 0
-    zip_path = dataset.build_submission(pages, predictions, run_dir / "submission")
-    print(f"Submission ready: {zip_path}")
+    report = score_run(pages, run_dir / "predictions", run_dir)
+    print(json.dumps(json_safe(report), indent=2, allow_nan=False))
+    if not report["pages"]:
+        print(f"No page of the run has ground truth under {root}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -427,17 +451,6 @@ def _manifest_ids(run_dir: Path) -> list[str]:
 
 def _is_path_segment(value: str) -> bool:
     return bool(value) and value not in {".", ".."} and "/" not in value and "\\" not in value
-
-
-def _finite(value):
-    """Convert non-finite numbers to ``null`` so output is strict JSON."""
-    if isinstance(value, float) and not math.isfinite(value):
-        return None
-    if isinstance(value, dict):
-        return {key: _finite(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_finite(item) for item in value]
-    return value
 
 
 if __name__ == "__main__":
