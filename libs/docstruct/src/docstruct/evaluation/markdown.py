@@ -23,18 +23,22 @@ TABLE_RE = re.compile(r"<table.*?</table>", re.DOTALL | re.IGNORECASE)
 DISPLAY_FORMULA_RE = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
 
 
-def score_markdown_page(item_id: str, pred_md: str, gt_md: str) -> PageScores:
+def score_markdown_page(
+    item_id: str, pred_md: str, gt_md: str, *, penalize_unmatched: bool = False
+) -> PageScores:
     """Text, reading order, TEDS and CDM of one page.
 
     Tables and formulas are paired by order of appearance; a component is
-    non-scorable (``None``) when either side has none of that element.
+    non-scorable (``None``) when either side has none of that element, unless
+    ``penalize_unmatched`` is set. With that policy each unmatched element
+    contributes zero, and a component absent on both sides remains unscored.
     """
     return PageScores(
         item_id=item_id,
         text_ed=text_ed(pred_md, gt_md),
         reading_order=reading_order_score(_blocks(pred_md), _blocks(gt_md)),
-        teds=_pairwise_mean(_tables(pred_md), _tables(gt_md), teds_score),
-        cdm=_pairwise_mean(_formulas(pred_md), _formulas(gt_md), cdm_score),
+        teds=_pairwise_mean(_tables(pred_md), _tables(gt_md), teds_score, penalize_unmatched),
+        cdm=_pairwise_mean(_formulas(pred_md), _formulas(gt_md), cdm_score, penalize_unmatched),
     )
 
 
@@ -51,12 +55,15 @@ def _formulas(md: str) -> list[str]:
 
 
 def _pairwise_mean(
-    preds: list[str], gts: list[str], metric: Callable[[str, str], float | None]
+    preds: list[str],
+    gts: list[str],
+    metric: Callable[[str, str], float | None],
+    penalize_unmatched: bool,
 ) -> float | None:
-    if not preds or not gts:
-        return None
     valid = [v for v in (metric(p, g) for p, g in zip(preds, gts)) if v is not None]
-    return sum(valid) / len(valid) if valid else None
+    unmatched = abs(len(preds) - len(gts)) if penalize_unmatched else 0
+    denominator = len(valid) + unmatched
+    return sum(valid) / denominator if denominator else None
 
 
 __all__ = ["score_markdown_page"]

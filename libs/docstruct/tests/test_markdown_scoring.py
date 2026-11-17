@@ -25,3 +25,17 @@ def test_tables_and_formulas_pair_by_order():
     other = "<table><tr><td>2</td></tr></table>"
     page = score_markdown_page("p1", f"{TABLE}\n\n{TABLE}", f"{TABLE}\n\n{other}")
     assert 50.0 < page.teds < 100.0
+
+
+@pytest.mark.parametrize("component, element", [("teds", TABLE), ("cdm", "$$x$$")])
+@pytest.mark.parametrize("predicted_count, reference_count, expected", [
+    (0, 0, None), (0, 1, 0.0), (1, 2, 50.0), (2, 1, 50.0),
+])
+def test_unmatched_elements_count_as_zero(
+    component, element, predicted_count, reference_count, expected
+):
+    prediction = "\n\n".join([element] * predicted_count)
+    reference = "\n\n".join([element] * reference_count)
+    page = score_markdown_page("p1", prediction, reference, penalize_unmatched=True)
+
+    assert getattr(page, component) == expected

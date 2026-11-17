@@ -9,6 +9,7 @@ from docstruct.profiles import verbosity_for_mode
 from docstruct.text.paragraphs import merge_broken_paragraphs
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.config.core_config import core_config_from_settings
 from backend.core.config import CoreConfig
 from backend.config.settings import settings
 from backend.core.pipeline.canonical_builder import build_canonical_document
@@ -59,6 +60,11 @@ def _normalized_engine() -> str:
         f"Pipeline legado ({engine}) foi desativado. "
         f"Use PIPELINE_ENGINE=pddl para o pipeline PDDL+Toolbox."
     )
+
+
+def _resolve_process_config(config: CoreConfig | None) -> CoreConfig:
+    """Keep the legacy benchmark call working while Core callers pass config."""
+    return config if config is not None else core_config_from_settings()
 
 
 def _build_orchestrator():
@@ -166,7 +172,7 @@ async def process(
     display_filename: str | None = None,
     resumed: bool = False,
     *,
-    config: CoreConfig,
+    config: CoreConfig | None = None,
 ) -> dict[str, Any]:
     """Process one document and return its canonical document.
 
@@ -182,7 +188,12 @@ async def process(
     ``resumed`` says the job continues from a checkpoint after a restart: the
     progress and stage the user already saw are kept instead of being reset to
     the start of the pipeline (#407).
+
+    When ``config`` is omitted, settings are snapshotted for the legacy external
+    benchmark adapter during its migration. Core callers should pass the
+    ``CoreConfig`` built for their job.
     """
+    config = _resolve_process_config(config)
     external_task_id = task_id is not None
     # Only the name, never a path the client sent.
     shown_name = (
