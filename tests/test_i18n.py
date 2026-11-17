@@ -332,3 +332,51 @@ def test_planning_messages_state_the_rule_they_report(monkeypatch, catalogs) -> 
     # The old translation stopped before the clause that names the executor.
     assert schema != MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION
     assert ";" in schema and "executor" in schema
+
+
+def test_the_catalogs_are_compiled_without_writing_next_to_them(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An installed package may be read-only: the catalogs compile in memory
+    and nothing is written beside their sources (ADR-0016, step 6)."""
+    import os
+    import shutil
+    import stat
+
+    root = tmp_path / "locales"
+    shutil.copytree(DEFAULT_REPOS_CATALOGS_DIR, root, ignore=shutil.ignore_patterns("*.mo"))
+    for directory, _, _ in os.walk(root):
+        os.chmod(directory, stat.S_IRUSR | stat.S_IXUSR)
+    monkeypatch.setattr(i8n, "LOCALE_CATALOGS_DIR", root)
+    i8n._catalog_for.cache_clear()
+    use_server_locale(monkeypatch, "pt_BR")
+    try:
+        assert i8n.t("Processing your document…") == "Processando seu documento…"
+        assert i8n.n("document", "documents", 2) == "documentos"
+        assert not list(root.rglob("*.mo"))
+    finally:
+        for directory, _, _ in os.walk(root):
+            os.chmod(directory, stat.S_IRWXU)
+        i8n._catalog_for.cache_clear()
+
+
+def test_a_broken_catalog_falls_back_to_english(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "locales"
+    (root / "pt_BR" / "LC_MESSAGES").mkdir(parents=True)
+    (root / "pt_BR" / "LC_MESSAGES" / "messages.po").write_bytes(b"\xff\xfe not a po file")
+    monkeypatch.setattr(i8n, "LOCALE_CATALOGS_DIR", root)
+    i8n._catalog_for.cache_clear()
+    use_server_locale(monkeypatch, "pt_BR")
+    try:
+        assert i8n.t("Processing your document…") == "Processing your document…"
+    finally:
+        i8n._catalog_for.cache_clear()
+
+
+def test_the_catalog_of_an_unknown_locale_is_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    i8n._catalog_for.cache_clear()
+
+    assert i8n._catalog_for("xx_XX").gettext("Processing your document…") == "Processing your document…"
+    assert i8n._catalog_for("pt_BR").gettext("Processing your document…") == "Processando seu documento…"

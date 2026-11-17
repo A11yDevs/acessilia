@@ -4,10 +4,11 @@ import contextvars
 import re
 from collections.abc import Mapping
 from functools import lru_cache
+from io import BytesIO
 from pathlib import Path
 
 from babel import negotiate_locale
-from babel.support import Translations
+from babel.support import NullTranslations, Translations
 
 BASE_DIR = Path(__file__).resolve().parent
 LOCALE_CATALOGS_DIR = BASE_DIR / "locales"
@@ -253,71 +254,49 @@ def locale_for_user(raw_locale: str | None) -> str:
     return _active_locale()
 
 
-def _ensure_compiled_catalogs() -> None:
-    """Compile any missing or stale Babel ``.mo`` binaries in place from their ``.po`` sources.
+def _compiled_catalog(locale: str) -> Translations | None:
+    """Compile ``locale``'s ``.po`` source in memory, or ``None`` without one.
 
-    The compiled ``messages.mo`` binaries are build artifacts and are not
-    checked into git, so a fresh checkout (or a CI environment) runs without
-    them and lookups would silently fall back to English msgids. Rebuilding
-    here, once at import time, lets every runtime path (bot/API/web startup,
-    tests, docker) resolve real catalogs without a separate compilation step.
-    A locale whose sources cannot be read or compiled is skipped so the
-    runtime degrades to the English-identity path instead of crashing.
-
-    Args:
-        (none)
-
-    Returns:
-        None: Always returns; individual catalog failures are absorbed intentionally.
+    The catalogs ship as ``.po`` sources only. They used to be compiled to
+    ``messages.mo`` next to the sources, at import; an installed package may
+    be read-only, and a failed write silently left every message in English.
+    Compiling in memory needs no write and no build step (ADR-0016, step 6).
+    A source that cannot be read or compiled is skipped, so the runtime
+    degrades to the English-identity path instead of crashing.
     """
+    po_path = LOCALE_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po"
+    if not po_path.is_file():
+        return None
     try:
         from babel.messages.mofile import write_mo
         from babel.messages.pofile import read_po
-    except Exception:
-        return
-    for locale in SUPPORTED_LOCALES:
-        lmessages = LOCALE_CATALOGS_DIR / locale / "LC_MESSAGES"
-        po_path = lmessages / "messages.po"
-        mo_path = lmessages / "messages.mo"
-        if not po_path.is_file():
-            continue
-        try:
-            # Skip when the binary is present, non-empty, and not older than its source.
-            if (
-                mo_path.is_file()
-                and mo_path.stat().st_size > 0
-                and po_path.stat().st_mtime <= mo_path.stat().st_mtime
-            ):
-                continue
-            with open(po_path, "rb") as source_stream:
-                catalog = read_po(source_stream, locale=locale)
-            with open(mo_path, "wb") as mo_stream:
-                write_mo(mo_stream, catalog)
-        except Exception:
-            continue
 
-
-# Self-heal once at import time so every consumer of this module (test runs,
-# bot/API/web startup, docker containers) starts with compiled catalogs even
-# on a checkout that only carries the tracked .po sources.
-_ensure_compiled_catalogs()
+        with open(po_path, "rb") as source:
+            catalog = read_po(source, locale=locale)
+        compiled = BytesIO()
+        write_mo(compiled, catalog)
+        compiled.seek(0)
+        return Translations(fp=compiled, domain=Translations.DEFAULT_DOMAIN)
+    except Exception:  # noqa: BLE001 - a broken catalog degrades to English
+        return None
 
 
 @lru_cache(maxsize=None)
-def _catalog_for(locale: str) -> Translations | None:
-    """Load a Babel message catalog directory (or ``None`` when none could be found).
+def _catalog_for(locale: str) -> Translations | NullTranslations:
+    """The catalog of ``locale``, else of :data:`DEFAULT_LOCALE`, else the
+    English identity (``NullTranslations``), like ``Translations.load``.
 
     Args:
-        locale (str): Candidate locale name; loader falls back to DEFAULT_LOCALE when the raw lookup would otherwise miss the file tree at all.
+        locale (str): Candidate locale name.
 
     Returns:
-        Translations | None: Loaded Babel catalog via ::Translations.load(...) or a plain Null-like value representing English identity fallback so t()/n() behave like before i18n wiring is fully populated per locale.
+        Translations | NullTranslations: The first catalog found.
     """
-    return Translations.load(
-        dirname=str(LOCALE_CATALOGS_DIR),
-        locales=[locale, DEFAULT_LOCALE],
-        domain=Translations.DEFAULT_DOMAIN,
-    )
+    for candidate in (locale, DEFAULT_LOCALE):
+        catalog = _compiled_catalog(candidate)
+        if catalog is not None:
+            return catalog
+    return NullTranslations()
 
 
 def get_translations(locale: str | None = None) -> Translations | None:

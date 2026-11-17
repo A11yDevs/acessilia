@@ -28,24 +28,26 @@ from backend.core.planning.pddl_processor import (
 )
 
 
-_SANDBOX_BASE = (Path(__file__).resolve().parent.parent.parent.parent / "temp" / "pddl-sandbox").resolve()
+#: The sandbox's folder under the caller's data directory (ADR-0016, step 6):
+#: ``PathsConfig.data_dir / SANDBOX_DIRNAME``.
+SANDBOX_DIRNAME = "pddl-sandbox"
 
 
-def _sandbox_path(user_path: str) -> Path:
-    """Resolve a model-supplied path inside the sandbox directory.
+def _sandbox_path(user_path: str, sandbox: Path) -> Path:
+    """Resolve a model-supplied path inside ``sandbox``.
 
-    The sandbox directory is <repo>/temp/pddl-sandbox/. Any attempt to
-    escape outside the sandbox raises ValueError. A ``~`` is not expanded:
-    the core reads no environment (``HOME``; ADR-0016, step 5), and a home
-    path is outside the sandbox anyway.
+    Any attempt to escape outside the sandbox raises ValueError. A ``~`` is
+    not expanded: the core reads no environment (``HOME``; ADR-0016, step 5),
+    and a home path is outside the sandbox anyway.
     """
+    base = sandbox.resolve()
     resolved = Path(user_path).resolve()
     try:
-        resolved.relative_to(_SANDBOX_BASE)
+        resolved.relative_to(base)
     except ValueError:
         raise ValueError(
             f"O caminho '{user_path}' está fora do diretório sandbox "
-            f"permitido ({_SANDBOX_BASE})."
+            f"permitido ({base})."
         )
     return resolved
 
@@ -59,7 +61,13 @@ class PlannerAgent:
         domain_path: Path = DEFAULT_DOMAIN_PATH,
         description_path: Path = DEFAULT_DESCRIPTION_PATH,
         model: Any | None = None,
+        sandbox_dir: Path | None = None,
     ) -> None:
+        """``sandbox_dir`` is where the file tools may read and write, given
+        by the caller (``PathsConfig.data_dir / SANDBOX_DIRNAME``). Without it
+        they refuse to run; ``plan`` and ``compare``, which the pipeline
+        calls, work in memory and need none."""
+        self.sandbox_dir = sandbox_dir
         self.domain = DomainBundle.load(domain_path, description_path)
         self.compiler = PddlProblemCompiler(self.domain)
         self.validator = PddlProblemValidator(self.domain)
@@ -78,6 +86,14 @@ class PlannerAgent:
             ),
             model=model,
         )
+
+    def _sandboxed(self, user_path: str) -> Path:
+        if self.sandbox_dir is None:
+            raise RuntimeError(
+                "the planner's file tools need the agent built with sandbox_dir= "
+                "(ADR-0016, step 6)"
+            )
+        return _sandbox_path(user_path, self.sandbox_dir)
 
     def inspect_domain(self) -> dict[str, str]:
         """Retorna a identidade validada do par domínio/descrição."""
@@ -100,7 +116,7 @@ class PlannerAgent:
         selected_roots: list[str] | None = None,
     ) -> dict[str, str]:
         """Compila um manifesto JSON validado em um problem.pddl."""
-        safe_manifest = _sandbox_path(manifest_path)
+        safe_manifest = self._sandboxed(manifest_path)
         manifest = ProcessingManifest.model_validate_json(
             safe_manifest.read_text(encoding="utf-8")
         )
@@ -108,7 +124,7 @@ class PlannerAgent:
             manifest,
             selected_roots=selected_roots,
         )
-        destination = _sandbox_path(problem_path)
+        destination = self._sandboxed(problem_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(compiled.text, encoding="utf-8")
         return {
@@ -126,16 +142,16 @@ class PlannerAgent:
         preferred_backend: str = "internal",
     ) -> dict[str, str]:
         """Gera problema, plano(s) e comparação opcional."""
-        safe_manifest = _sandbox_path(manifest_path)
+        safe_manifest = self._sandboxed(manifest_path)
         manifest = ProcessingManifest.model_validate_json(
             safe_manifest.read_text(encoding="utf-8")
         )
-        destination = _sandbox_path(output_directory)
+        destination = self._sandboxed(output_directory)
         destination.mkdir(parents=True, exist_ok=True)
         problem_path = destination / "problem.pddl"
         plan_path = destination / "nominal-plan.json"
         fast_downward = (
-            _sandbox_path(fast_downward_path) if fast_downward_path else None
+            self._sandboxed(fast_downward_path) if fast_downward_path else None
         )
         comparison_path: Path | None = None
         if backend == "both":
