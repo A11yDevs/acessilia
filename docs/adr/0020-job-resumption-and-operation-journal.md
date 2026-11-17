@@ -27,7 +27,9 @@ one is only wasteful.
 ### Checkpoints
 
 The core must write one JSON checkpoint per pipeline phase, under
-`DATA_DIR/jobs/<task_id>/checkpoints/`:
+`DATA_DIR/jobs/<task_id>/checkpoints/`. The core writes them through the job's
+`JobCheckpoints` port, which the service binds to the task id
+(`FileJobCheckpoints`; [ADR-0016](0016-core-package.md), step 4):
 
 | Phase | Written when | Holds |
 |---|---|---|

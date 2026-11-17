@@ -3,12 +3,13 @@
 The core does not own the service's state: its caches, its job checkpoints
 and its registry of remote operations live in ``backend/services``. A run
 receives them as ``RunPorts``, built by its caller for that job, so the core
-does not import them. The region cache is a port now; the checkpoints and
-the remote operations follow in step 4's next pull requests, and
+does not import them. The region cache and the job checkpoints are ports
+now; the remote operations follow in step 4's next pull request, and
 ``tests/test_run_ports.py`` lists the service imports still pending.
 
-Every port has a no-op implementation here, which ``RunPorts.none()``
-gathers: a script or a test that hosts no service state runs with it.
+``RunPorts.none()`` keeps no state, for a script or a test that hosts no
+service: its region cache stores nothing, and it has no job, so no
+checkpoints.
 """
 
 from __future__ import annotations
@@ -34,6 +35,41 @@ class RegionCache(Protocol):
         """Store ``payload`` (JSON-ready) for ``content`` under ``variant``."""
 
 
+#: The phases of a run the core checkpoints, in order (#407). A job resumes
+#: from the last phase stored for it; the service stores them by name.
+PHASE_MEDIA = "media"
+PHASE_MANIFEST = "manifest"
+PHASE_ENRICHED = "enriched"
+PHASE_PLAN = "plan"
+PHASE_EXECUTION = "execution"
+CHECKPOINT_PHASES: tuple[str, ...] = (
+    PHASE_MEDIA, PHASE_MANIFEST, PHASE_ENRICHED, PHASE_PLAN, PHASE_EXECUTION,
+)
+
+
+class JobCheckpoints(Protocol):
+    """The durable checkpoints of one job, by phase (ADR-0020).
+
+    Bound to the job by the service, which names and stores them; the core
+    only says which phase it writes. ``job_id`` names the job in the log.
+    Methods are blocking. The core runs ``save`` off the event loop, during
+    the run; it calls ``load`` and ``remove`` directly, as it did before the
+    port, each once per phase.
+    """
+
+    job_id: str
+
+    def load(self, phase: str) -> dict[str, Any] | None:
+        """The phase's payload, ``None`` when absent; raises when it exists
+        but cannot be trusted, so the phase is not resumed from it."""
+
+    def save(self, phase: str, payload: dict[str, Any]) -> None:
+        """Store the phase's JSON-ready payload, replacing the previous one."""
+
+    def remove(self, phase: str) -> None:
+        """Drop the phase's payload, if any."""
+
+
 class NoRegionCache:
     """A region cache that stores nothing: every region is described again."""
 
@@ -49,11 +85,13 @@ class RunPorts:
     """The service state one run reaches, built by its caller for that job."""
 
     region_cache: RegionCache
+    #: ``None`` outside a job: nothing is checkpointed and nothing resumes.
+    checkpoints: JobCheckpoints | None
 
     @classmethod
     def none(cls) -> RunPorts:
         """Ports that keep no state, for a run outside the service."""
-        return cls(region_cache=NoRegionCache())
+        return cls(region_cache=NoRegionCache(), checkpoints=None)
 
 
 def region_cache_for(ports: RunPorts, vision: VisionConfig) -> RegionCache | None:
@@ -62,4 +100,16 @@ def region_cache_for(ports: RunPorts, vision: VisionConfig) -> RegionCache | Non
     return ports.region_cache if vision.region_cache_enabled else None
 
 
-__all__ = ["NoRegionCache", "RegionCache", "RunPorts", "region_cache_for"]
+__all__ = [
+    "CHECKPOINT_PHASES",
+    "PHASE_ENRICHED",
+    "PHASE_EXECUTION",
+    "PHASE_MANIFEST",
+    "PHASE_MEDIA",
+    "PHASE_PLAN",
+    "JobCheckpoints",
+    "NoRegionCache",
+    "RegionCache",
+    "RunPorts",
+    "region_cache_for",
+]

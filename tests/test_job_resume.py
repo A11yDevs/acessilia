@@ -24,8 +24,9 @@ from backend.core.manifest.models import ProcessingManifest
 from backend.core.pipeline import orchestrator as pddl
 from backend.core.planning.domain_bundle import DomainBundle
 from backend.core.planning.planner_agent import PlannerAgent
+from backend.core.ports import PHASE_ENRICHED, PHASE_EXECUTION, PHASE_MANIFEST, PHASE_MEDIA, PHASE_PLAN
 from backend.services import job_checkpoint
-from backend.services.operation_context import task_context
+from backend.services.run_ports import service_run_ports
 from backend.services.operation_registry import OperationRegistry
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
@@ -54,12 +55,12 @@ def _sample_manifest(obligations: int = 1) -> ProcessingManifest:
 
 
 def test_a_checkpoint_round_trips_and_reports_itself_as_resumable(data_dir):
-    job_checkpoint.save("task-1", job_checkpoint.PHASE_MANIFEST, {"manifest": {"a": 1}})
+    job_checkpoint.save("task-1", PHASE_MANIFEST, {"manifest": {"a": 1}})
 
-    assert job_checkpoint.load("task-1", job_checkpoint.PHASE_MANIFEST) == {
+    assert job_checkpoint.load("task-1", PHASE_MANIFEST) == {
         "manifest": {"a": 1}
     }
-    assert job_checkpoint.load("task-1", job_checkpoint.PHASE_ENRICHED) is None
+    assert job_checkpoint.load("task-1", PHASE_ENRICHED) is None
     assert job_checkpoint.resumable("task-1") is True
 
     job_checkpoint.clear("task-1")
@@ -67,7 +68,7 @@ def test_a_checkpoint_round_trips_and_reports_itself_as_resumable(data_dir):
 
 
 def test_a_checkpoint_from_another_version_is_never_used(data_dir):
-    job_checkpoint.save("task-1", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+    job_checkpoint.save("task-1", PHASE_MANIFEST, {"manifest": {}})
     path = data_dir / "jobs" / "task-1" / "checkpoints" / "manifest.json"
     document = path.read_text(encoding="utf-8").replace(
         '"version":1', '"version":999', 1
@@ -75,22 +76,22 @@ def test_a_checkpoint_from_another_version_is_never_used(data_dir):
     path.write_text(document, encoding="utf-8")
 
     with pytest.raises(job_checkpoint.CheckpointError):
-        job_checkpoint.load("task-1", job_checkpoint.PHASE_MANIFEST)
+        job_checkpoint.load("task-1", PHASE_MANIFEST)
     assert job_checkpoint.resumable("task-1") is False
 
 
 def test_a_corrupt_checkpoint_is_never_used(data_dir):
-    job_checkpoint.save("task-1", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+    job_checkpoint.save("task-1", PHASE_MANIFEST, {"manifest": {}})
     path = data_dir / "jobs" / "task-1" / "checkpoints" / "manifest.json"
     path.write_text("{not json", encoding="utf-8")
 
     with pytest.raises(job_checkpoint.CheckpointError):
-        job_checkpoint.load("task-1", job_checkpoint.PHASE_MANIFEST)
+        job_checkpoint.load("task-1", PHASE_MANIFEST)
     assert job_checkpoint.resumable("task-1") is False
 
 
 def test_expired_checkpoints_are_swept(data_dir):
-    job_checkpoint.save("task-1", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+    job_checkpoint.save("task-1", PHASE_MANIFEST, {"manifest": {}})
 
     assert job_checkpoint.expire(7 * 24 * 60 * 60) == 0
     assert job_checkpoint.expire(0) == 1
@@ -210,23 +211,22 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
     )
     orchestrator.information_structural = SimpleNamespace(process=extract)
 
-    with task_context("resume-task"):
-        with pytest.raises(RuntimeError, match="died during enrichment"):
-            await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
+    with pytest.raises(RuntimeError, match="died during enrichment"):
+        await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("resume-task"))
 
-        assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_MEDIA) is not None
-        assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_MANIFEST) is not None
-        assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_ENRICHED) is None
+    assert job_checkpoint.load("resume-task", PHASE_MEDIA) is not None
+    assert job_checkpoint.load("resume-task", PHASE_MANIFEST) is not None
+    assert job_checkpoint.load("resume-task", PHASE_ENRICHED) is None
 
-        crash["armed"] = False
-        result = await orchestrator.execute(
-            tmp_path / "doc.pdf", tmp_path, structured_output=True,
-            config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
-        )
+    crash["armed"] = False
+    result = await orchestrator.execute(
+        tmp_path / "doc.pdf", tmp_path, structured_output=True,
+        config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("resume-task")
+    )
 
     assert counts == {"inspect": 1, "extract": 1, "enrich": 7}
     assert result["text"]
-    assert job_checkpoint.load("resume-task", job_checkpoint.PHASE_PLAN) is not None
+    assert job_checkpoint.load("resume-task", PHASE_PLAN) is not None
 
 
 @pytest.mark.asyncio
@@ -317,7 +317,7 @@ async def test_recovery_requeues_a_processing_job_that_has_a_checkpoint(isolated
     _save_processing_job("resume-task", path)
     job_checkpoint.save(
         "resume-task",
-        job_checkpoint.PHASE_EXECUTION,
+        PHASE_EXECUTION,
         {"plan_id": "plan-1", "manifest": {}, "results": []},
     )
 
@@ -346,7 +346,7 @@ async def test_a_recovered_job_can_be_cancelled_while_it_waits(
     path.write_bytes(b"%PDF")
     _save_processing_job("resume-cancel", path)
     job_checkpoint.save(
-        "resume-cancel", job_checkpoint.PHASE_MEDIA, {"inspection": None, "configuration": {}}
+        "resume-cancel", PHASE_MEDIA, {"inspection": None, "configuration": {}}
     )
 
     await recover_pending_jobs()
@@ -375,7 +375,7 @@ async def test_recovery_still_fails_a_job_whose_checkpoint_is_unusable(
     path.write_bytes(b"%PDF")
     _save_processing_job("broken-checkpoint", path)
     job_checkpoint.save(
-        "broken-checkpoint", job_checkpoint.PHASE_MANIFEST, {"manifest": {}}
+        "broken-checkpoint", PHASE_MANIFEST, {"manifest": {}}
     )
     checkpoint = (
         data_dir / "jobs" / "broken-checkpoint" / "checkpoints" / "manifest.json"
@@ -418,7 +418,7 @@ async def test_a_resumed_run_restores_progress_and_skips_the_confirmation(
             "inicio": 1000.0,
         },
     )
-    job_checkpoint.save("resume-run", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+    job_checkpoint.save("resume-run", PHASE_MANIFEST, {"manifest": {}})
 
     seen: list[str] = []
 
@@ -460,7 +460,7 @@ async def test_resumption_can_be_disabled_without_a_code_revert(
     path = tmp_path / "doc.pdf"
     path.write_bytes(b"%PDF")
     _save_processing_job("no-resume", path)
-    job_checkpoint.save("no-resume", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+    job_checkpoint.save("no-resume", PHASE_MANIFEST, {"manifest": {}})
     monkeypatch.setattr(settings, "job_resume_on_restart", False)
 
     await recover_pending_jobs()
@@ -554,25 +554,24 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
     def crash_after_the_first_obligation(task_id, phase, payload):
         real_save(task_id, phase, payload)
         if (
-            phase == job_checkpoint.PHASE_EXECUTION
+            phase == PHASE_EXECUTION
             and len(payload["results"]) == 2
         ):
             raise Crash()
 
-    with task_context("plan-resume"):
-        monkeypatch.setattr(job_checkpoint, "save", crash_after_the_first_obligation)
-        with pytest.raises(Crash):
-            await orchestrator.execute(
-                tmp_path / "doc.pdf", tmp_path, structured_output=True,
-                config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
-            )
-        assert len(handler_calls) == 1
-
-        monkeypatch.setattr(job_checkpoint, "save", real_save)
-        result = await orchestrator.execute(
+    monkeypatch.setattr(job_checkpoint, "save", crash_after_the_first_obligation)
+    with pytest.raises(Crash):
+        await orchestrator.execute(
             tmp_path / "doc.pdf", tmp_path, structured_output=True,
-            config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()
+            config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("plan-resume")
         )
+    assert len(handler_calls) == 1
+
+    monkeypatch.setattr(job_checkpoint, "save", real_save)
+    result = await orchestrator.execute(
+        tmp_path / "doc.pdf", tmp_path, structured_output=True,
+        config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("plan-resume")
+    )
 
     assert len(handler_calls) == 2
     assert len(set(handler_calls)) == 2
@@ -606,7 +605,7 @@ async def test_a_graceful_shutdown_keeps_the_job_resumable(
             "etapa_atual": "Executing the plan: step 3 of 9...",
         },
     )
-    job_checkpoint.save("shutdown-job", job_checkpoint.PHASE_MANIFEST, {"manifest": {}})
+    job_checkpoint.save("shutdown-job", PHASE_MANIFEST, {"manifest": {}})
 
     started = asyncio.Event()
 
@@ -718,7 +717,7 @@ async def test_a_completed_picture_is_checkpointed_during_the_stage(
     async def save() -> None:
         job_checkpoint.save(
             "pictures",
-            job_checkpoint.PHASE_MANIFEST,
+            PHASE_MANIFEST,
             {"manifest": manifest.model_dump(mode="json", by_alias=True)},
         )
 
@@ -732,7 +731,7 @@ async def test_a_completed_picture_is_checkpointed_during_the_stage(
     )
     try:
         await asyncio.wait_for(started.wait(), 5)
-        saved = job_checkpoint.load("pictures", job_checkpoint.PHASE_MANIFEST)
+        saved = job_checkpoint.load("pictures", PHASE_MANIFEST)
         by_id = {element["id"]: element for element in saved["manifest"]["elements"]}
         assert by_id["pic-1"]["metadata"].get("vision_description_complete") is True
         assert not by_id["pic-2"]["metadata"].get("vision_description_complete")

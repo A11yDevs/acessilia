@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from backend.core.ports import RunPorts
 from backend.services.cache import ContentCache
+from backend.services.job_checkpoint import FileJobCheckpoints
 
 
-def service_run_ports() -> RunPorts:
-    """The ports of a run the service hosts: the region cache on its file cache."""
-    return RunPorts(region_cache=ContentCache())
+def service_run_ports(task_id: str | None = None) -> RunPorts:
+    """The ports of a run the service hosts: the region cache on its file
+    cache and, inside a job (``task_id``), that job's checkpoints. A run
+    without a job (the pipeline scripts) has none."""
+    return RunPorts(
+        region_cache=ContentCache(),
+        checkpoints=FileJobCheckpoints(task_id) if task_id else None,
+    )
 
 
 __all__ = ["service_run_ports"]

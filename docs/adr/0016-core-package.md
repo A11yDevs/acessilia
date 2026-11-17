@@ -86,11 +86,13 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
       two, which stay in the service: it builds its identities in
       `backend/core/run_identity.py`, #544).
 
-    Imports added after this inventory, and pending in step 4: the job
-    checkpoints (`job_checkpoint`) and the job id (`operation_context`) in
-    the orchestrator, and the registry of remote operations
-    (`operation_registry`, `operation_context`) in the Toolbox extractor.
-    `tests/test_run_ports.py` lists them, and the list only shrinks.
+    Imports added after this inventory: the job checkpoints
+    (`job_checkpoint`) and the job id (`operation_context`) in the
+    orchestrator, which take the `JobCheckpoints` port in step 4, and the
+    registry of remote operations (`operation_registry`,
+    `operation_context`) in the Toolbox extractor, still pending.
+    `tests/test_run_ports.py` lists the pending ones, and the list only
+    shrinks.
 - **The service reaches the core** from `backend/service.py`
   (`PddlAccessibilityOrchestrator`), from `backend/api/worker.py` (the
   exporters), and from the API and services (the messages and tools).
@@ -284,7 +286,12 @@ Proposed: option 2.
        `ports` get them (`bind_run`, which replaces `bind_config`). The
        service implements the port on its file cache (`ContentCache`).
        `run_blocking` and `options_cache_key` moved into the core.
-     - **The job checkpoints and the job id**, which the orchestrator reads.
+     - **The job checkpoints and the job id (done).** `RunPorts.checkpoints`
+       is the job's `JobCheckpoints` (`load`, `save`, `remove` by phase, and
+       the `job_id` for the log), or `None` outside a job, which writes and
+       resumes nothing. The phase names are the core's (`CHECKPOINT_PHASES`).
+       The service binds `FileJobCheckpoints` to the job's task id, and the
+       orchestrator no longer reads the job id.
      - **The registry of remote operations**, which the extractor reads.
 
      A test lists the service modules the core still imports, and the list

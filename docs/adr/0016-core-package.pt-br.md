@@ -88,11 +88,12 @@ Medido na develop em fd7f7152, sobre os módulos listados acima como core
       dois, que ficam no serviço: ele monta as suas identidades em
       `backend/core/run_identity.py`, #544).
 
-    Imports acrescentados depois deste inventário, pendentes no passo 4: os
-    checkpoints do job (`job_checkpoint`) e o id do job (`operation_context`)
-    no orquestrador, e o registro de operações remotas (`operation_registry`,
-    `operation_context`) no extrator da Toolbox. O `tests/test_run_ports.py`
-    os lista, e a lista só diminui.
+    Imports acrescentados depois deste inventário: os checkpoints do job
+    (`job_checkpoint`) e o id do job (`operation_context`) no orquestrador,
+    que passam pela porta `JobCheckpoints` no passo 4, e o registro de
+    operações remotas (`operation_registry`, `operation_context`) no extrator
+    da Toolbox, ainda pendente. O `tests/test_run_ports.py` lista os
+    pendentes, e a lista só diminui.
 - **O serviço chega ao core** por `backend/service.py`
   (`PddlAccessibilityOrchestrator`), por `backend/api/worker.py` (os
   exportadores) e pela API e pelos serviços (as mensagens e as ferramentas).
@@ -292,7 +293,12 @@ Proposta: a opção 2.
        que substitui o `bind_config`). O serviço implementa a porta sobre o seu
        cache em arquivos (`ContentCache`). O `run_blocking` e o
        `options_cache_key` passaram para o core.
-     - **Os checkpoints do job e o id do job**, que o orquestrador lê.
+     - **Os checkpoints do job e o id do job (feito).** O
+       `RunPorts.checkpoints` é o `JobCheckpoints` do job (`load`, `save`,
+       `remove` por fase, e o `job_id` para o log), ou `None` fora de um job,
+       que não grava nem retoma nada. Os nomes das fases são do core
+       (`CHECKPOINT_PHASES`). O serviço vincula o `FileJobCheckpoints` ao id
+       da tarefa do job, e o orquestrador não lê mais o id do job.
      - **O registro de operações remotas**, que o extrator lê.
 
      Um teste lista os módulos do serviço que o core ainda importa, e a lista

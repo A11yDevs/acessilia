@@ -293,7 +293,7 @@ async def process(
                     thinking_mode=thinking_mode,
                     config=config,
                     model_calls=get_model_calls(),
-                    ports=service_run_ports(),
+                    ports=service_run_ports(task_id),
                 )
             except Exception:
                 # A cancellation that arrives while the extraction thread is
