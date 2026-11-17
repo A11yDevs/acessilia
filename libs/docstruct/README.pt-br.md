@@ -57,12 +57,52 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.evaluation.markdown` | `score_markdown_page` — uma página de markdown predito contra o ground truth |
 | `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (de `docstruct.text.latex`) — documento canônico → markdown de benchmark (tabelas HTML, matemática `$$`) |
 | `docstruct.export.page_text` | `blocks_text`, `pages_text` — o texto simples do payload PDDL, página a página (quem chama dá o texto de uma imagem sem descrição) |
+| `docstruct.export.walk` | `walk`, `Visitor`, `SectionContext`, `BlockContext`, `BLOCK_TYPES`, aliases de tipos de callback — travessia ordenada de seções com seleção e renderização definidas pelo consumidor |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 
 Módulos planejados (fases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Módulos
+
+### Walker de exportação (`docstruct.export.walk`)
+
+Adicionado na 0.5.1 para a [#371, E1.6](https://github.com/A11yDevs/acessilia/issues/371).
+As APIs e saídas dos exportadores existentes permanecem iguais; migrar os quatro
+exportadores é a E1.7, após a revisão deste contrato
+([ADR 0022](../../docs/adr/0022-export-walker-contract.pt-br.md)).
+
+```python
+from docstruct.export.walk import Visitor, walk
+
+visitor = Visitor[str](
+    default=lambda block, ctx: block.get("text", ""),
+    enter_section=lambda ctx: ctx.data.get("title") or None,
+)
+parts = list(walk(document, visitor, select=lambda block, ctx: not ctx.is_legacy_title))
+```
+
+`walk(document, visitor, select=None)` visita cada seção sob demanda, na ordem de
+entrada: hook de entrada, blocos selecionados, filhos, hook de saída. Metadados
+do documento ficam com quem chama. A seleção padrão inclui todos os blocos,
+inclusive títulos legados; nunca poda filhos nem suprime hooks de seção. Não
+aplica políticas de perfil, validação ou rótulos.
+
+`Visitor` exige um fallback `default` chamável e aceita callbacks opcionais com
+os nomes dos onze `BLOCK_TYPES`, além de `enter_section` e `leave_section`.
+Tipos desconhecidos e callbacks ausentes usam `default`. Callbacks de bloco
+recebem `(block, BlockContext)`; hooks de seção recebem `SectionContext`. Cada
+callback emite um valor, ou `None` para não emitir nada; strings e listas vazias
+e outros valores falsos são preservados. Quem chama agrega os resultados.
+Exceções do consumidor são propagadas.
+
+Os contextos expõem o mapping original da seção, `path` de índices de irmãos
+iniciados em zero, `depth` relativo à raiz (raiz = 0) e `index` original do bloco,
+antes do filtro. `legacy_title`, `title_alias` e `is_legacy_title` consultam sob
+demanda os helpers de seção existentes; não são regras automáticas de omissão.
+Os campos dos contextos são congelados, mas os mappings são compartilhados:
+callbacks e seletores devem tratá-los como somente leitura. O walker não copia
+nem modifica o documento.
 
 ### Normalização de LaTeX (`docstruct.text.latex`)
 

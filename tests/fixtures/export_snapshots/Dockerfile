@@ -6,4 +6,4 @@ ENV UV_PROJECT_ENVIRONMENT=/tmp/export-characterization-venv \
     UV_PYTHON_DOWNLOADS=never \
     PYTHONDONTWRITEBYTECODE=1
 WORKDIR /workspace/libs/docstruct
-CMD ["uv", "run", "--locked", "--extra", "dev", "--no-editable", "python", "-I", "-m", "pytest", "tests/test_export_characterization.py", "-p", "no:cacheprovider", "-q"]
+CMD ["uv", "run", "--locked", "--extra", "dev", "--no-editable", "python", "-I", "-m", "pytest", "tests/test_export_characterization.py", "tests/test_export_walk.py", "tests/test_export_walk_parity.py", "-p", "no:cacheprovider", "-q"]

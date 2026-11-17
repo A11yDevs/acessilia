@@ -37,6 +37,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0019](0019-operation-identifiers-and-cancellation.pt-br.md) | Identificadores de operação e cancelamento remoto | Aceita |
 | [0020](0020-job-resumption-and-operation-journal.pt-br.md) | Retomar um job a partir do seu checkpoint durável | Aceita |
 | [0021](0021-bounded-model-call-execution.pt-br.md) | Execução limitada de chamadas de modelo pertencente à aplicação | Aceita |
+| [0022](0022-export-walker-contract.pt-br.md) | Um walker de exportação compartilhado com política de renderização do consumidor | Aceita |
 
 ## Processo
 

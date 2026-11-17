@@ -57,12 +57,49 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.evaluation.markdown` | `score_markdown_page` — one predicted markdown page against its ground truth |
 | `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (from `docstruct.text.latex`) — canonical document → benchmark markdown (HTML tables, `$$` math) |
 | `docstruct.export.page_text` | `blocks_text`, `pages_text` — the PDDL payload's plain text, page by page (the caller names an image without alt text) |
+| `docstruct.export.walk` | `walk`, `Visitor`, `SectionContext`, `BlockContext`, `BLOCK_TYPES`, callback type aliases — ordered section traversal with consumer-owned selection and rendering |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
 
 Planned modules (phases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Modules
+
+### Export walker (`docstruct.export.walk`)
+
+Added in 0.5.1 for [#371, E1.6](https://github.com/A11yDevs/acessilia/issues/371).
+Existing exporter APIs and output remain unchanged; migrating the four exporters
+is E1.7, after review of this contract ([ADR 0022](../../docs/adr/0022-export-walker-contract.md)).
+
+```python
+from docstruct.export.walk import Visitor, walk
+
+visitor = Visitor[str](
+    default=lambda block, ctx: block.get("text", ""),
+    enter_section=lambda ctx: ctx.data.get("title") or None,
+)
+parts = list(walk(document, visitor, select=lambda block, ctx: not ctx.is_legacy_title))
+```
+
+`walk(document, visitor, select=None)` lazily visits each section in input order:
+entry hook, selected blocks, children, exit hook. Document-level metadata is
+left to the caller. Selection defaults to all blocks, including legacy titles;
+it never prunes children or suppresses section hooks. It applies no profile,
+validation or label policy.
+
+`Visitor` requires a callable `default` fallback and accepts optional callbacks
+named for the eleven `BLOCK_TYPES`, plus `enter_section` and `leave_section`.
+Unknown block types and unset callbacks use `default`. Block callbacks receive
+`(block, BlockContext)`; section hooks receive `SectionContext`. Each callback
+emits one value, or `None` to emit nothing; empty strings, lists and other falsey
+values are retained. The caller aggregates results. Consumer exceptions propagate.
+
+Contexts expose the original section mapping, zero-based sibling-index `path`,
+root-relative `depth` (root = 0), and original unfiltered block `index`.
+`legacy_title`, `title_alias` and `is_legacy_title` are lazy views of the existing
+section helpers, not automatic omission rules. Context fields are frozen, but
+the mappings are shared: callbacks and selectors must treat them as read-only.
+The walker neither copies nor mutates the document.
 
 ### LaTeX Normalization (`docstruct.text.latex`)
 
