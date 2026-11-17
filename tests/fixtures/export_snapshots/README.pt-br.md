@@ -9,6 +9,12 @@ registra essa origem e as 30 chamadas. Quatro entradas sintéticas produzem
 gerado ou timestamp é necessário para renderizá-las. Os testes carregam cada
 entrada novamente e verificam sua integridade após cada chamada.
 
+O teste de inventário fixa os quatro casos, as 30 chamadas únicas, o conjunto
+exato dos 39 arquivos esperados (incluindo arrays de linhas TXT) e o commit/
+versão de origem registrados. Remover cobertura, duplicar uma chamada ou deixar
+um arquivo de referência sem uso faz o gate falhar, mesmo que as comparações
+restantes de saída passem.
+
 | Entrada | Comportamento caracterizado |
 |---|---|
 | `blocks` | Os onze tipos de bloco do schema, listas ordenadas/não ordenadas, escopos e spans de linhas/colunas de tabelas, matemática com/sem fala, números de equações, descrições de imagens, escape e blocos basic/detailed/technical em seções pai e filhas |

@@ -8,6 +8,11 @@ baseline and the 30 calls. Four synthetic inputs produce 39 golden files.
 No provider, network, model, generated identifier or timestamp is needed to render
 them. Tests load each input afresh and check it for mutation after each call.
 
+The inventory guard fixes the four cases, 30 unique calls, exact set of 39
+expected files (including TXT line arrays), and recorded source commit/version.
+Removing coverage, duplicating a call, or leaving an unreferenced golden fails
+the gate even if the remaining output comparisons pass.
+
 | Input | Characterized behavior |
 |---|---|
 | `blocks` | All eleven schema block types, ordered/unordered lists, table scopes and row/column spans, math with/without speech, equation numbers, image descriptions, escaping, and basic/detailed/technical blocks in parent and child sections |

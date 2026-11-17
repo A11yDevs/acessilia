@@ -22,6 +22,30 @@ SPEC.loader.exec_module(CAPTURE)
 VARIANTS = list(CAPTURE.variants())
 
 
+def test_snapshot_inventory_and_provenance_are_frozen() -> None:
+    manifest = CAPTURE.plan()
+    assert manifest["baseline"] == {
+        "repository": "https://github.com/A11yDevs/acessilia",
+        "commit": "027b87f13bf061603d94b736a90ac62bd89b458e",
+        "docstruct_version": "0.5.0",
+    }
+    assert set(manifest["cases"]) == {"blocks", "sections", "unknown", "empty"}
+    assert {p.stem for p in (FIXTURES / "inputs").glob("*.json")} == set(manifest["cases"])
+    assert len(VARIANTS) == len({
+        (case, export["kind"], export.get("profile"), export.get("target"))
+        for case, export in VARIANTS
+    }) == 30
+    paths = []
+    for case, export in VARIANTS:
+        path = CAPTURE.filename(case, export)
+        paths.append(path)
+        if export["kind"] == "txt":
+            paths.append(path.with_suffix(".lines.json"))
+    assert len(paths) == len(set(paths)) == 39
+    expected = FIXTURES / "expected"
+    assert {p.relative_to(expected) for p in expected.rglob("*") if p.is_file()} == set(paths)
+
+
 @pytest.mark.parametrize(
     "case,export", VARIANTS,
     ids=[f"{case}-{export['snapshot']}" for case, export in VARIANTS],
