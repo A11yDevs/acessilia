@@ -399,8 +399,6 @@ def test_slurm_resume_reuses_pages_across_ports_for_same_deployment(tmp_path, mo
 def test_cli_run_rejects_input_changed_during_extraction(tmp_path, monkeypatch):
     _tree(tmp_path / "data", pages=(1,))
     monkeypatch.setattr(cli, "VAR", tmp_path / "var")
-    image_path = tmp_path / "data" / "MATH" / DOC / "images" / "page_1.jpg"
-
     def mutate_input(image, provider):
         image.write_bytes(b"changed")
         return {"document": {"elements": []}}
