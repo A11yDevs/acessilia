@@ -2,10 +2,20 @@
 
 > English version: [English guide](bench.md)
 
-`python -m scripts.bench` roda o core sobre um dataset de parsing de documentos,
-pontua o resultado e compara execuções. É assim que a extração de estrutura do
-core é medida no Dr.DocBench, e é assim que será medida no OmniDocBench e nos
-próximos datasets.
+`python -m scripts.bench` mede o harness de estrutura por página. Ele chama a
+capacidade `document.structure.extract` da Toolbox, converte a resposta para o
+documento canônico do benchmark e grava Markdown. Não executa o planner ou
+executor do Core, enriquecimento visual ou matemático remoto, nem as exportações
+finais do produto.
+Trate tempos e pontuações como medidas deste harness, não do pipeline completo
+do Core. Os scorecards de produto dos casos 036 e 006 continuam no Core; as
+campanhas públicas e seus avaliadores oficiais ficam em `acessilia-benchmark`.
+
+O downloader de Dr.DocBench, o empacotador de submissão e os jobs Slurm já
+existentes no Core são mantidos como ferramentas de compatibilidade para
+execuções locais de estrutura. Não os amplie para orquestrar campanhas ou serem
+dono de resultados oficiais; o fluxo público está sendo consolidado em
+`acessilia-benchmark`.
 
 ## Onde fica cada parte
 
@@ -13,14 +23,18 @@ próximos datasets.
 |---|---|---|
 | Métricas (distância de edição de texto, ordem de leitura, TEDS, CDM, overall) | `docstruct.evaluation.metrics` | não |
 | Pontuação de página (pareia tabelas e fórmulas pela ordem) | `docstruct.evaluation.markdown` | não |
-| Aceite tune/holdout | `docstruct.evaluation.holdout` | não |
+| Gate local de melhoria tune/holdout | `docstruct.evaluation.holdout` | não |
 | Documento canônico → markdown de benchmark | `docstruct.export.markdown` | não |
 | Payload da Toolbox → documento canônico | `scripts/bench/core.py` | não |
 | Download, layout das páginas, formato de submissão | `scripts/bench/datasets/<nome>.py` | sim |
+| Campanhas públicas, avaliadores oficiais, comparações de campanha e workflows Slurm | `acessilia-benchmark` | sim |
 
-As métricas são aproximações locais para acompanhar a diferença entre
-execuções. Para um número que vá ser reportado, rode o avaliador oficial do
-benchmark sobre as predições.
+As métricas do Core são aproximações locais para acompanhar mudanças entre
+execuções. Para reportar um número publicamente, use o avaliador oficial do
+benchmark. O `scripts.bench compare` local serve apenas ao gate de melhoria
+tune/holdout do harness de estrutura do Core. Não é uma checagem de paridade,
+comparação de campanha pública nem veredito oficial; comparações de campanha
+ficam no `acessilia-benchmark`.
 
 ## Fluxo
 
@@ -34,7 +48,7 @@ mesmos nomes de variáveis e padrões do core: `TOOLBOX_BASE_URLS` (ou então
 # 1. Materializa um split localmente: var/bench/<dataset>/<split>/data
 uv run python -m scripts.bench download --dataset drdocbench --split dev --limit 100
 
-# 2. Roda o core: var/bench/<dataset>/<split>/<run>/predictions/<item>.md (+ .blocks.json)
+# 2. Roda a extração de estrutura e grava predições e run-manifest.json
 uv run python -m scripts.bench run --dataset drdocbench --split dev --run baseline
 
 # 3. Pontua: report.json, pages.jsonl e drilldown.csv (piores páginas primeiro) no diretório da execução
@@ -49,18 +63,61 @@ uv run python -m scripts.bench submit --dataset drdocbench --split test --run ba
 
 `--root` aponta para uma árvore local existente em vez de `var/bench/.../data`;
 `run` também aceita `--sample N`, `--item <id>`, `--provider` e `--save-raw`.
-`run` substitui as predições anteriores da run e registra as páginas que cobriu
-em `pages.txt`; `score` pontua só essas páginas, então uma run com `--sample`
-não é pontuada contra o split inteiro. `score` sai com 1 quando nenhuma página
-tem ground truth (o split `test`, por exemplo). Já `--resume` continua uma run
-interrompida: as predições anteriores ficam e o `pages.txt` segue cobrindo todas
-as páginas da seleção.
+Cada execução grava `run-manifest.json` com hashes das imagens selecionadas e
+referências, identidade do Core e dos pacotes, configuração efetiva da Toolbox,
+hashes das saídas, estado por página e tempos observados. O manifesto não grava
+a chave de API nem o conteúdo dos documentos. O payload opcional `.provider.json`
+é conteúdo e fica nos artefatos da execução em `BENCH_VAR`.
+
+Predições e payloads brutos opcionais podem conter conteúdo documental. Restrinja
+o acesso a `BENCH_VAR` e aplique a política de retenção do dataset; o harness não
+expira nem exclui artefatos automaticamente. Mantenha `--save-raw` desativado
+salvo quando a resposta bruta do provider for necessária.
+
+Se a árvore materializada não for, ela própria, a raiz de um checkout Git,
+informe o commit fixado de origem com `run --dataset-revision`. O valor deve
+ser um SHA completo de 40 ou 64 caracteres; nomes mutáveis como `main` são
+rejeitados. Se a revisão não estiver disponível, o manifesto registra a ausência
+e `compare` rejeita um veredito aceito; os hashes identificam os bytes locais
+exatos, mas não a release de origem. O protocolo registra o tipo de mídia e o
+tamanho da imagem. Declara que o Core não aplica recorte nem transformação; transformações
+internas da Toolbox ficam marcadas como não observadas.
+
+Uma nova `run` substitui as predições e registra a seleção em `pages.txt` para
+compatibilidade. `score` pontua a seleção do manifesto, então uma execução com
+`--sample` não é pontuada contra o split inteiro. `score` sai com 1 quando
+nenhuma página tem ground truth (o split `test`, por exemplo). `--resume` exige
+os mesmos dataset, hashes de entrada e referência, identidade do código,
+software, hardware e configuração efetiva da execução salva. Ele verifica os
+hashes das saídas antes de reutilizar uma página concluída. O manifesto mantém
+um hash do caminho de cada endpoint. Se a nova resposta trouxer capability,
+provider ou versões de provider/modelo conflitantes com as páginas concluídas,
+a página falha antes de gravar a predição. Manifestos antigos sem os hashes
+dos caminhos ainda podem ser pontuados para diagnóstico. O gate exige esses
+hashes e consistência da proveniência reportada. Arquivos Markdown sem
+manifesto continuam como `legacy_unverified`.
+
+`run`, `score` e `submit` usam um bloqueio exclusivo por diretório de rodada. `compare`
+bloqueia os dois diretórios enquanto verifica os artefatos e grava o relatório.
+Se outro processo estiver com um dos bloqueios necessários, o comando sai com
+código 1. Repita após o fim do outro processo.
+
+O manifesto registra a duração observada pelo chamador na chamada à Toolbox,
+o tempo da checagem de integridade da entrada depois da chamada e o tempo de
+parede da página, incluindo conversão canônica e gravação dos artefatos. A
+resposta da Toolbox não expõe tentativas/retries reais, tempo de fila, tempo
+de consulta ou política efetiva de cache. Quando a
+resposta inclui proveniência, cada chamada registra à parte as versões do
+provider e dos modelos, a duração informada e o acerto de cache. Num acerto,
+a duração informada pertence ao resultado armazenado.
 
 A pontuação calcula duas distâncias de Levenshtein por página. Sem o `rapidfuzz`
 (instalado pelo extra `dev`), o docstruct usa Python puro, que leva cerca de
 20 s para uma página de 3.000 caracteres.
 
-`compare` aplica o critério de aceite de `docstruct.evaluation.holdout`: o split
+`report.json` registra cobertura esperada, executada, falha e pontuável para
+cada métrica local. `compare` aplica o gate de melhoria de
+`docstruct.evaluation.holdout`: o split
 é por documento (1/3 no holdout), e um candidato só é aceito se ganhar no tune,
 não perder no holdout e nenhuma métrica cair além da tolerância. Sai com 1
 quando o candidato é rejeitado, inclusive quando um dos subconjuntos não tem
@@ -69,8 +126,66 @@ base não tem nenhum valor no candidato (por exemplo, ele parou de emitir
 tabelas): sem isso a métrica sairia da média e contaria como ganho. Valores que
 não podem ser calculados saem como `null`.
 
-Uma métrica que some só em algumas páginas ainda deixa essas páginas fora da
-sua média; no `drilldown.csv` esse componente fica em branco nessas páginas.
+O avaliador local v2 pareia tabelas e fórmulas display por ordem de aparição.
+Cada elemento sem par vale zero, inclusive quando a previsão omite só parte
+da referência. O denominador da página conta pares válidos e elementos sem
+par. Um componente ausente nos dois lados fica sem nota. O TEDS local ignora
+a mesclagem de células e o CDM local compara multiconjuntos de tokens. Para
+usar o avaliador v2, repontue as duas rodadas offline. O gate exige o
+protocolo `toolbox-structure@2`, que desativa o enriquecimento remoto de
+fórmulas.
+
+O resultado fica em `comparison.json` e registra se a compatibilidade
+permitiu aplicar o gate de melhoria. `CDM` é apenas diagnóstico e não participa deste
+gate. A comparação é rejeitada se faltar manifesto concluído e com artefatos
+verificados, ou se divergirem revisão do dataset, seleção, referências,
+unidade, protocolo de pontuação ou cobertura por métrica. O relatório também
+lista software, hardware e configuração efetiva para explicitar mudanças
+intencionais do runtime. IDs de item/página duplicados invalidam a comparação,
+em vez de sobrescrever uma linha.
+
+O manifesto reutiliza o contrato de identidade e relatório definido para a
+#370. Este protocolo de estrutura não chama a pipeline de processamento do
+Core, então não aplica `processing_cache_configuration()`. Uma medição futura da
+pipeline completa deve reutilizar essa função para as configurações de
+processamento do Core.
+
+Os limites medidos hoje e os contratos propostos para etapas estão em
+[`benchmarks/regions.pt-br.md`](benchmarks/regions.pt-br.md); as
+responsabilidades e cobertura estão em
+[`benchmarks/coverage-map.pt-br.md`](benchmarks/coverage-map.pt-br.md). A
+captura futura de etapas depende da modularização do Orchestrator na #381. Esta
+issue não adiciona importação de `scripts/bench` no runtime nem cria outro
+runner público de benchmark.
+
+## Adaptador de compatibilidade e migração
+
+`backend/tools/toolbox_client.py` é uma factory temporária baseada em settings,
+mantida para o adaptador `acessilia-benchmark` fixado em `810c748`. Ela não é uma
+API pública do Core. Código novo do Core deve usar
+`backend.core.toolbox.toolbox_client.make_toolbox_client` e passar um
+`ToolboxConfig` explícito.
+
+A remoção dessa compatibilidade depende de duas migrações:
+
+- O modo `structure` do adaptador deve usar diretamente os clientes do SDK.
+  Isso acompanha a #402, cujo critério de aceite exige que os scripts de
+  benchmark não importem `backend.tools.toolbox_*`.
+- O modo `pipeline` do adaptador precisa de uma API pública estável do Core. A
+  ADR-0016 propõe o pacote separado `acessilia_core`; essa mudança é distinta da
+  transferência do transporte da Toolbox para o SDK na #402.
+
+A ADR-0018 continua proposta e trata do uso da API pública do SDK pelo próprio
+Core; ela não define a API pública do Core necessária para o modo `pipeline`.
+Enquanto o adaptador importar internos do Core, a exceção de dependência P3
+continua sem resolução. O processo de ADR exige um registro aceito que informe
+escopo, responsável e critério de saída da exceção. Mantenha P3 sem marcar até
+que a exceção seja aceita ou esses imports sejam removidos.
+
+Prefira pontuação/replay offline e jobs Slurm isolados. A execução atual é
+serial (`worker_count=1`), mas isso não reserva capacidade em um gateway
+compartilhado. Não direcione o harness a um gateway de produção compartilhado
+antes de definir política de admissão, janela de execução e condição de parada.
 
 ## Em um cluster Slurm
 
@@ -78,17 +193,26 @@ sua média; no `drilldown.csv` esse componente fica em branco nessas páginas.
 (o workspace com `repos/acessilia`, `repos/acessilia-toolbox` e `data/`) e mantém
 todos os caches e execuções dentro dele (`BENCH_VAR=$WS/bench`). Submeta a partir
 de `$WS` e passe a partição com `-p`.
+Esses jobs existentes são ferramentas de compatibilidade para execuções locais
+isoladas; execução de campanhas públicas e relatórios oficiais ficam no
+`acessilia-benchmark`.
 
 | Job | O quê |
 |---|---|
 | `setup.sbatch` | venvs e modelos da Toolbox, do docling-serve e do MinerU, venv deste repositório; opcionalmente um snapshot de dataset do HuggingFace (`HF_DATASET`, `HF_PATTERN`, `DATASET_DIR`) |
-| `bench.sbatch` | sobe o provider (`PROVIDER=docling\|mineru`) e a Toolbox dentro do job, em portas derivadas do id do job, e roda `scripts.bench run --resume` e `score`; submeter de novo o mesmo `RUN` retoma de onde parou |
+| `bench.sbatch` | sobe o provider (`PROVIDER=docling\|mineru`) e a Toolbox dentro do job, em portas derivadas do id do job, e roda `scripts.bench run --resume` e `score` |
 | `eval_official.sbatch` | monta a árvore de janelas de uma página do avaliador oficial para cada execução em `RUNS` e pontua com `$WS/repos/DrDocBench` (`CONFIG` é a configuração do avaliador; `cdm_env.sh` para o CDM) |
+
+A porta local da Toolbox pode mudar entre jobs. Retomar o mesmo `RUN` ainda
+exige o mesmo commit da Toolbox, as mesmas alterações rastreadas, a mesma
+configuração do provider e os demais campos de identidade da rodada. Para um
+dataset materializado, defina `DATASET_REVISION` com o SHA completo do commit de
+origem para que o job registre a revisão usada na comparação.
 
 ```bash
 cd $WS
 sbatch -p <partition> -c 8 --mem 32G --time 04:00:00 --job-name mineru-dev \
-  --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=mineru,PROVIDER=mineru \
+  --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=mineru,PROVIDER=mineru,DATASET_REVISION=$DATASET_REVISION \
   repos/acessilia/scripts/bench/slurm/bench.sbatch
 ```
 
@@ -163,6 +287,9 @@ reconhecimento, a concordância com a camada de texto, a camada de texto e o
 número da equação; de cada bloco, tabelas incluídas, o texto e as expressões
 inline; de cada tabela, a forma e as células; a estrutura dos blocos; e os
 avisos técnicos. Sai com 1 quando há diferença.
+Os relatórios JSON e Markdown identificam o gate de paridade. A comparação do
+caso de slides 006 é apenas diagnóstica; não aceita nem rejeita candidatos
+automaticamente.
 
 O que um modelo de visão escreveu pode diferir entre duas execuções
 quaisquer, então aparece à parte e não reprova a comparação:
