@@ -37,6 +37,7 @@ ones here instead of restating them.
 | [0019](0019-operation-identifiers-and-cancellation.md) | Operation identifiers and remote cancellation | Accepted |
 | [0020](0020-job-resumption-and-operation-journal.md) | Resuming a job from its durable checkpoint | Accepted |
 | [0021](0021-bounded-model-call-execution.md) | Bounded model-call execution owned by the application | Accepted |
+| [0022](0022-export-walker-contract.md) | A shared export walker with consumer-owned rendering policy | Accepted |
 
 ## Process
 
