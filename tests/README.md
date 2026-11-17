@@ -41,6 +41,15 @@ uv run pytest tests/test_pddl_planning.py
 
 `fixtures/` holds sample PDFs and images, used both by the tests and by the load scenarios and benchmarks in `scripts/`. `fixtures/failures/` holds inert corrupt documents used by `test_job_failure_e2e.py` to reproduce a pipeline failure and the failure e-mail; see its [README](fixtures/failures/README.md). No debug switch is involved: the files live only in the test tree.
 
+## Export characterization
+
+The export parity baseline for #371 lives in
+[`fixtures/export_snapshots/`](fixtures/export_snapshots/README.md).
+`libs/docstruct/tests/test_export_characterization.py` freezes the four pure
+export APIs, their current omission/filter policies and both Pandoc targets.
+It runs natively, against the isolated wheel and in a locked CI container.
+Keep its golden files unchanged during the walker extraction/migration.
+
 ## End-to-end tests
 
 Tests marked with `-m e2e` are excluded from CI and need a live environment:

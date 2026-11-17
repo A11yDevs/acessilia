@@ -1,0 +1,163 @@
+{
+  "baseline": {
+    "repository": "https://github.com/A11yDevs/acessilia",
+    "commit": "027b87f13bf061603d94b736a90ac62bd89b458e",
+    "docstruct_version": "0.5.0"
+  },
+  "cases": {
+    "blocks": [
+      {
+        "kind": "txt",
+        "profile": "txt",
+        "snapshot": "txt.txt"
+      },
+      {
+        "kind": "html",
+        "profile": "html",
+        "snapshot": "html.html"
+      },
+      {
+        "kind": "markdown",
+        "snapshot": "markdown.md"
+      },
+      {
+        "kind": "pandoc",
+        "target": "docx",
+        "snapshot": "pandoc-docx.json"
+      },
+      {
+        "kind": "pandoc",
+        "target": "pdf_ua",
+        "snapshot": "pandoc-pdf-ua.json"
+      },
+      {
+        "kind": "txt",
+        "profile": "html",
+        "snapshot": "txt-html.txt"
+      },
+      {
+        "kind": "txt",
+        "profile": "pdf",
+        "snapshot": "txt-pdf.txt"
+      },
+      {
+        "kind": "txt",
+        "profile": "pdf_ua",
+        "snapshot": "txt-pdf_ua.txt"
+      },
+      {
+        "kind": "txt",
+        "profile": "docx",
+        "snapshot": "txt-docx.txt"
+      },
+      {
+        "kind": "txt",
+        "profile": "unrecognized",
+        "snapshot": "txt-unrecognized.txt"
+      },
+      {
+        "kind": "html",
+        "profile": "txt",
+        "snapshot": "html-txt.html"
+      },
+      {
+        "kind": "html",
+        "profile": "pdf",
+        "snapshot": "html-pdf.html"
+      },
+      {
+        "kind": "html",
+        "profile": "pdf_ua",
+        "snapshot": "html-pdf_ua.html"
+      },
+      {
+        "kind": "html",
+        "profile": "docx",
+        "snapshot": "html-docx.html"
+      },
+      {
+        "kind": "html",
+        "profile": "unrecognized",
+        "snapshot": "html-unrecognized.html"
+      }
+    ],
+    "sections": [
+      {
+        "kind": "txt",
+        "profile": "txt",
+        "snapshot": "txt.txt"
+      },
+      {
+        "kind": "html",
+        "profile": "html",
+        "snapshot": "html.html"
+      },
+      {
+        "kind": "markdown",
+        "snapshot": "markdown.md"
+      },
+      {
+        "kind": "pandoc",
+        "target": "docx",
+        "snapshot": "pandoc-docx.json"
+      },
+      {
+        "kind": "pandoc",
+        "target": "pdf_ua",
+        "snapshot": "pandoc-pdf-ua.json"
+      }
+    ],
+    "unknown": [
+      {
+        "kind": "txt",
+        "profile": "txt",
+        "snapshot": "txt.txt"
+      },
+      {
+        "kind": "html",
+        "profile": "html",
+        "snapshot": "html.html"
+      },
+      {
+        "kind": "markdown",
+        "snapshot": "markdown.md"
+      },
+      {
+        "kind": "pandoc",
+        "target": "docx",
+        "snapshot": "pandoc-docx.json"
+      },
+      {
+        "kind": "pandoc",
+        "target": "pdf_ua",
+        "snapshot": "pandoc-pdf-ua.json"
+      }
+    ],
+    "empty": [
+      {
+        "kind": "txt",
+        "profile": "txt",
+        "snapshot": "txt.txt"
+      },
+      {
+        "kind": "html",
+        "profile": "html",
+        "snapshot": "html.html"
+      },
+      {
+        "kind": "markdown",
+        "snapshot": "markdown.md"
+      },
+      {
+        "kind": "pandoc",
+        "target": "docx",
+        "snapshot": "pandoc-docx.json"
+      },
+      {
+        "kind": "pandoc",
+        "target": "pdf_ua",
+        "snapshot": "pandoc-pdf-ua.json"
+      }
+    ]
+  }
+}

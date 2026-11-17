@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "id": "unknown",
+  "title": "Unknown block types",
+  "language": "en",
+  "sections": [
+    {
+      "id": "fallback",
+      "title": "Fallback",
+      "level": 1,
+      "blocks": [
+        {
+          "id": "custom",
+          "type": "custom",
+          "text": "Accepted fallback text"
+        },
+        {
+          "id": "custom-detail",
+          "type": "custom",
+          "text": "Detailed fallback",
+          "verbosity": "detailed"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "title": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Unknown"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "block"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "types"
+        }
+      ]
+    },
+    "lang": {
+      "t": "MetaString",
+      "c": "en"
+    },
+    "verbosity": {
+      "t": "MetaString",
+      "c": "detailed"
+    }
+  },
+  "blocks": [
+    {
+      "t": "Header",
+      "c": [
+        1,
+        [
+          "fallback",
+          [],
+          []
+        ],
+        [
+          {
+            "t": "Str",
+            "c": "Fallback"
+          }
+        ]
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Accepted"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "fallback"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "text"
+        }
+      ]
+    },
+    {
+      "t": "Para",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Detailed"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "fallback"
+        }
+      ]
+    }
+  ],
+  "source_document": {
+    "schema_version": "1.0.0",
+    "id": "unknown",
+    "title": "Unknown block types",
+    "language": "en",
+    "sections": [
+      {
+        "id": "fallback",
+        "title": "Fallback",
+        "level": 1,
+        "blocks": [
+          {
+            "id": "custom",
+            "type": "custom",
+            "text": "Accepted fallback text"
+          },
+          {
+            "id": "custom-detail",
+            "type": "custom",
+            "text": "Detailed fallback",
+            "verbosity": "detailed"
+          }
+        ]
+      }
+    ]
+  }
+}

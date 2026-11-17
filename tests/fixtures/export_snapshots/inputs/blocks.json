@@ -1,0 +1,201 @@
+{
+  "schema_version": "1.0.0",
+  "id": "blocks",
+  "title": "All block types",
+  "language": "en",
+  "sections": [
+    {
+      "id": "blocks-section",
+      "title": "Blocks",
+      "level": 1,
+      "blocks": [
+        {
+          "id": "heading",
+          "type": "heading",
+          "text": "Subheading",
+          "level": 2
+        },
+        {
+          "id": "basic",
+          "type": "paragraph",
+          "text": "BASIC_ONLY: <text> & whitespace  preserved."
+        },
+        {
+          "id": "ordered",
+          "type": "list",
+          "text": "",
+          "ordered": true,
+          "start": 3,
+          "items": [
+            "One",
+            "",
+            "Three"
+          ]
+        },
+        {
+          "id": "unordered",
+          "type": "list",
+          "text": "",
+          "ordered": false,
+          "items": [
+            "First",
+            "Second"
+          ]
+        },
+        {
+          "id": "table",
+          "type": "table",
+          "text": "",
+          "table_ast": {
+            "caption": "Cells & spans",
+            "header": [
+              {
+                "cells": [
+                  {
+                    "text": "Group",
+                    "header": true,
+                    "scope": "colgroup",
+                    "colspan": 2
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "Name",
+                    "header": true,
+                    "scope": "col"
+                  },
+                  {
+                    "text": "Value",
+                    "header": true,
+                    "scope": "col"
+                  }
+                ]
+              }
+            ],
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "First",
+                    "header": true,
+                    "scope": "rowgroup",
+                    "rowspan": 2
+                  },
+                  {
+                    "text": "3"
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "4"
+                  }
+                ]
+              }
+            ],
+            "footer": [
+              {
+                "cells": [
+                  {
+                    "text": "Total",
+                    "header": true,
+                    "scope": "row"
+                  },
+                  {
+                    "text": "7"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "image",
+          "type": "image",
+          "text": "Image source",
+          "alt_text": "An accessible image",
+          "long_description": "Long image description.",
+          "metadata": {
+            "src": "image.png"
+          }
+        },
+        {
+          "id": "code",
+          "type": "code",
+          "text": "TECH_ONLY\nprint(\"<value>&\")",
+          "language": "python",
+          "verbosity": "technical"
+        },
+        {
+          "id": "numbered-math",
+          "type": "math",
+          "text": "x=y",
+          "alt_text": "X equals Y",
+          "metadata": {
+            "equation_number": "2.1",
+            "mathml": "<math><mi>x</mi><mo>=</mo><mi>y</mi></math>"
+          }
+        },
+        {
+          "id": "math-without-alt",
+          "type": "math",
+          "text": "unspoken_math"
+        },
+        {
+          "id": "quote",
+          "type": "quote",
+          "text": "Quoted words.",
+          "title": "Quotation"
+        },
+        {
+          "id": "details",
+          "type": "details",
+          "text": "DETAIL_ONLY",
+          "title": "More information",
+          "verbosity": "detailed"
+        },
+        {
+          "id": "note",
+          "type": "note",
+          "text": "A note.",
+          "title": "Note"
+        },
+        {
+          "id": "warning",
+          "type": "warning",
+          "text": "A warning.",
+          "title": "Warning"
+        }
+      ],
+      "children": [
+        {
+          "id": "filtered-child",
+          "title": "Filtered child",
+          "level": 2,
+          "blocks": [
+            {
+              "id": "child-basic",
+              "type": "paragraph",
+              "text": "Child BASIC_ONLY"
+            },
+            {
+              "id": "child-detail",
+              "type": "note",
+              "text": "Child DETAIL_ONLY",
+              "verbosity": "detailed"
+            },
+            {
+              "id": "child-tech",
+              "type": "warning",
+              "text": "Child TECH_ONLY",
+              "verbosity": "technical"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

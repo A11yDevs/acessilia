@@ -42,6 +42,16 @@ uv run pytest tests/test_pddl_planning.py
 
 `fixtures/` guarda os PDFs e imagens de exemplo, usados tanto pelos testes quanto pelos cenários de carga e benchmarks em `scripts/`. `fixtures/failures/` guarda documentos corrompidos inertes usados por `test_job_failure_e2e.py` para reproduzir a falha do pipeline e o e-mail de falha; veja o [README](fixtures/failures/README.md). Não há flag de debug envolvida: os arquivos vivem apenas na árvore de testes.
 
+## Caracterização dos exports
+
+A linha de base de paridade dos exports da #371 fica em
+[`fixtures/export_snapshots/`](fixtures/export_snapshots/README.pt-br.md).
+`libs/docstruct/tests/test_export_characterization.py` congela as quatro APIs
+puras de export, suas políticas atuais de omissão/filtro e os dois destinos
+Pandoc. Executa nativamente, contra o wheel isolado e em contêiner de CI travado
+pelo lock. Manter seus arquivos de referência inalterados durante a extração/
+migração do walker.
+
 ## Testes end-to-end
 
 Os testes marcados com `-m e2e` ficam fora da CI e precisam de um ambiente real:
