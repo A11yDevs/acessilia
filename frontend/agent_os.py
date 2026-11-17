@@ -23,6 +23,7 @@ from agno.media import Image  # noqa: F401  (available for multimodal tests in t
 from agno.os import AgentOS
 
 from backend.config.core_config import core_config_from_settings
+from backend.config.process_setup import setup_process
 from backend.core.agents.ai_client import get_agno_model
 from backend.core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
@@ -42,6 +43,9 @@ from frontend.web.messages import (
 
 # The service's configuration (ADR-0016, step 3): the model client takes the
 # model and Toolbox groups explicitly, as the pipeline's agents do.
+# At import, before the agents' descriptions are translated: uvicorn imports
+# this module for ``app`` (ADR-0016, step 5; review of #568).
+setup_process()
 _config = core_config_from_settings()
 
 # Session/memory database of the AgentOS (kept in the project data directory).

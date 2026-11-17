@@ -315,7 +315,24 @@ Proposed: option 2.
        on the test's allowlist and a reference to acessilia-toolbox#73;
      - it reads no environment variable.
 
-     It must pass before the extraction.
+     It must pass before the extraction. Done: `tests/test_core_boundary.py`
+     checks the three rules, keeps the library allowlist from growing
+     (a library the core stops importing leaves it), confines edge-tts to
+     the audio exporter, and checks that the SDK and docstruct do not import
+     the core. The scan follows aliases (`import os as o`) and catches
+     `expanduser`/`expandvars` on any receiver. Two environment reads were
+     left, both moved out:
+     - the server-side locale, which `t()` negotiated from `LOCALE`,
+       `LANGUAGE`, `LC_ALL` and `LANG` at every call. The service now
+       negotiates it once at startup (`setup_process`, with
+       `negotiate_server_locale`) and passes it to the catalogs
+       (`configure_server_locale`). A process that skips the setup uses
+       `en_US`;
+     - `expanduser` (`HOME`) in the planner's sandbox paths, which a home
+       path could not pass anyway.
+
+     `tempfile` honours `TMPDIR` inside the standard library; that is not
+     the core reading its environment, so the test allows it.
   6. **The extraction:**
      - the modules move to `libs/core`, and `backend/core` disappears;
      - the PDDL domains, the prompts and the catalogs are declared as package

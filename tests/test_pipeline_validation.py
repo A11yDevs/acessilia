@@ -16,6 +16,7 @@ from backend.core.pipeline.validators import validate_output_text
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.profiles import normalize_profile
 from docstruct.profiles import verbosity_for_mode
+from tests.locale_support import use_server_locale
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +26,7 @@ def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     The validators resolve every finding through backend.core.i18n.t, so assertions on the
     localized text need a deterministic locale; en_US returns the canonical English msgids.
     """
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
 
 

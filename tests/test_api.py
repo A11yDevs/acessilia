@@ -23,6 +23,7 @@ pytest.importorskip("fastapi.testclient")
 
 from backend.api.app import app  # noqa: E402
 from tests.core_config_support import core_config
+from tests.locale_support import use_server_locale
 
 
 @pytest.fixture(scope="session")
@@ -228,12 +229,12 @@ def test_access_log_filter_redacts_download_tokens():
 
 def test_logs_require_configured_token(client, monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "")
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     resp_en = client.get("/api/v1/logs")
     assert resp_en.status_code == 503
     assert resp_en.json()["detail"] == "Observability access not configured"
 
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     resp_pt = client.get("/api/v1/logs")
     assert resp_pt.status_code == 503
     assert resp_pt.json()["detail"] == "Acesso de observabilidade não configurado"
@@ -248,12 +249,12 @@ def test_logs_declare_bearer_auth_in_openapi(client):
 
 def test_cache_clear_requires_configured_operations_token(client, monkeypatch):
     monkeypatch.setattr(settings, "operations_api_token", "")
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     resp_en = client.post("/api/v1/cache/clear")
     assert resp_en.status_code == 503
     assert resp_en.json()["detail"] == "Operations access not configured"
 
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     resp_pt = client.post("/api/v1/cache/clear")
     assert resp_pt.status_code == 503
     from backend.core.i18n import t
@@ -305,13 +306,13 @@ def test_observability_token_cannot_authorize_writes(monkeypatch):
     request = Request({"type": "http", "method": "POST"})
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="secret")
 
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     with pytest.raises(HTTPException) as exc_en:
         require_observability_token(request, credentials)
     assert exc_en.value.status_code == 403
     assert exc_en.value.detail == "Token allows read-only access"
 
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     with pytest.raises(HTTPException) as exc_pt:
         require_observability_token(request, credentials)
     assert exc_pt.value.status_code == 403
@@ -347,13 +348,13 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
     (settings.logs_dir / "bot_2019-12-31.log.zip").write_bytes(b"archive")
     (settings.logs_dir / "other.log").write_text("hidden", encoding="utf-8")
 
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     resp_401_en = client.get("/api/v1/logs")
     assert resp_401_en.status_code == 401
     assert resp_401_en.json()["detail"] == "Invalid token"
     assert resp_401_en.headers["WWW-Authenticate"] == "Bearer"
 
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     resp_401_pt = client.get("/api/v1/logs")
     assert resp_401_pt.status_code == 401
     assert resp_401_pt.json()["detail"] == "Token inválido"
@@ -372,12 +373,12 @@ def test_logs_list_and_download_files_with_token(client, monkeypatch):
     assert client.get("/api/v1/logs/bot_2020-01-01.log", headers=headers).text == "first\nsecond\nthird\n"
     assert client.get("/api/v1/logs/bot_2019-12-31.log.zip", headers=headers).content == b"archive"
 
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     resp_404_en = client.get("/api/v1/logs/other.log", headers=headers)
     assert resp_404_en.status_code == 404
     assert resp_404_en.json()["detail"] == "Log file not found"
 
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     resp_404_pt = client.get("/api/v1/logs/other.log", headers=headers)
     assert resp_404_pt.status_code == 404
     assert resp_404_pt.json()["detail"] == "Log não encontrado"
@@ -433,7 +434,7 @@ def test_history_empty(client, monkeypatch, fresh_history_db):
 
 def test_upload_invalid_extension(client, monkeypatch):
     """Under pt_BR the API should reject unknown extensions with the localized unsupported-format detail."""
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     resp = client.post(
         "/api/v1/jobs",
         files={"document_file": ("script.exe", b"MZ...", "application/octet-stream")},
@@ -455,7 +456,7 @@ def test_upload_oversized_prompt(client):
 
 def test_upload_oversized_file(client, monkeypatch):
     """Under pt_BR an over-limit upload should be rejected with the localized oversized-file detail."""
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     monkeypatch.setattr(settings, "max_file_size_mb", 0.000001)
     resp = client.post(
         "/api/v1/jobs",

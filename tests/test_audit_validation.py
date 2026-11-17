@@ -11,6 +11,7 @@ import pytest
 
 import backend.core.i18n as i8n
 from backend.core.pipeline.validators import audit_canonical_document
+from tests.locale_support import use_server_locale
 
 
 @pytest.fixture(autouse=True)
@@ -20,7 +21,7 @@ def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     The audit findings resolve through backend.core.i18n.t, so assertions need a deterministic locale;
     en_US returns the canonical English msgids.
     """
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
 
 

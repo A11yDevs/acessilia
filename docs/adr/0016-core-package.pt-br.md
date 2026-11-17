@@ -322,7 +322,24 @@ Proposta: a opção 2.
        edge-tts na allowlist do teste e uma referência à acessilia-toolbox#73;
      - ele não lê variáveis de ambiente.
 
-     Ele precisa passar antes da extração.
+     Ele precisa passar antes da extração. Feito: o
+     `tests/test_core_boundary.py` confere as três regras, impede que a
+     allowlist de bibliotecas cresça (uma biblioteca que o core deixa de
+     importar sai dela), restringe o edge-tts ao exportador de áudio e
+     confere que o SDK e o docstruct não importam o core. A varredura segue
+     apelidos (`import os as o`) e pega `expanduser`/`expandvars` em qualquer
+     receptor. Restavam duas leituras do ambiente, e as duas saíram:
+     - o locale do servidor, que o `t()` negociava a partir de `LOCALE`,
+       `LANGUAGE`, `LC_ALL` e `LANG` a cada chamada. Agora o serviço o
+       negocia uma vez na inicialização (`setup_process`, com a
+       `negotiate_server_locale`) e o passa aos catálogos
+       (`configure_server_locale`). Um processo que não faz essa preparação
+       usa `en_US`;
+     - o `expanduser` (`HOME`) nos caminhos do sandbox do planejador, por
+       onde um caminho da home não passaria de qualquer jeito.
+
+     O `tempfile` respeita o `TMPDIR` dentro da biblioteca padrão; isso não
+     é o core lendo o seu ambiente, então o teste o permite.
   6. **A extração:**
      - os módulos vão para `libs/core`, e o `backend/core` some;
      - os domínios PDDL, os prompts e os catálogos são declarados como dados

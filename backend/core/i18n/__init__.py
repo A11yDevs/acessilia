@@ -1,16 +1,13 @@
 """Internationalization module backed by Babel locale strings files."""
 
 import contextvars
-import locale as _c_locale
-import os
 import re
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 
 from babel import negotiate_locale
 from babel.support import Translations
-
-
 
 BASE_DIR = Path(__file__).resolve().parent
 LOCALE_CATALOGS_DIR = BASE_DIR / "locales"
@@ -119,53 +116,72 @@ def _expand_candidates(raw_values: list[str]) -> list[str]:
     return candidates
 
 
-def _shell_locale_candidates() -> list[str]:
-    """Collect locale hints from the process environment in priority order.
+def _shell_locale_candidates(environ: Mapping[str, str], c_locale: str | None) -> list[str]:
+    """Collect locale hints from a process environment in priority order.
+
+    Args:
+        environ (Mapping[str, str]): The environment to read; the service passes its own.
+        c_locale (str | None): The process C locale's language, the last hint.
 
     Returns:
-        list: Normalized candidate locale identifiers from LOCALE, LANGUAGE, LC_ALL and LANG, most specific first, skipping blank and C/POSIX values; falls back to DEFAULT_LOCALE when nothing is set.
+        list: Normalized candidate locale identifiers from LOCALE, LANGUAGE, LC_ALL and LANG, most specific first, skipping blank and C/POSIX values, then ``c_locale``; falls back to DEFAULT_LOCALE when nothing is set.
     """
     raw_variables: list[str] = []
     for env_var in ("LOCALE", "LANGUAGE", "LC_ALL", "LANG"):
-        value = (os.getenv(env_var) or "").strip()
+        value = (environ.get(env_var) or "").strip()
         if value and value not in ("C", "POSIX"):
             raw_variables.append(value if env_var == "LOCALE" else value.split(":")[0])
     candidates = _expand_candidates(raw_variables)
     if candidates:
         return candidates
-    # Last hint: the process C locale inherited from the shell, queried
-    # without side effects (locale.getlocale only reads the current
-    # category state); C/POSIX identities carry no translatable language.
-    try:
-        language, _ = _c_locale.getlocale(_c_locale.LC_ALL)
-        if not language:
-            language, _ = _c_locale.getlocale()
-        if language and language not in ("C", "POSIX"):
-            return _expand_candidates([language])
-    except Exception:
-        pass
+    # Last hint: the process C locale inherited from the shell; C/POSIX
+    # identities carry no translatable language.
+    if c_locale and c_locale not in ("C", "POSIX"):
+        return _expand_candidates([c_locale])
     return [DEFAULT_LOCALE]
 
 
-def _locale_from_env() -> str:
-    """Resolve the server-side locale for local logging and default outputs.
+def negotiate_server_locale(environ: Mapping[str, str], c_locale: str | None = None) -> str:
+    """Negotiate the server-side locale for local logging and default outputs.
 
-    Negotiation order: the .env LOCALE value (if set), then the shell
-    environment locale hints (LANGUAGE/LC_ALL/LANG), then :data:`DEFAULT_LOCALE`.
+    Negotiation order: the LOCALE value (if set), then the shell locale hints
+    (LANGUAGE/LC_ALL/LANG), then ``c_locale``, then :data:`DEFAULT_LOCALE`.
+    The core reads no environment (ADR-0016, step 5): the service passes its
+    own at startup (``backend/config/process_setup.py``).
 
     Returns:
         str: Negotiated locale identifier restricted to :data:`SUPPORTED_LOCALES`; falls back to DEFAULT_LOCALE when no input yields a supported locale.
     """
     preferred: list[str] = []
-    env_locale = (os.getenv("LOCALE") or "").strip()
+    env_locale = (environ.get("LOCALE") or "").strip()
     if env_locale:
         preferred.append(env_locale)
-    preferred.extend(_shell_locale_candidates())
+    preferred.extend(_shell_locale_candidates(environ, c_locale))
     preferred.append(DEFAULT_LOCALE)
 
     available_languages = list(SUPPORTED_LOCALES)
     negotiated_locale = negotiate_locale(preferred, available_languages)
     return negotiated_locale or DEFAULT_LOCALE
+
+
+#: The server-side locale, set once at startup by
+#: :func:`configure_server_locale`; ``None`` until then, which is
+#: :data:`DEFAULT_LOCALE`.
+_SERVER_LOCALE: str | None = None
+
+
+def configure_server_locale(locale: str) -> None:
+    """Set the server-side locale (process setup, like :func:`configure_locales`).
+
+    An unsupported value falls back to :data:`DEFAULT_LOCALE`.
+    """
+    global _SERVER_LOCALE
+    _SERVER_LOCALE = locale if locale in SUPPORTED_LOCALES else DEFAULT_LOCALE
+
+
+def server_locale() -> str:
+    """The server-side locale: as configured at startup, else :data:`DEFAULT_LOCALE`."""
+    return _SERVER_LOCALE if _SERVER_LOCALE is not None else DEFAULT_LOCALE
 
 
 def set_request_locale(locale: str) -> contextvars.Token:
@@ -194,14 +210,14 @@ def _active_locale() -> str:
     override = _REQUEST_LOCALE_VAR.get()
     if override:
         return override
-    return _locale_from_env()
+    return server_locale()
 
 
 def active_locale() -> str:
     """Public accessor for the lookup locale t()/n() currently resolve against.
 
     Returns:
-        str: The per-task override locale when one is in effect for the calling task, otherwise the server-side locale from :func:`_locale_from_env`.
+        str: The per-task override locale when one is in effect for the calling task, otherwise the server-side locale from :func:`server_locale`.
     """
     return _active_locale()
 
