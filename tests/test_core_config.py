@@ -580,7 +580,6 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
             "backend.core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
             "ports",
         ),
-        ("backend.service:process", "config"),
         ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "paths"),
         (
             "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
@@ -762,6 +761,8 @@ METHOD_CALLERS_CHECKED = {
 
 #: ``service.process`` (review of #559): a call ``service.process(...)``, or a
 #: bare ``process(...)`` in a module that imports it from ``backend.service``.
+#: Its optional config is a temporary bridge for the external adapter; the
+#: caller scan below still requires every in-repository call to pass config=.
 SERVICE_PROCESS = "backend.service:process"
 
 #: Receivers that are the orchestrator, whatever the call passes: the
@@ -821,6 +822,13 @@ def test_every_caller_passes_the_run_configuration() -> None:
                         and isinstance(func.value, ast.Name) and func.value.id == "service")
                 ):
                     signature, receiver = service_process, []
+                    if "config" not in keywords and not any(
+                        keyword.arg is None for keyword in node.keywords
+                    ):
+                        rel = path.relative_to(ROOT).as_posix()
+                        unbound.append(
+                            f"{rel}:{node.lineno} process: missing explicit config="
+                        )
                 elif name in methods and isinstance(func, ast.Attribute) and (
                     methods[name][1] in keywords
                     or (name == "execute" and _is_orchestrator(func.value))

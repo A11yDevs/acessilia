@@ -243,6 +243,16 @@ jobs:
         with:
           persist-credentials: false
 
+      # Keep this adapter pin on a reviewed acessilia-benchmark revision. The
+      # smoke below exercises its private Core imports until #402 removes them.
+      - name: Check out acessilia-benchmark adapter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: A11yDevs/acessilia-benchmark
+          ref: 810c748d3a2caf0074cfddab68bf307c59976f40
+          path: external/acessilia-benchmark
+          persist-credentials: false
+
       - name: Set up Python 3.11
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
@@ -304,7 +314,7 @@ jobs:
       # slowest test from dominating the tail. The run also collects the suite,
       # so the old standalone `--collect-only` step is redundant.
       - name: Run complete test suite
-        run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=test-results.xml
+        run: uv run --locked --extra dev python -m pytest -m "not e2e and not external_adapter" -n 4 --dist worksteal --durations=25 --junitxml=test-results.xml
 
       # The gate is the root environment (#405). A step inside a library points
       # at that project explicitly, so `uv run` neither selects the library's
@@ -317,6 +327,13 @@ jobs:
         working-directory: libs/sdk
         run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
+      - name: Smoke test the external benchmark adapter against Core
+        env:
+          ACESSILIA_BENCHMARK_ADAPTER: ${{ github.workspace }}/external/acessilia-benchmark/src/acessilia_benchmark/adapters/acessilia.py
+        run: |
+          test -f "$ACESSILIA_BENCHMARK_ADAPTER"
+          uv run --locked --extra dev python -m pytest -m external_adapter tests/test_benchmark_adapter_smoke.py --junitxml=benchmark-adapter-results.xml -q
+
       - name: Reject unexpected skipped tests
         run: |
           uv run --locked --extra dev python - <<'PY'
@@ -325,6 +342,7 @@ jobs:
 
           reports = [
               Path("test-results.xml"),
+              Path("benchmark-adapter-results.xml"),
               Path("libs/docstruct/docstruct-test-results.xml"),
               Path("libs/sdk/sdk-test-results.xml"),
           ]
@@ -350,6 +368,7 @@ jobs:
           name: test-reports
           path: |
             test-results.xml
+            benchmark-adapter-results.xml
             libs/docstruct/docstruct-test-results.xml
             libs/sdk/sdk-test-results.xml
           if-no-files-found: ignore
