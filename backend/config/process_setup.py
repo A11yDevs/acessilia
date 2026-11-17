@@ -42,14 +42,30 @@ def setup_process(
 
 def _process_c_locale() -> str | None:
     """The language of the process C locale inherited from the shell, read
-    without side effects (``locale.getlocale`` only reads the current state)."""
-    try:
-        language, _ = locale.getlocale(locale.LC_ALL)
-        if not language:
-            language, _ = locale.getlocale()
-    except Exception:  # noqa: BLE001 - a locale hint never fails the startup
-        return None
-    return language
+    without side effects (``locale.getlocale`` only reads the current state).
+
+    ``getlocale(LC_ALL)`` returns a composite of the categories when they
+    differ (``"C/pt_BR"``, or ``"C/C"`` when none is set), so each category
+    is tried, then ``LC_CTYPE`` (review of #568).
+    """
+    for category in (locale.LC_ALL, locale.LC_CTYPE):
+        try:
+            raw, _ = locale.getlocale(category)
+        except Exception:  # noqa: BLE001, S112 - a locale hint never fails the startup
+            continue
+        language = _first_language(raw)
+        if language:
+            return language
+    return None
+
+
+def _first_language(raw: str | None) -> str | None:
+    """The first category of a ``getlocale`` value that names a language."""
+    for part in (raw or "").split("/"):
+        part = part.strip()
+        if part and part not in ("C", "POSIX"):
+            return part
+    return None
 
 
 __all__ = ["setup_process"]

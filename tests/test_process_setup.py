@@ -136,3 +136,79 @@ def test_setup_logger_writes_under_the_given_directory(tmp_path) -> None:
         import sys
 
         logger.add(sys.stderr)
+
+
+@pytest.mark.parametrize(
+    ("all_categories", "ctype", "expected"),
+    [
+        ("C/pt_BR", "pt_BR", "pt_BR"),
+        ("C/C", "pt_BR", "pt_BR"),
+        ("C/C", "C", None),
+        ("pt_BR", "pt_BR", "pt_BR"),
+        (None, None, None),
+    ],
+    ids=["composite", "composite-without-language", "c-only", "plain", "unset"],
+)
+def test_the_c_locale_hint_reads_the_composite_getlocale_returns(
+    monkeypatch, all_categories, ctype, expected
+) -> None:
+    """``getlocale(LC_ALL)`` gives ``"C/pt_BR"`` or ``"C/C"`` when the categories
+    differ, as Python does on macOS and glibc (review of #568)."""
+    import locale
+
+    from backend.config import process_setup
+
+    values = {locale.LC_ALL: (all_categories, "UTF-8"), locale.LC_CTYPE: (ctype, "UTF-8")}
+    monkeypatch.setattr(locale, "getlocale", lambda category=locale.LC_CTYPE: values[category])
+
+    assert process_setup._process_c_locale() == expected
+
+
+def test_a_composite_c_locale_reaches_the_server_locale(monkeypatch) -> None:
+    import locale
+
+    from backend.config import process_setup
+    from backend.core import logger as core_logger
+
+    monkeypatch.setattr(core_logger, "setup_logger", lambda **_kwargs: None)
+    monkeypatch.setattr(locale, "getlocale", lambda category=locale.LC_CTYPE: ("C/pt_BR", "UTF-8"))
+
+    process_setup.setup_process(replace(settings, locale=""), environ={})
+
+    assert i18n.server_locale() == "pt_BR"
+
+
+@pytest.mark.parametrize("entry", ["frontend/run.py", "frontend/cli/run.py"])
+def test_the_entry_points_set_up_the_process_before_the_lock(entry) -> None:
+    """The lock's messages are translated, so the setup comes first (review of #568)."""
+    import ast
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / entry).read_text(encoding="utf-8")
+    calls = [
+        node.func.id
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id in {"setup_process", "acquire_lock"}
+    ]
+
+    assert calls == ["setup_process", "acquire_lock"]
+
+
+def test_agent_os_sets_up_the_process_before_its_descriptions() -> None:
+    """uvicorn imports the module for ``app``; its agents' descriptions are
+    translated at import, so the setup runs first (review of #568)."""
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse((Path(__file__).resolve().parents[1] / "frontend/agent_os.py").read_text())
+    lines = {
+        name: min(
+            node.lineno for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        )
+        for name in ("setup_process", "t")
+    }
+
+    assert lines["setup_process"] < lines["t"]

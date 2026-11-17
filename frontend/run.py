@@ -73,8 +73,6 @@ def release_lock() -> None:
 
 
 async def startup():
-    setup_process()
-
     enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]
     tasks = []
 
@@ -128,6 +126,8 @@ async def startup():
 
 
 if __name__ == "__main__":
+    # Before the lock: its messages are already translated (review of #568).
+    setup_process()
     acquire_lock()
     try:
         asyncio.run(startup())

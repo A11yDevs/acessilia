@@ -64,21 +64,44 @@ def _modules(root: Path) -> Iterator[tuple[str, ast.AST]]:
         yield path.relative_to(ROOT).as_posix(), ast.parse(path.read_text(encoding="utf-8"))
 
 
-def _imports(tree: ast.AST) -> Iterator[tuple[int, str]]:
-    """Every absolute import, inside functions included, as ``(line, module)``.
+def _imports(tree: ast.AST, module: str = "") -> Iterator[tuple[int, str]]:
+    """Every import, inside functions included, as ``(line, module)``.
 
-    A relative import stays inside its package, so it is not a boundary.
+    A relative import is resolved against ``module``, the dotted name of the
+    file scanned: ``from ..services import x`` in ``backend/core/foo.py`` is
+    ``backend.services`` (review of #568).
     """
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            yield node.lineno, node.module
+        if isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                if node.module:
+                    yield node.lineno, node.module
+                continue
+            base = module.split(".")[: -node.level] if module else []
+            target = ".".join([*base, node.module] if node.module else base)
+            if node.module:
+                yield node.lineno, target
+            else:
+                for alias in node.names:
+                    yield node.lineno, f"{target}.{alias.name}" if target else alias.name
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 yield node.lineno, alias.name
 
 
+def _dotted(rel: str) -> str:
+    """``backend/core/a/b.py`` -> ``backend.core.a.b``; a package's
+    ``__init__.py`` is the package (``backend.core.a.__init__`` keeps its
+    name, so one level up resolves inside it)."""
+    return rel.removesuffix(".py").replace("/", ".")
+
+
 def _core_imports() -> list[tuple[str, int, str]]:
-    return [(rel, line, module) for rel, tree in _modules(CORE) for line, module in _imports(tree)]
+    return [
+        (rel, line, module)
+        for rel, tree in _modules(CORE)
+        for line, module in _imports(tree, _dotted(rel))
+    ]
 
 
 def test_the_scan_sees_the_core() -> None:
@@ -151,6 +174,10 @@ def _environment_reads(tree: ast.AST) -> Iterator[tuple[int, str]]:
         elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
             if (aliases.get(node.value.id), node.attr) in ENVIRONMENT_READS:
                 yield node.lineno, f"{node.value.id}.{node.attr}"
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Attribute):
+            # ``pathlib.Path.home()``, ``os.path``'s own reads are methods above
+            if (node.value.attr, node.attr) in ENVIRONMENT_READS:
+                yield node.lineno, f"{node.value.attr}.{node.attr}"
         elif isinstance(node, ast.ImportFrom) and node.module in {"os", "os.path", "dotenv"}:
             names = {alias.name for alias in node.names}
             if node.module == "dotenv" or names & ENVIRONMENT_NAMES:
@@ -183,6 +210,7 @@ def test_the_core_reads_no_environment_variable() -> None:
         "from dotenv import load_dotenv",
         "import os as system\nsystem.environ['X']",
         "from pathlib import Path as P\nP.home()",
+        "import pathlib\npathlib.Path.home()",
     ],
 )
 def test_the_environment_scan_sees_each_way_to_read_it(source) -> None:
@@ -190,6 +218,35 @@ def test_the_environment_scan_sees_each_way_to_read_it(source) -> None:
     reads = list(_environment_reads(ast.parse(source)))
 
     assert reads, source
+
+
+@pytest.mark.parametrize(
+    ("module", "source", "expected"),
+    [
+        ("backend.core.foo", "from ..services import cache", "backend.services"),
+        ("backend.core.foo", "from ..config.settings import settings", "backend.config.settings"),
+        ("backend.core.foo", "from . import ports", "backend.core.ports"),
+        ("backend.core.a.b", "from ..ports import RunPorts", "backend.core.ports"),
+        ("backend.core.a.__init__", "from .b import x", "backend.core.a.b"),
+        ("backend.core.foo", "from .. import services", "backend.services"),
+    ],
+)
+def test_a_relative_import_is_resolved_against_its_module(module, source, expected) -> None:
+    """A relative import can leave the core (review of #568)."""
+    assert [found for _, found in _imports(ast.parse(source), module)] == [expected]
+
+
+def test_a_relative_import_out_of_the_core_is_caught(tmp_path, monkeypatch) -> None:
+    """End to end: a core module that reaches the service relatively fails."""
+    boundary = sys.modules[__name__]
+    core = tmp_path / "backend" / "core"
+    core.mkdir(parents=True)
+    (core / "leak.py").write_text("from ..services import cache\n")
+    monkeypatch.setattr(boundary, "ROOT", tmp_path)
+    monkeypatch.setattr(boundary, "CORE", core)
+
+    with pytest.raises(AssertionError, match="backend.services"):
+        boundary.test_the_core_imports_nothing_from_the_service_or_the_frontends()
 
 
 @pytest.mark.parametrize("library", ["libs/sdk/src", "libs/docstruct/src"])
