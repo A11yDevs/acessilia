@@ -53,7 +53,7 @@ def _manifest(tmp_path: Path):
     source.write_bytes(b"%PDF-test")
     return InformationalStructuralAgent(extractor=FakeExtractor()).process(
         source, document=document_config(), fusion=fusion_config(), toolbox=toolbox_config(),
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
 
 
@@ -211,7 +211,7 @@ def test_process_passes_the_run_document_config_to_the_builder(tmp_path, monkeyp
 
     InformationalStructuralAgent(extractor=FakeExtractor()).process(
         source, document=document, fusion=fusion_config(), toolbox=toolbox_config(),
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
 
     assert received["slide_visual_coverage"] == 0.25
@@ -255,6 +255,7 @@ def test_process_passes_the_run_fusion_config_to_the_extractor_and_the_builder(
     from backend.core.agents import informational_structural
 
     built: dict = {}
+    operations = SimpleNamespace(job_id="job-1")  # the job's registry, passed through
     extracted: dict = {}
 
     class RecordingExtractor(FakeExtractor):
@@ -275,8 +276,12 @@ def test_process_passes_the_run_fusion_config_to_the_extractor_and_the_builder(
 
     InformationalStructuralAgent(extractor=RecordingExtractor()).process(
         source, document=document_config(), fusion=fusion, toolbox=toolbox, presentation=True,
-        paths=paths,
+        paths=paths, operations=operations
     )
 
-    assert extracted == {"fusion": fusion, "toolbox": toolbox, "paths": paths, "dual_fusion": False}
+    assert extracted == {
+        "fusion": fusion, "toolbox": toolbox, "paths": paths, "operations": operations,
+        "dual_fusion": False,
+    }
+    assert extracted["operations"] is operations
     assert built["fusion_judge_max_pages"] == 3

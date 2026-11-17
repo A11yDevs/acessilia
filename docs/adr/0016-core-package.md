@@ -90,9 +90,9 @@ Measured on develop at fd7f7152, over the modules listed as core above (about
     (`job_checkpoint`) and the job id (`operation_context`) in the
     orchestrator, which take the `JobCheckpoints` port in step 4, and the
     registry of remote operations (`operation_registry`,
-    `operation_context`) in the Toolbox extractor, still pending.
-    `tests/test_run_ports.py` lists the pending ones, and the list only
-    shrinks.
+    `operation_context`) in the Toolbox extractor, which takes the
+    `RemoteOperations` port in step 4. Since then the core imports nothing
+    from `backend.services`, which `tests/test_run_ports.py` checks.
 - **The service reaches the core** from `backend/service.py`
   (`PddlAccessibilityOrchestrator`), from `backend/api/worker.py` (the
   exporters), and from the API and services (the messages and tools).
@@ -276,8 +276,8 @@ Proposed: option 2.
      the `mathml` and `latex-verbalizer` formula handlers, and the VLM
      judge's), and each run binds its config to them (`bind_run`) on a copy
      of the registry.
-  4. The caches and `run_blocking` are injected through `ports`. In
-     progress, in three pull requests:
+  4. The caches and `run_blocking` are injected through `ports`. Done, in
+     three pull requests:
      - **The region cache and `run_blocking` (done).** `backend/core/ports.py`
        defines `RegionCache` and `RunPorts`, with a no-op for runs outside the
        service (`RunPorts.none()`). `execute(..., ports=)` is required, like
@@ -292,10 +292,21 @@ Proposed: option 2.
        resumes nothing. The phase names are the core's (`CHECKPOINT_PHASES`).
        The service binds `FileJobCheckpoints` to the job's task id, and the
        orchestrator no longer reads the job id.
-     - **The registry of remote operations**, which the extractor reads.
+     - **The registry of remote operations (done).** `RunPorts.operations`
+       is the job's `RemoteOperations` (`begin` a call of an
+       `OperationKind`, `finish` it, and the `job_id` that labels it), or
+       `None` outside a job, whose calls are neither registered nor
+       labelled. The run passes it to the extractor; the service binds
+       `JobOperations` to the task id. The core and the service no longer
+       read the job id from the service's context variable, so
+       `backend/services/operation_context.py` (`task_context`,
+       `current_task_id`) is gone. The SDK keeps its own: the extractor
+       opens `operation_context(job_id, operation_id)` around each call, and
+       the clients read it through `current_operation()` to send the
+       ADR-0019 headers.
 
-     A test lists the service modules the core still imports, and the list
-     only shrinks.
+     The core imports nothing from `backend.services`, inside functions
+     included, which `tests/test_run_ports.py` checks.
   5. **A boundary test** checks `backend/core/`, imports inside functions
      included:
      - it imports nothing from `backend` outside `backend/core`, and nothing

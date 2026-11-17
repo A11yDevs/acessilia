@@ -115,7 +115,7 @@ def _call(run_toolbox, tmp_path):
         ),
         "extraction": lambda: ToolboxManifestExtractor().extract(
             FIXTURE_PDF, fusion=fusion_config(), toolbox=run_toolbox,
-            paths=paths_config(),
+            paths=paths_config(), operations=None
         ),
     }
 

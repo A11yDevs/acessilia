@@ -257,7 +257,7 @@ def test_the_page_is_rendered_and_inspected_as_the_run_config_says(
     cache = NoRegionCache()
 
     result = inspection_handlers._handle_vision_page_inspection_method(
-        manifest, obligation_id, config=config, ports=RunPorts(region_cache=cache, checkpoints=None)
+        manifest, obligation_id, config=config, ports=RunPorts(region_cache=cache, checkpoints=None, operations=None)
     )
 
     assert result.success, result.message

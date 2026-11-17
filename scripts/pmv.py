@@ -182,6 +182,7 @@ def _run_manifest(
         fusion=config.fusion,
         toolbox=config.toolbox,
         paths=config.paths,
+        operations=None,  # a script runs outside a job
     )
     payload = manifest.model_dump(mode="json", by_alias=True)
     errors = validate_manifest(payload, DEFAULT_MANIFEST_SCHEMA)

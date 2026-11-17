@@ -572,6 +572,11 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "config"),
         ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "model_calls"),
         ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "ports"),
+        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "operations"),
+        (
+            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "operations",
+        ),
         ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "region_cache"),
         ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "region_cache"),
         ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "region_cache"),

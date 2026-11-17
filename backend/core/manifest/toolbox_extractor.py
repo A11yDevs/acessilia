@@ -19,6 +19,7 @@ from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructur
 
 from backend.core.run_identity import fusion_reuse_identity
 from backend.core.config import FusionConfig, PathsConfig, ToolboxConfig
+from backend.core.ports import OperationKind, RemoteOperations
 from backend.core.i18n import t
 from backend.core.i18n.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
@@ -27,8 +28,6 @@ from backend.core.i18n.log_messages import (
     LOG_STRUCTURAL_PROVIDER_DEGRADED,
     MSG_TOOLBOX_EXTRACTION_TIMEOUT,
 )
-from backend.services.operation_context import current_task_id
-from backend.services.operation_registry import OperationKind, operation_registry
 from backend.core.logger import logger
 from backend.core.toolbox.toolbox_client import (
     ToolboxError,
@@ -91,6 +90,7 @@ class ToolboxManifestExtractor:
         fusion: FusionConfig,
         toolbox: ToolboxConfig,
         paths: PathsConfig,
+        operations: RemoteOperations | None,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         """Extract a document's structure using the Toolbox (synchronous).
@@ -100,7 +100,8 @@ class ToolboxManifestExtractor:
         asyncio.to_thread(). ``fusion`` is the run's ``FusionConfig`` (mode,
         secondary provider, page routes), and ``toolbox`` its ``ToolboxConfig``
         (the artifact store, the Toolbox cache, the extraction timeout), and
-        ``paths`` where the fusion evidence is written. With
+        ``paths`` where the fusion evidence is written. ``operations`` is the
+        job's registry of remote calls (ADR-0019), ``None`` outside a job. With
         ``dual_fusion=False`` the
         secondary provider is not called even in dual mode (a presentation).
         """
@@ -113,6 +114,7 @@ class ToolboxManifestExtractor:
                         fusion_config=fusion,
                         toolbox_config=toolbox,
                         data_dir=paths.data_dir,
+                        operations=operations,
                         dual_fusion=dual_fusion,
                     ),
                     timeout=timeout,
@@ -127,25 +129,25 @@ class ToolboxManifestExtractor:
             logger.warning(message)
             raise ToolboxTimeout(message) from exc
 
+    @staticmethod
     @contextmanager
-    def _remote_operation(self, kind: OperationKind):
+    def _remote_operation(kind: OperationKind, operations: RemoteOperations | None):
         """Register and label one remote call for cancellation (ADR-0019).
 
-        Outside a job there is no task id and no registry entry: the call keeps
-        the pre-ADR behaviour.  Inside a job the operation id stays the same
-        across SDK retries and failover, while the SDK gives each attempt its
-        own attempt id.
+        Outside a job (``operations`` is ``None``) there is no registry entry:
+        the call keeps the pre-ADR behaviour. Inside a job the operation id
+        stays the same across SDK retries and failover, while the SDK gives
+        each attempt its own attempt id.
         """
-        task_id = current_task_id()
-        if task_id is None:
+        if operations is None:
             yield
             return
-        operation = operation_registry.begin(task_id, kind)
+        operation_id = operations.begin(kind)
         try:
-            with operation_context(task_id, operation.operation_id):
+            with operation_context(operations.job_id, operation_id):
                 yield
         finally:
-            operation_registry.finish(task_id, operation.operation_id)
+            operations.finish(operation_id)
 
     async def _extract_async(
         self,
@@ -154,6 +156,7 @@ class ToolboxManifestExtractor:
         fusion_config: FusionConfig,
         toolbox_config: ToolboxConfig,
         data_dir: Path,
+        operations: RemoteOperations | None,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         structure = self._client or make_toolbox_client(ToolboxStructureClient, toolbox_config)
@@ -182,6 +185,7 @@ class ToolboxManifestExtractor:
                 fusion_config=fusion_config,
                 toolbox_config=toolbox_config,
                 data_dir=data_dir,
+                operations=operations,
                 dual_fusion=dual_fusion,
             )
         finally:
@@ -200,6 +204,7 @@ class ToolboxManifestExtractor:
         fusion_config: FusionConfig,
         toolbox_config: ToolboxConfig,
         data_dir: Path,
+        operations: RemoteOperations | None,
         dual_fusion: bool = True,
     ) -> ToolboxExtraction:
         source_path = source_path.resolve()
@@ -215,7 +220,7 @@ class ToolboxManifestExtractor:
             logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
         if use_artifact_store and artifacts is not None:
             try:
-                with self._remote_operation("upload"):
+                with self._remote_operation("upload", operations):
                     artifact_id = await artifacts.upload(source_path)
             except (ToolboxTimeout, ToolboxProviderUnavailable) as exc:
                 upload_error = type(exc).__name__
@@ -238,7 +243,7 @@ class ToolboxManifestExtractor:
             and fusion_config.secondary_provider != structure.provider
         )
         try:
-            with self._remote_operation("primary"):
+            with self._remote_operation("primary", operations):
                 result = await structure.extract_structure(
                     file_path=None if artifact_id else source_path,
                     artifact_id=artifact_id,
@@ -287,7 +292,7 @@ class ToolboxManifestExtractor:
                     )
                     if artifact_id is not None and secondary_artifact_id is None:
                         logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
-                    with self._remote_operation("secondary"):
+                    with self._remote_operation("secondary", operations):
                         secondary_result = await secondary_client.extract_structure(
                             file_path=None if secondary_artifact_id else source_path,
                             artifact_id=secondary_artifact_id,

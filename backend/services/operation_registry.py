@@ -14,11 +14,9 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, replace
-from typing import Literal
 
+from backend.core.ports import OperationKind
 from backend.services import operation_journal
-
-OperationKind = Literal["upload", "primary", "secondary"]
 
 
 class RemoteOperationCancelled(Exception):
@@ -95,9 +93,24 @@ class OperationRegistry:
 
 operation_registry = OperationRegistry()
 
+
+class JobOperations:
+    """The core's ``RemoteOperations`` port for one job, on this process's
+    registry (ADR-0016, step 4)."""
+
+    def __init__(self, job_id: str, registry: OperationRegistry = operation_registry) -> None:
+        self.job_id = job_id
+        self._registry = registry
+
+    def begin(self, kind: OperationKind) -> str:
+        return self._registry.begin(self.job_id, kind).operation_id
+
+    def finish(self, operation_id: str) -> None:
+        self._registry.finish(self.job_id, operation_id)
+
 __all__ = [
     "ActiveOperation",
-    "OperationKind",
+    "JobOperations",
     "OperationRegistry",
     "RemoteOperationCancelled",
     "operation_registry",

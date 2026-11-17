@@ -181,6 +181,7 @@ async def test_direct_file_extraction_does_not_require_shared_artifact_storage(
                 fusion_config=fusion_config(),
                 toolbox_config=toolbox_config(use_artifact_store=use_artifact_store),
                 data_dir=paths_config().data_dir,
+                operations=None,
             )
             assert result.document["status"] == "succeeded"
             assert result.artifact_id is None

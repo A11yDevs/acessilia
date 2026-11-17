@@ -113,7 +113,7 @@ def test_extract_returns_toolbox_extraction(mock_client, mock_artifact_client):
         client=mock_client,
         artifact_client=mock_artifact_client,
     )
-    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True, use_remote_cache=True), paths=paths_config())
+    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True, use_remote_cache=True), paths=paths_config(), operations=None)
 
     assert isinstance(result, ToolboxExtraction)
     assert result.document["status"] == "succeeded"
@@ -134,7 +134,7 @@ def test_extract_without_artifact_store_skips_upload(mock_client, mock_artifact_
         client=mock_client,
         artifact_client=mock_artifact_client,
     )
-    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
 
     mock_artifact_client.upload.assert_not_called()
     assert result.artifact_id is None
@@ -144,7 +144,7 @@ def test_extract_raises_file_not_found(mock_client):
     """Arquivo inexistente levanta FileNotFoundError."""
     extractor = ToolboxManifestExtractor(client=mock_client)
     with pytest.raises(FileNotFoundError):
-        extractor.extract(Path("/nonexistent/file.pdf"), fusion=fusion_config(), toolbox=toolbox_config(), paths=paths_config())
+        extractor.extract(Path("/nonexistent/file.pdf"), fusion=fusion_config(), toolbox=toolbox_config(), paths=paths_config(), operations=None)
 
 
 def test_extract_preserves_configuration(mock_client):
@@ -155,7 +155,7 @@ def test_extract_preserves_configuration(mock_client):
         client=mock_client,
         enable_ocr=False,
     )
-    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False, use_remote_cache=False), paths=paths_config())
+    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False, use_remote_cache=False), paths=paths_config(), operations=None)
 
     assert result.configuration["ocr"] is False
     assert result.configuration["use_artifact_store"] is False
@@ -168,7 +168,7 @@ def test_extract_duration_and_timestamps(mock_client):
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
 
     extractor = ToolboxManifestExtractor(client=mock_client)
-    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
 
     assert result.duration_ms >= 0
     assert result.started_at is not None
@@ -203,7 +203,7 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     )
     result = ToolboxManifestExtractor(
         client=mock_client,
-    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
 
     assert result.document["document"] == SAMPLE_TOOLBOX_RESPONSE["document"]
     assert (
@@ -265,7 +265,7 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
 
     result = ToolboxManifestExtractor(
         client=mock_client,
-    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru", apply_page_routes=apply_routes), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru", apply_page_routes=apply_routes), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
 
     elements = result.document["document"]["elements"]
     stored = json.loads(Path(result.document["secondary_extraction"]["path"]).read_bytes())
@@ -330,7 +330,7 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
     ToolboxManifestExtractor(
         client=mock_client,
         fusion_policy=policy,
-    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
 
     assert seen["policy"] is policy
 
@@ -354,7 +354,7 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
 
     result = ToolboxManifestExtractor(
         client=mock_client,
-    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     manifest = build_processing_manifest(FIXTURE_PDF, deepcopy(result))
 
     assert not result.document["fusion_evidence"]["pages"][0]["stats"][
@@ -384,7 +384,7 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
 
     result = ToolboxManifestExtractor(
         client=mock_client,
-    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
 
     assert "fusion_evidence" not in result.document
     assert "fusion_stats" not in result.document
@@ -426,8 +426,8 @@ def test_extract_builds_and_closes_its_own_clients(monkeypatch):
     )
     extractor = ToolboxManifestExtractor()
 
-    extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
-    extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+    extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=None)
+    extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=None)
 
     assert [cls for cls, _ in built] == [
         ToolboxStructureClient, ToolboxArtifactClient,
@@ -461,7 +461,7 @@ def test_multi_endpoint_extraction_builds_no_artifact_upload_client(monkeypatch)
     result = ToolboxManifestExtractor().extract(
         FIXTURE_PDF, dual_fusion=False,
         fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True),
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
     assert len(built) == 1
     built[0].extract_structure.assert_awaited_once_with(
@@ -490,7 +490,7 @@ def test_created_upload_client_must_share_the_structure_endpoint(
     toolbox = toolbox_config(use_artifact_store=True)
     result = ToolboxManifestExtractor(client=mock_client).extract(
         FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox,
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
 
     factory.assert_called_once_with(ToolboxArtifactClient, toolbox)
@@ -530,7 +530,7 @@ def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
     result = ToolboxManifestExtractor(
         client=mock_client,
         artifact_client=mock_artifact_client,
-    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+    ).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=None)
     assert result.artifact_id == "sha256:primary"
     assert (
         mock_client.extract_structure.call_args.kwargs["artifact_id"]
@@ -555,7 +555,7 @@ def test_transient_upload_failure_uses_direct_extraction(
     mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
     result = ToolboxManifestExtractor(
         client=mock_client, artifact_client=mock_artifact_client,
-    ).extract(FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+    ).extract(FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=None)
     mock_client.extract_structure.assert_awaited_once_with(
         file_path=FIXTURE_PDF.resolve(), artifact_id=None, language="pt-BR", use_remote_cache=True,
     )
@@ -575,7 +575,7 @@ def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_cli
     with pytest.raises(type(failure)):
         ToolboxManifestExtractor(
             client=mock_client, artifact_client=mock_artifact_client,
-        ).extract(FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+        ).extract(FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=None)
     mock_client.extract_structure.assert_not_awaited()
 
 
@@ -606,10 +606,10 @@ def test_dual_extraction_handles_each_provider_independently(
     extractor = ToolboxManifestExtractor(client=mock_client)
     if not primary_ok and not secondary_ok:
         with pytest.raises(ToolboxUnavailable) as info:
-            extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+            extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
         assert len(info.value.causes) == 2
     else:
-        result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+        result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
         assert result.configuration["toolbox_provider"] == ("docling" if primary_ok else "mineru")
         if not primary_ok:
             assert result.cache_key == "secondary-key"
@@ -644,7 +644,7 @@ def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, f
     factory = lambda *a, **kw: secondary
     monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
     with pytest.raises(type(failure)) as caught:
-        ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+        ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert caught.value is failure
     secondary.extract_structure.assert_not_awaited()
 
@@ -662,7 +662,7 @@ def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_clie
         "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
     with pytest.raises(ToolboxUnsupportedMediaType) as caught:
-        ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+        ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert caught.value.__cause__ is primary_error
     secondary.close.assert_awaited_once()
 
@@ -682,7 +682,7 @@ def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, mon
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
-    result = ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    result = ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert result.configuration["toolbox_provider"] == "docling"
     assert result.configuration["extraction_degraded"] is True
     assert result.configuration["extraction_failures"] == {"mineru": failure_name}
@@ -708,7 +708,7 @@ def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
     monkeypatch.setattr(
         "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
-    result = ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config())
+    result = ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert result.configuration["toolbox_provider"] == "mineru"
     assert result.configuration["extraction_failures"] == {"docling": "ToolboxError"}
 
@@ -728,7 +728,7 @@ def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, moc
     monkeypatch.setattr(module.logger, "info", info)
     result = ToolboxManifestExtractor(
         client=mock_client, artifact_client=mock_artifact_client,
-    ).extract(FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+    ).extract(FIXTURE_PDF, dual_fusion=False, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=None)
     info.assert_called_once_with(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
     mock_artifact_client.upload.assert_not_awaited()
     assert result.artifact_id is None
@@ -751,7 +751,7 @@ def test_extraction_deadline_bounds_a_blocked_primary(mock_client, monkeypatch):
 
     started = time.monotonic()
     with pytest.raises(ToolboxTimeout):
-        extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False, extraction_timeout_seconds=1), paths=paths_config())
+        extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=False, extraction_timeout_seconds=1), paths=paths_config(), operations=None)
 
     assert time.monotonic() - started < 3
 
@@ -770,7 +770,7 @@ def test_extraction_deadline_covers_a_blocked_upload(
     )
 
     with pytest.raises(ToolboxTimeout):
-        extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True, extraction_timeout_seconds=1), paths=paths_config())
+        extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True, extraction_timeout_seconds=1), paths=paths_config(), operations=None)
 
     mock_client.extract_structure.assert_not_awaited()
 
@@ -793,7 +793,7 @@ def test_extraction_deadline_covers_a_blocked_secondary(
     extractor = ToolboxManifestExtractor(client=mock_client)
 
     with pytest.raises(ToolboxTimeout):
-        extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False, extraction_timeout_seconds=1), paths=paths_config())
+        extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False, extraction_timeout_seconds=1), paths=paths_config(), operations=None)
 
     secondary.close.assert_awaited_once()
 
@@ -803,8 +803,7 @@ def test_extraction_labels_upload_primary_and_secondary_operations(
 ):
     """Each remote call gets a stable operation id for cancellation (ADR-0019)."""
     from acessilia_sdk.toolbox.operation import current_operation
-    from backend.services.operation_context import task_context
-    from backend.services.operation_registry import operation_registry
+    from backend.services.operation_registry import JobOperations, operation_registry
 
     seen: list[tuple[str, str | None, str | None]] = []
 
@@ -843,8 +842,7 @@ def test_extraction_labels_upload_primary_and_secondary_operations(
     )
 
     operation_registry.clear("task-ops")
-    with task_context("task-ops"):
-        extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+    extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=JobOperations("task-ops"))
 
     assert [kind for kind, _, _ in seen] == ["upload", "primary", "secondary"]
     assert {task for _, task, _ in seen} == {"task-ops"}
@@ -860,8 +858,8 @@ def test_cancelling_during_upload_refuses_the_next_operation(
     """A cancel during upload marks the task before the primary begins."""
     from acessilia_sdk.toolbox import OperationCancelResult
     from backend.services import remote_cancellation
-    from backend.services.operation_context import task_context
     from backend.services.operation_registry import (
+        JobOperations,
         RemoteOperationCancelled,
         operation_registry,
     )
@@ -898,8 +896,7 @@ def test_cancelling_during_upload_refuses_the_next_operation(
 
     def run() -> None:
         try:
-            with task_context("task-upload-cancel"):
-                extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config())
+            extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=JobOperations("task-upload-cancel"))
         except BaseException as exc:
             outcomes.append(exc)
 
@@ -941,7 +938,7 @@ def test_two_extractions_at_once_each_use_their_own_toolbox_config(mock_client):
 
     def run(use_remote_cache):
         toolbox = toolbox_config(use_artifact_store=False, use_remote_cache=use_remote_cache)
-        return extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox, paths=paths_config())
+        return extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox, paths=paths_config(), operations=None)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         cached, uncached = pool.map(run, [True, False])
@@ -973,7 +970,7 @@ def test_the_fusion_evidence_is_written_under_the_run_data_dir(mock_client, monk
         FIXTURE_PDF,
         fusion=fusion_config(mode="dual", secondary_provider="mineru"),
         toolbox=toolbox_config(use_artifact_store=False),
-        paths=paths_config(data_dir=run_dir),
+        paths=paths_config(data_dir=run_dir), operations=None
     )
 
     written = {Path(result.document["fusion_reuse"]["path"]),

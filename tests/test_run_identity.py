@@ -226,7 +226,7 @@ def test_the_extractor_stores_the_run_fusion_identity(tmp_path, monkeypatch) -> 
     toolbox = toolbox_config(use_artifact_store=False)
 
     result = ToolboxManifestExtractor(client=primary).extract(
-        FIXTURE_PDF, fusion=fusion, toolbox=toolbox, paths=paths_config(data_dir=tmp_path),
+        FIXTURE_PDF, fusion=fusion, toolbox=toolbox, paths=paths_config(data_dir=tmp_path), operations=None
     )
 
     record = json.loads(Path(result.document["fusion_reuse"]["path"]).read_bytes())

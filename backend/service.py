@@ -43,7 +43,6 @@ from backend.core.i18n.stage_messages import (
     STAGE_PROCESSING_FINISHED,
     STAGE_PROCESSING_WITH_AI,
 )
-from backend.services.operation_context import task_context
 from backend.services.model_calls import get_model_calls
 from backend.services.run_ports import service_run_ports
 from backend.services.operation_registry import operation_registry
@@ -281,30 +280,29 @@ async def process(
             )
         state_manager.verificar_cancelamento(task_id)
 
-        with task_context(task_id):
-            try:
-                resultado = await agente.execute(
-                    file_path,
-                    file_path.parent,
-                    status_callback,
-                    mode=mode,
-                    structured_output=True,
-                    custom_prompt=custom_prompt,
-                    thinking_mode=thinking_mode,
-                    config=config,
-                    model_calls=get_model_calls(),
-                    ports=service_run_ports(task_id),
-                )
-            except Exception:
-                # A cancellation that arrives while the extraction thread is
-                # running must win over the timeout/error it produces when it ends.
-                state_manager.verificar_cancelamento(task_id)
-                raise
-            finally:
-                # A graceful shutdown keeps the operation ids so the resumed
-                # call reaches the Toolbox as the same operation (#407).
-                if not shutdown.shutting_down():
-                    operation_registry.clear(task_id)
+        try:
+            resultado = await agente.execute(
+                file_path,
+                file_path.parent,
+                status_callback,
+                mode=mode,
+                structured_output=True,
+                custom_prompt=custom_prompt,
+                thinking_mode=thinking_mode,
+                config=config,
+                model_calls=get_model_calls(),
+                ports=service_run_ports(task_id),
+            )
+        except Exception:
+            # A cancellation that arrives while the extraction thread is
+            # running must win over the timeout/error it produces when it ends.
+            state_manager.verificar_cancelamento(task_id)
+            raise
+        finally:
+            # A graceful shutdown keeps the operation ids so the resumed
+            # call reaches the Toolbox as the same operation (#407).
+            if not shutdown.shutting_down():
+                operation_registry.clear(task_id)
 
         canonical_metadata: dict[str, Any] | None = None
         technical_warnings: list[str] | None = None

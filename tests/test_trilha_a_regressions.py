@@ -120,7 +120,7 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
         source,
         fusion=fusion_config(mode="dual"),
         toolbox=toolbox_config(use_artifact_store=False),
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
     assert result.configuration["fusion"]["status"] == "degraded"
     assert result.configuration["fusion"]["failed_providers"] == ["mineru"]
@@ -144,7 +144,7 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
         source,
         fusion=fusion_config(mode="dual", secondary_provider="docling"),
         toolbox=toolbox_config(use_artifact_store=False),
-        paths=paths_config(),
+        paths=paths_config(), operations=None
     )
 
     assert extracted.configuration["fusion"]["status"] == "skipped"

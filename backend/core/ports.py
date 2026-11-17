@@ -3,19 +3,17 @@
 The core does not own the service's state: its caches, its job checkpoints
 and its registry of remote operations live in ``backend/services``. A run
 receives them as ``RunPorts``, built by its caller for that job, so the core
-does not import them. The region cache and the job checkpoints are ports
-now; the remote operations follow in step 4's next pull request, and
-``tests/test_run_ports.py`` lists the service imports still pending.
+imports nothing from it; ``tests/test_run_ports.py`` checks that.
 
 ``RunPorts.none()`` keeps no state, for a script or a test that hosts no
 service: its region cache stores nothing, and it has no job, so no
-checkpoints.
+checkpoints and no registered operations.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from backend.core.config import VisionConfig
 
@@ -70,6 +68,29 @@ class JobCheckpoints(Protocol):
         """Drop the phase's payload, if any."""
 
 
+#: The remote calls of an extraction a job can cancel (ADR-0019).
+OperationKind = Literal["upload", "primary", "secondary"]
+
+
+class RemoteOperations(Protocol):
+    """The registry of one job's remote operations (ADR-0019).
+
+    Bound to the job by the service, which keeps the operation ids durable
+    and cancels the job's operations. The core registers each logical call
+    around it and sends its id to the Toolbox. ``job_id`` labels the calls.
+    """
+
+    job_id: str
+
+    def begin(self, kind: OperationKind) -> str:
+        """Register one call and return its operation id, the same across
+        retries and a restart; raises when the job is being cancelled, so no
+        new call starts."""
+
+    def finish(self, operation_id: str) -> None:
+        """Mark the call finished."""
+
+
 class NoRegionCache:
     """A region cache that stores nothing: every region is described again."""
 
@@ -87,11 +108,14 @@ class RunPorts:
     region_cache: RegionCache
     #: ``None`` outside a job: nothing is checkpointed and nothing resumes.
     checkpoints: JobCheckpoints | None
+    #: ``None`` outside a job: the remote calls are neither registered nor
+    #: labelled with an operation id, as before ADR-0019.
+    operations: RemoteOperations | None
 
     @classmethod
     def none(cls) -> RunPorts:
         """Ports that keep no state, for a run outside the service."""
-        return cls(region_cache=NoRegionCache(), checkpoints=None)
+        return cls(region_cache=NoRegionCache(), checkpoints=None, operations=None)
 
 
 def region_cache_for(ports: RunPorts, vision: VisionConfig) -> RegionCache | None:
@@ -109,7 +133,9 @@ __all__ = [
     "PHASE_PLAN",
     "JobCheckpoints",
     "NoRegionCache",
+    "OperationKind",
     "RegionCache",
+    "RemoteOperations",
     "RunPorts",
     "region_cache_for",
 ]
