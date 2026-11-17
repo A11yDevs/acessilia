@@ -223,6 +223,11 @@ jobs:
           print("No docstruct test was skipped.")
           PY
 
+      - name: Characterize exports in a locked container
+        run: |
+          docker build --file tests/fixtures/export_snapshots/Dockerfile --tag acessilia-export-characterization .
+          docker run --rm --volume "$GITHUB_WORKSPACE:/workspace:ro" acessilia-export-characterization
+
       - name: Upload docstruct isolation report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

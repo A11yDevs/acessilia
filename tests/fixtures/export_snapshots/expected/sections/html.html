@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Section examples</title>
+<style>
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;max-width:980px;margin:0 auto;padding:2rem;background:#fafafa;color:#1c1c1c}
+nav.toc{background:#fff;border:1px solid #ddd;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem}
+nav.toc ul{margin:0;padding-left:1.2rem}
+pre{overflow:auto;background:#111;color:#f4f4f4;padding:1rem;border-radius:10px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+details,aside.note,aside.warning,blockquote.quote{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.75rem 1rem;margin:1rem 0}
+.table-wrap{overflow-x:auto;margin:1rem 0}
+table{border-collapse:collapse;background:#fff}
+th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}
+th{background:#f3f4f6}
+.equation{display:flex;align-items:center}
+.equation>math{flex:1 1 auto}
+.equation-number{margin-left:1em;white-space:nowrap}
+</style>
+</head>
+<body>
+<main aria-label="Section examples">
+<nav class="toc" aria-label="Contents"><strong>Contents</strong><ul>
+<li class="lvl-1"><a href="#repeat-section">Repeat</a></li>
+<li class="lvl-2"><a href="#late-heading">Repeat</a></li>
+<li class="lvl-2"><a href="#child">Child</a></li>
+<li class="lvl-1"><a href="#second">Second</a></li>
+<li class="lvl-2"><a href="#wrong-level">Second</a></li>
+</ul></nav>
+<span id="legacy-alias"></span><h1 id="repeat-section">Repeat</h1>
+<p id="intro">Intro</p>
+<h2 id="late-heading">Repeat</h2>
+<p id="root-math" role="math" aria-label="">root_math</p>
+<span id="child-alias"></span><h2 id="child">Child</h2>
+<p id="child-math" role="math" aria-label="">child_math</p>
+<p id="untitled-body">Untitled child</p>
+<p id="grandchild-math" role="math" aria-label="">grandchild_math</p>
+<h1 id="second">Second</h1>
+<h2 id="wrong-level">Second</h2>
+<p id="level-body">Level mismatch</p>
+</main></body></html>

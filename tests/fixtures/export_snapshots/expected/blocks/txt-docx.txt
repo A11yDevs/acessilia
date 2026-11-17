@@ -1,0 +1,22 @@
+Blocks
+Subheading
+BASIC_ONLY: <text> & whitespace  preserved.
+3. One
+4. 
+5. Three
+- First
+- Second
+Table: Cells & spans
+Row 1: Group - Name: First; Group - Value: 3
+Row 2: Group - Name: First; Group - Value: 4
+Footer: Total | 7
+An accessible image
+(2.1) X equals Y
+Equation: unspoken_math
+Quoted words.
+DETAIL_ONLY
+A note.
+A warning.
+Filtered child
+Child BASIC_ONLY
+Child DETAIL_ONLY

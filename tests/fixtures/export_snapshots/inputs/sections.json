@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0.0",
+  "id": "sections",
+  "title": "Section examples",
+  "language": "en",
+  "sections": [
+    {
+      "id": "repeat-section",
+      "title": "Repeat",
+      "level": 1,
+      "blocks": [
+        {
+          "id": "legacy-alias",
+          "type": "heading",
+          "text": "Repeat",
+          "level": 1
+        },
+        {
+          "id": "intro",
+          "type": "paragraph",
+          "text": "Intro"
+        },
+        {
+          "id": "late-heading",
+          "type": "heading",
+          "text": "Repeat",
+          "level": 2
+        },
+        {
+          "id": "root-math",
+          "type": "math",
+          "text": "root_math"
+        }
+      ],
+      "children": [
+        {
+          "id": "child",
+          "title": "Child",
+          "level": 2,
+          "blocks": [
+            {
+              "id": "child-alias",
+              "type": "heading",
+              "title": "Child",
+              "level": 2
+            },
+            {
+              "id": "child-math",
+              "type": "math",
+              "text": "child_math"
+            }
+          ],
+          "children": [
+            {
+              "id": "untitled",
+              "title": "",
+              "level": 3,
+              "blocks": [
+                {
+                  "id": "untitled-body",
+                  "type": "paragraph",
+                  "text": "Untitled child"
+                },
+                {
+                  "id": "grandchild-math",
+                  "type": "math",
+                  "text": "grandchild_math"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "second",
+      "title": "Second",
+      "level": 1,
+      "blocks": [
+        {
+          "id": "wrong-level",
+          "type": "heading",
+          "text": "Second",
+          "level": 2
+        },
+        {
+          "id": "level-body",
+          "type": "paragraph",
+          "text": "Level mismatch"
+        }
+      ]
+    }
+  ]
+}

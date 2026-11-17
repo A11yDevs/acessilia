@@ -1,0 +1,41 @@
+{
+  "pandoc-api-version": [
+    1,
+    23,
+    1
+  ],
+  "meta": {
+    "title": {
+      "t": "MetaInlines",
+      "c": [
+        {
+          "t": "Str",
+          "c": "Empty"
+        },
+        {
+          "t": "Space"
+        },
+        {
+          "t": "Str",
+          "c": "document"
+        }
+      ]
+    },
+    "lang": {
+      "t": "MetaString",
+      "c": "en"
+    },
+    "verbosity": {
+      "t": "MetaString",
+      "c": "detailed"
+    }
+  },
+  "blocks": [],
+  "source_document": {
+    "schema_version": "1.0.0",
+    "id": "empty",
+    "title": "Empty document",
+    "language": "en",
+    "sections": []
+  }
+}

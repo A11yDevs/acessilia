@@ -1,0 +1,2 @@
+# Literal TXT goldens preserve the current spaces after empty list markers.
+tests/fixtures/export_snapshots/expected/**/*.txt whitespace=-blank-at-eol

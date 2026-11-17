@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All block types</title>
+<style>
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;max-width:980px;margin:0 auto;padding:2rem;background:#fafafa;color:#1c1c1c}
+nav.toc{background:#fff;border:1px solid #ddd;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem}
+nav.toc ul{margin:0;padding-left:1.2rem}
+pre{overflow:auto;background:#111;color:#f4f4f4;padding:1rem;border-radius:10px}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+details,aside.note,aside.warning,blockquote.quote{background:#fff;border:1px solid #ddd;border-radius:10px;padding:.75rem 1rem;margin:1rem 0}
+.table-wrap{overflow-x:auto;margin:1rem 0}
+table{border-collapse:collapse;background:#fff}
+th,td{border:1px solid #999;padding:.35rem .75rem;text-align:left;vertical-align:top}
+th{background:#f3f4f6}
+.equation{display:flex;align-items:center}
+.equation>math{flex:1 1 auto}
+.equation-number{margin-left:1em;white-space:nowrap}
+</style>
+</head>
+<body>
+<main aria-label="All block types">
+<nav class="toc" aria-label="Contents"><strong>Contents</strong><ul>
+<li class="lvl-1"><a href="#blocks-section">Blocks</a></li>
+<li class="lvl-2"><a href="#heading">Subheading</a></li>
+<li class="lvl-2"><a href="#filtered-child">Filtered child</a></li>
+</ul></nav>
+<h1 id="blocks-section">Blocks</h1>
+<h2 id="heading">Subheading</h2>
+<p id="basic">BASIC_ONLY: &lt;text&gt; &amp; whitespace  preserved.</p>
+<ol id="ordered" start="3"><li>One</li><li></li><li>Three</li></ol>
+<ul id="unordered"><li>First</li><li>Second</li></ul>
+<div class="table-wrap" tabindex="0" role="region" aria-labelledby="table-caption"><table id="table"><caption id="table-caption">Cells &amp; spans</caption><thead><tr><th scope="colgroup" colspan="2">Group</th></tr><tr><th scope="col">Name</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="rowgroup" rowspan="2">First</th><td>3</td></tr><tr><td>4</td></tr></tbody><tfoot><tr><th scope="row">Total</th><td>7</td></tr></tfoot></table></div>
+<figure id="image"><img alt="An accessible image" src="image.png"><details><summary>Image description</summary><p>Long image description.</p></details></figure>
+<div id="numbered-math" class="equation"><math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="(2.1) X equals Y" display="block"><mi>x</mi><mo>=</mo><mi>y</mi></math><span class="equation-number" aria-hidden="true">(2.1)</span></div>
+<p id="math-without-alt" role="math" aria-label="">unspoken_math</p>
+<blockquote id="quote" class="quote"><p><strong>Quotation</strong></p><p>Quoted words.</p></blockquote>
+<aside id="note" class="note" role="note" aria-labelledby="note-title"><p id="note-title"><strong>Note</strong></p><p>A note.</p></aside>
+<aside id="warning" class="warning" role="note" aria-labelledby="warning-title"><p id="warning-title"><strong>Warning</strong></p><p>A warning.</p></aside>
+<h2 id="filtered-child">Filtered child</h2>
+<p id="child-basic">Child BASIC_ONLY</p>
+</main></body></html>
