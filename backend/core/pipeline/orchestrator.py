@@ -246,7 +246,7 @@ class PddlAccessibilityOrchestrator:
             await _save_checkpoint(
                 checkpoints,
                 PHASE_MEDIA,
-                {"inspection": media_inspection, "configuration": media_configuration},
+                lambda: {"inspection": media_inspection, "configuration": media_configuration},
             )
         _check_page_limit_before_extraction(media_inspection, config.document)
         presentation = _is_presentation(media_inspection)
@@ -271,7 +271,7 @@ class PddlAccessibilityOrchestrator:
             await _save_checkpoint(
                 checkpoints,
                 PHASE_MANIFEST,
-                {"manifest": _manifest_payload(manifest)},
+                lambda: {"manifest": _manifest_payload(manifest)},
             )
 
         enriched_state = _load_checkpoint(checkpoints, PHASE_ENRICHED)
@@ -289,7 +289,7 @@ class PddlAccessibilityOrchestrator:
             await _save_checkpoint(
                 checkpoints,
                 PHASE_ENRICHED,
-                {"manifest": _manifest_payload(manifest)},
+                lambda: {"manifest": _manifest_payload(manifest)},
             )
 
         plan_state = _load_checkpoint(checkpoints, PHASE_PLAN)
@@ -720,7 +720,7 @@ class _EnrichmentCheckpoint:
                 await _save_checkpoint(
                     self._checkpoints,
                     PHASE_MANIFEST,
-                    {"manifest": _manifest_payload(self._manifest)},
+                    lambda: {"manifest": _manifest_payload(self._manifest)},
                 )
 
 
@@ -735,11 +735,13 @@ def _load_checkpoint(checkpoints: JobCheckpoints | None, phase: str) -> dict[str
 
 
 async def _save_checkpoint(
-    checkpoints: JobCheckpoints | None, phase: str, payload: dict[str, Any]
+    checkpoints: JobCheckpoints | None, phase: str, build: Callable[[], dict[str, Any]]
 ) -> None:
-    """Persist one phase off the event loop; a failed write never fails the job."""
+    """Persist one phase off the event loop (``build`` runs only inside a job);
+    a failed write never fails the job."""
     if checkpoints is None:
         return
+    payload = build()
     try:
         await run_blocking(checkpoints.save, phase, payload)
     except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail the job
@@ -750,7 +752,7 @@ async def _checkpoint_enrichment(
     checkpoints: JobCheckpoints | None, manifest: ProcessingManifest
 ) -> None:
     """Keep the manifest checkpoint current between enrichment steps (#407)."""
-    await _save_checkpoint(checkpoints, PHASE_MANIFEST, {"manifest": _manifest_payload(manifest)})
+    await _save_checkpoint(checkpoints, PHASE_MANIFEST, lambda: {"manifest": _manifest_payload(manifest)})
 
 
 def _remove_checkpoint(checkpoints: JobCheckpoints | None, phase: str) -> None:
@@ -770,7 +772,7 @@ async def _save_plan(
     await _save_checkpoint(
         checkpoints,
         PHASE_PLAN,
-        {
+        lambda: {
             "plan": plan.model_dump(mode="json", by_alias=True),
             "comparison": (
                 comparison.model_dump(mode="json", by_alias=True)

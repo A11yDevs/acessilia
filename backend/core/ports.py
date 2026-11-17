@@ -52,7 +52,9 @@ class JobCheckpoints(Protocol):
 
     Bound to the job by the service, which names and stores them; the core
     only says which phase it writes. ``job_id`` names the job in the log.
-    Methods are blocking: the core runs them off the event loop.
+    Methods are blocking. The core runs ``save`` off the event loop, during
+    the run; it calls ``load`` and ``remove`` directly, as it did before the
+    port, each once per phase.
     """
 
     job_id: str

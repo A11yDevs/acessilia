@@ -140,8 +140,13 @@ async def test_a_run_checkpoints_and_resumes_through_its_port(monkeypatch, tmp_p
 async def test_a_run_without_a_job_neither_reads_nor_writes_checkpoints(
     monkeypatch, tmp_path
 ) -> None:
+    """Not even the manifest is serialized for a checkpoint (review of #565)."""
+    from backend.core.pipeline import orchestrator as pddl
+
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
+    serialized = []
+    monkeypatch.setattr(pddl, "_manifest_payload", lambda manifest: serialized.append(manifest))
 
     for _ in range(2):
         with pytest.raises(Stop):
@@ -151,6 +156,7 @@ async def test_a_run_without_a_job_neither_reads_nor_writes_checkpoints(
             )
 
     assert counts == {"inspect": 2, "extract": 2}
+    assert serialized == []
 
 
 @pytest.mark.asyncio
