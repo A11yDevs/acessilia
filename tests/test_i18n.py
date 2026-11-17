@@ -13,6 +13,7 @@ import pytest
 
 import backend.core.i18n as i8n
 import scripts.gen_locale_catalogs as gen_locales
+from tests.locale_support import use_server_locale
 
 DEFAULT_REPOS_CATALOGS_DIR: Path = Path("backend/core/i18n/locales")
 
@@ -43,31 +44,31 @@ def catalogs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_en_us_identity_lookup(monkeypatch, catalogs) -> None:
     """en_US is the runtime default: t() should return canonical English msgids because en strings mirror their ids."""
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Processing your document…") == "Processing your document…"
 
 
 def test_pt_br_translation_lookup(monkeypatch, catalogs) -> None:
     """pt_BR should select the translated message from its locale strings file instead of falling back to English text."""
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Processing your document…") == "Processando seu documento…"
 
 
 def test_default_locale_used_when_env_missing(monkeypatch, catalogs) -> None:
-    """When neither LOCALE nor LANGUAGE is present, t() should behave as en_US identity lookup for msgids."""
-    monkeypatch.delenv("LOCALE", raising=False)
-    monkeypatch.delenv("LANGUAGE", raising=False)
-    monkeypatch.delenv("LC_ALL", raising=False)
-    monkeypatch.delenv("LANG", raising=False)
+    """When the process configured no server locale, t() should behave as en_US identity lookup for msgids,
+    whatever the environment says: the core reads none (ADR-0016, step 5)."""
+    use_server_locale(monkeypatch, None)
+    monkeypatch.setenv("LOCALE", "pt_BR")
+    monkeypatch.setenv("LANG", "pt_BR.UTF-8")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Processing your document…") == "Processing your document…"
 
 
 def test_untranslated_msgid_falls_back_to_english(monkeypatch, catalogs) -> None:
     """Unknown/untranslatable msgids should pass through unchanged in pt_BR as per fallback-by-identity t() contract."""
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     i8n._catalog_for.cache_clear()
     assert (
         i8n.t("This message id was never translated into the pt_BR catalog")
@@ -77,11 +78,11 @@ def test_untranslated_msgid_falls_back_to_english(monkeypatch, catalogs) -> None
 
 def test_ngettext_selection_by_count(monkeypatch, catalogs) -> None:
     """n() should pick the grammatical-correct plural form for a given count under each locale's Babel N-plurals rule."""
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
     assert i8n.n("document", "documents", 1) == "document"
     assert i8n.n("document", "documents", 2) == "documents"
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     i8n._catalog_for.cache_clear()
     assert i8n.n("document", "documents", 1) == "documento"   # n==1 selects singular form under pt plural rule
     assert i8n.n("document", "documents", 2) == "documentos"
@@ -93,7 +94,7 @@ def test_pt_br_telegram_command_messages_resolve_from_catalog(monkeypatch, catal
     translation from the generated catalog (instead of the English msgid), proving that scripts/gen_locale_catalogs
     keeps the telegram ids in both checked-in locale strings files and that placeholder-free substitution works end-to-end.
     """
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     i8n._catalog_for.cache_clear()
     import frontend.telegram.messages as bot_messages
 
@@ -110,7 +111,7 @@ def test_pt_br_email_configured_placeholder_substitutes(monkeypatch, catalogs) -
     The e-mail-confirmation msgid keeps an {email} placeholder for callers; t() must hand it back untouched so the
     Telegram handler can .format(...) the address in after lookup, with the localized pt_BR wording around it.
     """
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     i8n._catalog_for.cache_clear()
     import frontend.telegram.messages as bot_messages
 
@@ -238,27 +239,34 @@ def test_catalog_generation_is_deterministic(tmp_path) -> None:
         assert first[locale][1].read_bytes() == second[locale][1].read_bytes()
 
 
-def test_server_locale_negotiated_from_shell_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_server_locale_negotiated_from_shell_env() -> None:
     """
-    The server-side locale should negotiate from the shell environment (no LOCALE set): a Portuguese shell locale
-    maps to pt_BR, an English one to en_US, and a C/POSIX locale (no translatable language) falls back to en_US.
+    The server-side locale should negotiate from the shell environment the service passes (no LOCALE set): a
+    Portuguese shell locale maps to pt_BR, an English one to en_US, and a C/POSIX locale (no translatable language)
+    falls back to the C locale's language, then to en_US.
     """
-    monkeypatch.delenv("LOCALE", raising=False)
-    monkeypatch.delenv("LANGUAGE", raising=False)
-    monkeypatch.delenv("LC_ALL", raising=False)
-    monkeypatch.setenv("LANG", "pt_BR.UTF-8")
-    assert i8n._active_locale() == "pt_BR"
-    monkeypatch.setenv("LANG", "en_US.UTF-8")
-    assert i8n._active_locale() == "en_US"
-    monkeypatch.setenv("LANG", "C")
-    assert i8n._active_locale() == "en_US"
+    assert i8n.negotiate_server_locale({"LANG": "pt_BR.UTF-8"}) == "pt_BR"
+    assert i8n.negotiate_server_locale({"LANG": "en_US.UTF-8"}) == "en_US"
+    assert i8n.negotiate_server_locale({"LANG": "C"}) == "en_US"
+    assert i8n.negotiate_server_locale({"LANG": "C"}, "pt_BR") == "pt_BR"
+    assert i8n.negotiate_server_locale({"LANGUAGE": "pt_BR:en_US", "LANG": "en_US.UTF-8"}) == "pt_BR"
+    assert i8n.negotiate_server_locale({}) == "en_US"
 
 
-def test_env_locale_value_overrides_shell_locale(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_env_locale_value_overrides_shell_locale() -> None:
     """A set LOCALE value (e.g. from .env) takes precedence over the shell environment locale."""
-    monkeypatch.setenv("LOCALE", "pt_BR")
-    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    assert i8n.negotiate_server_locale({"LOCALE": "pt_BR", "LANG": "en_US.UTF-8"}) == "pt_BR"
+
+
+def test_the_server_locale_is_configured_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A configured locale stays until configured again, whatever the environment says later; an unsupported
+    one falls back to en_US."""
+    use_server_locale(monkeypatch, None)
+    i8n.configure_server_locale("pt_BR")
+    monkeypatch.setenv("LOCALE", "en_US")
     assert i8n._active_locale() == "pt_BR"
+    i8n.configure_server_locale("xx_XX")
+    assert i8n._active_locale() == "en_US"
 
 
 def test_locale_for_user_matches_offered_locale(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -266,7 +274,7 @@ def test_locale_for_user_matches_offered_locale(monkeypatch: pytest.MonkeyPatch)
     Remote users advertising a Portuguese hint (base 'pt', 'pt-BR' or with an encoding tail) should map to the offered
     pt_BR locale; English hints map to en_US; unmatched or absent hints fall back to the server-side locale.
     """
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     assert i8n.locale_for_user("pt") == "pt_BR"
     assert i8n.locale_for_user("pt-BR") == "pt_BR"
     assert i8n.locale_for_user("pt_BR.UTF-8") == "pt_BR"
@@ -281,7 +289,7 @@ def test_set_request_locale_overrides_server_locale(monkeypatch: pytest.MonkeyPa
     Within a task, set_request_locale should redirect t() to the user locale even when the server locale differs, and
     reset_request_locale should restore the server-side locale afterwards.
     """
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
     assert i8n.t("Downloading file...") == "Downloading file..."
     token = i8n.set_request_locale("pt_BR")
@@ -310,14 +318,14 @@ def test_planning_messages_state_the_rule_they_report(monkeypatch, catalogs) -> 
         MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS,
     )
 
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
     english = i8n.t(MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS)
     assert "solved" in english
     assert "plan_file" in english
     assert "ended before execution" not in english
 
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     i8n._catalog_for.cache_clear()
     assert i8n.t(MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS) != english
     schema = i8n.t(MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION)

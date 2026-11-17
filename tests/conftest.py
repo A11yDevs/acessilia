@@ -24,6 +24,21 @@ def model_calls():
 
 
 @pytest.fixture(autouse=True)
+def _locales_start_unconfigured(monkeypatch):
+    """Each test starts from a process whose locales nobody configured.
+
+    The process setup (``backend/config/process_setup.py``) sets the server
+    locale and the offered locales once; the API's startup runs it from the
+    developer's environment. Restoring both after each test keeps one test's
+    setup, or a shell's ``LANG``, out of the others (ADR-0016, step 5).
+    """
+    from backend.core import i18n
+
+    monkeypatch.setattr(i18n, "_SERVER_LOCALE", None)
+    monkeypatch.setattr(i18n, "_ACTIVE_LOCALES", None)
+
+
+@pytest.fixture(autouse=True)
 def _vision_cache_stays_out_of_tests(monkeypatch):
     """Keep region-description cache hits out of the test suite.
 

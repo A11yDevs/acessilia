@@ -17,6 +17,7 @@ from backend.core.export.pandoc_exporter import export_accessible_document
 from backend.core.pipeline.canonical_builder import build_canonical_document
 from backend.core.pipeline.validators import validate_canonical_document
 from backend.core.pipeline.validators import validate_output_text
+from tests.locale_support import use_server_locale
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +28,7 @@ def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     error-message assertions need a deterministic locale; en_US returns the canonical English
     msgids the assertions below are written against.
     """
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
 
 

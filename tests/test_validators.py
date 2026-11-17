@@ -11,6 +11,7 @@ from backend.services.validators import (
     is_file_size_allowed,
     validate_file,
 )
+from tests.locale_support import use_server_locale
 
 
 def test_valid_extension():
@@ -45,7 +46,7 @@ def test_validate_file_valid():
 
 def test_validate_file_invalid_ext(monkeypatch):
     """Under pt_BR an unsupported extension should fail with the catalog-translated Portuguese reason text."""
-    monkeypatch.setenv("LOCALE", "pt_BR")
+    use_server_locale(monkeypatch, "pt_BR")
     _catalog_for.cache_clear()
     valid, msg = validate_file("test.exe", 1024 * 1024)
     assert valid is False

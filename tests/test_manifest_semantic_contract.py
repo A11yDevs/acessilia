@@ -31,6 +31,7 @@ from docstruct.manifest import (
     structured_document_to_payload,
     validate_structured_document,
 )
+from tests.locale_support import use_server_locale
 
 GOLDEN = sorted((Path(__file__).parent / "fixtures" / "manifests").glob("*.json"))
 DOCUMENT_FIELDS = ("title", "language", "pages", "elements")
@@ -227,7 +228,7 @@ def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, loc
     from backend.core.i18n import t
     from scripts.gen_locale_catalogs import TRANSLATIONS
 
-    monkeypatch.setenv("LOCALE", locale)
+    use_server_locale(monkeypatch, locale)
     name, kwargs = DOCUMENT_INVARIANT_MESSAGES[case]
     msgid = getattr(model, name)
     expected = (TRANSLATIONS["pt_BR"][msgid] if locale == "pt_BR" else msgid).format(**kwargs)

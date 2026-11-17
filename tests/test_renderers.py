@@ -14,12 +14,13 @@ import pytest
 import backend.core.i18n as i8n
 from backend.core.export.renderers.html_renderer import render_html
 from backend.core.export.renderers.txt_renderer import render_txt
+from tests.locale_support import use_server_locale
 
 
 @pytest.fixture(autouse=True)
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale so localized txt/html strings are the canonical English ones."""
-    monkeypatch.setenv("LOCALE", "en_US")
+    use_server_locale(monkeypatch, "en_US")
     i8n._catalog_for.cache_clear()
 
 

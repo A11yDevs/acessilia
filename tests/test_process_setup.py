@@ -1,4 +1,4 @@
-"""The process setup is passed at startup, not read by the core (ADR-0016, step 3)."""
+"""The process setup is passed at startup, not read by the core (ADR-0016, steps 3 and 5)."""
 
 from __future__ import annotations
 
@@ -32,10 +32,47 @@ def test_setup_process_passes_the_settings_to_the_logger_and_the_catalogs(
         settings, log_level="WARNING", logs_dir=tmp_path / "logs", i18n_locales_active=("pt_BR",)
     )
 
-    process_setup.setup_process(custom)
+    process_setup.setup_process(custom, environ={})
 
     assert received["logger"] == ("WARNING", tmp_path / "logs")
     assert i18n.active_locales() == ("pt_BR",)
+
+
+@pytest.mark.parametrize(
+    ("setting", "environ", "c_locale", "expected"),
+    [
+        ("", {"LANG": "pt_BR.UTF-8"}, None, "pt_BR"),
+        ("", {"LOCALE": "pt_BR", "LANG": "en_US.UTF-8"}, None, "pt_BR"),
+        ("pt_BR", {"LANG": "en_US.UTF-8"}, None, "pt_BR"),
+        ("en_US", {"LOCALE": "pt_BR"}, None, "en_US"),
+        ("", {}, "pt_BR", "pt_BR"),
+        ("", {"LANG": "C"}, None, "en_US"),
+    ],
+    ids=["shell", "env-locale", "setting-over-shell", "setting-over-env", "c-locale", "nothing"],
+)
+def test_setup_process_negotiates_the_server_locale(
+    monkeypatch, tmp_path, setting, environ, c_locale, expected
+) -> None:
+    """The service reads its environment and the core gets the result: the
+    ``LOCALE`` setting, then the shell's hints, then the C locale."""
+    from backend.config import process_setup
+    from backend.core import logger as core_logger
+
+    monkeypatch.setattr(core_logger, "setup_logger", lambda **_kwargs: None)
+    monkeypatch.setattr(process_setup, "_process_c_locale", lambda: c_locale)
+
+    process_setup.setup_process(replace(settings, locale=setting), environ=environ)
+
+    assert i18n.server_locale() == expected
+    assert i18n.active_locale() == expected
+
+
+def test_an_unconfigured_process_uses_the_default_server_locale(monkeypatch) -> None:
+    """A script or a test that skips the setup gets en_US, whatever its shell says."""
+    monkeypatch.setenv("LANG", "pt_BR.UTF-8")
+    monkeypatch.setenv("LOCALE", "pt_BR")
+
+    assert i18n.server_locale() == i18n.DEFAULT_LOCALE == "en_US"
 
 
 def test_an_unconfigured_process_offers_every_supported_locale(unconfigured_locales) -> None:

@@ -35,9 +35,11 @@ def _sandbox_path(user_path: str) -> Path:
     """Resolve a model-supplied path inside the sandbox directory.
 
     The sandbox directory is <repo>/temp/pddl-sandbox/. Any attempt to
-    escape outside the sandbox raises ValueError.
+    escape outside the sandbox raises ValueError. A ``~`` is not expanded:
+    the core reads no environment (``HOME``; ADR-0016, step 5), and a home
+    path is outside the sandbox anyway.
     """
-    resolved = (Path(user_path).expanduser()).resolve()
+    resolved = Path(user_path).resolve()
     try:
         resolved.relative_to(_SANDBOX_BASE)
     except ValueError:
