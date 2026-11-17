@@ -4,7 +4,7 @@
 # share a node. Re-submitting the same RUN resumes where it stopped.
 # Submit from $WS:
 #   sbatch -p <partition> -c 8 --mem 32G --time 04:00:00 --job-name X \
-#     --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=docling-v1,PROVIDER=docling[,SPLIT=dev,SAMPLE=20,SCORE=1] \
+#     --export=ALL,WS=$PWD,DATASET=drdocbench,ROOT=$PWD/data/drdocbench/dev,RUN=docling-v1,PROVIDER=docling[,DATASET_REVISION=<commit>,SPLIT=dev,SAMPLE=20,SCORE=1] \
 #     repos/acessilia/scripts/bench/slurm/bench.sbatch
 #SBATCH --signal=B:SIGUSR1@300
 #SBATCH --output=logs/slurm/%x_%j.log
@@ -16,11 +16,23 @@ SPLIT=${SPLIT:-dev}; SAMPLE=${SAMPLE:-}; SCORE=${SCORE:-1}
 HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-600}
 TB=$WS/repos/acessilia-toolbox; ACC=$WS/repos/acessilia
 
+# The service port is job-specific. Identify the local deployment by its
+# source and provider configuration so a new job can reuse verified pages.
+toolbox_identity=$(
+  {
+    git -C "$TB" rev-parse HEAD &&
+      git -C "$TB" diff --no-ext-diff --binary HEAD &&
+      sha256sum < "$TOOLBOX_PROVIDERS_CONFIG"
+  } | sha256sum
+) || exit 1
+export BENCH_SLURM_TOOLBOX_SHA256=${toolbox_identity%% *}
+
 B=$(( (SLURM_JOB_ID % 100) * 10 ))
 DOCLING_PORT=$((5001 + B)); MINERU_PORT=$((5002 + B)); TOOLBOX_PORT=$((8002 + B))
 export DOCLING_SERVE_URL=http://localhost:$DOCLING_PORT
 export MINERU_SERVE_URL=http://localhost:$MINERU_PORT
 export TOOLBOX_BASE_URL=http://localhost:$TOOLBOX_PORT
+export TOOLBOX_BASE_URLS=
 export TOOLBOX_PROVIDER=$PROVIDER
 export TOOLBOX_TIMEOUT_SECONDS=3600
 if [[ -z "${CUDA_VISIBLE_DEVICES:-}" || -z "${SLURM_JOB_GPUS:-}" ]]; then
@@ -67,8 +79,11 @@ wait_health "$TOOLBOX_BASE_URL/v1/health" 120 || exit 1
 
 cd "$ACC"
 BENCH=(uv run --frozen python -m scripts.bench)
-"${BENCH[@]}" run --dataset "$DATASET" --split "$SPLIT" --root "$ROOT" --run "$RUN" \
-    --provider "$PROVIDER" --resume ${SAMPLE:+--sample "$SAMPLE"} &
+RUN_ARGS=(run --dataset "$DATASET" --split "$SPLIT" --root "$ROOT" --run "$RUN"
+          --provider "$PROVIDER" --resume)
+if [[ -n "${SAMPLE:-}" ]]; then RUN_ARGS+=(--sample "$SAMPLE"); fi
+if [[ -n "${DATASET_REVISION:-}" ]]; then RUN_ARGS+=(--dataset-revision "$DATASET_REVISION"); fi
+"${BENCH[@]}" "${RUN_ARGS[@]}" &
 CHILD=$!; wait $CHILD; rc=$?
 echo "[$(date -u +%T)] run exit=$rc"
 if (( ! STOP )) && [[ "$SCORE" == 1 ]]; then

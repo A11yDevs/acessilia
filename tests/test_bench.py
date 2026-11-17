@@ -268,6 +268,37 @@ def test_cli_resume_rejects_toolbox_changes_and_can_retry(tmp_path, monkeypatch,
     assert calls == ["page_2.jpg"]
 
 
+def test_slurm_resume_reuses_pages_across_ports_for_same_deployment(tmp_path, monkeypatch):
+    root = tmp_path / "data"
+    _tree(root)
+    run = _stub_toolbox(tmp_path, monkeypatch)
+    args = ["run", "--dataset", "drdocbench", "--root", str(root), "--resume",
+            "--dataset-revision", "a" * 40]
+    monkeypatch.delenv("TOOLBOX_BASE_URLS", raising=False)
+    monkeypatch.setenv("TOOLBOX_BASE_URL", "http://localhost:8012")
+    monkeypatch.setenv("BENCH_SLURM_TOOLBOX_SHA256", "b" * 64)
+    calls = []
+
+    def extract(image, provider):
+        calls.append(image.name)
+        if image.name == "page_2.jpg" and len(calls) == 2:
+            raise TimeoutError
+        return {"document": {"elements": []}}
+
+    monkeypatch.setattr(cli.toolbox, "extract_structure", extract)
+    assert cli.main(args) == 1
+    assert calls == ["page_1.jpg", "page_2.jpg"]
+    monkeypatch.setenv("TOOLBOX_BASE_URL", "http://localhost:8022")
+    monkeypatch.setenv("BENCH_SLURM_TOOLBOX_SHA256", "c" * 64)
+    assert cli.main(args) == 1
+    assert calls == ["page_1.jpg", "page_2.jpg"]
+
+    monkeypatch.setenv("BENCH_SLURM_TOOLBOX_SHA256", "b" * 64)
+    assert cli.main(args) == 0
+    assert calls == ["page_1.jpg", "page_2.jpg", "page_2.jpg"]
+    assert json.loads((run / "run-manifest.json").read_text())["status"] == "completed"
+
+
 def test_cli_run_rejects_input_changed_during_extraction(tmp_path, monkeypatch):
     _tree(tmp_path / "data", pages=(1,))
     monkeypatch.setattr(cli, "VAR", tmp_path / "var")

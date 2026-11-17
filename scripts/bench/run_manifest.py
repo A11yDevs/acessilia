@@ -176,7 +176,7 @@ def software_identity() -> dict:
     }
 
 
-def _safe_endpoint(endpoint) -> str:
+def _safe_endpoint(endpoint, *, include_port: bool = True) -> str:
     """Keep the endpoint origin while dropping credentials, paths and query data."""
     try:
         parts = urlsplit(str(getattr(endpoint, "base_url", endpoint)))
@@ -185,7 +185,7 @@ def _safe_endpoint(endpoint) -> str:
             return "unknown"
         if ":" in host and not host.startswith("["):
             host = f"[{host}]"
-        netloc = f"{host}:{parts.port}" if parts.port else host
+        netloc = f"{host}:{parts.port}" if include_port and parts.port else host
         return urlunsplit((parts.scheme, netloc, "", "", ""))
     except ValueError:
         return "unknown"
@@ -358,11 +358,25 @@ def build_run_manifest(
     selection = selection_snapshot(pages)
     client_config = toolbox.client_config()
     effective_provider = provider or client_config.providers.get("toolbox_provider")
+    slurm_toolbox = os.environ.get("BENCH_SLURM_TOOLBOX_SHA256")
+    if slurm_toolbox:
+        # Only the single loopback origin created by bench.sbatch gets a
+        # job-independent port identity. Remote routes keep their full origin.
+        if (
+            len(slurm_toolbox) != 64
+            or not is_pinned_revision(slurm_toolbox)
+            or len(client_config.endpoints) != 1
+            or _safe_endpoint(client_config.endpoints[0], include_port=False) != "http://localhost"
+        ):
+            raise ValueError("invalid Slurm Toolbox identity or endpoint")
     configuration = {
         "capability": "document.structure.extract",
         "language": "pt-BR",
         "provider": effective_provider or "sdk_default",
-        "endpoints": [_safe_endpoint(endpoint) for endpoint in client_config.endpoints],
+        "endpoints": [
+            _safe_endpoint(endpoint, include_port=not slurm_toolbox)
+            for endpoint in client_config.endpoints
+        ],
         "endpoint_path_sha256": [
             _endpoint_path_sha256(endpoint.base_url) for endpoint in client_config.endpoints
         ],
@@ -380,6 +394,8 @@ def build_run_manifest(
             "reason": "structure_protocol_does_not_run_the_core_pipeline",
         },
     }
+    if slurm_toolbox:
+        configuration["slurm_toolbox_sha256"] = slurm_toolbox
     software = software_identity()
     visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
     hardware = {
