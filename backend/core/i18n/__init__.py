@@ -292,15 +292,18 @@ def _catalog_for(locale: str) -> Translations | NullTranslations:
     Returns:
         Translations | NullTranslations: The first catalog found.
     """
-    for candidate in (locale, DEFAULT_LOCALE):
+    # Normalized like ``Translations.load`` did: ``pt_BR.UTF-8``, ``pt_br``
+    # and ``pt-BR`` find the ``pt_BR`` catalog (review of #569).
+    for candidate in (_normalize_locale(locale) or locale, DEFAULT_LOCALE):
         catalog = _compiled_catalog(candidate)
         if catalog is not None:
             return catalog
     return NullTranslations()
 
 
-def get_translations(locale: str | None = None) -> Translations | None:
-    """Return a Babel catalog for a locale (or the active one when ``None`` is given)."""
+def get_translations(locale: str | None = None) -> Translations | NullTranslations:
+    """Return a Babel catalog for a locale (or the active one when ``None`` is given);
+    the English identity (``NullTranslations``) when no catalog is found."""
     if locale is None:
         locale = _active_locale()
     return _catalog_for(locale)
@@ -317,8 +320,6 @@ def t(message_id: str) -> str:
             Falls back to returning the original English msgid unchanged when this locale's strings file does not hold that translation yet.
     """
     trans = get_translations()
-    if trans is None:
-        return message_id
     result = trans.gettext(message_id)
     if isinstance(result, (bytes, bytearray)):
         try:
@@ -340,8 +341,6 @@ def n(singular_msgid: str, plural_msgid: str, count: int) -> str:
         str: Chosen localized string via Babel ngettext(); identity/fallback to the original English strings when the message pair has not been translated yet for this locale environment state. Placeholder (%d etc) substitution remains caller-side after text extraction here, as before gettext design intent keeps formatting separate from lookup resolution step in stack-level separation policy (per N-function contract pattern documented by chosen OSS i18n module per project guidelines).
     """
     trans = get_translations()
-    if trans is None:
-        return singular_msgid if count == 1 else plural_msgid
     result = trans.ngettext(singular_msgid, plural_msgid, count)
     if isinstance(result, (bytes, bytearray)):
         try:

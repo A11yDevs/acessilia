@@ -380,3 +380,35 @@ def test_the_catalog_of_an_unknown_locale_is_the_default(monkeypatch: pytest.Mon
 
     assert i8n._catalog_for("xx_XX").gettext("Processing your document…") == "Processing your document…"
     assert i8n._catalog_for("pt_BR").gettext("Processing your document…") == "Processando seu documento…"
+
+
+@pytest.mark.parametrize("variant", ["pt_BR", "pt_BR.UTF-8", "pt_br", "pt-BR", "pt_BR.utf8"])
+def test_a_locale_variant_finds_its_catalog(variant: str) -> None:
+    """Normalized as ``Translations.load`` did (review of #569)."""
+    i8n._catalog_for.cache_clear()
+
+    assert i8n.get_translations(variant).gettext("Processing your document…") == "Processando seu documento…"
+
+
+def test_the_runtime_reads_the_po_not_a_stale_mo(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A ``messages.mo`` left beside the source is not read: only the ``.po``
+    is the catalog (review of #569)."""
+    import shutil
+
+    from babel.messages.catalog import Catalog
+    from babel.messages.mofile import write_mo
+
+    root = tmp_path / "locales"
+    shutil.copytree(DEFAULT_REPOS_CATALOGS_DIR, root, ignore=shutil.ignore_patterns("*.mo"))
+    stale = Catalog(locale="pt_BR")
+    stale.add("Processing your document…", "STALE TRANSLATION")
+    with open(root / "pt_BR" / "LC_MESSAGES" / "messages.mo", "wb") as stream:
+        write_mo(stream, stale)
+    monkeypatch.setattr(i8n, "LOCALE_CATALOGS_DIR", root)
+    i8n._catalog_for.cache_clear()
+    try:
+        assert i8n.get_translations("pt_BR").gettext("Processing your document…") == "Processando seu documento…"
+    finally:
+        i8n._catalog_for.cache_clear()

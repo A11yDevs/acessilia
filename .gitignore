@@ -40,7 +40,7 @@ temp/
 *.fls
 *.synctex.gz
 
-# Compiled Babel locale catalogs (build artifacts, regenerated from .po sources at import time)
+# Compiled Babel locale catalogs (written by scripts/gen_locale_catalogs.py; the runtime compiles the .po in memory)
 **/LC_MESSAGES/*.mo
 
 # PDFs temporarios gerados durante benchmark em fixtures

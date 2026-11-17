@@ -65,8 +65,9 @@ class PlannerAgent:
     ) -> None:
         """``sandbox_dir`` is where the file tools may read and write, given
         by the caller (``PathsConfig.data_dir / SANDBOX_DIRNAME``). Without it
-        they refuse to run; ``plan`` and ``compare``, which the pipeline
-        calls, work in memory and need none."""
+        the Agno agent is not offered them, and calling them raises; ``plan``
+        and ``compare``, which the pipeline calls, work in memory and need
+        none (review of #569)."""
         self.sandbox_dir = sandbox_dir
         self.domain = DomainBundle.load(domain_path, description_path)
         self.compiler = PddlProblemCompiler(self.domain)
@@ -81,8 +82,11 @@ class PlannerAgent:
             tools=(
                 self.inspect_domain,
                 self.validate_problem_text,
-                self.compile_manifest_file,
-                self.generate_nominal_plan_files,
+                *(
+                    (self.compile_manifest_file, self.generate_nominal_plan_files)
+                    if sandbox_dir is not None
+                    else ()
+                ),
             ),
             model=model,
         )

@@ -63,3 +63,16 @@ def test_planning_in_memory_needs_no_sandbox() -> None:
     _, plan = PlannerAgent().plan(manifest, selected_roots=[obligation.id])
 
     assert plan.steps
+
+
+def _tool_names(planner):
+    return [tool.__name__ for tool in planner.agent.tools[0].tools]
+
+
+def test_the_agent_is_offered_the_file_tools_only_with_a_sandbox(tmp_path) -> None:
+    """An Agno agent must not be offered a tool that always fails (review of #569)."""
+    file_tools = {"compile_manifest_file", "generate_nominal_plan_files"}
+
+    assert not file_tools & set(_tool_names(PlannerAgent()))
+    assert file_tools <= set(_tool_names(PlannerAgent(sandbox_dir=tmp_path / SANDBOX_DIRNAME)))
+    assert {"inspect_domain", "validate_problem_text"} <= set(_tool_names(PlannerAgent()))
