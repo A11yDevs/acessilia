@@ -20,8 +20,6 @@ from typing import Any
 
 
 from backend.core.blocking import run_blocking
-from backend.services import job_checkpoint
-from backend.services.operation_context import current_task_id
 from backend.core.agents.provider_breaker import ProviderBreaker
 from backend.core.config import CoreConfig, DocumentConfig, FusionConfig, PathsConfig, ToolboxConfig
 from backend.core.agents.informational_structural import InformationalStructuralAgent
@@ -88,7 +86,16 @@ from backend.core.pipeline.enrichment.formulas import (
 )
 from backend.core.pipeline.handlers.registry import bind_run, build_method_registry
 from backend.core.agents.model_calls import ModelCallRunner, model_call_scope
-from backend.core.ports import RunPorts, region_cache_for
+from backend.core.ports import (
+    PHASE_ENRICHED,
+    PHASE_EXECUTION,
+    PHASE_MANIFEST,
+    PHASE_MEDIA,
+    PHASE_PLAN,
+    JobCheckpoints,
+    RunPorts,
+    region_cache_for,
+)
 
 
 class StructuralExtractionError(RuntimeError):
@@ -222,11 +229,11 @@ class PddlAccessibilityOrchestrator:
 
         executor = self._run_executor(config, ports)
         source_path = file_path.resolve()
-        # Inside a job this id names the checkpoints; a benchmark or the CLI
-        # calls the orchestrator without one and keeps the old behaviour.
-        task_id = current_task_id()
+        # Inside a job the service gives the run its checkpoints; a benchmark
+        # or the CLI runs without one and keeps the old behaviour.
+        checkpoints = ports.checkpoints
 
-        media_state = _load_checkpoint(task_id, job_checkpoint.PHASE_MEDIA)
+        media_state = _load_checkpoint(checkpoints, PHASE_MEDIA)
         if media_state is not None:
             media_inspection = media_state.get("inspection")
             media_configuration = dict(media_state.get("configuration") or {})
@@ -237,14 +244,14 @@ class PddlAccessibilityOrchestrator:
                 source_path, config.toolbox
             )
             await _save_checkpoint(
-                task_id,
-                job_checkpoint.PHASE_MEDIA,
+                checkpoints,
+                PHASE_MEDIA,
                 {"inspection": media_inspection, "configuration": media_configuration},
             )
         _check_page_limit_before_extraction(media_inspection, config.document)
         presentation = _is_presentation(media_inspection)
 
-        manifest_state = _load_checkpoint(task_id, job_checkpoint.PHASE_MANIFEST)
+        manifest_state = _load_checkpoint(checkpoints, PHASE_MANIFEST)
         resumed_manifest = manifest_state is not None
         if manifest_state is not None:
             manifest = ProcessingManifest.model_validate(manifest_state["manifest"])
@@ -262,12 +269,12 @@ class PddlAccessibilityOrchestrator:
             # Saved after the page limit and the media configuration: an
             # oversized document must not leave a checkpoint to resume from.
             await _save_checkpoint(
-                task_id,
-                job_checkpoint.PHASE_MANIFEST,
+                checkpoints,
+                PHASE_MANIFEST,
                 {"manifest": _manifest_payload(manifest)},
             )
 
-        enriched_state = _load_checkpoint(task_id, job_checkpoint.PHASE_ENRICHED)
+        enriched_state = _load_checkpoint(checkpoints, PHASE_ENRICHED)
         if enriched_state is not None:
             manifest = ProcessingManifest.model_validate(enriched_state["manifest"])
             # An enrichment checkpoint is complete for the mode it ran in; the
@@ -280,12 +287,12 @@ class PddlAccessibilityOrchestrator:
                 config, ports,
             )
             await _save_checkpoint(
-                task_id,
-                job_checkpoint.PHASE_ENRICHED,
+                checkpoints,
+                PHASE_ENRICHED,
                 {"manifest": _manifest_payload(manifest)},
             )
 
-        plan_state = _load_checkpoint(task_id, job_checkpoint.PHASE_PLAN)
+        plan_state = _load_checkpoint(checkpoints, PHASE_PLAN)
         if plan_state is not None:
             plan = NominalPlan.model_validate(plan_state["plan"])
             comparison = (
@@ -313,10 +320,10 @@ class PddlAccessibilityOrchestrator:
             planning_manifest = manifest
             replans = 0
             await _save_plan(
-                task_id, plan, comparison, planning_manifest, availability, gated, replans
+                checkpoints, plan, comparison, planning_manifest, availability, gated, replans
             )
 
-        execution_state = _load_checkpoint(task_id, job_checkpoint.PHASE_EXECUTION)
+        execution_state = _load_checkpoint(checkpoints, PHASE_EXECUTION)
         if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
             # The plan checkpoint was replaced after this execution checkpoint
             # was written (a replan that crashed before it started). The old
@@ -337,7 +344,7 @@ class PddlAccessibilityOrchestrator:
             plan,
             planning_manifest,
             execution_state,
-            task_id,
+            checkpoints,
             status_callback,
             loop,
             executor=executor,
@@ -350,7 +357,7 @@ class PddlAccessibilityOrchestrator:
             gated,
             status_callback,
             loop,
-            task_id=task_id,
+            checkpoints=checkpoints,
             planning_manifest=planning_manifest,
             availability=availability,
             replans=replans,
@@ -377,7 +384,7 @@ class PddlAccessibilityOrchestrator:
         plan: NominalPlan,
         planning_manifest: ProcessingManifest,
         execution_state: dict[str, Any] | None,
-        task_id: str | None,
+        checkpoints: JobCheckpoints | None,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         loop: asyncio.AbstractEventLoop,
         *,
@@ -395,8 +402,8 @@ class PddlAccessibilityOrchestrator:
                 replan_required=bool(execution_state.get("replan_required")),
             )
         on_step = (
-            _execution_saver(task_id, plan)
-            if task_id is not None and not self.execute_dry_run
+            _execution_saver(checkpoints, plan)
+            if checkpoints is not None and not self.execute_dry_run
             else None
         )
         return await run_blocking(
@@ -475,30 +482,31 @@ class PddlAccessibilityOrchestrator:
         # every remaining object.
         breaker = ProviderBreaker(config.vision.breaker_threshold)
         region_cache = region_cache_for(ports, config.vision)
-        progress = _EnrichmentCheckpoint(current_task_id(), manifest).save
+        checkpoints = ports.checkpoints
+        progress = _EnrichmentCheckpoint(checkpoints, manifest).save
         await _classify_formula_regions(
             manifest, source_path, mode=effective_mode, vision=config.vision,
             toolbox=config.toolbox, models=config.models, region_cache=region_cache,
             breaker=breaker, on_progress=progress,
         )
-        await self._checkpoint_enrichment(manifest)
+        await _checkpoint_enrichment(checkpoints, manifest)
         await _enrich_picture_descriptions(
             manifest, source_path, mode=effective_mode, vision=config.vision,
             toolbox=config.toolbox, models=config.models, region_cache=region_cache,
             media_inspection=media_inspection, status_callback=status_callback,
             breaker=breaker, on_progress=progress,
         )
-        await self._checkpoint_enrichment(manifest)
+        await _checkpoint_enrichment(checkpoints, manifest)
         text_spans = _TextSpanReader(manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
-        await self._checkpoint_enrichment(manifest)
+        await _checkpoint_enrichment(checkpoints, manifest)
         await _enrich_formula_latex(
             manifest, source_path, mode=effective_mode, document=config.document,
             vision=config.vision, toolbox=config.toolbox, models=config.models,
             region_cache=region_cache, status_callback=status_callback,
             breaker=breaker, on_progress=progress,
         )
-        await self._checkpoint_enrichment(manifest)
+        await _checkpoint_enrichment(checkpoints, manifest)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
@@ -512,21 +520,10 @@ class PddlAccessibilityOrchestrator:
             breaker=breaker,
             on_progress=progress,
         )
-        await self._checkpoint_enrichment(manifest)
+        await _checkpoint_enrichment(checkpoints, manifest)
         # After the table enrichment, which can replace a table's cells.
         await _mark_table_inline_math(manifest, source_path, config.document, text_spans)
-        await self._checkpoint_enrichment(manifest)
-
-    async def _checkpoint_enrichment(self, manifest: ProcessingManifest) -> None:
-        """Keep the manifest checkpoint current between enrichment steps (#407)."""
-        task_id = current_task_id()
-        if task_id is None:
-            return
-        await _save_checkpoint(
-            task_id,
-            job_checkpoint.PHASE_MANIFEST,
-            {"manifest": _manifest_payload(manifest)},
-        )
+        await _checkpoint_enrichment(checkpoints, manifest)
 
     async def _replan_until_done(
         self,
@@ -538,7 +535,7 @@ class PddlAccessibilityOrchestrator:
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         loop: asyncio.AbstractEventLoop,
         *,
-        task_id: str | None,
+        checkpoints: JobCheckpoints | None,
         planning_manifest: ProcessingManifest,
         availability: Any,
         replans: int,
@@ -589,15 +586,15 @@ class PddlAccessibilityOrchestrator:
                 selected_roots=roots,
             )
             await _save_plan(
-                task_id, plan, comparison, planning_manifest, availability, gated, replans
+                checkpoints, plan, comparison, planning_manifest, availability, gated, replans
             )
             # The previous execution checkpoint belongs to the previous plan.
-            _remove_checkpoint(task_id, job_checkpoint.PHASE_EXECUTION)
+            _remove_checkpoint(checkpoints, PHASE_EXECUTION)
             manifest, execution_report = await self._run_plan(
                 plan,
                 planning_manifest,
                 None,
-                task_id,
+                checkpoints,
                 status_callback,
                 loop,
                 executor=executor,
@@ -704,14 +701,14 @@ class _EnrichmentCheckpoint:
     handed to a thread, so concurrent folds never race with serialization.
     """
 
-    def __init__(self, task_id: str | None, manifest: ProcessingManifest) -> None:
-        self._task_id = task_id
+    def __init__(self, checkpoints: JobCheckpoints | None, manifest: ProcessingManifest) -> None:
+        self._checkpoints = checkpoints
         self._manifest = manifest
         self._lock = asyncio.Lock()
         self._pending = 0
 
     async def save(self) -> None:
-        if self._task_id is None:
+        if self._checkpoints is None:
             return
         self._pending += 1
         if self._lock.locked():
@@ -721,8 +718,8 @@ class _EnrichmentCheckpoint:
             while self._pending:
                 self._pending = 0
                 await _save_checkpoint(
-                    self._task_id,
-                    job_checkpoint.PHASE_MANIFEST,
+                    self._checkpoints,
+                    PHASE_MANIFEST,
                     {"manifest": _manifest_payload(self._manifest)},
                 )
 
@@ -731,31 +728,38 @@ def _manifest_payload(manifest: ProcessingManifest) -> dict[str, Any]:
     return manifest.model_dump(mode="json", by_alias=True)
 
 
-def _load_checkpoint(task_id: str | None, phase: str) -> dict[str, Any] | None:
-    if task_id is None:
+def _load_checkpoint(checkpoints: JobCheckpoints | None, phase: str) -> dict[str, Any] | None:
+    if checkpoints is None:
         return None
-    return job_checkpoint.load(task_id, phase)
+    return checkpoints.load(phase)
 
 
 async def _save_checkpoint(
-    task_id: str | None, phase: str, payload: dict[str, Any]
+    checkpoints: JobCheckpoints | None, phase: str, payload: dict[str, Any]
 ) -> None:
     """Persist one phase off the event loop; a failed write never fails the job."""
-    if task_id is None:
+    if checkpoints is None:
         return
     try:
-        await run_blocking(job_checkpoint.save, task_id, phase, payload)
+        await run_blocking(checkpoints.save, phase, payload)
     except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail the job
-        logger.warning("Job {}: {} checkpoint not written: {}", task_id, phase, exc)
+        logger.warning("Job {}: {} checkpoint not written: {}", checkpoints.job_id, phase, exc)
 
 
-def _remove_checkpoint(task_id: str | None, phase: str) -> None:
-    if task_id is not None:
-        job_checkpoint.remove(task_id, phase)
+async def _checkpoint_enrichment(
+    checkpoints: JobCheckpoints | None, manifest: ProcessingManifest
+) -> None:
+    """Keep the manifest checkpoint current between enrichment steps (#407)."""
+    await _save_checkpoint(checkpoints, PHASE_MANIFEST, {"manifest": _manifest_payload(manifest)})
+
+
+def _remove_checkpoint(checkpoints: JobCheckpoints | None, phase: str) -> None:
+    if checkpoints is not None:
+        checkpoints.remove(phase)
 
 
 async def _save_plan(
-    task_id: str | None,
+    checkpoints: JobCheckpoints | None,
     plan: NominalPlan,
     comparison: PlanningComparison | None,
     manifest: ProcessingManifest,
@@ -764,8 +768,8 @@ async def _save_plan(
     replans: int,
 ) -> None:
     await _save_checkpoint(
-        task_id,
-        job_checkpoint.PHASE_PLAN,
+        checkpoints,
+        PHASE_PLAN,
         {
             "plan": plan.model_dump(mode="json", by_alias=True),
             "comparison": (
@@ -800,7 +804,7 @@ def _availability_from(
     )
 
 
-def _execution_saver(task_id: str, plan: NominalPlan):
+def _execution_saver(checkpoints: JobCheckpoints, plan: NominalPlan):
     """A callback the executor calls after each step, writing the checkpoint."""
 
     def save(snapshot: dict[str, Any]) -> None:
@@ -808,10 +812,10 @@ def _execution_saver(task_id: str, plan: NominalPlan):
             # A snapshot from another plan must never overwrite this one.
             return
         try:
-            job_checkpoint.save(task_id, job_checkpoint.PHASE_EXECUTION, snapshot)
+            checkpoints.save(PHASE_EXECUTION, snapshot)
         except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail a step
             logger.warning(
-                "Job {}: execution checkpoint not written: {}", task_id, exc
+                "Job {}: execution checkpoint not written: {}", checkpoints.job_id, exc
             )
 
     return save

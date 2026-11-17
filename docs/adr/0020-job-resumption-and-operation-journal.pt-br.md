@@ -27,7 +27,9 @@ repetir uma etapa concluída é apenas desperdício.
 ### Checkpoints
 
 O core deve gravar um checkpoint JSON por fase do pipeline, em
-`DATA_DIR/jobs/<task_id>/checkpoints/`:
+`DATA_DIR/jobs/<task_id>/checkpoints/`. O core os grava pela porta
+`JobCheckpoints` do job, que o serviço vincula ao id da tarefa
+(`FileJobCheckpoints`; [ADR-0016](0016-core-package.pt-br.md), passo 4):
 
 | Fase | Gravada quando | Contém |
 |---|---|---|

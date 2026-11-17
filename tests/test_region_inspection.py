@@ -133,7 +133,7 @@ def test_the_region_cache_follows_the_run_config(inspection, enabled):
 
     result = inspection_handlers._handle_pymupdf_region_method(
         manifest, "o-1", config=core_config(vision={"region_cache_enabled": enabled}),
-        ports=RunPorts(region_cache=cache),
+        ports=RunPorts(region_cache=cache, checkpoints=None),
     )
 
     assert result.success, result.message

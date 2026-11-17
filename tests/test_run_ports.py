@@ -21,10 +21,6 @@ CORE = ROOT / "backend" / "core"
 #: and so does an entry nobody imports any more. Empty, the boundary test of
 #: step 5 can pass.
 PENDING_SERVICE_IMPORTS = {
-    "backend/core/pipeline/orchestrator.py": {
-        "backend.services.job_checkpoint",
-        "backend.services.operation_context",
-    },
     "backend/core/manifest/toolbox_extractor.py": {
         "backend.services.operation_context",
         "backend.services.operation_registry",
@@ -60,6 +56,162 @@ def test_ports_outside_the_service_keep_no_state() -> None:
     ports = RunPorts.none()
 
     assert isinstance(ports.region_cache, NoRegionCache)
+    assert ports.checkpoints is None
+
+
+class MemoryCheckpoints:
+    """A ``JobCheckpoints`` that is not the service's: the core needs no more."""
+
+    def __init__(self, job_id: str = "memory-job") -> None:
+        self.job_id = job_id
+        self.phases: dict[str, dict] = {}
+        self.saved: list[str] = []
+
+    def load(self, phase):
+        return self.phases.get(phase)
+
+    def save(self, phase, payload):
+        self.saved.append(phase)
+        self.phases[phase] = payload
+
+    def remove(self, phase):
+        self.phases.pop(phase, None)
+
+
+def _stopped_before_execution(monkeypatch, counts):
+    """An orchestrator whose stages are stubs and whose plan run stops the job."""
+    from backend.core.pipeline import orchestrator as pddl
+    from tests.pddl_support import build_element, build_manifest
+
+    class Stop(Exception):
+        pass
+
+    async def inspect(*_args, **_kwargs):
+        counts["inspect"] += 1
+        return None, {}
+
+    async def enrich(*_args, **_kwargs):
+        return None
+
+    async def run_plan(*_args, **_kwargs):
+        raise Stop
+
+    def extract(*_args, **_kwargs):
+        counts["extract"] += 1
+        return build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
+
+    monkeypatch.setattr(pddl, "_inspect_media", inspect)
+    for name in (
+        "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
+        "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math",
+    ):
+        monkeypatch.setattr(pddl, name, enrich)
+    orchestrator = build_orchestrator()
+    orchestrator.information_structural = SimpleNamespace(process=extract)
+    monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
+    return orchestrator, Stop
+
+
+@pytest.mark.asyncio
+async def test_a_run_checkpoints_and_resumes_through_its_port(monkeypatch, tmp_path) -> None:
+    """Any ``JobCheckpoints`` works: the phases go to the run's port, in
+    order, and a second run of the same job resumes from them."""
+    from backend.core.ports import CHECKPOINT_PHASES
+
+    counts = {"inspect": 0, "extract": 0}
+    orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
+    checkpoints = MemoryCheckpoints()
+    ports = RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints)
+
+    for _ in range(2):
+        with pytest.raises(Stop):
+            await orchestrator.execute(
+                tmp_path / "doc.pdf", tmp_path, config=core_config(),
+                model_calls=current_model_calls(), ports=ports,
+            )
+
+    assert counts == {"inspect": 1, "extract": 1}
+    assert set(checkpoints.phases) == {"media", "manifest", "enriched", "plan"}
+    first_writes = [phase for phase in dict.fromkeys(checkpoints.saved)]
+    assert first_writes == [p for p in CHECKPOINT_PHASES if p in checkpoints.phases]
+
+
+@pytest.mark.asyncio
+async def test_a_run_without_a_job_neither_reads_nor_writes_checkpoints(
+    monkeypatch, tmp_path
+) -> None:
+    counts = {"inspect": 0, "extract": 0}
+    orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
+
+    for _ in range(2):
+        with pytest.raises(Stop):
+            await orchestrator.execute(
+                tmp_path / "doc.pdf", tmp_path, config=core_config(),
+                model_calls=current_model_calls(), ports=RunPorts.none(),
+            )
+
+    assert counts == {"inspect": 2, "extract": 2}
+
+
+@pytest.mark.asyncio
+async def test_a_checkpoint_that_cannot_be_written_does_not_fail_the_run(
+    monkeypatch, tmp_path
+) -> None:
+    from loguru import logger
+
+    class Full(MemoryCheckpoints):
+        def save(self, phase, payload):
+            raise OSError("disk full")
+
+    counts = {"inspect": 0, "extract": 0}
+    orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(str(message)), level="WARNING")
+    try:
+        with pytest.raises(Stop):
+            await orchestrator.execute(
+                tmp_path / "doc.pdf", tmp_path, config=core_config(),
+                model_calls=current_model_calls(),
+                ports=RunPorts(region_cache=NoRegionCache(), checkpoints=Full("full-job")),
+            )
+    finally:
+        logger.remove(sink)
+
+    assert any("full-job" in m and "disk full" in m for m in messages)
+
+
+def test_the_service_checkpoints_are_bound_to_the_job(monkeypatch, tmp_path) -> None:
+    from backend.config.settings import settings
+    from backend.services import job_checkpoint
+    from backend.services.run_ports import service_run_ports
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    checkpoints = service_run_ports("job-7").checkpoints
+
+    checkpoints.save("plan", {"plan": 1})
+
+    assert isinstance(checkpoints, job_checkpoint.FileJobCheckpoints)
+    assert checkpoints.job_id == "job-7"
+    assert checkpoints.load("plan") == {"plan": 1}
+    assert job_checkpoint.load("job-7", "plan") == {"plan": 1}
+    assert job_checkpoint.load("job-8", "plan") is None
+    checkpoints.remove("plan")
+    assert checkpoints.load("plan") is None
+    assert service_run_ports().checkpoints is None
+
+
+def test_an_untrusted_service_checkpoint_is_not_resumed(monkeypatch, tmp_path) -> None:
+    from backend.config.settings import settings
+    from backend.services import job_checkpoint
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    checkpoints = job_checkpoint.FileJobCheckpoints("job-9")
+    checkpoints.save("manifest", {"manifest": {}})
+    path = tmp_path / "jobs" / "job-9" / "checkpoints" / "manifest.json"
+    path.write_text(path.read_text().replace('"manifest":{}', '"manifest":{"x":1}'))
+
+    with pytest.raises(job_checkpoint.CheckpointError):
+        checkpoints.load("manifest")
 
 
 @pytest.mark.asyncio
@@ -74,7 +226,7 @@ async def test_the_no_op_region_cache_never_answers() -> None:
 @pytest.mark.parametrize("enabled", [True, False])
 def test_the_run_config_turns_the_region_cache_on_or_off(enabled) -> None:
     cache = NoRegionCache()
-    ports = RunPorts(region_cache=cache)
+    ports = RunPorts(region_cache=cache, checkpoints=None)
 
     chosen = region_cache_for(ports, vision_config(region_cache_enabled=enabled))
 
@@ -151,7 +303,7 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
     cache = NoRegionCache()
-    ports = RunPorts(region_cache=cache)
+    ports = RunPorts(region_cache=cache, checkpoints=None)
 
     with pytest.raises(Stop):
         await orchestrator.execute(
@@ -198,3 +350,65 @@ def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
     assert bound.get("ports")(None, "o") is ports
     assert bound.get("both")(None, "o") == (config, ports)
     assert bound.get("plain") is plain
+
+
+@pytest.mark.asyncio
+async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp_path) -> None:
+    """After each of the six enrichment steps the manifest checkpoint is
+    written again (#407), so a restart repeats at most the step that ran."""
+    counts = {"inspect": 0, "extract": 0}
+    orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
+    checkpoints = MemoryCheckpoints()
+
+    with pytest.raises(Stop):
+        await orchestrator.execute(
+            tmp_path / "doc.pdf", tmp_path, config=core_config(),
+            model_calls=current_model_calls(),
+            ports=RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints),
+        )
+
+    # One after the extraction, then one after each enrichment step.
+    assert checkpoints.saved.count("manifest") == 1 + 6
+
+
+@pytest.mark.asyncio
+async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypatch) -> None:
+    import asyncio
+
+    from tests.pddl_support import build_element, build_manifest, build_obligation
+
+    orchestrator = build_orchestrator(max_replans=1)
+    obligation = build_obligation("describe-image", ["p-1"], ["human-review"])
+    obligation.selected = True
+    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [obligation])
+    checkpoints = MemoryCheckpoints()
+    checkpoints.phases["execution"] = {"plan_id": "first-plan", "results": []}
+    seen = []
+
+    async def run_plan(*_args, **_kwargs):
+        seen.append(dict(checkpoints.phases))
+        return manifest, SimpleNamespace(replan_required=False, status="completed")
+
+    async def no_save(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
+    monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: ("plan", None))
+    monkeypatch.setattr("backend.core.pipeline.orchestrator._save_plan", no_save)
+
+    await orchestrator._replan_until_done(
+        manifest,
+        SimpleNamespace(replan_required=True, status="replan-required"),
+        "first-plan",
+        None,
+        [],
+        None,
+        asyncio.get_running_loop(),
+        checkpoints=checkpoints,
+        planning_manifest=manifest,
+        availability=None,
+        replans=0,
+        executor=orchestrator._run_executor(core_config(), RunPorts.none()),
+    )
+
+    assert seen == [{}], "the new plan starts without the old plan's progress"

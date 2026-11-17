@@ -545,7 +545,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         [],
         None,
         asyncio.get_running_loop(),
-        task_id=None,
+        checkpoints=None,
         planning_manifest=manifest,
         availability=None,
         replans=0,

@@ -7,9 +7,9 @@ left half-written is never used as if it were valid. Writes replace the file
 atomically: a process killed mid-write leaves the previous checkpoint, never a
 truncated one.
 
-There is no checkpoint outside a job. The benchmark and the CLI call the
-orchestrator without a task id, so they keep the old behaviour and write
-nothing.
+There is no checkpoint outside a job. The service gives a job's run its
+checkpoints (``FileJobCheckpoints``, the core's ``JobCheckpoints`` port); the
+benchmark and the CLI run without a job, so they write nothing.
 
 Checkpoints are removed when the job reaches a terminal state (the worker does
 it) and swept by the periodic cleanup if a job disappears without one. The
@@ -30,25 +30,14 @@ from typing import Any
 
 from backend.config.settings import settings
 from backend.core.logger import logger
+from backend.core.ports import CHECKPOINT_PHASES
 
 #: Version of the checkpoint document. A job never resumes on another version:
 #: the caller treats the phase as absent, or the recovery fails the job.
 CHECKPOINT_VERSION = 1
 
-#: Phase names written by the pipeline, in order.
-PHASE_MEDIA = "media"
-PHASE_MANIFEST = "manifest"
-PHASE_ENRICHED = "enriched"
-PHASE_PLAN = "plan"
-PHASE_EXECUTION = "execution"
-
-PHASES: tuple[str, ...] = (
-    PHASE_MEDIA,
-    PHASE_MANIFEST,
-    PHASE_ENRICHED,
-    PHASE_PLAN,
-    PHASE_EXECUTION,
-)
+#: Phase names written by the pipeline, in order; the core names them.
+PHASES = CHECKPOINT_PHASES
 
 #: Task ids reach a path, so only the shape the API generates is accepted.
 _TASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -179,6 +168,23 @@ def clear(task_id: str) -> None:
     shutil.rmtree(directory.parent, ignore_errors=True)
 
 
+class FileJobCheckpoints:
+    """The core's ``JobCheckpoints`` port for one job, on these files
+    (ADR-0016, step 4)."""
+
+    def __init__(self, job_id: str) -> None:
+        self.job_id = job_id
+
+    def load(self, phase: str) -> dict[str, Any] | None:
+        return load(self.job_id, phase)
+
+    def save(self, phase: str, payload: dict[str, Any]) -> None:
+        save(self.job_id, phase, payload)
+
+    def remove(self, phase: str) -> None:
+        remove(self.job_id, phase)
+
+
 def expire(max_age_seconds: float, now: float | None = None) -> int:
     """Remove job checkpoint directories untouched for longer than ``max_age_seconds``."""
     root = settings.data_dir / "jobs"
@@ -206,12 +212,8 @@ def expire(max_age_seconds: float, now: float | None = None) -> int:
 __all__ = [
     "CHECKPOINT_VERSION",
     "PHASES",
-    "PHASE_ENRICHED",
-    "PHASE_EXECUTION",
-    "PHASE_MANIFEST",
-    "PHASE_MEDIA",
-    "PHASE_PLAN",
     "CheckpointError",
+    "FileJobCheckpoints",
     "clear",
     "expire",
     "load",

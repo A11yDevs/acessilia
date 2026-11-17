@@ -272,6 +272,7 @@ def test_process_gives_the_run_its_runner_the_job_config_and_its_ports(monkeypat
     from backend.services.cache import ContentCache
 
     assert isinstance(received["ports"].region_cache, ContentCache)
+    assert received["ports"].checkpoints.job_id == "scope-wiring"
 
 
 def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path, runner):
