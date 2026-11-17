@@ -4,17 +4,19 @@ from pathlib import Path
 
 import pytest
 
+from docstruct.evaluation.holdout import partition
 from scripts.bench import __main__ as cli
 from scripts.bench import core
+from scripts.bench.datasets import BenchPage
 from scripts.bench.datasets.drdocbench import DrDocBench
 from scripts.bench.report import (
     _coverage_pair_issues,
     _identity_pair_issues,
     _read_windows,
-    compare_runs,
+    compare_run_report,
     score_run,
 )
-from scripts.bench.run_manifest import STRUCTURE_PROTOCOL, _dataset_revision, selection_snapshot
+from scripts.bench.run_manifest import STRUCTURE_PROTOCOL, _dataset_revision, digest, selection_snapshot
 
 DOC = "0a1b2c3d-0000-4000-8000-000000000001"
 
@@ -115,11 +117,11 @@ def test_score_counts_missing_prediction_as_miss_and_compare_runs(tmp_path):
 
     (preds / f"{DOC}_p2.md").write_text("# Page 2\n\nBody 2\n", encoding="utf-8")
     score_run(pages, preds, tmp_path / "candidate")
-    verdict = compare_runs(tmp_path / "base", tmp_path / "candidate")
-    # A single document lands in one subset only: there is nothing to hold out.
-    assert not verdict.accepted
-    assert verdict.metric_deltas["tune_text"] == pytest.approx(50.0) or (
-        verdict.metric_deltas["hold_text"] == pytest.approx(50.0))
+    comparison = compare_run_report(tmp_path / "base", tmp_path / "candidate")
+    assert not comparison["verdict"]["accepted"]
+    assert not comparison["measurement"]["gate_applied"]
+    subset = partition(f"{DOC}_page_1")
+    assert comparison["diagnostic_metric_deltas"]["text"][subset] == pytest.approx(50.0)
 
 
 def test_cli_run_writes_markdown_and_blocks(tmp_path, monkeypatch):
@@ -127,7 +129,10 @@ def test_cli_run_writes_markdown_and_blocks(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "VAR", tmp_path / "var")
     monkeypatch.setattr(cli.toolbox, "extract_structure", lambda image, provider: {
         "document": {"elements": [{"type": "title", "text": "Page 1", "reading_order": 0},
-                                  {"type": "text", "text": "Body 1", "reading_order": 1}]}})
+                                  {"type": "text", "text": "Body 1", "reading_order": 1}]},
+        "provenance": {"provider": "docling", "provider_version": "1", "duration_ms": 21,
+                       "cache_hit": True, "model_versions": {"layout": "model-v1"},
+                       "cache_key": "do-not-persist"}})
 
     assert cli.main(["run", "--dataset", "drdocbench", "--root", str(tmp_path / "data")]) == 0
     assert cli.main(["score", "--dataset", "drdocbench", "--root", str(tmp_path / "data")]) == 0
@@ -136,6 +141,13 @@ def test_cli_run_writes_markdown_and_blocks(tmp_path, monkeypatch):
     assert (run / "predictions" / f"{DOC}_p1.md").read_text() == "# Page 1\n\nBody 1\n"
     assert (run / "predictions" / f"{DOC}_p1.blocks.json").exists()
     assert json.loads((run / "report.json").read_text())["overall"] == pytest.approx(100.0)
+    manifest = json.loads((run / "run-manifest.json").read_text())
+    call = manifest["items"][f"{DOC}_p1"]["observed_calls"][0]
+    assert call["toolbox_provenance"]["cache_hit"] is True
+    assert call["toolbox_provenance"]["duration_ms"] == 21
+    assert call["toolbox_provenance"]["model_versions"] == {"layout": "model-v1"}
+    assert "cache_key" not in call["toolbox_provenance"]
+    assert manifest["evaluation"]["gate"]["kind"] == "improvement"
 
 
 def test_official_tree_uses_one_page_windows(tmp_path):
@@ -199,6 +211,61 @@ def test_cli_resume_completed_verified_run_returns_success(tmp_path, monkeypatch
     assert saved["status"] == "completed"
     assert saved["dataset"]["revision"] == "a" * 40
     assert saved["dataset"]["revision_source"] == "explicit"
+
+
+@pytest.mark.parametrize("change", ["route", "provider", "provider_version", "model_versions"])
+def test_cli_resume_rejects_toolbox_changes_and_can_retry(tmp_path, monkeypatch, change):
+    root = tmp_path / "data"
+    _tree(root)
+    run = _stub_toolbox(tmp_path, monkeypatch)
+    data = ["--dataset", "drdocbench", "--root", str(root)]
+    run_args = ["run", *data, "--dataset-revision", "a" * 40]
+    monkeypatch.delenv("TOOLBOX_BASE_URLS", raising=False)
+    monkeypatch.setenv("TOOLBOX_BASE_URL", "https://toolbox.example/blue-private-route")
+    provenance = {"provider": "docling", "provider_version": "v1", "model_versions": {"layout": "v1"}}
+    calls = []
+    second_page_fails = True
+
+    def extract(image, provider):
+        calls.append(image.name)
+        if second_page_fails and image.name == "page_2.jpg":
+            raise TimeoutError
+        return {"document": {"elements": []}, "provenance": dict(provenance)}
+
+    monkeypatch.setattr(cli.toolbox, "extract_structure", extract)
+    assert cli.main(run_args) == 1
+    manifest_path = run / "run-manifest.json"
+    initial_manifest = manifest_path.read_text()
+    assert "blue-private-route" not in initial_manifest
+    assert json.loads(initial_manifest)["configuration"]["endpoints"] == ["https://toolbox.example"]
+    second_page_fails = False
+    original_provenance = dict(provenance)
+    if change == "route":
+        monkeypatch.setenv("TOOLBOX_BASE_URL", "https://toolbox.example/green-private-route")
+    else:
+        provenance[change] = {
+            "provider": "other", "provider_version": "v2", "model_versions": {"layout": "v2"},
+        }[change]
+
+    calls.clear()
+    assert cli.main([*run_args, "--resume"]) == 1
+    assert not (run / "predictions" / f"{DOC}_p2.md").exists()
+    if change == "route":
+        assert calls == []
+        assert manifest_path.read_text() == initial_manifest
+    else:
+        assert calls == ["page_2.jpg"]
+        saved = json.loads(manifest_path.read_text())
+        assert saved["status"] == "partial"
+        assert saved["items"][f"{DOC}_p2"]["last_error_type"] == "ToolboxProvenanceMismatch"
+    assert cli.main(["score", *data]) == 0
+    assert not compare_run_report(run, run)["measurement"]["gate_applied"]
+
+    monkeypatch.setenv("TOOLBOX_BASE_URL", "https://toolbox.example/blue-private-route/")
+    provenance.update(original_provenance, cache_hit=True, duration_ms=123)
+    calls.clear()
+    assert cli.main([*run_args, "--resume"]) == 0
+    assert calls == ["page_2.jpg"]
 
 
 def test_cli_run_rejects_input_changed_during_extraction(tmp_path, monkeypatch):
@@ -342,4 +409,83 @@ def test_compare_prints_strict_json(tmp_path, capsys):
     cli.main(["compare", str(tmp_path / "base"), str(tmp_path / "candidate")])
 
     out = json.loads(capsys.readouterr().out, parse_constant=lambda c: pytest.fail(f"non-JSON {c}"))
-    assert out["metric_deltas"]["tune_teds"] is None or out["metric_deltas"]["hold_teds"] is None
+    assert out["metric_deltas"] == {}
+    assert out["tune_delta"] is None and out["holdout_delta"] is None
+
+
+def test_comparison_applies_gate_only_to_matching_verified_scores(tmp_path, monkeypatch):
+    doc_ids = [next(str(i) for i in range(20) if partition(f"{i}_page_1") == subset)
+               for subset in ("tune", "hold")]
+    pages = []
+    for doc_id in doc_ids:
+        image = tmp_path / f"{doc_id}.jpg"
+        image.write_bytes(b"input")
+        reference = tmp_path / f"{doc_id}.md"
+        reference.write_text("correct text\n\n$$x$$\n\n$$y$$\n")
+        pages.append(BenchPage(doc_id, doc_id, 1, image, reference))
+
+    base = tmp_path / "base"
+    candidate = tmp_path / "candidate"
+
+    def extract(image, provider):
+        elements = [{"type": "text", "text": "incorrect baseline" if provider == "base"
+                     else "correct text", "reading_order": 0},
+                    {"type": "formula", "text": "x", "reading_order": 1},
+                    {"type": "formula", "text": "y" if provider == "base" else "z",
+                     "reading_order": 2}]
+        return {"document": {"elements": elements}, "provenance": {"provider_version": "v1"}}
+
+    monkeypatch.setattr(cli.toolbox, "extract_structure", extract)
+
+    def unexpected_math_configuration():
+        pytest.fail("structure-only conversion consulted the remote math configuration")
+
+    monkeypatch.setattr(core, "core_config_from_settings", unexpected_math_configuration)
+    for run in (base, candidate):
+        assert cli._run(pages, run, run.name, False, dataset="drdocbench", split="dev",
+                        root=tmp_path, dataset_revision="a" * 40) == 0
+        score_run(pages, run / "predictions", run)
+
+    report = compare_run_report(base, candidate)
+    assert report["measurement"]["gate_applied"]
+    assert report["verdict"]["accepted"], report["verdict"]
+    assert report["diagnostic_metric_deltas"]["cdm"]["tune"] == pytest.approx(-50.0)
+    assert "tune_cdm" not in report["verdict"]["metric_deltas"]
+
+    prediction = candidate / "predictions" / f"{pages[0].item_id}.md"
+    original = prediction.read_bytes()
+    prediction.write_text("substituted\n")
+    score_run(pages, candidate / "predictions", candidate)
+    prediction.write_bytes(original)
+    report = compare_run_report(base, candidate)
+    assert not report["measurement"]["gate_applied"]
+    assert "candidate scored predictions or references do not match the run manifest" in (
+        report["compatibility"]["issues"]
+    )
+
+    score_run(pages[:1], candidate / "predictions", candidate)
+    report = compare_run_report(base, candidate)
+    assert not report["measurement"]["gate_applied"]
+    assert "candidate scored pages do not match its reference selection" in (
+        report["compatibility"]["issues"]
+    )
+
+    score_run(pages, candidate / "predictions", candidate)
+    manifest_path = candidate / "run-manifest.json"
+    original_manifest = json.loads(manifest_path.read_text())
+    mixed_manifest = json.loads(manifest_path.read_text())
+    call = mixed_manifest["items"][pages[0].item_id]["observed_calls"][-1]
+    call["toolbox_provenance"]["provider_version"] = "v2"
+    manifest_path.write_text(json.dumps(mixed_manifest))
+    report = compare_run_report(base, candidate)
+    assert not report["measurement"]["gate_applied"]
+    assert "candidate completed pages have conflicting Toolbox provenance" in report["compatibility"]["issues"]
+
+    original_manifest["configuration"].pop("endpoint_path_sha256")
+    original_manifest["identity"]["configuration"] = original_manifest["configuration"]
+    original_manifest["identity_sha256"] = digest(original_manifest["identity"])
+    manifest_path.write_text(json.dumps(original_manifest))
+    score_run(pages, candidate / "predictions", candidate)
+    report = compare_run_report(base, candidate)
+    assert not report["measurement"]["gate_applied"]
+    assert "candidate Toolbox endpoint paths are unverified" in report["compatibility"]["issues"]

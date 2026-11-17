@@ -41,14 +41,21 @@ from scripts.bench.run_manifest import (
     atomic_write_text,
     build_run_manifest,
     completed_artifacts_are_valid,
+    completed_toolbox_identity,
     is_pinned_revision,
     load_run_manifest,
+    merge_toolbox_identity,
     sha256_file,
+    toolbox_provenance_identity,
     utc_now,
     write_run_manifest,
 )
 
 VAR = Path(os.environ.get("BENCH_VAR") or Path(__file__).resolve().parents[2] / "var" / "bench")
+
+
+class ToolboxProvenanceMismatch(ValueError):
+    """The reported producer differs from the one that produced completed pages."""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -186,6 +193,7 @@ def _run(
         dataset_revision=dataset_revision,
     )
     legacy_ids: set[str] = set()
+    observed_toolbox: dict[str, str | int] = {}
     if resume:
         try:
             manifest = load_run_manifest(run_dir)
@@ -204,6 +212,11 @@ def _run(
             if set(manifest.get("items", {})) != expected_ids:
                 print("Cannot resume: saved item states do not match the selection", file=sys.stderr)
                 return 1
+            completed_identity = completed_toolbox_identity(manifest["items"])
+            if completed_identity is None:
+                print("Cannot resume: completed pages have conflicting Toolbox provenance", file=sys.stderr)
+                return 1
+            observed_toolbox = completed_identity
             for page in selected:
                 item = manifest["items"][page.item_id]
                 if item.get("status") == "completed" and not completed_artifacts_are_valid(
@@ -284,12 +297,18 @@ def _run(
         try:
             result = toolbox.extract_structure(page.image_path, provider)
             toolbox_call_seconds = time.perf_counter() - toolbox_call_start
+            call["toolbox_provenance"] = toolbox.execution_provenance(result)
+            page_identity = merge_toolbox_identity(
+                observed_toolbox, toolbox_provenance_identity(call["toolbox_provenance"])
+            )
+            if page_identity is None:
+                raise ToolboxProvenanceMismatch
             input_check_start = time.perf_counter()
             input_matches_manifest = sha256_file(page.image_path) == item["input_sha256"]
             input_integrity_check_seconds = time.perf_counter() - input_check_start
             if not input_matches_manifest:
                 raise RuntimeError("benchmark input changed during extraction")
-            canonical = core.payload_to_canonical(result)
+            canonical = core.payload_to_canonical(result, enrich_math=False)
             outputs = {
                 "markdown": (
                     f"{page.item_id}.md",
@@ -328,6 +347,7 @@ def _run(
             item["status"] = "completed"
             item["artifacts"] = artifacts
             item["last_error_type"] = None
+            observed_toolbox = page_identity
             print(f"[OK] {page.item_id} ({call['page_seconds']:.1f}s)")
         except KeyboardInterrupt:
             if toolbox_call_seconds is None:
@@ -355,6 +375,9 @@ def _run(
             item["status"] = "failed"
             item["last_error_type"] = type(exc).__name__
             print(f"[FAIL] {page.item_id} ({type(exc).__name__})", file=sys.stderr)
+            if isinstance(exc, ToolboxProvenanceMismatch):
+                print("Toolbox producer changed; use the original deployment or start a new run", file=sys.stderr)
+                break
         finally:
             write_run_manifest(run_dir, manifest)
         if interrupted:

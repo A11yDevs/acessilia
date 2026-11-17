@@ -23,11 +23,13 @@ _HEADING_TYPES = ("heading", "title", "section_header")
 _HEADER_SCOPES = {"row", "col", "rowgroup", "colgroup"}
 
 
-def payload_to_canonical(result: dict[str, Any]) -> dict[str, Any]:
+def payload_to_canonical(result: dict[str, Any], *, enrich_math: bool = True) -> dict[str, Any]:
     """Map manifest elements to canonical blocks and build the document.
 
     Block types come from the provider's layout model, not from the heuristic
     line parser (which mis-types prose with inline math as ``math``).
+    The structure-only runner disables remote math enrichment. The default
+    preserves the behavior expected by the pinned external adapter.
     """
     if "sections" in result and result.get("schema_version"):
         return sanitize_canonical_document(result)
@@ -37,12 +39,16 @@ def payload_to_canonical(result: dict[str, Any]) -> dict[str, Any]:
         "text": doc.get("text") or "",
         "pages": result.get("pages", []),
     }
+    math_config = (
+        {"toolbox": core_config_from_settings().toolbox}
+        if enrich_math else {"math_enricher": None}
+    )
     document = build_canonical_document(
         payload,
-        toolbox=core_config_from_settings().toolbox,
         title=_PLACEHOLDER_TITLE,
         language=result.get("language") or "en",
         verbosity="detailed",
+        **math_config,
     )
     if document.get("title") == _PLACEHOLDER_TITLE:
         # No heading on the page: do not emit a synthetic "# ..." line.

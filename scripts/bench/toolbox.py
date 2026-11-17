@@ -100,3 +100,15 @@ def extract_structure(image_path: Path, provider: str | None = None) -> dict[str
             await client.close()
 
     return run_sync(_call())
+
+
+def execution_provenance(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Keep provider identity and telemetry without content or cache identifiers."""
+    provenance = result.get("provenance")
+    if not isinstance(provenance, dict):
+        return None
+    fields = (
+        "capability", "capability_version", "provider", "provider_version",
+        "model_versions", "cache_hit", "duration_ms",
+    )
+    return {key: provenance.get(key) for key in fields}

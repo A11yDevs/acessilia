@@ -19,16 +19,33 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
+from docstruct.evaluation.holdout import (
+    LOOP_METRICS,
+    MAX_METRIC_LOSS,
+    MIN_HOLDOUT_GAIN,
+    MIN_TUNE_GAIN,
+)
+
 from scripts.bench.datasets.base import BenchPage
 from scripts.bench import toolbox
 
 RUN_MANIFEST_FILE = "run-manifest.json"
 RUN_MANIFEST_SCHEMA = "acessilia-benchmark-run"
 RUN_MANIFEST_VERSION = 1
+GATE_PROTOCOL = {
+    "id": "docstruct.evaluation.holdout.improvement",
+    "kind": "improvement",
+    "version": 1,
+    "metrics": list(LOOP_METRICS),
+    "minimum_tune_gain": MIN_TUNE_GAIN,
+    "minimum_holdout_gain": MIN_HOLDOUT_GAIN,
+    "maximum_metric_loss": MAX_METRIC_LOSS,
+    "cdm_in_gate": False,
+}
 
 STRUCTURE_PROTOCOL = {
     "id": "toolbox-structure",
-    "version": 1,
+    "version": 2,
     "unit": "document-page",
     "stages": [
         "document.structure.extract",
@@ -50,6 +67,7 @@ STRUCTURE_PROTOCOL = {
         "planner",
         "executor",
         "visual enrichment",
+        "remote formula conversion and verbalization",
         "final product exports",
     ],
     "telemetry": {
@@ -57,11 +75,11 @@ STRUCTURE_PROTOCOL = {
             "caller-observed Toolbox call duration",
             "post-call input integrity check duration",
             "page wall duration including conversion and artifact writes",
+            "provider-reported duration and cache hit when exposed by Toolbox",
         ],
         "not_observed": [
-            "provider execution duration",
             "provider attempt and retry counts",
-            "cache lookup or hit status",
+            "provider queue wait duration and cache lookup duration",
             "effective remote cache policy",
         ],
     },
@@ -153,10 +171,8 @@ def software_identity() -> dict:
         "core": {"version": package_version("acessilia"), **source_identity()},
         "sdk": package_version("acessilia-sdk"),
         "docstruct": package_version("acessilia-docstruct"),
-        # The capability response does not currently expose a stable image,
-        # provider-release or model-revision identifier.
+        # Provider and model versions, when present, are per-call provenance.
         "toolbox_release": "not_exposed_by_current_response",
-        "model_revision": "not_exposed_by_current_response",
     }
 
 
@@ -173,6 +189,65 @@ def _safe_endpoint(endpoint) -> str:
         return urlunsplit((parts.scheme, netloc, "", "", ""))
     except ValueError:
         return "unknown"
+
+
+def _endpoint_path_sha256(base_url: str) -> str:
+    path = urlsplit(base_url).path
+    # HTTPX appends a slash to a base URL before resolving relative requests.
+    if not path.endswith("/"):
+        path += "/"
+    return hashlib.sha256(path.encode("utf-8")).hexdigest()
+
+
+def toolbox_provenance_identity(provenance: object) -> dict[str, str | int]:
+    """Extract only observed fields that identify the producer, independently of timing and cache."""
+    if not isinstance(provenance, dict):
+        return {}
+    identity: dict[str, str | int] = {
+        field: value for field in ("capability", "provider", "provider_version")
+        if isinstance(value := provenance.get(field), str) and value.strip()
+    }
+    version = provenance.get("capability_version")
+    if type(version) is int:
+        identity["capability_version"] = version
+    models = provenance.get("model_versions")
+    if isinstance(models, dict):
+        identity.update({
+            f"model_versions.{name}": value for name, value in models.items()
+            if isinstance(value, str) and value.strip()
+        })
+    return identity
+
+
+def merge_toolbox_identity(
+    observed: dict[str, str | int], incoming: dict[str, str | int]
+) -> dict[str, str | int] | None:
+    """Combine known fields, returning None if an observed value changes."""
+    if any(field in observed and observed[field] != value for field, value in incoming.items()):
+        return None
+    return {**observed, **incoming}
+
+
+def completed_toolbox_identity(items: dict) -> dict[str, str | int] | None:
+    """Check the successful calls that produced the currently completed pages."""
+    observed: dict[str, str | int] = {}
+    for state in items.values():
+        if state.get("status") != "completed":
+            continue
+        calls = state.get("observed_calls")
+        if not isinstance(calls, list):
+            continue
+        call = next(
+            (call for call in reversed(calls) if isinstance(call, dict) and call.get("status") == "completed"),
+            {},
+        )
+        merged = merge_toolbox_identity(
+            observed, toolbox_provenance_identity(call.get("toolbox_provenance"))
+        )
+        if merged is None:
+            return None
+        observed = merged
+    return observed
 
 
 def _dataset_revision(root: Path | None) -> str | None:
@@ -285,16 +360,20 @@ def build_run_manifest(
     effective_provider = provider or client_config.providers.get("toolbox_provider")
     configuration = {
         "capability": "document.structure.extract",
+        "language": "pt-BR",
         "provider": effective_provider or "sdk_default",
         "endpoints": [_safe_endpoint(endpoint) for endpoint in client_config.endpoints],
+        "endpoint_path_sha256": [
+            _endpoint_path_sha256(endpoint.base_url) for endpoint in client_config.endpoints
+        ],
         "timeout_seconds": client_config.timeouts.get(
             "toolbox_structure_timeout_seconds", client_config.timeout_seconds
         ),
         "retries": client_config.retries,
         "retry_backoff_seconds": client_config.retry_backoff_seconds,
         "raw_payload_saved": save_raw,
+        "remote_cache_request": "toolbox_default",
         "remote_cache_policy": "not_exposed_by_toolbox",
-        "provider_cache_hit_status": "not_observed",
         "worker_count": 1,
         "core_processing_configuration": {
             "applicable": False,
@@ -365,6 +444,7 @@ def build_run_manifest(
         },
         "protocol": STRUCTURE_PROTOCOL,
         "selection": selection,
+        "evaluation": {"gate": GATE_PROTOCOL, "gate_applied": False},
         "configuration": configuration,
         "software": software,
         "hardware": hardware,

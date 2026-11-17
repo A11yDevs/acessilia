@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import math
+from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -13,10 +14,6 @@ from docstruct.evaluation import holdout as holdout_module
 from docstruct.evaluation import markdown as markdown_module
 from docstruct.evaluation import metrics as metrics_module
 from docstruct.evaluation.holdout import (
-    LOOP_METRICS,
-    MAX_METRIC_LOSS,
-    MIN_HOLDOUT_GAIN,
-    MIN_TUNE_GAIN,
     Verdict,
     evaluate_candidate,
     score as holdout_score,
@@ -26,9 +23,12 @@ from docstruct.evaluation.metrics import PageScores, overall_score
 
 from scripts.bench.datasets import BenchPage
 from scripts.bench.run_manifest import (
+    GATE_PROTOCOL,
     RUN_MANIFEST_FILE,
+    STRUCTURE_PROTOCOL,
     atomic_write_json,
     completed_artifacts_are_valid,
+    completed_toolbox_identity,
     digest,
     is_pinned_revision,
     load_run_manifest,
@@ -40,21 +40,17 @@ PAGES_FILE = "pages.jsonl"
 SELECTION_IDS_FILE = "pages.txt"  # compatibility list; run-manifest.json is authoritative
 SCORING_PROTOCOL = {
     "id": "acessilia-docstruct-local-page-metrics",
-    "version": 1,
+    "version": 2,
     "implementation": "docstruct.evaluation.markdown.score_markdown_page",
     "metrics": ["text", "reading_order", "teds", "cdm"],
     "scale": "0-100, higher is better",
+    "unit": "document-page",
+    "table_and_formula_pairing": "order of appearance",
+    "unmatched_table_or_formula": "zero for each unmatched element on either side",
+    "table_and_formula_page_denominator": "valid pairs plus unmatched elements",
+    "report_aggregation": "mean of scorable page overalls; each page averages present metrics",
+    "gate_aggregation": "per-split mean over scorable pages per metric, then over present gate metrics",
     "official_evaluator": False,
-}
-GATE_PROTOCOL = {
-    "id": "docstruct.evaluation.holdout.improvement",
-    "kind": "improvement",
-    "version": 1,
-    "metrics": list(LOOP_METRICS),
-    "minimum_tune_gain": MIN_TUNE_GAIN,
-    "minimum_holdout_gain": MIN_HOLDOUT_GAIN,
-    "maximum_metric_loss": MAX_METRIC_LOSS,
-    "cdm_in_gate": False,
 }
 ALL_METRICS = ("text", "reading_order", "teds", "cdm")
 SCORE_ARTIFACTS = ("report.json", PAGES_FILE, "drilldown.csv", "comparison.json")
@@ -74,21 +70,31 @@ def score_run(pages: list[BenchPage], predictions: Path, out: Path) -> dict:
     """
     out.mkdir(parents=True, exist_ok=True)
     invalidate_score_artifacts(out)
+    manifest, manifest_error = _load_manifest(predictions.parent)
+    manifest_items = manifest["items"] if manifest else {}
+    score_inputs_match = bool(manifest)
     rows: list[tuple[BenchPage, PageScores]] = []
     for page in pages:
         if page.gt_path is None:
             continue
         pred_path = predictions / f"{page.item_id}.md"
-        pred = pred_path.read_text(encoding="utf-8") if pred_path.exists() else ""
-        gt = page.gt_path.read_text(encoding="utf-8")
-        rows.append((page, score_markdown_page(page.item_id, pred, gt)))
+        pred_bytes = pred_path.read_bytes() if pred_path.exists() else b""
+        gt_bytes = page.gt_path.read_bytes()
+        if score_inputs_match:
+            item = manifest_items.get(page.item_id, {})
+            artifacts = item.get("artifacts")
+            markdown = artifacts.get("markdown") if isinstance(artifacts, dict) else None
+            score_inputs_match = (
+                isinstance(markdown, dict)
+                and hashlib.sha256(pred_bytes).hexdigest() == markdown.get("sha256")
+                and hashlib.sha256(gt_bytes).hexdigest() == item.get("reference_sha256")
+            )
+        pred = pred_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        gt = gt_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        rows.append((page, score_markdown_page(page.item_id, pred, gt, penalize_unmatched=True)))
 
     score = overall_score([page_score for _, page_score in rows])
     score["pages"] = len(rows)
-    manifest, manifest_error = _load_manifest(predictions.parent)
-    manifest_items = manifest.get("items", {}) if manifest else {}
-    if not isinstance(manifest_items, dict):
-        manifest_items = {}
     manifest_selection = manifest.get("selection") if manifest else None
     selection_items = (
         manifest_selection.get("items")
@@ -170,6 +176,7 @@ def score_run(pages: list[BenchPage], predictions: Path, out: Path) -> dict:
         "protocol": _current_scoring_protocol(),
         "official_evaluator": False,
         "gate": GATE_PROTOCOL,
+        "gate_applied": False,
     }
     score["run_identity"] = {
         "manifest_file": RUN_MANIFEST_FILE,
@@ -181,6 +188,7 @@ def score_run(pages: list[BenchPage], predictions: Path, out: Path) -> dict:
         ),
         "current_selection_sha256": current_selection_hash,
         "selection_matches_manifest": selection_matches,
+        "scored_content_matches_manifest": score_inputs_match if manifest else None,
         "manifest_status": manifest.get("status") if manifest else "missing",
         "manifest_error": manifest_error,
     }
@@ -247,6 +255,10 @@ def _current_scoring_protocol() -> dict:
             "markdown": _module_sha256(markdown_module),
             "metrics": _module_sha256(metrics_module),
             "holdout": _module_sha256(holdout_module),
+            **{
+                name: _module_sha256(import_module(f"docstruct.evaluation.metrics.{name}"))
+                for name in ("cdm", "overall", "reading_order", "teds", "text_ed")
+            },
         },
     }
 
@@ -270,27 +282,33 @@ def compare_run_report(base: Path, candidate: Path) -> dict:
         *candidate_row_issues,
         *_manifest_issues("base", base, base_manifest, base_error),
         *_manifest_issues("candidate", candidate, candidate_manifest, candidate_error),
-        *_report_issues("base", base_report, base_manifest),
-        *_report_issues("candidate", candidate_report, candidate_manifest),
+        *_report_issues("base", base, base_report, base_manifest),
+        *_report_issues("candidate", candidate, candidate_report, candidate_manifest),
     ]
     issues.extend(_identity_pair_issues(base_manifest, candidate_manifest))
     issues.extend(_coverage_pair_issues(base_report, candidate_report, base_rows, candidate_rows))
+    for label, manifest, rows in (
+        ("base", base_manifest, base_rows), ("candidate", candidate_manifest, candidate_rows)
+    ):
+        if manifest is not None:
+            expected_windows = {
+                (item["item_id"], item["document_id"], item["page"])
+                for item in manifest["selection"]["items"] if item.get("reference_sha256")
+            }
+            scored_windows = {(row["item_id"], row["document_id"], row["page"]) for row in rows}
+            if scored_windows != expected_windows:
+                issues.append(f"{label} scored pages do not match its reference selection")
 
-    verdict = evaluate_candidate(base_windows, candidate_windows)
-    accepted = verdict.accepted and not issues
-    reason_parts = []
     if issues:
-        reason_parts.append("incompatible runs: " + "; ".join(_unique(issues)))
-    if not verdict.accepted:
-        reason_parts.append(verdict.reason)
-    reason = "; ".join(reason_parts) if reason_parts else verdict.reason
-    final_verdict = Verdict(
-        accepted=accepted,
-        reason=reason,
-        tune_delta=verdict.tune_delta,
-        holdout_delta=verdict.holdout_delta,
-        metric_deltas=verdict.metric_deltas,
-    )
+        verdict = Verdict(
+            accepted=False,
+            reason="incompatible runs: " + "; ".join(_unique(issues)),
+            tune_delta=math.nan,
+            holdout_delta=math.nan,
+            metric_deltas={},
+        )
+    else:
+        verdict = evaluate_candidate(base_windows, candidate_windows)
 
     diagnostic_deltas = _diagnostic_deltas(base_windows, candidate_windows)
     report = {
@@ -300,6 +318,7 @@ def compare_run_report(base: Path, candidate: Path) -> dict:
             "kind": "local_approximation",
             "official_evaluator": False,
             "gate": GATE_PROTOCOL,
+            "gate_applied": not issues,
         },
         "compatibility": {"compatible": not issues, "issues": _unique(issues)},
         "environment_differences": {
@@ -316,11 +335,11 @@ def compare_run_report(base: Path, candidate: Path) -> dict:
         },
         "diagnostic_metric_deltas": diagnostic_deltas,
         "verdict": {
-            "accepted": final_verdict.accepted,
-            "reason": final_verdict.reason,
-            "tune_delta": final_verdict.tune_delta,
-            "holdout_delta": final_verdict.holdout_delta,
-            "metric_deltas": final_verdict.metric_deltas,
+            "accepted": verdict.accepted,
+            "reason": verdict.reason,
+            "tune_delta": verdict.tune_delta,
+            "holdout_delta": verdict.holdout_delta,
+            "metric_deltas": verdict.metric_deltas,
         },
     }
     return json_safe(report)
@@ -349,6 +368,8 @@ def _manifest_issues(
     issues = []
     if manifest.get("status") != "completed":
         issues.append(f"{label} run status is {manifest.get('status', 'unknown')}")
+    if manifest.get("protocol") != STRUCTURE_PROTOCOL:
+        issues.append(f"{label} run uses an unsupported structure protocol")
     selection = manifest.get("selection")
     selected = selection.get("items") if isinstance(selection, dict) else None
     items = manifest.get("items")
@@ -364,12 +385,21 @@ def _manifest_issues(
         issues.append(f"{label} run manifest has duplicate or invalid selection ids")
     if set(valid_ids) != set(items):
         issues.append(f"{label} run manifest item states do not match its selection")
+    if completed_toolbox_identity(items) is None:
+        issues.append(f"{label} completed pages have conflicting Toolbox provenance")
     predictions = run / "predictions"
-    require_raw_payload = bool(
-        manifest.get("configuration", {}).get("raw_payload_saved")
-        if isinstance(manifest.get("configuration"), dict)
-        else False
-    )
+    configuration = manifest.get("configuration")
+    endpoints = configuration.get("endpoints") if isinstance(configuration, dict) else None
+    endpoint_paths = configuration.get("endpoint_path_sha256") if isinstance(configuration, dict) else None
+    if (
+        not isinstance(endpoints, list)
+        or not endpoints
+        or not isinstance(endpoint_paths, list)
+        or len(endpoint_paths) != len(endpoints)
+        or any(not is_pinned_revision(path) or len(path) != 64 for path in endpoint_paths)
+    ):
+        issues.append(f"{label} Toolbox endpoint paths are unverified")
+    require_raw_payload = bool(configuration.get("raw_payload_saved")) if isinstance(configuration, dict) else False
     for item_id in valid_ids:
         state = items.get(item_id)
         if not isinstance(state, dict) or not completed_artifacts_are_valid(
@@ -379,7 +409,7 @@ def _manifest_issues(
     return issues
 
 
-def _report_issues(label: str, report: dict | None, manifest: dict | None) -> list[str]:
+def _report_issues(label: str, run: Path, report: dict | None, manifest: dict | None) -> list[str]:
     if report is None:
         return [f"{label} score report missing or invalid"]
     if manifest is None:
@@ -417,6 +447,8 @@ def _report_issues(label: str, report: dict | None, manifest: dict | None) -> li
         issues.append(f"{label} score rows do not match the score report")
     if identity.get("selection_matches_manifest") is not True:
         issues.append(f"{label} score inputs do not match the run manifest")
+    if identity.get("scored_content_matches_manifest") is not True:
+        issues.append(f"{label} scored predictions or references do not match the run manifest")
     selection = manifest.get("selection")
     descriptors = selection.get("items") if isinstance(selection, dict) else None
     if isinstance(descriptors, list):
