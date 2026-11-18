@@ -245,17 +245,17 @@ def test_a_handler_whose_signature_cannot_be_read_is_refused() -> None:
         bind_run(registry, core_config(), RunPorts.none())
 
 
-def _pmv_execute(monkeypatch, tmp_path, handlers: dict) -> MethodRegistry:
-    """Run ``pmv execute`` with a handler module, up to the executor."""
-    from scripts import pmv
+def _pipeline_execute(monkeypatch, tmp_path, handlers: dict) -> MethodRegistry:
+    """Run ``pddl_pipeline execute`` with a handler module, up to the executor."""
+    from scripts import pddl_pipeline
 
-    module = ModuleType("pmv_contract_handlers")
+    module = ModuleType("pipeline_contract_handlers")
     module.register_handlers = lambda registry: [
         registry.register(method, handler) for method, handler in handlers.items()
     ]
     monkeypatch.setitem(sys.modules, module.__name__, module)
     for name in ("ProcessingManifest", "NominalPlan"):
-        monkeypatch.setattr(pmv, name, SimpleNamespace(model_validate_json=lambda _text: None))
+        monkeypatch.setattr(pddl_pipeline, name, SimpleNamespace(model_validate_json=lambda _text: None))
     received = []
 
     class Stop(Exception):
@@ -265,8 +265,8 @@ def _pmv_execute(monkeypatch, tmp_path, handlers: dict) -> MethodRegistry:
         received.append(registry)
         raise Stop
 
-    monkeypatch.setattr(pmv, "ExecutorAgent", executor)
-    monkeypatch.setattr(pmv, "DomainBundle", SimpleNamespace(load=lambda *_args: None))
+    monkeypatch.setattr(pddl_pipeline, "ExecutorAgent", executor)
+    monkeypatch.setattr(pddl_pipeline, "DomainBundle", SimpleNamespace(load=lambda *_args: None))
     (tmp_path / "m.json").write_text("{}", encoding="utf-8")
     args = argparse.Namespace(
         manifest=tmp_path / "m.json",
@@ -276,22 +276,22 @@ def _pmv_execute(monkeypatch, tmp_path, handlers: dict) -> MethodRegistry:
         domain_description=None,
     )
     with pytest.raises(Stop):
-        pmv._run_execute(args)
+        pddl_pipeline._run_execute(args)
     return received[0]
 
 
-def test_pmv_binds_its_handler_module_like_a_run(monkeypatch, tmp_path) -> None:
+def test_the_pipeline_cli_binds_its_handler_module_like_a_run(monkeypatch, tmp_path) -> None:
     def with_config(manifest, obligation_id, *, config: CoreConfig):
         return config
 
-    registry = _pmv_execute(monkeypatch, tmp_path, {"vision-description": with_config})
+    registry = _pipeline_execute(monkeypatch, tmp_path, {"vision-description": with_config})
 
     assert isinstance(registry.get("vision-description")(None, "o"), CoreConfig)
 
 
-def test_pmv_refuses_a_handler_module_that_breaks_the_contract(monkeypatch, tmp_path) -> None:
+def test_the_pipeline_cli_refuses_a_handler_module_that_breaks_the_contract(monkeypatch, tmp_path) -> None:
     def broken(manifest, obligation_id, *, budget: int):
         return None
 
     with pytest.raises(HandlerContractError, match="`budget` is a required keyword-only"):
-        _pmv_execute(monkeypatch, tmp_path, {"vision-description": broken})
+        _pipeline_execute(monkeypatch, tmp_path, {"vision-description": broken})
