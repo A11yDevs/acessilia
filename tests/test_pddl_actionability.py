@@ -73,7 +73,6 @@ class TestRegistryCoverage:
     #: the test below fails if a *new* method appears without a handler.
     KNOWN_UNAVAILABLE = frozenset(
         {
-            "rescue-omitted",
             "table-specialist",
         }
     )
@@ -728,6 +727,12 @@ class TestEveryHandlerIsCallable:
         ),
         "agreement-rule": (
             "adjudicate-page",
+            [_element("el-1", "paragraph", text="texto")],
+        ),
+        # Reads the secondary extraction artifact too; the positive cases live
+        # in tests/test_rescue_omitted_method.py.
+        "rescue-omitted": (
+            "rescue-omitted-block",
             [_element("el-1", "paragraph", text="texto")],
         ),
         # Renders the page on the Toolbox and asks the vision model; the

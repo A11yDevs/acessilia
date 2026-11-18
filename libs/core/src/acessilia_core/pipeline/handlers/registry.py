@@ -51,6 +51,9 @@ from acessilia_core.pipeline.handlers.order import (
     _handle_skeleton_order_method,
     _handle_xycut_order_method,
 )
+from acessilia_core.pipeline.handlers.rescue import (
+    _handle_rescue_omitted_method,
+)
 from acessilia_core.pipeline.handlers.review import (
     _handle_human_review_method,
 )
@@ -91,6 +94,7 @@ METHOD_HANDLERS: dict[str, Callable[[ProcessingManifest, str], MethodResult]] = 
     "tailjoin-positioned": _handle_tailjoin_method,
     "xycut-order": _handle_xycut_order_method,
     "skeleton-order": _handle_skeleton_order_method,
+    "rescue-omitted": _handle_rescue_omitted_method,
     "table-smart-fusion": _handle_table_smart_fusion_method,
     "agreement-rule": _handle_agreement_rule_method,
     "deterministic-heading-repair": _handle_deterministic_heading_repair_method,

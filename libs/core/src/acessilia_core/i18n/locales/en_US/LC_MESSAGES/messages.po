@@ -2189,6 +2189,38 @@ msgstr "XY-cut found no reading-order change"
 msgid "XY-cut reading order applied on pages {pages}"
 msgstr "XY-cut reading order applied on pages {pages}"
 
+#, python-brace-format
+msgid "Blocks restored from the primary provider: {count} (pages {pages})"
+msgstr "Blocks restored from the primary provider: {count} (pages {pages})"
+
+#, python-brace-format
+msgid ""
+"Pages {pages}, taken from the secondary provider, already carry the "
+"primary provider's text"
+msgstr ""
+"Pages {pages}, taken from the secondary provider, already carry the "
+"primary provider's text"
+
+#, python-brace-format
+msgid "Pages {pages} keep the primary provider's extraction; no block is missing"
+msgstr "Pages {pages} keep the primary provider's extraction; no block is missing"
+
+#, python-brace-format
+msgid ""
+"Pages {pages} were rewritten by the text fusion; the primary provider's "
+"blocks are no longer available"
+msgstr ""
+"Pages {pages} were rewritten by the text fusion; the primary provider's "
+"blocks are no longer available"
+
+#, python-brace-format
+msgid ""
+"Pages {pages} came from {provider}, but the extraction does not keep the "
+"primary page they replaced"
+msgstr ""
+"Pages {pages} came from {provider}, but the extraction does not keep the "
+"primary page they replaced"
+
 msgid "Secondary provider extraction missing from the manifest"
 msgstr "Secondary provider extraction missing from the manifest"
 

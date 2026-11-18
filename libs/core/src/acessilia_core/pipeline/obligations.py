@@ -63,12 +63,6 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         "repair-legacy-unicode",
         "chunk-verse",
         "extract-line-numbers",
-        # No handler implements `rescue-omitted` yet, so its only path is
-        # human review: as a critical kind it failed every dual-fusion job
-        # with an omitted block. The content the primary provider extracted
-        # is delivered and the result e-mail names the pages of the omitted
-        # block. Remove the kind from here once the handler lands (#236).
-        "rescue-omitted-block",
         # The vision model is the only automatic method, and a degenerate
         # answer repeats on every try: in 006.pdf two images out of 40 failed
         # a 42-page document. The picture is exported with the generic alt
