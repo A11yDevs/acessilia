@@ -13,8 +13,11 @@ method-handler pair.
 
 from __future__ import annotations
 
+import ast
 import inspect
-from collections.abc import Callable
+import sys
+import typing
+from collections.abc import Callable, Mapping
 from functools import partial
 
 from acessilia_core.config import CoreConfig
@@ -98,23 +101,181 @@ METHOD_HANDLERS: dict[str, Callable[[ProcessingManifest, str], MethodResult]] = 
 
 
 def build_method_registry() -> MethodRegistry:
-    """A ``MethodRegistry`` with every method of ``METHOD_HANDLERS``."""
+    """A ``MethodRegistry`` with every method of ``METHOD_HANDLERS``.
+
+    Each handler's contract is checked here (``run_parameters``), so a
+    handler that breaks it fails when the executor is built, not when a plan
+    first runs it (#543).
+    """
     registry = MethodRegistry()
     for method, handler in METHOD_HANDLERS.items():
+        run_parameters(handler)
         registry.register(method, handler)
     return registry
 
 
-#: What a run binds to a handler, by the parameter name the handler declares.
-RUN_PARAMETERS = ("config", "ports")
+#: What a run binds to a handler: the parameter's name and its type.
+RUN_PARAMETERS: dict[str, type] = {"config": CoreConfig, "ports": RunPorts}
 
 
-def declares(handler: Callable[..., MethodResult], parameter: str) -> bool:
-    """Whether ``handler`` declares ``parameter`` (one of ``RUN_PARAMETERS``)."""
+class HandlerContractError(TypeError):
+    """A method handler whose signature the executor or a run cannot call."""
+
+
+#: An annotation that cannot be resolved to an object.
+_UNRESOLVED = object()
+
+
+def _namespace(handler: Callable[..., object]) -> Mapping[str, object]:
+    """The globals a handler's string annotations are resolved in."""
+    target = handler.func if isinstance(handler, partial) else handler
+    found = getattr(target, "__globals__", None)
+    if found is None:
+        module = sys.modules.get(getattr(target, "__module__", "") or "")
+        found = vars(module) if module is not None else {}
+    return found
+
+
+def _unwrap(annotation: object) -> object:
+    """``Annotated[X, ...]`` is ``X``."""
+    if typing.get_origin(annotation) is typing.Annotated:
+        return typing.get_args(annotation)[0]
+    return annotation
+
+
+def _resolve(annotation: object, namespace: Mapping[str, object]) -> object:
+    """The object ``annotation`` names, or ``_UNRESOLVED`` (review of #581).
+
+    Handler modules use ``from __future__ import annotations``, so their
+    annotations are strings. They are resolved in the handler's module,
+    without evaluating code: names, dotted attributes, quoted strings
+    (``"CoreConfig"``) and ``Annotated[X, ...]``. The resolved object is then
+    compared by identity, so a homonym from another module never matches.
+    """
+    if not isinstance(annotation, str):
+        return _unwrap(annotation)
     try:
-        return parameter in inspect.signature(handler).parameters
-    except (TypeError, ValueError):
-        return False
+        node = ast.parse(annotation.strip(), mode="eval").body
+    except SyntaxError:
+        return _UNRESOLVED
+    return _resolve_node(node, namespace)
+
+
+def _resolve_node(node: ast.expr, namespace: Mapping[str, object]) -> object:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return _resolve(node.value, namespace)
+    if isinstance(node, ast.Name):
+        return _unwrap(namespace[node.id]) if node.id in namespace else _UNRESOLVED
+    if isinstance(node, ast.Attribute):
+        base = _resolve_node(node.value, namespace)
+        if base is _UNRESOLVED:
+            return _UNRESOLVED
+        return _unwrap(getattr(base, node.attr, _UNRESOLVED))
+    if isinstance(node, ast.Subscript) and _resolve_node(node.value, namespace) is typing.Annotated:
+        first = node.slice.elts[0] if isinstance(node.slice, ast.Tuple) else node.slice
+        return _resolve_node(first, namespace)
+    return _UNRESOLVED
+
+
+def _names_a_run_type(annotation: object, resolved: object) -> str | None:
+    """The run parameter whose type ``annotation`` names, if any.
+
+    An annotation that cannot be resolved still counts when it spells a run
+    type's name, so a misspelled parameter is not let through for want of an
+    import.
+    """
+    for name, kind in RUN_PARAMETERS.items():
+        if resolved is kind:
+            return name
+    if resolved is _UNRESOLVED and isinstance(annotation, str):
+        spelled = annotation.strip().strip("\"'").rsplit(".", 1)[-1]
+        for name, kind in RUN_PARAMETERS.items():
+            if spelled == kind.__name__:
+                return name
+    return None
+
+
+def _handler_name(handler: Callable[..., object]) -> str:
+    target = handler.func if isinstance(handler, partial) else handler
+    return getattr(target, "__qualname__", repr(target))
+
+
+def run_parameters(handler: Callable[..., MethodResult]) -> tuple[str, ...]:
+    """The run parameters ``handler`` declares, after checking its contract (#543).
+
+    The executor calls a handler as ``handler(manifest, obligation_id)``, and
+    a run binds what the handler declares of ``RUN_PARAMETERS``. The contract:
+
+    - it accepts ``(manifest, obligation_id)`` positionally, and requires no
+      other positional parameter;
+    - a run parameter is keyword-only (after ``*``) and annotated with its
+      type: ``*, config: CoreConfig``, ``*, ports: RunPorts``;
+    - no other parameter is annotated ``CoreConfig`` or ``RunPorts``: a
+      misspelled name (``cfg: CoreConfig``) would never be bound;
+    - no other keyword-only parameter is required, since nothing would pass it.
+
+    An annotation is resolved in the handler's module and compared by
+    identity (``_resolve``).
+
+    Raises ``HandlerContractError`` naming every broken rule, and when the
+    handler's signature cannot be read, since then nothing can be checked.
+    """
+    try:
+        parameters = list(inspect.signature(handler).parameters.values())
+    except (TypeError, ValueError) as exc:
+        raise HandlerContractError(
+            f"method handler {_handler_name(handler)}: its signature cannot be read ({exc})"
+        ) from exc
+    namespace = _namespace(handler)
+    positional = [
+        p for p in parameters
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    takes_any = any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in parameters)
+    problems = []
+    if len(positional) < 2 and not takes_any:
+        problems.append("it must accept (manifest, obligation_id) positionally")
+    required = [p.name for p in positional if p.default is inspect.Parameter.empty]
+    if len(required) > 2:
+        problems.append(
+            f"it requires {len(required)} positional parameters ({', '.join(required)}); "
+            "the executor passes two"
+        )
+    declared = []
+    for parameter in parameters:
+        expected = RUN_PARAMETERS.get(parameter.name)
+        if expected is not None:
+            if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
+                problems.append(f"`{parameter.name}` must be keyword-only (after `*`)")
+            elif _resolve(parameter.annotation, namespace) is not expected:
+                problems.append(
+                    f"`{parameter.name}` must be annotated `{expected.__name__}` "
+                    f"(`{expected.__module__}.{expected.__qualname__}`)"
+                )
+            else:
+                declared.append(parameter.name)
+            continue
+        misnamed = _names_a_run_type(
+            parameter.annotation, _resolve(parameter.annotation, namespace)
+        )
+        if misnamed:
+            problems.append(
+                f"`{parameter.name}` is annotated `{RUN_PARAMETERS[misnamed].__name__}`, "
+                f"but a run binds it only as `{misnamed}`"
+            )
+        elif (
+            parameter.kind is inspect.Parameter.KEYWORD_ONLY
+            and parameter.default is inspect.Parameter.empty
+        ):
+            problems.append(
+                f"`{parameter.name}` is a required keyword-only parameter that no run binds "
+                f"(a run binds {', '.join(f'`{name}`' for name in RUN_PARAMETERS)})"
+            )
+    if problems:
+        raise HandlerContractError(
+            f"method handler {_handler_name(handler)}: " + "; ".join(problems)
+        )
+    return tuple(declared)
 
 
 def bind_run(registry: MethodRegistry, config: CoreConfig, ports: RunPorts) -> MethodRegistry:
@@ -126,15 +287,25 @@ def bind_run(registry: MethodRegistry, config: CoreConfig, ports: RunPorts) -> M
     ``handler(manifest, obligation_id)``. The copy keeps the registration
     order, and the given registry is left unchanged.
 
-    The convention is the parameter's name: a handler opts in by declaring
-    ``*, config: CoreConfig`` or ``*, ports: RunPorts``.
+    A handler opts in by declaring ``*, config: CoreConfig`` or
+    ``*, ports: RunPorts``. Every handler's contract is checked
+    (``run_parameters``) before any is bound, so a broken one fails the run
+    before its first step.
     """
     values = {"config": config, "ports": ports}
+    declared = [(method, handler, run_parameters(handler)) for method, handler in registry.items()]
     bound = MethodRegistry()
-    for method, handler in registry.items():
-        given = {name: values[name] for name in RUN_PARAMETERS if declares(handler, name)}
+    for method, handler, names in declared:
+        given = {name: values[name] for name in names}
         bound.register(method, partial(handler, **given) if given else handler)
     return bound
 
 
-__all__ = ["METHOD_HANDLERS", "RUN_PARAMETERS", "bind_run", "build_method_registry", "declares"]
+__all__ = [
+    "METHOD_HANDLERS",
+    "RUN_PARAMETERS",
+    "HandlerContractError",
+    "bind_run",
+    "build_method_registry",
+    "run_parameters",
+]
