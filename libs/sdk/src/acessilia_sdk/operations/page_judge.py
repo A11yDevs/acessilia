@@ -58,9 +58,12 @@ class JudgePage:
 class PageJudgement:
     """What ``document.adjudicate.page`` answered for one page.
 
-    ``p_b`` is ``pB`` when it is a number in [0, 1], else ``None``. ``p_b_ab``,
-    ``p_a_ba`` and ``model`` are what the answer reports, as it reports them.
-    ``document`` is the whole answer, for a caller that needs more.
+    ``p_b`` is what ``page_judgement_probability`` reads from ``pB``: whatever
+    ``float()`` reads (a number, a numeric string, a boolean) when it falls in
+    [0, 1], else ``None`` (review of #605). ``p_b_ab``, ``p_a_ba`` and
+    ``model`` are what the answer reports, as it reports them. ``document`` is
+    the answer's document when it is an object, and ``{}`` when it is absent or
+    not an object, as with no ``pB``.
     """
 
     p_b: float | None
@@ -159,13 +162,22 @@ async def page_judgement(
     candidate_b: str,
     artifact_id: str | None = None,
     prompt: str = "base",
+    dpi: int = JUDGE_PAGE_DPI,
+    max_side: int = JUDGE_PAGE_MAX_SIDE,
+    use_remote_cache: bool | None = None,
 ) -> PageJudgementChain:
-    """Render ``page_number`` and judge its two candidates."""
+    """Render ``page_number`` and judge its two candidates.
+
+    ``dpi`` and ``max_side`` go to the render, ``prompt`` to the judge, and
+    ``use_remote_cache`` to both, as when the steps are called one by one.
+    """
     page = await render_judge_page(
-        pdf, source, page_number=page_number, artifact_id=artifact_id
+        pdf, source, page_number=page_number, artifact_id=artifact_id,
+        dpi=dpi, max_side=max_side, use_remote_cache=use_remote_cache,
     )
     judgement = await judge_page(
-        adjudicate, page.image, candidate_a, candidate_b, prompt=prompt
+        adjudicate, page.image, candidate_a, candidate_b,
+        prompt=prompt, use_remote_cache=use_remote_cache,
     )
     return PageJudgementChain(page, judgement)
 

@@ -73,6 +73,14 @@ def _parameters(request: httpx.Request) -> dict:
     return json.loads(parse_qs(body.decode())["parameters"][0])
 
 
+def _no_cache(request: httpx.Request) -> bool:
+    """Whether the request asks the Toolbox to skip its cache (a form field)."""
+    body = request.content
+    if b"Content-Disposition" in body:
+        return b'name="no_cache"' in body
+    return "no_cache" in parse_qs(body.decode())
+
+
 @pytest.fixture
 def pdf() -> ToolboxPdfClient:
     return ToolboxPdfClient(base_url=BASE, provider="pymupdf-pdf", timeout_seconds=5)
@@ -166,6 +174,33 @@ async def test_an_answer_without_a_valid_pb_is_reported_not_decided(
 
 
 @pytest.mark.asyncio
+async def test_pb_is_read_as_page_judgement_probability_reads_it(respx_mock, adjudicate) -> None:
+    """Whatever ``float()`` reads, in [0, 1]: a numeric string and a boolean
+    too (review of #605). The core reads ``pB`` the same way today."""
+    for value, expected in (("0.5", 0.5), (True, 1.0), (False, 0.0), (0, 0.0), (1, 1.0)):
+        _mock_judge(respx_mock, {"pB": value})
+
+        judgement = await judge_page(adjudicate, PNG, "a", "b")
+
+        assert judgement.p_b == expected, value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("document", [["not", "an", "object"], None, "text"])
+async def test_a_document_that_is_not_an_object_is_reported_empty(
+    respx_mock, adjudicate, document
+) -> None:
+    _mock_judge(respx_mock, document)
+
+    judgement = await judge_page(adjudicate, PNG, "a", "b")
+
+    assert judgement.document == {}
+    assert (judgement.p_b, judgement.p_b_ab, judgement.p_a_ba, judgement.model) == (
+        None, None, None, None,
+    )
+
+
+@pytest.mark.asyncio
 async def test_an_unavailable_judge_is_raised_as_it_is(respx_mock, adjudicate) -> None:
     respx_mock.post(f"{BASE}/v1/capabilities/document.adjudicate.page:execute").mock(
         return_value=httpx.Response(
@@ -191,5 +226,26 @@ async def test_the_chain_renders_then_judges(respx_mock, pdf, adjudicate) -> Non
     )
 
     assert PNG in route.calls.last.request.content
+    assert not _no_cache(route.calls.last.request), "the cache is used by default"
     assert chain.judgement.p_b == pytest.approx(0.2)
     assert [step.capability for step in chain.steps] == ["pdf.render", "document.adjudicate.page"]
+
+
+@pytest.mark.asyncio
+async def test_the_chain_forwards_the_options_of_its_steps(respx_mock, pdf, adjudicate) -> None:
+    """``dpi`` and ``max_side`` reach the render, ``prompt`` the judge, and
+    ``use_remote_cache`` both (review of #605)."""
+    render = _mock_render(respx_mock)
+    judge = _mock_judge(respx_mock, {"pB": 0.5})
+
+    chain = await page_judgement(
+        pdf, adjudicate, None, page_number=2, candidate_a="A", candidate_b="B",
+        artifact_id=SOURCE_ID, prompt="para", dpi=96, max_side=1000, use_remote_cache=False,
+    )
+
+    sent = _parameters(render.calls.last.request)
+    assert (sent["dpi"], sent["max_side"]) == (96, 1000)
+    assert _parameters(judge.calls.last.request)["prompt"] == "para"
+    assert _no_cache(render.calls.last.request) and _no_cache(judge.calls.last.request)
+    assert chain.page.step.parameters == {"page_number": 2, "dpi": 96, "max_side": 1000}
+    assert chain.judgement.step.parameters == {"prompt": "para"}
