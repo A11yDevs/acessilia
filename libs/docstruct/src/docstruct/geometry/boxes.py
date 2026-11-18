@@ -133,10 +133,12 @@ def union_area(boxes: Sequence[BBox]) -> float:
     ``left <= right`` and ``top <= bottom``. A sweep over the boxes' vertical
     edges: in each band between two of them, the covered height is the union
     of the spans of the boxes that cross the whole band. Moved from the core's
-    slide layout (``manifest/slides.py``, #470), unchanged.
+    slide layout (``manifest/slides.py``, #470).
 
-    The vertical sweep starts at 0, so the part of a box above ``y = 0`` is
-    not counted: the boxes are page coordinates, which start at 0.
+    Any coordinates work, including the negative ones of
+    :meth:`OrientedBox.top_down` for a bottom-left box: the vertical sweep
+    starts below every box, not at 0 (review of #596). The core's copy started
+    at 0, which gives the same areas for page coordinates, all of them >= 0.
     """
     xs = sorted({x for box in boxes for x in (box[0], box[2])})
     area = 0.0
@@ -144,7 +146,7 @@ def union_area(boxes: Sequence[BBox]) -> float:
         spans = sorted(
             (box[1], box[3]) for box in boxes if box[0] <= left and box[2] >= right
         )
-        covered, reach = 0.0, 0.0
+        covered, reach = 0.0, -math.inf
         for top, bottom in spans:
             top = max(top, reach)
             if bottom > top:

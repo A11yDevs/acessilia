@@ -112,6 +112,14 @@ def test_union_area_matches_a_grid_count_on_integer_boxes():
         assert union_area(boxes) == pytest.approx(len(cells)), boxes
 
 
-def test_union_area_does_not_count_above_y_zero():
-    """The documented limit: the sweep starts at 0, as page coordinates do."""
-    assert union_area([(0, -5, 10, 5)]) == pytest.approx(50.0)
+def test_union_area_counts_negative_coordinates():
+    """The sweep starts below every box, not at 0 (review of #596)."""
+    assert union_area([(0, -5, 10, 5)]) == pytest.approx(100.0)
+    assert union_area([(0, -20, 10, -10), (5, -15, 15, -5)]) == pytest.approx(175.0)
+
+
+def test_union_area_of_a_bottom_left_box_seen_top_down():
+    """``top_down()`` mirrors a bottom-left box to negative y; its area holds."""
+    box = OrientedBox(0, 700, 10, 690, "BOTTOMLEFT").top_down()
+
+    assert union_area([box]) == pytest.approx(100.0)
