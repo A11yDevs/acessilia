@@ -39,6 +39,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0021](0021-bounded-model-call-execution.pt-br.md) | Execução limitada de chamadas de modelo pertencente à aplicação | Aceita |
 | [0022](0022-export-walker-contract.pt-br.md) | Um walker de exportação compartilhado com política de renderização do consumidor | Aceita |
 | [0023](0023-packaged-canonical-schema.pt-br.md) | Empacotar o schema canônico com motor de validação injetado | Aceita |
+| [0024](0024-legacy-canonical-type-deprecation.pt-br.md) | Descontinuar dataclasses canônicas legadas preservando compatibilidade | Aceita |
 
 ## Processo
 

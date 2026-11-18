@@ -27,6 +27,11 @@ atual continua governando os exports. O schema da raiz é uma cópia gerada e
 conferida da fonte empacotada. Veja a
 [API de schema](libs/docstruct/README.pt-br.md#schema-canônico-docstructschemas-docstructvalidation).
 
+As dataclasses legadas `CanonicalDocument` e `CanonicalSection` estão
+descontinuadas desde a docstruct 0.5.3 e são mantidas por compatibilidade. Novas
+árvores de documento usam os dicionários do builder definidos pelo schema. Veja
+a [nota de migração](libs/docstruct/README.pt-br.md#dataclasses-canônicas-legadas-descontinuadas-desde-053).
+
 ### API standalone
 
 A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.

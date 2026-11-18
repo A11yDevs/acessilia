@@ -72,7 +72,7 @@
     "libs/docstruct/src/docstruct/text/norm_fix.py": 11,
     "libs/docstruct/src/docstruct/text/normalize.py": 5,
     "libs/docstruct/src/docstruct/text/sanitize.py": 2,
-    "libs/docstruct/src/docstruct/types.py": 15,
+    "libs/docstruct/src/docstruct/types.py": 13,
     "libs/docstruct/tests/test_adjudication.py": 1,
     "libs/docstruct/tests/test_flood.py": 3,
     "libs/docstruct/tests/test_fusion.py": 36,

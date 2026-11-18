@@ -32,7 +32,19 @@ class CanonicalBlock:
 
 @dataclass
 class CanonicalDocument:
-    """Documento canônico: seções hierárquicas de blocos."""
+    """Deprecated since 0.5.3: legacy document dataclass kept for compatibility.
+
+    New code should use the dictionaries returned by
+    ``docstruct.canonical.build_canonical_document``, whose structure is defined
+    by ``docstruct.schemas.accessible_document_schema``. This dataclass is not
+    the serialized canonical schema. Construction and ``blocks()`` are unchanged.
+    """
+
+    __deprecated__ = (
+        "CanonicalDocument is deprecated since docstruct 0.5.3. Use dictionaries "
+        "from docstruct.canonical.build_canonical_document and the schema from "
+        "docstruct.schemas.accessible_document_schema."
+    )
 
     title: str | None
     sections: list["CanonicalSection"] = field(default_factory=list)
@@ -45,7 +57,19 @@ class CanonicalDocument:
 
 @dataclass
 class CanonicalSection:
-    """Seção do documento canônico (nível de heading + blocos filhos)."""
+    """Deprecated since 0.5.3: legacy section dataclass kept for compatibility.
+
+    Use the section dictionaries returned by
+    ``docstruct.canonical.build_canonical_document`` and described by
+    ``docstruct.schemas.accessible_document_schema``. Fields and defaults stay
+    unchanged; the serialized schema's child sections belong to dictionaries.
+    """
+
+    __deprecated__ = (
+        "CanonicalSection is deprecated since docstruct 0.5.3. Use section "
+        "dictionaries from docstruct.canonical.build_canonical_document and the "
+        "schema from docstruct.schemas.accessible_document_schema."
+    )
 
     id: str
     level: int

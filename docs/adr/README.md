@@ -39,6 +39,7 @@ ones here instead of restating them.
 | [0021](0021-bounded-model-call-execution.md) | Bounded model-call execution owned by the application | Accepted |
 | [0022](0022-export-walker-contract.md) | A shared export walker with consumer-owned rendering policy | Accepted |
 | [0023](0023-packaged-canonical-schema.md) | Package the canonical schema with an injected validation engine | Accepted |
+| [0024](0024-legacy-canonical-type-deprecation.md) | Deprecate legacy canonical dataclasses while retaining compatibility | Accepted |
 
 ## Process
 

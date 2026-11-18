@@ -26,6 +26,11 @@ can validate explicitly with an injected engine; the existing export audit
 continues to govern exports. The root schema is a checked, generated copy of
 the packaged source. See the [schema API](libs/docstruct/README.md#canonical-schema-docstructschemas-docstructvalidation).
 
+The legacy `CanonicalDocument` and `CanonicalSection` dataclasses are deprecated
+since docstruct 0.5.3 and retained for compatibility. New document trees use the
+builder's schema-defined dictionaries. See the
+[migration note](libs/docstruct/README.md#legacy-canonical-dataclasses-deprecated-since-053).
+
 ### Standalone API
 
 The **API** (`http://localhost:8000`) is the core: it receives files, enqueues them, processes them with LLMs, exports the accessible formats (TXT, DOCX, PDF/UA, HTML, MP3, ZIP), and makes downloads available via a token. All frontends (web, Telegram, CLI) consume it over HTTP using the shared client `frontend.clients.api_client.ApiClient`.

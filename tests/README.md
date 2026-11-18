@@ -41,6 +41,16 @@ uv run pytest tests/test_pddl_planning.py
 
 `fixtures/` holds sample PDFs and images, used both by the tests and by the load scenarios and benchmarks in `scripts/`. `fixtures/failures/` holds inert corrupt documents used by `test_job_failure_e2e.py` to reproduce a pipeline failure and the failure e-mail; see its [README](fixtures/failures/README.md). No debug switch is involved: the files live only in the test tree.
 
+## Legacy canonical type compatibility
+
+E1.3 compatibility is covered by
+`libs/docstruct/tests/test_legacy_canonical_types.py`: deprecated metadata, root
+reexport identity, constructor/field compatibility, defaults, serialized state,
+loading a pre-deprecation 0.5.2 pickle, and cold imports/construction with
+warnings treated as errors. These tests run against the installed wheel too.
+The existing type and export characterization suites retain their coverage.
+See [ADR 0024](../docs/adr/0024-legacy-canonical-type-deprecation.md).
+
 ## Canonical schema contract
 
 The canonical schema contract is checked separately:

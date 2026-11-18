@@ -51,6 +51,8 @@ Builder --> Orchestrator: validated canonical document
 
 note over Builder, Export
   The canonical JSON Schema ships in docstruct's wheel.
+  The builder returns dictionaries; legacy dataclasses remain
+  compatibility exports, deprecated since 0.5.3 (ADR-0024).
   Builder/schema parity is tested, including child sections.
   Existing export audit applies; strict schema-gate activation
   remains separate (E1.2b, ADR-0023).

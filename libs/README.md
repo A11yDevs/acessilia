@@ -13,12 +13,20 @@ Shared Python packages that live in this repository, next to the core (`backend`
 
 | | **acessilia-docstruct** | **acessilia-sdk** |
 |---|---|---|
-| **What it is** | Document structure algorithms: canonical types (`CanonicalDocument`, `BBox`…), reading order, multi-provider fusion, text and LaTeX normalization, tables, validation | Uniform access to Toolbox capabilities: contract registry, HTTP transport (`execute_capability`), clients, catalog, errors, artifact references, retries and failover |
+| **What it is** | Document structure algorithms: value types (`CanonicalBlock`, `BBox`…), schema-defined canonical dictionaries, reading order, multi-provider fusion, text and LaTeX normalization, tables, validation | Uniform access to Toolbox capabilities: contract registry, HTTP transport (`execute_capability`), clients, catalog, errors, artifact references, retries and failover |
 | **Nature** | Pure: no network, files, subprocess or settings | Performs I/O: asynchronous HTTP client |
 | **Dependencies** | None (`dependencies = []`) | `httpx` |
 | **Consumers** | The core (`backend/core/pipeline`, `tools`, `export`…) **and the Toolbox**, which runs these algorithms on its side | The core only, to talk to the Toolbox |
 | **Distribution** | Wheel published on a GitHub Release (`.github/workflows/docstruct-release.yml`, tags `docstruct-v*`); the Toolbox pins it by hash | Installed editable, inside this repository only |
 | **Import guard** (`tests/test_purity.py`) | Must not import `backend`, `acessilia_toolbox` or `acessilia_sdk` | Must not import `backend` or `acessilia_toolbox` |
+
+## Legacy canonical types
+
+`CanonicalDocument` and `CanonicalSection` are legacy compatibility dataclasses,
+deprecated since docstruct 0.5.3. Both remain exported from `docstruct.types` and
+`docstruct`; their construction and serialization keep working. New code uses
+the builder's dictionaries and the packaged canonical schema. See the
+[migration note](docstruct/README.md#legacy-canonical-dataclasses-deprecated-since-053).
 
 ## Dependency direction
 
