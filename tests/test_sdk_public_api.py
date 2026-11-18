@@ -29,8 +29,18 @@ from pathlib import Path
 import acessilia_sdk
 
 ROOT = Path(__file__).resolve().parents[1]
-#: The core's code, its scripts and its tests.
-SCANNED = ("backend", "libs/core/src", "scripts", "tests")
+#: The core's code, its tests and example, the service, its front ends,
+#: scripts and tests. ``libs/core`` is listed by directory, so a new one
+#: must be added here (``test_every_core_directory_is_scanned``).
+SCANNED = (
+    "backend",
+    "frontend",
+    "libs/core/examples",
+    "libs/core/src",
+    "libs/core/tests",
+    "scripts",
+    "tests",
+)
 #: ``"acessilia_sdk.module.name": "reason"`` for a reviewed exception. Empty.
 ALLOWED: dict[str, str] = {}
 #: Calls that read or replace ``getattr(module, "name")``-style attributes.
@@ -145,6 +155,25 @@ def test_every_exception_is_still_needed() -> None:
     assert set(ALLOWED) <= used, f"exceptions nothing uses any more: {sorted(set(ALLOWED) - used)}"
 
 
+def test_every_core_directory_is_scanned() -> None:
+    """A directory of ``libs/core`` holding Python is in ``SCANNED``.
+
+    The core's tests moved from ``tests/`` to ``libs/core/tests`` (#575) and
+    left the scan unnoticed (review of #580).
+    """
+    core = ROOT / "libs" / "core"
+    unscanned = sorted(
+        child.name
+        for child in core.iterdir()
+        if child.is_dir()
+        and not child.name.startswith((".", "_"))
+        and child.name not in {"build", "dist"}
+        and f"libs/core/{child.name}" not in SCANNED
+        and any(child.rglob("*.py"))
+    )
+    assert not unscanned, f"libs/core directories the guard does not scan: {unscanned}"
+
+
 def test_every_sdk_module_declares_its_public_names() -> None:
     """Without ``__all__``, a module would have no public name at all.
 
@@ -184,6 +213,11 @@ def test_the_guard_recognizes_each_kind_of_use() -> None:
         f"from acessilia_sdk.toolbox import artifacts\nmonkeypatch.setattr(artifacts, '{internal}', fake)": f"{module}.{internal}",
         f"from acessilia_sdk.toolbox import artifacts\npatch.object(artifacts, '{internal}')": f"{module}.{internal}",
         f"import {module} as a\nhasattr(a, '{internal}')": f"{module}.{internal}",
+        # The other calls the decision lists (review of #580).
+        f"from acessilia_sdk.toolbox import artifacts\nsetattr(artifacts, '{internal}', fake)": f"{module}.{internal}",
+        f"import {module} as a\ndelattr(a, '{internal}')": f"{module}.{internal}",
+        f"from acessilia_sdk.toolbox import artifacts\nmonkeypatch.delattr(artifacts, '{internal}')": f"{module}.{internal}",
+        f"monkeypatch.delattr('{module}.{internal}')": f"{module}.{internal}",
     }
     for source, path in cases.items():
         assert path in {used for _, used in sdk_uses(source)}, source

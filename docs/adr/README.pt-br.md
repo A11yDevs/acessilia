@@ -6,7 +6,7 @@ Um Registro de Decisão Arquitetural (ADR, do inglês *Architecture Decision
 Record*) documenta uma decisão arquitetural relevante: o contexto, a decisão em
 si e suas consequências. Este diretório é a **fonte única de verdade das
 decisões que atravessam as fronteiras entre componentes** do ecossistema
-Acessilia: o core (`backend/`), o SDK (`libs/sdk`), a docstruct
+Acessilia: o core (`libs/core`, pacote `acessilia_core`), o SDK (`libs/sdk`), a docstruct
 (`libs/docstruct`) e a [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox).
 
 Cada repositório pode manter ADRs sobre seus próprios detalhes internos. Esses
@@ -33,7 +33,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0015](0015-artifact-reference-v1.pt-br.md) | O contrato de referência de artefato, `artifact/reference@1`, em fases | Aceito |
 | [0016](0016-core-package.pt-br.md) | O core como um pacote próprio, `acessilia_core` | Aceito |
 | [0017](0017-operational-sdk-and-agentic-core.pt-br.md) | Fronteiras entre o SDK operacional e o core agêntico | Aceito |
-| [0018](0018-core-uses-sdk-public-api.pt-br.md) | O core usa só a API pública do SDK | Proposto |
+| [0018](0018-core-uses-sdk-public-api.pt-br.md) | O core usa só a API pública do SDK | Aceito |
 | [0019](0019-operation-identifiers-and-cancellation.pt-br.md) | Identificadores de operação e cancelamento remoto | Aceita |
 | [0020](0020-job-resumption-and-operation-journal.pt-br.md) | Retomar um job a partir do seu checkpoint durável | Aceita |
 | [0021](0021-bounded-model-call-execution.pt-br.md) | Execução limitada de chamadas de modelo pertencente à aplicação | Aceita |

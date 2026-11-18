@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0018-core-uses-sdk-public-api.pt-br.md)
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-18, evidence below)
 - **Date:** 2026-11-13
 - **Components:** core, SDK
 - **Issues:** [#470](https://github.com/A11yDevs/acessilia/issues/470), [#402](https://github.com/A11yDevs/acessilia/issues/402)
@@ -17,7 +17,8 @@ the SDK would break the core without being a breaking change of the API, and
 the SDK could not refactor freely. #402 called this "ADR B": the core depends
 only on the SDK's public API.
 
-What the code says today, measured on develop at cfa45001:
+What the code said when this ADR was proposed, measured on develop at
+cfa45001:
 
 - **Every SDK module already declares `__all__`**, except the package itself
   (`__version__`) and the `python -m` entry point (`acessilia_sdk.__main__`).
@@ -28,13 +29,13 @@ What the code says today, measured on develop at cfa45001:
   example, `ToolboxPdfValidateClient` is exported and was missing from the
   clients row).
 - **The core used one internal name.** A scan of `backend/`, `scripts/` and
-  `tests/` checks 180 uses of SDK names in 51 files. It covers imports,
+  `tests/` found 182 uses of SDK names in 52 files. It covers imports,
   attributes read through an imported SDK module, `getattr`/`setattr`-style
   calls with a literal name, and dotted string paths such as
   `monkeypatch.setattr` targets. One test patched the client's internal
   `_sleep` to skip the retry backoff; it now sets the public
-  `TOOLBOX_RETRY_BACKOFF_SECONDS` to zero. A first scan without the calls had
-  missed it. Every other use is in a module's `__all__`, so keeping to the
+  `TOOLBOX_RETRY_BACKOFF_SECONDS` to zero, which leaves 180 uses in 51 files.
+  A first scan without the calls had missed it. Every other use is in a module's `__all__`, so keeping to the
   public API costs almost nothing.
 
 Options considered:
@@ -49,7 +50,7 @@ Options considered:
 
 ## Decision
 
-Proposed: option 3.
+Option 3.
 
 - **The SDK's public API is what each SDK module lists in `__all__`**, plus the
   public SDK modules themselves. A name outside `__all__` is internal: it may
@@ -75,6 +76,32 @@ Proposed: option 3.
   changelog. When the core needs an internal name, the fix is to export it
   (with a changelog entry), not to add an exception.
 
+## Acceptance evidence
+
+The guard has blocked every pull request since 2026-11-13 (#501), and the
+rule held while the SDK and the core changed the most:
+
+- **It held through the SDK's first operation.** The formula chain
+  (`acessilia_sdk.operations.formula`, #504) was exported through `__all__`
+  and the README table, and the core's formula enrichment reached it only
+  through those names (#507, #509). That is the case the rule was written
+  for: the core needed new SDK code, and got it by export, not by exception.
+- **It followed the core's move.** When the core became `acessilia_core` in
+  `libs/core` (ADR-0016, #572), the guard's scan was extended to
+  `libs/core/src`, so the moved code stayed checked. The core's tests and
+  example, which the move also took out of the scanned paths, are scanned
+  since #580, and a test fails when a directory of `libs/core` holding Python
+  is not scanned. Their three uses were public.
+- **No exception was needed.** `ALLOWED` is still empty. With #580's scan, on
+  develop at 983e8ffd the guard checks 207 uses of 98 SDK names in 60 files
+  (18 in `libs/core/src`, 1 in `libs/core/tests`, 1 in `libs/core/examples`,
+  3 in `backend/`, 3 in `scripts/`, 34 in `tests/`), against the `__all__` of
+  36 SDK modules: all of them public.
+- **Its cost stayed at zero.** No exception was added while ten commits
+  changed the SDK's code after #501 was merged
+  (`git log --no-merges d8a7a40b..983e8ffd -- libs/sdk/src`), and no core
+  change had to wait on one.
+
 ## Consequences
 
 - **Easier:**
@@ -85,14 +112,16 @@ Proposed: option 3.
   - the core cannot borrow an SDK helper without exporting it first;
   - a new SDK module must declare `__all__`.
 - **Compliance:**
-  - `tests/test_sdk_public_api.py` (core): every SDK use in `backend/`,
-    `scripts/` and `tests/` is public; no SDK API module lacks `__all__`; no
-    exception is stale. A self-test checks the guard on each kind of use;
+  - `tests/test_sdk_public_api.py` (core): every SDK use in the core
+    (`libs/core`: its code, tests and example), the service (`backend/`,
+    `frontend/`), `scripts/` and `tests/` is public; every directory of
+    `libs/core` holding Python is scanned; no SDK API module lacks `__all__`;
+    no exception is stale. A self-test checks the guard on each kind of use
+    the decision lists;
   - `libs/sdk/tests/test_public_api.py` (SDK): every name of a module the
     README table lists is in its `__all__`, the other backticked words are
     class attributes or listed prose, and the English and Brazilian Portuguese
     tables match. It also runs in the `SDK alone` job.
-- **Follow-up:** none required. The guard is blocking from the start, because
-  the measured cost was one test, changed in the same pull request to use the
-  public setting (decision of 2026-11-13). If this ADR is rejected, the two
-  tests are removed.
+- **Follow-up:** none required. The guard has been blocking from the start,
+  because the measured cost was one test, changed in the same pull request to
+  use the public setting (decision of 2026-11-13).
