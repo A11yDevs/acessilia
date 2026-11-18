@@ -138,7 +138,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 ## 7. Princípios arquiteturais do ecossistema
 
 Estes princípios regem como os quatro componentes do ecossistema dividem o
-trabalho: o core (`backend/`), o SDK (`libs/sdk`), a docstruct
+trabalho: o core (`libs/core`), o SDK (`libs/sdk`), a docstruct
 (`libs/docstruct`) e a [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox).
 Cada um aponta para o ADR que o detalha e diz como a conformidade é verificada.
 Uma exceção exige um ADR com justificativa, escopo, responsável e critério de
@@ -183,8 +183,9 @@ capacidades operacionais.
      para oferecer um.
    - **Detalhe:** [ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md).
    - **Verificado por:** revisão e o `tests/test_architecture_layers.py`,
-     que falha se `backend/` importar o pacote da Toolbox, ou se `backend/`
-     ou `frontend/` importar uma biblioteca operacional. Ele não tem lista de
+     que falha se o core ou o `backend/` importar o pacote da Toolbox, ou se
+     o core, o `backend/` ou o `frontend/` importar uma biblioteca
+     operacional. Ele não tem lista de
      exceções: uma exceção exige uma ADR, e uma lista de exceções, depois de
      criada, só pode diminuir.
 5. **P5 — Processamento orientado a referências.**

@@ -137,7 +137,7 @@ Deliver document and image conversion to accessible formats through:
 ## 7. Ecosystem architecture principles
 
 These principles govern how the four components of the ecosystem divide the
-work: the core (`backend/`), the SDK (`libs/sdk`), docstruct (`libs/docstruct`)
+work: the core (`libs/core`), the SDK (`libs/sdk`), docstruct (`libs/docstruct`)
 and the [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox). Each
 one links to the ADR that details it and says how compliance is checked. An
 exception requires an ADR that states its justification, scope, owner and exit
@@ -181,9 +181,9 @@ Toolbox executes operational capabilities.
      offer one.
    - **Detail:** [ADR-0003](adr/0003-remote-only-operational-capabilities.md).
    - **Checked by:** review, and
-     `tests/test_architecture_layers.py`, which fails if `backend/` imports
-     the Toolbox package, or if `backend/` or `frontend/` imports an
-     operational library. It has no allowlist: an exception needs an ADR,
+     `tests/test_architecture_layers.py`, which fails if the core or
+     `backend/` imports the Toolbox package, or if the core, `backend/` or
+     `frontend/` imports an operational library. It has no allowlist: an exception needs an ADR,
      and an allowlist, once added, can only shrink.
 5. **P5 — Reference-oriented processing.**
    - **Rule:** persisted artifacts are processed where they are stored and

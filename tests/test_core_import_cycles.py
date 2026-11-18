@@ -64,8 +64,23 @@ def cycles(graph: dict[str, set[str]]) -> list[list[str]]:
     return [list(cycle) for cycle in sorted(found)]
 
 
+#: The package's source root: module names are ``acessilia_core.*`` from here.
+SOURCE_ROOT = CORE.parent
+
+
+def test_the_scan_sees_the_core_imports() -> None:
+    """A graph without edges would pass the cycle check on nothing: after the
+    move to libs/core, names computed from the repository root matched no
+    import (review of #572)."""
+    graph = import_graph(CORE, SOURCE_ROOT)
+
+    assert "acessilia_core.pipeline.orchestrator" in graph
+    assert sum(len(edges) for edges in graph.values()) > 300
+    assert "acessilia_core.ports" in graph["acessilia_core.pipeline.orchestrator"]
+
+
 def test_the_core_has_no_import_cycle() -> None:
-    found = cycles(import_graph(CORE, ROOT))
+    found = cycles(import_graph(CORE, SOURCE_ROOT))
     assert not found, "import cycles in libs/core/src/acessilia_core:\n" + "\n".join(
         " -> ".join([*cycle, cycle[0]]) for cycle in found
     )

@@ -13,7 +13,9 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 
 ## Camadas
 
-### 0. Backend (`backend/`) — lógica de negócio agnóstica de interface e pipeline de IA
+### 0. Core e serviço (`libs/core/src/acessilia_core`, `backend/`) — lógica de negócio agnóstica de interface e pipeline de IA
+
+O core é o pacote `acessilia_core` em `libs/core` ([ADR-0016](adr/0016-core-package.pt-br.md)); o serviço em `backend/` monta a sua configuração e as suas portas e entrega os seus resultados.
 
 #### 0.1. Pipeline Multiagente e Orquestração (`libs/core/src/acessilia_core/agents/`)
 - [libs/core/src/acessilia_core/agents/vision_agent.py](../libs/core/src/acessilia_core/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
@@ -177,7 +179,7 @@ Os modelos pesados rodam num serviço separado, a [Acessilia Toolbox](https://gi
 | 0 | `libs/docstruct` (`acessilia-docstruct`) | Algoritmos puros de estrutura de documentos (fusão, tabelas, ordem de leitura), sem dependências próprias | nada |
 | 1 | Toolbox (repositório separado) | Providers pesados, armazenamento de artefatos, execução de capacidades por REST/MCP | docstruct |
 | 2 | `libs/sdk` (`acessilia-sdk`) | Allowlist de capacidades, transporte HTTP, verificações do catálogo, referências de artefatos, retries e failover; a configuração é injetada | o **contrato publicado** da Toolbox (IDs de capacidade, versões, schemas), nunca o pacote dela |
-| 3 | Core (`backend/`) | Agentes, planejamento PDDL, obrigações, políticas | SDK, docstruct |
+| 3 | Core (`libs/core/src/acessilia_core`) | Agentes, planejamento PDDL, obrigações, políticas | SDK, docstruct |
 
 - **O core decide o que fazer e quando; o SDK define como acessar uma operação; a Toolbox fornece onde e com quais recursos ela roda.** Obrigações, métodos admissíveis e custos são política de planejamento do core: a Toolbox relata o que encontrou, e o core deriva as obrigações ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
 - **Capacidades operacionais rodam só na Toolbox.** A política de produção é `remote_only`: o core não mantém fallback local para Pandoc, TeX Live, veraPDF, renderização com PyMuPDF, inspeção de mídias ou OCR, e a Toolbox não depende do SDK ([ADR-0002](adr/0002-component-responsibilities.pt-br.md), [ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md)).

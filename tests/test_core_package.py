@@ -1,0 +1,32 @@
+"""The core is a regular package of its own distribution (ADR-0016, step 6)."""
+
+from __future__ import annotations
+
+import tomllib
+from pathlib import Path
+
+import acessilia_core
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_the_core_is_a_regular_package() -> None:
+    """Not a namespace package, which a stale ``acessilia_core`` left in
+    site-packages could silently merge with (review of #572)."""
+    assert acessilia_core.__file__ is not None
+    assert Path(acessilia_core.__file__).parent == ROOT / "libs" / "core" / "src" / "acessilia_core"
+    assert len(list(acessilia_core.__path__)) == 1
+
+
+def test_the_version_matches_the_distribution() -> None:
+    project = tomllib.loads((ROOT / "libs" / "core" / "pyproject.toml").read_text())["project"]
+
+    assert project["name"] == "acessilia-core"
+    assert acessilia_core.__version__ == project["version"]
+
+
+def test_the_service_depends_on_the_core_package() -> None:
+    root = tomllib.loads((ROOT / "pyproject.toml").read_text())
+
+    assert "acessilia-core" in root["project"]["dependencies"]
+    assert root["tool"]["uv"]["sources"]["acessilia-core"] == {"path": "libs/core", "editable": True}

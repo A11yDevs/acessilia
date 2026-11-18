@@ -36,7 +36,8 @@ dependencies = [
     # Núcleo puro de processamento estrutural (libs/docstruct, instalado editável)
     "acessilia-docstruct",
     # Acesso às capacidades da Toolbox pelo contrato HTTP (libs/sdk, instalado editável)
-    "acessilia-sdk",    # The core's PDDL pipeline (libs/core, installed editable; ADR-0016)
+    "acessilia-sdk",
+    # The core's PDDL pipeline (libs/core, installed editable; ADR-0016)
     "acessilia-core",
 ]
 

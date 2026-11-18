@@ -1,11 +1,12 @@
 # Bibliotecas do Acessilia
 
-Pacotes Python compartilhados que vivem neste repositório, ao lado do core (`backend`).
+Pacotes Python compartilhados que vivem neste repositório: o core e as duas bibliotecas abaixo dele. O serviço (`backend/`) e os front-ends (`frontend/`) dependem do core.
 
 > Também disponível em **inglês (EUA)**: [English version](README.md) — versão autoritativa.
 
 | Pacote | Diretório | Em uma frase |
 |---|---|---|
+| `acessilia-core` | [core/](core/) | **Quando e por quê**: o pipeline PDDL que planeja e executa a acessibilidade de um documento, com seus agentes, etapas de enriquecimento e exportadores ([ADR-0016](../docs/adr/0016-core-package.pt-br.md)). |
 | `acessilia-docstruct` | [docstruct/](docstruct/) | **O que** se calcula sobre um documento: algoritmos estruturais puros. |
 | `acessilia-sdk` | [sdk/](sdk/) | **Como** o core pede à Toolbox que execute uma operação: contratos, transporte HTTP, clientes, referências de artefatos e failover. |
 
@@ -18,15 +19,15 @@ Pacotes Python compartilhados que vivem neste repositório, ao lado do core (`ba
 | **Dependências** | Nenhuma (`dependencies = []`) | `httpx` |
 | **Quem usa** | O core (`libs/core/src/acessilia_core/pipeline`, `tools`, `export`…) **e a Toolbox**, que roda esses algoritmos do lado dela | Só o core, para falar com a Toolbox |
 | **Distribuição** | Wheel publicada em GitHub Release (`.github/workflows/docstruct-release.yml`, tags `docstruct-v*`); a Toolbox a fixa por hash | Instalada em modo editável, só dentro deste repositório |
-| **Restrição de imports** (`tests/test_purity.py`) | Não pode importar `backend`, `acessilia_toolbox` nem `acessilia_sdk` | Não pode importar `backend` nem `acessilia_toolbox` |
+| **Restrição de imports** (`tests/test_purity.py`) | Não pode importar `backend`, `acessilia_toolbox` nem `acessilia_sdk` | Não pode importar `acessilia_core`, `backend` nem `acessilia_toolbox` |
 
 ## Direção das dependências
 
 ```
-backend (core) ──→ acessilia-sdk ──contrato HTTP──→ Toolbox
-      │                  │                             │
-      ▼                  ▼                             ▼
-            acessilia-docstruct  ←─────────────────────┘
+backend ──→ acessilia-core ──→ acessilia-sdk ──contrato HTTP──→ Toolbox
+                  │                  │                             │
+                  ▼                  ▼                             ▼
+                        acessilia-docstruct  ←─────────────────────┘
 ```
 
 As dependências só apontam para baixo: a docstruct não importa nada acima dela,

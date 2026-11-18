@@ -2,7 +2,8 @@
 
 The SDK sits between the core and the services it uses. It depends on the
 Toolbox only through its published HTTP contract and never imports the core
-(``backend``) or the Toolbox package (``acessilia_toolbox``).
+(``acessilia_core``), the service (``backend``) or the Toolbox package
+(``acessilia_toolbox``).
 """
 
 #: Kept equal to ``project.version`` in ``pyproject.toml``; a test checks it.
