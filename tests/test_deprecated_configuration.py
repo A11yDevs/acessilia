@@ -8,7 +8,7 @@ reported: at startup in the log, or as a ``DeprecationWarning``.
 
 from __future__ import annotations
 
-import re
+import ast
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,7 +31,10 @@ def startup(monkeypatch) -> list[str]:
     from acessilia_core import i18n
     from acessilia_core import logger as core_logger
 
+    from backend.config import process_setup
+
     warned: list[str] = []
+    monkeypatch.setattr(process_setup, "_LOGGED_DEPRECATIONS", set())
     monkeypatch.setattr(core_logger, "setup_logger", lambda **_kwargs: None)
     monkeypatch.setattr(core_logger, "logger", SimpleNamespace(warning=warned.append))
     monkeypatch.setattr(i18n, "configure_locales", lambda *_args: None)
@@ -39,12 +42,46 @@ def startup(monkeypatch) -> list[str]:
     return warned
 
 
+def _pmv_names_read(source: str) -> set[str]:
+    """Every ``PMV_*`` string in ``source``, whatever its quotes, outside the
+    ``DEPRECATED_ENV_ALIASES`` table itself (review of #586)."""
+    tree = ast.parse(source)
+    table = {
+        id(node)
+        for statement in ast.walk(tree)
+        if isinstance(statement, (ast.Assign, ast.AnnAssign))
+        and any(
+            isinstance(target, ast.Name) and target.id == "DEPRECATED_ENV_ALIASES"
+            for target in (statement.targets if isinstance(statement, ast.Assign) else [statement.target])
+        )
+        for node in ast.walk(statement)
+    }
+    return {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value.startswith("PMV_")
+        and id(node) not in table
+    }
+
+
 def test_every_pmv_variable_settings_reads_is_listed_as_deprecated() -> None:
     source = (ROOT / "backend" / "config" / "settings.py").read_text(encoding="utf-8")
-    read = set(re.findall(r'"(PMV_\w+)"', source))
 
-    assert read == set(DEPRECATED_ENV_ALIASES)
+    # Both ways: a read missing from the table, and a key nothing reads.
+    assert _pmv_names_read(source) == set(DEPRECATED_ENV_ALIASES)
     assert all(new == "PDDL_" + old.removeprefix("PMV_") for old, new in DEPRECATED_ENV_ALIASES.items())
+
+
+def test_the_name_scan_sees_any_quotes_and_skips_the_table() -> None:
+    source = (
+        "DEPRECATED_ENV_ALIASES = {'PMV_ORPHAN': 'PDDL_ORPHAN'}\n"
+        "a = os.getenv('PMV_SINGLE')\n"
+        'b = os.getenv("PMV_DOUBLE", os.getenv("PDDL_DOUBLE"))\n'
+    )
+
+    assert _pmv_names_read(source) == {"PMV_SINGLE", "PMV_DOUBLE"}
 
 
 def test_a_current_configuration_has_nothing_deprecated() -> None:
@@ -92,3 +129,27 @@ def test_setup_process_logs_nothing_for_a_current_configuration(startup, tmp_pat
     process_setup.setup_process(replace(settings, pipeline_engine="pddl", logs_dir=tmp_path), environ={})
 
     assert startup == []
+
+
+def test_each_deprecation_is_logged_once_per_process(startup, tmp_path) -> None:
+    """The runner and the API both set the process up (review of #586)."""
+    from backend.config import process_setup
+
+    custom = replace(settings, pipeline_engine="pmv", logs_dir=tmp_path)
+
+    process_setup.setup_process(custom, environ={})
+    process_setup.setup_process(custom, environ={})
+
+    assert startup == ["PIPELINE_ENGINE=pmv is deprecated: set PIPELINE_ENGINE=pddl"]
+
+
+def test_the_pipeline_cli_logs_the_deprecations(startup, monkeypatch, tmp_path) -> None:
+    """It reads the settings without the process setup (review of #586)."""
+    from scripts import pddl_pipeline
+
+    monkeypatch.setenv("PMV_MAX_REPLANS", "3")
+    monkeypatch.delenv("PDDL_MAX_REPLANS", raising=False)
+    monkeypatch.setattr(pddl_pipeline, "_run_manifest", lambda *_args: None)
+
+    assert pddl_pipeline.main(["manifest", "doc.pdf", "-o", str(tmp_path / "m.json")]) == 0
+    assert "PMV_MAX_REPLANS is deprecated: rename it to PDDL_MAX_REPLANS" in startup

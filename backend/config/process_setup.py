@@ -31,7 +31,7 @@ def setup_process(
         configure_server_locale,
         negotiate_server_locale,
     )
-    from acessilia_core.logger import logger, setup_logger
+    from acessilia_core.logger import setup_logger
 
     s = default_settings if settings is None else settings
     environment = os.environ if environ is None else environ
@@ -41,8 +41,32 @@ def setup_process(
     configure_locales(s.i18n_locales_active)
     configure_server_locale(negotiate_server_locale(hints, _process_c_locale()))
     setup_logger(level=s.log_level, logs_dir=s.logs_dir)
+    warn_deprecated_configuration(s, environment)
+
+
+#: The deprecation messages this process has logged. The runner and the API
+#: both set the process up, so each message is logged once, not once per call
+#: (review of #586).
+_LOGGED_DEPRECATIONS: set[str] = set()
+
+
+def warn_deprecated_configuration(
+    settings: Settings | None = None, environ: Mapping[str, str] | None = None
+) -> None:
+    """Log each deprecated configuration name still in use, once per process.
+
+    ``setup_process`` calls it at startup. An entry point that reads the
+    settings without setting the process up, such as
+    ``scripts/pddl_pipeline.py``, calls it directly.
+    """
+    from acessilia_core.logger import logger
+
+    s = default_settings if settings is None else settings
+    environment = os.environ if environ is None else environ
     for message in deprecated_configuration(environment, s.pipeline_engine):
-        logger.warning(message)
+        if message not in _LOGGED_DEPRECATIONS:
+            _LOGGED_DEPRECATIONS.add(message)
+            logger.warning(message)
 
 
 def _process_c_locale() -> str | None:
@@ -73,4 +97,4 @@ def _first_language(raw: str | None) -> str | None:
     return None
 
 
-__all__ = ["setup_process"]
+__all__ = ["setup_process", "warn_deprecated_configuration"]

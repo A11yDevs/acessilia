@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.config.core_config import core_config_from_settings
+from backend.config.process_setup import warn_deprecated_configuration
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -150,6 +151,9 @@ def _add_domain_arguments(parser: argparse.ArgumentParser) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # The script reads the settings without the service's process setup, so
+    # it reports the deprecated configuration names itself (review of #586).
+    warn_deprecated_configuration()
     try:
         if args.command == "manifest":
             _run_manifest(args.document, args.output, args.language, args.no_ocr)
