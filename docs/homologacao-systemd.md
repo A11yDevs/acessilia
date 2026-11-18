@@ -139,7 +139,7 @@ The effective `MAX_PAGES` and `FUSION_MODE` are the values inside the running co
 docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
 ```
 
-- **Preflight decision:** the early check rejects only a PDF whose count comes from `pymupdf` (`page_count_source == "pymupdf"`). Without a trustworthy count — a failed inspection, a content-stream scan, a non-PDF — rejecting before extraction would refuse legitimate scanned documents, so the limit stays authoritative after extraction (`_check_page_limit(manifest)`). No separate page cap is added for dual extraction: the same limit applies to the extracted manifest and the provider timeouts bound remote work.
+- **Preflight decision:** the early check rejects only a PDF whose count comes from `pymupdf` (`page_count_source == "pymupdf"`). Without a trustworthy count — a failed inspection, a content-stream scan, a non-PDF — rejecting before extraction would refuse legitimate scanned documents, so the limit stays authoritative after extraction (`_check_page_limit` in `libs/core/src/acessilia_core/pipeline/preflight.py`). No separate page cap is added for dual extraction: the same limit applies to the extracted manifest and the provider timeouts bound remote work.
 - **Fusion mode decision:** homologation uses `FUSION_MODE=single`. With `dual`, `/ready` depends on MinerU as well, so one provider outage fails readiness and degrades every job; dual is used only while evaluating fusion, with both providers monitored. This is a decision for the staging environment, not a product default.
 
 ## Troubleshooting

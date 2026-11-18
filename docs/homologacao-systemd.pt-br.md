@@ -141,7 +141,7 @@ O `MAX_PAGES` e o `FUSION_MODE` efetivos são os valores dentro do container em 
 docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
 ```
 
-- **Decisão do preflight:** a checagem antecipada recusa apenas PDF cuja contagem veio do `pymupdf` (`page_count_source == "pymupdf"`). Sem contagem confiável — inspeção falhou, varredura de content stream, formato não-PDF — recusar antes da extração rejeitaria documentos digitalizados legítimos, então o limite vale de forma autoritativa depois da extração (`_check_page_limit(manifest)`). Não há teto separado para extração dual: o mesmo limite vale para o manifesto extraído e os timeouts dos providers limitam o trabalho remoto.
+- **Decisão do preflight:** a checagem antecipada recusa apenas PDF cuja contagem veio do `pymupdf` (`page_count_source == "pymupdf"`). Sem contagem confiável — inspeção falhou, varredura de content stream, formato não-PDF — recusar antes da extração rejeitaria documentos digitalizados legítimos, então o limite vale de forma autoritativa depois da extração (`_check_page_limit` em `libs/core/src/acessilia_core/pipeline/preflight.py`). Não há teto separado para extração dual: o mesmo limite vale para o manifesto extraído e os timeouts dos providers limitam o trabalho remoto.
 - **Decisão do modo de fusão:** a homologação usa `FUSION_MODE=single`. Com `dual`, o `/ready` também depende do MinerU, então a queda de um provider derruba a prontidão e degrada todos os jobs; `dual` só é usado durante avaliação da fusão, com os dois providers monitorados. Esta é uma decisão do ambiente de homologação, não um padrão do produto.
 
 ## Solução de problemas
