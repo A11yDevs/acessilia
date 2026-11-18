@@ -1,0 +1,486 @@
+"""
+What this suite verifies: libs/core/src/acessilia_core/pipeline/canonical_builder builds a well-formed, sanitized
+canonical document from raw markdown or structured payloads (inferring titles, ids, sections and a
+fallback minimum section for non-textual sources), libs/core/src/acessilia_core/pipeline/validators flags markdown and
+prompt-leak artifacts in final output text, and libs/core/src/acessilia_core/export/pandoc_exporter exports those
+documents to txt/html while enforcing the deterministic audit and export-profile checks.
+"""
+
+import tempfile
+from pathlib import Path
+
+import pytest
+
+import acessilia_core.i18n as i8n
+from core_config_support import export_config, toolbox_config
+from acessilia_core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.validators import validate_canonical_document
+from acessilia_core.pipeline.validators import validate_output_text
+from locale_support import use_server_locale
+
+
+@pytest.fixture(autouse=True)
+def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the en_US runtime locale for every test in this module.
+
+    The exporter and validators resolve every user-visible string through acessilia_core.i18n.t, so
+    error-message assertions need a deterministic locale; en_US returns the canonical English
+    msgids the assertions below are written against.
+    """
+    use_server_locale(monkeypatch, "en_US")
+    i8n._catalog_for.cache_clear()
+
+
+def test_build_canonical_document_creates_sections_and_ids():
+    """Raw markdown input should become a canonical document with sections, a title and zero validation errors."""
+    document = build_canonical_document(
+        "# Titulo\n\nParagrafo com **negrito**.\n\n- Item 1\n- Item 2",
+        title="Titulo",
+        toolbox=toolbox_config(),
+    )
+
+    assert document["title"] == "Titulo"
+    assert document["sections"]
+    assert validate_canonical_document(document) == []
+
+
+def test_build_canonical_document_accepts_structured_payload():
+    """A structured per-page payload should be folded into a canonical document preserving page_count and mode in metadata."""
+    payload = {
+        "text": "# Titulo\n\nParagrafo simples.",
+        "page_count": 2,
+        "mode": "normal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "# Titulo",
+                "blocks": [{"type": "heading", "level": 1, "text": "Titulo"}],
+            },
+            {
+                "page_number": 2,
+                "text": "Paragrafo simples.",
+                "blocks": [
+                    {"type": "paragraph", "text": "Paragrafo simples."},
+                ],
+            },
+        ],
+    }
+
+    document = build_canonical_document(payload, title="Titulo", toolbox=toolbox_config())
+
+    assert document["metadata"]["page_count"] == 2
+    assert document["metadata"]["mode"] == "normal"
+    assert document["sections"]
+
+
+def test_build_canonical_document_prefers_composed_heading_title_over_filename():
+    payload = {
+        "text": "# CAPÍTULO 9\n## HERANÇA, REESCRITA E POLIMORFISMO\n### 9.1 REPETINDO CÓDIGO?",
+        "page_count": 1,
+        "mode": "pddl-internal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "# CAPÍTULO 9\n## HERANÇA, REESCRITA E POLIMORFISMO\n### 9.1 REPETINDO CÓDIGO?",
+                "blocks": [
+                    {"type": "heading", "level": 1, "text": "CAPÍTULO 9"},
+                    {
+                        "type": "heading",
+                        "level": 2,
+                        "text": "HERANÇA, REESCRITA E POLIMORFISMO",
+                    },
+                    {"type": "heading", "level": 3, "text": "9.1 REPETINDO CÓDIGO?"},
+                ],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="java-oo-3pgs", toolbox=toolbox_config())
+
+    assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
+
+
+def test_build_canonical_document_normalizes_docling_tabs_in_prose():
+    # Regression for #338: docling extraction produces tabs between words
+    # in prose, which should be normalized to spaces across TXT/HTML/canonical export.
+    payload = {
+        "text": (
+            "CAPÍTULO\t9\n"
+            "HERANÇA,\tREESCRITA\tE\tPOLIMORFISMO\n"
+            "First\tprose\tparagraph\twith\ttabs.\n"
+            "Second\tprose\tparagraph\twith\ttabs.\n"
+        ),
+        "page_count": 1,
+        "mode": "docling",
+        "pages": [
+            {
+                "page_number": 1,
+                "blocks": [
+                    {"type": "heading", "level": 1, "text": "CAPÍTULO\t9"},
+                    {
+                        "type": "heading",
+                        "level": 2,
+                        "text": "HERANÇA,\tREESCRITA\tE\tPOLIMORFISMO",
+                    },
+                    {
+                        "type": "paragraph",
+                        "text": "First\tprose\tparagraph\twith\ttabs.",
+                    },
+                    {
+                        "type": "paragraph",
+                        "text": "Second\tprose\tparagraph\twith\ttabs.",
+                    },
+                    {
+                        "type": "list",
+                        "ordered": False,
+                        "items": ["First\tlist\titem", "Second\tlist\titem"],
+                    },
+                    {
+                        "type": "table",
+                        "rows": [["Col\t1", "Col\t2"], ["Val\tA", "Val\tB"]],
+                    },
+                    {
+                        "type": "code",
+                        "text": "class Funcionario {\n\tdouble salario;\n\tvoid setSalario() {}\n}",
+                    },
+                ],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="java-oo-3pgs", toolbox=toolbox_config())
+
+    # Document title and section titles
+    assert document["title"] == "CAPÍTULO 9 - HERANÇA, REESCRITA E POLIMORFISMO"
+    assert "\t" not in document["title"]
+
+    # Export to TXT
+    from docstruct.export.txt import document_to_txt_lines
+
+    txt_lines = document_to_txt_lines(document)
+    for line in txt_lines:
+        if "double salario" in line or "void setSalario" in line:
+            # Code block preserves its indentation tabs
+            assert "\t" in line
+        else:
+            # Prose lines, list items, table text must not contain tabs
+            assert "\t" not in line, f"Tab found in prose line: {line!r}"
+
+    # Export to HTML
+    from docstruct.export.html import document_to_html
+
+    html = document_to_html(document)
+    assert "CAPÍTULO 9" in html
+    assert "HERANÇA, REESCRITA E POLIMORFISMO" in html
+    assert "First list item" in html
+    assert "Second list item" in html
+
+    from html.parser import HTMLParser
+    from docstruct.export.pandoc_ast import build_pandoc_ast
+
+    class TextCollector(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_code = False
+            self.code = []
+            self.prose = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "pre":
+                self.in_code = True
+
+        def handle_endtag(self, tag):
+            if tag == "pre":
+                self.in_code = False
+
+        def handle_data(self, data):
+            (self.code if self.in_code else self.prose).append(data)
+
+    rendered = TextCollector()
+    rendered.feed(html)
+    assert "\t" not in "".join(rendered.prose)
+    assert "\tdouble salario;" in "".join(rendered.code)
+
+    # DOCX receives this Pandoc AST; only CodeBlock may retain literal TABs.
+    ast = build_pandoc_ast(document, target_format="docx")
+
+    def assert_prose_has_no_tabs(node):
+        if isinstance(node, dict):
+            if node.get("t") == "CodeBlock":
+                assert "\tdouble salario;" in node["c"][1]
+                return
+            for value in node.values():
+                assert_prose_has_no_tabs(value)
+        elif isinstance(node, list):
+            for value in node:
+                assert_prose_has_no_tabs(value)
+        elif isinstance(node, str):
+            assert "\t" not in node
+
+    for key in ("meta", "blocks"):
+        assert_prose_has_no_tabs(ast[key])
+
+
+def test_build_canonical_document_creates_fallback_for_non_textual_payload():
+    payload = {
+        "text": "",
+        "page_count": 1,
+        "mode": "pddl-internal",
+        "pages": [
+            {
+                "page_number": 1,
+                "text": "",
+                "blocks": [],
+            }
+        ],
+    }
+
+    document = build_canonical_document(payload, title="sunset-skyline", toolbox=toolbox_config())
+
+    assert document["sections"]
+    first_section = document["sections"][0]
+    assert first_section["level"] == 1
+    assert first_section["blocks"]
+    assert first_section["blocks"][0]["type"] == "paragraph"
+    assert "não possui texto extraível" in first_section["blocks"][0]["text"]
+    assert any("seção mínima" in warning for warning in document["technical_warnings"])
+    assert validate_canonical_document(document) == []
+
+
+def test_validate_output_text_flags_markdown_leaks():
+    errors = validate_output_text("Texto com **marcacao** e `codigo`.", "pdf")
+
+    assert errors
+
+
+def test_export_accessible_document_txt_and_html():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        txt_path = Path(tmpdir) / "saida.txt"
+        html_path = Path(tmpdir) / "saida.html"
+
+        txt_result = export_accessible_document(
+            "# Titulo\n\nParagrafo simples.",
+            txt_path,
+            format_name="txt",
+            title="Titulo",
+            toolbox=toolbox_config(),
+        )
+        html_result = export_accessible_document(
+            "# Titulo\n\nParagrafo simples.",
+            html_path,
+            format_name="html",
+            title="Titulo",
+            toolbox=toolbox_config(),
+        )
+
+        assert txt_result.read_text(encoding="utf-8") == ("Titulo\nParagrafo simples.")
+        assert html_result.exists()
+        html_content = html_result.read_text(encoding="utf-8")
+        assert "<nav" in html_content
+
+
+def test_export_accessible_document_sanitizes_legacy_canonical_dict():
+    legacy_document = {
+        "schema_version": "1.0.0",
+        "id": "doc-legacy",
+        "title": "Titulo",
+        "language": "pt-BR",
+        "sections": [
+            {
+                "id": "sec-1",
+                "title": "Titulo",
+                "level": 1,
+                "blocks": [
+                    {
+                        "id": "blk-1",
+                        "type": "paragraph",
+                        "text": "Texto com **marcacao** antiga.",
+                    }
+                ],
+                "children": [],
+            }
+        ],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        txt_path = Path(tmpdir) / "legacy.txt"
+        result = export_accessible_document(
+            legacy_document,
+            txt_path,
+            format_name="txt",
+            title="Titulo",
+            toolbox=toolbox_config(),
+        )
+
+        content = result.read_text(encoding="utf-8")
+        assert "**" not in content
+        assert "Texto com marcacao antiga." in content
+
+
+def test_export_accessible_document_sanitizes_legacy_block_markdown():
+    legacy_document = {
+        "schema_version": "1.0.0",
+        "id": "doc-legacy-2",
+        "title": "Titulo",
+        "language": "pt-BR",
+        "sections": [
+            {
+                "id": "sec-1",
+                "title": "Titulo",
+                "level": 1,
+                "blocks": [
+                    {
+                        "id": "blk-1",
+                        "type": "paragraph",
+                        "text": "# Capitulo\n- Item A\n1. Item B",
+                    }
+                ],
+                "children": [],
+            }
+        ],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        txt_path = Path(tmpdir) / "legacy_block.txt"
+        result = export_accessible_document(
+            legacy_document,
+            txt_path,
+            format_name="txt",
+            title="Titulo",
+            toolbox=toolbox_config(),
+        )
+
+        content = result.read_text(encoding="utf-8")
+        assert "#" not in content
+        assert "- " not in content
+        assert "1. " not in content
+        assert "Capitulo" in content
+        assert "Item A" in content
+        assert "Item B" in content
+
+
+def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
+    """PDF/UA is rendered only by the Toolbox (docs/adr/0003)."""
+    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+
+
+    def toolbox_down(ast, output_path, *, lang, toolbox):
+        raise ToolboxProviderUnavailable("pdf-ua-render offline")
+
+    monkeypatch.setattr("acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_down)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out = Path(tmpdir) / "saida.pdf_ua.pdf"
+        with pytest.raises(ToolboxProviderUnavailable):
+            export_accessible_document(
+                "# Titulo\n\nParagrafo simples.",
+                out,
+                format_name="pdf_ua",
+                title="Titulo",
+                export=export_config(),
+                toolbox=toolbox_config(),
+            )
+
+
+def test_export_accessible_document_html_preserves_mixed_header_cells():
+    document = {
+        "schema_version": "1",
+        "id": "doc-table",
+        "title": "Tabela",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "table-1",
+                "type": "table",
+                "table_ast": {
+                    "body": [
+                        {"cells": [{"text": ""}, {"text": "Valor", "header": True, "scope": "col"}]},
+                        {"cells": [{"text": "Janeiro", "header": True, "scope": "row"}, {"text": "10"}]},
+                    ]
+                },
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html",
+            toolbox=toolbox_config(),
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert '<thead><tr><td></td><th scope="col">Valor</th></tr></thead>' in html
+
+
+def test_export_accessible_document_html_keeps_legacy_column_headers():
+    document = {
+        "schema_version": "1",
+        "id": "doc-table-legacy",
+        "title": "Tabela",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "table-1",
+                "type": "table",
+                "rows": [["Mês", "Valor"], ["Janeiro", "10"]],
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html",
+            toolbox=toolbox_config(),
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert (
+        '<table id="table-1">'
+        '<thead><tr><th scope="col">Mês</th><th scope="col">Valor</th></tr></thead>'
+        '<tbody><tr><td>Janeiro</td><td>10</td></tr></tbody>'
+        '</table>'
+    ) in html
+
+
+def test_export_accessible_document_html_renders_long_image_description():
+    document = {
+        "schema_version": "1",
+        "id": "doc-image",
+        "title": "Imagem",
+        "language": "pt-BR",
+        "sections": [{
+            "id": "sec-1",
+            "title": "Dados",
+            "level": 1,
+            "children": [],
+            "blocks": [{
+                "id": "image-1",
+                "type": "image",
+                "alt_text": "Gráfico",
+                "long_description": "Barras de janeiro e fevereiro.",
+                "metadata": {"src": "grafico.png"},
+            }],
+        }],
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = export_accessible_document(
+            document, Path(tmpdir) / "saida.html", format_name="html",
+            toolbox=toolbox_config(),
+        )
+        html = output.read_text(encoding="utf-8")
+
+    assert (
+        '<figure id="image-1"><img alt="Gráfico" src="grafico.png">'
+        '<details><summary>Image description</summary>'
+        '<p>Barras de janeiro e fevereiro.</p></details></figure>'
+    ) in html

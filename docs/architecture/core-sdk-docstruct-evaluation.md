@@ -136,19 +136,21 @@ The direction of the dependencies is checked by tests:
 
 | Suite | Test functions, baseline → now | Time now |
 |---|---:|---:|
-| main (`tests/`, `-n 4`) | 1,512 → 2,211 | 71–88 s |
+| main (`tests/`, `-n 4`) | 1,512 → 1,495 | 163 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
-| core (`libs/core/tests`) | none → 15 | 6–10 s |
+| core (`libs/core/tests`) | none → 735 | 30 s |
 
 - **The libraries' suites run in seconds on their own,** so a change to
   docstruct or the SDK gets its feedback without the main suite.
-- **The main suite is still the bulk of the time.** Most of the core's tests
-  still live in `tests/`, next to the service's, because they were written
-  against `backend/` before the move. `libs/core/tests` holds the boundary
-  and smoke tests only.
+- **The main suite is still the bulk of the time**, but it now holds the
+  service and API tests; the core's own suite runs in about 30 s in its own
+  environment. The core's tests moved from `tests/` to `libs/core/tests` in
+  #613, with the boundary and smoke tests.
 - The baseline's suites were not timed: their environment cannot be rebuilt
   as it was, so only the counts are compared.
+- The main/core counts and times are the post-#613 measurement (one local
+  run); the rest of this page is at `ec3ddf0b`.
 
 ## 5. Reuse of operations
 
@@ -211,8 +213,8 @@ request:
 1. **Simplify the complex functions:** the five above first, starting with
    `_derive_v23_processing_needs` (complexity 71). This is the internal
    modularization #381 asked for, now on modules that have clear boundaries.
-2. **Move the core's tests to `libs/core/tests`** where they test the core
-   alone, so the core's suite runs without the service.
+2. ~~**Move the core's tests to `libs/core/tests`** where they test the core
+   alone, so the core's suite runs without the service.~~ Done in #613.
 3. **Give the operations users:** a `judge` command in the SDK's command line,
    and the math benchmark (`scripts/bench`) on the formula chain instead of
    the core.

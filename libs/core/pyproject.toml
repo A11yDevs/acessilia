@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=1.4.0,<2"]
+dev = ["pytest>=8.0", "pytest-asyncio>=1.4.0,<2", "respx>=0.23.1,<0.24", "pymupdf>=1.24,<2"]
 
 [tool.uv.sources]
 acessilia-docstruct = { path = "../docstruct", editable = true }

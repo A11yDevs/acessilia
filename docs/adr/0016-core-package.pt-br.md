@@ -384,8 +384,9 @@ A opção 2.
        ela devolve o mesmo manifesto que o serviço para a mesma entrada e não
        carrega nem o `backend` nem o FastAPI.
 
-     Os testes ficam em `tests/`; só o teste de fronteira e o de fumaça vão
-     para `libs/core/tests`. Quando os três estiverem feitos:
+     Os testes do serviço ficam em `tests/`; os testes do core foram para
+     `libs/core/tests` no #613, junto com o de fronteira e o de fumaça. Quando os
+     três estiverem feitos:
 
      - os módulos vão para `libs/core`, e o `backend/core` some;
      - os domínios PDDL, os prompts e os catálogos são declarados como dados

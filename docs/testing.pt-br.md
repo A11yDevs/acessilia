@@ -46,8 +46,9 @@ o workflow `CI` do GitHub Actions:
 
 - **`tests (Python 3.11)`** instala o projeto, confere o contrato de capacidades
   da Toolbox, informa se a versão do docstruct fixada pela Toolbox acompanha o
-  core (só avisos; veja abaixo), roda o core non-E2E com **quatro workers**,
-  roda as suítes do docstruct e do SDK, recusa skips inesperados e publica
+  core (só avisos; veja abaixo), roda a suíte principal non-E2E com **quatro
+  workers**, roda as suítes do docstruct, do SDK e da biblioteca do core, recusa
+  skips inesperados e publica
   relatórios JUnit.
 - **`SDK alone (Python 3.11)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
@@ -81,8 +82,8 @@ make test-all
 ```
 
 Ele roda a suíte principal non-E2E com quatro workers e depois as suítes do
-docstruct, do SDK e do `libs/core`, sequencialmente (a última tem os testes de
-fronteira e de fumaça do core). As bibliotecas são rápidas e têm ambientes de
+docstruct, do SDK e do `libs/core`, sequencialmente (a última tem a suíte da biblioteca do core:
+fronteira, fumaça e os testes migrados do `tests/` no #613). As bibliotecas são rápidas e têm ambientes de
 pacote separados, então permanecem simples. O `make test-all` executa as quatro suítes
 mesmo se uma falhar e retorna status não zero se alguma falhou.
 
@@ -127,9 +128,9 @@ O `make test-failed` é o wrapper suportado. Ele:
 Isso torna o ciclo “corrige uma falha, confirma, segue adiante” rápido e
 previsível.
 
-### 3. Rode o core em paralelo
+### 3. Rode a suíte principal em paralelo
 
-A suíte do core é a grande. O `pytest-xdist` inicia vários processos workers e
+A suíte principal é a grande. O `pytest-xdist` inicia vários processos workers e
 distribui os testes entre eles. O Makefile e a CI usam
 `-n 4 --dist worksteal`:
 
@@ -289,7 +290,7 @@ você passe `-m "not e2e"`; use os alvos do Makefile no ciclo normal.
 
 ### Timeouts e marcadores
 
-O `pytest-timeout` dá à suíte do core um limite de 180 segundos por teste. O
+O `pytest-timeout` dá à suíte principal um limite de 180 segundos por teste. O
 teste CPU-heavy do juiz VLM eleva o próprio limite para 300 segundos porque
 quatro workers podem esticá-lo em uma máquina ocupada. O E2E é a outra exceção:
 suas operações e esperas de job podem exceder esse limite legitimamente, então a
@@ -406,9 +407,9 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 ## Onde ver os resultados
 
 - **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
-  `Run complete test suite`. O log mostra `created: 4/4 workers` e
+  `Run main test suite`. O log mostra `created: 4/4 workers` e
   `--durations=25`.
-- **Artefatos:** `test-reports` (core, docstruct, SDK),
+- **Artefatos:** `test-reports` (principal, docstruct, SDK e biblioteca do core),
   `sdk-isolated-report` e `docstruct-isolated-report`.
 - **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
   30 dias e uma issue de acompanhamento em falhas agendadas.

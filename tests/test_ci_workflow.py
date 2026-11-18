@@ -1,4 +1,4 @@
-"""The CI gate keeps its required name and runs the core suite in parallel (#448)."""
+"""The CI gate keeps its required name and runs the main suite in parallel (#448)."""
 
 import json
 import shutil
@@ -43,7 +43,7 @@ def test_core_suite_runs_with_bounded_parallelism() -> None:
     steps = _workflow()["jobs"]["tests"]["steps"]
     names = [step.get("name") for step in steps]
     run = next(
-        step["run"] for step in steps if step.get("name") == "Run complete test suite"
+        step["run"] for step in steps if step.get("name") == "Run main test suite"
     )
 
     assert "-n 4" in run
@@ -145,13 +145,15 @@ def test_ci_installs_the_root_environment_from_the_lock() -> None:
     assert "uv sync --locked --extra dev" in install
 
     for name in (
-        "Run complete test suite",
+        "Run main test suite",
         "Run docstruct library test suite",
         "Run SDK library test suite",
+        "Run core library test suite",
     ):
         assert "uv run --locked" in steps[name]["run"]
     for name in ("Run docstruct library test suite", "Run SDK library test suite"):
         assert '--project "$GITHUB_WORKSPACE"' in steps[name]["run"]
+    assert '--project "$GITHUB_WORKSPACE/libs/core"' in steps["Run core library test suite"]["run"]
 
     assert not any(
         "pip install" in (step.get("run") or "") for step in job["steps"]
@@ -214,8 +216,12 @@ def test_scheduled_workflow_covers_both_branches_and_library_results() -> None:
         step for step in steps if step.get("name", "").startswith("Check out")
     )
     assert checkout["with"]["ref"] == "${{ matrix.ref }}"
-    assert any(step.get("name") == "Check docstruct and SDK reports" for step in steps)
-    for name in ("Run docstruct library test suite", "Run SDK library test suite"):
+    assert any(step.get("name") == "Check library reports" for step in steps)
+    for name in (
+        "Run docstruct library test suite",
+        "Run SDK library test suite",
+        "Run core library test suite",
+    ):
         step = next(step for step in steps if step.get("name") == name)
         assert step.get("continue-on-error") is True
 

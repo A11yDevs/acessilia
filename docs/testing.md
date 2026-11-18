@@ -46,8 +46,8 @@ GitHub Actions workflow `CI`:
 
 - **`tests (Python 3.11)`** installs the project, checks the Toolbox capability
   contract, reports whether the Toolbox's docstruct pin follows the core
-  (warnings only; see below), runs the non-E2E core suite with **four
-  workers**, runs the docstruct and SDK suites, rejects unexpected skipped
+  (warnings only; see below), runs the non-E2E main suite with **four
+  workers**, runs the docstruct, SDK and core library suites, rejects unexpected skipped
   tests and uploads JUnit reports.
 - **`SDK alone (Python 3.11)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,
@@ -80,8 +80,8 @@ make test-all
 ```
 
 It runs the non-E2E main suite with four workers, then the docstruct, SDK and
-`libs/core` suites sequentially (the last one holds the core's boundary and
-smoke tests). The libraries are fast and have separate package environments, so
+`libs/core` suites sequentially (the last one holds the core library suite: boundary,
+smoke and the core tests migrated from `tests/` in #613). The libraries are fast and have separate package environments, so
 they stay simple. `make test-all` executes all four suites even if one fails,
 and returns a non-zero status if any of them failed.
 
@@ -124,9 +124,9 @@ is empty, and it knows nothing about the separate library caches.
 
 That makes the "fix one failure, confirm it, move on" loop fast and predictable.
 
-### 3. Run the core suite in parallel
+### 3. Run the main suite in parallel
 
-The core suite is the large one. `pytest-xdist` starts several worker processes
+The main suite is the large one. `pytest-xdist` starts several worker processes
 and distributes tests across them. The Makefile and CI use
 `-n 4 --dist worksteal`:
 
@@ -137,7 +137,7 @@ and distributes tests across them. The Makefile and CI use
   module-based distribution leaves workers idle while one worker finishes a
   long tail.
 
-The result is roughly **1.9x** for the core suite on the reference 12-core
+The result is roughly **1.9x** for the main suite on the reference 12-core
 machine: **143s serial → 74s with four workers** in a quiet run. `-n 2` is
 slower (124s), `--dist load` is slower (178s), and `-n auto` (12 workers) was
 slower (96s) because the long test cannot be split and the extra processes
@@ -179,7 +179,7 @@ check still runs and the JUnit artifacts are still uploaded even on failure.
 
 Parallelism and different orders can reveal a test that depends on another
 test's leftovers. The `Scheduled test monitoring` workflow runs weekly (and on
-demand) for `main` and `develop`. For each branch it runs the core suite
+demand) for `main` and `develop`. For each branch it runs the main suite
 serially and again with four workers, compares the JUnit outcomes, fails on a
 difference, failure, error or unexpected skip, and writes a summary with p50/p95
 test durations and the slowest tests. It also checks the Toolbox's docstruct
@@ -200,7 +200,7 @@ experiment found that it cannot see static files such as docs, schemas and
 fixtures, and that the root command does not run the library suites. A README
 change selected zero tests even though a mandatory static gate failed; a
 central change selected 246 tests; rebuilding the dependency database took
-221s in the quiet measurement (+55% over the serial core baseline). It also
+221s in the quiet measurement (+55% over the serial main baseline). It also
 added a stateful `.testmondata` database and showed unstable selection between
 runs. The full details and measurements are in the experiment record from
 [#448](https://github.com/A11yDevs/acessilia/issues/448).
@@ -284,7 +284,7 @@ loop.
 
 ### Timeouts and markers
 
-`pytest-timeout` gives the core suite a 180-second per-test limit. The CPU-heavy
+`pytest-timeout` gives the main suite a 180-second per-test limit. The CPU-heavy
 VLM judge test raises its own limit to 300 seconds because four workers can
 stretch it on a busy machine. E2E is the other exception: its operations and job
 waits can legitimately exceed that limit, so the [E2E recipe](#i-need-e2e)
@@ -397,15 +397,15 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 ## Where to see the results
 
 - **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
-  `Run complete test suite`. The log shows `created: 4/4 workers` and
+  `Run main test suite`. The log shows `created: 4/4 workers` and
   `--durations=25`.
-- **Artifacts:** `test-reports` (core, docstruct, SDK),
+- **Artifacts:** `test-reports` (main, docstruct, SDK and core library),
   `sdk-isolated-report` and `docstruct-isolated-report`.
 - **Scheduled:** workflow `Scheduled test monitoring`, with artifacts retained
   for 30 days and a tracking issue on scheduled failures.
 - **Rulesets:** both `main` and `develop` require `tests (Python 3.11)` and
   `SDK alone (Python 3.11)`.
-- **Locally:** run `time make test-all` and compare it with the serial core
+- **Locally:** run `time make test-all` and compare it with the serial main
   command above on the same idle machine.
 
 ## Supported environments

@@ -192,7 +192,7 @@ def render_summary(
         "## Scheduled test monitoring",
         "",
         (
-            "The same non-E2E core suite ran serially and with four workers "
+            "The same non-E2E main suite ran serially and with four workers "
             "(`--dist worksteal`)."
         ),
         "",

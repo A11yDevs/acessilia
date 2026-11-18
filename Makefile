@@ -1,6 +1,6 @@
 # Local test entry points; see docs/testing.md for the workflow.
 #
-# `test-all` runs the core suite with four workers after the isolation fixes
+# `test-all` runs the main suite with four workers after the isolation fixes
 # tracked by #448 (PR 2); docstruct and SDK stay sequential because they are
 # fast. Use `uv run pytest ...` directly for anything these targets do not cover.
 
