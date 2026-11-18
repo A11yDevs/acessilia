@@ -9,7 +9,8 @@ pede um diagnóstico antes de qualquer decisão. Esta página registra o que o
 código e as ADRs já resolvem e o que continua em aberto. A medição foi feita na
 develop em 8d7465e4 (a Toolbox nas refs da seção dela, abaixo), com uma varredura de AST que inclui os imports dentro de
 funções. A [ADR-0017](../adr/0017-operational-sdk-and-agentic-core.pt-br.md)
-parte daqui.
+parte daqui. A fase 5 mede o que mudou, na
+[avaliação](core-sdk-docstruct-evaluation.pt-br.md).
 
 ## O que já está decidido e verificado
 

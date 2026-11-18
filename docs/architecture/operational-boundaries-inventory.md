@@ -9,7 +9,8 @@ asks for a diagnosis before any decision. This page records what the code and
 the ADRs already settle, and what is still open. It was measured on develop at
 8d7465e4 (the Toolbox at the refs in its section below), with an AST scan that includes imports inside functions.
 [ADR-0017](../adr/0017-operational-sdk-and-agentic-core.md) takes its
-decisions from here.
+decisions from here. Phase 5 measures what changed, in the
+[evaluation](core-sdk-docstruct-evaluation.md).
 
 ## What is already decided and enforced
 
