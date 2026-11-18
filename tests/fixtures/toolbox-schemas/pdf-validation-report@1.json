@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:pdf-validation-report:1.0.0",
+  "title": "PDF validation report",
+  "description": "Verdict of a PDF/UA validation profile on one PDF, reduced from the veraPDF report.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "compliant",
+    "profile",
+    "profile_name",
+    "statement",
+    "summary",
+    "failures",
+    "validator"
+  ],
+  "properties": {
+    "compliant": {
+      "type": "boolean",
+      "description": "True when no rule of the profile failed."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "ua1",
+        "ua2"
+      ],
+      "description": "Requested validation profile."
+    },
+    "profile_name": {
+      "type": "string",
+      "description": "Profile name as veraPDF reports it."
+    },
+    "statement": {
+      "type": "string",
+      "description": "veraPDF's one-line verdict."
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed_rules",
+        "failed_rules",
+        "passed_checks",
+        "failed_checks"
+      ],
+      "properties": {
+        "passed_rules": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_rules": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed_checks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_checks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "failures": {
+      "type": "array",
+      "description": "One entry per failed rule.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "specification",
+          "clause",
+          "test_number",
+          "description",
+          "object",
+          "test",
+          "tags",
+          "failed_checks",
+          "checks"
+        ],
+        "properties": {
+          "specification": {
+            "type": "string",
+            "description": "Standard the rule comes from, such as ISO 14289-1:2014."
+          },
+          "clause": {
+            "type": "string",
+            "description": "Clause of that standard, such as 7.1."
+          },
+          "test_number": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string",
+            "description": "PDF object type the rule applies to."
+          },
+          "test": {
+            "type": "string",
+            "description": "Rule expression that failed."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed_checks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total failing objects; may exceed the listed checks."
+          },
+          "checks": {
+            "type": "array",
+            "description": "First failing contexts, capped per rule.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "context",
+                "message"
+              ],
+              "properties": {
+                "context": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validator": {
+      "type": "object",
+      "description": "Validator identity; its versions are part of the cache key.",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

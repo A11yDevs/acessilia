@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.config import CoreConfig
 from acessilia_core.ports import NoRegionCache, RunPorts, region_cache_for
 
 from tests.core_config_support import core_config, vision_config
@@ -332,10 +333,10 @@ def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
     from acessilia_core.execution.executor import MethodRegistry
     from acessilia_core.pipeline.handlers.registry import bind_run
 
-    def with_ports(manifest, obligation_id, *, ports):
+    def with_ports(manifest, obligation_id, *, ports: RunPorts):
         return ports
 
-    def with_both(manifest, obligation_id, *, config, ports):
+    def with_both(manifest, obligation_id, *, config: CoreConfig, ports: RunPorts):
         return config, ports
 
     def plain(manifest, obligation_id):

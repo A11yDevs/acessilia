@@ -156,7 +156,7 @@ ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 ## Documentação relacionada
 - [Fluxo local de testes](../docs/testing.pt-br.md) — comandos `make`, tempos de linha de base e timeouts
 - [Arquitetura](../docs/architecture.md)
-- [Pipeline PDDL + Agno](../docs/pmv_agno_pddl.md)
+- [Pipeline PDDL + Agno](../docs/pddl_pipeline.pt-br.md)
 - [Internacionalização (i18n)](../docs/i18n.pt-br.md) — veja a suíte de testes de internacionalização em [test_i18n.py](test_i18n.py)
 
 ## Compatibilidade do catálogo de formatos

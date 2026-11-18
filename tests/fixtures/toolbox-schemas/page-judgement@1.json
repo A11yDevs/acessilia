@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:page-judgement:1.0.0",
+  "title": "Page Judgement",
+  "description": "Pairwise judgement of two candidate transcriptions of a page by a vision-language model.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pB_ab", "pA_ba", "pB", "prompt", "model"],
+  "properties": {
+    "pB_ab": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Probability that candidate B is more faithful, asked with A first."
+    },
+    "pA_ba": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Probability that candidate A is more faithful, asked with B first."
+    },
+    "pB": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Position-debiased probability that candidate B is more faithful: (pB_ab + 1 - pA_ba) / 2."
+    },
+    "prompt": {
+      "type": "string",
+      "enum": ["base", "para", "err"],
+      "description": "Judge prompt variant used."
+    },
+    "model": {
+      "type": "string",
+      "description": "Model identifier the server answered with."
+    }
+  }
+}

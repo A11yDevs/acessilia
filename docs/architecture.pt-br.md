@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](architecture.md)
 ## Visão geral
 O sistema converte documentos em formatos acessíveis por meio de um pipeline de extração multiagente (extração estrutural por meio das capacidades da Acessilia Toolbox, mais agentes de visão e de dados de IA multimodal conduzidos por Agno), um pipeline de documento canônico, validação determinística e renderizadores específicos de formato. A arquitetura é modular: **backend/** guarda a lógica de domínio e a API REST que a expõe, **frontend/** guarda os clientes de interface (Telegram, Web, CLI) que conversam com essa API, e **infra/** guarda o Dockerfile (o arquivo Compose fica na raiz do repositório).
 
-O sistema combina **planejamento determinístico com execução guiada por IA**: as funções determinísticas (extração, geração do problema PDDL, validação de contrato) são a fonte da verdade, e os LLMs fornecem interpretação e descrição. Os documentos passam pelo motor de pipeline **`pddl`** (`PIPELINE_ENGINE`, padrão `pddl`): um manifesto de processamento é extraído, um plano PDDL é gerado e validado, e um executor Agno Workflow o aplica. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
+O sistema combina **planejamento determinístico com execução guiada por IA**: as funções determinísticas (extração, geração do problema PDDL, validação de contrato) são a fonte da verdade, e os LLMs fornecem interpretação e descrição. Os documentos passam pelo motor de pipeline **`pddl`** (`PIPELINE_ENGINE`, padrão `pddl`): um manifesto de processamento é extraído, um plano PDDL é gerado e validado, e um executor Agno Workflow o aplica. Veja [pddl_pipeline.pt-br.md](pddl_pipeline.pt-br.md).
 
 O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele, mas está depreciado: gera um aviso no log ao iniciar e será removido) e recusa qualquer outro valor. O código dele foi removido.
 
@@ -126,7 +126,7 @@ Este é o único motor ativo. Ele transforma a estrutura do documento em um plan
 - `libs/core/src/acessilia_core/agents/fusion_agent.py`: o `FusionAgent` expõe ferramentas Agno determinísticas sobre a biblioteca pura `docstruct` — `fuse_providers`, `audit_document`, `classify_block` e `needs_reinfer`. O método PDDL `dual-provider-fusion` reutiliza `acessilia_core.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para saber como funcionam esses algoritmos.
 - `libs/core/src/acessilia_core/pipeline/orchestrator.py`: `PddlAccessibilityOrchestrator.execute()` coordena as fases manifesto → plano → execução. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística. O [inventário](architecture/pddl-orchestrator-inventory.pt-br.md) dele atribui cada parte ao core, ao docstruct ou ao SDK (#402).
 
-O domínio PDDL vive em `libs/core/src/acessilia_core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pmv_schemas.py`.
+O domínio PDDL vive em `libs/core/src/acessilia_core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pddl_schemas.py`.
 
 ---
 

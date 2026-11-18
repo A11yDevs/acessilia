@@ -1,6 +1,6 @@
-# PMV 2.1 — Agno, manifesto, PDDL, comparação e execução nominal
+# O pipeline PDDL — Agno, manifesto, PDDL, comparação e execução nominal
 
-> English version: [English](pmv_agno_pddl.md)
+> English version: [English](pddl_pipeline.md)
 
 ## Objetivo
 
@@ -29,7 +29,7 @@ Nenhum LLM escreve PDDL diretamente.
 
 ```bash
 uv sync --extra dev
-uv run python scripts/generate_pmv_schemas.py
+uv run python scripts/generate_pddl_schemas.py
 uv run pytest
 ```
 
@@ -38,7 +38,7 @@ estrutura roda na Acessilia Toolbox ([ADR-0003](adr/0003-remote-only-operational
 então o Docling não é instalado localmente.
 
 O Fast Downward só é necessário ao usar `--planner fast-downward` ou
-`--planner both`. O backend `internal` é o planner de referência do PMV e
+`--planner both`. O backend `internal` é o planner de referência do pipeline e
 funciona sem binário externo.
 
 ## 1. Agente Informacional-Estrutural
@@ -54,7 +54,7 @@ A estrutura vem da Toolbox via `ToolboxManifestExtractor`, então os comandos
 veja o `.env.example`).
 
 ```bash
-uv run python scripts/pmv.py manifest documento.pdf \
+uv run python scripts/pddl_pipeline.py manifest documento.pdf \
   -o output/processing-manifest.json \
   --no-ocr
 ```
@@ -87,7 +87,7 @@ compilador:
 6. valida a projeção antes de chamar o planner.
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output
 ```
 
@@ -96,7 +96,7 @@ estiver marcada, todas as obrigações não satisfeitas são selecionadas. Para
 escolher raízes:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --select obligation-describe-image-000012
 ```
@@ -106,7 +106,7 @@ uv run python scripts/pmv.py plan output/processing-manifest.json \
 Planner interno:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --planner internal
 ```
@@ -114,7 +114,7 @@ uv run python scripts/pmv.py plan output/processing-manifest.json \
 Fast Downward:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --planner fast-downward \
   --fast-downward /caminho/fast-downward.py \
@@ -129,14 +129,14 @@ domínio 2.2.
 O backend interno não pretende substituir um planner geral. Ele explora a
 estrutura específica do domínio 2.2: ordena o DAG de obrigações e escolhe o
 método admissível não tentado de menor custo. É um oráculo simples e
-reprodutível para validar o PMV.
+reprodutível para validar o pipeline.
 
 ### Execução dos dois backends
 
 Para estudos diferenciais:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --planner both \
   --fast-downward /caminho/fast-downward.py \
@@ -228,7 +228,7 @@ passos em sequência e interrompe no primeiro erro.
 Dry-run, sem confirmar efeitos:
 
 ```bash
-uv run python scripts/pmv.py execute \
+uv run python scripts/pddl_pipeline.py execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution
@@ -237,7 +237,7 @@ uv run python scripts/pmv.py execute \
 Execução real requer handlers:
 
 ```bash
-uv run python scripts/pmv.py execute \
+uv run python scripts/pddl_pipeline.py execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution \
@@ -248,7 +248,7 @@ uv run python scripts/pmv.py execute \
 O módulo deve fornecer:
 
 ```python
-from core.execution.models import MethodResult
+from acessilia_core.execution.models import MethodResult
 
 
 def describe_image(manifest, obligation_id):
@@ -265,8 +265,11 @@ def register_handlers(registry):
     registry.register("vision-description", describe_image)
 ```
 
-`examples.demo_handlers` permite exercitar o caminho `--live`, mas é
-explicitamente simulado e não deve ser usado em produção.
+O registro é vinculado como numa execução do serviço (`bind_run`): um
+handler que precisa da configuração ou dos ports da execução os declara
+depois do `*`, anotados com o tipo (`*, config: CoreConfig`,
+`*, ports: RunPorts`). Um handler que quebra esse contrato interrompe o
+`execute` antes de o plano rodar (#543).
 
 Em caso de falha:
 
@@ -337,7 +340,7 @@ planner só recorre a eles quando o caminho determinístico não está disponív
 ## 6. Execução ponta a ponta
 
 ```bash
-uv run python scripts/pmv.py pipeline documento.pdf \
+uv run python scripts/pddl_pipeline.py pipeline documento.pdf \
   -o output/job-001 \
   --no-ocr \
   --planner both \
@@ -374,12 +377,12 @@ output/job-001/
 Os três JSON Schemas são gerados dos modelos Pydantic:
 
 ```bash
-uv run python scripts/generate_pmv_schemas.py
+uv run python scripts/generate_pddl_schemas.py
 ```
 
 O CI deve falhar se os arquivos gerados divergirem dos schemas versionados.
 
-## Limites do PMV
+## Limites
 
 - o domínio trata um documento/job por instância;
 - o planner interno só cobre o domínio de obrigações 2.2;

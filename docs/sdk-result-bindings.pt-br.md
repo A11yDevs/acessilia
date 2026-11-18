@@ -333,3 +333,12 @@ entram automaticamente no escopo da geração.
 [layout-publication]: https://github.com/A11yDevs/acessilia-toolbox/pull/161
 [dataset-contract]: https://github.com/A11yDevs/acessilia-toolbox/blob/c536c2007912e0ce2f20bd930215d96e6f4c09be/docs/dataset-contracts.pt-br.md
 [layout-contract]: https://github.com/A11yDevs/acessilia-toolbox/blob/c536c2007912e0ce2f20bd930215d96e6f4c09be/docs/layout-contract.pt-br.md
+
+## Sequência de revisão da implementação
+
+A implementação foi dividida para limitar cada revisão: captura fixada,
+leitores execute selecionados, leitor de variantes de layout e leitores REST
+de datasets. Cada PR seguinte aponta para a branch anterior até sua mesclagem.
+A origem está fixada em `tests/fixtures/toolbox-snapshot.json`, com checksums
+SHA-256 dos bytes do contrato público completo e de cada schema selecionado.
+Capturas com `--url` são diagnósticas e não sobrescrevem a entrada da geração.
