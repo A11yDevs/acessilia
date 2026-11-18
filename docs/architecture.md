@@ -7,7 +7,7 @@ The system converts documents into accessible formats through a multi-agent extr
 
 The system combines **deterministic planning with AI-driven execution**: deterministic functions (extraction, PDDL problem generation, contract validation) are the source of truth, and LLMs provide interpretation and description. Documents run through the **`pddl`** pipeline engine (`PIPELINE_ENGINE`, default `pddl`): a processing manifest is extracted, a PDDL plan is generated and validated, and an Agno Workflow executor applies it. See [pddl_pipeline.md](pddl_pipeline.md).
 
-The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) is disabled: `backend/service.py` accepts only `pddl` (the old `pmv` alias is normalized to it) and refuses any other value. Its code has been removed.
+The former **`legacy`** engine (`AccessibilityOrchestrator`: Reader → Vision/Data → Editor) is disabled: `backend/service.py` accepts only `pddl` (the old `pmv` alias is normalized to it, and is deprecated: it logs a warning at startup and will be removed) and refuses any other value. Its code has been removed.
 
 ---
 
