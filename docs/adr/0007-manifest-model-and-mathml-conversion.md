@@ -20,12 +20,12 @@ The audit found two questions that needed a decision:
 
 1. **Which component holds the single definition of the processing manifest's
    semantic model.** Today the model exists twice, in
-   `backend/core/manifest/models.py` and in the Toolbox's
+   `libs/core/src/acessilia_core/manifest/models.py` and in the Toolbox's
    `core/normalization/models.py`, under the same schema id; the Toolbox
    publishes it as `artifact/structured-document@1` (finding A1).
 2. **Where LaTeX → MathML conversion and the verbalization of formulas
    happen.** Today the core converts with `latex2mathml` and verbalizes with
-   its own pt-BR rules, both in `backend/core/formula_tools.py`, while the
+   its own pt-BR rules, both in `libs/core/src/acessilia_core/formula_tools.py`, while the
    Toolbox has its own implementations behind `math.convert` and
    `math.verbalize`; the two verbalizers have diverged (finding A3).
 
@@ -160,7 +160,7 @@ Implementation and acceptance criteria:
 - Only the semantic model moves to docstruct. The core's
   `ProcessingManifest` also carries process state (obligations, attempts,
   statuses, dependencies, history); that state, and the manifest as a whole,
-  stay in the core, which splits `backend/core/manifest/models.py` instead of
+  stay in the core, which splits `libs/core/src/acessilia_core/manifest/models.py` instead of
   replacing it. Identification and origin fields are classified one by one;
   they are not structural semantics by default.
 - Three versions are independent: the core's `processing-manifest:1.1.0`

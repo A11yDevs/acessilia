@@ -2,8 +2,7 @@ import asyncio
 import threading
 
 import pytest
-
-from backend.core.blocking import run_blocking
+from acessilia_core.blocking import run_blocking
 
 
 @pytest.mark.asyncio

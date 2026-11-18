@@ -1,5 +1,5 @@
 """
-What this suite verifies: backend/core/pipeline/validators.audit_canonical_document separates findings
+What this suite verifies: libs/core/src/acessilia_core/pipeline/validators.audit_canonical_document separates findings
 into BLOCKER (base-structural failures plus missing sections) and WARNING (accessibility issues
 such as images without alt text and tables lacking an explicit table_ast header). Locale is pinned
 to en_US for deterministic canonical-English assertions.
@@ -7,10 +7,10 @@ to en_US for deterministic canonical-English assertions.
 
 from __future__ import annotations
 
+import acessilia_core.i18n as i8n
 import pytest
+from acessilia_core.pipeline.validators import audit_canonical_document
 
-import backend.core.i18n as i8n
-from backend.core.pipeline.validators import audit_canonical_document
 from tests.locale_support import use_server_locale
 
 
@@ -18,7 +18,7 @@ from tests.locale_support import use_server_locale
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.
 
-    The audit findings resolve through backend.core.i18n.t, so assertions need a deterministic locale;
+    The audit findings resolve through acessilia_core.i18n.t, so assertions need a deterministic locale;
     en_US returns the canonical English msgids.
     """
     use_server_locale(monkeypatch, "en_US")

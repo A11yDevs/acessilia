@@ -1,6 +1,6 @@
 """The veraPDF audit of the PDF/UA: its e-mail summary, and the worker step.
 
-Every user-visible line is resolved through backend.core.i18n.t, so the assertions
+Every user-visible line is resolved through acessilia_core.i18n.t, so the assertions
 hold under any supported server locale.
 """
 
@@ -11,10 +11,8 @@ import json
 from pathlib import Path
 
 import pytest
-
-from backend.config.settings import settings
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     EMAIL_AUDIT_COMPLIANT,
     EMAIL_AUDIT_MORE_RULES,
     EMAIL_AUDIT_NON_COMPLIANT,
@@ -22,7 +20,9 @@ from backend.core.i18n.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,
     EMAIL_RESULT_AUDIT_HEADER,
 )
-from backend.core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
+from acessilia_core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
+
+from backend.config.settings import settings
 from tests.conftest import COMPLIANT_PDF_UA_REPORT
 from tests.core_config_support import toolbox_config
 

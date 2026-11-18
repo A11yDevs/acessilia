@@ -34,7 +34,7 @@ different things: Docling is strong on reading order and headings; MinerU is
 strong on text quality and formula extraction. Fusion combines them into a
 single, higher-quality block sequence.
 
-### 1.2 Pipeline (`backend/core/pipeline/fusion.py`)
+### 1.2 Pipeline (`libs/core/src/acessilia_core/pipeline/fusion.py`)
 
 `extract_fused()` orchestrates the two providers and calls the pure
 `docstruct.fusion.merge_blocks()`:
@@ -276,7 +276,7 @@ deterministic gate that decides whether an LLM pass is required.
 
 ## 4. The `FusionAgent` (Agno tool envelope)
 
-`backend/core/agents/fusion_agent.py` exposes the algorithms as Agno tools,
+`libs/core/src/acessilia_core/agents/fusion_agent.py` exposes the algorithms as Agno tools,
 following the `InformationalStructuralAgent` pattern: each capability has a
 pure `process_*` method (unit-testable without Agno) plus a thin JSON tool
 envelope.
@@ -310,10 +310,10 @@ PDDL plan
 ExecutorAgent (Agno Workflow)
    │  calls the registered handler
    ▼
-_handle_dual_provider_fusion_method (backend/core/pipeline/handlers/fusion.py)
+_handle_dual_provider_fusion_method (libs/core/src/acessilia_core/pipeline/handlers/fusion.py)
    │  calls extract_fused()
    ▼
-backend.core.pipeline.fusion.extract_fused
+acessilia_core.pipeline.fusion.extract_fused
    │  extracts with docling + mineru (parallel)
    ▼
 docstruct.fusion.merge_blocks (Tree Differ)

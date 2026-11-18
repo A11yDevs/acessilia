@@ -9,15 +9,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.pipeline.secondary import _SecondaryExtraction
-from backend.core.pipeline.elements import _element_bbox as orchestrator_bbox
+from acessilia_core.pipeline.secondary import _SecondaryExtraction
+from acessilia_core.pipeline.elements import _element_bbox as orchestrator_bbox
 from docstruct.geometry import is_bottom_left
 from docstruct.geometry.boxes import best_effort_clip
-from backend.core.manifest.builder import (
+from acessilia_core.manifest.builder import (
     _normalized_element_bbox,
     _refine_reading_order,
 )
-from backend.core.manifest.models import (
+from acessilia_core.manifest.models import (
     BoundingBox,
     ManifestElement,
     PageDescriptor,

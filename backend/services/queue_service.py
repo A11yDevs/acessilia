@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Coroutine, Any
 
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_QUEUE_ITEM_ENQUEUED,
     LOG_WORKER_STARTED,
     LOG_WORKER_TASK_COMPLETED,
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 
 
 @dataclass

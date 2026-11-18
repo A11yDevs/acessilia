@@ -1,14 +1,14 @@
-"""A presentation is structured slide by slide (backend.core.manifest.slides).
+"""A presentation is structured slide by slide (acessilia_core.manifest.slides).
 
-Every user-visible heading is resolved through backend.core.i18n.t, so the
+Every user-visible heading is resolved through acessilia_core.i18n.t, so the
 assertions hold under any supported server locale.
 """
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 import copy
 from datetime import UTC, datetime
@@ -16,14 +16,14 @@ from datetime import UTC, datetime
 import pytest
 
 from tests.core_config_support import core_config, fusion_config, model_config, paths_config, toolbox_config, vision_config
-from backend.core.manifest.builder import build_processing_manifest
-from backend.core.manifest.models import ProcessingManifest
-from backend.core.manifest.slides import is_slide_heading
-from backend.core.manifest.toolbox_extractor import ToolboxExtraction
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
-from backend.core.pipeline.enrichment import pictures as picture_stage
-from backend.core.pipeline import preflight as pipeline_preflight
+from acessilia_core.manifest.builder import build_processing_manifest
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.manifest.slides import is_slide_heading
+from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline import preflight as pipeline_preflight
 
 NOW = datetime(2026, 10, 23, tzinfo=UTC)
 WIDTH, HEIGHT = 960, 540
@@ -327,7 +327,7 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
     from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 
     from backend.config.settings import settings
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from tests.test_toolbox_manifest_extractor import (
         FIXTURE_PDF,
         SAMPLE_TOOLBOX_RESPONSE,
@@ -342,7 +342,7 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
         pytest.fail("the secondary provider was called for a presentation")
 
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client", no_secondary
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", no_secondary
     )
 
     result = ToolboxManifestExtractor(client=client).extract(
@@ -357,7 +357,7 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_a_whole_slide_is_described_with_the_page_prompt(source, monkeypatch):
-    from backend.core.agents.output_schemas import VisionOutput
+    from acessilia_core.agents.output_schemas import VisionOutput
 
     manifest = _build(source)
     classifications = {}
@@ -390,8 +390,8 @@ async def test_media_inspection_decides_the_structure_before_extraction(
 
     from docstruct.validation import validate_canonical_document
 
-    from backend.core.pipeline import orchestrator as pddl
-    from backend.core.pipeline.canonical_builder import build_canonical_document
+    from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline.canonical_builder import build_canonical_document
     from tests.pddl_support import build_orchestrator
 
     calls = []
@@ -567,8 +567,8 @@ def test_an_undescribed_picture_gives_its_labels_back_as_paragraphs(source):
     006.pdf v5 listed them as the picture's alt text ("Aquecedor para vaporizar
     a; amostra; ..."); they go back to the slide after the picture instead.
     """
-    from backend.core.pipeline.payload import _manifest_pages_to_payload
-    from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
+    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
+    from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 
     manifest = _build_edited(
         source,
@@ -596,8 +596,8 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
     source, monkeypatch
 ):
     """A failed vision call leaves the extractor's alt in place; it carries no labels."""
-    from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-    from backend.core.pipeline.payload import _manifest_pages_to_payload
+    from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
 
     class FailingVision:
         def __init__(self, mode: str, *, region_cache, toolbox, models) -> None:
@@ -606,9 +606,9 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
         async def describe_region(self, *, errors=None, **kwargs):
             return None
 
-    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FailingVision)
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.pictures.VisionAgent", FailingVision)
     monkeypatch.setattr(
-        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.pictures._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 2),
     )
     extraction = _with_labels(
@@ -633,8 +633,8 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
 
 def test_an_undescribed_slide_picture_gives_back_the_text_it_replaced(source):
     """A slide read as one picture keeps its text when the picture goes undescribed."""
-    from backend.core.pipeline.payload import _manifest_pages_to_payload
-    from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
+    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
+    from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
 
     manifest = _build(source)
     [picture] = [e for e in manifest.elements if e.metadata.get("slide_visual")]
@@ -924,7 +924,7 @@ def test_text_read_across_two_slides_is_split_back_into_each(source):
 @pytest.mark.parametrize("top", [450, 510], ids=["on-picture", "beside-picture"])
 def test_split_labels_stay_as_text_when_the_picture_is_described(source, top):
     """006.pdf 26/37: a split part can name pictures in separate columns."""
-    from backend.core.pipeline.payload import _manifest_pages_to_payload
+    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
 
     labels = "Molecule macromolecule"
     exercise = "For vitamin C, calculate the following:"

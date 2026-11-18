@@ -3,7 +3,7 @@
 The SDK reads no settings and no environment (ADR-0002): a caller builds a
 :class:`ToolboxClientConfig` from its own configuration source and passes it to
 :func:`make_client`. The core maps its ``settings`` onto this object
-(``backend/core/toolbox/toolbox_client.py``); a script or a benchmark harness can build
+(``libs/core/src/acessilia_core/toolbox/toolbox_client.py``); a script or a benchmark harness can build
 one by hand, with no core install.
 """
 

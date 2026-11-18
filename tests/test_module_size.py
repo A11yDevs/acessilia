@@ -22,11 +22,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWLIST_PATH = REPO_ROOT / "tests" / "fixtures" / "module_size_allowlist.json"
 
 #: The folders and files that hold the core's modules today (ADR-0016). Step 2
-#: gathered the core under backend/core; the job state left in backend/agents
+#: gathered the core under libs/core/src/acessilia_core; the job state left in backend/agents
 #: belongs to the service.
-SCANNED_ROOTS = ("backend/core",)
+SCANNED_ROOTS = ("libs/core/src/acessilia_core",)
 #: Single files outside the roots above. The message modules were here until
-#: ADR-0016's step 2 gathered them into backend/core/i18n, which backend/core covers.
+#: ADR-0016's step 2 gathered them into libs/core/src/acessilia_core/i18n, which libs/core/src/acessilia_core covers.
 SCANNED_FILES: tuple[str, ...] = ()
 
 

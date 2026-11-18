@@ -16,23 +16,23 @@ from typing import ClassVar
 import pytest
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
-from backend.core.pipeline import orchestrator as pddl
-from backend.core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
-from backend.core.agents.output_schemas import VisionOutput
-from backend.core.manifest.models import ManifestElement
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.manifest.models import ManifestElement
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
     LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
     LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
 )
-from backend.core.i18n.stage_messages import (
+from acessilia_core.i18n.stage_messages import (
     STAGE_ENRICHING_FORMULAS,
     STAGE_PAGE,
     STAGE_RECOGNIZING_FORMULA,
 )
-from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from tests.pddl_support import (
     install_formula_recognizer,
     build_element,
@@ -152,7 +152,7 @@ async def test_unavailable_recognizer_falls_back_to_vision(monkeypatch, cropped)
 
 
 def _capture_logs(level: str) -> tuple[list[tuple[str, str]], int]:
-    from backend.core.logger import logger
+    from acessilia_core.logger import logger
 
     records: list[tuple[str, str]] = []
     sink = logger.add(
@@ -226,7 +226,7 @@ async def test_a_latex_label_alone_still_marks_the_formula_as_latex(monkeypatch)
     command, but the extractor's LaTeX is kept and no recognition is paid."""
     from types import SimpleNamespace
 
-    from backend.core.manifest.builder import separate_equation_number
+    from acessilia_core.manifest.builder import separate_equation_number
 
     element = SimpleNamespace(type="formula", text=r"x=y\tag{1}", metadata={})
     separate_equation_number(element)
@@ -249,7 +249,7 @@ async def test_a_latex_label_alone_still_marks_the_formula_as_latex(monkeypatch)
 async def test_a_plain_text_label_does_not_mark_the_formula_as_latex():
     from types import SimpleNamespace
 
-    from backend.core.manifest.builder import separate_equation_number
+    from acessilia_core.manifest.builder import separate_equation_number
 
     element = SimpleNamespace(type="formula", text="x = y (1)", metadata={})
     separate_equation_number(element)
@@ -262,7 +262,7 @@ async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropp
     an outage: each fallback is a DEBUG line and the document gets one INFO
     line that names the provider."""
     from backend.config.settings import settings
-    from backend.core.logger import logger
+    from acessilia_core.logger import logger
 
     manifest = _formula_manifest(None, None)
     FakeVision.output = VisionOutput(
@@ -301,7 +301,7 @@ async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, 
     from acessilia_sdk.toolbox.capabilities import provider_default
 
     from backend.config.settings import settings
-    from backend.core.logger import logger
+    from acessilia_core.logger import logger
 
     manifest = _formula_manifest()
     _recognizer_answers(monkeypatch, [])
@@ -322,7 +322,7 @@ async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, 
 
 @pytest.mark.asyncio
 async def test_an_outage_logs_no_empty_answer_line(monkeypatch, cropped):
-    from backend.core.logger import logger
+    from acessilia_core.logger import logger
 
     manifest = _formula_manifest(None, None)
 

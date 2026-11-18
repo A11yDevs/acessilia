@@ -17,16 +17,16 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Output: TXT, DOCX, PDF/UA, HTML and MP3, delivered in chat, as a download link, or by email.
 - Implementation:
   - input/validation: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/services/validators.py](../backend/services/validators.py)
-  - processing: [backend/service.py](../backend/service.py) runs the PDDL orchestrator [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; the legacy engine is disabled), which feeds [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py)
-  - export: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py), [backend/core/export/exporters](../backend/core/export/exporters), [backend/core/export/renderers](../backend/core/export/renderers)
+  - processing: [backend/service.py](../backend/service.py) runs the PDDL orchestrator [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; the legacy engine is disabled), which feeds [libs/core/src/acessilia_core/pipeline/canonical_builder.py](../libs/core/src/acessilia_core/pipeline/canonical_builder.py)
+  - export: [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py), [libs/core/src/acessilia_core/export/exporters](../libs/core/src/acessilia_core/export/exporters), [libs/core/src/acessilia_core/export/renderers](../libs/core/src/acessilia_core/export/renderers)
 
 ## UC-02 Select description level
 - Primary actor: End user.
 - Goal: pick the description level — `detalhado`, `medio` (alias `normal`), `baixo` or `ocr`.
 - Implementation:
   - commands: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
-  - prompts by mode: [backend/core/agents/prompts](../backend/core/agents/prompts)
-  - application in processing: [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py)
+  - prompts by mode: [libs/core/src/acessilia_core/agents/prompts](../libs/core/src/acessilia_core/agents/prompts)
+  - application in processing: [libs/core/src/acessilia_core/agents/vision_agent.py](../libs/core/src/acessilia_core/agents/vision_agent.py)
 
 ## UC-03 Check status and cancel
 - Primary actor: End user.
@@ -47,7 +47,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Goal: verify AI backend availability and local resources.
 - Implementation:
   - /health command: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
-  - AI backend client: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py)
+  - AI backend client: [libs/core/src/acessilia_core/agents/ai_client.py](../libs/core/src/acessilia_core/agents/ai_client.py)
 
 ## UC-06 Submit feedback
 - Primary actor: End user.

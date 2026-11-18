@@ -7,16 +7,16 @@ import time
 from types import SimpleNamespace
 
 import pytest
-
-from backend.core.agents.model_calls import (
+from acessilia_core.agents.model_calls import (
     ModelCallRejected,
     ModelCallTimeout,
     current_model_calls,
     model_call_scope,
 )
-from backend.core.blocking import run_blocking
-from backend.core.i18n import active_locale, reset_request_locale, set_request_locale
-from backend.core.ports import RunPorts
+from acessilia_core.blocking import run_blocking
+from acessilia_core.i18n import active_locale, reset_request_locale, set_request_locale
+from acessilia_core.ports import RunPorts
+
 from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
 from tests.core_config_support import core_config, model_config, toolbox_config
 
@@ -143,7 +143,7 @@ async def test_saturation_is_explicit_observable_and_does_not_grow_admission(run
     active = asyncio.create_task(runner.run(blocked, timeout=5, label="active"))
     pending = None
     messages = []
-    from backend.core.logger import logger
+    from acessilia_core.logger import logger
     sink = logger.add(messages.append, format="{message}")
     try:
         await until(blocked.started.is_set)
@@ -280,10 +280,11 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
     """A fresh Context bypasses the autouse scope, as a real service entry does."""
     from types import SimpleNamespace as Namespace
 
-    from backend.core.agents.data_agent import DataAgent
-    from backend.core.agents.vision_agent import VisionAgent
-    from backend.core.pipeline import orchestrator as pddl
-    from backend.core.pipeline import preflight
+    from acessilia_core.agents.data_agent import DataAgent
+    from acessilia_core.agents.vision_agent import VisionAgent
+    from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import preflight
+
     from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
     observed = []
@@ -352,8 +353,11 @@ async def test_close_discards_pending_work_without_joining_running_provider(runn
     ("page-handler", False), ("region-handler", True), ("page-handler", True),
 ])
 def test_sync_call_returns_while_provider_stays_blocked(monkeypatch, runner, agent_kind, nested):
-    from backend.core.agents import data_agent, model_call_policy, vision_agent
-    from backend.core.pipeline.handlers.inspection import _inspect_page, _inspect_region
+    from acessilia_core.agents import data_agent, model_call_policy, vision_agent
+    from acessilia_core.pipeline.handlers.inspection import (
+        _inspect_page,
+        _inspect_region,
+    )
 
     blocked = Blocked(SimpleNamespace(content=None))
     for module in (data_agent, vision_agent):

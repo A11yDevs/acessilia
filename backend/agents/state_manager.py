@@ -3,9 +3,9 @@ import time
 import uuid
 from pathlib import Path
 
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import LOG_TASK_CANCELLED_BY_USER
-from backend.core.i18n.stage_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import LOG_TASK_CANCELLED_BY_USER
+from acessilia_core.i18n.stage_messages import (
     STAGE_CANCELLATION_REQUESTED,
     STAGE_CANCELLED_BY_USER,
     STAGE_FAILED_DURING,

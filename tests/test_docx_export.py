@@ -20,8 +20,8 @@ from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
 from tests.core_config_support import export_config, toolbox_config
 from backend.config.settings import settings
-from backend.core.export import pandoc_exporter
-from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
+from acessilia_core.export import pandoc_exporter
+from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
 
 BASE_URL = "http://localhost:8002"
 EXECUTE_URL = f"{BASE_URL}/v1/capabilities/document.export.docx:execute"
@@ -61,7 +61,7 @@ def test_exporter_renders_on_the_toolbox_in_the_document_language(monkeypatch, t
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
 
-    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("acessilia_core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report", toolbox=toolbox_config())
     document["language"] = "en-US"
 
@@ -78,7 +78,7 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(monkeypatch, tmp_
     def toolbox_down(ast, output_path, *, lang, toolbox):
         raise ToolboxProviderUnavailable("docx renderer offline")
 
-    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_down)
+    monkeypatch.setattr("acessilia_core.export.pandoc_exporter.toolbox_export_docx", toolbox_down)
 
     with pytest.raises(ToolboxProviderUnavailable, match="offline"):
         _export_docx(tmp_path)
@@ -110,7 +110,7 @@ def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
         raise AssertionError("the Toolbox ran while DOCX is disabled")
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
+        "acessilia_core.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
     )
 
     with pytest.raises(RuntimeError, match="TOOLBOX_DOCX_ENABLED=false"):
@@ -153,7 +153,7 @@ def test_the_destination_directory_is_created(monkeypatch, tmp_path):
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
 
-    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("acessilia_core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
     output = pandoc_exporter.export_accessible_document(
         "# Relatório\n", tmp_path / "missing" / "doc.docx", format_name="docx",
         export=export_config(),
@@ -204,7 +204,7 @@ def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
         output_path.write_bytes(DOCX)
         return {"artifact_id": DOCX_ID}
 
-    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
+    monkeypatch.setattr("acessilia_core.export.pandoc_exporter.toolbox_export_docx", fake_toolbox)
 
     document = {
         "id": "doc-1",
@@ -246,7 +246,7 @@ def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
         raise AssertionError("the Toolbox ran without an export config")
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
+        "acessilia_core.export.pandoc_exporter.toolbox_export_docx", toolbox_must_not_run
     )
 
     with pytest.raises(TypeError, match="ExportConfig"):

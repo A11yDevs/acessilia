@@ -1,14 +1,14 @@
 """Regression coverage for planning and portable accessible exports."""
 import base64
-from backend.core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import payload as pipeline_payload
 import re
 from pathlib import Path
 
 import pytest
 
-from backend.core.manifest.builder import _derive_processing_needs
-from backend.core.export.pandoc_exporter import export_accessible_document
-from backend.core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.manifest.builder import _derive_processing_needs
+from acessilia_core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.validation import (
     audit_canonical_document, validate_canonical_document,

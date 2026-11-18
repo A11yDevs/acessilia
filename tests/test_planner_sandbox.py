@@ -6,8 +6,8 @@ from __future__ import annotations
 import json
 
 import pytest
+from acessilia_core.planning.planner_agent import SANDBOX_DIRNAME, PlannerAgent
 
-from backend.core.planning.planner_agent import SANDBOX_DIRNAME, PlannerAgent
 from tests.core_config_support import paths_config
 from tests.pddl_support import build_element, build_manifest, build_obligation
 

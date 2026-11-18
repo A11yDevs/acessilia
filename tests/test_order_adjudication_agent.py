@@ -5,7 +5,7 @@ directly so the tests run without Agno installed.
 """
 from __future__ import annotations
 
-from backend.core.agents.order_adjudication_agent import (
+from acessilia_core.agents.order_adjudication_agent import (
     OrderAdjudicationAgent,
     complete_order,
     kendall_tau,

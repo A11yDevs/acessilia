@@ -15,6 +15,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
+#: The core's package, out of backend/ since ADR-0016's step 6.
+CORE_DIR = REPO_ROOT / "libs" / "core" / "src" / "acessilia_core"
+#: The service and the core: both must reach the Toolbox through the SDK.
+SERVER_DIRS = (BACKEND_DIR, CORE_DIR)
 FORBIDDEN_IN_BACKEND = ("acessilia_toolbox",)
 
 
@@ -31,7 +35,8 @@ def _imported_roots(path: Path) -> set[str]:
 def test_backend_does_not_import_the_toolbox_package() -> None:
     offenders = sorted(
         str(path.relative_to(REPO_ROOT))
-        for path in BACKEND_DIR.rglob("*.py")
+        for directory in SERVER_DIRS
+        for path in directory.rglob("*.py")
         if _imported_roots(path) & set(FORBIDDEN_IN_BACKEND)
     )
     assert not offenders, (
@@ -40,8 +45,6 @@ def test_backend_does_not_import_the_toolbox_package() -> None:
     )
 
 
-
-CORE_DIR = BACKEND_DIR / "core"
 
 
 def test_the_core_imports_nothing_from_the_frontend() -> None:
@@ -54,7 +57,7 @@ def test_the_core_imports_nothing_from_the_frontend() -> None:
         for path in CORE_DIR.rglob("*.py")
         if "frontend" in _imported_roots(path)
     )
-    assert not offenders, f"backend/core modules importing the frontend: {offenders}"
+    assert not offenders, f"libs/core/src/acessilia_core modules importing the frontend: {offenders}"
 
 #: Libraries that run operations (rendering, OCR, conversion, extraction). They
 #: belong to the Toolbox; the core reaches them through its capabilities
@@ -75,7 +78,7 @@ OPERATIONAL_LIBRARIES = (
     "rapidocr_onnxruntime",
     "reportlab",
 )
-APPLICATION_DIRS = (BACKEND_DIR, REPO_ROOT / "frontend")
+APPLICATION_DIRS = (BACKEND_DIR, CORE_DIR, REPO_ROOT / "frontend")
 
 
 def test_the_application_imports_no_operational_library() -> None:
@@ -103,7 +106,8 @@ HTTP_CLIENT_EXCEPTIONS = {
 def test_the_backend_builds_no_http_client_for_the_toolbox() -> None:
     importers = {
         str(path.relative_to(REPO_ROOT))
-        for path in BACKEND_DIR.rglob("*.py")
+        for directory in SERVER_DIRS
+        for path in directory.rglob("*.py")
         if "httpx" in _imported_roots(path)
     }
     assert importers <= HTTP_CLIENT_EXCEPTIONS, (
@@ -114,3 +118,10 @@ def test_the_backend_builds_no_http_client_for_the_toolbox() -> None:
         "remove exceptions that no longer import httpx: "
         f"{sorted(HTTP_CLIENT_EXCEPTIONS - importers)}"
     )
+
+
+def test_the_scanned_directories_exist() -> None:
+    """A directory that moved would make every scan above pass on nothing."""
+    for directory in (*SERVER_DIRS, *APPLICATION_DIRS):
+        assert directory.is_dir(), directory
+        assert any(directory.rglob("*.py")), directory

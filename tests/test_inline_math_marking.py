@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.pipeline.enrichment import inline_math as inline_math_stage
-from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
+from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.pddl_support import build_element, build_manifest
 from tests.core_config_support import document_config, toolbox_config
 
@@ -69,7 +69,7 @@ def spans(monkeypatch):
         calls.append(pages)
         return {1: _page(PARAGRAPH_LINE, DISPLAY_LINE)}
 
-    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
     return calls
 
 
@@ -114,7 +114,7 @@ def test_an_unavailable_capability_leaves_the_text(monkeypatch, spans):
     async def failing(*args, **kwargs):
         raise ToolboxError("document.text.spans is not in the catalogue")
 
-    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", failing)
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", failing)
     manifest = _manifest()
 
     assert _run(manifest)["marked"] == 0
@@ -167,7 +167,7 @@ def _fetch_page(monkeypatch, **changes):
     async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
         return {1: {**_page(PARAGRAPH_LINE, DISPLAY_LINE), **changes}}
 
-    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
 
 
 def test_a_rotated_page_is_left_out(monkeypatch, spans):

@@ -10,10 +10,10 @@ from collections import Counter
 import httpx
 import pytest
 import respx
+from acessilia_core.pipeline.fusion import extract_fused
+from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
 from backend.config.settings import settings
-from backend.core.pipeline.fusion import extract_fused
-from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
 from tests.core_config_support import toolbox_config
 
 BASE_URL = "http://toolbox.test"
@@ -142,7 +142,7 @@ async def test_unexpected_error_is_propagated_without_retry(monkeypatch, source)
                 raise RuntimeError("synthetic bug")
             return _payload(self.provider)
 
-    monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
+    monkeypatch.setattr("acessilia_core.pipeline.fusion._structure_client", Client)
     with pytest.raises(RuntimeError):
         await extract_fused(
             source, primary_provider="docling", secondary_provider="mineru",

@@ -1,4 +1,4 @@
-"""Tests for the core's Toolbox-backed math tools (backend/core/toolbox/toolbox_math_tools.py).
+"""Tests for the core's Toolbox-backed math tools (libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py).
 
 Sync functions wrapping async calls via asyncio.run().
 Uses respx for HTTP mocking.
@@ -8,14 +8,14 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
-
-from backend.config.settings import settings
-from backend.core.toolbox.toolbox_math_tools import (
+from acessilia_core.toolbox.toolbox_math_tools import (
     MathCapabilityUnavailable,
     toolbox_convert_latex,
     toolbox_recognize_formula,
     toolbox_verbalize_latex,
 )
+
+from backend.config.settings import settings
 from tests.core_config_support import toolbox_config
 
 TOOLBOX_URL = settings.toolbox_base_url.rstrip("/")
@@ -221,7 +221,7 @@ class TestRecognizeUnexpectedErrors:
 
     @pytest.mark.parametrize("raise_on_unavailable", [False, True])
     def test_a_bug_is_raised(self, monkeypatch, raise_on_unavailable):
-        from backend.core.toolbox import toolbox_math_tools
+        from acessilia_core.toolbox import toolbox_math_tools
 
         async def broken(image_bytes, toolbox):
             raise TypeError("a bug in the call")

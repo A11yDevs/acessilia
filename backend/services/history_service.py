@@ -1,13 +1,13 @@
 from backend.services.blocking import offload
 import threading
 import sqlite3
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_ORPHAN_TASKS_CLEANED,
     LOG_ORPHAN_TASKS_CLEANUP_FAILED,
     LOG_STALE_PROCESS_INTERRUPTED,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.config.settings import settings
 
 _connection: sqlite3.Connection | None = None

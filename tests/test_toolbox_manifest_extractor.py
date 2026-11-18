@@ -15,13 +15,13 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from tests.core_config_support import fusion_config, paths_config, toolbox_config
-from backend.core.manifest.toolbox_extractor import (
+from acessilia_core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 
-from backend.core.toolbox.toolbox_client import ToolboxTimeout
+from acessilia_core.toolbox.toolbox_client import ToolboxTimeout
 
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
@@ -198,7 +198,7 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     secondary_client.extract_structure.return_value = secondary_response
 
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
     result = ToolboxManifestExtractor(
@@ -218,9 +218,9 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     secondary_client.extract_structure.assert_awaited_once()
     secondary_client.close.assert_awaited_once()
 
-    from backend.core.manifest.builder import build_processing_manifest
-    from backend.core.planning.domain_bundle import DomainBundle
-    from backend.core.planning.pddl_processor import PddlProblemCompiler
+    from acessilia_core.manifest.builder import build_processing_manifest
+    from acessilia_core.planning.domain_bundle import DomainBundle
+    from acessilia_core.planning.pddl_processor import PddlProblemCompiler
 
     manifest = build_processing_manifest(FIXTURE_PDF, deepcopy(result))
     assert any(item.kind == "fuse-providers" for item in manifest.obligations)
@@ -249,7 +249,7 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
     from backend.config.settings import settings
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.decide_v1",
+        "acessilia_core.pipeline.fusion.decide_v1",
         lambda primary, secondary: ("mineru", "both_formula->mineru"),
     )
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
@@ -259,7 +259,7 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
     secondary_client.provider = "mineru"
     secondary_client.extract_structure.return_value = secondary_response
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 
@@ -282,9 +282,9 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
 
         # The mixed document is still a valid manifest the planner can use, and
         # its elements say which provider they came from (the VLM judge reads it).
-        from backend.core.manifest.builder import build_processing_manifest
-        from backend.core.planning.domain_bundle import DomainBundle
-        from backend.core.planning.pddl_processor import PddlProblemCompiler
+        from acessilia_core.manifest.builder import build_processing_manifest
+        from acessilia_core.planning.domain_bundle import DomainBundle
+        from acessilia_core.planning.pddl_processor import PddlProblemCompiler
 
         manifest = build_processing_manifest(FIXTURE_PDF, deepcopy(result))
         assert [e.id for e in manifest.elements] == [
@@ -313,7 +313,7 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
         SAMPLE_TOOLBOX_RESPONSE
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
     seen: dict = {}
@@ -323,7 +323,7 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
         return {"fusion_stats": {}, "fusion_evidence": {"pages": []}}
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.fuse_extraction_payloads", fake_fuse
+        "acessilia_core.pipeline.fusion.fuse_extraction_payloads", fake_fuse
     )
     policy = FusionPolicy(text_pick="mineru")
 
@@ -339,7 +339,7 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
     mock_client, monkeypatch
 ):
     from backend.config.settings import settings
-    from backend.core.manifest.builder import build_processing_manifest
+    from acessilia_core.manifest.builder import build_processing_manifest
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -348,7 +348,7 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
         SAMPLE_TOOLBOX_RESPONSE
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 
@@ -370,7 +370,7 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     mock_client, monkeypatch
 ):
     from backend.config.settings import settings
-    from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -378,7 +378,7 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
         "provider indisponível"
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 
@@ -395,7 +395,7 @@ def test_secondary_extraction_write_failure_does_not_fail_extraction(
 ):
     """The artifact only feeds the provider-choice methods, which fail without it."""
     from backend.config.settings import settings
-    from backend.core.manifest.toolbox_extractor import _persist_secondary_extraction
+    from acessilia_core.manifest.toolbox_extractor import _persist_secondary_extraction
 
     blocker = tmp_path / "artifacts"
     blocker.write_text("not a directory")
@@ -422,7 +422,7 @@ def test_extract_builds_and_closes_its_own_clients(monkeypatch):
         return client
 
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client", factory
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", factory
     )
     extractor = ToolboxManifestExtractor()
 
@@ -456,7 +456,7 @@ def test_multi_endpoint_extraction_builds_no_artifact_upload_client(monkeypatch)
         return client
 
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client", factory
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", factory
     )
     result = ToolboxManifestExtractor().extract(
         FIXTURE_PDF, dual_fusion=False,
@@ -485,7 +485,7 @@ def test_created_upload_client_must_share_the_structure_endpoint(
     mock_artifact_client.endpoints = (ToolboxEndpoint(artifact_url),)
     mock_artifact_client.upload.return_value = "sha256:stored"
     factory = Mock(return_value=mock_artifact_client)
-    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
+    monkeypatch.setattr("acessilia_core.manifest.toolbox_extractor.make_toolbox_client", factory)
 
     toolbox = toolbox_config(use_artifact_store=True)
     result = ToolboxManifestExtractor(client=mock_client).extract(
@@ -524,7 +524,7 @@ def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
     secondary.endpoints = (ToolboxEndpoint("http://toolbox-b.test"),)
     secondary.extract_structure.return_value = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary,
     )
     result = ToolboxManifestExtractor(
@@ -602,7 +602,7 @@ def test_dual_extraction_handles_each_provider_independently(
         secondary.extract_structure.return_value = secondary_payload
     else:
         secondary.extract_structure.side_effect = ToolboxProviderUnavailable("secondary down")
-    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **k: secondary)
+    monkeypatch.setattr("acessilia_core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **k: secondary)
     extractor = ToolboxManifestExtractor(client=mock_client)
     if not primary_ok and not secondary_ok:
         with pytest.raises(ToolboxUnavailable) as info:
@@ -642,7 +642,7 @@ def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, f
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.extract_structure.side_effect = failure
     factory = lambda *a, **kw: secondary
-    monkeypatch.setattr("backend.core.manifest.toolbox_extractor.make_toolbox_client", factory)
+    monkeypatch.setattr("acessilia_core.manifest.toolbox_extractor.make_toolbox_client", factory)
     with pytest.raises(type(failure)) as caught:
         ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert caught.value is failure
@@ -659,7 +659,7 @@ def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_clie
     secondary.provider = "mineru"
     secondary.extract_structure.side_effect = ToolboxUnsupportedMediaType("unsupported document")
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
     with pytest.raises(ToolboxUnsupportedMediaType) as caught:
         ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
@@ -680,7 +680,7 @@ def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, mon
     secondary.provider = "mineru"
     secondary.extract_structure.side_effect = getattr(errors, failure_name)("rejected")
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
     result = ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert result.configuration["toolbox_provider"] == "docling"
@@ -706,7 +706,7 @@ def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
     secondary.base_url = "http://localhost:8002"
     secondary.extract_structure.return_value = secondary_payload
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client", lambda *a, **kw: secondary
     )
     result = ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
     assert result.configuration["toolbox_provider"] == "mineru"
@@ -715,9 +715,9 @@ def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
 
 def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, mock_artifact_client, monkeypatch):
     from acessilia_sdk.toolbox import ToolboxEndpoint
-    from backend.core.manifest import toolbox_extractor as module
-    from backend.core.i18n import t
-    from backend.core.i18n.log_messages import LOG_ARTIFACT_STORE_DIRECT_INPUT
+    from acessilia_core.manifest import toolbox_extractor as module
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.log_messages import LOG_ARTIFACT_STORE_DIRECT_INPUT
 
     mock_client.endpoints = (
         ToolboxEndpoint("http://toolbox-a.test"), ToolboxEndpoint("http://toolbox-b.test"),
@@ -787,7 +787,7 @@ def test_extraction_deadline_covers_a_blocked_secondary(
     secondary.provider = "mineru"
     secondary.extract_structure = AsyncMock(side_effect=hang)
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *_args, **_kwargs: secondary,
     )
     extractor = ToolboxManifestExtractor(client=mock_client)
@@ -833,7 +833,7 @@ def test_extraction_labels_upload_primary_and_secondary_operations(
     mock_client.extract_structure = AsyncMock(side_effect=primary)
     secondary.extract_structure = AsyncMock(side_effect=secondary_call)
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *_args, **_kwargs: secondary,
     )
     extractor = ToolboxManifestExtractor(
@@ -962,7 +962,7 @@ def test_the_fusion_evidence_is_written_under_the_run_data_dir(mock_client, monk
     secondary_client.provider = "mineru"
     secondary_client.extract_structure.return_value = secondary_response
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda client_cls, _toolbox, **kwargs: secondary_client,
     )
 

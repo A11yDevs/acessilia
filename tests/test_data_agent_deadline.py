@@ -11,8 +11,8 @@ import pytest_asyncio
 
 from tests.core_config_support import model_config, toolbox_config
 
-from backend.core.agents import data_agent as data_module
-from backend.core.agents import model_call_policy
+from acessilia_core.agents import data_agent as data_module
+from acessilia_core.agents import model_call_policy
 
 
 async def _wait_for_event(event: Event) -> None:

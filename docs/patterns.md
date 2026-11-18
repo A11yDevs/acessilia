@@ -5,12 +5,12 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Identified Patterns
 
 ### 1. Canonical Document Pipeline
-- Implementation: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py)
+- Implementation: [libs/core/src/acessilia_core/pipeline/canonical_builder.py](../libs/core/src/acessilia_core/pipeline/canonical_builder.py), [libs/core/src/acessilia_core/pipeline/validators.py](../libs/core/src/acessilia_core/pipeline/validators.py), [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py)
 - Role: normalize structured region payloads into a canonical document schema, validate structure and heading hierarchy, build intermediate AST, and dispatch to renderers.
 - Benefit: deterministic output and a single source of truth for all output exporters.
 
 ### 2. Strategy & Model Abstraction for AI (Agno)
-- Implementation: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model(models, toolbox)`, from the run's `ModelConfig` and `ToolboxConfig`)
+- Implementation: [libs/core/src/acessilia_core/agents/ai_client.py](../libs/core/src/acessilia_core/agents/ai_client.py) (`get_agno_model(models, toolbox)`, from the run's `ModelConfig` and `ToolboxConfig`)
 - Strategies:
   - Ollama (local open-weights models like LLaVA/Qwen-VL)
   - OpenRouter (cloud API models like Claude/GPT-4o)
@@ -18,12 +18,12 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 ### 3. Multi-Agent Specialization
 - Implementation:
-  - [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py) (`VisionAgent` - Agno LLM visual alt-text & audio descriptions)
-  - [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py) (`DataAgent` - Agno LLM tables & math formulas)
+  - [libs/core/src/acessilia_core/agents/vision_agent.py](../libs/core/src/acessilia_core/agents/vision_agent.py) (`VisionAgent` - Agno LLM visual alt-text & audio descriptions)
+  - [libs/core/src/acessilia_core/agents/data_agent.py](../libs/core/src/acessilia_core/agents/data_agent.py) (`DataAgent` - Agno LLM tables & math formulas)
 - Benefit: clean separation of concerns and parallel execution (`asyncio.gather`).
 
 ### 4. Export Adapters & Renderers
-- Implementation: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py) with renderers in `backend/core/export/renderers/` (TXT, HTML) and export adapters in `backend/core/export/exporters/` (MP3 via edge-tts; DOCX and PDF/UA, the only PDF, rendered on the Toolbox, which also audits the PDF/UA with veraPDF).
+- Implementation: [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py) with renderers in `libs/core/src/acessilia_core/export/renderers/` (TXT, HTML) and export adapters in `libs/core/src/acessilia_core/export/exporters/` (MP3 via edge-tts; DOCX and PDF/UA, the only PDF, rendered on the Toolbox, which also audits the PDF/UA with veraPDF).
 - Benefit: identical canonical document produces multiple output formats cleanly.
 
 ### 5. In-Memory State Machine & Cooperative Cancellation
@@ -41,7 +41,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: prevents process collisions on the host machine.
 
 ### 8. Deterministic Planning with PDDL
-- Implementation: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordinated by [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.
+- Implementation: [libs/core/src/acessilia_core/manifest/](../libs/core/src/acessilia_core/manifest/), [libs/core/src/acessilia_core/planning/](../libs/core/src/acessilia_core/planning/), [libs/core/src/acessilia_core/execution/](../libs/core/src/acessilia_core/execution/), coordinated by [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py). This is the only active engine; the manifest is extracted through the Toolbox.
 - Role: separate *what to do* from *doing it*. A deterministic manifest describes the document's regions and obligations; a PDDL planner compiles it into a validated, ordered plan; an Agno Workflow executor applies the plan, calling the Vision/Data agents only where the plan requires. See [pmv_agno_pddl.md](pmv_agno_pddl.md).
 - Benefit: task ordering and dependencies become explicit and auditable, and planning stays deterministic (no LLM writes PDDL) while AI is confined to description. A planning failure fails the job; there is no fallback to deterministic extraction.
 
@@ -50,9 +50,9 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - Benefit: one place owns the queue and pipeline; every interface (API callers, Telegram, Web, CLI) is a thin client, so behavior stays consistent across surfaces.
 
 ### 10. Deterministic Fusion Agent (docstruct tools)
-- Implementation: [backend/core/agents/fusion_agent.py](../backend/core/agents/fusion_agent.py) (`FusionAgent`), wrapping the pure `docstruct` library (`libs/docstruct`).
+- Implementation: [libs/core/src/acessilia_core/agents/fusion_agent.py](../libs/core/src/acessilia_core/agents/fusion_agent.py) (`FusionAgent`), wrapping the pure `docstruct` library (`libs/docstruct`).
 - Role: exposes four deterministic tools to Agno — `fuse_providers` (merge two toolbox providers via `docstruct.fusion`), `audit_document` (canonical-document audit), `classify_block` (region classification), and `needs_reinfer` (decide whether a region needs vision/orientation re-inference). Each capability has a pure `process_*` method (unit-testable without Agno) plus a thin JSON tool envelope.
-- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 8) reuses `backend.core.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
+- Benefit: follows the `InformationalStructuralAgent` pattern — deterministic core, optional Agno envelope — so the fusion/audit logic stays testable and the LLM only selects which tool to call. The `dual-provider-fusion` PDDL method (pattern 8) reuses `acessilia_core.pipeline.fusion.extract_fused` and is only admissible when `FUSION_MODE=dual`. See [docstruct_algorithms.md](docstruct_algorithms.md) for the algorithm details.
 
 ---
 

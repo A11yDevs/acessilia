@@ -9,13 +9,13 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from acessilia_sdk.toolbox import vlm_provider_healthy
-from backend.core.agents.ai_client import active_model_name
+from acessilia_core.agents.ai_client import active_model_name
 from backend.api.limiter import limiter
 from backend.api.schemas import HealthResponse
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
 from backend.config.core_config import core_config_from_settings
-from backend.core.toolbox.toolbox_client import toolbox_endpoints, toolbox_vlm_endpoint
+from acessilia_core.toolbox.toolbox_client import toolbox_endpoints, toolbox_vlm_endpoint
 
 router = APIRouter(tags=["health"])
 

@@ -11,8 +11,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api.limiter import limiter
 from backend.api.routes import download, health, history, jobs, logs, operations
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     API_INTERNAL_ERROR_DETAIL,
     API_RATE_LIMIT_DETAIL,
     LOG_API_ERROR,
@@ -23,7 +23,7 @@ from backend.services.download_token_service import limpar_tokens_expirados
 from backend.services.queue_service import unified_queue
 from backend.services.access_log_filter import AccessLogFilter
 from backend.config.process_setup import setup_process
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 
 
 @asynccontextmanager
@@ -38,7 +38,7 @@ async def _lifespan(app: FastAPI):
         setup_process()
         from backend.services.model_calls import get_model_calls, shutdown_model_calls
         get_model_calls()
-        from backend.core.blocking import run_blocking
+        from acessilia_core.blocking import run_blocking
         from backend.services.history_service import limpar_orfas
         await run_blocking(limpar_orfas)
         from backend.api.worker import recover_pending_jobs

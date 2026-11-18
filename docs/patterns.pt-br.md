@@ -5,12 +5,12 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 ## Padrões Identificados
 
 ### 1. Pipeline de Documento Canônico
-- Implementação: [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py), [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py), [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py)
+- Implementação: [libs/core/src/acessilia_core/pipeline/canonical_builder.py](../libs/core/src/acessilia_core/pipeline/canonical_builder.py), [libs/core/src/acessilia_core/pipeline/validators.py](../libs/core/src/acessilia_core/pipeline/validators.py), [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py)
 - Papel: normalizar cargas de regiões estruturadas em um esquema de documento canônico, validar estrutura e hierarquia de títulos, construir o AST intermediário e despachar para os renderizadores.
 - Benefício: saída determinística e uma única fonte da verdade para todos os exportadores de saída.
 
 ### 2. Estratégia e Abstração de Modelo para IA (Agno)
-- Implementação: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py) (`get_agno_model(models, toolbox)`, a partir da `ModelConfig` e da `ToolboxConfig` da execução)
+- Implementação: [libs/core/src/acessilia_core/agents/ai_client.py](../libs/core/src/acessilia_core/agents/ai_client.py) (`get_agno_model(models, toolbox)`, a partir da `ModelConfig` e da `ToolboxConfig` da execução)
 - Estratégias:
   - Ollama (modelos locais de pesos abertos como LLaVA/Qwen-VL)
   - OpenRouter (modelos de API em nuvem como Claude/GPT-4o)
@@ -18,12 +18,12 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 
 ### 3. Especialização Multiagente
 - Implementação:
-  - [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py) (`VisionAgent` - alt-text visual e descrições em áudio via LLM do Agno)
-  - [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py) (`DataAgent` - tabelas e fórmulas matemáticas via LLM do Agno)
+  - [libs/core/src/acessilia_core/agents/vision_agent.py](../libs/core/src/acessilia_core/agents/vision_agent.py) (`VisionAgent` - alt-text visual e descrições em áudio via LLM do Agno)
+  - [libs/core/src/acessilia_core/agents/data_agent.py](../libs/core/src/acessilia_core/agents/data_agent.py) (`DataAgent` - tabelas e fórmulas matemáticas via LLM do Agno)
 - Benefício: separação limpa de responsabilidades e execução em paralelo (`asyncio.gather`).
 
 ### 4. Adaptadores de Exportação e Renderizadores
-- Implementação: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py) com renderizadores em `backend/core/export/renderers/` (TXT, HTML) e adaptadores de exportação em `backend/core/export/exporters/` (MP3 via edge-tts; DOCX e PDF/UA, o único PDF, renderizados na Toolbox, que também audita o PDF/UA com o veraPDF).
+- Implementação: [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py) com renderizadores em `libs/core/src/acessilia_core/export/renderers/` (TXT, HTML) e adaptadores de exportação em `libs/core/src/acessilia_core/export/exporters/` (MP3 via edge-tts; DOCX e PDF/UA, o único PDF, renderizados na Toolbox, que também audita o PDF/UA com o veraPDF).
 - Benefício: um documento canônico idêntico produz diversos formatos de saída de forma limpa.
 
 ### 5. Máquina de Estados em Memória e Cancelamento Cooperativo
@@ -41,7 +41,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: impede colisões de processos na máquina do host.
 
 ### 8. Planejamento Determinístico com PDDL
-- Implementação: [backend/core/manifest/](../backend/core/manifest/), [backend/core/planning/](../backend/core/planning/), [backend/core/execution/](../backend/core/execution/), coordenados por [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.
+- Implementação: [libs/core/src/acessilia_core/manifest/](../libs/core/src/acessilia_core/manifest/), [libs/core/src/acessilia_core/planning/](../libs/core/src/acessilia_core/planning/), [libs/core/src/acessilia_core/execution/](../libs/core/src/acessilia_core/execution/), coordenados por [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.
 - Papel: separar *o que fazer* de *fazer*. Um manifesto determinístico descreve as regiões e obrigações do documento; um planejador PDDL o compila em um plano validado e ordenado; um executor Agno Workflow aplica o plano, chamando os agentes Vision/Data apenas onde o plano exige. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
 - Benefício: a ordem e as dependências das tarefas ficam explícitas e auditáveis, e o planejamento permanece determinístico (nenhum LLM escreve PDDL) enquanto a IA fica restrita à descrição. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística.
 
@@ -50,9 +50,9 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 - Benefício: um único lugar possui a fila e o pipeline; toda interface (chamadores da API, Telegram, Web, CLI) é um cliente fino, de modo que o comportamento permanece consistente entre as superfícies.
 
 ### 10. Agente de Fusão Determinístico (ferramentas docstruct)
-- Implementação: [backend/core/agents/fusion_agent.py](../backend/core/agents/fusion_agent.py) (`FusionAgent`), envolvendo a biblioteca pura `docstruct` (`libs/docstruct`).
+- Implementação: [libs/core/src/acessilia_core/agents/fusion_agent.py](../libs/core/src/acessilia_core/agents/fusion_agent.py) (`FusionAgent`), envolvendo a biblioteca pura `docstruct` (`libs/docstruct`).
 - Papel: expõe quatro ferramentas determinísticas ao Agno — `fuse_providers` (funde dois providers de toolbox via `docstruct.fusion`), `audit_document` (auditoria do documento canônico), `classify_block` (classificação de regiões) e `needs_reinfer` (decide se uma região precisa de re-inferência de visão/orientação). Cada capacidade tem um método `process_*` puro (testável sem Agno) mais um envelope JSON fino.
-- Benefício: segue o padrão `InformationalStructuralAgent` — núcleo determinístico, envelope Agno opcional — de modo que a lógica de fusão/auditoria permanece testável e o LLM só seleciona qual ferramenta chamar. O método PDDL `dual-provider-fusion` (padrão 8) reutiliza `backend.core.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para os detalhes dos algoritmos.
+- Benefício: segue o padrão `InformationalStructuralAgent` — núcleo determinístico, envelope Agno opcional — de modo que a lógica de fusão/auditoria permanece testável e o LLM só seleciona qual ferramenta chamar. O método PDDL `dual-provider-fusion` (padrão 8) reutiliza `acessilia_core.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para os detalhes dos algoritmos.
 
 ---
 

@@ -1,12 +1,12 @@
-"""The core's boundary, before its extraction to ``libs/core`` (ADR-0016, step 5).
+"""The core's boundary (ADR-0016, steps 5 and 6).
 
-Checked on ``backend/core`` with an AST scan that includes imports inside
-functions:
+Checked on the ``acessilia_core`` package (``libs/core/src/acessilia_core``)
+with an AST scan that includes imports inside functions:
 
-- it imports nothing from ``backend`` outside ``backend/core``, and nothing
-  from ``frontend``;
-- its other imports are the standard library and the libraries the ADR
-  allows, with edge-tts as the deviation ADR-0003 records;
+- it imports nothing from the service (``backend``) or the front ends
+  (``frontend``);
+- its other imports are itself, the standard library and the libraries the
+  ADR allows, with edge-tts as the deviation ADR-0003 records;
 - it reads no environment variable;
 - and the SDK and docstruct do not import it.
 
@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "backend" / "core"
+CORE = ROOT / "libs" / "core" / "src" / "acessilia_core"
 
 #: Third-party libraries the core may import, by top-level module (ADR-0016,
 #: "acessilia_core may import ...").
@@ -68,7 +68,7 @@ def _imports(tree: ast.AST, module: str = "") -> Iterator[tuple[int, str]]:
     """Every import, inside functions included, as ``(line, module)``.
 
     A relative import is resolved against ``module``, the dotted name of the
-    file scanned: ``from ..services import x`` in ``backend/core/foo.py`` is
+    file scanned: ``from ..services import x`` in ``libs/core/src/acessilia_core/foo.py`` is
     ``backend.services`` (review of #568).
     """
     for node in ast.walk(tree):
@@ -90,10 +90,12 @@ def _imports(tree: ast.AST, module: str = "") -> Iterator[tuple[int, str]]:
 
 
 def _dotted(rel: str) -> str:
-    """``backend/core/a/b.py`` -> ``backend.core.a.b``; a package's
-    ``__init__.py`` is the package (``backend.core.a.__init__`` keeps its
-    name, so one level up resolves inside it)."""
-    return rel.removesuffix(".py").replace("/", ".")
+    """``libs/core/src/acessilia_core/a/b.py`` -> ``acessilia_core.a.b``,
+    from the package's source root; a package's ``__init__.py`` is the
+    package (``acessilia_core.a.__init__`` keeps its name, so one level up
+    resolves inside it)."""
+    source_root = CORE.parent.relative_to(ROOT).as_posix() + "/"
+    return rel.removeprefix(source_root).removesuffix(".py").replace("/", ".")
 
 
 def _core_imports() -> list[tuple[str, int, str]]:
@@ -116,24 +118,22 @@ def test_the_core_imports_nothing_from_the_service_or_the_frontends() -> None:
     found = [
         f"{rel}:{line} {module}"
         for rel, line, module in _core_imports()
-        if (module == "backend" or module.startswith("backend."))
-        and not (module == "backend.core" or module.startswith("backend.core."))
-        or module == "frontend" or module.startswith("frontend.")
+        if module.split(".")[0] in {"backend", "frontend"}
     ]
 
-    assert not found, "backend/core reaches outside itself:\n" + "\n".join(found)
+    assert not found, "acessilia_core imports the service or a front end:\n" + "\n".join(found)
 
 
 def test_the_core_imports_only_the_allowed_libraries() -> None:
     stdlib = set(sys.stdlib_module_names)
-    allowed = stdlib | set(ALLOWED_LIBRARIES) | set(DEVIATIONS) | {"backend"}
+    allowed = stdlib | set(ALLOWED_LIBRARIES) | set(DEVIATIONS) | {"acessilia_core"}
     found = sorted(
         f"{rel}:{line} {module}"
         for rel, line, module in _core_imports()
         if module.split(".")[0] not in allowed
     )
 
-    assert not found, "backend/core imports a library ADR-0016 does not allow:\n" + "\n".join(found)
+    assert not found, "libs/core/src/acessilia_core imports a library ADR-0016 does not allow:\n" + "\n".join(found)
 
 
 @pytest.mark.parametrize("library", sorted(set(ALLOWED_LIBRARIES) | set(DEVIATIONS)))
@@ -148,7 +148,7 @@ def test_the_deviation_stays_where_it_is_recorded() -> None:
     """edge-tts is the audio exporter's, and nobody else's."""
     users = {rel for rel, _, module in _core_imports() if module.split(".")[0] == "edge_tts"}
 
-    assert users == {"backend/core/export/exporters/audio_exporter.py"}
+    assert users == {"libs/core/src/acessilia_core/export/exporters/audio_exporter.py"}
 
 
 def _aliases(tree: ast.AST) -> dict[str, str]:
@@ -194,7 +194,7 @@ def test_the_core_reads_no_environment_variable() -> None:
         for line, read in _environment_reads(tree)
     ]
 
-    assert not found, "backend/core reads the environment:\n" + "\n".join(found)
+    assert not found, "libs/core/src/acessilia_core reads the environment:\n" + "\n".join(found)
 
 
 @pytest.mark.parametrize(
@@ -223,30 +223,31 @@ def test_the_environment_scan_sees_each_way_to_read_it(source) -> None:
 @pytest.mark.parametrize(
     ("module", "source", "expected"),
     [
-        ("backend.core.foo", "from ..services import cache", "backend.services"),
-        ("backend.core.foo", "from ..config.settings import settings", "backend.config.settings"),
-        ("backend.core.foo", "from . import ports", "backend.core.ports"),
-        ("backend.core.a.b", "from ..ports import RunPorts", "backend.core.ports"),
-        ("backend.core.a.__init__", "from .b import x", "backend.core.a.b"),
-        ("backend.core.foo", "from .. import services", "backend.services"),
+        # Above the top-level package: a bare name, which no rule allows.
+        ("acessilia_core.foo", "from ..services import cache", "services"),
+        ("acessilia_core.foo", "from .. import services", "services"),
+        ("acessilia_core.foo", "from . import ports", "acessilia_core.ports"),
+        ("acessilia_core.a.b", "from ..ports import RunPorts", "acessilia_core.ports"),
+        ("acessilia_core.a.__init__", "from .b import x", "acessilia_core.a.b"),
+        ("acessilia_core.a.b", "from ...services import x", "services"),
     ],
 )
 def test_a_relative_import_is_resolved_against_its_module(module, source, expected) -> None:
-    """A relative import can leave the core (review of #568)."""
+    """A relative import is resolved, so it cannot slip past the rules (review of #568)."""
     assert [found for _, found in _imports(ast.parse(source), module)] == [expected]
 
 
 def test_a_relative_import_out_of_the_core_is_caught(tmp_path, monkeypatch) -> None:
-    """End to end: a core module that reaches the service relatively fails."""
+    """End to end: a core module that reaches above its package fails."""
     boundary = sys.modules[__name__]
-    core = tmp_path / "backend" / "core"
+    core = tmp_path / "src" / "acessilia_core"
     core.mkdir(parents=True)
     (core / "leak.py").write_text("from ..services import cache\n")
     monkeypatch.setattr(boundary, "ROOT", tmp_path)
     monkeypatch.setattr(boundary, "CORE", core)
 
-    with pytest.raises(AssertionError, match="backend.services"):
-        boundary.test_the_core_imports_nothing_from_the_service_or_the_frontends()
+    with pytest.raises(AssertionError, match="leak.py:1 services"):
+        boundary.test_the_core_imports_only_the_allowed_libraries()
 
 
 @pytest.mark.parametrize("library", ["libs/sdk/src", "libs/docstruct/src"])

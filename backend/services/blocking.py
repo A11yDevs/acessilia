@@ -2,7 +2,7 @@
 
 from functools import wraps
 
-from backend.core.blocking import run_blocking
+from acessilia_core.blocking import run_blocking
 
 
 def offload(function):

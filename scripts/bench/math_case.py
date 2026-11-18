@@ -600,9 +600,10 @@ def pdf_text(path: Path) -> str:
 
 async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, Path | None]:
     """Run the core on ``pdf`` and write the canonical document, TXT and PDF/UA."""
+    from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
+    from acessilia_core.export.exporters.txt_exporter import export_txt
+
     from backend.config.core_config import core_config_from_settings
-    from backend.core.export.exporters.pdf_exporter import export_pdf_ua
-    from backend.core.export.exporters.txt_exporter import export_txt
     from backend.service import process
 
     config = core_config_from_settings()

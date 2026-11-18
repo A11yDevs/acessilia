@@ -4,8 +4,9 @@ extension whitelist and size limit, and that their user-facing error messages re
 locale strings files under each supported locale (en_US identity lookup vs pt_BR translations).
 """
 
+from acessilia_core.i18n import _catalog_for
+
 from backend.config.settings import settings
-from backend.core.i18n import _catalog_for
 from backend.services.validators import (
     is_extension_allowed,
     is_file_size_allowed,

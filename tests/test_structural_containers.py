@@ -8,9 +8,9 @@ their escalation failed the whole job.
 
 from __future__ import annotations
 
-from backend.core.manifest.builder import _derive_processing_needs
-from backend.core.manifest.models import BoundingBox, Provenance
-from backend.core.logger import logger
+from acessilia_core.manifest.builder import _derive_processing_needs
+from acessilia_core.manifest.models import BoundingBox, Provenance
+from acessilia_core.logger import logger
 from tests.pddl_support import build_element
 
 

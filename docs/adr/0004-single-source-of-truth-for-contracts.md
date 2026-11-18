@@ -12,7 +12,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The same models exist in several places. Examples:
 
 - The Processing Manifest 1.1 models and schema exist in both the core
-  (`backend/core/manifest/models.py`, `schema.py`) and the Toolbox
+  (`libs/core/src/acessilia_core/manifest/models.py`, `schema.py`) and the Toolbox
   (`core/normalization/`).
 - The layout vocabulary is defined by the Toolbox's docling layout provider
   and mapped back by hand in the core (`toolbox_layout_structurer.py`).

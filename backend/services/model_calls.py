@@ -28,14 +28,14 @@ from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any, TypeVar
 
-from backend.core.agents.model_calls import ModelCallRejected, ModelCallTimeout
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.agents.model_calls import ModelCallRejected, ModelCallTimeout
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_MODEL_CALL_STATE, LOG_MODEL_CALL_ABANDONED, LOG_MODEL_CALL_EXPIRED,
     LOG_MODEL_CALL_REJECTED, MSG_MODEL_CALL_CLOSED, MSG_MODEL_CALL_FULL,
     MSG_MODEL_CALL_DEADLINE,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 
 T = TypeVar("T")
 

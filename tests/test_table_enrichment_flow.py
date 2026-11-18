@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.pipeline import orchestrator as pddl
-from backend.core.agents.output_schemas import DataOutput
-from backend.core.manifest.models import PageDescriptor
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.agents.output_schemas import DataOutput
+from acessilia_core.manifest.models import PageDescriptor
 from tests.pddl_support import build_element, build_manifest
-from backend.core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
 from tests.core_config_support import model_config, toolbox_config, vision_config
 
 

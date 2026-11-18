@@ -7,9 +7,9 @@ centered in the bottom margin.
 
 from __future__ import annotations
 
-from backend.core.pipeline.payload import _manifest_pages_to_payload
-from backend.core.pipeline import payload as pipeline_payload
-from backend.core.manifest.models import BoundingBox, Provenance
+from acessilia_core.pipeline.payload import _manifest_pages_to_payload
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.manifest.models import BoundingBox, Provenance
 from tests.pddl_support import build_element, build_manifest
 
 WIDTH, HEIGHT = 612.0, 792.0

@@ -8,9 +8,9 @@ from typing import Any, Awaitable, Callable
 
 import pytest
 
-from backend.core.agents.data_agent import DataAgent
-from backend.core.agents.output_schemas import DataOutput, VisionOutput
-from backend.core.agents.vision_agent import VisionAgent
+from acessilia_core.agents.data_agent import DataAgent
+from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
+from acessilia_core.agents.vision_agent import VisionAgent
 from tests.core_config_support import model_config, toolbox_config
 
 
@@ -61,8 +61,8 @@ async def _assert_event_loop_is_responsive(
 
 @pytest.mark.asyncio
 async def test_vision_inference_does_not_block_event_loop(monkeypatch):
-    monkeypatch.setattr("backend.core.agents.vision_agent.Agent", _BlockingAgent)
-    monkeypatch.setattr("backend.core.agents.vision_agent.get_agno_model", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr("acessilia_core.agents.vision_agent.Agent", _BlockingAgent)
+    monkeypatch.setattr("acessilia_core.agents.vision_agent.get_agno_model", lambda *_args, **_kwargs: object())
     agent = VisionAgent(region_cache=None, toolbox=toolbox_config(), models=model_config())
 
     await _assert_event_loop_is_responsive(
@@ -73,9 +73,9 @@ async def test_vision_inference_does_not_block_event_loop(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_data_inference_does_not_block_event_loop(monkeypatch):
-    monkeypatch.setattr("backend.core.agents.data_agent.Agent", _BlockingAgent)
-    monkeypatch.setattr("backend.core.agents.data_agent.get_agno_model", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr("backend.core.agents.data_agent.load_region_prompt", lambda _key: "prompt")
+    monkeypatch.setattr("acessilia_core.agents.data_agent.Agent", _BlockingAgent)
+    monkeypatch.setattr("acessilia_core.agents.data_agent.get_agno_model", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr("acessilia_core.agents.data_agent.load_region_prompt", lambda _key: "prompt")
     agent = DataAgent(models=model_config(), toolbox=toolbox_config())
 
     await _assert_event_loop_is_responsive(

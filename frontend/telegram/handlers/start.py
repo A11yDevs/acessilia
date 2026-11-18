@@ -8,9 +8,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
 from backend.config.settings import settings
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import LOG_TELEGRAM_FEEDBACK_RECEIVED
-from backend.core.logger import logger
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import LOG_TELEGRAM_FEEDBACK_RECEIVED
+from acessilia_core.logger import logger
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.telegram import user_context

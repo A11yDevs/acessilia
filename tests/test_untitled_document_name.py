@@ -60,7 +60,7 @@ async def test_untitled_document_takes_the_uploaded_name(
 
     assert document["title"] == "51-pages"
     assert document["source"]["name"] == UPLOADED
-    from backend.core.export.renderers.html_renderer import render_html
+    from acessilia_core.export.renderers.html_renderer import render_html
 
     html = render_html(document, tmp_path / "result.html").read_text(encoding="utf-8")
     assert "<title>51-pages</title>" in html
@@ -124,7 +124,7 @@ async def test_the_worker_passes_the_uploaded_name_to_the_pipeline(
         seen.update(kwargs)
         if manager.obter(task_id) is None:
             manager.criar_tarefa(stored, task_id=task_id)
-        from backend.core.pipeline.canonical_builder import build_canonical_document
+        from acessilia_core.pipeline.canonical_builder import build_canonical_document
         return build_canonical_document(_untitled_payload(), title="51-pages", toolbox=toolbox_config())
 
     monkeypatch.setattr("backend.service.process", fake_process)

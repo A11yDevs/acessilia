@@ -94,7 +94,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
    - O domínio PDDL (v2.2+) codifica dependências e restrições de ordem entre tarefas
    - O plano é saída determinística do planejador (backend interno ou fast-downward)
    - O relatório de execução valida a aderência ao plano e registra o resultado das tarefas
-3. O modo de processamento muda o comportamento dos prompts e da verbosidade. Os valores aceitos são `detalhado`, `medio` (com `normal` como alias), `baixo` e `ocr`; um valor desconhecido cai para `medio`. Eles correspondem aos prompts em `backend/core/agents/prompts` e aos perfis de verbosidade em `docstruct.profiles`.
+3. O modo de processamento muda o comportamento dos prompts e da verbosidade. Os valores aceitos são `detalhado`, `medio` (com `normal` como alias), `baixo` e `ocr`; um valor desconhecido cai para `medio`. Eles correspondem aos prompts em `libs/core/src/acessilia_core/agents/prompts` e aos perfis de verbosidade em `docstruct.profiles`.
 4. A extração é híbrida: extração de texto determinística primeiro, depois visão por IA para páginas escaneadas ou sem texto e para entradas de imagem (veja o princípio 2.5).
 5. Os caches de página e de arquivo são otimizações, não fonte de verdade.
 6. Os renderizadores só devem consumir dados canônicos validados.
@@ -138,7 +138,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
 ## 7. Princípios arquiteturais do ecossistema
 
 Estes princípios regem como os quatro componentes do ecossistema dividem o
-trabalho: o core (`backend/`), o SDK (`libs/sdk`), a docstruct
+trabalho: o core (`libs/core`), o SDK (`libs/sdk`), a docstruct
 (`libs/docstruct`) e a [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox).
 Cada um aponta para o ADR que o detalha e diz como a conformidade é verificada.
 Uma exceção exige um ADR com justificativa, escopo, responsável e critério de
@@ -183,8 +183,9 @@ capacidades operacionais.
      para oferecer um.
    - **Detalhe:** [ADR-0003](adr/0003-remote-only-operational-capabilities.pt-br.md).
    - **Verificado por:** revisão e o `tests/test_architecture_layers.py`,
-     que falha se `backend/` importar o pacote da Toolbox, ou se `backend/`
-     ou `frontend/` importar uma biblioteca operacional. Ele não tem lista de
+     que falha se o core ou o `backend/` importar o pacote da Toolbox, ou se
+     o core, o `backend/` ou o `frontend/` importar uma biblioteca
+     operacional. Ele não tem lista de
      exceções: uma exceção exige uma ADR, e uma lista de exceções, depois de
      criada, só pode diminuir.
 5. **P5 — Processamento orientado a referências.**
@@ -262,7 +263,7 @@ O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
   da P8, registra a instalação por lockfile entregue pela #405 / PR #539 e
   deixa a publicação de cobertura para a #366.
 - **2.0.7 (2026-11-14):** a seção 4.3 passa a citar
-  `backend/core/agents/prompts` para os prompts dos modos, que o passo 2 da
+  `libs/core/src/acessilia_core/agents/prompts` para os prompts dos modos, que o passo 2 da
   ADR-0016 moveu de `backend/ai/prompts`. Nenhum princípio muda.
 - **2.0.6 (2026-11-09):** o "Verificado por" da P5 passa a citar os testes que
   agora existem para o `artifact/reference@1` (#185). Nenhum princípio muda.

@@ -8,18 +8,18 @@ tests/test_structural_extraction_failure.py cover how a run ends.
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 from types import SimpleNamespace
 
 import pytest
 
-from backend.core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline import orchestrator as pddl
 from tests.core_config_support import core_config
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
-from backend.core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import preflight as pipeline_preflight
 
 
 def _recorders(monkeypatch):
@@ -170,8 +170,8 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
 async def test_the_progress_messages_come_in_order(monkeypatch, tmp_path) -> None:
     _, _, statuses, _ = await _run(monkeypatch, tmp_path)
 
-    from backend.core.i18n import t
-    from backend.core.i18n.stage_messages import (
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.stage_messages import (
         STAGE_ANALYZING_STRUCTURAL,
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
         STAGE_ENRICHING_TABLES_OCR,

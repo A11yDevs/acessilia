@@ -12,8 +12,8 @@ from typing import Any
 from backend.config.core_config import core_config_from_settings
 from backend.services.model_calls import get_model_calls
 from backend.services.run_ports import service_run_ports
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
 
 
@@ -143,7 +143,7 @@ def _export_outputs(
         try:
             if fmt == "pdf_ua":
                 export_pdf_ua = getattr(
-                    import_module("backend.core.export.exporters.pdf_exporter"),
+                    import_module("acessilia_core.export.exporters.pdf_exporter"),
                     "export_pdf_ua",
                 )
                 export_pdf_ua(
@@ -155,13 +155,13 @@ def _export_outputs(
                 )
             elif fmt == "txt":
                 export_txt = getattr(
-                    import_module("backend.core.export.exporters.txt_exporter"),
+                    import_module("acessilia_core.export.exporters.txt_exporter"),
                     "export_txt",
                 )
                 export_txt(canonical, output_path, title=canonical.get("title", engine_name))
             elif fmt == "docx":
                 export_docx = getattr(
-                    import_module("backend.core.export.exporters.docx_exporter"),
+                    import_module("acessilia_core.export.exporters.docx_exporter"),
                     "export_docx",
                 )
                 export_docx(

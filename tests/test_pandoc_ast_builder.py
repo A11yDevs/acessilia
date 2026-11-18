@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from backend.core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
 from tests.core_config_support import toolbox_config
 

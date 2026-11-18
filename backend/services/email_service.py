@@ -1,8 +1,8 @@
 import aiosmtplib
 from email.message import EmailMessage
 from pathlib import Path
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     EMAIL_CONFIRMATION_BODY,
     EMAIL_CONFIRMATION_SUBJECT,
     EMAIL_FAILURE_BODY,
@@ -22,7 +22,7 @@ from backend.core.i18n.log_messages import (
     LOG_EMAIL_SENT,
     LOG_SMTP_NOT_CONFIGURED,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.config.settings import settings
 
 

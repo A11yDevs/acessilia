@@ -7,7 +7,7 @@ import pytest
 
 from backend.api import worker
 from backend.services import job_store
-from backend.core.blocking import run_blocking
+from acessilia_core.blocking import run_blocking
 from backend.services.queue_service import QueueItem, UnifiedQueue
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from tests.test_pending_fixes import stop_queue
@@ -44,7 +44,7 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
 
     async def process(*args, **kwargs):
         if kwargs["task_id"] == "next":
-            from backend.core.pipeline.canonical_builder import build_canonical_document
+            from acessilia_core.pipeline.canonical_builder import build_canonical_document
             advanced.set()
             return build_canonical_document("Next document.", title="Next", toolbox=toolbox_config())
         await run_blocking(extract)
@@ -177,8 +177,8 @@ async def test_normal_jobs_keep_the_configured_concurrency(tmp_path, max_concurr
 
 @pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
 def test_cancellation_wait_is_localized_and_read_only(isolated_runtime, monkeypatch, tmp_path, locale):
-    from backend.core import i18n
-    from backend.core.i18n.stage_messages import STAGE_CANCELLATION_WAITING
+    from acessilia_core import i18n
+    from acessilia_core.i18n.stage_messages import STAGE_CANCELLATION_WAITING
 
     _, manager = isolated_runtime
     manager.criar_tarefa(tmp_path / "input.pdf", task_id="localized")

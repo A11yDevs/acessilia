@@ -9,12 +9,12 @@ accepted and left out of the document, and any failure fails the method.
 
 from __future__ import annotations
 
-from backend.core.ports import NoRegionCache, RunPorts
+from acessilia_core.ports import NoRegionCache, RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 import base64
-from backend.core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import payload as pipeline_payload
 import hashlib
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -24,25 +24,25 @@ import httpx
 import pytest
 import respx
 
-from backend.core.pipeline.enrichment import pictures as picture_stage
-from backend.core.pipeline.handlers import inspection as inspection_handlers
-from backend.core.agents.output_schemas import PageInspectionOutput
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.agents.output_schemas import PageInspectionOutput
 from backend.config.settings import settings
-from backend.core.manifest.builder import (
+from acessilia_core.manifest.builder import (
     UNSTRUCTURED_PAGE_OBLIGATION_KIND,
     UNSTRUCTURED_PAGE_OBSERVATION_KIND,
     append_unstructured_page_needs,
     build_processing_manifest,
     is_unstructured_page_placeholder,
 )
-from backend.core.manifest.models import PageDescriptor
-from backend.core.manifest.toolbox_extractor import ToolboxExtraction
-from backend.core.planning import toolbox_gate
-from backend.core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
+from acessilia_core.manifest.models import PageDescriptor
+from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
+from acessilia_core.planning import toolbox_gate
+from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
 from docstruct.placeholders import is_placeholder_visual
 from tests.pddl_support import build_element, build_manifest
 from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
-from backend.core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import preflight as pipeline_preflight
 from tests.core_config_support import core_config, model_config, toolbox_config
 
 NOW = datetime(2026, 10, 19, tzinfo=timezone.utc)
@@ -142,8 +142,8 @@ def test_a_page_whose_elements_point_at_it_by_page_number_is_not_empty():
 
 
 def test_the_obligation_kind_is_in_the_v23_catalog():
-    from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
-    from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+    from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
+    from acessilia_core.planning.domain_bundle import V23_OBLIGATION_KINDS
 
     assert UNSTRUCTURED_PAGE_OBLIGATION_KIND in V23_OBLIGATION_KINDS
     assert V23_OBLIGATION_BY_KIND[UNSTRUCTURED_PAGE_OBLIGATION_KIND][1] == [
@@ -362,8 +362,8 @@ def test_inspect_page_asks_for_the_page_inspection_schema(monkeypatch):
 
     from agno.run.base import RunStatus
 
-    from backend.core.agents import vision_agent
-    from backend.core.agents.output_schemas import PAGE_INSPECTION_INSTRUCTION
+    from acessilia_core.agents import vision_agent
+    from acessilia_core.agents.output_schemas import PAGE_INSPECTION_INSTRUCTION
 
     seen = {}
 
@@ -398,7 +398,7 @@ def test_a_model_answer_of_content_without_description_is_refused(monkeypatch):
 
     from agno.run.base import RunStatus
 
-    from backend.core.agents import vision_agent
+    from acessilia_core.agents import vision_agent
 
     class FakeAgent:
         def __init__(self, **kwargs):
@@ -469,7 +469,7 @@ def test_a_source_the_toolbox_lost_is_sent_again(fake_toolbox_render, tmp_path):
 def test_a_raster_input_is_rendered_by_the_toolbox_as_its_single_page(
     fake_toolbox_render, tmp_path
 ):
-    from backend.core.toolbox.toolbox_client import ToolboxCapabilityError
+    from acessilia_core.toolbox.toolbox_client import ToolboxCapabilityError
 
     image = tmp_path / "scan.png"
     image.write_bytes(PNG_PAGE)
@@ -504,7 +504,7 @@ def test_a_source_sent_unlike_its_manifest_media_type_is_refused(
 
 
 def test_a_render_without_an_image_is_a_contract_violation(monkeypatch, tmp_path):
-    from backend.core.toolbox.toolbox_client import ToolboxContractViolation
+    from acessilia_core.toolbox.toolbox_client import ToolboxContractViolation
 
     monkeypatch.setattr(settings, "toolbox_base_url", "http://toolbox.test")
     monkeypatch.setattr(settings, "toolbox_base_urls", "")

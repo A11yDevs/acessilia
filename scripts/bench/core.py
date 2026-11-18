@@ -10,13 +10,13 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from docstruct.export.markdown import bare_latex
-
-from backend.config.core_config import core_config_from_settings
-from backend.core.pipeline.canonical_builder import (
+from acessilia_core.pipeline.canonical_builder import (
     build_canonical_document,
     sanitize_canonical_document,
 )
+from docstruct.export.markdown import bare_latex
+
+from backend.config.core_config import core_config_from_settings
 
 _PLACEHOLDER_TITLE = "Benchmark page"
 _HEADING_TYPES = ("heading", "title", "section_header")

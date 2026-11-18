@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 import asyncio
 import threading
@@ -14,17 +14,17 @@ from types import SimpleNamespace
 import pytest
 
 from backend.config.settings import settings
-from backend.core.execution.executor import (
+from acessilia_core.execution.executor import (
     ExecutionResume,
     ExecutorAgent,
     MethodRegistry,
 )
-from backend.core.execution.models import ExecutionStepResult, MethodResult
-from backend.core.manifest.models import ProcessingManifest
-from backend.core.pipeline import orchestrator as pddl
-from backend.core.planning.domain_bundle import DomainBundle
-from backend.core.planning.planner_agent import PlannerAgent
-from backend.core.ports import PHASE_ENRICHED, PHASE_EXECUTION, PHASE_MANIFEST, PHASE_MEDIA, PHASE_PLAN
+from acessilia_core.execution.models import ExecutionStepResult, MethodResult
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.planning.domain_bundle import DomainBundle
+from acessilia_core.planning.planner_agent import PlannerAgent
+from acessilia_core.ports import PHASE_ENRICHED, PHASE_EXECUTION, PHASE_MANIFEST, PHASE_MEDIA, PHASE_PLAN
 from backend.services import job_checkpoint
 from backend.services.run_ports import service_run_ports
 from backend.services.operation_registry import OperationRegistry
@@ -680,8 +680,8 @@ async def test_a_completed_picture_is_checkpointed_during_the_stage(
     monkeypatch, data_dir
 ):
     """A picture folded before the stage ends must be durable for a resume."""
-    from backend.core.agents.output_schemas import VisionOutput
-    from backend.core.pipeline.enrichment import pictures as picture_stage
+    from acessilia_core.agents.output_schemas import VisionOutput
+    from acessilia_core.pipeline.enrichment import pictures as picture_stage
 
     manifest = build_manifest(
         [

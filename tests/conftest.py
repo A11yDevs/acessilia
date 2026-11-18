@@ -12,7 +12,8 @@ from tests.toolbox_render_fake import fake_toolbox_render  # noqa: F401
 @pytest.fixture(autouse=True)
 def model_calls():
     """Each test explicitly owns execution, independently of its event loops."""
-    from backend.core.agents.model_calls import model_call_scope
+    from acessilia_core.agents.model_calls import model_call_scope
+
     from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
 
     runner = ModelCallExecutor(ModelCallLimits(workers=4, max_pending=4))
@@ -32,7 +33,7 @@ def _locales_start_unconfigured(monkeypatch):
     developer's environment. Restoring both after each test keeps one test's
     setup, or a shell's ``LANG``, out of the others (ADR-0016, step 5).
     """
-    from backend.core import i18n
+    from acessilia_core import i18n
 
     monkeypatch.setattr(i18n, "_SERVER_LOCALE", None)
     monkeypatch.setattr(i18n, "_ACTIVE_LOCALES", None)

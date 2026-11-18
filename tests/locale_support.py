@@ -11,6 +11,6 @@ import pytest
 
 def use_server_locale(monkeypatch: pytest.MonkeyPatch, locale: str | None) -> None:
     """Make ``locale`` the server-side locale for this test (``None``: not configured)."""
-    from backend.core import i18n
+    from acessilia_core import i18n
 
     monkeypatch.setattr(i18n, "_SERVER_LOCALE", locale)

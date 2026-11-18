@@ -30,7 +30,7 @@ import acessilia_sdk
 
 ROOT = Path(__file__).resolve().parents[1]
 #: The core's code, its scripts and its tests.
-SCANNED = ("backend", "scripts", "tests")
+SCANNED = ("backend", "libs/core/src", "scripts", "tests")
 #: ``"acessilia_sdk.module.name": "reason"`` for a reviewed exception. Empty.
 ALLOWED: dict[str, str] = {}
 #: Calls that read or replace ``getattr(module, "name")``-style attributes.
