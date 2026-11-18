@@ -21,6 +21,8 @@ from acessilia_core.planning.domain_bundle import (
 )
 from acessilia_core.planning.models import NominalPlan
 from acessilia_core.planning.planner_agent import PlannerAgent
+from acessilia_core.pipeline.handlers.registry import bind_run
+from acessilia_core.ports import RunPorts
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -274,6 +276,9 @@ def _run_execute(args: argparse.Namespace) -> tuple[Path, Path]:
                 "O módulo deve expor register_handlers(registry)"
             )
         register(registry)
+        # The handlers' contract is checked, and the ones that declare
+        # ``config`` or ``ports`` get them, as in a service run (#543).
+        registry = bind_run(registry, core_config_from_settings(), RunPorts.none())
     executor = ExecutorAgent(
         registry,
         domain=DomainBundle.load(args.domain, args.domain_description),

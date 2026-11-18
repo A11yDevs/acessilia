@@ -358,7 +358,7 @@ def test_bind_run_gives_the_run_config_to_the_handlers_that_take_it() -> None:
 
     received = []
 
-    def with_config(manifest, obligation_id, *, config):
+    def with_config(manifest, obligation_id, *, config: CoreConfig):
         received.append(config)
 
     def without_config(manifest, obligation_id):
@@ -471,7 +471,7 @@ async def test_concurrent_runs_each_get_their_own_config(monkeypatch, tmp_path) 
 
     from acessilia_core.execution.models import MethodResult
 
-    def handler(manifest, obligation_id, *, config):
+    def handler(manifest, obligation_id, *, config: CoreConfig):
         return MethodResult(success=True, validated=True, message=config.fusion.secondary_provider)
 
     shared = build_orchestrator()

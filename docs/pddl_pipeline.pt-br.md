@@ -248,7 +248,7 @@ uv run python scripts/pddl_pipeline.py execute \
 O módulo deve fornecer:
 
 ```python
-from core.execution.models import MethodResult
+from acessilia_core.execution.models import MethodResult
 
 
 def describe_image(manifest, obligation_id):
@@ -265,8 +265,11 @@ def register_handlers(registry):
     registry.register("vision-description", describe_image)
 ```
 
-`examples.demo_handlers` permite exercitar o caminho `--live`, mas é
-explicitamente simulado e não deve ser usado em produção.
+O registro é vinculado como numa execução do serviço (`bind_run`): um
+handler que precisa da configuração ou dos ports da execução os declara
+depois do `*`, anotados com o tipo (`*, config: CoreConfig`,
+`*, ports: RunPorts`). Um handler que quebra esse contrato interrompe o
+`execute` antes de o plano rodar (#543).
 
 Em caso de falha:
 
