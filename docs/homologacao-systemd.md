@@ -129,7 +129,7 @@ cd /path/to/acessilia
 
 A monitor that should only watch readiness can use `curl -fsS http://localhost:8000/api/v1/ready` instead; the endpoint returns 503 when a chain provider is unhealthy. The check allows 30 s for `/ready` because the route probes providers sequentially (3 s each) and may fail over between Toolbox endpoints; a 5 s limit would alert while the application was still ready. Raise `OPS_READY_TIMEOUT` when the deployment has more endpoints than that budget covers.
 
-To test the alert with the homologation `FUSION_MODE=single`, in a test instance set `TOOLBOX_PROVIDER` to an invalid id (the primary provider is always checked), restart the API and run the command: it must report `readiness endpoint does not answer or reports unavailable` and exit 1. Restore the setting afterwards. To exercise the secondary provider, set `FUSION_MODE=dual` and invalidate `FUSION_SECONDARY_PROVIDER` instead, restoring both afterwards.
+To test the alert with the homologation `FUSION_MODE=dual`, in a test instance set `FUSION_SECONDARY_PROVIDER` to an invalid id, recreate the container (see [Changing a limit](#changing-a-limit)) and run the command: it must report `readiness endpoint does not answer or reports unavailable` and exit 1. Restore the setting afterwards. Invalidating `TOOLBOX_PROVIDER` exercises the primary provider, which is checked in either mode, the same way.
 
 ## Processing limits and fusion mode
 
@@ -139,8 +139,27 @@ The effective `MAX_PAGES` and `FUSION_MODE` are the values inside the running co
 docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
 ```
 
+### Changing a limit
+
+The container reads `.env` only when it is created (`env_file` in `docker-compose.staging.yml`), so `docker restart` keeps the old values. Edit `.env` in the clone and recreate the container:
+
+```bash
+cd /path/to/acessilia                 # the clone: docker-compose.staging.yml and .env
+cp .env ".env.bak-$(date +%F)"
+sed -i 's/^MAX_PAGES=.*/MAX_PAGES=50/' .env
+grep -q '^FUSION_MODE=' .env && sed -i 's/^FUSION_MODE=.*/FUSION_MODE=dual/' .env \
+  || echo 'FUSION_MODE=dual' >> .env
+grep -nE '^(MAX_PAGES|FUSION_MODE|FUSION_SECONDARY_PROVIDER)=' .env   # one line each
+docker compose -f docker-compose.staging.yml up -d --force-recreate acessilia
+docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
+./scripts/ops.sh auto-update check
+```
+
+Run it from the clone: `.env` sets `COMPOSE_PROJECT_NAME=acessilia-staging`, and compose reads it only from the project directory. When a variable appears twice in `.env`, the last line wins. Recreating the container interrupts the running job, which resumes from its last checkpoint; wait for the queue to drain when you can. The update timer runs `docker compose up -d` with the same `.env`, so it keeps the change.
+
 - **Preflight decision:** the early check rejects only a PDF whose count comes from `pymupdf` (`page_count_source == "pymupdf"`). Without a trustworthy count — a failed inspection, a content-stream scan, a non-PDF — rejecting before extraction would refuse legitimate scanned documents, so the limit stays authoritative after extraction (`_check_page_limit` in `libs/core/src/acessilia_core/pipeline/preflight.py`). No separate page cap is added for dual extraction: the same limit applies to the extracted manifest and the provider timeouts bound remote work.
-- **Fusion mode decision:** homologation uses `FUSION_MODE=single`. With `dual`, `/ready` depends on MinerU as well, so one provider outage fails readiness and degrades every job; dual is used only while evaluating fusion, with both providers monitored. This is a decision for the staging environment, not a product default.
+- **Page limit decision:** homologation uses `MAX_PAGES=50`, the `.env.example` default. On 2026-11-18 the container had `MAX_PAGES=2000`. A document that large passes the early check and, in dual mode, holds both providers until the extraction deadline (`TOOLBOX_EXTRACTION_TIMEOUT_SECONDS`, 1500 s): the failure of 30/10, with 201 pages. Raise the limit only after measuring, in dual mode, how many pages an extraction completes within the deadline with margin.
+- **Fusion mode decision:** homologation uses `FUSION_MODE=dual` (2026-11-18, replacing `single`). Quality through adjudication between the two providers is a research hypothesis under evaluation, so staging runs the fusion. `/ready` then depends on MinerU as well: a MinerU outage fails readiness and the alert above fires. Jobs keep running, because an extraction whose secondary fails degrades to the primary (`fusion.status = "degraded"`) and loses the adjudication of that document only; a secondary that hangs degrades the same way once the primary is complete (#603). Monitor both providers. This is a decision for the staging environment, not a product default.
 
 ## Troubleshooting
 
