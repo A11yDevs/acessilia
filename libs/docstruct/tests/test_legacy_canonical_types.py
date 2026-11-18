@@ -82,12 +82,14 @@ def test_pre_deprecation_pickles_still_load_and_current_objects_round_trip():
 
 
 def test_cold_import_and_construction_emit_no_warnings():
-    result = subprocess.run([
-        sys.executable, '-I', '-W', 'error', '-c',
-        'from docstruct import CanonicalDocument, CanonicalSection; '
-        'from docstruct.types import CanonicalBlock; '
-        'section = CanonicalSection("s", 1, "Title", [CanonicalBlock("b", "paragraph", "Body")]); '
+    code = '\n'.join([
+        'from docstruct import CanonicalDocument, CanonicalSection',
+        'from docstruct.types import CanonicalBlock',
+        'section = CanonicalSection("s", 1, "Title", [CanonicalBlock("b", "paragraph", "Body")])',
         'assert CanonicalDocument("Title", [section]).blocks() == section.blocks',
+    ])
+    result = subprocess.run([
+        sys.executable, '-I', '-W', 'error', '-c', code,
     ], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout == result.stderr == ''
