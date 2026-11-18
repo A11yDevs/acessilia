@@ -775,9 +775,10 @@ def test_extraction_deadline_covers_a_blocked_upload(
     mock_client.extract_structure.assert_not_awaited()
 
 
-def test_extraction_deadline_covers_a_blocked_secondary(
+def test_a_blocked_secondary_degrades_to_the_complete_primary(
     mock_client, monkeypatch
 ):
+    """#603: a hung secondary no longer throws the primary result away."""
     async def hang(*_args, **_kwargs):
         await asyncio.sleep(HANG_SECONDS)
 
@@ -792,9 +793,14 @@ def test_extraction_deadline_covers_a_blocked_secondary(
     )
     extractor = ToolboxManifestExtractor(client=mock_client)
 
-    with pytest.raises(ToolboxTimeout):
-        extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False, extraction_timeout_seconds=1), paths=paths_config(), operations=None)
+    started = time.monotonic()
+    result = extractor.extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False, extraction_timeout_seconds=2), paths=paths_config(), operations=None)
 
+    assert time.monotonic() - started < 3
+    assert result.configuration["toolbox_provider"] == "docling"
+    assert result.configuration["fusion"]["status"] == "degraded"
+    assert result.configuration["fusion"]["failed_providers"] == ["mineru"]
+    assert result.configuration["fusion"]["reason"] == "ToolboxTimeout"
     secondary.close.assert_awaited_once()
 
 
