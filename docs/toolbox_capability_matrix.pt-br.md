@@ -20,7 +20,10 @@ A matriz abaixo é o *contrato*. A Toolbox publica o lado dela como
 o registro do SDK contra o arquivo publicado na branch correspondente da
 Toolbox. O verificador também roda contra uma Toolbox em execução (`--url`) ou
 contra `tests/fixtures/toolbox-contract.json`, uma cópia do arquivo publicado
-atualizada com `scripts/capture_toolbox_contract.py --ref develop`.
+atualizada com `scripts/capture_toolbox_contract.py --ref <immutable-toolbox-sha>`,
+substituindo o marcador pelo SHA de 40 caracteres do commit revisado. Capturas de
+uma Toolbox em execução usam `--out` explícito fora de `tests/fixtures` e nunca
+substituem as entradas da geração.
 
 ## Pontos de acionamento exigidos por capacidade
 

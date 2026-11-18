@@ -14,8 +14,9 @@ generation exists" (#213). The registry
 
 The input is ``tests/fixtures/toolbox-contract.json``, a copy of the contract
 the Toolbox publishes (``contract/toolbox-contract.json``), refreshed only by
-``scripts/capture_toolbox_contract.py --ref <ref>``. This script never reads
-the Toolbox's manifests or imports its package (ADR-0002, P3), and it is a
+``scripts/capture_toolbox_contract.py --ref <immutable-toolbox-sha>`` using a
+reviewed 40-character commit SHA. This script never reads the Toolbox's
+manifests or imports its package (ADR-0002, P3), and it is a
 development tool: nothing in the SDK imports it.
 
 Rules for the generated data:

@@ -20,7 +20,9 @@ The matrix below is the *contract*. The Toolbox publishes its side as
 checks the SDK registry against the file published on the matching Toolbox
 branch. The checker also runs against a live Toolbox (`--url`) or against
 `tests/fixtures/toolbox-contract.json`, a copy of the published file refreshed
-with `scripts/capture_toolbox_contract.py --ref develop`.
+with `scripts/capture_toolbox_contract.py --ref <immutable-toolbox-sha>`, where
+the placeholder is the reviewed 40-character commit SHA. Live captures use an
+explicit `--out` outside `tests/fixtures` and never replace generation inputs.
 
 ## Required capability entry points
 
