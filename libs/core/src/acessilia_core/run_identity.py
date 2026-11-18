@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -166,16 +167,23 @@ STAGE_FIELDS: dict[str, frozenset[str]] = {
         "document.inline_math_detection",
         "document.formula_text_agreement_min",
     },
-    "planning": _TOOLBOX | {"toolbox.availability_gate"},
+    # The gate reads the secondary provider of a dual fusion too.
+    "planning": _TOOLBOX | {"toolbox.availability_gate", "fusion.secondary_provider"},
     "execution": PROCESSING_FIELDS,
 }
 
 
-def stage_identity(config: CoreConfig, stage: str) -> str:
-    """A digest of what ``stage`` depends on in ``config``; no credentials,
-    since ``processing_identity`` holds none."""
+def stage_identity(
+    config: CoreConfig, stage: str, options: Mapping[str, Any] | None = None
+) -> str:
+    """A digest of what ``stage`` depends on in ``config``, plus the run's
+    ``options`` outside it (the orchestrator's planner and dry run, the
+    service's model revision; review of #578). No credentials: neither
+    ``processing_identity`` nor those options hold any."""
     identity = processing_identity(config)
-    subset = {name: identity[name] for name in sorted(STAGE_FIELDS[stage])}
+    subset: dict[str, Any] = {name: identity[name] for name in sorted(STAGE_FIELDS[stage])}
+    if options:
+        subset["options"] = {key: options[key] for key in sorted(options)}
     encoded = json.dumps(subset, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
 

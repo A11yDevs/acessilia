@@ -14,7 +14,7 @@ warning, as it was before.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 from acessilia_core.blocking import run_blocking
@@ -61,12 +61,23 @@ class RunCheckpoints:
     and no payload is even serialized.
     """
 
-    def __init__(self, checkpoints: JobCheckpoints | None, config: CoreConfig) -> None:
+    def __init__(
+        self,
+        checkpoints: JobCheckpoints | None,
+        config: CoreConfig,
+        *,
+        options: Mapping[str, Mapping[str, Any]] | None = None,
+    ) -> None:
+        """``options`` are the run's own options outside ``config``, by stage
+        (the orchestrator's planner and dry run); the port's ``options``
+        add the service's (its model revision). Both enter the identities."""
         self._checkpoints = checkpoints
-        self._identity = (
-            {stage: stage_identity(config, stage) for stage in STAGE_FIELDS}
-            if checkpoints is not None else {}
-        )
+        self._identity: dict[str, str] = {}
+        if checkpoints is not None:
+            port_options = getattr(checkpoints, "options", None) or {}
+            for stage in STAGE_FIELDS:
+                merged = {**(options or {}).get(stage, {}), **port_options.get(stage, {})}
+                self._identity[stage] = stage_identity(config, stage, merged)
         # Set once a phase is redone: the phases after it were built on the
         # old one, so none of them is reused either.
         self._stale = False
@@ -83,14 +94,26 @@ class RunCheckpoints:
         payload = self._checkpoints.load(phase)
         if payload is None:
             return None
-        stored = payload.get(IDENTITY_KEY)
-        if stored is None:
+        if IDENTITY_KEY not in payload:
             logger.warning(
                 "Job {}: the {} checkpoint predates config identities; reused as before",
                 self._checkpoints.job_id, phase,
             )
             return payload
-        changed = sorted(stage for stage, digest in stored.items() if self._identity.get(stage) != digest)
+        stored = payload[IDENTITY_KEY]
+        if not isinstance(stored, Mapping):
+            # Unreadable identity: never taken as a match (review of #578).
+            changed = ["unreadable identity"]
+        else:
+            # Every stage the phase holds must be recorded and equal: a
+            # partial identity is not a match (review of #578).
+            changed = sorted(
+                stage for stage in PHASE_STAGES[phase]
+                if stored.get(stage) != self._identity.get(stage)
+            ) + sorted(
+                stage for stage, digest in stored.items()
+                if stage not in PHASE_STAGES[phase] and self._identity.get(stage) != digest
+            )
         if changed:
             self._stale = True
             logger.warning(
@@ -165,7 +188,8 @@ class RunCheckpoints:
     def execution_saver(self, plan: NominalPlan) -> Callable[[dict[str, Any]], None]:
         """A callback the executor calls after each step, writing the checkpoint."""
         checkpoints = self._checkpoints
-        assert checkpoints is not None
+        if checkpoints is None:
+            raise RuntimeError("an execution checkpoint needs the job's checkpoints")
 
         def save(snapshot: dict[str, Any]) -> None:
             if snapshot.get("plan_id") != plan.plan_id:

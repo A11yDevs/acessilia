@@ -19,6 +19,7 @@ from acessilia_core.pipeline.checkpointing import (
     IDENTITY_KEY,
     PHASE_STAGES,
     RunCheckpoints,
+    manifest_payload,
 )
 from acessilia_core.ports import CHECKPOINT_PHASES, NoRegionCache, RunPorts
 from acessilia_core.run_identity import PROCESSING_FIELDS, STAGE_FIELDS, stage_identity
@@ -56,7 +57,15 @@ def _counting_orchestrator(monkeypatch, counts):
         counts["planning"] += 1
         return await real_decide(manifest, replace(config, toolbox=replace(config.toolbox, availability_gate="off")))
 
-    async def run_plan(*_args, **_kwargs):
+    async def run_plan(plan, planning_manifest, execution_state, checkpoints, *_args, **_kwargs):
+        """Stands in for the executor: records whether the run resumed an
+        execution, then writes one step's checkpoint and stops."""
+        counts.setdefault("resumed_execution", []).append(execution_state is not None)
+        if checkpoints.active:
+            checkpoints.execution_saver(plan)({
+                "plan_id": plan.plan_id, "manifest": manifest_payload(planning_manifest),
+                "results": [], "replan_required": False,
+            })
         raise Stop
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
@@ -86,18 +95,28 @@ def _changed(config, group: str, **fields):
     return replace(config, **{group: replace(getattr(config, group), **fields)})
 
 
-async def _resume_counts(monkeypatch, tmp_path, second) -> dict[str, int]:
+async def _resume_counts(
+    monkeypatch, tmp_path, second, *, between=None, with_execution=False
+) -> dict[str, int]:
     """Runs a job, then resumes it under ``second`` (a function of the first
-    config); returns how many times each stage ran in the resumed run."""
+    config), after ``between(orchestrator, checkpoints)`` if given; returns
+    how many times each stage ran in the resumed run, and with
+    ``with_execution`` whether it resumed the execution."""
     counts = dict.fromkeys(("media", "extraction", "enrichment", "planning"), 0)
     orchestrator = _counting_orchestrator(monkeypatch, counts)
     checkpoints = MemoryCheckpoints("job-549")
     first = core_config()
 
     await _run(orchestrator, tmp_path, first, checkpoints)
+    assert counts.pop("resumed_execution") == [False]
     assert counts == dict.fromkeys(counts, 1)
     counts.update(dict.fromkeys(counts, 0))
+    if between is not None:
+        between(orchestrator, checkpoints)
     await _run(orchestrator, tmp_path, second(first), checkpoints)
+    resumed = counts.pop("resumed_execution")
+    if with_execution:
+        counts["execution"] = 0 if resumed == [True] else 1
     return counts
 
 
@@ -256,3 +275,125 @@ def test_the_execution_checkpoint_carries_every_stage() -> None:
     assert set(stored) == set(PHASE_STAGES["execution"])
     assert RunCheckpoints(store, config).load("execution") is not None
     assert RunCheckpoints(store, _changed(config, "vision", pdf_split_dpi=99)).load("execution") is None
+
+
+@pytest.mark.asyncio
+async def test_the_same_config_resumes_the_execution(monkeypatch, tmp_path) -> None:
+    counts = await _resume_counts(monkeypatch, tmp_path, lambda c: c, with_execution=True)
+
+    assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 0, "execution": 0}
+
+
+@pytest.mark.asyncio
+async def test_an_execution_only_field_redoes_only_the_execution(monkeypatch, tmp_path) -> None:
+    """``vision.pdf_split_dpi`` is read by the inspection handlers alone
+    (review of #578)."""
+    counts = await _resume_counts(
+        monkeypatch, tmp_path, lambda c: _changed(c, "vision", pdf_split_dpi=c.vision.pdf_split_dpi + 1),
+        with_execution=True,
+    )
+
+    assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 0, "execution": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_toolbox_deployment_change_redoes_the_execution_too(monkeypatch, tmp_path) -> None:
+    counts = await _resume_counts(
+        monkeypatch, tmp_path, lambda c: _changed(c, "toolbox", base_url="http://elsewhere:8002"),
+        with_execution=True,
+    )
+
+    assert counts == {"media": 1, "extraction": 1, "enrichment": 1, "planning": 1, "execution": 1}
+
+
+@pytest.mark.asyncio
+async def test_switching_to_a_dry_run_does_not_resume_a_real_execution(monkeypatch, tmp_path) -> None:
+    """Review of #578: a dry run cannot resume an execution checkpoint (the
+    executor refuses), so turning PDDL_EXECUTE_DRY_RUN on between two runs
+    must redo the execution, not fail the job."""
+    def dry(orchestrator, _checkpoints):
+        orchestrator.execute_dry_run = True
+
+    counts = await _resume_counts(monkeypatch, tmp_path, lambda c: c, between=dry, with_execution=True)
+
+    assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 0, "execution": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_planner_change_plans_again(monkeypatch, tmp_path) -> None:
+    def internal_only(orchestrator, _checkpoints):
+        orchestrator.preferred_plan = "fast-downward"
+
+    counts = await _resume_counts(monkeypatch, tmp_path, lambda c: c, between=internal_only, with_execution=True)
+
+    assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 1, "execution": 1}
+
+
+@pytest.mark.asyncio
+async def test_a_new_model_revision_enriches_again(monkeypatch, tmp_path) -> None:
+    """The service's model revision, declared on its checkpoint port, is part
+    of the enrichment's and the execution's identity."""
+    def bump(_orchestrator, checkpoints):
+        checkpoints.options = {"enrichment": {"processing_model_revision": "weights-2"},
+                               "execution": {"processing_model_revision": "weights-2"}}
+
+    counts = await _resume_counts(monkeypatch, tmp_path, lambda c: c, between=bump, with_execution=True)
+
+    assert counts == {"media": 0, "extraction": 1, "enrichment": 1, "planning": 1, "execution": 1}
+
+
+def test_the_service_declares_its_model_revision(monkeypatch) -> None:
+    from backend.config.settings import settings
+    from backend.services.run_ports import service_run_ports
+
+    monkeypatch.setattr(settings, "processing_model_revision", "weights-7")
+    options = service_run_ports("job-7").checkpoints.options
+
+    assert options["enrichment"] == {"processing_model_revision": "weights-7"}
+    assert options["execution"] == {"processing_model_revision": "weights-7"}
+
+
+def test_a_stamped_execution_snapshot_still_resumes() -> None:
+    """The identity rides along in the payload; the executor's resume reads
+    the same fields as before."""
+    from acessilia_core.execution.executor import ExecutionResume
+    from acessilia_core.execution.models import ExecutionStepResult
+    from acessilia_core.manifest.models import ProcessingManifest
+
+    store = MemoryCheckpoints()
+    config = core_config()
+    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
+    RunCheckpoints(store, config).execution_saver(SimpleNamespace(plan_id="plan-1"))(
+        {"plan_id": "plan-1", "manifest": manifest_payload(manifest), "results": [], "replan_required": False}
+    )
+    state = RunCheckpoints(store, config).load("execution")
+
+    resume = ExecutionResume(
+        manifest=ProcessingManifest.model_validate(state["manifest"]),
+        results=[ExecutionStepResult.model_validate(item) for item in state.get("results") or []],
+        replan_required=bool(state.get("replan_required")),
+    )
+    assert resume.manifest.manifest_id == manifest.manifest_id
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [{"media": "x"}, "not-a-mapping", ["media"], None],
+    ids=["partial", "string", "list", "null"],
+)
+def test_a_partial_or_unreadable_identity_is_not_a_match(identity) -> None:
+    """Review of #578: only a complete identity for the phase's stages is
+    reused; a partial or malformed one is redone."""
+    config = core_config()
+    store = MemoryCheckpoints("job-bad")
+    store.phases["manifest"] = {"manifest": {}, IDENTITY_KEY: identity}
+    if isinstance(identity, dict):
+        identity["media"] = stage_identity(config, "media")
+
+    assert RunCheckpoints(store, config).load("manifest") is None
+
+
+def test_the_planning_stage_holds_what_the_gate_reads() -> None:
+    """The gate resolves the dual fusion's secondary provider (review of #578)."""
+    assert "fusion.secondary_provider" in STAGE_FIELDS["planning"]
+    assert "toolbox.availability_gate" in STAGE_FIELDS["planning"]

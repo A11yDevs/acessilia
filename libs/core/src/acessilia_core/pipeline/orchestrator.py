@@ -177,6 +177,16 @@ class PddlAccessibilityOrchestrator:
             bind_run(self.executor.registry, config, ports), domain=self.executor.domain
         )
 
+    def _checkpoint_options(self) -> dict[str, dict[str, Any]]:
+        """The orchestrator's own options a checkpoint depends on (#549)."""
+        planner = {
+            "planner_backend": self.planner_backend, "preferred_plan": self.preferred_plan,
+            "fast_downward": str(self.fast_downward or ""), "max_replans": self.max_replans,
+            "fast_downward_alias": self.fast_downward_alias or "",
+            "fast_downward_search": self.fast_downward_search,
+        }
+        return {"planning": planner, "execution": {**planner, "dry_run": self.execute_dry_run}}
+
     @staticmethod
     def _build_executor() -> ExecutorAgent:
         return ExecutorAgent(build_method_registry(), domain=DomainBundle.load())
@@ -237,7 +247,7 @@ class PddlAccessibilityOrchestrator:
         source_path = file_path.resolve()
         # Inside a job the service gives the run its checkpoints; a benchmark
         # or the CLI runs without one and keeps the old behaviour.
-        checkpoints = RunCheckpoints(ports.checkpoints, config)
+        checkpoints = RunCheckpoints(ports.checkpoints, config, options=self._checkpoint_options())
 
         media_state = checkpoints.load(PHASE_MEDIA)
         if media_state is not None:

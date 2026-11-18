@@ -57,11 +57,19 @@ extração (as opções de fusão e de documento), o enriquecimento (os modelos 
 as opções de visão), o plano (o gate de disponibilidade) e a execução (todas
 elas), cada uma com o deployment e os providers da Toolbox. O checkpoint do
 manifesto gravado durante o enriquecimento também leva a etapa do
-enriquecimento, pois carrega o progresso dele. Uma execução retomada cuja
+enriquecimento, pois carrega o progresso dele. Os digests cobrem também as opções da
+execução fora do seu `CoreConfig`: as opções do planejador do orquestrador (no
+plano e na execução) e a chave de dry run (na execução), e a revisão do modelo
+do serviço (`PROCESSING_MODEL_REVISION`, no enriquecimento e na execução), que
+o serviço declara na sua porta de checkpoints. Uma execução retomada cuja
 configuração mudou refaz a primeira fase que contém uma etapa alterada e todas
 as fases depois dela, mantém as anteriores e registra no log quais etapas
-mudaram. Um checkpoint gravado antes desses digests é reaproveitado com um
-aviso, como antes.
+mudaram; uma identidade que não tem uma das etapas da fase, ou que não pode
+ser lida, conta como mudança. Um limite: o enriquecimento grava o seu
+progresso no checkpoint do manifesto (#407), então, depois de uma mudança na
+etapa do enriquecimento (um modelo, por exemplo), a extração roda de novo
+também; só a inspeção de mídia é mantida. Um checkpoint gravado antes desses
+digests é reaproveitado com um aviso, como antes.
 
 Os payloads dos checkpoints são os documentos pydantic que o pipeline já carrega
 (`ProcessingManifest`, `NominalPlan`, `PlanningComparison`, passos do

@@ -12,6 +12,7 @@ checkpoints and no registered operations.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
@@ -56,6 +57,10 @@ class JobCheckpoints(Protocol):
     """
 
     job_id: str
+    #: Optional: the service's own processing options the checkpoints depend
+    #: on, by stage name (``run_identity.STAGE_FIELDS``), such as the model
+    #: revision for ``enrichment`` and ``execution``. Absent means none.
+    options: Mapping[str, Mapping[str, Any]]
 
     def load(self, phase: str) -> dict[str, Any] | None:
         """The phase's payload, ``None`` when absent; raises when it exists
