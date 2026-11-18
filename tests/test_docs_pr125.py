@@ -17,7 +17,7 @@ DOCS = REPO_ROOT / "docs"
 PAIRS = (
     ("docstruct_algorithms.md", "docstruct_algorithms.pt-br.md"),
     ("drbench.md", "drbench.pt-br.md"),
-    ("pmv_agno_pddl.md", "pmv_agno_pddl.pt-br.md"),
+    ("pddl_pipeline.md", "pddl_pipeline.pt-br.md"),
     ("testing.md", "testing.pt-br.md"),
     ("toolbox_integration.md", "toolbox_integration.pt-br.md"),
     ("toolbox_capability_matrix.md", "toolbox_capability_matrix.pt-br.md"),
@@ -87,8 +87,8 @@ class TestDomainVersionIsConsistent:
             assert "domain_v2.2.pddl" not in text, f"{name} ainda referencia v2.2"
             assert "domain_description_v2.2.md" not in text, f"{name} ainda referencia v2.2"
 
-    def test_pmv_doc_references_the_current_version(self):
-        text = (DOCS / "pmv_agno_pddl.md").read_text(encoding="utf-8")
+    def test_pipeline_doc_references_the_current_version(self):
+        text = (DOCS / "pddl_pipeline.md").read_text(encoding="utf-8")
         assert "domain_v2.3.pddl" in text
 
 
@@ -112,13 +112,13 @@ class TestAgentsAreDocumented:
         }[agent]
         assert hasattr(importlib.import_module(module), agent)
 
-    def test_pmv_doc_lists_every_agent(self):
-        text = (DOCS / "pmv_agno_pddl.md").read_text(encoding="utf-8")
+    def test_pipeline_doc_lists_every_agent(self):
+        text = (DOCS / "pddl_pipeline.md").read_text(encoding="utf-8")
         for agent in self.AGENTS:
-            assert agent in text, f"pmv_agno_pddl.md não menciona {agent}"
+            assert agent in text, f"pddl_pipeline.md não menciona {agent}"
 
     def test_mirror_lists_every_agent(self):
-        text = (DOCS / "pmv_agno_pddl.pt-br.md").read_text(encoding="utf-8")
+        text = (DOCS / "pddl_pipeline.pt-br.md").read_text(encoding="utf-8")
         for agent in self.AGENTS:
             assert agent in text, f"espelho pt-BR não menciona {agent}"
 

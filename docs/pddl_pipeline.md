@@ -1,6 +1,6 @@
-# PMV 2.1 — Agno, manifest, PDDL, comparison and nominal execution
+# The PDDL pipeline — Agno, manifest, PDDL, comparison and nominal execution
 
-You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](pmv_agno_pddl.pt-br.md)
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](pddl_pipeline.pt-br.md)
 
 ## Purpose
 
@@ -29,7 +29,7 @@ No LLM writes PDDL directly.
 
 ```bash
 uv sync --extra dev
-uv run python scripts/generate_pmv_schemas.py
+uv run python scripts/generate_pddl_schemas.py
 uv run pytest
 ```
 
@@ -38,7 +38,7 @@ runs on the Acessilia Toolbox ([ADR-0003](adr/0003-remote-only-operational-capab
 so Docling is not installed locally.
 
 Fast Downward is only required when using `--planner fast-downward` or
-`--planner both`. The `internal` backend is the PMV's reference planner and works
+`--planner both`. The `internal` backend is the pipeline's reference planner and works
 without any external binary.
 
 ## 1. Informational-Structural Agent
@@ -54,7 +54,7 @@ The structure comes from the Toolbox through `ToolboxManifestExtractor`, so the
 see `.env.example`).
 
 ```bash
-uv run python scripts/pmv.py manifest document.pdf \
+uv run python scripts/pddl_pipeline.py manifest document.pdf \
   -o output/processing-manifest.json \
   --no-ocr
 ```
@@ -86,7 +86,7 @@ The loader checks version, name, hashes and mandatory clauses. The compiler:
 6. validates the projection before invoking any planner.
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output
 ```
 
@@ -94,7 +94,7 @@ By default, obligations already marked as `selected` are the roots. If none are
 marked, all unsatisfied obligations are selected. To choose specific roots:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --select obligation-describe-image-000012
 ```
@@ -104,7 +104,7 @@ uv run python scripts/pmv.py plan output/processing-manifest.json \
 Internal planner:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --planner internal
 ```
@@ -112,7 +112,7 @@ uv run python scripts/pmv.py plan output/processing-manifest.json \
 Fast Downward:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --planner fast-downward \
   --fast-downward /path/to/fast-downward.py \
@@ -126,14 +126,14 @@ domain axioms/derived predicates. An alias can be given explicitly with
 The internal backend is not meant to replace a general-purpose planner. It exploits
 the specific structure of domain 2.2: it sorts the obligations DAG and picks the
 cheapest admissible, never-tried method. It is a simple, reproducible oracle for
-validating the PMV.
+validating the pipeline.
 
 ### Running both backends
 
 For differential studies:
 
 ```bash
-uv run python scripts/pmv.py plan output/processing-manifest.json \
+uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
   -o output \
   --planner both \
   --fast-downward /path/to/fast-downward.py \
@@ -219,7 +219,7 @@ in sequence and stops on the first error.
 Dry-run, without confirming effects:
 
 ```bash
-uv run python scripts/pmv.py execute \
+uv run python scripts/pddl_pipeline.py execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution
@@ -228,7 +228,7 @@ uv run python scripts/pmv.py execute \
 Real execution requires handlers:
 
 ```bash
-uv run python scripts/pmv.py execute \
+uv run python scripts/pddl_pipeline.py execute \
   output/processing-manifest.json \
   output/nominal-plan.json \
   -o output/execution \
@@ -326,7 +326,7 @@ planner only reaches for them when the deterministic path is unavailable.
 ## 6. End-to-end execution
 
 ```bash
-uv run python scripts/pmv.py pipeline document.pdf \
+uv run python scripts/pddl_pipeline.py pipeline document.pdf \
   -o output/job-001 \
   --no-ocr \
   --planner both \
@@ -363,12 +363,12 @@ output/job-001/
 The three JSON Schemas are generated from the Pydantic models:
 
 ```bash
-uv run python scripts/generate_pmv_schemas.py
+uv run python scripts/generate_pddl_schemas.py
 ```
 
 CI must fail if any generated file diverges from the versioned schemas.
 
-## PMV limitations
+## Limitations
 
 - one document/job per PDDL instance; the internal planner covers only the 2.2 obligations domain;
 - the comparison covers plans and metrics published by both backends, not artifact quality at runtime;

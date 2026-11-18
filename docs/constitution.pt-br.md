@@ -123,13 +123,13 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
    - Definições de ferramentas (para funções determinísticas como a extração do manifesto)
    - Arquivo de teste dedicado validando entradas, saídas e comportamento de fallback do agente
    - Atualizações em [architecture.pt-br.md](architecture.pt-br.md) e [patterns.pt-br.md](patterns.pt-br.md), e nos diagramas de sequência relevantes
-   - Ao adicionar artefatos PDDL (novo domínio, novo planejador): atualizar `schemas/` e `core/planning/domains/`, além de `docs/pmv_agno_pddl.md`
+   - Ao adicionar artefatos PDDL (novo domínio, novo planejador): atualizar `schemas/` e `core/planning/domains/`, além de `docs/pddl_pipeline.md`
 3. Mudanças de PDDL/planejamento (schemas, domínio, backend do planejador):
    - Atualizações de domínio: modificar `core/planning/domains/domain_vX.Y.pddl` e incrementar a versão
    - Mudanças de schema: atualizar `schemas/processing_manifest.schema.json`, `schemas/nominal_plan.schema.json`, `schemas/execution_report.schema.json`
    - Backend do planejador: registrar em `core/planning/models.py` (enum PlannerBackend)
    - Validação: rodar `pytest tests/test_pddl_planning.py` (geração do plano) e `pytest tests/test_agno_executor.py` (execução)
-   - Documentação: atualizar `docs/pmv_agno_pddl.md` com novos exemplos
+   - Documentação: atualizar `docs/pddl_pipeline.md` com novos exemplos
 4. Mudar o schema canônico ou os renderizadores exige atualizações em [README.pt-br.md](../README.pt-br.md), [architecture.pt-br.md](architecture.pt-br.md), [tests/README.pt-br.md](../tests/README.pt-br.md) e nos diagramas PlantUML.
 5. Regressão de acessibilidade é tratada como defeito crítico.
 6. Adicionar uma capacidade ou provider da Toolbox segue a seção 4 de [toolbox_integration.pt-br.md](toolbox_integration.pt-br.md), e decide onde cada parte do código fica com o guia do [ADR-0002](adr/0002-component-responsibilities.pt-br.md#decisão).
