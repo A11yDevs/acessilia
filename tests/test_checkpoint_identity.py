@@ -108,7 +108,8 @@ async def _resume_counts(
     first = core_config()
 
     await _run(orchestrator, tmp_path, first, checkpoints)
-    assert counts.pop("resumed_execution") == [False]
+    first_resumed = counts.pop("resumed_execution")
+    assert first_resumed == [False]
     assert counts == dict.fromkeys(counts, 1)
     counts.update(dict.fromkeys(counts, 0))
     if between is not None:
