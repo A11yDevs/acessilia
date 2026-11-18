@@ -383,3 +383,23 @@ manifesto genérico sem esses metadados é rejeitado. Somente o padrão anuláve
 explícito do manifesto é normalizado; uniões e interseções genéricas continuam
 sem suporte. Formatos date-time permanecem anotações do schema. Os leitores
 existentes, incluindo mapas legados de páginas, permanecem compatíveis.
+
+### Leitores REST de datasets e critérios de conclusão
+
+`results.datasets` expõe os seis registros gerados e os cinco leitores de coleções.
+Os métodos do cliente de datasets ganham variantes adicionais `*_result`, incluindo
+paginação. Listas continuam listas, amostras contêm `DatasetItem` e relatórios de
+sincronização contêm `DatasetSyncEntry`, incluindo eventos globais ignorados e
+`[]`. As referências de artefatos de datasets mantêm a semântica de caminhos.
+Respostas brutas de sincronização, bytes e codificação de caminhos, revisões,
+timeouts e falhas de páginas preservam os contratos existentes.
+
+O gerador verifica cada rota selecionada em `dataset_routes` e só reutiliza um
+modelo após conferir o schema embutido. A união execute compartilhada é conferida,
+sem gerar seu leitor. Somente o padrão publicado mirrored/skipped é compilado;
+restrições condicionais adicionais causam erro explícito. O registro REST mantém
+`output_schema=None` e a seleção de capacidades do SDK não muda.
+
+As quatro etapas agora cobrem o escopo acordado por leitores públicos do SDK e
+testes diferenciais e de desvios. Mescle-as em ordem após as revisões; a #213 poderá
+então ser fechada. As famílias adiadas permanecem fora deste escopo.

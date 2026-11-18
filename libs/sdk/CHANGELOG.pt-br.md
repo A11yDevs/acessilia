@@ -7,6 +7,8 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** registros REST e leitores de arrays de datasets gerados, com métodos tipados adicionais que preservam paginação, nulls, caminhos de artefatos e compatibilidade da sincronização bruta (#213).
+
 - **Corrigido** os leitores tipados de estrutura e layout MinerU agora executam
   a validação canônica do docstruct após validar o payload. IDs de elementos
   duplicados, referências a pais ou páginas inexistentes e outros problemas

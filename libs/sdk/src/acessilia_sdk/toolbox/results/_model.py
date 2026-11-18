@@ -138,6 +138,13 @@ def decode(
         missing = set(rule.get("required", [])) - value.keys()
         if missing:
             fail(f"missing required properties {sorted(missing)}")
+        if "status_required" in rule:
+            status = value.get("status")
+            if not isinstance(status, str) or status not in rule["status_required"]:
+                fail("unexpected status discriminator")
+            branch_missing = set(rule["status_required"][status]) - value.keys()
+            if branch_missing:
+                fail(f"missing status-specific properties {sorted(branch_missing)}")
         properties = rule.get("properties", {})
         result = {
             name: decode(

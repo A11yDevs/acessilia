@@ -2,11 +2,27 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Awaitable, Callable
+from functools import partial
+from typing import Any, TypeVar
 from urllib.parse import quote
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.results.datasets import (
+    DatasetInfo,
+    SplitInfo,
+    ItemSummary,
+    DatasetItem,
+    DatasetSyncEntry,
+    read_dataset_list,
+    read_dataset_info,
+    read_dataset_splits,
+    read_item_summaries,
+    read_dataset_item,
+    read_dataset_sample,
+    read_sync_report,
+)
 
 LIST_CAPABILITY = "dataset.list"
 DESCRIBE_CAPABILITY = "dataset.describe"
@@ -36,7 +52,10 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
     ) -> dict[str, Any]:
         """``GET /v1/datasets/{dataset_id}``."""
         return await self._json(
-            "GET", f"/v1/datasets/{dataset_id}", DESCRIBE_CAPABILITY, _revision(revision)
+            "GET",
+            f"/v1/datasets/{dataset_id}",
+            DESCRIBE_CAPABILITY,
+            _revision(revision),
         )
 
     async def list_splits(
@@ -82,20 +101,11 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
         for what ``limit`` still needs. A failed page raises its typed error:
         no partial list is returned.
         """
-        if not 1 <= page_size <= MAX_PAGE_SIZE:
-            raise ValueError(f"page_size must be between 1 and {MAX_PAGE_SIZE}")
-        if limit is not None and limit < 0:
-            raise ValueError("limit must be zero or positive")
-        items: list[dict[str, Any]] = []
-        while limit is None or len(items) < limit:
-            size = page_size if limit is None else min(page_size, limit - len(items))
-            batch = await self.list_items(
-                dataset_id, split, revision=revision, limit=size, offset=len(items)
-            )
-            items.extend(batch)
-            if len(batch) < size:
-                break
-        return items
+        return await _collect_items(
+            partial(self.list_items, dataset_id, split, revision=revision),
+            limit=limit,
+            page_size=page_size,
+        )
 
     async def get_item(
         self,
@@ -192,6 +202,119 @@ class ToolboxDatasetClient(ToolboxCapabilityClient):
             raise ToolboxContractViolation(
                 f"{capability_id} response is not valid JSON"
             ) from e
+
+    async def list_datasets_result(self) -> list[DatasetInfo]:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_dataset_list(await self.list_datasets())
+
+    async def describe_dataset_result(
+        self, dataset_id: str, revision: str | None = None
+    ) -> DatasetInfo:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_dataset_info(
+            await self.describe_dataset(dataset_id=dataset_id, revision=revision)
+        )
+
+    async def list_splits_result(
+        self, dataset_id: str, revision: str | None = None
+    ) -> list[SplitInfo]:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_dataset_splits(
+            await self.list_splits(dataset_id=dataset_id, revision=revision)
+        )
+
+    async def list_items_result(
+        self,
+        dataset_id: str,
+        split: str,
+        revision: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[ItemSummary]:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_item_summaries(
+            await self.list_items(
+                dataset_id=dataset_id,
+                split=split,
+                revision=revision,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    async def list_all_items_result(
+        self,
+        dataset_id: str,
+        split: str,
+        *,
+        revision: str | None = None,
+        limit: int | None = None,
+        page_size: int = MAX_PAGE_SIZE,
+    ) -> list[ItemSummary]:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return await _collect_items(
+            partial(self.list_items_result, dataset_id, split, revision=revision),
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def get_item_result(
+        self, dataset_id: str, split: str, item_id: str, revision: str | None = None
+    ) -> DatasetItem:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_dataset_item(
+            await self.get_item(
+                dataset_id=dataset_id, split=split, item_id=item_id, revision=revision
+            )
+        )
+
+    async def sample_dataset_result(
+        self, dataset_id: str, split: str, revision: str | None = None, n: int = 5
+    ) -> list[DatasetItem]:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_dataset_sample(
+            await self.sample_dataset(
+                dataset_id=dataset_id, split=split, revision=revision, n=n
+            )
+        )
+
+    async def sync_dataset_result(
+        self,
+        dataset_id: str,
+        revision: str | None = None,
+        split: str | None = None,
+        timeout_seconds: float | None = None,
+    ) -> list[DatasetSyncEntry]:
+        """Typed REST result; the existing raw method retains compatibility."""
+        return read_sync_report(
+            await self.sync_dataset(
+                dataset_id=dataset_id,
+                revision=revision,
+                split=split,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+
+
+T = TypeVar("T")
+
+
+async def _collect_items(
+    read_page: Callable[..., Awaitable[list[T]]], *, limit: int | None, page_size: int
+) -> list[T]:
+    """Share pagination between raw and typed readers; validate each typed page."""
+    if not 1 <= page_size <= MAX_PAGE_SIZE:
+        raise ValueError(f"page_size must be between 1 and {MAX_PAGE_SIZE}")
+    if limit is not None and limit < 0:
+        raise ValueError("limit must be zero or positive")
+    items: list[T] = []
+    while limit is None or len(items) < limit:
+        size = page_size if limit is None else min(page_size, limit - len(items))
+        batch = await read_page(limit=size, offset=len(items))
+        items.extend(batch)
+        if len(batch) < size:
+            break
+    return items
 
 
 def _revision(revision: str | None) -> dict[str, Any]:
