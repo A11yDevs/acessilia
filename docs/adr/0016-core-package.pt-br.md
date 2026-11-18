@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](0016-core-package.md)
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-18, evidência abaixo)
 - **Data:** 2026-11-11
 - **Componentes:** core
 - **Issues:** [#402](https://github.com/A11yDevs/acessilia/issues/402), [#365](https://github.com/A11yDevs/acessilia/issues/365)
@@ -123,7 +123,7 @@ Opções consideradas:
 
 ## Decisão
 
-Proposta: a opção 2.
+A opção 2.
 
 - **O core é um pacote, `acessilia_core`, em `libs/core`.** A estrutura:
 
@@ -394,6 +394,39 @@ Proposta: a opção 2.
   um script com um `CoreConfig` explícito, sem importar o FastAPI nem o
   `backend.config`, e devolve o mesmo manifesto que o serviço para a mesma
   entrada.
+
+## Evidência de aceitação
+
+Os seis passos estavam feitos em 2026-11-18, e as condições acima se
+cumpriram:
+
+- **O core é um pacote próprio.** O `acessilia_core` fica em `libs/core`
+  (`acessilia-core` 0.1.0, #572); o `backend/core` saiu, sem ponte. A sua
+  wheel leva os domínios PDDL e as suas descrições, os prompts e os catálogos
+  `.po`, que ele localiza a partir do próprio pacote e compila em memória
+  (#569).
+- **A sua fronteira é verificada.** O `libs/core/tests/test_boundary.py`
+  (#568, movido no #575) confere, incluindo os imports dentro de funções, que
+  ele não importa nada do `backend` nem do `frontend`, só as bibliotecas
+  permitidas, com o edge-tts como desvio registrado, e não lê variáveis de
+  ambiente; e que o SDK e o docstruct não o importam. Quem o chama passa tudo
+  o que ele precisa: um `CoreConfig` por execução (passo 3, #537 a #562), os
+  `RunPorts` da execução (passo 4, #563, #565, #566), o runner de chamadas de
+  modelo e a preparação do processo uma vez (#562, #568).
+- **Ele funciona sozinho.** O job de CI `core alone` (#575) instala o core a
+  partir do seu próprio lock, como wheel, onde nem o serviço, nem os
+  front-ends, nem o FastAPI, nem o pacote da Toolbox podem ser importados, e
+  roda o teste de fumaça fora do checkout: o domínio PDDL, todo arquivo de
+  prompt e os dois catálogos carregam, e um manifesto de fixture é planejado
+  e executado (dry run). Deixar os prompts, os catálogos ou os domínios fora
+  da wheel o faz falhar.
+- **A prova de conceito.** O `libs/core/examples/table_stage.py` roda a etapa
+  de estrutura de tabelas com um `CoreConfig` montado campo a campo e um
+  runner de chamadas de modelo do próprio script, também nesse job. O
+  `tests/test_core_standalone_table_stage.py` confere que ela devolve o mesmo
+  manifesto que o serviço para a mesma entrada, não importa nem o `backend`
+  nem o FastAPI, e que uma tabela lida pelo modelo passa pelo runner do
+  script, com o modelo que a sua config indica.
 
 ## Consequências
 
