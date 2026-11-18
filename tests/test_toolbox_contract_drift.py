@@ -9,8 +9,8 @@ fail at runtime.
 against the contract the Toolbox publishes (``contract/toolbox-contract.json``
 in its repository, #186). This module runs it offline against
 ``tests/fixtures/toolbox-contract.json``, a copy of that file refreshed with
-``scripts/capture_toolbox_contract.py --ref develop``, and asserts an exact set
-of findings: the known drift is recorded here, and any *new* drift
+``scripts/capture_toolbox_contract.py --ref <immutable-toolbox-sha>``, and asserts
+an exact set of findings: the known drift is recorded here, and any *new* drift
 fails the suite. Fixing a finding requires removing it from the expected list,
 which is what makes the ratchet tighten over time.
 """

@@ -7,7 +7,8 @@ of truth, and CI checks the SDK registry against it (#186).
 
 ``--ref`` copies byte-exact public files at an immutable Toolbox commit,
 including route/schema metadata and a checksum manifest. ``--url`` captures
-only a diagnostic snapshot of a running deployment, at an explicit output path.
+only a diagnostic snapshot of a running deployment, at an explicit output path
+outside ``tests/fixtures``.
 
 Usage:
     python scripts/capture_toolbox_contract.py --ref <40-character-commit-sha>
@@ -29,21 +30,35 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
-#: Where the Toolbox publishes its contract, per branch or tag.
-PUBLISHED_URL = (
-    "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/contract/toolbox-contract.json"
-)
+#: Public contract URL, always addressed by an immutable commit SHA.
+PUBLISHED_URL = "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/contract/toolbox-contract.json"
 #: The published schemas the SDK generates models from (#185, #213), copied
 #: from the same ref as the contract so the two snapshots always agree.
 SDK_MODEL_SCHEMAS = (
-    "reference@1.json", "structured-document@1.json", "layout-analysis@1.json",
-    "latex@1.json", "mathml@1.json", "verbalized@1.json", "page-judgement@1.json",
-    "region-transcription@1.json", "pdf-validation-report@1.json",
-    "media-inspection@1.json", "image@2.json", "text-spans@1.json",
-    "dataset-info@1.json", "dataset-split@1.json", "dataset-item-summary@1.json",
-    "dataset-item@1.json", "dataset-artifact@1.json", "dataset-sync-entry@1.json",
-    "dataset-list@1.json", "dataset-splits@1.json", "dataset-item-summary-list@1.json",
-    "dataset-sample@1.json", "dataset-sync-report@1.json", "dataset-item-list@1.json",
+    "reference@1.json",
+    "structured-document@1.json",
+    "layout-analysis@1.json",
+    "latex@1.json",
+    "mathml@1.json",
+    "verbalized@1.json",
+    "page-judgement@1.json",
+    "region-transcription@1.json",
+    "pdf-validation-report@1.json",
+    "media-inspection@1.json",
+    "image@2.json",
+    "text-spans@1.json",
+    "dataset-info@1.json",
+    "dataset-split@1.json",
+    "dataset-item-summary@1.json",
+    "dataset-item@1.json",
+    "dataset-artifact@1.json",
+    "dataset-sync-entry@1.json",
+    "dataset-list@1.json",
+    "dataset-splits@1.json",
+    "dataset-item-summary-list@1.json",
+    "dataset-sample@1.json",
+    "dataset-sync-report@1.json",
+    "dataset-item-list@1.json",
 )
 SCHEMAS_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-schemas"
 PUBLISHED_SCHEMA_URL = (
@@ -138,6 +153,8 @@ def snapshot(ref: str) -> dict[str, bytes]:
         raise ValueError("--ref must be an immutable 40-character lowercase commit SHA")
     files = {"toolbox-contract.json": _fetch_bytes(PUBLISHED_URL.format(ref=ref))}
     contract = json.loads(files["toolbox-contract.json"])
+    if not isinstance(contract, dict):
+        raise ValueError(f"the Toolbox contract at {ref} must be a JSON object")
     for key in ("capabilities", "providers", "dataset_routes", "schema_refs"):
         if not isinstance(contract.get(key), list):
             raise ValueError(f"the Toolbox contract at {ref} is missing {key}")
@@ -150,7 +167,9 @@ def snapshot(ref: str) -> dict[str, bytes]:
     manifest = {
         "repository": "A11yDevs/acessilia-toolbox",
         "commit": ref,
-        "sha256": {name: hashlib.sha256(raw).hexdigest() for name, raw in sorted(files.items())},
+        "sha256": {
+            name: hashlib.sha256(raw).hexdigest() for name, raw in sorted(files.items())
+        },
     }
     files["toolbox-snapshot.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     return files
@@ -165,7 +184,9 @@ def write_snapshot(ref: str, out: Path) -> None:
         digest = manifest["sha256"].pop("toolbox-contract.json")
         manifest["sha256"][out.name] = digest
         manifest["sha256"] = dict(sorted(manifest["sha256"].items()))
-        files["toolbox-snapshot.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
+        files["toolbox-snapshot.json"] = (
+            json.dumps(manifest, indent=2) + "\n"
+        ).encode()
     out.parent.mkdir(parents=True, exist_ok=True)
     # Stage the complete validated download on the destination filesystem.
     # Network/parse failures leave every previous generation input untouched.
@@ -195,11 +216,13 @@ def main(argv: list[str] | None = None) -> int:
         except (ValueError, TypeError) as exc:
             parser.error(str(exc))
     else:
-        if args.out.resolve() == DEFAULT_OUT.resolve():
-            parser.error("--url requires a diagnostic --out outside the generation snapshot")
+        if args.out.resolve().is_relative_to(DEFAULT_OUT.parent.resolve()):
+            parser.error("--url requires a diagnostic --out outside tests/fixtures")
         payload = build(args.url)
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        args.out.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
     print(f"wrote {args.out}")
     return 0
 

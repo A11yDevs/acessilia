@@ -257,8 +257,9 @@ a capability or change a client's return type.
    transport=..., provider_key=...)`: these are the SDK's own choices. Then run
    `python scripts/generate_sdk_bindings.py` in the core, which writes the
    capability's output schema and `idempotent` from the Toolbox's published
-   contract (`tests/fixtures/toolbox-contract.json`, refreshed with
-   `scripts/capture_toolbox_contract.py --ref <ref>`) into the generated block
+   contract (`tests/fixtures/toolbox-contract.json`, refreshed at a reviewed
+   40-character commit SHA with
+   `scripts/capture_toolbox_contract.py --ref <immutable-toolbox-sha>`) into the generated block
    of `capabilities.py`. That block is never edited by hand (ADR-0004, #213);
    a test fails while it is stale or when the contract does not publish the
    selected version. A new provider key also needs an entry in

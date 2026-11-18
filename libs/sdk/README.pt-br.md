@@ -265,7 +265,8 @@ capacidade nem altera o tipo de retorno de um cliente.
    Depois, rodar `python scripts/generate_sdk_bindings.py` no core, que escreve
    o schema de saída e o `idempotent` da capacidade, a partir do contrato
    publicado pela Toolbox (`tests/fixtures/toolbox-contract.json`, atualizado
-   com `scripts/capture_toolbox_contract.py --ref <ref>`), no bloco gerado de
+   com o SHA de 40 caracteres de um commit revisado por meio de
+   `scripts/capture_toolbox_contract.py --ref <immutable-toolbox-sha>`), no bloco gerado de
    `capabilities.py`. Esse bloco nunca é editado à mão (ADR-0004, #213); um
    teste falha enquanto ele estiver desatualizado ou quando o contrato não
    publicar a versão selecionada. Uma chave de provider nova também precisa de
