@@ -44,10 +44,12 @@ that the existing sanitizer already converts to text.
   additional fields and schema-version strings are not restricted further.
 - A new schema failure raises localized `ValueError`, naming the JSON Pointer
   and schema keyword. Do not include document values or jsonschema's verbose
-  exception in the diagnostic/traceback. Reject before AST construction,
-  directory creation, local serialization or a remote renderer call. Existing
-  destination files remain untouched. The worker's required TXT failure path
-  records the job error, cleans its output and registers no download token.
+  exception in the diagnostic/traceback. A direct call to the Core exporter
+  rejects before it builds an AST, creates a destination directory, serializes
+  locally or calls a remote renderer. Existing destination files remain untouched.
+  The service worker creates the job output directory before calling the exporter;
+  a required TXT rejection then records the error, removes that directory and
+  registers no download token. The service's directory lifecycle is unchanged.
 - This intentionally narrows accepted public inputs, so the pre-1.0 Core moves
   from **0.1.1 to 0.2.0**. Callers must supply canonical mappings matching the
   packaged schema; use the builder for document/section IDs and shape, repair

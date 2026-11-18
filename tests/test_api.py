@@ -1316,8 +1316,9 @@ async def test_a_timeout_after_cancellation_is_reported_as_cancellation(
 
 
 @pytest.mark.asyncio
-async def test_schema_invalid_job_fails_before_download_registration(api_paths, monkeypatch):
+async def test_schema_invalid_job_creates_then_cleans_directory_without_registering_download(api_paths, monkeypatch):
     from backend.agents.state_manager import state_manager
+    from backend.api import worker
     from backend.api.worker import ApiJob, JobExecutor
     from backend.services.history_service import registrar_conversao, listar_historico
     from docstruct.canonical import build_canonical_document
@@ -1335,6 +1336,42 @@ async def test_schema_invalid_job_fails_before_download_registration(api_paths, 
         document['sections'][0]['blocks'][0]['type'] = 'custom'
         return document
 
+    # The service owns the job directory; the Core gate owns renderer effects.
+    output.parent.mkdir(parents=True, exist_ok=True)
+    assert not output.exists()
+    events = []
+    original_mkdir = Path.mkdir
+    original_export = worker.export_txt
+    original_remove = worker._remove_output_dir
+
+    def track_mkdir(path, *args, **kwargs):
+        result = original_mkdir(path, *args, **kwargs)
+        if path == output:
+            events.append('created')
+        return result
+
+    def track_export(*args, **kwargs):
+        assert output.is_dir()
+        events.append('export-started')
+        try:
+            return original_export(*args, **kwargs)
+        except ValueError as exc:
+            assert '/sections/0/blocks/0/type' in str(exc)
+            events.append('schema-rejected')
+            raise
+
+    def track_remove(path):
+        assert path == output
+        assert path.is_dir()
+        assert not list(path.iterdir())
+        original_remove(path)
+        assert not path.exists()
+        events.append('removed')
+
+    monkeypatch.setattr(Path, 'mkdir', track_mkdir)
+    monkeypatch.setattr(worker, 'export_txt', track_export)
+    monkeypatch.setattr(worker, '_remove_output_dir', track_remove)
+
     async def register_token(*args, **kwargs):
         pytest.fail('Schema-invalid job registered a download token')
 
@@ -1344,6 +1381,7 @@ async def test_schema_invalid_job_fails_before_download_registration(api_paths, 
         tamanho_bytes=source.stat().st_size, modo='normal')
     await JobExecutor().run(ApiJob(task_id=task_id, file_path=source,
         filename=source.name, output_dir=output))
+    assert events == ['created', 'export-started', 'schema-rejected', 'removed']
     assert state_manager.obter(task_id)['status'] == 'error'
     assert not output.exists()
     [row] = [row for row in await listar_historico(10) if row['task_id'] == task_id]

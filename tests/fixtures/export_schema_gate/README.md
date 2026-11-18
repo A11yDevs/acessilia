@@ -19,9 +19,16 @@ unchanged packaged schema. Input JSON is synthetic, without real document data.
 The captured schema path/keyword and `strict_outcome` are the reviewed
 compatibility decision, not regenerated expectations. Tests materialize each
 input from `base_document` and `changes` and exercise the production gate in
-all four formats. Rejected cases may not build an AST, call a renderer, create
-a directory or overwrite an existing artifact; inputs stay unchanged. The
-normalization classification is checked against the packaged schema too.
+all four formats through direct calls to the Core exporter. These rejected
+calls may not build an AST, call a renderer, create a destination directory or
+overwrite an existing artifact; inputs stay unchanged. The normalization
+classification is checked against the packaged schema too.
+
+The service worker has a separate directory lifecycle: it creates the job
+output directory before invoking the exporter. `tests/test_api.py` observes
+creation, export entry, schema rejection and directory removal in order, and
+checks error/history and no download registration. Cleanup is a post-failure
+guarantee, not a claim that the worker never created the directory.
 
 ```bash
 make test-file F=tests/test_export_schema_gate.py

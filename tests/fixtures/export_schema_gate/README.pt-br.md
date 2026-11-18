@@ -19,9 +19,15 @@ empacotado inalterado. O JSON é sintético, sem dados de documentos reais.
 Caminho/palavra do schema e `strict_outcome` são a decisão de compatibilidade
 revisada, não expectativas regeneradas. Testes materializam cada entrada a
 partir de `base_document` e `changes` e exercitam o gate real nos quatro
-formatos. Rejeições não podem construir AST, chamar renderer, criar diretório
-ou sobrescrever destino; a entrada permanece intacta. A classificação após
+formatos por chamadas diretas ao exportador do Core. Essas chamadas rejeitadas
+não podem construir AST, chamar renderer, criar diretório de destino ou
+sobrescrever artefato; a entrada permanece intacta. A classificação após
 normalização também é conferida com o schema empacotado.
+
+O worker do serviço tem ciclo de diretório próprio: cria a saída do job antes
+de chamar o exportador. `tests/test_api.py` observa criação, entrada no export,
+rejeição por schema e remoção nessa ordem, além de erro/histórico e ausência de
+token. A limpeza é garantia após a falha, não de ausência de criação.
 
 ```bash
 make test-file F=tests/test_export_schema_gate.py

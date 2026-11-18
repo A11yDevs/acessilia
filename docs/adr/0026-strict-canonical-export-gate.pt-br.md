@@ -44,10 +44,12 @@ sanitizador existente.
   de versão do schema não recebem restrições extras.
 - Nova falha de schema gera `ValueError` localizado com JSON Pointer e palavra
   de validação. Valores do documento e exceção extensa do jsonschema não
-  aparecem no diagnóstico/traceback. Rejeitar antes de AST, diretório, escrita
-  local ou chamada de renderer remoto. Arquivos de destino existentes ficam
-  intactos. Falha no TXT obrigatório faz o worker registrar erro, limpar a
-  saída e não cadastrar token de download.
+  aparecem no diagnóstico/traceback. A chamada direta ao exportador do Core
+  rejeita antes de construir AST, criar diretório de destino, escrever localmente
+  ou chamar renderer remoto. Arquivos existentes ficam intactos. O worker do
+  serviço cria o diretório do job antes de chamar o exportador; uma rejeição no
+  TXT obrigatório registra erro, remove esse diretório e não cadastra token de
+  download. O ciclo de diretório do serviço permanece igual.
 - Como restringe entradas públicas aceitas, o Core pré-1.0 passa de **0.1.1
   para 0.2.0**. Consumidores devem fornecer mappings conformes: usar o builder
   para IDs/estrutura de documento/seções, corrigir campos inválidos e representar

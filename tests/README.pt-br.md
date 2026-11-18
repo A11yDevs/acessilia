@@ -73,8 +73,10 @@ uv run python scripts/sync_accessible_document_schema.py --check
 
 O Core 0.2.0 valida após normalização/auditoria e antes do perfil.
 `test_export_schema_gate.py` verifica 68 resultados antes/depois, normalização,
-filhos/blocos filtrados, ausência de efeitos e diagnóstico localizado. O worker
-verifica limpeza e ausência de token após rejeição. Veja o
+filhos/blocos filtrados, ausência de efeitos do renderer em chamadas diretas
+ao Core e diagnóstico localizado. O teste do worker observa criação do
+diretório antes do export, rejeição e remoção posterior, além de histórico
+de erro e ausência de token. Veja o
 [corpus de compatibilidade](fixtures/export_schema_gate/README.pt-br.md) e a [API de schema](../libs/docstruct/README.pt-br.md#schema-canônico-docstructschemas-docstructvalidation).
 
 ## Caracterização dos exports

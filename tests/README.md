@@ -71,8 +71,10 @@ uv run python scripts/sync_accessible_document_schema.py --check
 
 Core 0.2.0 applies schema validation after normalization/audit and before profile
 selection. `test_export_schema_gate.py` exercises 68 old/new format outcomes,
-normalization, nested/filtered cases, no side effects and localized diagnostics.
-The worker regression verifies cleanup and no download token after rejection.
+normalization, nested/filtered cases, no renderer side effects in direct Core
+calls and localized diagnostics. The worker regression observes job-directory
+creation before export, schema rejection and removal afterward, plus error
+history and no download registration.
 See the [compatibility corpus](fixtures/export_schema_gate/README.md) and the
 [schema API](../libs/docstruct/README.md#canonical-schema-docstructschemas-docstructvalidation).
 
