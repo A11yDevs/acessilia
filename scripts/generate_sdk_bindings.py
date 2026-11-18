@@ -45,6 +45,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import ast
 import json
 import sys
@@ -52,7 +53,9 @@ import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_PATH = REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "capabilities.py"
+REGISTRY_PATH = (
+    REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "capabilities.py"
+)
 CONTRACT_PATH = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
 SCHEMAS_DIR = REPO_ROOT / "tests" / "fixtures" / "toolbox-schemas"
 SDK_TOOLBOX = REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox"
@@ -62,10 +65,35 @@ MODELS: dict[str, tuple[str, Path]] = {
     "reference@1.json": ("ArtifactReference", SDK_TOOLBOX / "reference.py"),
 }
 
+EXECUTE_MODELS = {
+    "latex@1.json": "LatexResult",
+    "mathml@1.json": "MathmlResult",
+    "verbalized@1.json": "VerbalizedResult",
+    "page-judgement@1.json": "PageJudgement",
+    "region-transcription@1.json": "RegionTranscription",
+    "pdf-validation-report@1.json": "PdfValidationReport",
+    "media-inspection@1.json": "MediaInspection",
+    "image@2.json": "RenderedPageMetadata",
+    "text-spans@1.json": "TextSpansResult",
+}
+
+
+def result_compiler():
+    spec = importlib.util.spec_from_file_location(
+        "sdk_result_compiler", REPO_ROOT / "scripts" / "sdk_result_compiler.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.Compiler()
+
+
 _JSON_TYPES = {
     "string": ("str", "isinstance(value, str)"),
     "integer": ("int", "isinstance(value, int) and not isinstance(value, bool)"),
-    "number": ("float", "isinstance(value, (int, float)) and not isinstance(value, bool)"),
+    "number": (
+        "float",
+        "isinstance(value, (int, float)) and not isinstance(value, bool)",
+    ),
     "boolean": ("bool", "isinstance(value, bool)"),
     "null": ("None", "value is None"),
 }
@@ -75,7 +103,13 @@ _KEYWORDS = {"description", "type", "pattern", "minLength", "minimum"}
 #: enforce, so it is refused instead of silently dropped. additionalProperties
 #: is allowed: the reader ignores unknown properties on purpose (#185).
 _ROOT_KEYWORDS = {
-    "$schema", "$id", "title", "description", "type", "properties", "required",
+    "$schema",
+    "$id",
+    "title",
+    "description",
+    "type",
+    "properties",
+    "required",
     "additionalProperties",
 }
 
@@ -182,7 +216,9 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
     types = spec.get("type")
     types = [types] if isinstance(types, str) else list(types or [])
     if not types or any(kind not in _JSON_TYPES for kind in types):
-        raise BindingError(f"property {name!r} has an unsupported type {spec.get('type')!r}")
+        raise BindingError(
+            f"property {name!r} has an unsupported type {spec.get('type')!r}"
+        )
     annotation = " | ".join(_JSON_TYPES[kind][0] for kind in types)
     if not required and "null" not in types:
         annotation += " | None"
@@ -234,7 +270,9 @@ def render_model(schema: dict, class_name: str, schema_file: str) -> str:
     required = list(schema.get("required") or [])
     missing = sorted(set(required) - set(properties))
     if missing:
-        raise BindingError(f"{schema_file}: required properties not declared: {missing}")
+        raise BindingError(
+            f"{schema_file}: required properties not declared: {missing}"
+        )
     # Required fields first: a dataclass field without default cannot follow one with.
     ordered = [n for n in properties if n in required] + [
         n for n in properties if n not in required
@@ -323,12 +361,25 @@ def models() -> dict[Path, str]:
     for schema_file, (class_name, target) in MODELS.items():
         schema = json.loads((SCHEMAS_DIR / schema_file).read_text(encoding="utf-8"))
         generated[target] = render_model(schema, class_name, schema_file)
+    compiler = result_compiler()
+    try:
+        for schema_file, class_name in EXECUTE_MODELS.items():
+            compiler.compile(
+                json.loads((SCHEMAS_DIR / schema_file).read_text()), class_name
+            )
+    except ValueError as exc:
+        raise BindingError(str(exc)) from exc
+    generated[SDK_TOOLBOX / "results" / "execute.py"] = compiler.render(
+        "selected Toolbox schemas; scripts/generate_sdk_bindings.py"
+    )
     return generated
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--check", action="store_true", help="exit 1 if the block is stale")
+    parser.add_argument(
+        "--check", action="store_true", help="exit 1 if the block is stale"
+    )
     parser.add_argument("--contract", type=Path, default=CONTRACT_PATH)
     args = parser.parse_args(argv)
 

@@ -2,10 +2,10 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](sdk-result-bindings.pt-br.md).
 
-This is the inventory step requested by the [latest review of #213][review],
-under #380. It defines the proposed scope of the next two implementation PRs;
-it does not introduce result models or change clients. The issue stays open
-until the selected bindings are generated, used and checked for drift.
+This records the inventory requested by the [latest review of #213][review],
+under #380, and its implementation sequence. The sections describing the
+original inventory remain the review baseline; progress is recorded below.
+The issue stays open until the selected bindings are reviewed and merged.
 
 ## Evidence and ownership
 
@@ -323,3 +323,19 @@ Each subsequent PR targets the preceding branch until it is merged. The source
 is pinned in `tests/fixtures/toolbox-snapshot.json`; it records byte-level SHA-256
 checksums for the complete public contract and every selected schema. Live
 `--url` captures are diagnostic files and cannot overwrite the generation input.
+
+### Selected execute readers
+
+`acessilia_sdk.toolbox.results` exposes the nine selected generated models,
+`read_result(document, Model)` and `read_document(envelope, Model)`. Math,
+adjudication, inspection, PDF validation and text-span clients add corresponding
+`*_result` methods; `RenderedPage.metadata` reads the generated render metadata
+without replacing verified image bytes. Recognition normalizes single expressions
+and legacy formula lists before reading individual LaTeX records.
+
+These readers enforce the published shape and raise `ToolboxContractViolation`.
+Existing raw methods, formula operations and probability normalization keep their
+compatibility behavior. Optional attributes read as `None` when absent, while
+`to_dict()` preserves absence, explicit nulls, open metadata and extension fields.
+Direct dataclass construction is not validation; use `from_dict` for untrusted
+input. General unions/intersections and remote or cyclic references remain errors.

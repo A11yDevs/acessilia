@@ -10,6 +10,11 @@ from typing import Any, Literal
 
 from acessilia_sdk.toolbox.artifacts import ArtifactRef, read_artifact
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.results import (
+    RenderedPageMetadata,
+    TextSpansResult,
+    read_result,
+)
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
 SPLIT_CAPABILITY = "pdf.split"
@@ -44,6 +49,11 @@ class RenderedPage:
     document: dict[str, Any]
 
     @property
+    def metadata(self) -> RenderedPageMetadata:
+        """Strict metadata binding; image bytes were verified by ``render``."""
+        return read_result(self.document, RenderedPageMetadata)
+
+    @property
     def page_count(self) -> int:
         return self.document["page_count"]
 
@@ -52,7 +62,9 @@ def _number(value: Any) -> bool:
     return type(value) in (int, float) and math.isfinite(value)
 
 
-def _checked_render(document: Any, page_number: int) -> tuple[float, float, float, float]:
+def _checked_render(
+    document: Any, page_number: int
+) -> tuple[float, float, float, float]:
     """Validate the parts of an ``image@2`` result the caller relies on; return its clip."""
     context = f"{RENDER_CAPABILITY}@2"
     if not isinstance(document, dict):
@@ -135,7 +147,10 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
         if clip is not None:
             left, top, right, bottom = clip
             parameters["clip"] = {
-                "left": left, "top": top, "right": right, "bottom": bottom,
+                "left": left,
+                "top": top,
+                "right": right,
+                "bottom": bottom,
                 "origin": clip_origin,
             }
         http, result = await self._execute_on(
@@ -185,7 +200,9 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
         )
         document = result.get("document")
         context = f"{TEXT_SPANS_CAPABILITY}@1"
-        if not isinstance(document, dict) or not isinstance(document.get("pages"), list):
+        if not isinstance(document, dict) or not isinstance(
+            document.get("pages"), list
+        ):
             raise ToolboxContractViolation(f"{context} response has no pages")
         if document.get("coord_origin") != "TOPLEFT":
             raise ToolboxContractViolation(
@@ -222,21 +239,46 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
                 by_page[int(page["page_number"])] = page
         return by_page
 
+    async def text_spans_result(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        pages: list[int] | None = None,
+        use_remote_cache: bool | None = None,
+    ) -> TextSpansResult:
+        """Typed published result of :meth:`text_spans`; raw compatibility is unchanged."""
+        result = await self.text_spans(
+            file_path=file_path,
+            artifact_id=artifact_id,
+            pages=pages,
+            use_remote_cache=use_remote_cache,
+        )
+        return read_result(result, TextSpansResult)
+
 
 def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _is_point_list(value: Any, length: int) -> bool:
-    return isinstance(value, list) and len(value) == length and all(_is_number(item) for item in value)
+    return (
+        isinstance(value, list)
+        and len(value) == length
+        and all(_is_number(item) for item in value)
+    )
 
 
 def _check_text_spans_page(page: Any, context: str) -> None:
     """Refuse a page whose spans lack what readers of ``text-spans@1`` use."""
-    if not isinstance(page, dict) or isinstance(page.get("page_number"), bool) or not isinstance(
-        page.get("page_number"), int
+    if (
+        not isinstance(page, dict)
+        or isinstance(page.get("page_number"), bool)
+        or not isinstance(page.get("page_number"), int)
     ):
-        raise ToolboxContractViolation(f"{context} returned a page without a page_number")
+        raise ToolboxContractViolation(
+            f"{context} returned a page without a page_number"
+        )
     number = page["page_number"]
     lines = page.get("lines", [])
     if not isinstance(lines, list):
@@ -244,7 +286,9 @@ def _check_text_spans_page(page: Any, context: str) -> None:
     for line in lines:
         spans = line.get("spans", []) if isinstance(line, dict) else None
         if not isinstance(spans, list):
-            raise ToolboxContractViolation(f"{context} page {number} has a line without spans")
+            raise ToolboxContractViolation(
+                f"{context} page {number} has a line without spans"
+            )
         for span in spans:
             if not (
                 isinstance(span, dict)
@@ -254,7 +298,9 @@ def _check_text_spans_page(page: Any, context: str) -> None:
                 and _is_point_list(span.get("bbox"), 4)
                 and _is_point_list(span.get("origin"), 2)
             ):
-                raise ToolboxContractViolation(f"{context} page {number} has a malformed span: {span!r}")
+                raise ToolboxContractViolation(
+                    f"{context} page {number} has a malformed span: {span!r}"
+                )
 
 
 __all__ = [

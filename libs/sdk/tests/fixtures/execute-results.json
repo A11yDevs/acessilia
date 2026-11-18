@@ -1,0 +1,11 @@
+{
+  "LatexResult": {"latex": "x^2", "confidence": 0.8, "page": 1, "bbox": [0, 1, 20, 30]},
+  "MathmlResult": {"mathml": "<math><mi>x</mi></math>", "latex": "x", "direction": "latex-to-mathml"},
+  "VerbalizedResult": {"verbalized": "x squared", "latex": "x^2", "language": "en"},
+  "PageJudgement": {"pB_ab": 0.6, "pA_ba": 0.4, "pB": 0.6, "prompt": "base", "model": "judge"},
+  "RegionTranscription": {"text": "", "model": "transcriber"},
+  "PdfValidationReport": {"compliant": false, "profile": "ua1", "profile_name": "PDF/UA-1", "statement": "failed", "summary": {"passed_rules": 1, "failed_rules": 1, "passed_checks": 2, "failed_checks": 1}, "failures": [{"specification": "ISO 14289", "clause": "7.1", "test_number": 1, "description": "Tagged", "object": "document", "test": "isTagged", "tags": ["accessibility"], "failed_checks": 1, "checks": [{"context": "root", "message": "missing tag"}]}], "validator": {"name": "veraPDF", "version": "1.28"}},
+  "MediaInspection": {"media_type": "image/png", "declared_media_type": null, "file_size_bytes": 100, "is_image": true, "is_pdf": false, "page_count": 1, "page_count_source": "pillow", "dimensions": {"width": 10, "height": 20, "aspect_ratio": 0.5}, "artifact_nature": "standalone_image", "requires_visual_inspection": true, "metadata": {"producer": {"tags": [1, null, "x"]}}},
+  "RenderedPageMetadata": {"artifact_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "media_type": "image/png", "size_bytes": 100, "page_number": 1, "page_count": 1, "page_width": 100, "page_height": 200, "clip": {"left": 0, "top": 0, "right": 100, "bottom": 200}, "scale": 1, "dpi": 72, "width_px": 100, "height_px": 200, "source_media_type": "application/pdf", "source_filename": "sample.pdf"},
+  "TextSpansResult": {"page_count": 1, "coord_origin": "TOPLEFT", "pages": [{"page_number": 1, "width": 100, "height": 200, "rotation": 0, "lines": [{"bbox": [0, 0, 20, 10], "spans": [{"text": "x", "font": "Times", "size": 12, "flags": 0, "bbox": [0, 0, 20, 10], "origin": [0, 10]}]}]}]}
+}

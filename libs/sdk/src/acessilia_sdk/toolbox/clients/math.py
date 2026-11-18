@@ -7,6 +7,14 @@ from typing import Any
 
 from acessilia_sdk.toolbox.capabilities import provider_default
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.results import (
+    LatexResult,
+    MathmlResult,
+    VerbalizedResult,
+    read_document,
+    read_result,
+)
 
 RECOGNIZE_CAPABILITY = "math.recognize"
 CONVERT_CAPABILITY = "math.convert"
@@ -34,11 +42,13 @@ def recognized_formulas(document: Any) -> list[dict[str, Any]]:
     if isinstance(formulas, list):
         return [f for f in formulas if isinstance(f, dict) and _has_latex(f)]
     if _has_latex(document):
-        return [{
-            key: document[key]
-            for key in ("latex", "confidence", "page", "bbox")
-            if key in document
-        }]
+        return [
+            {
+                key: document[key]
+                for key in ("latex", "confidence", "page", "bbox")
+                if key in document
+            }
+        ]
     return []
 
 
@@ -130,6 +140,58 @@ class ToolboxMathClient(ToolboxCapabilityClient):
             language=language,
             no_cache=use_remote_cache is False,
         )
+
+    async def recognize_result(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        language: str = "pt-BR",
+        use_remote_cache: bool | None = None,
+    ) -> list[LatexResult]:
+        """Typed published result of :meth:`recognize`; raw compatibility is unchanged."""
+        result = await self.recognize(
+            file_path=file_path,
+            artifact_id=artifact_id,
+            language=language,
+            use_remote_cache=use_remote_cache,
+        )
+        if not isinstance(result, dict) or not isinstance(result.get("document"), dict):
+            raise ToolboxContractViolation(
+                f"{RECOGNIZE_CAPABILITY} response has no document object"
+            )
+        document = result["document"]
+        if isinstance(document.get("formulas"), list):
+            return [
+                read_result(item, LatexResult) for item in recognized_formulas(document)
+            ]
+        return [read_result(document, LatexResult)]
+
+    async def convert_result(
+        self,
+        latex: str,
+        *,
+        direction: str = "latex-to-mathml",
+        use_remote_cache: bool | None = None,
+    ) -> MathmlResult:
+        """Typed published result of :meth:`convert`; raw compatibility is unchanged."""
+        result = await self.convert(
+            latex=latex, direction=direction, use_remote_cache=use_remote_cache
+        )
+        return read_document(result, MathmlResult)
+
+    async def verbalize_result(
+        self,
+        latex: str,
+        *,
+        language: str = "pt-BR",
+        use_remote_cache: bool | None = None,
+    ) -> VerbalizedResult:
+        """Typed published result of :meth:`verbalize`; raw compatibility is unchanged."""
+        result = await self.verbalize(
+            latex=latex, language=language, use_remote_cache=use_remote_cache
+        )
+        return read_document(result, VerbalizedResult)
 
 
 __all__ = [
