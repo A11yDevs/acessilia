@@ -7,6 +7,13 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** `ToolboxMathClient.recognize_result` now reports malformed response
+  envelopes/documents as `ToolboxContractViolation` and preserves extension
+  fields from complete single-expression records. Legacy formula lists keep
+  their existing normalization behavior (#583).
+- **Fixed** generated result serialization recursively converts model-valued
+  extensions, including nested arrays/maps, to JSON-compatible values (#583).
+
 - **Added** generated bindings for nine selected Toolbox execute documents, additive typed client accessors and render metadata, with bounded schema checks and no new runtime dependencies (#213).
 
 

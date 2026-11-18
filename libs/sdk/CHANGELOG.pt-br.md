@@ -7,6 +7,14 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido** `ToolboxMathClient.recognize_result` agora informa envelopes ou
+  documentos inválidos como `ToolboxContractViolation` e preserva os campos de
+  extensão de registros completos de expressões individuais. Listas legadas de
+  fórmulas mantêm a normalização existente (#583).
+- **Corrigido** a serialização de resultados gerados converte recursivamente
+  extensões que contêm modelos, incluindo arrays e mapas aninhados, em valores
+  compatíveis com JSON (#583).
+
 - **Adicionado** bindings gerados para nove documentos execute selecionados da Toolbox, acessores tipados adicionais e metadados de renderização, com validação limitada aos schemas e sem novas dependências de execução (#213).
 
 

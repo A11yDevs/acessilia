@@ -7,6 +7,7 @@ from typing import Any
 
 from acessilia_sdk.toolbox.capabilities import provider_default
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.results import (
     LatexResult,
     MathmlResult,
@@ -155,10 +156,16 @@ class ToolboxMathClient(ToolboxCapabilityClient):
             language=language,
             use_remote_cache=use_remote_cache,
         )
-        return [
-            read_result(item, LatexResult)
-            for item in recognized_formulas(result.get("document"))
-        ]
+        if not isinstance(result, dict) or not isinstance(result.get("document"), dict):
+            raise ToolboxContractViolation(
+                f"{RECOGNIZE_CAPABILITY} response has no document object"
+            )
+        document = result["document"]
+        if isinstance(document.get("formulas"), list):
+            return [
+                read_result(item, LatexResult) for item in recognized_formulas(document)
+            ]
+        return [read_result(document, LatexResult)]
 
     async def convert_result(
         self,

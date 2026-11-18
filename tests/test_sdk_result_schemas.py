@@ -160,3 +160,61 @@ def test_published_layout_union_is_not_flattened():
     )
     with pytest.raises(module.SchemaError, match="anyOf"):
         module.Compiler().compile(schema, "Layout")
+
+
+@pytest.mark.parametrize("container", ["object", "array", "map"])
+def test_generated_model_valued_additional_properties_round_trip(
+    monkeypatch, container
+):
+    """Exercise compiler -> decoder -> JSON for typed extension models."""
+    import sys
+    from types import ModuleType
+
+    record_schema = {
+        "type": "object",
+        "properties": {
+            "label": {"type": "string"},
+            "children": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "integer"},
+                        "note": {"type": ["string", "null"]},
+                    },
+                    "required": ["value"],
+                },
+            },
+        },
+        "required": ["label", "children"],
+    }
+    record = {"label": "future", "children": [{"value": 1, "note": None}, {"value": 2}]}
+    if container == "array":
+        extension_schema = {"type": "array", "items": record_schema}
+        extension = [record]
+    elif container == "map":
+        extension_schema = {"type": "object", "additionalProperties": record_schema}
+        extension = {"entry": record}
+    else:
+        extension_schema = record_schema
+        extension = record
+    schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+        "additionalProperties": extension_schema,
+    }
+    document = {"id": "result", "future": extension}
+    jsonschema.Draft7Validator(schema).validate(document)
+    generator = compiler().Compiler()
+    generator.compile(schema, "GeneratedResult")
+    module = ModuleType("generated_result_extensions")
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    exec(generator.render("typed additionalProperties regression"), module.__dict__)
+    model = module.GeneratedResult.from_dict(document)
+    serialized = model.to_dict()
+    assert serialized == document
+    assert json.loads(json.dumps(serialized)) == document
+    jsonschema.Draft7Validator(schema).validate(serialized)
+    serialized["future"] = None
+    assert model.to_dict() == document

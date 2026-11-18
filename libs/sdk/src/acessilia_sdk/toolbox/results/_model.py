@@ -36,7 +36,7 @@ class ResultModel:
         return decode(data, cls._rule, cls._models, cls.__name__)
 
     def to_dict(self) -> dict[str, Any]:
-        result = copy.deepcopy(self._extensions)
+        result = {name: to_json(value) for name, value in self._extensions.items()}
         result.update(
             {
                 f.name: to_json(getattr(self, f.name))

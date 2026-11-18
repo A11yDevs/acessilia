@@ -126,3 +126,78 @@ def test_missing_null_extensions_and_open_metadata_round_trip():
 def test_non_json_numbers_rejected(value):
     with pytest.raises(ValueError):
         results.LatexResult.from_dict({"latex": "x", "confidence": value})
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        None,
+        [],
+        "response",
+        True,
+        {},
+        {"document": None},
+        {"document": []},
+        {"document": "formula"},
+        {"document": {}},
+        {"document": {"latex": None}},
+        {"document": {"latex": ""}},
+        {"document": {"formulas": "not a list"}},
+    ],
+)
+@pytest.mark.asyncio
+async def test_recognition_rejects_malformed_responses(response):
+    client = ToolboxMathClient(base_url="http://toolbox")
+    try:
+        client.recognize = AsyncMock(return_value=response)
+        with pytest.raises(ToolboxContractViolation):
+            await client.recognize_result()
+    finally:
+        await client.close()
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.asyncio
+async def test_recognition_retains_complete_formula_records(legacy):
+    document = {
+        **EXAMPLES["LatexResult"],
+        "future": {"nullable": None, "items": [{"source": "extension"}]},
+    }
+    response = {"document": {"formulas": [document]} if legacy else document}
+    client = ToolboxMathClient(base_url="http://toolbox")
+    try:
+        client.recognize = AsyncMock(return_value=response)
+        formulas = await client.recognize_result()
+        assert len(formulas) == 1
+        assert formulas[0].to_dict() == document
+        json.dumps(formulas[0].to_dict())
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_recognition_keeps_empty_and_filtered_legacy_results():
+    client = ToolboxMathClient(base_url="http://toolbox")
+    try:
+        for entries in ([], [None, {}, {"latex": " "}, {"latex": None}]):
+            client.recognize = AsyncMock(
+                return_value={"document": {"formulas": entries}}
+            )
+            assert await client.recognize_result() == []
+        client.recognize.side_effect = ToolboxTimeout("slow")
+        with pytest.raises(ToolboxTimeout):
+            await client.recognize_result()
+    finally:
+        await client.close()
+
+
+def test_nested_model_extensions_are_serialized_to_independent_json_values():
+    extension = results.RegionTranscription.from_dict({"text": "x", "model": "reader"})
+    document = results.LatexResult.from_dict(
+        {"latex": "x", "future": {"nested": [extension]}}
+    )
+    expected = {"latex": "x", "future": {"nested": [{"text": "x", "model": "reader"}]}}
+    output = document.to_dict()
+    assert json.loads(json.dumps(output)) == expected
+    output["future"]["nested"][0]["text"] = "changed"
+    assert document.to_dict() == expected
