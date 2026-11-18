@@ -66,7 +66,12 @@ def _equal(left: Any, right: Any) -> bool:
 
 
 def decode(
-    value: Any, rule: dict[str, Any], models: dict[str, type[ResultModel]], path: str
+    value: Any,
+    rule: dict[str, Any],
+    models: dict[str, type[ResultModel]],
+    path: str,
+    *,
+    strict: bool = False,
 ) -> Any:
     def fail(message: str) -> None:
         raise ValueError(f"{path}: {message}")
@@ -126,7 +131,7 @@ def decode(
             if key in rule and bad(rule[key]):
                 fail(f"violates {key}")
         return [
-            decode(item, rule["items"], models, f"{path}[{i}]")
+            decode(item, rule["items"], models, f"{path}[{i}]", strict=strict)
             for i, item in enumerate(value)
         ]
     if isinstance(value, dict):
@@ -135,14 +140,18 @@ def decode(
             fail(f"missing required properties {sorted(missing)}")
         properties = rule.get("properties", {})
         result = {
-            name: decode(item, properties[name], models, f"{path}.{name}")
+            name: decode(
+                item, properties[name], models, f"{path}.{name}", strict=strict
+            )
             for name, item in value.items()
             if name in properties
         }
         extra_rule = rule.get("additionalProperties", True)
+        if strict and extra_rule is False and value.keys() - properties.keys():
+            fail("unknown properties")
         extra = {
             name: (
-                decode(item, extra_rule, models, f"{path}.{name}")
+                decode(item, extra_rule, models, f"{path}.{name}", strict=strict)
                 if isinstance(extra_rule, dict)
                 else copy.deepcopy(item)
             )

@@ -339,3 +339,21 @@ compatibility behavior. Optional attributes read as `None` when absent, while
 `to_dict()` preserves absence, explicit nulls, open metadata and extension fields.
 Direct dataclass construction is not validation; use `from_dict` for untrusted
 input. General unions/intersections and remote or cyclic references remain errors.
+
+### Layout and structural readers
+
+`ToolboxLayoutClient.analyze_result` uses `results.layout.read_layout` for the
+complete published union. It returns the compact generated records or a manifest
+with generated classification metadata; `regions` provides docstruct bounding
+boxes, one-based page numbers and optional confidence. MinerU's original
+zero-based indexes remain in `configuration`, without invented confidence.
+Canonical elements and unresolved origins stay in docstruct's `StructuredDocument`.
+
+`ToolboxStructureClient.extract_structure_result` and `read_manifest` use the
+same canonical adapter and retain producer/process metadata separately. Full
+manifest wire constraints are generated as validation data, without generating
+canonical SDK classes. The layout adapter additionally enforces the containing
+MinerU branch: a generic manifest without layout metadata is rejected. Only the
+manifest's explicit nullable pattern is normalized; general union/intersection
+compilation stays unsupported. Date-time formats remain schema annotations.
+Existing raw readers, including legacy layout page maps, are unchanged.

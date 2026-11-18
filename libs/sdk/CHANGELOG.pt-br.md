@@ -7,6 +7,8 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** leitores tipados de layout e estrutura que reutilizam documentos e geometria canônicos do docstruct, preservam metadados do produtor e validam as duas variantes publicadas de layout (#213).
+
 - **Corrigido** `ToolboxMathClient.recognize_result` agora informa envelopes ou
   documentos inválidos como `ToolboxContractViolation` e preserva os campos de
   extensão de registros completos de expressões individuais. Listas legadas de

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.results.layout import LayoutResult, read_layout
 
 CAPABILITY = "document.layout.analyze"
 
@@ -70,6 +71,23 @@ class ToolboxLayoutClient(ToolboxCapabilityClient):
             if page.get("page_number") == page_number:
                 return page
         return None
+
+    async def analyze_result(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        language: str = "pt-BR",
+        use_remote_cache: bool | None = None,
+    ) -> LayoutResult:
+        """Typed published result, preserving the existing raw method."""
+        result = await self.analyze(
+            file_path=file_path,
+            artifact_id=artifact_id,
+            language=language,
+            use_remote_cache=use_remote_cache,
+        )
+        return read_layout(result.get("document"))
 
 
 __all__ = ["CAPABILITY", "ToolboxLayoutClient"]

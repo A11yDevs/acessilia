@@ -1,0 +1,26 @@
+{
+  "pages": [
+    {
+      "page_number": 2,
+      "width": 595,
+      "height": 842,
+      "regions": [
+        {
+          "type": "table",
+          "label": "table",
+          "bbox": [
+            50,
+            342,
+            500,
+            642
+          ],
+          "confidence": 0.95,
+          "text": null,
+          "page_number": 2
+        }
+      ]
+    }
+  ],
+  "page_count": 1,
+  "region_count": 1
+}

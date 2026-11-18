@@ -78,13 +78,13 @@ EXECUTE_MODELS = {
 }
 
 
-def result_compiler():
+def result_compiler(**options):
     spec = importlib.util.spec_from_file_location(
         "sdk_result_compiler", REPO_ROOT / "scripts" / "sdk_result_compiler.py"
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.Compiler()
+    return module.Compiler(**options)
 
 
 _JSON_TYPES = {
@@ -372,6 +372,17 @@ def models() -> dict[Path, str]:
     generated[SDK_TOOLBOX / "results" / "execute.py"] = compiler.render(
         "selected Toolbox schemas; scripts/generate_sdk_bindings.py"
     )
+    spec = importlib.util.spec_from_file_location(
+        "sdk_layout_binding", REPO_ROOT / "scripts" / "sdk_layout_binding.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        generated[SDK_TOOLBOX / "results" / "_layout_generated.py"] = (
+            module.render_layout(result_compiler, SCHEMAS_DIR)
+        )
+    except ValueError as exc:
+        raise BindingError(str(exc)) from exc
     return generated
 
 

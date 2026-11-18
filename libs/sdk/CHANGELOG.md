@@ -7,6 +7,8 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** typed layout and structure readers that reuse docstruct canonical documents and geometry, retain producer metadata and validate both published layout variants (#213).
+
 - **Fixed** `ToolboxMathClient.recognize_result` now reports malformed response
   envelopes/documents as `ToolboxContractViolation` and preserves extension
   fields from complete single-expression records. Legacy formula lists keep

@@ -43,7 +43,16 @@ def camel(name: str) -> str:
 
 
 class Compiler:
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        emit_models: bool = True,
+        nullable_branches: bool = False,
+        plain_definitions: tuple[str, ...] = (),
+    ):
+        self.emit_models = emit_models
+        self.nullable_branches = nullable_branches
+        self.plain_definitions = plain_definitions
         self.classes: dict[str, dict] = {}
         self.roots: dict[str, dict] = {}
 
@@ -57,7 +66,14 @@ class Compiler:
         self.roots[name] = rule
         return rule
 
-    def _node(self, node: Any, root: dict, name: str, stack: tuple[str, ...]) -> dict:
+    def _node(
+        self,
+        node: Any,
+        root: dict,
+        name: str,
+        stack: tuple[str, ...],
+        plain: bool = False,
+    ) -> dict:
         if not isinstance(node, dict):
             raise SchemaError(f"{name}: schema must be an object")
         if "$ref" in node:
@@ -78,7 +94,30 @@ class Compiler:
                 target = root[section][key]
             except KeyError as exc:
                 raise SchemaError(f"{name}: unresolved reference {ref}") from exc
-            return self._node(target, root, name, (*stack, ref))
+            return self._node(
+                target, root, name, (*stack, ref), key in self.plain_definitions
+            )
+        if "anyOf" in node and self.nullable_branches:
+            branches = node["anyOf"]
+            if (
+                set(node) - ANNOTATIONS - {"anyOf"}
+                or not isinstance(branches, list)
+                or len(branches) != 2
+                or branches[1] != {"type": "null"}
+            ):
+                raise SchemaError(
+                    f"{name}: only the manifest's nullable branches are supported"
+                )
+            rule = self._node(branches[0], root, name, stack, plain)
+            if "null" in rule["type"]:
+                raise SchemaError(f"{name}: duplicate nullable branch")
+            return {**rule, "type": [*rule["type"], "null"]}
+        if "type" not in node and "const" in node and isinstance(node["const"], str):
+            node = {**node, "type": "string"}
+        if self.nullable_branches and node.get("format") == "date-time":
+            # Draft 2020-12's format is an annotation, like validator_for(schema)
+            # without a FormatChecker; it is not a hidden runtime dependency.
+            node = {key: value for key, value in node.items() if key != "format"}
         types = node.get("type")
         types = [types] if isinstance(types, str) else types
         if (
@@ -122,7 +161,7 @@ class Compiler:
                 )
             elif not isinstance(additional, bool):
                 raise SchemaError(f"{name}: invalid additionalProperties")
-            if props:
+            if props and self.emit_models and not plain:
                 for key in props:
                     if (
                         not key.isidentifier()
