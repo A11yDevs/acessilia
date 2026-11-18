@@ -65,3 +65,28 @@ def test_public_download_never_sends_deployment_api_key(monkeypatch):
     capture._fetch('http://localhost/v1/providers')
     assert not seen[0].has_header('Authorization')
     assert seen[1].get_header('Authorization') == 'Bearer deployment-secret'
+
+
+def test_custom_output_name_is_recorded_in_checksum_manifest(monkeypatch, tmp_path):
+    capture = capture_module()
+    raw = b'{"capabilities":[],"providers":[],"dataset_routes":[],"schema_refs":[]}'
+    manifest = {"commit": "a" * 40, "sha256": {
+        "toolbox-contract.json": hashlib.sha256(raw).hexdigest()
+    }}
+    monkeypatch.setattr(capture, "snapshot", lambda ref: {
+        "toolbox-contract.json": raw,
+        "toolbox-snapshot.json": json.dumps(manifest).encode(),
+    })
+    capture.write_snapshot("a" * 40, tmp_path / "custom.json")
+    recorded = json.loads((tmp_path / "toolbox-snapshot.json").read_text())
+    assert recorded["sha256"] == {"custom.json": hashlib.sha256(raw).hexdigest()}
+    assert (tmp_path / "custom.json").read_bytes() == raw
+
+
+@pytest.mark.parametrize("name", ["toolbox-snapshot.json", "toolbox-schemas"])
+def test_output_cannot_overwrite_metadata_paths(monkeypatch, tmp_path, name):
+    capture = capture_module()
+    monkeypatch.setattr(capture, "snapshot", lambda ref: pytest.fail("download started"))
+    with pytest.raises(ValueError, match="metadata path"):
+        capture.write_snapshot("a" * 40, tmp_path / name)
+    assert not list(tmp_path.iterdir())

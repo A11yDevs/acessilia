@@ -157,7 +157,15 @@ def snapshot(ref: str) -> dict[str, bytes]:
 
 
 def write_snapshot(ref: str, out: Path) -> None:
+    if out.name in {"toolbox-snapshot.json", "toolbox-schemas"}:
+        raise ValueError("--out conflicts with a snapshot metadata path")
     files = snapshot(ref)
+    if out.name != "toolbox-contract.json":
+        manifest = json.loads(files["toolbox-snapshot.json"])
+        digest = manifest["sha256"].pop("toolbox-contract.json")
+        manifest["sha256"][out.name] = digest
+        manifest["sha256"] = dict(sorted(manifest["sha256"].items()))
+        files["toolbox-snapshot.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     out.parent.mkdir(parents=True, exist_ok=True)
     # Stage the complete validated download on the destination filesystem.
     # Network/parse failures leave every previous generation input untouched.
