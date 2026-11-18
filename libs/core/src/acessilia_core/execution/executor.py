@@ -205,8 +205,16 @@ class ExecutorAgent:
                     f"A resumed plan has {len(results)} recorded steps, "
                     f"but the plan has {len(plan.steps)}"
                 )
+        # An obligation the plan's manifest does not have was added by a
+        # handler of this execution (#594): a resumed checkpoint keeps it
+        # selected, and one still open asks for a replan, as when it was found.
+        planned = {item.id for item in manifest.obligations}
+        selected = set(plan.selected_obligations)
         for obligation in working.obligations:
-            obligation.selected = obligation.id in set(plan.selected_obligations)
+            discovered = obligation.id not in planned
+            obligation.selected = obligation.id in selected or discovered
+            if discovered and obligation.status != "satisfied":
+                replan_required = True
 
         started_at = datetime.now(timezone.utc)
         state = _ExecutionState(
@@ -395,6 +403,7 @@ class ExecutorAgent:
                             )
                         )
                     attempt_started = datetime.now(timezone.utc)
+                    known = {item.id for item in state.manifest.obligations}
                     try:
                         result = handler(state.manifest, obligation.id)
                     except Exception as exc:
@@ -451,16 +460,14 @@ class ExecutorAgent:
                         )
                     obligation.status = "satisfied"
                     message = result.message
+                    self._select_discovered(state, known)
             elif step.action == "complete-job":
-                selected = {
-                    item.id: item
-                    for item in state.manifest.obligations
-                    if item.id in set(plan.selected_obligations)
-                }
+                # `selected`, not the plan's list: it also holds what a
+                # handler added during this execution.
                 unsatisfied = [
                     item.id
-                    for item in selected.values()
-                    if item.status != "satisfied"
+                    for item in state.manifest.obligations
+                    if item.selected and item.status != "satisfied"
                 ]
                 if unsatisfied:
                     raise ValueError(
@@ -502,6 +509,24 @@ class ExecutorAgent:
         )
         state.results.append(result)
         return result
+
+    @staticmethod
+    def _select_discovered(state: _ExecutionState, known: set[str]) -> None:
+        """Select the obligations a successful handler added (#594).
+
+        A handler that adds content derives its processing needs, which no
+        plan covers yet. They are selected, so ``complete-job`` waits for them
+        and the replan takes them as roots, and one still open asks for that
+        replan. The rest of the plan still runs first, as after a failed
+        method: its steps stay valid, and the replan budget is not spent on
+        work the old plan already had.
+        """
+        for item in state.manifest.obligations:
+            if item.id in known:
+                continue
+            item.selected = True
+            if item.status != "satisfied":
+                state.replan_required = True
 
     @staticmethod
     def _check_obligation_preconditions(

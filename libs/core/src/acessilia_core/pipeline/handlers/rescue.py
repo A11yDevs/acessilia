@@ -25,6 +25,10 @@ secondary provider (``fusion.apply_page_routes``). So, per page:
 The method restores the primary provider's own content and applies no
 preference between the providers, so unlike ``skeleton-order`` it does not
 require the calibrated docling + mineru pair.
+
+The restored blocks arrive after the processing needs were derived, so the
+method derives theirs (#594) and adds them as ordinary obligations; the
+executor selects what a handler adds and replans for it.
 """
 
 from __future__ import annotations
@@ -36,9 +40,20 @@ from docstruct.fusion.noise import is_junk, quality
 from docstruct.fusion.similarity import PAGENUM_RE, is_duplicate, pair_block
 from pydantic import ValidationError
 
+from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
-from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.manifest.builder import (
+    _append_processing_needs,
+    _derive_processing_needs,
+    _derive_v23_processing_needs,
+)
+from acessilia_core.manifest.models import (
+    ManifestElement,
+    Obligation,
+    Observation,
+    ProcessingManifest,
+)
 from acessilia_core.pipeline.elements import _element_bbox
 from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
@@ -74,6 +89,18 @@ _MIN_CONTAINED_TEXT = 8
 #: Lowest share of word-like tokens of a legitimate block (``is_legitimate_text``).
 _MIN_QUALITY = 0.35
 
+#: v2.3 needs that a block has on its own. The others (reading order, verse,
+#: line numbers, tail join) describe a whole page: derived over the restored
+#: blocks alone they would judge a page made only of them.
+_ELEMENT_V23_KINDS = frozenset(
+    {"normalize-text", "normalize-formula", "repair-legacy-unicode"}
+)
+
+#: Base needs that depend on the document's heading sequence, which a restored
+#: heading changes, rather than on one element.
+_SEQUENCE_KINDS = frozenset({"repair-heading-hierarchy"})
+_SEQUENCE_OBSERVATION_KINDS = frozenset({"heading-hierarchy-gap"})
+
 
 def is_legitimate_text(text: str) -> bool:
     """Whether ``text`` reads as real text rather than OCR residue.
@@ -93,7 +120,7 @@ def is_legitimate_text(text: str) -> bool:
 
 
 def _handle_rescue_omitted_method(
-    manifest: ProcessingManifest, obligation_id: str
+    manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
     """Restore the primary text blocks missing from the obligation's pages."""
     elements = _target_elements(manifest, obligation_id)
@@ -142,6 +169,7 @@ def _handle_rescue_omitted_method(
         )
     kept = [page for page in pages if page not in routed]
 
+    present = {element.id for element in manifest.elements}
     complete: list[int] = []
     restored: dict[int, int] = {}
     for page in routed:
@@ -157,6 +185,11 @@ def _handle_rescue_omitted_method(
             complete.append(page)
     if restored:
         _renumber(manifest, set(restored))
+        _add_restored_needs(
+            manifest,
+            [element for element in manifest.elements if element.id not in present],
+            legacy_unicode_repair=config.document.legacy_unicode_repair,
+        )
 
     parts = []
     if restored:
@@ -170,6 +203,53 @@ def _handle_rescue_omitted_method(
     if kept:
         parts.append(t(MSG_RESCUE_PRIMARY_KEPT).format(pages=_pages(kept)))
     return MethodResult(success=True, validated=True, message="; ".join(parts))
+
+
+def _add_restored_needs(
+    manifest: ProcessingManifest,
+    restored: list[ManifestElement],
+    *,
+    legacy_unicode_repair: str,
+) -> None:
+    """Add the processing needs of the restored blocks to the manifest.
+
+    The base needs are derived over the whole document, because a restored
+    heading can open a gap in the heading sequence; of those, only the ones
+    targeting a restored block or depending on the heading sequence are kept,
+    so an obligation an enrichment stage removed on purpose does not come
+    back. The v2.3 needs are derived over the restored blocks alone, and only
+    the kinds a block has on its own are kept (``_ELEMENT_V23_KINDS``).
+    ``_append_processing_needs`` skips any obligation whose id or kind and
+    targets the manifest already has, so a live obligation and its attempts
+    are never replaced.
+    """
+    ids = {element.id for element in restored}
+
+    def targets_restored(item: Observation | Obligation) -> bool:
+        return bool(set(item.target_ids) & ids)
+
+    base_observations, base_obligations = _derive_processing_needs(manifest.elements)
+    observations = [
+        item for item in base_observations
+        if targets_restored(item) or item.kind in _SEQUENCE_OBSERVATION_KINDS
+    ]
+    obligations = [
+        item for item in base_obligations
+        if targets_restored(item) or item.kind in _SEQUENCE_KINDS
+    ]
+    v23_observations, v23_obligations = _derive_v23_processing_needs(
+        restored,
+        page_sizes={
+            page.page_number: (page.width, page.height) for page in manifest.pages
+        },
+        legacy_unicode_repair=legacy_unicode_repair,
+    )
+    observations += [
+        item for item in v23_observations
+        if item.kind.removesuffix("-detected") in _ELEMENT_V23_KINDS
+    ]
+    obligations += [item for item in v23_obligations if item.kind in _ELEMENT_V23_KINDS]
+    _append_processing_needs(manifest, observations, obligations)
 
 
 def _pages(pages: Any) -> str:
