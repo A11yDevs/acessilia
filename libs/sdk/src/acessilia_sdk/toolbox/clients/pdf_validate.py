@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.results import PdfValidationReport, read_result
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
 CAPABILITY = "pdf.validate.pdf_ua"
@@ -41,7 +42,9 @@ class ToolboxPdfValidateClient(ToolboxCapabilityClient):
         ``compliant``, ``profile``, ``profile_name``, ``summary`` and ``failures``.
         """
         if profile not in PROFILES:
-            raise ValueError(f"profile must be one of {list(PROFILES)}, got {profile!r}")
+            raise ValueError(
+                f"profile must be one of {list(PROFILES)}, got {profile!r}"
+            )
         result = await self._execute(
             CAPABILITY,
             file_path=file_path,
@@ -50,11 +53,30 @@ class ToolboxPdfValidateClient(ToolboxCapabilityClient):
             no_cache=use_remote_cache is False,
         )
         document = result.get("document")
-        if not isinstance(document, dict) or not isinstance(document.get("compliant"), bool):
+        if not isinstance(document, dict) or not isinstance(
+            document.get("compliant"), bool
+        ):
             raise ToolboxContractViolation(
                 f"{CAPABILITY} response has no validation report in 'document'"
             )
         return document
+
+    async def validate_result(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        profile: str = "ua1",
+        use_remote_cache: bool | None = None,
+    ) -> PdfValidationReport:
+        """Typed published result of :meth:`validate`; raw compatibility is unchanged."""
+        result = await self.validate(
+            file_path=file_path,
+            artifact_id=artifact_id,
+            profile=profile,
+            use_remote_cache=use_remote_cache,
+        )
+        return read_result(result, PdfValidationReport)
 
 
 __all__ = ["CAPABILITY", "PROFILES", "ToolboxPdfValidateClient"]

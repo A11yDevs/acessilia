@@ -13,6 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.results import (
+    PageJudgement,
+    RegionTranscription,
+    read_document,
+)
 
 PAGE_CAPABILITY = "document.adjudicate.page"
 REGION_CAPABILITY = "document.adjudicate.region"
@@ -88,6 +93,44 @@ class ToolboxAdjudicateClient(ToolboxCapabilityClient):
             parameters={"candidates": candidates},
             no_cache=use_remote_cache is False,
         )
+
+    async def judge_page_result(
+        self,
+        candidate_a: str,
+        candidate_b: str,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        prompt: str = "base",
+        use_remote_cache: bool | None = None,
+    ) -> PageJudgement:
+        """Typed published result of :meth:`judge_page`; raw compatibility is unchanged."""
+        result = await self.judge_page(
+            candidate_a=candidate_a,
+            candidate_b=candidate_b,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            prompt=prompt,
+            use_remote_cache=use_remote_cache,
+        )
+        return read_document(result, PageJudgement)
+
+    async def transcribe_region_result(
+        self,
+        candidates: list[str],
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        use_remote_cache: bool | None = None,
+    ) -> RegionTranscription:
+        """Typed published result of :meth:`transcribe_region`; raw compatibility is unchanged."""
+        result = await self.transcribe_region(
+            candidates=candidates,
+            file_path=file_path,
+            artifact_id=artifact_id,
+            use_remote_cache=use_remote_cache,
+        )
+        return read_document(result, RegionTranscription)
 
 
 __all__ = [

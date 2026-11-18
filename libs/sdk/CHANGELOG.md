@@ -7,6 +7,9 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** generated bindings for nine selected Toolbox execute documents, additive typed client accessors and render metadata, with bounded schema checks and no new runtime dependencies (#213).
+
+
 - **Added** operation identifiers and cancellation (ADR-0019): `operation_context`
   and `operation_attempt` attach `task_id`, a stable `operation_id` and a fresh
   `attempt_id` to Toolbox capability and artifact headers, without reading

@@ -7,6 +7,9 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** bindings gerados para nove documentos execute selecionados da Toolbox, acessores tipados adicionais e metadados de renderização, com validação limitada aos schemas e sem novas dependências de execução (#213).
+
+
 - **Adicionado** identificadores de operação e cancelamento (ADR-0019):
   `operation_context` e `operation_attempt` anexam `task_id`, um
   `operation_id` estável e um `attempt_id` novo aos cabeçalhos de capacidade e

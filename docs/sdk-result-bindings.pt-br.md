@@ -2,10 +2,10 @@
 
 Você também pode ler esta documentação em **inglês**: [English](sdk-result-bindings.md).
 
-Este é o inventário solicitado pela [revisão mais recente da #213][review],
-sob a #380. Ele define o escopo proposto dos dois próximos PRs de implementação;
-não introduz modelos de resultados nem altera clientes. A issue permanece aberta
-até os bindings selecionados serem gerados, utilizados e verificados contra desvios.
+Este documento registra o inventário solicitado pela [revisão mais recente da #213][review],
+sob a #380, e sua sequência de implementação. As seções do inventário original
+permanecem como base da revisão; o progresso está registrado ao final.
+A issue permanece aberta até a revisão e mesclagem dos bindings selecionados.
 
 ## Evidências e responsabilidades
 
@@ -342,3 +342,20 @@ de datasets. Cada PR seguinte aponta para a branch anterior até sua mesclagem.
 A origem está fixada em `tests/fixtures/toolbox-snapshot.json`, com checksums
 SHA-256 dos bytes do contrato público completo e de cada schema selecionado.
 Capturas com `--url` são diagnósticas e não sobrescrevem a entrada da geração.
+
+### Leitores execute selecionados
+
+`acessilia_sdk.toolbox.results` expõe os nove modelos gerados selecionados,
+`read_result(document, Model)` e `read_document(envelope, Model)`. Os clientes de
+matemática, adjudicação, inspeção, validação PDF e spans acrescentam métodos
+`*_result`; `RenderedPage.metadata` lê os metadados gerados sem substituir os
+bytes verificados. O reconhecimento normaliza expressões e listas legadas antes
+de ler cada registro LaTeX.
+
+Os leitores validam a forma publicada e lançam `ToolboxContractViolation`.
+Os métodos existentes, operações de fórmulas e normalização de probabilidades
+preservam sua compatibilidade. Atributos opcionais ausentes retornam `None`, mas
+`to_dict()` preserva ausência, null explícito, metadados abertos e extensões.
+A construção direta da dataclass não valida: use `from_dict` para entradas
+externas. Uniões e interseções genéricas e referências remotas ou cíclicas
+continuam sendo erros explícitos.

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.results import MediaInspection, read_result
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 
 CAPABILITY = "media.inspect"
@@ -47,6 +48,21 @@ class ToolboxMediaInspectClient(ToolboxCapabilityClient):
                 f"{CAPABILITY} response has no 'document' field"
             )
         return document
+
+    async def inspect_result(
+        self,
+        file_path: Path | None = None,
+        artifact_id: str | None = None,
+        *,
+        use_remote_cache: bool | None = None,
+    ) -> MediaInspection:
+        """Typed published result of :meth:`inspect`; raw compatibility is unchanged."""
+        result = await self.inspect(
+            file_path=file_path,
+            artifact_id=artifact_id,
+            use_remote_cache=use_remote_cache,
+        )
+        return read_result(result, MediaInspection)
 
 
 __all__ = ["CAPABILITY", "ToolboxMediaInspectClient"]
