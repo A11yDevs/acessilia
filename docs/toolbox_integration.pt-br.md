@@ -439,7 +439,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições para os clientes de capacidade que não declaram o próprio |
 | `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` | `600` | Timeout HTTP por tentativa do `document.structure.extract`; acompanha o timeout de 600 s dos providers da Toolbox |
 | `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` | `1500` | Orçamento total de parede da etapa de extração: upload, retries, failover e os dois providers. Retries/failover não o estendem, e um job cancelado aguarda no máximo esse tempo pela thread de extração. No modo dual, depois que o primário respondeu, o secundário recebe só o tempo que sobra, menos uma reserva para a fusão (no máximo 60 s e no máximo um décimo do orçamento): um secundário que não responde nesse tempo degrada a extração para o primário em vez de falhá-la (#603) |
-| `TOOLBOX_CANCEL_TIMEOUT_SECONDS` | `5` | Orçamento de parede do lote de cancelamentos remotos de melhor esforço quando um job é cancelado. Um cancelamento que falha ou atrasa é registrado como `failed`, sem retry indefinido |
+| `TOOLBOX_CANCEL_TIMEOUT_SECONDS` | `5` | Orçamento de parede do lote de cancelamentos remotos de melhor esforço quando um job é cancelado, incluindo o fechamento do cliente HTTP. Um cancelamento que falha ou atrasa é registrado como `failed`, sem retry indefinido |
 | `JOB_RESUME_ON_RESTART` | `true` | Retoma um job interrompido por reinício a partir do último checkpoint durável do pipeline. Com `false`, ele é marcado como interrompido, exigindo reenvio, como antes da #407 |
 | `TOOLBOX_RETRIES` | `1` | Novas tentativas no mesmo endpoint após timeout ou instância indisponível (502/503/504), nas capacidades que o contrato da Toolbox marca como idempotentes (todas menos `dataset.sample`); uma chamada não idempotente tem uma tentativa e nenhum failover (#406). `0` as desliga (ADR-0006). O timeout também é retentado, então o pior caso de uma chamada pendurada é `TOOLBOX_TIMEOUT_SECONDS × (TOOLBOX_RETRIES + 1)` por endpoint de `TOOLBOX_BASE_URLS` (2 h por endpoint com os padrões) |
 | `TOOLBOX_RETRY_BACKOFF_SECONDS` | `0.5` | Base do backoff exponencial entre as tentativas, com jitter |
@@ -571,20 +571,29 @@ Cancelar agora também pede à Toolbox para parar as operações ativas do job
 (ADR-0019). O upload, a extração primária e a secundária carregam
 `X-Acessilia-Task-Id`, `X-Acessilia-Operation-Id` e `X-Acessilia-Attempt-Id`; o
 SDK mantém o id da operação entre retries/failover e dá um novo id de tentativa
-a cada requisição HTTP. A API registra um valor de melhor esforço
+a cada requisição HTTP. O SDK pede o cancelamento a todos os endpoints
+configurados, pois um failover pode ter deixado a operação executando em outro
+deployment, e a API agrega as respostas em um valor de melhor esforço
 `remote_cancellation`: `none` (nenhuma operação ativa), `requested` (ao menos um
-cancelamento aceito), `finished` (o trabalho já tinha terminado), `not_found`
-(nenhum endpoint conhecia a operação) ou `failed` (a requisição falhou ou
-excedeu `TOOLBOX_CANCEL_TIMEOUT_SECONDS`). Um cancelamento que falha nunca vira
-erro do job, retry, failover ou reenvio da entrada.
+cancelamento aceito), `finished` (só trabalho que já tinha terminado),
+`not_found` (todos os endpoints responderam que não conheciam a operação) ou
+`failed` (uma resposta foi inconclusiva — timeout, `5xx`, orçamento esgotado —
+ou o lote excedeu `TOOLBOX_CANCEL_TIMEOUT_SECONDS`, incluindo o fechamento do
+cliente HTTP). Uma falha nunca é escondida pelo sucesso de outro endpoint ou de
+outra operação, e um cancelamento que falha nunca vira erro do job, retry,
+failover ou reenvio da entrada.
 
 `requested` não é confirmação de que o provider parou de calcular. O registro
 da Toolbox é em memória e por processo; um reinício, um endpoint independente
 ou um balanceador que encaminhe o cancelamento para outra réplica podem
-produzir `not_found`. `cancelled` continua significando que o job local
-terminou. Trabalho que um provider não consegue interromper pode continuar até
-terminar, mas seu resultado é descartado e não é cacheado, armazenado ou
-publicado. A thread de extração continua limitada por
+produzir `not_found`. Um retry idempotente mantém o id da operação, mas uma
+Toolbox que rejeitou a operação antes da execução — por exemplo `503` por falta
+de slot — o libera, para que o retry seja admitido quando houver capacidade; um
+retry só se junta a uma operação que pode ter executado ou cujo resultado é
+incerto. `cancelled` continua significando que o job local terminou. Trabalho
+que um provider não consegue interromper pode continuar até terminar, mas seu
+resultado é descartado e não é cacheado, armazenado ou publicado. A thread de
+extração continua limitada por
 `TOOLBOX_EXTRACTION_TIMEOUT_SECONDS` (padrão 1500 s), com
 `TOOLBOX_STRUCTURE_TIMEOUT_SECONDS` (padrão 600 s) como timeout HTTP por
 tentativa. O encerramento da fila continua aguardando as operações ativas,

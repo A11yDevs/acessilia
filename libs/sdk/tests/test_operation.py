@@ -147,6 +147,107 @@ async def test_cancel_treats_404_as_not_found() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancel_asks_every_endpoint_and_aggregates_the_answers() -> None:
+    """A failover may have left the operation running on another deployment."""
+    other = "http://toolbox-b.test"
+    with respx.mock() as router:
+        finished = router.post(CANCEL).mock(
+            return_value=httpx.Response(200, json={"state": "finished"})
+        )
+        requested = router.post(f"{other}/v1/operations/op-1:cancel").mock(
+            return_value=httpx.Response(
+                200, json={"state": "cancel_requested", "cancel_requested": True}
+            )
+        )
+        client = ToolboxOperationClient(endpoints=[BASE_URL, other])
+        try:
+            result = await client.cancel("op-1", task_id="task-1")
+        finally:
+            await client.close()
+
+    assert finished.called and requested.called
+    assert result.state == "cancel_requested"
+    assert result.cancel_requested is True
+    assert result.endpoint == other
+
+
+@pytest.mark.asyncio
+async def test_cancel_does_not_hide_a_failure_behind_a_404() -> None:
+    """``not_found`` needs every endpoint to answer 404 (review of #527)."""
+    other = "http://toolbox-b.test"
+    with respx.mock() as router:
+        router.post(CANCEL).mock(
+            return_value=httpx.Response(503, json={"message": "busy"})
+        )
+        router.post(f"{other}/v1/operations/op-1:cancel").mock(
+            return_value=httpx.Response(404, json={"code": "operation_not_found"})
+        )
+        client = ToolboxOperationClient(endpoints=[BASE_URL, other])
+        try:
+            result = await client.cancel("op-1", task_id="task-1")
+        finally:
+            await client.close()
+
+    assert result.state == "failed"
+    assert result.error and BASE_URL in result.error
+
+
+@pytest.mark.asyncio
+async def test_cancel_is_failed_when_there_is_no_budget_for_any_endpoint() -> None:
+    other = "http://toolbox-b.test"
+    with respx.mock(assert_all_called=False) as router:
+        route = router.post(CANCEL).mock(
+            return_value=httpx.Response(200, json={"state": "cancel_requested", "cancel_requested": True})
+        )
+        client = ToolboxOperationClient(endpoints=[BASE_URL, other])
+        try:
+            result = await client.cancel("op-1", task_id="task-1", timeout_seconds=0)
+        finally:
+            await client.close()
+
+    assert route.called is False
+    assert result.state == "failed"
+    assert result.error and "budget" in result.error
+
+
+@pytest.mark.asyncio
+async def test_a_capacity_503_is_retried_with_the_same_operation(monkeypatch) -> None:
+    """A rejection before execution must not become an idempotent terminal.
+
+    The Toolbox releases an operation id it refused for lack of a slot, so the
+    retry with the same id is admitted once capacity is available (ADR-0019).
+    """
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr("acessilia_sdk.toolbox.client._sleep", no_sleep)
+    operations: list[tuple[str, str]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        operations.append(
+            (request.headers[OPERATION_ID_HEADER], request.headers[ATTEMPT_ID_HEADER])
+        )
+        if len(operations) == 1:
+            return httpx.Response(503, json={"message": "execution capacity exhausted"})
+        return httpx.Response(200, json=SUCCEEDED)
+
+    with respx.mock() as router:
+        router.post(EXECUTE).mock(side_effect=answer)
+        client = _OcrClient(base_url=BASE_URL, retries=1)
+        try:
+            with operation_context("task-1", "op-1"):
+                await client._execute(
+                    "document.ocr", provider="docling-ocr", upload=("x.txt", b"x", "text/plain")
+                )
+        finally:
+            await client.close()
+
+    assert len(operations) == 2
+    assert operations[0][0] == operations[1][0] == "op-1"
+    assert operations[0][1] != operations[1][1]
+
+
+@pytest.mark.asyncio
 async def test_cancel_returns_failures_instead_of_raising() -> None:
     with respx.mock() as router:
         router.post(CANCEL).mock(return_value=httpx.Response(500, json={"message": "boom"}))

@@ -31,10 +31,12 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   `operation_context` e `operation_attempt` anexam `task_id`, um
   `operation_id` estável e um `attempt_id` novo aos cabeçalhos de capacidade e
   artefato da Toolbox, sem ler configuração. `ToolboxOperationClient.cancel`
-  pede aos endpoints configurados que parem uma operação com timeout curto e
-  devolve `OperationCancelResult` (`cancel_requested`, `cancelled`, `finished`,
-  `failed` ou `not_found`) em vez de levantar; um cancelamento que falha fica
-  para o chamador registrar (#409).
+  pede a todos os endpoints configurados que parem uma operação, com um único
+  timeout curto, e devolve `OperationCancelResult` (`cancel_requested`,
+  `cancelled`, `finished`, `failed` ou `not_found`) em vez de levantar;
+  `not_found` só quando todos os endpoints responderam 404, e um endpoint
+  inconclusivo torna o resultado `failed`. Um cancelamento que falha fica para
+  o chamador registrar (#409).
 - **Adicionado** `convert_formula` e `verbalize_formula` em
   `acessilia_sdk.operations.formula`, um passo por capacidade (`math.convert`,
   nas duas direções, e `math.verbalize`), cada um devolvendo um `FormulaText`
