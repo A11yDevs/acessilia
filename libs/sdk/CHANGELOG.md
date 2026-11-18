@@ -7,6 +7,14 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** the page judge, the SDK's second operation (ADR-0017, #470 phase 4):
+  `acessilia_sdk.operations.page_judge`. `render_judge_page` renders a whole
+  page for the judge (`pdf.render`, 144 dpi, longest side 1600 px);
+  `judge_page` asks `document.adjudicate.page` which of two transcriptions the
+  page holds and reads `pB`, `pB_ab`, `pA_ba` and `model`; `page_judgement`
+  runs both. An answer without a valid `pB` is a judgement whose `p_b` is
+  `None`. Typed errors are raised unchanged.
+
 - **Added** generated dataset REST records and array readers, plus additive typed client methods preserving pagination, nulls, artifact paths and raw sync compatibility (#213).
 
 - **Fixed** typed structure and MinerU layout readers now run docstruct's
