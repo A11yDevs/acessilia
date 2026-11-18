@@ -239,7 +239,7 @@ uv run python scripts/pmv.py execute \
 The module must provide:
 
 ```python
-from core.execution.models import MethodResult
+from acessilia_core.execution.models import MethodResult
 
 
 def describe_image(manifest, obligation_id):
@@ -256,8 +256,10 @@ def register_handlers(registry):
     registry.register("vision-description", describe_image)
 ```
 
-`examples.demo_handlers` lets you exercise the `--live` path, but it is explicitly
-simulated and must not be used in production.
+The registry is bound as in a service run (`bind_run`): a handler that needs
+the run's configuration or ports declares them after `*`, annotated with their
+type (`*, config: CoreConfig`, `*, ports: RunPorts`). A handler that breaks
+this contract stops `execute` before the plan runs (#543).
 
 On failure:
 

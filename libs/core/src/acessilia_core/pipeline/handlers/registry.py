@@ -13,8 +13,11 @@ method-handler pair.
 
 from __future__ import annotations
 
+import ast
 import inspect
-from collections.abc import Callable
+import sys
+import typing
+from collections.abc import Callable, Mapping
 from functools import partial
 
 from acessilia_core.config import CoreConfig
@@ -119,16 +122,77 @@ class HandlerContractError(TypeError):
     """A method handler whose signature the executor or a run cannot call."""
 
 
-def _annotated(annotation: object, expected: type) -> bool:
-    """Whether ``annotation`` names ``expected``.
+#: An annotation that cannot be resolved to an object.
+_UNRESOLVED = object()
 
-    Handler modules use ``from __future__ import annotations`` and may import
-    ``RunPorts`` only for type checking, so a string annotation is compared by
-    its last dotted name instead of being evaluated.
+
+def _namespace(handler: Callable[..., object]) -> Mapping[str, object]:
+    """The globals a handler's string annotations are resolved in."""
+    target = handler.func if isinstance(handler, partial) else handler
+    found = getattr(target, "__globals__", None)
+    if found is None:
+        module = sys.modules.get(getattr(target, "__module__", "") or "")
+        found = vars(module) if module is not None else {}
+    return found
+
+
+def _unwrap(annotation: object) -> object:
+    """``Annotated[X, ...]`` is ``X``."""
+    if typing.get_origin(annotation) is typing.Annotated:
+        return typing.get_args(annotation)[0]
+    return annotation
+
+
+def _resolve(annotation: object, namespace: Mapping[str, object]) -> object:
+    """The object ``annotation`` names, or ``_UNRESOLVED`` (review of #581).
+
+    Handler modules use ``from __future__ import annotations``, so their
+    annotations are strings. They are resolved in the handler's module,
+    without evaluating code: names, dotted attributes, quoted strings
+    (``"CoreConfig"``) and ``Annotated[X, ...]``. The resolved object is then
+    compared by identity, so a homonym from another module never matches.
     """
-    if annotation is expected:
-        return True
-    return isinstance(annotation, str) and annotation.rsplit(".", 1)[-1] == expected.__name__
+    if not isinstance(annotation, str):
+        return _unwrap(annotation)
+    try:
+        node = ast.parse(annotation.strip(), mode="eval").body
+    except SyntaxError:
+        return _UNRESOLVED
+    return _resolve_node(node, namespace)
+
+
+def _resolve_node(node: ast.expr, namespace: Mapping[str, object]) -> object:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return _resolve(node.value, namespace)
+    if isinstance(node, ast.Name):
+        return _unwrap(namespace[node.id]) if node.id in namespace else _UNRESOLVED
+    if isinstance(node, ast.Attribute):
+        base = _resolve_node(node.value, namespace)
+        if base is _UNRESOLVED:
+            return _UNRESOLVED
+        return _unwrap(getattr(base, node.attr, _UNRESOLVED))
+    if isinstance(node, ast.Subscript) and _resolve_node(node.value, namespace) is typing.Annotated:
+        first = node.slice.elts[0] if isinstance(node.slice, ast.Tuple) else node.slice
+        return _resolve_node(first, namespace)
+    return _UNRESOLVED
+
+
+def _names_a_run_type(annotation: object, resolved: object) -> str | None:
+    """The run parameter whose type ``annotation`` names, if any.
+
+    An annotation that cannot be resolved still counts when it spells a run
+    type's name, so a misspelled parameter is not let through for want of an
+    import.
+    """
+    for name, kind in RUN_PARAMETERS.items():
+        if resolved is kind:
+            return name
+    if resolved is _UNRESOLVED and isinstance(annotation, str):
+        spelled = annotation.strip().strip("\"'").rsplit(".", 1)[-1]
+        for name, kind in RUN_PARAMETERS.items():
+            if spelled == kind.__name__:
+                return name
+    return None
 
 
 def _handler_name(handler: Callable[..., object]) -> str:
@@ -150,13 +214,19 @@ def run_parameters(handler: Callable[..., MethodResult]) -> tuple[str, ...]:
       misspelled name (``cfg: CoreConfig``) would never be bound;
     - no other keyword-only parameter is required, since nothing would pass it.
 
-    Raises ``HandlerContractError`` naming every broken rule. A callable
-    whose signature cannot be read declares nothing, as before.
+    An annotation is resolved in the handler's module and compared by
+    identity (``_resolve``).
+
+    Raises ``HandlerContractError`` naming every broken rule, and when the
+    handler's signature cannot be read, since then nothing can be checked.
     """
     try:
         parameters = list(inspect.signature(handler).parameters.values())
-    except (TypeError, ValueError):
-        return ()
+    except (TypeError, ValueError) as exc:
+        raise HandlerContractError(
+            f"method handler {_handler_name(handler)}: its signature cannot be read ({exc})"
+        ) from exc
+    namespace = _namespace(handler)
     positional = [
         p for p in parameters
         if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
@@ -177,19 +247,21 @@ def run_parameters(handler: Callable[..., MethodResult]) -> tuple[str, ...]:
         if expected is not None:
             if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
                 problems.append(f"`{parameter.name}` must be keyword-only (after `*`)")
-            elif not _annotated(parameter.annotation, expected):
-                problems.append(f"`{parameter.name}` must be annotated `{expected.__name__}`")
+            elif _resolve(parameter.annotation, namespace) is not expected:
+                problems.append(
+                    f"`{parameter.name}` must be annotated `{expected.__name__}` "
+                    f"(`{expected.__module__}.{expected.__qualname__}`)"
+                )
             else:
                 declared.append(parameter.name)
             continue
-        misnamed = [
-            name for name, kind in RUN_PARAMETERS.items()
-            if _annotated(parameter.annotation, kind)
-        ]
+        misnamed = _names_a_run_type(
+            parameter.annotation, _resolve(parameter.annotation, namespace)
+        )
         if misnamed:
             problems.append(
-                f"`{parameter.name}` is annotated `{RUN_PARAMETERS[misnamed[0]].__name__}`, "
-                f"but a run binds it only as `{misnamed[0]}`"
+                f"`{parameter.name}` is annotated `{RUN_PARAMETERS[misnamed].__name__}`, "
+                f"but a run binds it only as `{misnamed}`"
             )
         elif (
             parameter.kind is inspect.Parameter.KEYWORD_ONLY

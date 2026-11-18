@@ -9,8 +9,13 @@ rejects what it is meant to.
 
 from __future__ import annotations
 
+import argparse
+import sys
 from functools import partial
+from types import ModuleType, SimpleNamespace
+from typing import Annotated
 
+import acessilia_core.config
 import pytest
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.executor import MethodRegistry
@@ -54,22 +59,28 @@ def test_a_broken_registered_handler_fails_when_the_registry_is_built(monkeypatc
         build_method_registry()
 
 
-def test_bind_run_checks_every_handler_before_binding_any() -> None:
-    calls = []
-
+def test_bind_run_checks_every_handler_before_binding_any(monkeypatch) -> None:
     def fine(manifest, obligation_id, *, config: CoreConfig):
-        calls.append(config)
+        return config
 
     def broken(manifest, obligation_id, *, config):
-        calls.append(config)
+        return config
 
     registry = MethodRegistry()
     registry.register("fine", fine)
     registry.register("broken", broken)
+    bound = []
+
+    class Recording(MethodRegistry):
+        def register(self, method, handler):
+            bound.append(method)
+            super().register(method, handler)
+
+    monkeypatch.setattr(handler_registry, "MethodRegistry", Recording)
 
     with pytest.raises(HandlerContractError, match=r"broken: `config` must be annotated `CoreConfig`"):
         bind_run(registry, core_config(), RunPorts.none())
-    assert calls == [], "no handler runs"
+    assert bound == [], "the first handler, which keeps the contract, is not bound either"
 
 
 def test_the_contract_error_is_a_type_error() -> None:
@@ -84,7 +95,15 @@ def _with_both(manifest, obligation_id, *, config: CoreConfig, ports: RunPorts):
     return config, ports
 
 
-def _dotted(manifest, obligation_id, *, config: acessilia_core.config.CoreConfig):  # noqa: F821
+def _dotted(manifest, obligation_id, *, config: acessilia_core.config.CoreConfig):
+    return config
+
+
+def _quoted(manifest, obligation_id, *, config: "CoreConfig", ports: "RunPorts"):  # noqa: UP037 - the quotes are the case
+    return config
+
+
+def _annotated(manifest, obligation_id, *, config: Annotated[CoreConfig, "the run's"]):
     return config
 
 
@@ -101,8 +120,10 @@ def _anything(*args, **kwargs):
     [
         (_plain, ()),
         (_with_both, ("config", "ports")),
-        # A string annotation is compared by its last dotted name.
+        # Annotations are resolved in the handler's module (review of #581).
         (_dotted, ("config",)),
+        (_quoted, ("config", "ports")),
+        (_annotated, ("config",)),
         # An optional keyword-only parameter is allowed; nothing binds it.
         (_optional_extra, ("config",)),
         (_anything, ()),
@@ -110,7 +131,10 @@ def _anything(*args, **kwargs):
         (partial(_with_both, config="first", ports="first"), ("config", "ports")),
         (lambda manifest, obligation_id: None, ()),
     ],
-    ids=["plain", "both", "dotted", "optional-extra", "var-args", "partial", "lambda"],
+    ids=[
+        "plain", "both", "dotted", "quoted", "annotated", "optional-extra", "var-args",
+        "partial", "lambda",
+    ],
 )
 def test_the_contract_accepts(handler, declared) -> None:
     assert run_parameters(handler) == declared
@@ -129,6 +153,26 @@ def _wrong_type(manifest, obligation_id, *, ports: CoreConfig):
 
 
 def _misspelled(manifest, obligation_id, *, cfg: CoreConfig):
+    return None
+
+
+#: A class with the run type's name, from somewhere else.
+elsewhere = SimpleNamespace(CoreConfig=type("CoreConfig", (), {}))
+
+
+def _homonym(manifest, obligation_id, *, config: elsewhere.CoreConfig):
+    return None
+
+
+def _unresolvable(manifest, obligation_id, *, config: Missing):  # noqa: F821
+    return None
+
+
+def _misspelled_quoted(manifest, obligation_id, *, cfg: "CoreConfig" = None):  # noqa: UP037 - the quotes are the case
+    return None
+
+
+def _misspelled_unresolvable(manifest, obligation_id, *, cfg: nowhere.CoreConfig = None):  # noqa: F821
     return None
 
 
@@ -151,11 +195,18 @@ def _three_positionals(manifest, obligation_id, extra):
         (_unannotated, "`config` must be annotated `CoreConfig`"),
         (_wrong_type, "`ports` must be annotated `RunPorts`"),
         (_misspelled, "`cfg` is annotated `CoreConfig`, but a run binds it only as `config`"),
+        (_homonym, "`config` must be annotated `CoreConfig` (`acessilia_core.config.CoreConfig`)"),
+        (_unresolvable, "`config` must be annotated `CoreConfig`"),
+        (_misspelled_quoted, "`cfg` is annotated `CoreConfig`, but a run binds it only as `config`"),
+        (_misspelled_unresolvable, "`cfg` is annotated `CoreConfig`"),
         (_required_unknown, "`budget` is a required keyword-only parameter that no run binds"),
         (_one_positional, "must accept (manifest, obligation_id) positionally"),
         (_three_positionals, "requires 3 positional parameters (manifest, obligation_id, extra)"),
     ],
-    ids=["positional", "unannotated", "wrong-type", "misspelled", "required-unknown", "one", "three"],
+    ids=[
+        "positional", "unannotated", "wrong-type", "misspelled", "homonym", "unresolvable",
+        "misspelled-quoted", "misspelled-unresolvable", "required-unknown", "one", "three",
+    ],
 )
 def test_the_contract_rejects(handler, message) -> None:
     with pytest.raises(HandlerContractError) as raised:
@@ -175,3 +226,72 @@ def test_every_broken_rule_is_reported_at_once() -> None:
     message = str(raised.value)
     for part in ("must accept", "`config` must be annotated", "`cfg` is annotated `RunPorts`"):
         assert part in message
+
+
+class _Unreadable:
+    """A callable whose signature ``inspect`` cannot read."""
+
+    __signature__ = "not a signature"
+
+    def __call__(self, manifest, obligation_id):
+        return None
+
+
+def test_a_handler_whose_signature_cannot_be_read_is_refused() -> None:
+    registry = MethodRegistry()
+    registry.register("unreadable", _Unreadable())
+
+    with pytest.raises(HandlerContractError, match="its signature cannot be read"):
+        bind_run(registry, core_config(), RunPorts.none())
+
+
+def _pmv_execute(monkeypatch, tmp_path, handlers: dict) -> MethodRegistry:
+    """Run ``pmv execute`` with a handler module, up to the executor."""
+    from scripts import pmv
+
+    module = ModuleType("pmv_contract_handlers")
+    module.register_handlers = lambda registry: [
+        registry.register(method, handler) for method, handler in handlers.items()
+    ]
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    for name in ("ProcessingManifest", "NominalPlan"):
+        monkeypatch.setattr(pmv, name, SimpleNamespace(model_validate_json=lambda _text: None))
+    received = []
+
+    class Stop(Exception):
+        pass
+
+    def executor(registry, **_kwargs):
+        received.append(registry)
+        raise Stop
+
+    monkeypatch.setattr(pmv, "ExecutorAgent", executor)
+    monkeypatch.setattr(pmv, "DomainBundle", SimpleNamespace(load=lambda *_args: None))
+    (tmp_path / "m.json").write_text("{}", encoding="utf-8")
+    args = argparse.Namespace(
+        manifest=tmp_path / "m.json",
+        plan=tmp_path / "m.json",
+        handler_module=module.__name__,
+        domain=None,
+        domain_description=None,
+    )
+    with pytest.raises(Stop):
+        pmv._run_execute(args)
+    return received[0]
+
+
+def test_pmv_binds_its_handler_module_like_a_run(monkeypatch, tmp_path) -> None:
+    def with_config(manifest, obligation_id, *, config: CoreConfig):
+        return config
+
+    registry = _pmv_execute(monkeypatch, tmp_path, {"vision-description": with_config})
+
+    assert isinstance(registry.get("vision-description")(None, "o"), CoreConfig)
+
+
+def test_pmv_refuses_a_handler_module_that_breaks_the_contract(monkeypatch, tmp_path) -> None:
+    def broken(manifest, obligation_id, *, budget: int):
+        return None
+
+    with pytest.raises(HandlerContractError, match="`budget` is a required keyword-only"):
+        _pmv_execute(monkeypatch, tmp_path, {"vision-description": broken})

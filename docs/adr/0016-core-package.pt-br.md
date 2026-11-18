@@ -283,7 +283,7 @@ A opção 2.
      de inspeção de região e de página, os de fórmula, `mathml` e
      `latex-verbalizer`, e o do juiz VLM), e cada execução vincula a sua config
      a eles (`bind_run`) numa cópia do registro. O parâmetro é um contrato
-     conferido (#543): só por nome (depois do `*`) e anotado,
+     conferido (#543): só por palavra-chave (depois do `*`) e anotado,
      `*, config: CoreConfig` ou `*, ports: RunPorts`. Um handler que o quebra
      (um parâmetro com nome errado ou sem anotação, ou um que nenhuma execução
      vincula) falha quando o registro é montado ou vinculado, antes de
