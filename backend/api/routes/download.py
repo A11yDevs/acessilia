@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from acessilia_core.export.catalog import DOWNLOAD_MEDIA_TYPES as MEDIA_TYPES
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     API_FILE_NOT_FOUND,
@@ -16,18 +17,6 @@ from backend.api.schemas import DownloadFormat, DownloadInfo
 from backend.services.download_token_service import obter_info_token
 
 router = APIRouter(prefix="/download", tags=["download"])
-
-MEDIA_TYPES = {
-    "txt": "text/plain; charset=utf-8",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    # Only PDF/UA is produced now; "pdf" serves links issued before that,
-    # which stay valid for TOKEN_EXPIRY_DAYS.
-    "pdf": "application/pdf",
-    "pdf_ua": "application/pdf",
-    "html": "text/html; charset=utf-8",
-    "mp3": "audio/mpeg",
-    "zip": "application/zip",
-}
 
 
 @router.get("/{token}", response_model=DownloadInfo)

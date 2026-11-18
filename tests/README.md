@@ -148,3 +148,15 @@ ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 - [Architecture](../docs/architecture.md)
 - [PDDL + Agno pipeline](../docs/pmv_agno_pddl.md)
 - [Internationalization (i18n)](../docs/i18n.md) — see the internationalization test suite in [test_i18n.py](test_i18n.py)
+
+## Format catalogue compatibility
+
+`test_export_catalog.py` freezes the E1.9 download identities, wire labels, MIME
+types, filenames, distinct delivery roles, SDK references and worker plan.
+`test_download_token_service.py` checks existing files, including legacy PDF,
+in both locales. `test_web_panel.py` excludes internal and experimental entries
+from the offered formats. Worker regressions cover mandatory TXT/HTML/ZIP
+failures, optional benchmark/remote/audio failures, flags, completed format
+order and archive entry order. `libs/docstruct/tests/test_format_spec.py` runs
+against the standalone wheel too. Existing E1.0 goldens remain unchanged. See
+[ADR 0025](../docs/adr/0025-format-catalogue-ownership.md).

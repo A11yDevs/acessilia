@@ -7,6 +7,11 @@ import threading
 import shutil
 from pathlib import Path
 
+from acessilia_core.export.catalog import (
+    DOWNLOAD_LABELS as FORMAT_EXTENSIONS,
+    DOWNLOAD_SUFFIXES as FORMAT_OUTPUT_SUFFIX,
+    downloadable_formats,
+)
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_DOWNLOAD_TOKEN_CREATED,
@@ -22,23 +27,6 @@ _connection = None
 _connection_lock = threading.Lock()
 
 TOKEN_EXPIRY_DAYS = 7
-
-FORMAT_EXTENSIONS = {
-    "txt": "texto",
-    "docx": "word",
-    # Only PDF/UA is produced now; "pdf" lists the files of jobs made before
-    # that, whose links stay valid for TOKEN_EXPIRY_DAYS.
-    "pdf": "pdf",
-    "pdf_ua": "pdf/ua",
-    "html": "html",
-    "mp3": "audio",
-    "zip": "completo",
-}
-
-FORMAT_OUTPUT_SUFFIX = {
-    "pdf_ua": "pdf_ua.pdf",
-    "zip": "_acessivel.zip",
-}
 
 
 def _get_connection():
@@ -134,12 +122,11 @@ def obter_info_token(token: str) -> dict | None:
     allowed_formats = set(formats_list) if isinstance(formats_list, list) else set()
     base = str(row["filename"])
     formats = []
-    for ext, label in FORMAT_EXTENSIONS.items():
+    for delivery in downloadable_formats():
+        ext, label = delivery.spec.id, delivery.api_label
         if allowed_formats and ext not in allowed_formats:
             continue
-        suffix = FORMAT_OUTPUT_SUFFIX.get(ext, ext)
-        separator = "" if suffix.startswith("_") else "."
-        file_path = output_dir / f"{base}{separator}{suffix}"
+        file_path = output_dir / delivery.output_filename(base)
         if file_path.exists():
             size_bytes = file_path.stat().st_size
             # Choose the unit before rounding: 1 MB minus one byte remains
