@@ -10,13 +10,13 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from backend.core.export.renderers.html_renderer import _render_block as render_html_block
-from backend.core.export.renderers.txt_renderer import _render_block as render_txt_block
-from backend.core.pipeline.validators import validate_canonical_document
-from backend.core.formula_tools import label_spoken_formula, normalize_latex
-from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+from acessilia_core.export.renderers.html_renderer import _render_block as render_html_block
+from acessilia_core.export.renderers.txt_renderer import _render_block as render_txt_block
+from acessilia_core.pipeline.validators import validate_canonical_document
+from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
-from backend.core.pipeline.handlers import formula as formula_handlers
+from acessilia_core.pipeline.handlers import formula as formula_handlers
 from tests.core_config_support import core_config, toolbox_config
 
 FAKE_MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>E</mi></math>'
@@ -34,7 +34,7 @@ def _unavailable(capability):
 @pytest.fixture
 def toolbox_math(monkeypatch):
     """Simula math.convert e math.verbalize no builder canônico e no PDDL."""
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     calls = {"convert": [], "verbalize": []}
 
@@ -68,7 +68,7 @@ def test_label_spoken_formula():
 
 
 def test_core_has_no_local_converter_or_verbalizer():
-    from backend.core import formula_tools
+    from acessilia_core import formula_tools
 
     assert not hasattr(formula_tools, "latex_to_mathml")
     assert not hasattr(formula_tools, "verbalize_latex_fallback")
@@ -80,7 +80,7 @@ def test_core_has_no_local_converter_or_verbalizer():
 def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
     from copy import deepcopy
 
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     def unexpected(*args):
         pytest.fail("Non-math blocks must not invoke formula helpers")
@@ -96,7 +96,7 @@ def test_enrichment_skips_non_math_without_changing_document(monkeypatch):
 
 
 def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     calls = []
 
@@ -113,7 +113,7 @@ def test_enrichment_reaches_nested_math_and_preserves_alt_text(monkeypatch):
 
 
 def test_canonical_document_enriches_math_blocks(toolbox_math):
-    from backend.core.pipeline.canonical_builder import build_canonical_document
+    from acessilia_core.pipeline.canonical_builder import build_canonical_document
 
     document = build_canonical_document(
         "# Física\n\nConsidere:\n\n$E=mc^2$\n", title="Física",
@@ -138,7 +138,7 @@ def test_canonical_document_enriches_math_blocks(toolbox_math):
 
 def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
     """LaTeX que a Toolbox rejeita fica sem MathML; o documento conta as fórmulas."""
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     monkeypatch.setattr(canonical_builder, "toolbox_convert_latex", lambda latex, **_kw: "")
     document = canonical_builder.build_canonical_document("$x=1$\n\n$y=2$", toolbox=toolbox_config())
@@ -155,7 +155,7 @@ def test_rejected_formula_keeps_latex_and_is_counted(monkeypatch, toolbox_math):
 
 def test_unavailable_capabilities_are_reported_once(monkeypatch):
     """Sem fallback local: a fórmula fica com o LaTeX e o documento avisa."""
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     convert = _unavailable("math.convert")
     verbalize = _unavailable("math.verbalize")
@@ -198,7 +198,7 @@ def test_an_answer_outside_the_contract_turns_the_capability_off_for_the_documen
     Declared in #470 phase 3 (PR 3): on develop, ``mathml: null`` left only that
     formula without MathML and the next one was converted.
     """
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
     verbalize = _broken_then_good(respx_mock, "verbalize", "verbalized", "x igual a 1")
@@ -221,7 +221,7 @@ def test_an_answer_outside_the_contract_turns_the_capability_off_for_the_documen
 
 
 def test_an_answer_outside_the_contract_fails_the_mathml_handler(respx_mock):
-    from backend.core.pipeline.handlers.formula import _handle_mathml_method
+    from acessilia_core.pipeline.handlers.formula import _handle_mathml_method
 
     convert = _broken_then_good(respx_mock, "convert", "mathml", FAKE_MATHML)
     manifest = _manifest_with_formulas("x=1", "y=2")
@@ -281,7 +281,7 @@ def test_txt_renderer_falls_back_to_latex():
 
 
 def _manifest_with_formula():
-    from backend.core.manifest.models import (
+    from acessilia_core.manifest.models import (
         ExtractorRun,
         ManifestElement,
         ManifestSummary,
@@ -345,7 +345,7 @@ def _manifest_with_formula():
 
 
 def test_pddl_mathml_handler_enriches_formula_element(toolbox_math):
-    from backend.core.pipeline.handlers.formula import _handle_mathml_method
+    from acessilia_core.pipeline.handlers.formula import _handle_mathml_method
 
     manifest = _manifest_with_formula()
     result = _handle_mathml_method(manifest, "o-f", config=core_config())
@@ -356,7 +356,7 @@ def test_pddl_mathml_handler_enriches_formula_element(toolbox_math):
 
 
 def test_pddl_latex_verbalizer_handler(toolbox_math):
-    from backend.core.pipeline.handlers.formula import _handle_latex_verbalizer_method
+    from acessilia_core.pipeline.handlers.formula import _handle_latex_verbalizer_method
 
     manifest = _manifest_with_formula()
     result = _handle_latex_verbalizer_method(manifest, "o-f", config=core_config())
@@ -395,7 +395,7 @@ def test_pddl_mathml_handler_rejected_formula_is_partial(monkeypatch, toolbox_ma
 
 
 def test_pddl_handlers_fail_for_unknown_obligation():
-    from backend.core.pipeline.handlers.formula import _handle_mathml_method
+    from acessilia_core.pipeline.handlers.formula import _handle_mathml_method
 
     manifest = _manifest_with_formula()
     result = _handle_mathml_method(manifest, "o-inexistente", config=core_config())
@@ -464,7 +464,7 @@ IT = "\u2062"
 
 
 def _manifest_with_formulas(*texts):
-    from backend.core.manifest.models import ManifestElement
+    from acessilia_core.manifest.models import ManifestElement
 
     manifest = _manifest_with_formula()
     manifest.elements = [
@@ -506,7 +506,7 @@ def test_pddl_handlers_send_a_variable_product_as_a_product(toolbox_math, handle
 
 
 def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math):
-    from backend.core.pipeline.canonical_builder import build_canonical_document
+    from acessilia_core.pipeline.canonical_builder import build_canonical_document
 
     payload = {
         "pages": [
@@ -535,8 +535,8 @@ def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math)
 ])
 def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, handler, capability):
     from copy import deepcopy
-    from backend.core.manifest.models import ManifestElement
-    from backend.core.pipeline.elements import _element_to_block, _text_kept_by_picture
+    from acessilia_core.manifest.models import ManifestElement
+    from acessilia_core.pipeline.elements import _element_to_block, _text_kept_by_picture
     from docstruct.canonical import _math_sources
     from docstruct.text.implicit_products import implicit_product_variables
 

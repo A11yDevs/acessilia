@@ -2,16 +2,16 @@ import asyncio
 import time
 from pathlib import Path
 
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_CLEANUP_OUTPUT_FAILED,
     LOG_CLEANUP_PERIODIC_ERROR,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.agents.state_manager import state_manager
 from backend.config.settings import settings
 from backend.services.queue_service import unified_queue
-from backend.core.blocking import run_blocking
+from acessilia_core.blocking import run_blocking
 from backend.services.download_token_service import (
     TOKEN_EXPIRY_DAYS,
     limpar_tokens_expirados,

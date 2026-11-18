@@ -11,6 +11,7 @@ name = "acessilia"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "acessilia-core" },
     { name = "acessilia-docstruct" },
     { name = "acessilia-sdk" },
     { name = "agno" },
@@ -47,6 +48,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "acessilia-core", editable = "libs/core" },
     { name = "acessilia-docstruct", editable = "libs/docstruct" },
     { name = "acessilia-sdk", editable = "libs/sdk" },
     { name = "agno", specifier = "==3.0.5" },
@@ -77,6 +79,39 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.30,<0.31" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "acessilia-core"
+version = "0.1.0"
+source = { editable = "libs/core" }
+dependencies = [
+    { name = "acessilia-docstruct" },
+    { name = "acessilia-sdk" },
+    { name = "agno" },
+    { name = "babel" },
+    { name = "edge-tts" },
+    { name = "jsonschema" },
+    { name = "loguru" },
+    { name = "ollama" },
+    { name = "openai" },
+    { name = "pydantic" },
+    { name = "rapidfuzz" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "acessilia-docstruct", editable = "libs/docstruct" },
+    { name = "acessilia-sdk", editable = "libs/sdk" },
+    { name = "agno", specifier = "==3.0.5" },
+    { name = "babel", specifier = ">=2.18.0,<3" },
+    { name = "edge-tts", specifier = ">=7.3.1,<8" },
+    { name = "jsonschema", specifier = ">=4.20,<5" },
+    { name = "loguru", specifier = ">=0.7.3,<0.8" },
+    { name = "ollama", specifier = ">=0.6.2,<0.7" },
+    { name = "openai", specifier = ">=2.45.0,<3" },
+    { name = "pydantic", specifier = ">=2.10,<3" },
+    { name = "rapidfuzz", specifier = ">=3.9,<4" },
+]
 
 [[package]]
 name = "acessilia-docstruct"

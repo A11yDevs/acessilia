@@ -8,9 +8,9 @@ so only identity passes.
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 from dataclasses import replace
 from pathlib import Path
@@ -18,11 +18,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.pipeline.enrichment import formulas as formula_stage
-from backend.core.pipeline.enrichment import pictures as picture_stage
-from backend.core.pipeline.enrichment import tables as table_stage
-from backend.core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from tests.core_config_support import (
     core_config,
     document_config,
@@ -134,8 +134,8 @@ def test_the_inspection_helpers_build_their_agent_with_the_run_models(
 async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
     monkeypatch, tmp_path
 ) -> None:
-    from backend.core.pipeline import orchestrator as pddl
-    from backend.core.pipeline import preflight
+    from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import preflight
     from tests.pddl_support import build_orchestrator
 
     seen: dict[str, object] = {}
@@ -170,7 +170,7 @@ class Built(Exception):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("agent", ["vision", "data"])
 async def test_each_agent_builds_its_model_from_its_configs(monkeypatch, agent) -> None:
-    from backend.core.agents import data_agent, vision_agent
+    from acessilia_core.agents import data_agent, vision_agent
 
     seen: list = []
 

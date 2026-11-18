@@ -3,9 +3,9 @@
 from io import BytesIO
 
 import pytest
+from acessilia_core.toolbox.vision_payload import downscale_image
 from PIL import Image
 
-from backend.core.toolbox.vision_payload import downscale_image
 from tests.core_config_support import toolbox_config
 
 
@@ -34,9 +34,8 @@ async def test_invalid_or_unshrinkable_images_do_not_call_the_toolbox(fake_toolb
 
 @pytest.mark.asyncio
 async def test_a_toolbox_failure_returns_none_and_closes_the_client(monkeypatch):
+    from acessilia_core.toolbox import vision_payload
     from acessilia_sdk.toolbox import ToolboxProviderUnavailable
-
-    from backend.core.toolbox import vision_payload
 
     closed = []
 
@@ -57,7 +56,7 @@ async def test_a_toolbox_failure_returns_none_and_closes_the_client(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_a_client_that_cannot_be_built_returns_none(monkeypatch):
-    from backend.core.toolbox import vision_payload
+    from acessilia_core.toolbox import vision_payload
 
     def invalid_configuration(_cls, _toolbox):
         raise ValueError("Toolbox base_url must be an absolute http(s) URL")

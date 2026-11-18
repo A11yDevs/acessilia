@@ -4,11 +4,10 @@ from importlib.resources import files
 from pathlib import Path
 
 import pytest
-from jsonschema import ValidationError, validate
-
-from backend.core.export.pandoc_exporter import export_accessible_document
-from backend.core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.validation import validate_against_schema
+from jsonschema import ValidationError, validate
 
 ROOT = Path(__file__).resolve().parents[1]
 

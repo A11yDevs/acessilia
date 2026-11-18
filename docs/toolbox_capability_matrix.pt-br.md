@@ -39,9 +39,9 @@ sem descartar a capacidade por falta de acionamento atual.
 | Registro do provider | entrada em `providers-config.yaml` com adapter | `acessilia-toolbox` |
 
 Para o trabalho guiado por planejamento há dois elos adicionais: a entrada de
-obrigação/método em `DEFAULT_METHOD_COSTS` (`backend/core/manifest/builder.py`),
+obrigação/método em `DEFAULT_METHOD_COSTS` (`libs/core/src/acessilia_core/manifest/builder.py`),
 um handler em
-`METHOD_HANDLERS` (`backend/core/pipeline/handlers/registry.py`) e uma evidência real que faça o
+`METHOD_HANDLERS` (`libs/core/src/acessilia_core/pipeline/handlers/registry.py`) e uma evidência real que faça o
 compilador emitir os fatos necessários em `problem.pddl`.
 
 ## Matriz
@@ -58,10 +58,10 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `math.verbalize` | `acessilia_sdk/toolbox/clients/math.py` | `TOOLBOX_MATH_PROVIDER=math-speech` | `math-speech` | `toolbox_math_tools.py` → builder canônico (texto alternativo das fórmulas) e o handler `latex-verbalizer` do PDDL |
 | `pdf.split` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | sem chamador no core; o motor PDDL lê as páginas por `pdf.render` |
 | `pdf.render` | `acessilia_sdk/toolbox/clients/pdf.py` | `TOOLBOX_PDF_PROVIDER=pymupdf-pdf` | `pymupdf-pdf` | versão 2 (clip, `max_side`, PNG/JPEG, PNG por referência): métodos PDDL `vision-page-inspection`, `pymupdf-region` (recorte de região) e `vlm-pairwise-judge` (página com tamanho limitado), e o enriquecimento de imagens anterior ao plano; sem renderização local no orquestrador |
-| `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `backend/core/toolbox/media_inspect.py` (só na Toolbox; sem fallback local, ADR-0003), pulado quando `TOOLBOX_MEDIA_INSPECT_ENABLED=false` |
-| `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `backend/core/export/pandoc_exporter.py` (só na Toolbox, PDF baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_PDF_UA_ENABLED=false` |
-| `pdf.validate.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_validate.py` | `TOOLBOX_PDF_VALIDATE_PROVIDER=verapdf` | `verapdf` (sidecar `verapdf-validate`) | `backend/core/toolbox/pdf_ua_audit.py`: o worker audita o PDF/UA exportado (PDF/UA-1), resume no e-mail de resultado e empacota o relatório; uma falha não derruba o job; pulado quando `TOOLBOX_PDF_VALIDATE_ENABLED=false`. Todo deploy precisa rodar o `verapdf-validate`: sem ele, todo e-mail de resultado traz "Auditoria indisponível" |
-| `document.export.docx` | `acessilia_sdk/toolbox/clients/docx.py` | `TOOLBOX_DOCX_PROVIDER=pandoc-docx` | `pandoc-docx` (rota `/render/docx` do sidecar `pdf-ua-render`) | `backend/core/export/pandoc_exporter.py` (só na Toolbox, DOCX baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_DOCX_ENABLED=false` |
+| `media.inspect` | `acessilia_sdk/toolbox/clients/media_inspect.py` | `TOOLBOX_MEDIA_INSPECT_PROVIDER=pure-media-inspect` | `pure-media-inspect` | `libs/core/src/acessilia_core/toolbox/media_inspect.py` (só na Toolbox; sem fallback local, ADR-0003), pulado quando `TOOLBOX_MEDIA_INSPECT_ENABLED=false` |
+| `document.export.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_ua.py` | `TOOLBOX_PDF_UA_PROVIDER=pandoc-pdf-ua` | `pandoc-pdf-ua` (sidecar `pdf-ua-render`) | `libs/core/src/acessilia_core/export/pandoc_exporter.py` (só na Toolbox, PDF baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_PDF_UA_ENABLED=false` |
+| `pdf.validate.pdf_ua` | `acessilia_sdk/toolbox/clients/pdf_validate.py` | `TOOLBOX_PDF_VALIDATE_PROVIDER=verapdf` | `verapdf` (sidecar `verapdf-validate`) | `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py`: o worker audita o PDF/UA exportado (PDF/UA-1), resume no e-mail de resultado e empacota o relatório; uma falha não derruba o job; pulado quando `TOOLBOX_PDF_VALIDATE_ENABLED=false`. Todo deploy precisa rodar o `verapdf-validate`: sem ele, todo e-mail de resultado traz "Auditoria indisponível" |
+| `document.export.docx` | `acessilia_sdk/toolbox/clients/docx.py` | `TOOLBOX_DOCX_PROVIDER=pandoc-docx` | `pandoc-docx` (rota `/render/docx` do sidecar `pdf-ua-render`) | `libs/core/src/acessilia_core/export/pandoc_exporter.py` (só na Toolbox, DOCX baixado e verificado de `/v1/artifacts`; sem fallback local, ADR-0003), pulado quando `TOOLBOX_DOCX_ENABLED=false` |
 | `artifact.store` / `artifact.retrieve` | `acessilia_sdk/toolbox/clients/artifact.py` (REST `/v1/artifacts`) | — | `minio`, `filesystem` | upload antes da extração |
 | `dataset.*` (8 capacidades) | `acessilia_sdk/toolbox/clients/dataset.py` (REST `/v1/datasets`) | — | `dataset-github`, `dataset-huggingface` | `scripts/bench/toolbox.py` (harness de benchmark, Dr.DocBench) |
 | `document.ocr.page` | `acessilia_sdk/toolbox/clients/page_ocr.py` | `TOOLBOX_PAGE_OCR_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; nenhum método PDDL a chama ainda |

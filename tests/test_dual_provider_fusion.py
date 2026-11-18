@@ -11,17 +11,17 @@ from pathlib import Path
 from tests.core_config_support import core_config, toolbox_config
 import pytest
 
-from backend.core.pipeline.handlers.registry import bind_run
-from backend.core.ports import RunPorts
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.handlers.common import _missing_obligation
-from backend.core.i18n import reset_request_locale, set_request_locale
-from backend.core.pipeline.handlers.fusion import (
+from acessilia_core.pipeline.handlers.registry import bind_run
+from acessilia_core.ports import RunPorts
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.pipeline.handlers.common import _missing_obligation
+from acessilia_core.i18n import reset_request_locale, set_request_locale
+from acessilia_core.pipeline.handlers.fusion import (
     _handle_dual_provider_fusion_method,
     _handle_single_provider_method,
 )
-from backend.core.execution.executor import ExecutorAgent, MethodRegistry
-from backend.core.manifest.models import (
+from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
+from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -29,7 +29,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from backend.core.planning.planner_agent import PlannerAgent
+from acessilia_core.planning.planner_agent import PlannerAgent
 
 
 def _make_manifest(tmp_path: Path, *, source_path: Path | None = None) -> ProcessingManifest:
@@ -110,7 +110,7 @@ def test_fusion_handler_extracts_with_the_run_toolbox(tmp_path, monkeypatch, wit
         seen.append(toolbox)
         return _dual_payload()
 
-    monkeypatch.setattr("backend.core.pipeline.fusion.extract_fused", _fake_extract_fused)
+    monkeypatch.setattr("acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused)
 
     assert _handle_dual_provider_fusion_method(manifest, "o-fuse", config=run).success
     assert seen == [run.toolbox] and seen[0] is run.toolbox
@@ -124,7 +124,7 @@ def test_the_fusion_payload_is_written_under_the_run_data_dir(tmp_path, monkeypa
     async def _fake_extract_fused(*args, **kwargs):
         return _dual_payload()
 
-    monkeypatch.setattr("backend.core.pipeline.fusion.extract_fused", _fake_extract_fused)
+    monkeypatch.setattr("acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused)
 
     result = _handle_dual_provider_fusion_method(
         manifest, "o-fuse", config=core_config(paths={"data_dir": run_dir})
@@ -141,7 +141,7 @@ def test_fusion_handler_returns_artifact_in_method_result(tmp_path, monkeypatch)
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
@@ -167,7 +167,7 @@ def test_fusion_handler_fails_when_payload_not_succeeded(tmp_path, monkeypatch):
         return {"status": "failed", "document": {"elements": []}}
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
@@ -184,7 +184,7 @@ def test_fusion_handler_fails_on_unknown_obligation(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-inexistente", config=core_config())
 
@@ -205,7 +205,7 @@ def test_fusion_handler_fails_when_single_provider(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     token = set_request_locale("en_US")
     try:
@@ -225,7 +225,7 @@ def _forbid_toolbox(monkeypatch):
     def fail(*_args, **_kwargs):
         raise AssertionError("single-provider called the Toolbox")
 
-    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", fail)
+    monkeypatch.setattr("acessilia_core.toolbox.toolbox_client.make_toolbox_client", fail)
 
 
 def _provider(name):
@@ -290,7 +290,7 @@ def test_pddl_replans_from_dual_to_single_provider(tmp_path, monkeypatch):
     obligation.method_costs["single-provider"] = 20
     monkeypatch.setattr("backend.config.settings.settings.data_dir", tmp_path)
     monkeypatch.setattr(
-        "backend.core.pipeline.handlers.fusion._run_extract_fused",
+        "acessilia_core.pipeline.handlers.fusion._run_extract_fused",
         lambda path, **_kwargs: {
             "status": "succeeded",
             "provider": "docling",
@@ -336,7 +336,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
 
     registry = MethodRegistry()
@@ -385,7 +385,7 @@ def test_dual_fusion_reuses_the_extractor_artifact_of_this_source(
         return {"status": "failed"}
 
     monkeypatch.setattr(
-        "backend.core.pipeline.handlers.fusion._run_extract_fused", fake_run
+        "acessilia_core.pipeline.handlers.fusion._run_extract_fused", fake_run
     )
 
     _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())

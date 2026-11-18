@@ -26,7 +26,7 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxPdfClient,
     ToolboxStructureClient,
 )
-from backend.core.toolbox.toolbox_client import make_toolbox_client
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.toolbox.clients.math import recognized_formulas
 from tests.core_config_support import toolbox_config
 
@@ -392,10 +392,10 @@ class TestStructureClientE2E:
         from xml.etree import ElementTree
 
         from acessilia_sdk.toolbox.clients import ToolboxDocxClient
-        from backend.core.pipeline.payload import _manifest_pages_to_payload
-        from backend.core.manifest.builder import build_processing_manifest
-        from backend.core.manifest.toolbox_extractor import ToolboxExtraction
-        from backend.core.pipeline.canonical_builder import build_canonical_document
+        from acessilia_core.pipeline.payload import _manifest_pages_to_payload
+        from acessilia_core.manifest.builder import build_processing_manifest
+        from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
+        from acessilia_core.pipeline.canonical_builder import build_canonical_document
         from docstruct.export.html import document_to_html
         from docstruct.export.pandoc_ast import build_pandoc_ast
         from docstruct.export.txt import document_to_txt_lines

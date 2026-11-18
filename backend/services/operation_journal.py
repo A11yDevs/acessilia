@@ -23,8 +23,9 @@ from __future__ import annotations
 import sqlite3
 import time
 
+from acessilia_core.logger import logger
+
 from backend.config.settings import settings
-from backend.core.logger import logger
 
 #: A journal row is only useful while its job can still resume. After the
 #: longest cache retention (7 days) it cannot be, so the sweep may drop it.

@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import asyncio
-from backend.core.pipeline.handlers import text as text_handlers
+from acessilia_core.pipeline.handlers import text as text_handlers
 from pathlib import Path
 
 import pytest
 
-from backend.core.pipeline.enrichment import inline_math as inline_math_stage
-from backend.core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
+from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from tests.core_config_support import document_config, toolbox_config
 from tests.pddl_support import build_element, build_manifest
 
@@ -94,7 +94,7 @@ def spans(monkeypatch):
         return {1: {"page_number": 1, "width": 612.0, "height": HEIGHT, "rotation": 0,
                     "lines": [{"bbox": [0, 0, 0, 0], "spans": line} for line in [PARAGRAPH, *LINES]]}}
 
-    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
     return calls
 
 
@@ -173,7 +173,7 @@ def test_an_unavailable_capability_is_asked_once(monkeypatch, spans):
         calls.append(args)
         raise ToolboxError("document.text.spans is not in the catalogue")
 
-    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", failing)
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", failing)
     manifest = _manifest()
     reader = inline_math_stage._TextSpanReader(manifest, Path("/tmp/amostra.pdf"), toolbox=toolbox_config())
 
@@ -240,7 +240,7 @@ def test_a_slash_on_a_tables_second_page_is_claimed_there(monkeypatch, spans):
             for page in pages
         }
 
-    monkeypatch.setattr("backend.core.toolbox.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
     manifest = _manifest()
     table, slash = manifest.elements[1], manifest.elements[2]
     table.provenance = _box(173, 695, 453, 715) + _box(173, 254, 453, 311, page=2)

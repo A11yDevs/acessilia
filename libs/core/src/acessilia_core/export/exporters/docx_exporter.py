@@ -1,0 +1,44 @@
+"""DOCX export wrapper around the shared export entry point; the Toolbox renders it."""
+
+from pathlib import Path
+from typing import Any
+
+from acessilia_core.config import ExportConfig, ToolboxConfig
+from acessilia_core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
+from acessilia_core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import LOG_DOCX_EXPORTED
+from acessilia_core.logger import logger
+
+
+def export_docx(
+    text: str | dict[str, Any],
+    output_path: Path,
+    filename: str = "",
+    *,
+    export: ExportConfig,
+    toolbox: ToolboxConfig,
+) -> Path:
+    """Export a canonical document (or raw markdown/text) to a Word .docx file.
+
+    Args:
+        text (str | dict): Raw markdown/text or a canonical document mapping to export.
+        output_path (Path): Destination file path for the rendered .docx output.
+        filename (str): Optional document title/filename hint; when empty the localized default title is used (default "").
+        export (ExportConfig): The run's export configuration, which enables the Toolbox rendering.
+        toolbox (ToolboxConfig): The run's Toolbox configuration, which renders it.
+
+    Returns:
+        Path: The output_path where the .docx file was written.
+    """
+    result = export_accessible_document(
+        text,
+        output_path,
+        format_name="docx",
+        title=filename or t(MSG_DEFAULT_ACCESSIBLE_TITLE),
+        profile_name="docx",
+        export=export,
+        toolbox=toolbox,
+    )
+    logger.debug(t(LOG_DOCX_EXPORTED).format(output_path=output_path))
+    return result

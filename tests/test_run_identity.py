@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.run_identity import (
+from acessilia_core.run_identity import (
     FUSION_REUSE_VERSION,
     NOT_PROCESSING_FIELDS,
     NOT_PROCESSING_PROVIDERS,
@@ -139,7 +139,7 @@ def test_the_fusion_reuse_identity_leaves_out_what_does_not_change_the_payload()
 
 
 def _stored_fusion(tmp_path, config):
-    from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)
@@ -167,7 +167,7 @@ def test_the_reuse_record_keeps_its_provenance(tmp_path) -> None:
 
 
 def test_a_run_with_the_stored_options_reuses_the_fusion(tmp_path) -> None:
-    from backend.core.pipeline.handlers import fusion as fusion_handlers
+    from acessilia_core.pipeline.handlers import fusion as fusion_handlers
 
     config = core_config()
     manifest, payload = _stored_fusion(tmp_path, config)
@@ -181,7 +181,7 @@ def test_a_run_with_the_stored_options_reuses_the_fusion(tmp_path) -> None:
      "fusion.judge_max_pages", "toolbox.providers"],
 )
 def test_a_run_with_other_options_does_not_reuse_the_fusion(tmp_path, name) -> None:
-    from backend.core.pipeline.handlers import fusion as fusion_handlers
+    from acessilia_core.pipeline.handlers import fusion as fusion_handlers
 
     config = core_config()
     manifest, _ = _stored_fusion(tmp_path, config)
@@ -190,8 +190,8 @@ def test_a_run_with_other_options_does_not_reuse_the_fusion(tmp_path, name) -> N
 
 
 def test_a_record_of_another_strategy_version_is_not_reused(tmp_path, monkeypatch) -> None:
-    from backend.core import run_identity
-    from backend.core.pipeline.handlers import fusion as fusion_handlers
+    from acessilia_core import run_identity
+    from acessilia_core.pipeline.handlers import fusion as fusion_handlers
 
     config = core_config()
     manifest, _ = _stored_fusion(tmp_path, config)
@@ -208,7 +208,7 @@ def test_the_extractor_stores_the_run_fusion_identity(tmp_path, monkeypatch) -> 
 
     from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from tests.core_config_support import fusion_config, paths_config, toolbox_config
     from tests.test_toolbox_manifest_extractor import FIXTURE_PDF, SAMPLE_TOOLBOX_RESPONSE
 
@@ -219,7 +219,7 @@ def test_the_extractor_stores_the_run_fusion_identity(tmp_path, monkeypatch) -> 
     secondary.provider = "run-secondary"
     secondary.extract_structure.return_value = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *_a, **_k: secondary,
     )
     fusion = fusion_config(mode="dual", secondary_provider="run-secondary", judge_max_pages=4)

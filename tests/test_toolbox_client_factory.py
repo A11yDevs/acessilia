@@ -11,8 +11,8 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxPdfUaClient,
 )
 from backend.config.settings import settings
-from backend.core.toolbox import toolbox_client
-from backend.core.toolbox.toolbox_client import make_toolbox_client, toolbox_endpoints
+from acessilia_core.toolbox import toolbox_client
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client, toolbox_endpoints
 from tests.core_config_support import toolbox_config
 
 PRIMARY = "http://toolbox-a.test"

@@ -9,15 +9,15 @@ from typing import Any
 import aiofiles
 import aiofiles.os
 
-from backend.core.config import CoreConfig
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.config import CoreConfig
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_CACHE_CLEARED,
     LOG_CACHE_DEBUG_HIT,
     LOG_CACHE_DEBUG_SET,
     LOG_CACHE_SAVE_FAILED,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.services.cache_lock import cache_directory_lock
 
 CACHE_DIR = Path("var/temp/cache")
@@ -73,12 +73,12 @@ def processing_cache_configuration(config: CoreConfig) -> dict[str, Any]:
     """What a processed document depends on: the run's ``config`` (#544) and
     the service's own options, with the manifest rules and the PDDL domain."""
     from backend.config.settings import settings
-    from backend.core.run_identity import processing_identity
+    from acessilia_core.run_identity import processing_identity
 
     configuration: dict[str, Any] = {"core": processing_identity(config)}
     configuration.update({name: getattr(settings, name) for name in SERVICE_PROCESSING_SETTINGS})
     configuration["manifest_invariant_revision"] = MANIFEST_INVARIANT_REVISION
-    from backend.core.planning.domain_bundle import DomainBundle
+    from acessilia_core.planning.domain_bundle import DomainBundle
 
     domain = DomainBundle.load()
     configuration["pddl_domain"] = (domain.domain_sha256, domain.description_sha256)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate Babel locale string catalogs (.po sources and .mo binaries) for every supported runtime locale.
 
-Catalogs are written to ``backend/core/i18n/locales/<LOCALE>/LC_MESSAGES/messages.po`` (human-editable translation source),
-the file :mod:`backend.core.i18n` reads: it compiles each ``.po`` in memory on first use (ADR-0016, step 6). The matching
+Catalogs are written to ``libs/core/src/acessilia_core/i18n/locales/<LOCALE>/LC_MESSAGES/messages.po`` (human-editable translation source),
+the file :mod:`acessilia_core.i18n` reads: it compiles each ``.po`` in memory on first use (ADR-0016, step 6). The matching
 ``messages.mo`` is still written beside it for tools that want a binary catalog; the runtime does not read it. Adding a new
 locale later only requires extending TRANSLATIONS with its mapping and rerunning this script, which matches the
 project i18n goal of requiring zero or minimal code changes per added language.
@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from backend.core.execution.messages import (
+from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
     EXE_DOMAIN_DESCRIPTION_CHANGED,
     EXE_DOMAIN_PDDL_CHANGED,
@@ -45,7 +45,7 @@ from backend.core.execution.messages import (
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
 )
-from backend.core.planning.messages import (
+from acessilia_core.planning.messages import (
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
     MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
@@ -62,7 +62,7 @@ from backend.core.planning.messages import (
     MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
 )
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_FILE_NOT_FOUND,
     API_FORMAT_INVALID,
@@ -256,8 +256,8 @@ from backend.core.i18n.log_messages import (
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
 )
-from backend.core.pipeline.handlers import messages as handler_messages
-from backend.core.manifest.models import (
+from acessilia_core.pipeline.handlers import messages as handler_messages
+from acessilia_core.manifest.models import (
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_DUPLICATE_PAGE_NUMBERS,
@@ -270,7 +270,7 @@ from backend.core.manifest.models import (
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
 )
-from backend.core.pipeline.validators import (
+from acessilia_core.pipeline.validators import (
     MSG_BLOCK_NOT_ALLOWED_IN_PROFILE,
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_DOCUMENT_NO_SECTIONS,
@@ -307,35 +307,35 @@ from backend.core.pipeline.validators import (
     MSG_TECHNICAL_METADATA_IN_TXT,
     MSG_UNKNOWN_EXPORT_PROFILE,
 )
-from backend.core.export.messages import (
+from acessilia_core.export.messages import (
     MSG_AUDIT_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
 )
-from backend.core.pipeline.payload import (
+from acessilia_core.pipeline.payload import (
     MSG_PICTURES_NOT_DESCRIBED,
     MSG_LETTERHEAD_TEXT,
     MSG_TABLES_NOT_READ,
 )
-from backend.core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
-from backend.core.export.markers import (
+from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
+from acessilia_core.export.markers import (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_OBJECT_MARKER_IMAGE,
     MSG_OBJECT_MARKER_TABLE,
 )
-from backend.core.export.renderers.html_renderer import (
+from acessilia_core.export.renderers.html_renderer import (
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_HTML_TABLE_REGION,
 )
-from backend.core.pipeline.table_ast import (
+from acessilia_core.pipeline.table_ast import (
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_FOOTER,
     MSG_TABLE_TEXT_ROW,
 )
-from backend.core.i18n.stage_messages import (
+from acessilia_core.i18n.stage_messages import (
     STAGE_CANCELLATION_REQUESTED,
     STAGE_CANCELLATION_WAITING,
     STAGE_RESTART_CANCELLED,
@@ -383,7 +383,7 @@ from backend.core.i18n.stage_messages import (
     STAGE_FAILED_DURING,
     STAGE_RESTART_INTERRUPTED_DURING,
 )
-from backend.core.toolbox.toolbox_math_tools import (
+from acessilia_core.toolbox.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
     MSG_MATHML_UNAVAILABLE,
     MSG_SPEECH_REJECTED,
@@ -497,7 +497,7 @@ from frontend.telegram.messages import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LOCALES_DIR: Path = PROJECT_ROOT / "backend" / "core" / "i18n" / "locales"
+DEFAULT_LOCALES_DIR: Path = PROJECT_ROOT / "libs" / "core" / "src" / "acessilia_core" / "i18n" / "locales"
 SUPPORTED_LOCALES: tuple[str, ...] = ("en_US", "pt_BR")
 #: Locale whose strings act as canonical English identity lookups.
 DEFAULT_LOCALE: str = "en_US"
@@ -505,7 +505,7 @@ DEFAULT_LOCALE: str = "en_US"
 #: Value stamped into ``POT-Creation-Date``.
 #:
 #: Babel defaults the header to ``datetime.now()``, so regenerating the catalogs
-#: rewrote that one header line and left ``backend/core/i18n/locales`` dirty even when not a
+#: rewrote that one header line and left ``libs/core/src/acessilia_core/i18n/locales`` dirty even when not a
 #: single message had changed. `tests/test_i18n.py` regenerates the checked-in tree
 #: on purpose, which made every test run a source-tree modification and, when the
 #: worktree was not restored, made unrelated tests time-sensitive.
@@ -673,7 +673,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
     MSG_HEADING_GAP,
-    # Nominal-plan executor error and status messages (backend/core/execution/messages.py),
+    # Nominal-plan executor error and status messages (libs/core/src/acessilia_core/execution/messages.py),
     # raised or recorded by ExecutorAgent/MethodRegistry; placeholders substituted at call time.
     EXE_METHOD_NAME_REQUIRED,
     EXE_PLAN_DIFFERENT_DOMAIN,
@@ -716,7 +716,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
     MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
     MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
-    # Execution-model validation/schema strings consumed by backend/core/execution/models.py.
+    # Execution-model validation/schema strings consumed by libs/core/src/acessilia_core/execution/models.py.
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
     MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
@@ -724,8 +724,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,
     # Canonical-document / export-profile / output-text validation findings
-    # (backend/core/pipeline/validators.py), surfaced in audit reports and ValueError
-    # messages raised by backend/core/export/pandoc_exporter.py.
+    # (libs/core/src/acessilia_core/pipeline/validators.py), surfaced in audit reports and ValueError
+    # messages raised by libs/core/src/acessilia_core/export/pandoc_exporter.py.
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_FIELD_MISSING,
     MSG_SECTIONS_NOT_LIST,
@@ -762,14 +762,14 @@ MESSAGES: tuple[str, ...] = (
     MSG_TABLE_AST_CELL_NO_TEXT,
     MSG_TABLE_AST_WIDTH_INCONSISTENT,
     # Pandoc exporter runtime errors and default document title
-    # (backend/core/export/messages.py), surfaced as RuntimeError/ValueError
+    # (libs/core/src/acessilia_core/export/messages.py), surfaced as RuntimeError/ValueError
     # text in logs and HTTP error details.
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
     MSG_AUDIT_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
-    # HTML renderer UI chrome (backend/core/export/renderers/html_renderer.py).
+    # HTML renderer UI chrome (libs/core/src/acessilia_core/export/renderers/html_renderer.py).
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_UNDESCRIBED_PICTURE_ALT,
     MSG_LETTERHEAD_TEXT,
@@ -778,7 +778,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_REGION,
-    # TXT table line templates (backend/core/pipeline/table_ast.py).
+    # TXT table line templates (libs/core/src/acessilia_core/pipeline/table_ast.py).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
     MSG_TABLE_TEXT_FOOTER,
@@ -815,7 +815,7 @@ MESSAGES: tuple[str, ...] = (
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_RATE_LIMIT_EXCEEDED,
     WEB_SUCCESS_QUEUED,
-    # Server-side runtime log and e-mail message ids (backend/core/i18n/log_messages.py),
+    # Server-side runtime log and e-mail message ids (libs/core/src/acessilia_core/i18n/log_messages.py),
     # resolved at log time through t() so local logs and outgoing e-mail content
     # follow the server-side detected locale (shell locale, then .env LOCALE,
     # then en_US) per the project i18n goal for operator-facing output.
@@ -982,7 +982,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_STALE_PROCESS_INTERRUPTED,
     LOG_AGNO_NOT_INSTALLED,
     # Document invariants of the processing manifest (docstruct.manifest), raised
-    # by ProcessingManifest's validator in backend/core/manifest/models.py.
+    # by ProcessingManifest's validator in libs/core/src/acessilia_core/manifest/models.py.
     MSG_DUPLICATE_ELEMENT_IDS,
     MSG_UNKNOWN_PARENT,
     MSG_SELF_PARENT,
@@ -1001,7 +1001,7 @@ MESSAGES: tuple[str, ...] = (
 )
 
 #: Step messages of the deterministic handlers and the VLM judge (#410). The
-#: English msgids live in ``backend.core.pipeline.handlers.messages``; these are
+#: English msgids live in ``acessilia_core.pipeline.handlers.messages``; these are
 #: their pt-BR translations. Every one is user-facing: the executor persists the
 #: message in the obligation attempts and the orchestrator publishes it as
 #: ``last_message``.
@@ -1298,7 +1298,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "\n• HTML semântico"
             "\n• Audiodescrição (MP3)"
         ),
-        # Nominal-plan executor diagnostics (backend/core/execution/messages.py): pt-BR mirror preserving the original wording.
+        # Nominal-plan executor diagnostics (libs/core/src/acessilia_core/execution/messages.py): pt-BR mirror preserving the original wording.
         EXE_METHOD_NAME_REQUIRED: "O nome do método não pode ser vazio",
         EXE_PLAN_DIFFERENT_DOMAIN: "O plano usa outro domínio PDDL",
         EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE: (
@@ -1578,7 +1578,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_STATUS_CONVERSION_DONE: "✅ Conversão concluída!",
         MSG_STATUS_PROCESSING_FAILED: ("❌ Erro durante o processamento."),
         # Canonical-document / export-profile / output-text validation findings
-        # (pt-BR mirrors of the backend/core/pipeline/validators.py ids above).
+        # (pt-BR mirrors of the libs/core/src/acessilia_core/pipeline/validators.py ids above).
         MSG_CANONICAL_DOC_NOT_OBJECT: (
             "Documento canônico deve ser um objeto JSON."
         ),
@@ -1657,7 +1657,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "table_ast.{section_name} com largura inconsistente em {block_id} (row {row_index})"
         ),
         # Pandoc exporter runtime errors and default document title
-        # (pt-BR mirrors of the backend/core/export/messages.py ids above).
+        # (pt-BR mirrors of the libs/core/src/acessilia_core/export/messages.py ids above).
         MSG_DEFAULT_ACCESSIBLE_TITLE: "Documento acessível",
         MSG_DOCX_DISABLED: (
             "A exportação DOCX está desativada (TOOLBOX_DOCX_ENABLED=false)"
@@ -1747,7 +1747,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Converta tabelas e fórmulas matemáticas de imagens em texto estruturado "
             "acessível (Markdown para tabelas, LaTeX para fórmulas)."
         ),
-        # Server-side runtime log messages (pt-BR mirrors of backend/core/i18n/log_messages.py),
+        # Server-side runtime log messages (pt-BR mirrors of libs/core/src/acessilia_core/i18n/log_messages.py),
         # resolved at log time through t() so operator logs follow the server locale.
         LOG_LOGGER_CONFIGURED: "Logger configurado - nível: {level}",
         LOG_BOT_ALREADY_RUNNING: "Outra instância do bot já está em execução (PID={pid})",
@@ -2280,7 +2280,7 @@ def build_locales(locales_dir: Path = DEFAULT_LOCALES_DIR) -> dict[str, tuple[Pa
     """Build every supported locale's .po/.mo pair after validating translation tables are complete.
 
     Args:
-        locales_dir (Path): Output root receiving one directory per locale; tests pass a temporary directory outside the repo so generated artifacts never land inside the checked-in backend/core/i18n/locales production layout. Defaults to :data:`DEFAULT_LOCALES_DIR`.
+        locales_dir (Path): Output root receiving one directory per locale; tests pass a temporary directory outside the repo so generated artifacts never land inside the checked-in libs/core/src/acessilia_core/i18n/locales production layout. Defaults to :data:`DEFAULT_LOCALES_DIR`.
 
     Returns:
         dict: locale name mapped to its (po_path, mo_path) artifact pair written by this pass for that locale's LC_MESSAGES tree.
@@ -2315,7 +2315,7 @@ def build_parser() -> argparse.ArgumentParser:
         argparse.ArgumentParser: Argument parser accepting an optional --locales-dir flag whose default is :data:`DEFAULT_LOCALES_DIR` when omitted.
     """
     parser = argparse.ArgumentParser(prog="gen-locale-catalogs", description=__doc__)
-    parser.add_argument("--locales-dir", type=Path, default=None, help="output root directory for locale catalogs (default: backend/core/i18n/locales).")
+    parser.add_argument("--locales-dir", type=Path, default=None, help="output root directory for locale catalogs (default: libs/core/src/acessilia_core/i18n/locales).")
     return parser
 
 

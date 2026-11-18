@@ -13,8 +13,8 @@ from pathlib import Path
 
 import fitz
 import pytest
+from acessilia_core.toolbox import toolbox_client
 
-from backend.core.toolbox import toolbox_client
 from tests.core_config_support import fusion_config, paths_config, toolbox_config
 from tests.pddl_support import build_element
 
@@ -23,10 +23,10 @@ FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.p
 #: Modules that bind the factory at import; the others look it up in
 #: ``toolbox_client`` when they call it.
 BOUND_FACTORY_MODULES = (
-    "backend.core.manifest.toolbox_extractor",
-    "backend.core.pipeline.fusion",
-    "backend.core.toolbox.toolbox_math_tools",
-    "backend.core.toolbox.vision_payload",
+    "acessilia_core.manifest.toolbox_extractor",
+    "acessilia_core.pipeline.fusion",
+    "acessilia_core.toolbox.toolbox_math_tools",
+    "acessilia_core.toolbox.vision_payload",
 )
 
 
@@ -66,12 +66,12 @@ def _png(tmp_path: Path) -> bytes:
 
 def _call(run_toolbox, tmp_path):
     """One call per helper, each given ``run_toolbox``."""
-    from backend.core.export.pandoc_exporter import toolbox_export_docx
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-    from backend.core.pipeline import fusion, judge
-    from backend.core.pipeline.enrichment.common import _extract_picture_bytes
-    from backend.core.pipeline.toolbox import _toolbox_render
-    from backend.core.toolbox import (
+    from acessilia_core.export.pandoc_exporter import toolbox_export_docx
+    from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.pipeline import fusion, judge
+    from acessilia_core.pipeline.enrichment.common import _extract_picture_bytes
+    from acessilia_core.pipeline.toolbox import _toolbox_render
+    from acessilia_core.toolbox import (
         media_inspect,
         pdf_ua_audit,
         text_spans,

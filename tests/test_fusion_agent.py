@@ -5,7 +5,7 @@ from importlib.util import find_spec
 
 import pytest
 
-from backend.core.agents.fusion_agent import FusionAgent
+from acessilia_core.agents.fusion_agent import FusionAgent
 from docstruct.types import Region
 
 

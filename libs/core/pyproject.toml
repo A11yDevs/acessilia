@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "acessilia-core"
+version = "0.1.0"
+description = "Acessilia's core: the PDDL pipeline that plans and executes a document's accessibility, with its agents, enrichment stages and exporters (ADR-0016)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# The libraries ADR-0016 allows the core (tests/test_core_boundary.py checks
+# the imports). openai and ollama are what Agno's model classes load; edge-tts
+# is the audio export's recorded deviation (ADR-0003, acessilia-toolbox#73).
+# docstruct and the SDK are not on an index: install ./libs/docstruct and
+# ./libs/sdk first; uv resolves them from the paths below.
+dependencies = [
+    "acessilia-docstruct>=0.5,<0.6",
+    "acessilia-sdk>=0.3,<0.4",
+    "agno==3.0.5",
+    "openai>=2.45.0,<3",
+    "ollama>=0.6.2,<0.7",
+    "pydantic>=2.10,<3",
+    "loguru>=0.7.3,<0.8",
+    "babel>=2.18.0,<3",
+    "jsonschema>=4.20,<5",
+    "rapidfuzz>=3.9,<4",
+    "edge-tts>=7.3.1,<8",
+]
+
+[tool.uv.sources]
+acessilia-docstruct = { path = "../docstruct", editable = true }
+acessilia-sdk = { path = "../sdk", editable = true }
+
+[tool.hatch.build.targets.wheel]
+# The package's data travels with it: the PDDL domains, the prompts and the
+# translation catalogs' .po sources (the .mo files are git-ignored and the
+# runtime does not read them).
+packages = ["src/acessilia_core"]
+exclude = ["**/*.mo", "**/__pycache__"]

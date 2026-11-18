@@ -16,13 +16,13 @@ import pytest
 from docstruct.fusion.judge import should_judge
 from docstruct.fusion.page_select import page_norm, ratio
 
-from backend.core.manifest.builder import (
+from acessilia_core.manifest.builder import (
     MAX_ID_SUFFIX,
     VLM_JUDGE_METHODS,
     _derive_v23_processing_needs,
 )
-from backend.core.manifest.models import ManifestElement
-from backend.core.pipeline.fusion import (
+from acessilia_core.manifest.models import ManifestElement
+from acessilia_core.pipeline.fusion import (
     _similarity,
     apply_page_routes,
     fuse_extraction_payloads,

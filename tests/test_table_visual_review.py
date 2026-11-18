@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.agents.output_schemas import DataOutput
-from backend.core.pipeline.enrichment.tables import _enrich_table_structures
+from acessilia_core.agents.output_schemas import DataOutput
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
-from backend.core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
 from tests.core_config_support import model_config, toolbox_config, vision_config
 
 
@@ -62,7 +62,7 @@ def _reading(rows: list[list[str]]) -> DataOutput:
 def _run(monkeypatch, rows, reading, image=b"image", review=True):
     """Enrich a table read as ``rows``; ``reading`` answers every call, or each
     call in turn when it is a list."""
-    from backend.core.pipeline import orchestrator as pddl_module
+    from acessilia_core.pipeline import orchestrator as pddl_module
 
     table = _element("t-1", "table", metadata={"table_ast": _ast(rows)})
     manifest = _manifest([table], [])

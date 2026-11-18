@@ -1,14 +1,14 @@
 """Execution policy must be part of the cached-document contract."""
 
 import asyncio
-from backend.core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import payload as pipeline_payload
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
-from backend.core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
 from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
 
 isolated_runtime = runtime_fixture
@@ -34,7 +34,7 @@ def test_execution_configuration_invalidates_document_cache(monkeypatch, field, 
 
 def test_domain_identity_invalidates_document_cache(monkeypatch):
     from backend import service
-    from backend.core.planning.domain_bundle import DomainBundle
+    from acessilia_core.planning.domain_bundle import DomainBundle
 
     config = core_config()  # the job's, fixed: the service's own setting moves
     before = service._cache_version(config)
@@ -148,11 +148,11 @@ def _payload(manifest):
 
 
 def _warnings(failures):
-    from backend.core.pipeline.payload import (
+    from acessilia_core.pipeline.payload import (
         MSG_PICTURES_NOT_DESCRIBED,
         MSG_TABLES_NOT_READ,
     )
-    from backend.core.i18n import n
+    from acessilia_core.i18n import n
 
     expected = []
     for kind, msgids in (("pictures", MSG_PICTURES_NOT_DESCRIBED), ("tables", MSG_TABLES_NOT_READ)):
@@ -208,7 +208,7 @@ def test_a_run_the_vision_model_failed_is_not_cacheable(elements, failures):
 
 
 def _enrich_tables(monkeypatch, table, *, image, reading):
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
     from tests.pddl_support import build_manifest
 
     class FakeDataAgent:
@@ -248,7 +248,7 @@ def test_a_table_read_from_scratch_that_failed_is_not_cacheable(monkeypatch, ima
 
 def test_a_refused_reading_of_a_misread_table_is_cacheable(monkeypatch):
     """A reading refused as worse than the table is the model's answer, not its failure."""
-    from backend.core.agents.output_schemas import DataOutput
+    from acessilia_core.agents.output_schemas import DataOutput
     from tests.pddl_support import build_element
 
     collapsed = {
@@ -331,7 +331,7 @@ async def test_cached_degraded_entry_is_ignored(
     ],
 )
 def test_records_visual_failures(failures, recorded):
-    from backend.core.pipeline.payload import records_visual_failures
+    from acessilia_core.pipeline.payload import records_visual_failures
 
     assert records_visual_failures(failures) is recorded
 
@@ -343,7 +343,7 @@ def test_merged_cache_policy_requires_success_across_all_stages(
     fusion_degraded, visual_failed, execution_status
 ):
     """Visual recovery and fusion/execution recovery must both survive integration."""
-    from backend.core.pipeline.payload import build_pddl_structured_payload
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from tests.pddl_support import build_element, build_manifest
     from tests.test_pddl_orchestrator import _sample_plan
 

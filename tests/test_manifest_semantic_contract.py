@@ -21,8 +21,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from backend.core.manifest.models import ProcessingManifest
-from backend.core.manifest.schema import processing_manifest_schema
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.manifest.schema import processing_manifest_schema
 from docstruct.manifest import (
     WIRE_NAMES,
     StructuredDocument,
@@ -178,7 +178,7 @@ def test_unknown_fields_are_refused_as_by_the_schema() -> None:
 
 @pytest.mark.parametrize("golden", GOLDEN, ids=lambda path: path.stem)
 def test_core_adapter_round_trips_a_manifest(golden: Path) -> None:
-    from backend.core.manifest.document_adapter import (
+    from acessilia_core.manifest.document_adapter import (
         to_structured_document,
         with_structured_document,
     )
@@ -192,7 +192,7 @@ def test_core_adapter_round_trips_a_manifest(golden: Path) -> None:
 
 
 def test_core_adapter_revalidates_the_whole_manifest() -> None:
-    from backend.core.manifest.document_adapter import (
+    from acessilia_core.manifest.document_adapter import (
         to_structured_document,
         with_structured_document,
     )
@@ -225,7 +225,7 @@ DOCUMENT_INVARIANT_MESSAGES = {
 @pytest.mark.parametrize("case", list(DOCUMENT_INVARIANT_MESSAGES))
 def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, locale, case):
     import docstruct.manifest as model
-    from backend.core.i18n import t
+    from acessilia_core.i18n import t
     from scripts.gen_locale_catalogs import TRANSLATIONS
 
     use_server_locale(monkeypatch, locale)
@@ -246,9 +246,9 @@ MIXED_INTERVALS = {
 
 @pytest.mark.parametrize("case", list(MIXED_INTERVALS))
 def test_mixed_timezones_are_a_validation_error_not_a_type_error(case) -> None:
-    from backend.core.manifest.models import ExtractorRun, ObligationAttempt
-    from backend.core.i18n import t
-    from backend.core.i18n.log_messages import MSG_TIMESTAMPS_MIXED_TIMEZONES
+    from acessilia_core.manifest.models import ExtractorRun, ObligationAttempt
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.log_messages import MSG_TIMESTAMPS_MIXED_TIMEZONES
 
     started_at, completed_at = MIXED_INTERVALS[case]
     expected = re.escape(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))

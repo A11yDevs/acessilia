@@ -24,16 +24,16 @@ from agno.os import AgentOS
 
 from backend.config.core_config import core_config_from_settings
 from backend.config.process_setup import setup_process
-from backend.core.agents.ai_client import get_agno_model
-from backend.core.agents.output_schemas import (
+from acessilia_core.agents.ai_client import get_agno_model
+from acessilia_core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
     DataOutput,
     VisionOutput,
 )
 from backend.config.settings import settings
-from backend.core.i18n import t
-from backend.core.agents.prompt_tools import load_region_prompt, load_system_prompt
+from acessilia_core.i18n import t
+from acessilia_core.agents.prompt_tools import load_region_prompt, load_system_prompt
 from frontend.web.messages import (
     WEB_AGENT_DATA_DESCRIPTION,
     WEB_AGENT_DATA_INSTRUCTIONS_FALLBACK,

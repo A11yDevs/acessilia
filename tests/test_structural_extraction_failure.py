@@ -9,19 +9,19 @@ stays out of it.
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 from types import SimpleNamespace
 
 import pytest
 
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
-from backend.core import i18n
-from backend.core.pipeline import orchestrator as pddl
+from acessilia_core import i18n
+from acessilia_core.pipeline import orchestrator as pddl
 from tests.pddl_support import build_orchestrator
-from backend.core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import preflight as pipeline_preflight
 from tests.core_config_support import core_config
 
 

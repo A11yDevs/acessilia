@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.i18n import t
+from acessilia_core.i18n import t
 from tests.core_config_support import core_config
-from backend.core.manifest.models import (
+from acessilia_core.manifest.models import (
     MSG_ELEMENT_UNKNOWN_PAGE,
     MSG_PAGE_DUPLICATE_ELEMENT_IDS,
     MSG_PARENT_REF_MISMATCH,

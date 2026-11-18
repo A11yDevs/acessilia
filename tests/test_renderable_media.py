@@ -13,10 +13,10 @@ from pathlib import Path
 import fitz
 import pytest
 
-from backend.core.pipeline import orchestrator as pddl
-from backend.core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
-from backend.core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
 

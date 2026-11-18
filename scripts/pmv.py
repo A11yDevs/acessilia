@@ -9,18 +9,18 @@ from pathlib import Path
 from typing import Any
 
 from backend.config.core_config import core_config_from_settings
-from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.execution.executor import ExecutorAgent, MethodRegistry
-from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from backend.core.manifest.models import ProcessingManifest
-from backend.core.manifest.schema import validate_manifest
-from backend.core.planning.domain_bundle import (
+from acessilia_core.agents.informational_structural import InformationalStructuralAgent
+from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
+from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.manifest.schema import validate_manifest
+from acessilia_core.planning.domain_bundle import (
     DEFAULT_DESCRIPTION_PATH,
     DEFAULT_DOMAIN_PATH,
     DomainBundle,
 )
-from backend.core.planning.models import NominalPlan
-from backend.core.planning.planner_agent import PlannerAgent
+from acessilia_core.planning.models import NominalPlan
+from acessilia_core.planning.planner_agent import PlannerAgent
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

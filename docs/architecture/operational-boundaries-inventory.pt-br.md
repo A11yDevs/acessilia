@@ -81,7 +81,7 @@ O resto, com as duplicações já registradas:
 |---|---|---|
 | `_table_ast_from_rows` (orquestrador) | `docstruct.tables.ast.table_ast_from_rows` | Quase duplicata com comportamento diferente: `{"body": []}` contra `None` sem linhas. Registrada no inventário do orquestrador; unificar é uma decisão de comportamento. |
 | `_block_kind` (orquestrador) | `docstruct.fusion.convert.classify_kind` | Quase duplicata com comportamento diferente. Registrada no inventário do orquestrador. |
-| `_area` (`backend/core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | O mesmo cálculo, para uma caixa presente. |
+| `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | O mesmo cálculo, para uma caixa presente. |
 | `_overlaps`, `_union_area` (`slides.py`) | nenhuma | Geometria pura de caixas; candidatas ao docstruct. (O `_overlaps` do docstruct compara trechos de texto, não caixas.) |
 | `decide` (`planning/toolbox_gate.py`) | `docstruct.fusion.adjudication.decide` | Só o nome é igual; não têm relação. |
 | agrupamento de callouts (builder de normalização da Toolbox) | `docstruct.regions.grouping` | Desvio conhecido da ADR-0002 ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)). |
@@ -95,11 +95,11 @@ candidatos a operações do SDK, com a parte da decisão ficando no core:
 | Operação | Hoje | Mecanismo (candidato ao SDK) | Decisão (fica no core) |
 |---|---|---|---|
 | Cadeia de fórmula | `_formula_recognition_crop`, `toolbox_math_tools`, o enriquecimento de fórmulas (o recorte, o reconhecimento, o MathML e a fala agora chamam o `acessilia_sdk.operations.formula`, fase 3 da #470) | renderizar uma região e depois `math.recognize`, `math.convert` e `math.verbalize` em sequência | quais fórmulas, o portão de concordância com a camada de texto, o fallback da visão, o disjuntor |
-| Juiz de página | `_render_page_png`, `_judge_page`, `_judge_one_page` (no `backend/core/pipeline/judge.py` desde o passo 6 da #402; a divisão com o SDK continua em aberto) | renderizar uma página e depois `document.adjudicate.page`, lendo o `pB` | quais páginas, o limiar, se troca |
-| Inspeção de mídia | `backend/core/toolbox/media_inspect.py` | `media.inspect` | o que uma apresentação ou um limite de páginas significa para o job |
-| Auditoria PDF/UA | `backend/core/toolbox/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | o que uma auditoria reprovada faz com o job |
-| Text spans | `backend/core/toolbox/text_spans.py` | já é `ToolboxPdfClient.text_spans_by_page` (#455) | quais páginas, o cache por documento |
-| Exportação Pandoc | `backend/core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | qual perfil, quais formatos |
+| Juiz de página | `_render_page_png`, `_judge_page`, `_judge_one_page` (no `libs/core/src/acessilia_core/pipeline/judge.py` desde o passo 6 da #402; a divisão com o SDK continua em aberto) | renderizar uma página e depois `document.adjudicate.page`, lendo o `pB` | quais páginas, o limiar, se troca |
+| Inspeção de mídia | `libs/core/src/acessilia_core/toolbox/media_inspect.py` | `media.inspect` | o que uma apresentação ou um limite de páginas significa para o job |
+| Auditoria PDF/UA | `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | o que uma auditoria reprovada faz com o job |
+| Text spans | `libs/core/src/acessilia_core/toolbox/text_spans.py` | já é `ToolboxPdfClient.text_spans_by_page` (#455) | quais páginas, o cache por documento |
+| Exportação Pandoc | `libs/core/src/acessilia_core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | qual perfil, quais formatos |
 
 ## Em aberto, para a ADR-0017 e as seguintes
 

@@ -9,8 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from backend.config.core_config import core_config_from_settings
-from backend.core.config import (
+from acessilia_core.config import (
     CoreConfig,
     DocumentConfig,
     ExportConfig,
@@ -20,6 +19,8 @@ from backend.core.config import (
     ToolboxConfig,
     VisionConfig,
 )
+
+from backend.config.core_config import core_config_from_settings
 
 
 def core_config(**groups: dict[str, Any]) -> CoreConfig:

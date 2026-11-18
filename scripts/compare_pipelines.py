@@ -30,8 +30,8 @@ from typing import Any
 from backend.config.core_config import core_config_from_settings
 from backend.services.model_calls import get_model_calls
 from backend.services.run_ports import service_run_ports
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.profiles import verbosity_for_mode
 
 

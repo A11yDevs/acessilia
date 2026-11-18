@@ -6,14 +6,14 @@ cache choice and the orchestrator's visible degradation.
 from __future__ import annotations
 
 from pathlib import Path
-from backend.core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import payload as pipeline_payload
 from types import SimpleNamespace
 
 import pytest
 
-from backend.core.toolbox import media_inspect
-from backend.core.toolbox.media_inspect import inspect_source_media
-from backend.core.pipeline import preflight as pipeline_preflight
+from acessilia_core.toolbox import media_inspect
+from acessilia_core.toolbox.media_inspect import inspect_source_media
+from acessilia_core.pipeline import preflight as pipeline_preflight
 from tests.core_config_support import toolbox_config
 
 IMAGE = Path(__file__).parent / "fixtures" / "images" / "sunset-skyline.jpeg"
@@ -60,8 +60,8 @@ async def test_returns_the_toolbox_document(enabled) -> None:
 
 @pytest.mark.asyncio
 async def test_owned_client_is_closed_after_a_failure(enabled, monkeypatch) -> None:
-    from backend.core.toolbox import toolbox_client
-    from backend.core.toolbox.toolbox_client import ToolboxError
+    from acessilia_core.toolbox import toolbox_client
+    from acessilia_core.toolbox.toolbox_client import ToolboxError
 
     client = RecordingClient(error=ToolboxError("down"))
     monkeypatch.setattr(toolbox_client, "make_toolbox_client", lambda _cls, _toolbox: client)
@@ -74,7 +74,7 @@ async def test_owned_client_is_closed_after_a_failure(enabled, monkeypatch) -> N
 
 @pytest.mark.asyncio
 async def test_disabled_skips_without_calling_the_toolbox(monkeypatch) -> None:
-    from backend.core.toolbox import toolbox_client
+    from acessilia_core.toolbox import toolbox_client
 
     def fail(_cls):
         raise AssertionError("the Toolbox must not be called when disabled")
@@ -87,7 +87,7 @@ async def test_disabled_skips_without_calling_the_toolbox(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_toolbox_failure_propagates(enabled) -> None:
-    from backend.core.toolbox.toolbox_client import ToolboxContractViolation
+    from acessilia_core.toolbox.toolbox_client import ToolboxContractViolation
 
     client = RecordingClient(error=ToolboxContractViolation("invalid response"))
 
@@ -110,7 +110,7 @@ async def test_forwards_the_remote_cache_choice(use_remote_cache) -> None:
 @pytest.mark.asyncio
 async def test_a_missing_document_is_a_contract_violation(enabled) -> None:
     """A client that returns no document must not crash past the client close."""
-    from backend.core.toolbox.toolbox_client import ToolboxContractViolation
+    from acessilia_core.toolbox.toolbox_client import ToolboxContractViolation
 
     client = RecordingClient()
     client.result = None
@@ -169,7 +169,7 @@ async def test_orchestrator_degrades_and_records_the_cause_on_failure(
     monkeypatch, error, cause
 ) -> None:
     """Any exception degrades the step, not only a ToolboxError."""
-    from backend.core.toolbox.toolbox_client import ToolboxError
+    from acessilia_core.toolbox.toolbox_client import ToolboxError
 
     async def fail(_path, *, toolbox):
         if error == "toolbox":

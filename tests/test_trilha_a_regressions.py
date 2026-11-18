@@ -13,8 +13,8 @@ import pytest
 
 from tests.core_config_support import fusion_config
 from backend.config.settings import settings
-from backend.core.pipeline.handlers import fusion as fusion_handlers
-from backend.core.cache_keys import options_cache_key
+from acessilia_core.pipeline.handlers import fusion as fusion_handlers
+from acessilia_core.cache_keys import options_cache_key
 from backend.services.cache import processing_cache_configuration
 from tests.test_pending_fixes import isolated_runtime as isolated_runtime_fixture
 
@@ -78,7 +78,7 @@ async def test_concurrent_downloads_have_independent_temporary_files(tmp_path):
 
 @pytest.mark.parametrize("kind", ["table", "picture", "formula"])
 def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
-    from backend.core.pipeline.fusion import _group_by_page, fuse_extraction_payloads
+    from acessilia_core.pipeline.fusion import _group_by_page, fuse_extraction_payloads
 
     primary = {"document": {"elements": []}}
     secondary = {
@@ -97,8 +97,8 @@ def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
 
 
 def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-    from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
     source = tmp_path / "doc.pdf"
@@ -113,7 +113,7 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
         close=AsyncMock(),
     )
     monkeypatch.setattr(
-        "backend.core.manifest.toolbox_extractor.make_toolbox_client",
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: secondary,
     )
     result = ToolboxManifestExtractor(client=primary).extract(
@@ -127,8 +127,8 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
 
 
 def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tmp_path):
-    from backend.core.pipeline.payload import build_pddl_structured_payload
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
+    from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
@@ -175,8 +175,8 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
     ],
 )
 def test_pddl_cache_policy(status, open_kind, last_method, expected):
-    from backend.core.pipeline.payload import build_pddl_structured_payload
-    from backend.core.manifest.models import Obligation, ObligationAttempt
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
+    from acessilia_core.manifest.models import Obligation, ObligationAttempt
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
 
     manifest = _sample_manifest()
@@ -229,7 +229,7 @@ def test_pddl_cache_policy(status, open_kind, last_method, expected):
 
 
 def _reuse_identity():
-    from backend.core.run_identity import fusion_reuse_identity
+    from acessilia_core.run_identity import fusion_reuse_identity
 
     config = core_config()
     return fusion_reuse_identity(config.fusion, config.toolbox)
@@ -238,7 +238,7 @@ def _reuse_identity():
 @pytest.mark.parametrize("corrupt", [False, True, "configuration"])
 def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
     import json
-    from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)
@@ -321,8 +321,8 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
 ):
     """A second submission retries technical failures and reuses final results."""
     from backend import service
-    from backend.core.pipeline.payload import build_pddl_structured_payload
-    from backend.core.manifest.models import Obligation, ObligationAttempt
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
+    from acessilia_core.manifest.models import Obligation, ObligationAttempt
     from backend.services import cache
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
 
@@ -381,7 +381,7 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
 
 @pytest.mark.parametrize('kind', ['table', 'picture', 'formula'])
 def test_route_uses_structure_when_text_agrees(kind):
-    from backend.core.pipeline.fusion import fuse_extraction_payloads
+    from acessilia_core.pipeline.fusion import fuse_extraction_payloads
 
     text = {'type': 'paragraph', 'text': 'Texto da pagina com conteudo suficiente', 'page': 0}
     primary = {'document': {'elements': [text]}}
@@ -397,7 +397,7 @@ def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
 
     from docstruct.policy import FusionPolicy
 
-    from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)
@@ -439,7 +439,7 @@ def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_p
 
     from docstruct.policy import FusionPolicy
 
-    from backend.core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)

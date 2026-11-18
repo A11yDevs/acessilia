@@ -86,9 +86,9 @@ obrigações artificiais em cada documento.
 
 ### 4. Alinhar os dois repositórios
 
-- Core: `backend/core/manifest/builder.py`,
-  `backend/core/planning/domains/domain_v2.3.pddl`,
-  `domain_description_v2.3.md`, `backend/core/planning/pddl_processor.py`,
+- Core: `libs/core/src/acessilia_core/manifest/builder.py`,
+  `libs/core/src/acessilia_core/planning/domains/domain_v2.3.pddl`,
+  `domain_description_v2.3.md`, `libs/core/src/acessilia_core/planning/pddl_processor.py`,
   `backend/agents/pddl_orchestrator.py`, `backend/tools/` e configuração.
 - Toolbox (`/Users/akira/dados/sync/dev/acessilia-toolbox`): manifests de
   capacidades, providers/configuração e adaptadores para os contratos

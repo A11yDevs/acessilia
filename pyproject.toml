@@ -37,6 +37,8 @@ dependencies = [
     "acessilia-docstruct",
     # Acesso às capacidades da Toolbox pelo contrato HTTP (libs/sdk, instalado editável)
     "acessilia-sdk",
+    # The core's PDDL pipeline (libs/core, installed editable; ADR-0016)
+    "acessilia-core",
 ]
 
 [project.urls]
@@ -69,6 +71,8 @@ bot-acess = "frontend.cli.run:main"
 acessilia-docstruct = { path = "libs/docstruct", editable = true }
 # O SDK vive em libs/sdk enquanto não tiver repositório próprio.
 acessilia-sdk = { path = "libs/sdk", editable = true }
+# The core lives in libs/core (ADR-0016, step 6).
+acessilia-core = { path = "libs/core", editable = true }
 
 [tool.setuptools.packages.find]
 include = ["backend*", "frontend*"]

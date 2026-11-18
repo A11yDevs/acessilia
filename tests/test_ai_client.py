@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from acessilia_core.agents import ai_client
 from agno.models import ollama, openrouter
 
-from backend.core.agents import ai_client
 from tests.core_config_support import model_config, toolbox_config
 
 

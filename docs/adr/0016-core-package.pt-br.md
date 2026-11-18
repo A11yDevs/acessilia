@@ -352,7 +352,16 @@ Proposta: a opção 2.
        ferramentas de arquivo se recusam a rodar sem ele. O `plan` e o
        `compare`, que o pipeline chama, trabalham em memória e não precisam
        dele.
-     - **A mudança e a renomeação dos imports**, mecânica, sem ponte.
+     - **A mudança e a renomeação dos imports (feito).** O `backend/core`
+       agora é o pacote `acessilia_core` em `libs/core/src/acessilia_core`
+       (`libs/core/pyproject.toml`, versão 0.1.0), instalado editável como o
+       SDK e o docstruct, e todo import de `backend.core` virou
+       `acessilia_core`, sem ponte. Os passos acima citam o `backend/core`
+       como ele era quando foram feitos. O teste de fronteira agora varre o
+       pacote, que pode importar a si mesmo mas nada do `backend`; as
+       guardas que varriam o `backend/` varrem o pacote também, e o teste de
+       pureza do SDK e os jobs de CI de isolamento das duas bibliotecas
+       também recusam o `acessilia_core`.
      - **A instalação limpa, o seu teste de fumaça e a prova de conceito.**
 
      Os testes ficam em `tests/`; só o teste de fronteira e o de fumaça vão

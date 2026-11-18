@@ -6,17 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.agents.output_schemas import DataOutput, VisionOutput
-from backend.core.pipeline.enrichment.tables import _enrich_table_structures
-from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from backend.core.pipeline.payload import build_pddl_structured_payload
+from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from docstruct.tables.text_rows import rows_from_visual_table_text as _rows_from_visual_table_text
-from backend.core.pipeline.elements import (
+from acessilia_core.pipeline.elements import (
     _table_ast_from_metadata,
     _table_element_has_structured_content,
 )
-from backend.core.pipeline.canonical_builder import build_canonical_document
-from backend.core.manifest.models import (
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -26,9 +26,9 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from backend.core.planning.models import DomainIdentity, NominalPlan, PlanStep
-from backend.core.pipeline.enrichment import pictures as picture_stage
-from backend.core.pipeline.enrichment import tables as table_stage
+from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
 from tests.core_config_support import model_config, toolbox_config, vision_config
 
 
@@ -169,9 +169,9 @@ def _sample_manifest_without_page_element_ids() -> ProcessingManifest:
 
 
 def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
-    from backend.core.i18n import reset_request_locale, set_request_locale
-    from backend.core.i18n.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
-    from backend.core.i18n import t
+    from acessilia_core.i18n import reset_request_locale, set_request_locale
+    from acessilia_core.i18n.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
+    from acessilia_core.i18n import t
 
     manifest = _sample_manifest()
     manifest.extractor.configuration.update(
@@ -663,7 +663,7 @@ def test_table_ast_from_metadata_preserves_empty_structural_cells() -> None:
 def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from backend.core.pipeline import orchestrator as pddl_module
+    from acessilia_core.pipeline import orchestrator as pddl_module
 
     manifest = _sample_manifest()
     element = manifest.elements[1]
@@ -724,7 +724,7 @@ def test_table_enrichment_metadata_uses_ast_spans_and_scope_headers(
 def test_picture_reclassified_as_formula_reconciles_processing_needs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from backend.core.pipeline import orchestrator as pddl_module
+    from acessilia_core.pipeline import orchestrator as pddl_module
 
     manifest = _sample_manifest()
     element = manifest.elements[1]
@@ -815,7 +815,7 @@ def test_picture_reclassified_as_formula_reconciles_processing_needs(
 
     # MathML comes from the Toolbox's math.convert (ADR-0007); simulate it so
     # the test needs no running Toolbox.
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     converted: list[str] = []
     monkeypatch.setattr(
@@ -843,7 +843,7 @@ def test_standalone_image_injects_full_page_picture_for_vision(
     media.inspect (is_image + requires_visual_inspection), o orquestrador deve
     injetar um elemento `picture` de página inteira e acionar o VisionAgent.
     """
-    from backend.core.pipeline import orchestrator as pddl_module
+    from acessilia_core.pipeline import orchestrator as pddl_module
 
     manifest = _sample_manifest()
     # Simula o Docling: só texto curto de OCR, sem elementos visuais.

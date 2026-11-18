@@ -93,7 +93,7 @@ jobs:
 
           present = [
               name
-              for name in ("backend", "acessilia_toolbox", "agno", "fastapi")
+              for name in ("backend", "acessilia_core", "acessilia_toolbox", "agno", "fastapi")
               if importlib.util.find_spec(name) is not None
           ]
           if present:
@@ -193,7 +193,7 @@ jobs:
           present = [
               name
               for name in (
-                  "backend", "acessilia_sdk", "acessilia_toolbox", "agno",
+                  "backend", "acessilia_core", "acessilia_sdk", "acessilia_toolbox", "agno",
                   "fastapi", "pydantic", "httpx", "rapidfuzz",
               )
               if importlib.util.find_spec(name) is not None

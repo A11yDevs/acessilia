@@ -76,7 +76,7 @@ class TestDocumentedModulesExist:
 
 class TestDomainVersionIsConsistent:
     def test_referenced_domain_files_exist(self):
-        domains = REPO_ROOT / "backend" / "core" / "planning" / "domains"
+        domains = REPO_ROOT / "libs" / "core" / "src" / "acessilia_core" / "planning" / "domains"
         assert (domains / "domain_v2.3.pddl").is_file()
         assert (domains / "domain_description_v2.3.md").is_file()
 
@@ -102,13 +102,13 @@ class TestAgentsAreDocumented:
 
     @pytest.mark.parametrize("agent", AGENTS)
     def test_agent_exists(self, agent):
-        import backend.core.agents  # noqa: F401
+        import acessilia_core.agents  # noqa: F401
 
         module = {
-            "AdjudicationAgent": "backend.core.agents.adjudication_agent",
-            "PageLevelAgent": "backend.core.agents.page_level_agent",
-            "OrderAdjudicationAgent": "backend.core.agents.order_adjudication_agent",
-            "TableSpecialistAgent": "backend.core.agents.table_specialist_agent",
+            "AdjudicationAgent": "acessilia_core.agents.adjudication_agent",
+            "PageLevelAgent": "acessilia_core.agents.page_level_agent",
+            "OrderAdjudicationAgent": "acessilia_core.agents.order_adjudication_agent",
+            "TableSpecialistAgent": "acessilia_core.agents.table_specialist_agent",
         }[agent]
         assert hasattr(importlib.import_module(module), agent)
 

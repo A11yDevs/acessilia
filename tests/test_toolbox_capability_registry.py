@@ -32,6 +32,8 @@ from acessilia_sdk.toolbox.clients import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
+#: The core, which makes the Toolbox calls (ADR-0016, step 6).
+CORE_DIR = REPO_ROOT / "libs" / "core" / "src" / "acessilia_core"
 CLIENTS_DIR = REPO_ROOT / "libs" / "sdk" / "src" / "acessilia_sdk" / "toolbox" / "clients"
 BASE_URL = "http://toolbox.test"
 
@@ -104,7 +106,9 @@ def test_no_module_hardcodes_an_execute_route() -> None:
     """
     offenders = [
         f"{path.relative_to(REPO_ROOT)}:{line}: {literal}"
-        for path in sorted([*BACKEND_DIR.rglob("*.py"), *CLIENTS_DIR.glob("*.py")])
+        for path in sorted(
+            [*BACKEND_DIR.rglob("*.py"), *CORE_DIR.rglob("*.py"), *CLIENTS_DIR.glob("*.py")]
+        )
         for line, literal in _code_string_literals(path)
         if _EXECUTE_LITERAL_RE.search(literal)
     ]

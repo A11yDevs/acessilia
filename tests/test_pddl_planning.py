@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.manifest.models import (
+from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -15,8 +15,8 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from backend.core.planning.domain_bundle import DomainBundle
-from backend.core.planning.planner_agent import PlannerAgent
+from acessilia_core.planning.domain_bundle import DomainBundle
+from acessilia_core.planning.planner_agent import PlannerAgent
 from scripts.pmv import main
 
 
@@ -284,7 +284,7 @@ def test_cli_both_writes_backend_plans_and_comparison(tmp_path):
 
 
 def test_domain_v23_documents_the_new_obligations():
-    from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+    from acessilia_core.planning.domain_bundle import V23_OBLIGATION_KINDS
 
     domain = DomainBundle.load()
     description = domain.description_path.read_text(encoding="utf-8")
@@ -318,11 +318,11 @@ def test_domain_v23_rejects_a_description_missing_a_new_obligation(tmp_path):
 
 class TestV23Costs:
     def test_toda_obrigacao_v23_tem_metodos_com_custo(self):
-        from backend.core.manifest.builder import (
+        from acessilia_core.manifest.builder import (
             DEFAULT_METHOD_COSTS,
             V23_OBLIGATION_BY_KIND,
         )
-        from backend.core.planning.domain_bundle import V23_OBLIGATION_KINDS
+        from acessilia_core.planning.domain_bundle import V23_OBLIGATION_KINDS
 
         assert set(V23_OBLIGATION_KINDS) == set(V23_OBLIGATION_BY_KIND)
         for kind, (_, methods) in V23_OBLIGATION_BY_KIND.items():
@@ -331,7 +331,7 @@ class TestV23Costs:
                 assert method in DEFAULT_METHOD_COSTS, f"{kind}: {method} sem custo"
 
     def test_metodos_deterministicos_custam_menos_que_os_de_modelo(self):
-        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+        from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS as C
 
         deterministic = (
             "agreement-rule", "xycut-order", "skeleton-order", "latex-normalizer",
@@ -342,31 +342,31 @@ class TestV23Costs:
         assert max(C[m] for m in deterministic) < min(C[m] for m in model_based)
 
     def test_human_review_e_o_mais_caro(self):
-        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+        from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS as C
 
         assert C["human-review"] == max(C.values())
 
     def test_join_tail_prefere_a_variante_posicionada(self):
-        from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+        from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
 
         methods = V23_OBLIGATION_BY_KIND["join-tail-blocks"][1]
         assert methods.index("tailjoin-positioned") < methods.index("tailjoin")
 
     def test_fuse_providers_prefere_a_fusao_dual(self):
-        from backend.core.manifest.builder import V23_OBLIGATION_BY_KIND
+        from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
 
         methods = V23_OBLIGATION_BY_KIND["fuse-providers"][1]
         assert methods[0] == "dual-provider-fusion"
 
     def test_custos_sao_inteiros_nao_negativos(self):
-        from backend.core.manifest.builder import DEFAULT_METHOD_COSTS as C
+        from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS as C
 
         assert all(isinstance(v, int) and v >= 0 for v in C.values())
 
 
 class TestV23CompilerValidation:
     def _manifest_with(self, kind: str, methods: list[str], costs: dict[str, int]):
-        from backend.core.manifest.models import Obligation
+        from acessilia_core.manifest.models import Obligation
 
         base = make_manifest()
         obligation = Obligation(

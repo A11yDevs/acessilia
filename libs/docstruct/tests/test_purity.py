@@ -1,6 +1,6 @@
 """docstruct depends on nothing outside the Python standard library.
 
-It sits below the core (``backend``), the SDK and the Toolbox
+It sits below the core (``acessilia_core``), the SDK and the Toolbox
 (``acessilia_toolbox``) and must stay installable on its own (ADR-0002). Those
 packages, and other libraries, are usually importable in the test environment,
 so a stray import would go unnoticed. Three checks keep it pure:

@@ -1,11 +1,12 @@
 # Acessilia libraries
 
-Shared Python packages that live in this repository, next to the core (`backend`).
+Shared Python packages that live in this repository: the core and the two libraries below it. The service (`backend/`) and the front ends (`frontend/`) depend on the core.
 
 > Also available in **Brazilian Portuguese**: [Portuguese version](README.pt-br.md)
 
 | Package | Directory | In one sentence |
 |---|---|---|
+| `acessilia-core` | [core/](core/) | **When and why**: the PDDL pipeline that plans and executes a document's accessibility, with its agents, enrichment stages and exporters ([ADR-0016](../docs/adr/0016-core-package.md)). |
 | `acessilia-docstruct` | [docstruct/](docstruct/) | **What** is computed on a document: pure structural algorithms. |
 | `acessilia-sdk` | [sdk/](sdk/) | **How** the core asks the Toolbox to run an operation: contracts, HTTP transport, clients, artifact references and failover. |
 
@@ -16,17 +17,17 @@ Shared Python packages that live in this repository, next to the core (`backend`
 | **What it is** | Document structure algorithms: canonical types (`CanonicalDocument`, `BBox`…), reading order, multi-provider fusion, text and LaTeX normalization, tables, validation | Uniform access to Toolbox capabilities: contract registry, HTTP transport (`execute_capability`), clients, catalog, errors, artifact references, retries and failover |
 | **Nature** | Pure: no network, files, subprocess or settings | Performs I/O: asynchronous HTTP client |
 | **Dependencies** | None (`dependencies = []`) | `httpx` |
-| **Consumers** | The core (`backend/core/pipeline`, `tools`, `export`…) **and the Toolbox**, which runs these algorithms on its side | The core only, to talk to the Toolbox |
+| **Consumers** | The core (`libs/core/src/acessilia_core/pipeline`, `tools`, `export`…) **and the Toolbox**, which runs these algorithms on its side | The core only, to talk to the Toolbox |
 | **Distribution** | Wheel published on a GitHub Release (`.github/workflows/docstruct-release.yml`, tags `docstruct-v*`); the Toolbox pins it by hash | Installed editable, inside this repository only |
-| **Import guard** (`tests/test_purity.py`) | Must not import `backend`, `acessilia_toolbox` or `acessilia_sdk` | Must not import `backend` or `acessilia_toolbox` |
+| **Import guard** (`tests/test_purity.py`) | Must not import `backend`, `acessilia_toolbox` or `acessilia_sdk` | Must not import `acessilia_core`, `backend` or `acessilia_toolbox` |
 
 ## Dependency direction
 
 ```
-backend (core) ──→ acessilia-sdk ──HTTP contract──→ Toolbox
-      │                  │                             │
-      ▼                  ▼                             ▼
-            acessilia-docstruct  ←─────────────────────┘
+backend ──→ acessilia-core ──→ acessilia-sdk ──HTTP contract──→ Toolbox
+                  │                  │                             │
+                  ▼                  ▼                             ▼
+                        acessilia-docstruct  ←─────────────────────┘
 ```
 
 Dependencies only point downward: docstruct imports nothing above it, the SDK

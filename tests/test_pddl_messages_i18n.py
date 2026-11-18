@@ -11,25 +11,25 @@ import asyncio
 
 import pytest
 
-from backend.core.pipeline.handlers.formula import _handle_latex_normalizer_method
-from backend.core.pipeline.handlers.content import (
+from acessilia_core.pipeline.handlers.formula import _handle_latex_normalizer_method
+from acessilia_core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
     _handle_vision_description_method,
 )
-from backend.core.pipeline.handlers.messages import (
+from acessilia_core.pipeline.handlers.messages import (
     MSG_BLOCK_COUNT,
     MSG_CODE_NORMALIZED,
     MSG_TABLE_VALIDATED,
     MSG_VISION_VALIDATED,
 )
-from backend.core.pipeline.handlers.text import (
+from acessilia_core.pipeline.handlers.text import (
     _handle_chunk_verse_method,
     _handle_extract_line_numbers_method,
 )
-from backend.core.pipeline.obligations import _unsatisfied_obligations
-from backend.core.i18n import n, reset_request_locale, set_request_locale
-from backend.core.blocking import run_blocking
+from acessilia_core.pipeline.obligations import _unsatisfied_obligations
+from acessilia_core.i18n import n, reset_request_locale, set_request_locale
+from acessilia_core.blocking import run_blocking
 
 from tests.pddl_support import (
     build_element as _element,
@@ -396,9 +396,9 @@ class TestHandlerMessagesFollowTheLocale:
 
 
     def test_math_controlled_error_is_localized(self, locale, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.formula import _handle_mathml_method
-        from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
-        from backend.core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+        from acessilia_core.pipeline.handlers.formula import _handle_mathml_method
+        from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+        from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 
         def unavailable(*_args, **_kwargs):
             raise MathCapabilityUnavailable(
@@ -406,7 +406,7 @@ class TestHandlerMessagesFollowTheLocale:
             )
 
         monkeypatch.setattr(
-            "backend.core.pipeline.handlers.formula.toolbox_convert_latex", unavailable
+            "acessilia_core.pipeline.handlers.formula.toolbox_convert_latex", unavailable
         )
         elements, obligation = _formula_success(1)
         manifest = _manifest(elements, [obligation])

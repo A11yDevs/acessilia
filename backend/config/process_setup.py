@@ -24,12 +24,12 @@ def setup_process(
     (the service's, by default) and ``environ`` (the process's): ``LOCALE``,
     then the shell's ``LANGUAGE``/``LC_ALL``/``LANG`` and C locale. The core
     reads no environment (ADR-0016, step 5)."""
-    from backend.core.i18n import (
+    from acessilia_core.i18n import (
         configure_locales,
         configure_server_locale,
         negotiate_server_locale,
     )
-    from backend.core.logger import setup_logger
+    from acessilia_core.logger import setup_logger
 
     s = default_settings if settings is None else settings
     hints = dict(os.environ if environ is None else environ)

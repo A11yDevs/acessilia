@@ -1,6 +1,6 @@
 """Reading the text layer's spans in batches (#402).
 
-Characterization of ``backend.core.toolbox.text_spans.fetch_text_spans``, written on
+Characterization of ``acessilia_core.toolbox.text_spans.fetch_text_spans``, written on
 develop before the batching moved to ``ToolboxPdfClient``. The inline math
 steps call it; their tests replace it whole.
 """
@@ -11,10 +11,10 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from acessilia_core.toolbox import text_spans
 from acessilia_sdk.toolbox.clients.pdf import TEXT_SPANS_MAX_PAGES, ToolboxPdfClient
 from acessilia_sdk.toolbox.errors import ToolboxError
 
-from backend.core.toolbox import text_spans
 from tests.core_config_support import toolbox_config
 
 
@@ -48,7 +48,7 @@ def owned(monkeypatch):
         made.append((cls.__name__, kwargs))
         return client
 
-    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", make)
+    monkeypatch.setattr("acessilia_core.toolbox.toolbox_client.make_toolbox_client", make)
     return client, made
 
 
@@ -102,7 +102,7 @@ def test_without_an_artifact_the_file_is_not_resent(owned) -> None:
 
 def test_an_owned_client_is_closed_when_a_batch_fails(monkeypatch, owned) -> None:
     client = _FakeSpansClient(fail_on_call=2)
-    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", lambda cls, _toolbox, **kw: client)
+    monkeypatch.setattr("acessilia_core.toolbox.toolbox_client.make_toolbox_client", lambda cls, _toolbox, **kw: client)
 
     with pytest.raises(ToolboxError):
         _fetch(list(range(1, TEXT_SPANS_MAX_PAGES + 2)))
@@ -127,6 +127,6 @@ def test_a_page_repeated_in_a_later_answer_replaces_the_earlier(monkeypatch, own
             return document
 
     client = Repeating()
-    monkeypatch.setattr("backend.core.toolbox.toolbox_client.make_toolbox_client", lambda cls, _toolbox, **kw: client)
+    monkeypatch.setattr("acessilia_core.toolbox.toolbox_client.make_toolbox_client", lambda cls, _toolbox, **kw: client)
 
     assert _fetch(list(range(1, TEXT_SPANS_MAX_PAGES + 2)))[1]["call"] == 2

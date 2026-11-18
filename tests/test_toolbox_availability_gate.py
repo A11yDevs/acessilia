@@ -7,9 +7,9 @@ out of the plan and fails closed without a catalogue.
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 from collections import OrderedDict
 
@@ -20,8 +20,8 @@ from pathlib import Path
 import pytest
 
 from acessilia_sdk.toolbox import snapshot_from_payloads
-from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
-from backend.core.planning import toolbox_gate
+from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
+from acessilia_core.planning import toolbox_gate
 from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import (
     build_element as _element,
@@ -236,7 +236,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
     """Through ``execute``: the gate gets the run's ``CoreConfig``, not the settings."""
     from types import SimpleNamespace
 
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
 
     class Stop(Exception):
         pass
@@ -269,7 +269,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
 
 
 def test_a_checkpoint_without_the_mode_gets_the_mode_of_the_run() -> None:
-    from backend.core.pipeline.orchestrator import _availability_from
+    from acessilia_core.pipeline.orchestrator import _availability_from
 
     decision = _availability_from({}, toolbox_config(availability_gate="enforce"))
 

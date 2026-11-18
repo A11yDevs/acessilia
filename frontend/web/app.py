@@ -26,9 +26,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
-from backend.core.i18n import t, active_locale
+from acessilia_core.i18n import t, active_locale
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n.log_messages import (
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
     LOG_WEB_GLOBAL_ERROR,
@@ -37,7 +37,7 @@ from backend.core.i18n.log_messages import (
     LOG_WEB_UPLOAD_ERROR,
 )
 from backend.services.access_log_filter import AccessLogFilter
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.services.validators import MSG_FILE_TOO_LARGE
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client

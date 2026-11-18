@@ -93,7 +93,7 @@ Deliver document and image conversion to accessible formats through:
    - PDDL domain (v2.2+) encodes task dependencies and ordering constraints
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
-3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/core/agents/prompts` and to verbosity profiles in `docstruct.profiles`.
+3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `libs/core/src/acessilia_core/agents/prompts` and to verbosity profiles in `docstruct.profiles`.
 4. Extraction is hybrid: deterministic text extraction first, then AI vision for scanned/no-text pages and image inputs (see principle 2.5).
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.
@@ -137,7 +137,7 @@ Deliver document and image conversion to accessible formats through:
 ## 7. Ecosystem architecture principles
 
 These principles govern how the four components of the ecosystem divide the
-work: the core (`backend/`), the SDK (`libs/sdk`), docstruct (`libs/docstruct`)
+work: the core (`libs/core`), the SDK (`libs/sdk`), docstruct (`libs/docstruct`)
 and the [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox). Each
 one links to the ADR that details it and says how compliance is checked. An
 exception requires an ADR that states its justification, scope, owner and exit
@@ -181,9 +181,9 @@ Toolbox executes operational capabilities.
      offer one.
    - **Detail:** [ADR-0003](adr/0003-remote-only-operational-capabilities.md).
    - **Checked by:** review, and
-     `tests/test_architecture_layers.py`, which fails if `backend/` imports
-     the Toolbox package, or if `backend/` or `frontend/` imports an
-     operational library. It has no allowlist: an exception needs an ADR,
+     `tests/test_architecture_layers.py`, which fails if the core or
+     `backend/` imports the Toolbox package, or if the core, `backend/` or
+     `frontend/` imports an operational library. It has no allowlist: an exception needs an ADR,
      and an allowlist, once added, can only shrink.
 5. **P5 — Reference-oriented processing.**
    - **Rule:** persisted artifacts are processed where they are stored and
@@ -258,7 +258,7 @@ The unversioned text before 2026-10-18 counts as **1.0.0**.
   preserves P8's regression, contract and integration tests, records the
   lockfile installation delivered by #405 / PR #539, and leaves coverage
   reporting to #366.
-- **2.0.7 (2026-11-14):** section 4.3 names `backend/core/agents/prompts`
+- **2.0.7 (2026-11-14):** section 4.3 names `libs/core/src/acessilia_core/agents/prompts`
   for the mode prompts, which ADR-0016's step 2 moved there from
   `backend/ai/prompts`. No principle changes.
 - **2.0.6 (2026-11-09):** P5's "Checked by" names the tests that now exist

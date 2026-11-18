@@ -14,11 +14,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.pipeline.enrichment import formulas as formula_stage
-from backend.core.pipeline.enrichment import pictures as picture_stage
-from backend.core.pipeline.enrichment import tables as table_stage
-from backend.core.ports import NoRegionCache
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
+from acessilia_core.ports import NoRegionCache
 from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
 from tests.pddl_support import build_element, build_manifest, install_formula_recognizer
 

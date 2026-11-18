@@ -95,7 +95,7 @@ keeps the default in `PROVIDER_DEFAULTS`. `timeouts` maps an export client's
 `timeout_key` to its own timeout; without one, the shared `timeout_seconds`
 applies. Keyword arguments to `make_client` override the configuration;
 `None` is ignored, and `base_url` replaces the configured endpoints. The core
-builds the same object from its `settings` (`backend/core/toolbox/toolbox_client.py`).
+builds the same object from its `settings` (`libs/core/src/acessilia_core/toolbox/toolbox_client.py`).
 
 ## Availability and failover
 
@@ -271,7 +271,7 @@ a capability or change a client's return type.
    instead and leaves `provider_key` unset. Both paths share the failover and
    retry rules. Export the client from `acessilia_sdk.toolbox.clients` and test
    it in `tests/clients/` with an explicit `base_url`.
-3. In the core, build it with `backend.core.toolbox.toolbox_client.make_toolbox_client`,
+3. In the core, build it with `acessilia_core.toolbox.toolbox_client.make_toolbox_client`,
    which passes the run's `ToolboxConfig`.
 
 ## Tests

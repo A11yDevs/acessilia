@@ -11,7 +11,7 @@ requires the config its agent was built with: nothing falls back to
 
 from __future__ import annotations
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 import ast
 import copy
@@ -23,15 +23,15 @@ import pytest
 
 from backend.config import settings as settings_module
 from backend.config.core_config import core_config_from_settings
-from backend.core.config import CoreConfig
-from backend.core.pipeline import preflight as pipeline_preflight
-from backend.core.ports import RunPorts
-from backend.core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
+from acessilia_core.config import CoreConfig
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.ports import RunPorts
+from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
 from tests.core_config_support import core_config
 from tests.pddl_support import build_orchestrator
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "backend" / "core"
+CORE = ROOT / "libs" / "core" / "src" / "acessilia_core"
 BUILDER = ROOT / "backend" / "config" / "core_config.py"
 
 
@@ -176,11 +176,11 @@ def test_the_core_reads_no_settings() -> None:
     keys, unnamed = _core_reads()
 
     assert not unnamed, "settings reads the scan cannot name:\n" + "\n".join(unnamed)
-    assert not keys, f"settings read by backend/core: {sorted(keys)}"
+    assert not keys, f"settings read by libs/core/src/acessilia_core: {sorted(keys)}"
 
 
 def test_the_core_imports_nothing_from_the_service_config() -> None:
-    """No module of ``backend/core`` imports ``backend.config``, inside a
+    """No module of ``libs/core/src/acessilia_core`` imports ``backend.config``, inside a
     function included: the service builds the configuration and passes it."""
     found = []
     for path in sorted(CORE.rglob("*.py")):
@@ -193,7 +193,7 @@ def test_the_core_imports_nothing_from_the_service_config() -> None:
             if any(m == "backend.config" or m.startswith("backend.config.") for m in modules):
                 found.append(f"{path.relative_to(ROOT).as_posix()}:{node.lineno}")
 
-    assert not found, "backend/core imports backend.config:\n" + "\n".join(found)
+    assert not found, "libs/core/src/acessilia_core imports backend.config:\n" + "\n".join(found)
 
 
 #: The groups the core now receives from its caller: none of their settings
@@ -218,7 +218,7 @@ def test_the_moved_groups_are_not_read_from_settings() -> None:
         if reads:
             found[rel] = sorted(reads)
 
-    assert not found, f"backend/core reads moved settings again: {found}"
+    assert not found, f"libs/core/src/acessilia_core reads moved settings again: {found}"
 
 
 def test_the_pending_reads_are_still_pending() -> None:
@@ -243,7 +243,7 @@ def test_the_scan_names_the_key_of_a_read(tmp_path, source) -> None:
     probe = tmp_path / "probe.py"
     probe.write_text(source, encoding="utf-8")
 
-    assert _scan(probe, "backend/core/probe.py") == ({"bot_token"}, [])
+    assert _scan(probe, "libs/core/src/acessilia_core/probe.py") == ({"bot_token"}, [])
 
 
 @pytest.mark.parametrize(
@@ -259,7 +259,7 @@ def test_the_scan_reports_a_read_it_cannot_name(tmp_path, source) -> None:
     probe = tmp_path / "probe.py"
     probe.write_text(source, encoding="utf-8")
 
-    assert _scan(probe, "backend/core/probe.py")[1]
+    assert _scan(probe, "libs/core/src/acessilia_core/probe.py")[1]
 
 
 def test_each_field_takes_its_setting() -> None:
@@ -352,8 +352,8 @@ async def test_a_given_config_wins_over_the_settings(monkeypatch, tmp_path) -> N
 
 
 def test_bind_run_gives_the_run_config_to_the_handlers_that_take_it() -> None:
-    from backend.core.execution.executor import MethodRegistry
-    from backend.core.pipeline.handlers.registry import bind_run
+    from acessilia_core.execution.executor import MethodRegistry
+    from acessilia_core.pipeline.handlers.registry import bind_run
 
     received = []
 
@@ -379,8 +379,8 @@ def test_bind_run_gives_the_run_config_to_the_handlers_that_take_it() -> None:
 
 
 def test_bind_run_keeps_the_registration_order() -> None:
-    from backend.core.execution.executor import MethodRegistry
-    from backend.core.pipeline.handlers.registry import bind_run
+    from acessilia_core.execution.executor import MethodRegistry
+    from acessilia_core.pipeline.handlers.registry import bind_run
 
     registry = MethodRegistry()
     for method in ("zeta", "alpha", "mu"):
@@ -396,7 +396,7 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
     monkeypatch, tmp_path
 ) -> None:
     """Through ``execute``: the plan runs on the run's executor, not the unbound one."""
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -440,7 +440,7 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
 
 
 def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
     from tests.pddl_support import build_element, build_manifest
 
     async def no_media(*_args, **_kwargs):
@@ -468,7 +468,7 @@ async def test_concurrent_runs_each_get_their_own_config(monkeypatch, tmp_path) 
     """Two runs at once over one shared registry: each handler sees its own run's config."""
     import asyncio
 
-    from backend.core.execution.models import MethodResult
+    from acessilia_core.execution.models import MethodResult
 
     def handler(manifest, obligation_id, *, config):
         return MethodResult(success=True, validated=True, message=config.fusion.secondary_provider)
@@ -535,7 +535,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
 
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
     monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: ("plan", None))
-    monkeypatch.setattr("backend.core.pipeline.orchestrator._save_plan", no_save)
+    monkeypatch.setattr("acessilia_core.pipeline.orchestrator._save_plan", no_save)
 
     await orchestrator._replan_until_done(
         manifest,
@@ -558,108 +558,108 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
 @pytest.mark.parametrize(
     ("function", "parameter"),
     [
-        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "fusion"),
+        ("acessilia_core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "fusion"),
         (
-            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "acessilia_core.agents.informational_structural:InformationalStructuralAgent.process",
             "document",
         ),
         (
-            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "acessilia_core.agents.informational_structural:InformationalStructuralAgent.process",
             "fusion",
         ),
-        ("backend.core.pipeline.fusion:extract_fused", "secondary_provider"),
-        ("backend.core.planning.toolbox_gate:evaluate", "config"),
-        ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "config"),
-        ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "model_calls"),
-        ("backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "ports"),
-        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "operations"),
+        ("acessilia_core.pipeline.fusion:extract_fused", "secondary_provider"),
+        ("acessilia_core.planning.toolbox_gate:evaluate", "config"),
+        ("acessilia_core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "config"),
+        ("acessilia_core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "model_calls"),
+        ("acessilia_core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute", "ports"),
+        ("acessilia_core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "operations"),
         (
-            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "acessilia_core.agents.informational_structural:InformationalStructuralAgent.process",
             "operations",
         ),
-        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "region_cache"),
-        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "region_cache"),
-        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "region_cache"),
-        ("backend.core.pipeline.handlers.inspection:_handle_pymupdf_region_method", "ports"),
+        ("acessilia_core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "region_cache"),
+        ("acessilia_core.pipeline.enrichment.formulas:_classify_formula_regions", "region_cache"),
+        ("acessilia_core.pipeline.enrichment.formulas:_enrich_formula_latex", "region_cache"),
+        ("acessilia_core.pipeline.handlers.inspection:_handle_pymupdf_region_method", "ports"),
         (
-            "backend.core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
+            "acessilia_core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
             "ports",
         ),
         ("backend.service:process", "config"),
-        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "paths"),
+        ("acessilia_core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "paths"),
         (
-            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "acessilia_core.agents.informational_structural:InformationalStructuralAgent.process",
             "paths",
         ),
-        ("backend.core.manifest.toolbox_extractor:_persist_fusion_reuse", "data_dir"),
-        ("backend.core.manifest.toolbox_extractor:_persist_secondary_extraction", "data_dir"),
-        ("backend.core.pipeline.handlers.fusion:_persist_fusion_payload", "data_dir"),
-        ("backend.core.pipeline.handlers.inspection:_save_region_artifact", "data_dir"),
-        ("backend.core.agents.vision_agent:VisionAgent.__init__", "models"),
-        ("backend.core.agents.data_agent:DataAgent.__init__", "models"),
-        ("backend.core.agents.data_agent:DataAgent.__init__", "toolbox"),
-        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "models"),
-        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "models"),
-        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "models"),
-        ("backend.core.pipeline.enrichment.tables:_enrich_table_structures", "models"),
-        ("backend.core.pipeline.handlers.inspection:_inspect_region", "models"),
-        ("backend.core.pipeline.handlers.inspection:_inspect_page", "models"),
-        ("backend.core.pipeline.toolbox:_toolbox_render", "toolbox"),
-        ("backend.core.pipeline.toolbox:_toolbox_formula_crop", "toolbox"),
-        ("backend.core.pipeline.enrichment.common:_extract_picture_bytes", "toolbox"),
-        ("backend.core.pipeline.enrichment.formulas:_formula_recognition_crop", "toolbox"),
-        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "toolbox"),
-        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "toolbox"),
-        ("backend.core.pipeline.enrichment.tables:_enrich_table_structures", "toolbox"),
-        ("backend.core.pipeline.judge:_render_page_png", "toolbox"),
-        ("backend.core.pipeline.judge:_judge_page", "toolbox"),
-        ("backend.core.pipeline.judge:_judge_one_page", "toolbox"),
-        ("backend.core.pipeline.handlers.inspection:_render_inspection_region", "toolbox"),
-        ("backend.core.pipeline.handlers.inspection:_render_source_page", "toolbox"),
-        ("backend.core.pipeline.handlers.inspection:_inspect_region", "toolbox"),
-        ("backend.core.pipeline.handlers.inspection:_inspect_page", "toolbox"),
-        ("backend.core.agents.vision_agent:VisionAgent.__init__", "toolbox"),
-        ("backend.core.toolbox.vision_payload:downscale_image", "toolbox"),
-        ("backend.core.toolbox.toolbox_math_tools:toolbox_recognize_formula", "toolbox"),
-        ("backend.core.toolbox.toolbox_math_tools:toolbox_convert_latex", "toolbox"),
-        ("backend.core.toolbox.toolbox_math_tools:toolbox_verbalize_latex", "toolbox"),
-        ("backend.core.pipeline.handlers.formula:_handle_mathml_method", "config"),
-        ("backend.core.pipeline.handlers.formula:_handle_latex_verbalizer_method", "config"),
-        ("backend.core.pipeline.handlers.judge:_handle_vlm_pairwise_judge_method", "config"),
-        ("backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "toolbox"),
+        ("acessilia_core.manifest.toolbox_extractor:_persist_fusion_reuse", "data_dir"),
+        ("acessilia_core.manifest.toolbox_extractor:_persist_secondary_extraction", "data_dir"),
+        ("acessilia_core.pipeline.handlers.fusion:_persist_fusion_payload", "data_dir"),
+        ("acessilia_core.pipeline.handlers.inspection:_save_region_artifact", "data_dir"),
+        ("acessilia_core.agents.vision_agent:VisionAgent.__init__", "models"),
+        ("acessilia_core.agents.data_agent:DataAgent.__init__", "models"),
+        ("acessilia_core.agents.data_agent:DataAgent.__init__", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.formulas:_classify_formula_regions", "models"),
+        ("acessilia_core.pipeline.enrichment.formulas:_enrich_formula_latex", "models"),
+        ("acessilia_core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "models"),
+        ("acessilia_core.pipeline.enrichment.tables:_enrich_table_structures", "models"),
+        ("acessilia_core.pipeline.handlers.inspection:_inspect_region", "models"),
+        ("acessilia_core.pipeline.handlers.inspection:_inspect_page", "models"),
+        ("acessilia_core.pipeline.toolbox:_toolbox_render", "toolbox"),
+        ("acessilia_core.pipeline.toolbox:_toolbox_formula_crop", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.common:_extract_picture_bytes", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.formulas:_formula_recognition_crop", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.formulas:_classify_formula_regions", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.tables:_enrich_table_structures", "toolbox"),
+        ("acessilia_core.pipeline.judge:_render_page_png", "toolbox"),
+        ("acessilia_core.pipeline.judge:_judge_page", "toolbox"),
+        ("acessilia_core.pipeline.judge:_judge_one_page", "toolbox"),
+        ("acessilia_core.pipeline.handlers.inspection:_render_inspection_region", "toolbox"),
+        ("acessilia_core.pipeline.handlers.inspection:_render_source_page", "toolbox"),
+        ("acessilia_core.pipeline.handlers.inspection:_inspect_region", "toolbox"),
+        ("acessilia_core.pipeline.handlers.inspection:_inspect_page", "toolbox"),
+        ("acessilia_core.agents.vision_agent:VisionAgent.__init__", "toolbox"),
+        ("acessilia_core.toolbox.vision_payload:downscale_image", "toolbox"),
+        ("acessilia_core.toolbox.toolbox_math_tools:toolbox_recognize_formula", "toolbox"),
+        ("acessilia_core.toolbox.toolbox_math_tools:toolbox_convert_latex", "toolbox"),
+        ("acessilia_core.toolbox.toolbox_math_tools:toolbox_verbalize_latex", "toolbox"),
+        ("acessilia_core.pipeline.handlers.formula:_handle_mathml_method", "config"),
+        ("acessilia_core.pipeline.handlers.formula:_handle_latex_verbalizer_method", "config"),
+        ("acessilia_core.pipeline.handlers.judge:_handle_vlm_pairwise_judge_method", "config"),
+        ("acessilia_core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "toolbox"),
         (
-            "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+            "acessilia_core.agents.informational_structural:InformationalStructuralAgent.process",
             "toolbox",
         ),
-        ("backend.core.pipeline.fusion:extract_fused", "toolbox"),
-        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "toolbox"),
-        ("backend.core.toolbox.media_inspect:inspect_source_media", "toolbox"),
-        ("backend.core.toolbox.pdf_ua_audit:audit_pdf_ua", "toolbox"),
-        ("backend.core.toolbox.text_spans:fetch_text_spans", "toolbox"),
-        ("backend.core.export.exporters.docx_exporter:export_docx", "toolbox"),
-        ("backend.core.export.exporters.pdf_exporter:export_pdf_ua", "toolbox"),
-        ("backend.core.export.pandoc_exporter:toolbox_export_docx", "toolbox"),
-        ("backend.core.export.pandoc_exporter:toolbox_export_pdf_ua", "toolbox"),
+        ("acessilia_core.pipeline.fusion:extract_fused", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.formulas:_enrich_formula_latex", "toolbox"),
+        ("acessilia_core.toolbox.media_inspect:inspect_source_media", "toolbox"),
+        ("acessilia_core.toolbox.pdf_ua_audit:audit_pdf_ua", "toolbox"),
+        ("acessilia_core.toolbox.text_spans:fetch_text_spans", "toolbox"),
+        ("acessilia_core.export.exporters.docx_exporter:export_docx", "toolbox"),
+        ("acessilia_core.export.exporters.pdf_exporter:export_pdf_ua", "toolbox"),
+        ("acessilia_core.export.pandoc_exporter:toolbox_export_docx", "toolbox"),
+        ("acessilia_core.export.pandoc_exporter:toolbox_export_pdf_ua", "toolbox"),
         (
-            "backend.core.pipeline.handlers.fusion:_handle_single_provider_method",
+            "acessilia_core.pipeline.handlers.fusion:_handle_single_provider_method",
             "config",
         ),
-        ("backend.core.agents.vision_agent:VisionAgent.__init__", "region_cache"),
-        ("backend.core.pipeline.enrichment.common:_retry_failed", "delay_seconds"),
-        ("backend.core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "vision"),
-        ("backend.core.pipeline.enrichment.formulas:_classify_formula_regions", "vision"),
-        ("backend.core.pipeline.enrichment.formulas:_enrich_formula_latex", "vision"),
-        ("backend.core.pipeline.enrichment.tables:_enrich_table_structures", "vision"),
-        ("backend.core.pipeline.enrichment.tables:_tables_to_read", "visual_review"),
-        ("backend.core.pipeline.handlers.inspection:_render_source_page", "dpi"),
-        ("backend.core.pipeline.handlers.inspection:_inspect_region", "region_cache"),
-        ("backend.core.pipeline.handlers.inspection:_inspect_page", "region_cache"),
+        ("acessilia_core.agents.vision_agent:VisionAgent.__init__", "region_cache"),
+        ("acessilia_core.pipeline.enrichment.common:_retry_failed", "delay_seconds"),
+        ("acessilia_core.pipeline.enrichment.pictures:_enrich_picture_descriptions", "vision"),
+        ("acessilia_core.pipeline.enrichment.formulas:_classify_formula_regions", "vision"),
+        ("acessilia_core.pipeline.enrichment.formulas:_enrich_formula_latex", "vision"),
+        ("acessilia_core.pipeline.enrichment.tables:_enrich_table_structures", "vision"),
+        ("acessilia_core.pipeline.enrichment.tables:_tables_to_read", "visual_review"),
+        ("acessilia_core.pipeline.handlers.inspection:_render_source_page", "dpi"),
+        ("acessilia_core.pipeline.handlers.inspection:_inspect_region", "region_cache"),
+        ("acessilia_core.pipeline.handlers.inspection:_inspect_page", "region_cache"),
         (
-            "backend.core.pipeline.handlers.inspection:_handle_pymupdf_region_method",
+            "acessilia_core.pipeline.handlers.inspection:_handle_pymupdf_region_method",
             "config",
         ),
         (
-            "backend.core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
+            "acessilia_core.pipeline.handlers.inspection:_handle_vision_page_inspection_method",
             "config",
         ),
     ],
@@ -686,23 +686,23 @@ def test_the_run_config_parameters_are_required(function, parameter) -> None:
 @pytest.mark.parametrize(
     ("function", "parameter"),
     [
-        ("backend.core.pipeline.preflight:_inspect_media", "toolbox"),
-        ("backend.core.agents.ai_client:get_agno_model", "models"),
-        ("backend.core.agents.ai_client:get_agno_model", "toolbox"),
-        ("backend.core.agents.ai_client:active_model_name", "models"),
-        ("backend.core.toolbox.toolbox_client:make_toolbox_client", "toolbox"),
-        ("backend.core.toolbox.toolbox_client:toolbox_client_config", "toolbox"),
-        ("backend.core.toolbox.toolbox_client:toolbox_endpoints", "toolbox"),
-        ("backend.core.toolbox.toolbox_client:toolbox_vlm_endpoint", "toolbox"),
-        ("backend.core.pipeline.toolbox:_render_client", "toolbox"),
-        ("backend.core.pipeline.fusion:_structure_client", "toolbox"),
-        ("backend.core.pipeline.canonical_builder:latex_to_mathml", "toolbox"),
-        ("backend.core.pipeline.canonical_builder:verbalize_latex", "toolbox"),
-        ("backend.core.pipeline.canonical_builder:verbalize_inline_latex", "toolbox"),
-        ("backend.core.pipeline.canonical_builder:_ToolboxMathEnricher.__init__", "toolbox"),
-        ("backend.core.pipeline.enrichment.inline_math:_TextSpanReader.__init__", "toolbox"),
-        ("backend.core.pipeline.enrichment.inline_math:_mark_inline_math", "text_spans"),
-        ("backend.core.pipeline.enrichment.inline_math:_mark_table_inline_math", "text_spans"),
+        ("acessilia_core.pipeline.preflight:_inspect_media", "toolbox"),
+        ("acessilia_core.agents.ai_client:get_agno_model", "models"),
+        ("acessilia_core.agents.ai_client:get_agno_model", "toolbox"),
+        ("acessilia_core.agents.ai_client:active_model_name", "models"),
+        ("acessilia_core.toolbox.toolbox_client:make_toolbox_client", "toolbox"),
+        ("acessilia_core.toolbox.toolbox_client:toolbox_client_config", "toolbox"),
+        ("acessilia_core.toolbox.toolbox_client:toolbox_endpoints", "toolbox"),
+        ("acessilia_core.toolbox.toolbox_client:toolbox_vlm_endpoint", "toolbox"),
+        ("acessilia_core.pipeline.toolbox:_render_client", "toolbox"),
+        ("acessilia_core.pipeline.fusion:_structure_client", "toolbox"),
+        ("acessilia_core.pipeline.canonical_builder:latex_to_mathml", "toolbox"),
+        ("acessilia_core.pipeline.canonical_builder:verbalize_latex", "toolbox"),
+        ("acessilia_core.pipeline.canonical_builder:verbalize_inline_latex", "toolbox"),
+        ("acessilia_core.pipeline.canonical_builder:_ToolboxMathEnricher.__init__", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.inline_math:_TextSpanReader.__init__", "toolbox"),
+        ("acessilia_core.pipeline.enrichment.inline_math:_mark_inline_math", "text_spans"),
+        ("acessilia_core.pipeline.enrichment.inline_math:_mark_table_inline_math", "text_spans"),
     ],
 )
 def test_the_internal_run_parameters_have_no_default(function, parameter) -> None:
@@ -728,24 +728,24 @@ def test_the_internal_run_parameters_have_no_default(function, parameter) -> Non
 #: frontends and the scripts, must bind to the signature (review of #555:
 #: the AgentOS runtime in ``frontend/`` kept the old call).
 CALLERS_CHECKED = {
-    "get_agno_model": "backend.core.agents.ai_client:get_agno_model",
-    "active_model_name": "backend.core.agents.ai_client:active_model_name",
-    "make_toolbox_client": "backend.core.toolbox.toolbox_client:make_toolbox_client",
-    "toolbox_client_config": "backend.core.toolbox.toolbox_client:toolbox_client_config",
-    "toolbox_endpoints": "backend.core.toolbox.toolbox_client:toolbox_endpoints",
-    "toolbox_vlm_endpoint": "backend.core.toolbox.toolbox_client:toolbox_vlm_endpoint",
-    "VisionAgent": "backend.core.agents.vision_agent:VisionAgent",
-    "DataAgent": "backend.core.agents.data_agent:DataAgent",
-    "extract_fused": "backend.core.pipeline.fusion:extract_fused",
-    "inspect_source_media": "backend.core.toolbox.media_inspect:inspect_source_media",
-    "audit_pdf_ua": "backend.core.toolbox.pdf_ua_audit:audit_pdf_ua",
-    "fetch_text_spans": "backend.core.toolbox.text_spans:fetch_text_spans",
-    "export_docx": "backend.core.export.exporters.docx_exporter:export_docx",
-    "export_pdf_ua": "backend.core.export.exporters.pdf_exporter:export_pdf_ua",
-    "setup_logger": "backend.core.logger:setup_logger",
+    "get_agno_model": "acessilia_core.agents.ai_client:get_agno_model",
+    "active_model_name": "acessilia_core.agents.ai_client:active_model_name",
+    "make_toolbox_client": "acessilia_core.toolbox.toolbox_client:make_toolbox_client",
+    "toolbox_client_config": "acessilia_core.toolbox.toolbox_client:toolbox_client_config",
+    "toolbox_endpoints": "acessilia_core.toolbox.toolbox_client:toolbox_endpoints",
+    "toolbox_vlm_endpoint": "acessilia_core.toolbox.toolbox_client:toolbox_vlm_endpoint",
+    "VisionAgent": "acessilia_core.agents.vision_agent:VisionAgent",
+    "DataAgent": "acessilia_core.agents.data_agent:DataAgent",
+    "extract_fused": "acessilia_core.pipeline.fusion:extract_fused",
+    "inspect_source_media": "acessilia_core.toolbox.media_inspect:inspect_source_media",
+    "audit_pdf_ua": "acessilia_core.toolbox.pdf_ua_audit:audit_pdf_ua",
+    "fetch_text_spans": "acessilia_core.toolbox.text_spans:fetch_text_spans",
+    "export_docx": "acessilia_core.export.exporters.docx_exporter:export_docx",
+    "export_pdf_ua": "acessilia_core.export.exporters.pdf_exporter:export_pdf_ua",
+    "setup_logger": "acessilia_core.logger:setup_logger",
 }
 
-CALLER_ROOTS = ("backend", "frontend", "scripts")
+CALLER_ROOTS = ("backend", "libs/core/src", "frontend", "scripts")
 
 #: Methods with generic names, checked only on the calls that pass a keyword
 #: no other method of that name takes: ``fusion=`` for the extractor's
@@ -753,14 +753,14 @@ CALLER_ROOTS = ("backend", "frontend", "scripts")
 #: ``structured_output=`` for the orchestrator's ``execute``.
 METHOD_CALLERS_CHECKED = {
     "extract": (
-        "backend.core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "fusion"
+        "acessilia_core.manifest.toolbox_extractor:ToolboxManifestExtractor.extract", "fusion"
     ),
     "process": (
-        "backend.core.agents.informational_structural:InformationalStructuralAgent.process",
+        "acessilia_core.agents.informational_structural:InformationalStructuralAgent.process",
         "fusion",
     ),
     "execute": (
-        "backend.core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute",
+        "acessilia_core.pipeline.orchestrator:PddlAccessibilityOrchestrator.execute",
         "structured_output",
     ),
 }
@@ -881,8 +881,8 @@ def test_the_caller_scan_sees_a_method_call_that_leaves_out_the_paths() -> None:
 
 def test_the_agno_tools_refuse_to_run_without_their_agent_config(tmp_path) -> None:
     """No bridge: an Agno tool without a run takes the config its agent was built with."""
-    from backend.core.agents.fusion_agent import FusionAgent
-    from backend.core.agents.informational_structural import InformationalStructuralAgent
+    from acessilia_core.agents.fusion_agent import FusionAgent
+    from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 
     with pytest.raises(RuntimeError, match="config="):
         InformationalStructuralAgent(extractor=object()).extract_processing_manifest(
@@ -893,8 +893,8 @@ def test_the_agno_tools_refuse_to_run_without_their_agent_config(tmp_path) -> No
 
 
 def test_the_agno_tools_run_with_their_agent_config(monkeypatch, tmp_path) -> None:
-    from backend.core.agents.fusion_agent import FusionAgent
-    from backend.core.agents.informational_structural import InformationalStructuralAgent
+    from acessilia_core.agents.fusion_agent import FusionAgent
+    from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 
     config = core_config(fusion={"secondary_provider": "from-the-agent"})
     seen = {}

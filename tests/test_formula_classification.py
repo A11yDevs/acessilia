@@ -3,19 +3,19 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.pipeline import orchestrator as pddl
-from backend.core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
-from backend.core.pipeline.handlers import review as review_handlers
-from backend.core.agents.output_schemas import VisionOutput
-from backend.core.pipeline.elements import _element_to_block
+from acessilia_core.pipeline.handlers import review as review_handlers
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.pipeline.elements import _element_to_block
 from tests.pddl_support import (
     build_element,
     build_manifest,
     build_obligation,
     install_formula_recognizer,
 )
-from backend.core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
 
 
 def manifest_for(text=None):
@@ -176,7 +176,7 @@ async def test_a_classification_without_an_answer_keeps_the_formula_path(monkeyp
 
 @pytest.mark.asyncio
 async def test_a_reclassified_drawing_leaves_no_formula_obligation_behind(monkeypatch):
-    from backend.core.manifest.builder import _derive_v23_processing_needs
+    from acessilia_core.manifest.builder import _derive_v23_processing_needs
 
     manifest = manifest_for("Na+ + Cl-")
     observations, obligations = _derive_v23_processing_needs(manifest.elements)
@@ -211,7 +211,7 @@ async def test_a_reclassified_drawing_leaves_no_formula_obligation_behind(monkey
 
 @pytest.mark.asyncio
 async def test_an_unresolved_region_drops_its_normalization(monkeypatch):
-    from backend.core.manifest.builder import _derive_v23_processing_needs
+    from acessilia_core.manifest.builder import _derive_v23_processing_needs
 
     manifest = manifest_for("OH-")
     _, obligations = _derive_v23_processing_needs(manifest.elements)
@@ -264,7 +264,7 @@ def _html_of(element):
 
 
 def test_a_missing_candidate_prompt_falls_back_to_the_system_prompt(monkeypatch):
-    from backend.core.agents import vision_agent
+    from acessilia_core.agents import vision_agent
 
     monkeypatch.setattr(vision_agent, "load_region_prompt", lambda key: "")
     agent = vision_agent.VisionAgent(mode="medio", region_cache=None, toolbox=toolbox_config(), models=model_config())

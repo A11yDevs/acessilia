@@ -81,7 +81,7 @@ The rest, with the duplicates already on record:
 |---|---|---|
 | `_table_ast_from_rows` (orchestrator) | `docstruct.tables.ast.table_ast_from_rows` | Near-duplicate with different behaviour: `{"body": []}` against `None` for no rows. Recorded in the orchestrator inventory; merging it is a behaviour decision. |
 | `_block_kind` (orchestrator) | `docstruct.fusion.convert.classify_kind` | Near-duplicate with different behaviour. Recorded in the orchestrator inventory. |
-| `_area` (`backend/core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | The same computation, for a box that is present. |
+| `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | The same computation, for a box that is present. |
 | `_overlaps`, `_union_area` (`slides.py`) | none | Pure box geometry; docstruct candidates. (docstruct's `_overlaps` compares text spans, not boxes.) |
 | `decide` (`planning/toolbox_gate.py`) | `docstruct.fusion.adjudication.decide` | Same name only; unrelated. |
 | callout clustering (Toolbox normalization builder) | `docstruct.regions.grouping` | Known deviation of ADR-0002 ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)). |
@@ -95,11 +95,11 @@ operations, with the decision part staying in the core:
 | Operation | Today | Mechanism (SDK candidate) | Decision (stays in the core) |
 |---|---|---|---|
 | Formula chain | `_formula_recognition_crop`, `toolbox_math_tools`, the formula enrichment (crop, recognition, MathML and speech now call `acessilia_sdk.operations.formula`, phase 3 of #470) | render a region, then `math.recognize`, `math.convert` and `math.verbalize` in sequence | which formulas, the text-layer agreement gate, the vision fallback, the breaker |
-| Page judge | `_render_page_png`, `_judge_page`, `_judge_one_page` (in `backend/core/pipeline/judge.py` since step 6 of #402; the SDK split is still open) | render a page, then `document.adjudicate.page`, read `pB` | which pages, the threshold, whether to swap |
-| Media inspection | `backend/core/toolbox/media_inspect.py` | `media.inspect` | what a slide deck or a page limit means for the job |
-| PDF/UA audit | `backend/core/toolbox/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | what a failed audit does to the job |
-| Text spans | `backend/core/toolbox/text_spans.py` | already `ToolboxPdfClient.text_spans_by_page` (#455) | which pages, the per-document cache |
-| Pandoc export | `backend/core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | which profile, which formats |
+| Page judge | `_render_page_png`, `_judge_page`, `_judge_one_page` (in `libs/core/src/acessilia_core/pipeline/judge.py` since step 6 of #402; the SDK split is still open) | render a page, then `document.adjudicate.page`, read `pB` | which pages, the threshold, whether to swap |
+| Media inspection | `libs/core/src/acessilia_core/toolbox/media_inspect.py` | `media.inspect` | what a slide deck or a page limit means for the job |
+| PDF/UA audit | `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | what a failed audit does to the job |
+| Text spans | `libs/core/src/acessilia_core/toolbox/text_spans.py` | already `ToolboxPdfClient.text_spans_by_page` (#455) | which pages, the per-document cache |
+| Pandoc export | `libs/core/src/acessilia_core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | which profile, which formats |
 
 ## Open, for ADR-0017 and its follow-ups
 

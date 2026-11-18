@@ -4,11 +4,11 @@ import os
 import subprocess
 import sys
 
-from backend.core.i18n import t
+from acessilia_core.i18n import t
 from backend.config.process_setup import setup_process
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.config.settings import settings
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n.log_messages import (
     LOG_API_INTERFACE_ENABLED,
     LOG_BOT_ALREADY_RUNNING,
     LOG_BOT_INTERRUPTED_BY_USER,
