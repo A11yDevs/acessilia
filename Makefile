@@ -20,7 +20,7 @@ help:
 	@printf '%s\n' \
 		'make test-file F=tests/test_example.py  run one file or node id' \
 		'make test-failed                        rerun the tests that failed last time' \
-		'make test-all                           run the core (4 workers), docstruct and SDK suites'
+		'make test-all                           run the main suite (4 workers), docstruct, SDK and libs/core'
 
 test-file:
 	@if [ -z "$(F)" ]; then \
@@ -37,4 +37,5 @@ test-all:
 	$(PYTEST) $(PYTEST_FLAGS) $(CORE_PARALLEL) --durations=$(DURATIONS) || status=$$?; \
 	(cd libs/docstruct && $(UV) run --extra dev pytest --durations=$(DURATIONS)) || status=$$?; \
 	(cd libs/sdk && $(UV) run --extra dev pytest --durations=$(DURATIONS)) || status=$$?; \
+	(cd libs/core && $(UV) run --extra dev pytest --durations=$(DURATIONS)) || status=$$?; \
 	exit $$status

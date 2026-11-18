@@ -17,7 +17,7 @@ Issue #342 regressions cover list continuations across paragraphs and tables wit
 The supported local loop is described in [docs/testing.md](../docs/testing.md):
 
 ```bash
-# Everything CI runs, non-E2E (core, docstruct and SDK)
+# Everything CI runs, non-E2E (main suite, docstruct, SDK and libs/core)
 make test-all
 
 # One file or one node id

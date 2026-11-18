@@ -55,7 +55,9 @@ def test_core_suite_runs_with_bounded_parallelism() -> None:
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
-    assert set(jobs["delivery"]["needs"]) >= {"tests", "sdk-isolated", "docstruct-isolated"}
+    assert set(jobs["delivery"]["needs"]) >= {
+        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated",
+    }
     assert "sdk-isolated" in jobs
     assert "docstruct-isolated" in jobs
 
@@ -100,6 +102,29 @@ def test_sdk_runs_alone_with_docstruct_only() -> None:
         assert f'"{name}"' in check
     assert '"docstruct"' not in check
     assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
+
+
+def test_core_runs_alone_from_its_wheel() -> None:
+    """The core installs from its own lock, without the service, and its
+    smoke test runs outside the checkout (ADR-0016, step 6)."""
+    job = _workflow()["jobs"]["core-isolated"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    install = steps["Install the core alone from its lock"]["run"]
+    assert "uv lock --check --project libs/core" in install
+    assert "uv sync --locked --extra dev --project libs/core --no-editable" in install
+    check = steps["Check that the service is not importable"]
+    for name in ("backend", "frontend", "fastapi", "acessilia_toolbox"):
+        assert f'"{name}"' in check["run"]
+    assert "site-packages" in check["run"]
+    assert "tests/test_boundary.py" in steps["Run the boundary test on the source"]["run"]
+    smoke = steps["Run the smoke test outside the checkout"]["run"]
+    assert '"$RUNNER_TEMP/core-smoke"' in smoke and "cp libs/core/tests/test_smoke.py" in smoke
+    assert '--project "$GITHUB_WORKSPACE/libs/core"' in smoke
+    assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
+    example = steps["Run the table stage from a script"]["run"]
+    assert "libs/core/examples/table_stage.py" in example
+    assert "tables_manifest.json" in example and "text-heuristic" in example
 
 
 def test_ci_installs_the_root_environment_from_the_lock() -> None:
