@@ -1,22 +1,22 @@
 """The page judge: which provider's reading of a page the vision model prefers.
 
 For ``FUSION_MODE=dual``, ``_judge_texts`` picks the pages worth judging and
-their two candidates; ``_judge_one_page`` renders the page through the core's
-binding to ``pdf.render`` (``_render_page_png``), asks ``document.adjudicate.page``
-through the Toolbox (``_judge_page``) and reads the answer's ``pB`` with the
-SDK's ``page_judgement_probability``; ``_judgement_result`` records each page's
-judgement on its elements and reports the method's outcome. Moved verbatim from
-the PDDL orchestrator once ADR-0017 was accepted (#402, phase 3, step 6).
-Whether the render, adjudication and ``pB`` reading become an SDK operation, as
-the formula chain did, is a later decision.
+their two candidates; ``_judge_one_page`` renders the page (``_render_page_png``)
+and asks ``document.adjudicate.page`` (``_judge_page``) through the SDK's page
+judge operation (``acessilia_sdk.operations.page_judge``, #470 phase 4), with
+the run's ``ToolboxConfig``. The operation renders and reads the answer; the
+core keeps its decisions: the source check, which pages, the truncation
+warning, the threshold that turns ``pB`` into a choice and what each failure
+means. ``_judgement_result`` records each page's judgement on its elements and
+reports the method's outcome.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from acessilia_sdk.toolbox.clients.adjudicate import page_judgement_probability
+from acessilia_sdk.operations.page_judge import JUDGE_PAGE_MAX_SIDE
 
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.execution.models import MethodResult
@@ -31,16 +31,21 @@ from acessilia_core.pipeline.secondary import (
     _page_markdown,
 )
 from acessilia_core.pipeline.toolbox import (
+    _check_renderable,
+    _render_client,
     _source_artifact_id,
-    _toolbox_render,
 )
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
 
+if TYPE_CHECKING:
+    from acessilia_sdk.operations.page_judge import PageJudgement
 
-#: Longest side of the page image sent to the judge. Two candidates plus the
-#: image must fit one 8192-token slot of the production VLM server.
-_JUDGE_PAGE_MAX_SIDE = 1600
+
+#: Longest side of the page image sent to the judge: the SDK operation's.
+#: Two candidates plus the image must fit one 8192-token slot of the
+#: production VLM server.
+_JUDGE_PAGE_MAX_SIDE = JUDGE_PAGE_MAX_SIDE
 
 
 def _render_page_png(
@@ -53,46 +58,52 @@ def _render_page_png(
 ) -> bytes:
     """Page ``page_number`` (1-based) of a PDF, PNG or JPEG as PNG, rendered by the Toolbox.
 
-    At most 144 dpi, with the longest side bounded by ``_JUDGE_PAGE_MAX_SIDE``.
+    The SDK's ``render_judge_page`` (144 dpi, longest side bounded by
+    ``_JUDGE_PAGE_MAX_SIDE``) with the run's ``toolbox``. The source is checked
+    first, as for every render (``ValueError``), and the client resends a
+    source the Toolbox lost.
     """
-    return _toolbox_render(
-        source_path,
-        page_number,
-        media_type=media_type,
-        dpi=144,
-        max_side=_JUDGE_PAGE_MAX_SIDE,
-        artifact_id=artifact_id,
-        toolbox=toolbox,
-    ).image
+    from acessilia_sdk.operations.page_judge import render_judge_page
+    from acessilia_sdk.runtime import run_sync
+
+    _check_renderable(source_path, media_type)
+
+    async def render() -> bytes:
+        client = _render_client(artifact_id, toolbox)
+        try:
+            page = await render_judge_page(
+                client, source_path, page_number=page_number, artifact_id=artifact_id
+            )
+        finally:
+            await client.close()
+        return page.image
+
+    return run_sync(render())
 
 
 def _judge_page(
     image: bytes, candidate_a: str, candidate_b: str, *, toolbox: ToolboxConfig
-) -> dict[str, Any]:
-    """Call document.adjudicate.page through the Toolbox (sync wrapper)."""
-    import tempfile
-
+) -> PageJudgement:
+    """The SDK's ``judge_page`` with the run's ``toolbox`` (sync wrapper)."""
+    from acessilia_sdk.operations.page_judge import judge_page
     from acessilia_sdk.runtime import run_sync
     from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
 
     from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 
-    async def call(path: Path) -> dict[str, Any]:
+    async def call() -> PageJudgement:
         client = make_toolbox_client(ToolboxAdjudicateClient, toolbox)
         try:
-            result = await client.judge_page(candidate_a, candidate_b, file_path=path)
+            judgement = await judge_page(client, image, candidate_a, candidate_b)
         finally:
             await client.close()
         logger.info(
             "Toolbox: page adjudication finished (pB={})",
-            result.get("document", {}).get("pB", "?"),
+            judgement.document.get("pB", "?"),
         )
-        return result
+        return judgement
 
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "page.png"
-        path.write_bytes(image)
-        return run_sync(call(path))
+    return run_sync(call())
 
 
 #: Characters per candidate the Toolbox's judge reads (``judge_max_chars`` of
@@ -202,7 +213,7 @@ def _judge_one_page(
         )
     logger.info("vlm-pairwise-judge: judging page {}", page_number)
     try:
-        result = _judge_page(image, primary_md, secondary_md, toolbox=toolbox)
+        judgement = _judge_page(image, primary_md, secondary_md, toolbox=toolbox)
     except (ToolboxAuthenticationError, ToolboxContractViolation) as exc:
         return None, MethodResult(
             success=False,
@@ -217,22 +228,21 @@ def _judge_one_page(
             message=t(step_messages.MSG_JUDGE_UNAVAILABLE).format(
                 error_type=type(exc).__name__, error=exc),
         )
-    document = result.get("document") or {}
-    p_b = page_judgement_probability(document)
+    p_b = judgement.p_b
     if p_b is None:
         return None, MethodResult(
             success=False,
             validated=False,
             message=t(step_messages.MSG_JUDGE_INVALID_PB).format(
-                page_number=page_number, p_b=repr(document.get("pB"))),
+                page_number=page_number, p_b=repr(judgement.document.get("pB"))),
         )
     return {
         "content": content,
         "choice": other if p_b > DEFAULT_NEW_THR else content,
         "pB": p_b,
-        "pB_ab": document.get("pB_ab"),
-        "pA_ba": document.get("pA_ba"),
-        "model": document.get("model"),
+        "pB_ab": judgement.p_b_ab,
+        "pA_ba": judgement.p_a_ba,
+        "model": judgement.model,
         "truncated": truncated,
     }, None
 

@@ -2,6 +2,16 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.2.3 — o juiz de página pela operação do SDK
+
+O método `vlm-pairwise-judge` renderiza a página e consulta o juiz pela
+operação do juiz de página do SDK (`acessilia_sdk.operations.page_judge`,
+#470). O core mantém as suas decisões: a conferência da fonte, quais páginas, o
+aviso de truncamento, o limiar e o que cada falha significa. As requisições,
+as escolhas e as mensagens de falha não mudam, exceto num caso. Uma resposta
+cujo documento não é um objeto levantava `AttributeError` para fora do método;
+agora faz o método falhar como uma resposta sem `pB` válido.
+
 ## 0.2.2 — AST de tabela a partir das linhas, pelo docstruct
 
 O construtor do payload e o preenchimento de tabelas montam o AST de uma tabela

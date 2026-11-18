@@ -100,7 +100,7 @@ operations, with the decision part staying in the core:
 | Operation | Today | Mechanism (SDK candidate) | Decision (stays in the core) |
 |---|---|---|---|
 | Formula chain | `_formula_recognition_crop`, `toolbox_math_tools`, the formula enrichment (crop, recognition, MathML and speech now call `acessilia_sdk.operations.formula`, phase 3 of #470) | render a region, then `math.recognize`, `math.convert` and `math.verbalize` in sequence | which formulas, the text-layer agreement gate, the vision fallback, the breaker |
-| Page judge | `_render_page_png`, `_judge_page`, `_judge_one_page` (in `libs/core/src/acessilia_core/pipeline/judge.py` since step 6 of #402). **The mechanism is an SDK operation** since #470 phase 4, `acessilia_sdk.operations.page_judge`; the core's reuse of it follows in its own PR | render a page, then `document.adjudicate.page`, read `pB` | which pages, the threshold, whether to swap |
+| Page judge | `_render_page_png`, `_judge_page`, `_judge_one_page` (in `libs/core/src/acessilia_core/pipeline/judge.py` since step 6 of #402). **The mechanism is an SDK operation** since #470 phase 4, `acessilia_sdk.operations.page_judge` (#605), and the core's judge calls its steps | render a page, then `document.adjudicate.page`, read `pB` | which pages, the threshold, whether to swap |
 | Media inspection | `libs/core/src/acessilia_core/toolbox/media_inspect.py` | `media.inspect` | what a slide deck or a page limit means for the job |
 | PDF/UA audit | `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py` | `pdf.validate.pdf_ua` | what a failed audit does to the job |
 | Text spans | `libs/core/src/acessilia_core/toolbox/text_spans.py` | already `ToolboxPdfClient.text_spans_by_page` (#455) | which pages, the per-document cache |
