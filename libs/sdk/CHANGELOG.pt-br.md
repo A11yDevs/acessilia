@@ -7,6 +7,16 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** o juiz de página, a segunda operação do SDK (ADR-0017, #470
+  fase 4): `acessilia_sdk.operations.page_judge`. O `render_judge_page`
+  renderiza uma página inteira para o juiz (`pdf.render`, 144 dpi, lado maior
+  de 1600 px); o `judge_page` pergunta ao `document.adjudicate.page` qual de
+  duas transcrições a página contém e lê `pB` (como o
+  `page_judgement_probability` lê), `pB_ab`, `pA_ba` e `model`; o
+  `page_judgement` roda os dois e repassa aos passos `dpi`, `max_side`,
+  `prompt` e `use_remote_cache`. Uma resposta sem `pB` válido é um julgamento
+  cujo `p_b` é `None`. Os erros tipados são levantados sem alteração.
+
 - **Adicionado** registros REST e leitores de arrays de datasets gerados, com métodos tipados adicionais que preservam paginação, nulls, caminhos de artefatos e compatibilidade da sincronização bruta (#213).
 
 - **Corrigido** os leitores tipados de estrutura e layout MinerU agora executam
