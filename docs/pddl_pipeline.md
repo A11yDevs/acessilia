@@ -275,8 +275,9 @@ succeeds the executor selects them and, if one is still open, reports
 `replan-required`. The rest of the plan still runs first, as after a failed
 method, and `complete-job` checks every selected obligation, these included.
 The replan takes them as roots, within the same `max_replans` budget. A
-checkpoint resume keeps them selected: an obligation the plan's manifest does
-not have was added during that execution.
+checkpoint resume keeps the selection the checkpoint recorded for an
+obligation the plan's manifest does not have: selected if the handler that
+added it succeeded, not selected if it failed.
 
 ### 5.1 `dual-provider-fusion` method
 

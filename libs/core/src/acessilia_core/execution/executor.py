@@ -206,15 +206,18 @@ class ExecutorAgent:
                     f"but the plan has {len(plan.steps)}"
                 )
         # An obligation the plan's manifest does not have was added by a
-        # handler of this execution (#594): a resumed checkpoint keeps it
-        # selected, and one still open asks for a replan, as when it was found.
+        # handler of this execution (#594). Its `selected` flag is the one the
+        # checkpoint recorded: set by a handler that succeeded
+        # (`_select_discovered`), left unset by one that failed. One still
+        # selected and open asks for a replan, as when it was found.
         planned = {item.id for item in manifest.obligations}
         selected = set(plan.selected_obligations)
         for obligation in working.obligations:
-            discovered = obligation.id not in planned
-            obligation.selected = obligation.id in selected or discovered
-            if discovered and obligation.status != "satisfied":
-                replan_required = True
+            if obligation.id not in planned:
+                if obligation.selected and obligation.status != "satisfied":
+                    replan_required = True
+                continue
+            obligation.selected = obligation.id in selected
 
         started_at = datetime.now(timezone.utc)
         state = _ExecutionState(

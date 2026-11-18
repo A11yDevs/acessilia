@@ -179,6 +179,45 @@ def test_a_resumed_execution_keeps_the_discovered_obligation():
     assert _replannable_obligation_ids(updated) == [DISCOVERED]
 
 
+def test_a_resumed_execution_keeps_unselected_what_a_failed_handler_added():
+    """Review of #597: resuming must not turn a failed handler's work live."""
+    manifest = _manifest()
+    plan = _plan(manifest, ["o-1"])
+
+    def review(manifest: ProcessingManifest, obligation_id: str) -> MethodResult:
+        _add(manifest, _discovered())
+        return MethodResult(success=False, validated=False, message="failed")
+
+    registry = MethodRegistry()
+    registry.register("human-review", review)
+    executor = ExecutorAgent(registry, domain=DomainBundle.load())
+
+    class Crash(BaseException):
+        """A process death right after the step whose handler failed."""
+
+    snapshots: list[dict] = []
+
+    def save(snapshot: dict) -> None:
+        snapshots.append(snapshot)
+        if len(snapshot["results"]) == 2:
+            raise Crash()
+
+    with pytest.raises(Crash):
+        executor.execute(plan, manifest, on_step=save)
+    last = snapshots[-1]
+    resume = ExecutionResume(
+        manifest=ProcessingManifest.model_validate(last["manifest"]),
+        results=[ExecutionStepResult.model_validate(item) for item in last["results"]],
+        replan_required=last["replan_required"],
+    )
+
+    updated, report = executor.execute(plan, manifest, resume=resume)
+
+    assert not next(item for item in updated.obligations if item.id == DISCOVERED).selected
+    assert not report.replan_required
+    assert DISCOVERED not in _replannable_obligation_ids(updated)
+
+
 # --- in a job ---------------------------------------------------------------
 
 
