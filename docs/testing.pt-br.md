@@ -26,7 +26,7 @@ própria suíte completa mais rápida.
 | Situação | Comando | O que acontece |
 |---|---|---|
 | Mudei um arquivo ou um teste | `make test-file F=tests/test_example.py` | Roda apenas esse caminho, sem E2E |
-| Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches do core, docstruct e SDK |
+| Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches da suíte principal, do docstruct, do SDK e do `libs/core` |
 | Quero a confiança local completa | `make test-all` | Suíte principal com quatro workers, depois docstruct, SDK e `libs/core` |
 | Quero só o core, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda o core non-E2E com quatro workers |
 | Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
@@ -59,7 +59,14 @@ o workflow `CI` do GitHub Actions:
 - `tests` e `SDK alone` são checks obrigatórios nos rulesets vivos de `main` e
   `develop`. O `docstruct alone` ainda não é: torná-lo obrigatório é uma mudança
   de ruleset, decisão de quem mantém o repositório (CONTRIBUTING.pt-br.md).
-- A entrega da imagem espera pelos três jobs.
+- **`core alone (Python 3.11)`** instala só o core, como wheel, a partir do
+  seu próprio lock (`libs/core/uv.lock`): nem o serviço, nem os front-ends, nem
+  o FastAPI, nem o pacote da Toolbox podem ser importados. Ele roda o teste de
+  fronteira sobre o código-fonte, o teste de fumaça a partir de uma pasta fora
+  do checkout e a etapa de tabelas pelo `libs/core/examples/table_stage.py`
+  (ADR-0016, passo 6). Ainda não é um check obrigatório, pelo mesmo motivo do
+  `docstruct alone`.
+- A entrega da imagem espera pelos quatro jobs.
 
 O check do core não tem mais uma etapa separada de coleta: a própria execução
 coleta a suíte. O nome do job é mantido como `tests (Python 3.11)` de propósito,
@@ -108,7 +115,7 @@ quando o cache está vazio e não conhece os caches separados das bibliotecas.
 
 O `make test-failed` é o wrapper suportado. Ele:
 
-- lê o cache `lastfailed` do core, do docstruct e do SDK;
+- lê o cache `lastfailed` da suíte principal, do docstruct, do SDK e do `libs/core`;
 - confere se os arquivos registrados ainda existem e coleta apenas esses
   arquivos;
 - reexecuta os node ids explícitos que ainda existem;

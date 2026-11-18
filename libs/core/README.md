@@ -26,6 +26,6 @@ with an explicit `CoreConfig` and a model-call runner of its own, and imports
 neither the service nor FastAPI (ADR-0016's proof of concept):
 
 ```bash
-uv run --extra dev python examples/table_stage.py \\
-  examples/fixtures/tables_manifest.json tables.pdf tables.json --data-dir /tmp/core-data
+uv run --extra dev python examples/table_stage.py \
+  examples/fixtures/tables_manifest.json tables.pdf tables.json
 ```

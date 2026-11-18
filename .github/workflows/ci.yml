@@ -220,8 +220,7 @@ jobs:
           uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" \
             python "$GITHUB_WORKSPACE/libs/core/examples/table_stage.py" \
             "$GITHUB_WORKSPACE/libs/core/examples/fixtures/tables_manifest.json" \
-            "$RUNNER_TEMP/core-smoke/tables.pdf" "$RUNNER_TEMP/core-smoke/tables.json" \
-            --data-dir "$RUNNER_TEMP/core-smoke/data"
+            "$RUNNER_TEMP/core-smoke/tables.pdf" "$RUNNER_TEMP/core-smoke/tables.json"
           grep -q '"table_linearization_hint": "text-heuristic"' "$RUNNER_TEMP/core-smoke/tables.json"
 
       - name: Reject unexpected skipped tests

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Rerun the tests that failed in the previous pytest session.
 
-The core, docstruct and SDK suites keep separate pytest caches, so this wrapper
-reads all three and reruns each suite's failures from its own project directory.
+The main, docstruct, SDK and libs/core suites keep separate pytest caches, so
+this wrapper reads all four and reruns each suite's failures from its own
+project directory.
 It passes the still-collected node ids explicitly instead of ``--lf``: with a
 recorded id that no longer exists, ``--lf`` falls back to the whole suite and
 runs unrelated tests.
@@ -62,6 +63,13 @@ def default_suites() -> list[Suite]:
             REPO_ROOT / "libs" / "sdk" / CACHE_RELATIVE,
             runner=("uv", "run", "--extra", "dev", "pytest"),
             prefix="libs/sdk",
+        ),
+        Suite(
+            "libs-core",
+            REPO_ROOT / "libs" / "core",
+            REPO_ROOT / "libs" / "core" / CACHE_RELATIVE,
+            runner=("uv", "run", "--extra", "dev", "pytest"),
+            prefix="libs/core",
         ),
     ]
 

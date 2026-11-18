@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 
 import acessilia_core
 from acessilia_core.agents.prompt_tools import (
+    CHEMISTRY_PROMPT,
     MODE_MAP,
     PROMPTS_DIR,
     REGION_PROMPT_MAP,
@@ -101,7 +102,11 @@ def test_every_prompt_ships_with_the_package() -> None:
     """The loader falls back to a short built-in text when a file is
     missing, so loading one is no proof: each file the loaders name must be
     in the package, and the loaded text must be the file's."""
-    names = set(MODE_MAP.values()) | {name for name in REGION_PROMPT_MAP.values() if name}
+    names = (
+        set(MODE_MAP.values())
+        | {name for name in REGION_PROMPT_MAP.values() if name}
+        | {CHEMISTRY_PROMPT}
+    )
     missing = sorted(name for name in names if not (PROMPTS_DIR / name).is_file())
 
     assert not missing, f"prompts missing from the package: {missing}"

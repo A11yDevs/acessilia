@@ -9,7 +9,7 @@ it exits.
 Usage::
 
     python libs/core/examples/table_stage.py MANIFEST.json SOURCE OUTPUT.json \\
-        [--toolbox-url URL] [--data-dir DIR]
+        [--toolbox-url URL]
 
 It reads a processing manifest, enriches its tables and writes the manifest
 back. A table whose extracted text already holds its rows is read from that
@@ -41,7 +41,7 @@ from acessilia_core.config import (
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
 from acessilia_core.toolbox.toolbox_client import TIMEOUT_KEYS
-from acessilia_sdk.toolbox import PROVIDER_DEFAULTS
+from acessilia_sdk.toolbox import PROVIDER_DEFAULTS, provider_default
 
 T = TypeVar("T")
 
@@ -59,7 +59,10 @@ class ThreadRunner:
 
 
 def explicit_config(*, toolbox_url: str, data_dir: Path) -> CoreConfig:
-    """Every value the core reads, given here; nothing comes from settings."""
+    """Every value the core reads, given here; nothing comes from settings.
+
+    ``data_dir`` completes the config; the table stage writes nothing there.
+    """
     return CoreConfig(
         toolbox=ToolboxConfig(
             base_url=toolbox_url,
@@ -90,7 +93,8 @@ def explicit_config(*, toolbox_url: str, data_dir: Path) -> CoreConfig:
             openrouter_site_url="",
             openrouter_app_name="acessilia-core-example",
             openrouter_max_tokens=4096,
-            toolbox_vlm_provider=PROVIDER_DEFAULTS.get("toolbox_adjudicate_provider", ""),
+            # The service's default too (settings.toolbox_vlm_provider).
+            toolbox_vlm_provider=provider_default("toolbox_vlm_provider"),
             model_call_timeout_seconds=600,
             vision_region_max_tokens=2000,
             data_agent_max_tokens=8192,
@@ -149,11 +153,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--toolbox-url", default="http://127.0.0.1:8002")
-    parser.add_argument("--data-dir", type=Path, default=Path("var/data"))
     args = parser.parse_args(argv)
 
     manifest = ProcessingManifest.model_validate_json(args.manifest.read_text(encoding="utf-8"))
-    config = explicit_config(toolbox_url=args.toolbox_url, data_dir=args.data_dir)
+    # The stage writes nothing under data_dir; the config only needs one.
+    config = explicit_config(toolbox_url=args.toolbox_url, data_dir=args.output.parent)
     enrich_tables(manifest, args.source, config)
     args.output.write_text(
         json.dumps(manifest.model_dump(mode="json", by_alias=True), ensure_ascii=False, indent=2),
