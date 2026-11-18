@@ -54,8 +54,9 @@ which is accepted:
   half has shared cases since docstruct 0.5.5:** `docstruct.manifest_cases`
   holds a valid example, changes that break one rule each, and changes that
   must stay valid. The core's contract test and the SDK's manifest reader run
-  them against their own models; the Toolbox's contract test adopts them
-  with its docstruct pin.
+  them against their own models. **The Toolbox does not run them yet:** its
+  contract test will adopt them when it pins docstruct 0.5.5, after that
+  release is published, and until then the models half stays open.
 - **docstruct had no isolated install job.** `test_purity.py` refuses
   non-standard imports in a subprocess, but no CI job installed docstruct alone
   in a clean environment, as `SDK alone` does for the SDK. **Closed by phase 2

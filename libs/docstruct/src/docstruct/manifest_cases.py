@@ -1,13 +1,14 @@
 """Shared contract cases for the manifest's document part (#470, criterion 4).
 
 The core, the SDK and the Toolbox each check a wire model of the processing
-manifest against ``docstruct.manifest``. Each used to break documents its own
+manifest against ``docstruct.manifest`` (the Toolbox adopts this catalog with
+its pin of docstruct 0.5.5). Each used to break documents its own
 way, so the three could drift apart on a case only one of them tested. This
 module is the one catalog they all run:
 
 - ``example_document()`` — a small valid document part (two pages, three
-  elements), as the ``title``, ``language``, ``pages`` and ``elements`` fields
-  of a manifest payload;
+  elements, one of them a child), as the ``title``, ``language``, ``pages``
+  and ``elements`` fields of a manifest payload;
 - ``BROKEN`` — changes that make a document invalid. Each one names the rule
   it breaks;
 - ``SUPPORTED`` — changes that a document may have and must stay valid;
@@ -19,9 +20,12 @@ applies them to its own manifest (with its own process fields) and compares
 its model's verdict with ``document_findings``. A change only needs a document
 with at least two pages, two elements, the first element listed on a page and
 holding a provenance entry: ``example_document()`` is one, and so are the
-golden manifests of the core and the Toolbox's snapshots. A component whose
-manifest also summarizes the document (page and element counts) recomputes
-that summary after a change, since the summary is not docstruct's.
+golden manifests of the core and the Toolbox's snapshots. The changes keep a
+hierarchy consistent: a new parent link carries the parent's ``source_ref``
+as ``parent_ref``, and the children of an element whose id changes follow it.
+A component whose manifest also summarizes the document (page and element
+counts) recomputes that summary after a change, since the summary is not
+docstruct's.
 
 Pure data and functions: no file, no environment.
 """
@@ -43,7 +47,11 @@ Change = Callable[[dict[str, Any]], None]
 
 
 def example_document() -> dict[str, Any]:
-    """A fresh, valid document part: two pages and three elements."""
+    """A fresh, valid document part: two pages and three elements.
+
+    Every element has a source reference, as the Toolbox's documents do, and
+    the third is a child of the first, so the cases meet a hierarchy too.
+    """
 
     def element(
         number: int, kind: str, page: int, order: int, **extra: Any
@@ -55,8 +63,8 @@ def example_document() -> dict[str, Any]:
             "reading_order": order,
             "hierarchy_level": 1,
             "text": f"text {number}",
-            "source_ref": None,
-            "parent_ref": None,
+            "source_ref": f"#/texts/{number - 1}",
+            "parent_ref": "#/body",
             "parent_id": None,
             "page_number": page,
             "confidence": None,
@@ -91,7 +99,9 @@ def example_document() -> dict[str, Any]:
         "elements": [
             element(1, "heading", 1, 1),
             element(2, "paragraph", 1, 2, confidence=0.9),
-            element(3, "paragraph", 2, 3),
+            element(
+                3, "paragraph", 2, 3, parent_id="element-000001", parent_ref="#/texts/0"
+            ),
         ],
     }
 
@@ -128,6 +138,27 @@ def _unlist(payload: dict[str, Any], element_id: str) -> None:
         ]
 
 
+def _children(payload: dict[str, Any], element_id: str) -> list[dict[str, Any]]:
+    return [item for item in payload["elements"] if item.get("parent_id") == element_id]
+
+
+def _point_to(child: dict[str, Any], parent: dict[str, Any]) -> None:
+    """Make ``child`` a child of ``parent``, with the matching reference.
+
+    A child's ``parent_ref``, when its parent has a ``source_ref``, must be
+    that reference, so it follows the new parent: otherwise a hierarchy case
+    would also break that rule (review of #591).
+    """
+    child["parent_id"] = parent["id"]
+    child["parent_ref"] = parent.get("source_ref")
+
+
+def _detach(element: dict[str, Any]) -> None:
+    """``element`` becomes a root: no parent, no parent reference."""
+    element["parent_id"] = None
+    element["parent_ref"] = None
+
+
 def _set(change: Callable[[dict[str, Any]], dict[str, Any]], **values: Any) -> Change:
     def apply(payload: dict[str, Any]) -> None:
         change(payload).update(values)
@@ -136,26 +167,34 @@ def _set(change: Callable[[dict[str, Any]], dict[str, Any]], **values: Any) -> C
 
 
 def _duplicate_element_id(payload: dict[str, Any]) -> None:
-    # The pages drop the second's old id, so only the duplicate is broken.
-    old = _second(payload)["id"]
+    # The pages drop the second's old id, and the children of both become
+    # roots (the shared id would resolve to either parent), so only the
+    # duplicate is broken.
+    old, shared = _second(payload)["id"], _first(payload)["id"]
     _unlist(payload, old)
-    _second(payload)["id"] = _first(payload)["id"]
+    for child in _children(payload, old) + _children(payload, shared):
+        _detach(child)
+    _second(payload)["id"] = shared
 
 
 def _empty_id(payload: dict[str, Any]) -> None:
-    # The pages drop the id too, so only the length bound is broken.
+    # The pages drop the id, and its children follow it, so only the length
+    # bound is broken.
     old = _first(payload)["id"]
     _unlist(payload, old)
+    for child in _children(payload, old):
+        child["parent_id"] = ""
     _first(payload)["id"] = ""
 
 
 def _parent_cycle(payload: dict[str, Any]) -> None:
     first, second = _first(payload), _second(payload)
-    first["parent_id"], second["parent_id"] = second["id"], first["id"]
+    _point_to(first, second)
+    _point_to(second, first)
 
 
 def _own_parent(payload: dict[str, Any]) -> None:
-    _first(payload)["parent_id"] = _first(payload)["id"]
+    _point_to(_first(payload), _first(payload))
 
 
 def _duplicate_page_number(payload: dict[str, Any]) -> None:
@@ -187,7 +226,11 @@ def _provenance_on_unknown_page(payload: dict[str, Any]) -> None:
 
 def _parent_reference_mismatch(payload: dict[str, Any]) -> None:
     parent, child = _first(payload), _second(payload)
-    parent.update(parent_id=None, parent_ref=None, source_ref="source-parent")
+    _detach(parent)
+    parent["source_ref"] = "source-parent"
+    # The parent's other children follow its new reference.
+    for other in _children(payload, parent["id"]):
+        other["parent_ref"] = "source-parent"
     child.update(parent_id=parent["id"], parent_ref="different-source-parent")
 
 
@@ -215,7 +258,9 @@ BROKEN: dict[str, Change] = {
     "missing parent": _set(_first, parent_id="nowhere"),
     "own parent": _own_parent,
     "parent cycle": _parent_cycle,
-    "parent source reference disagrees with parent id": _parent_reference_mismatch,
+    "child parent reference disagrees with parent source reference": (
+        _parent_reference_mismatch
+    ),
     # Pages.
     "duplicate page number": _duplicate_page_number,
     "page lists an unknown element": _page_lists_unknown_element,
@@ -249,12 +294,15 @@ def _unlisted_element(payload: dict[str, Any]) -> None:
 
 def _parent_without_source_reference(payload: dict[str, Any]) -> None:
     parent, child = _first(payload), _second(payload)
-    parent.update(parent_id=None, parent_ref=None, source_ref=None)
+    _detach(parent)
+    parent["source_ref"] = None
     child.update(parent_id=parent["id"], parent_ref="source-reference")
 
 
 def _child_of_first(payload: dict[str, Any]) -> None:
-    _second(payload)["parent_id"] = _first(payload)["id"]
+    # The first becomes a root, so the new link can close no cycle.
+    _detach(_first(payload))
+    _point_to(_second(payload), _first(payload))
 
 
 #: Changes a valid document may have, which must keep it valid.

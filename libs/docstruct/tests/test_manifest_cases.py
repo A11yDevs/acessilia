@@ -30,7 +30,9 @@ EXPECTED = {
     "missing parent": {("MSG_UNKNOWN_PARENT", None)},
     "own parent": {("MSG_SELF_PARENT", None)},
     "parent cycle": {("MSG_PARENT_CYCLE", None)},
-    "parent source reference disagrees with parent id": {("MSG_PARENT_REF_MISMATCH", None)},
+    "child parent reference disagrees with parent source reference": {
+        ("MSG_PARENT_REF_MISMATCH", None),
+    },
     "duplicate page number": {("MSG_DUPLICATE_PAGE_NUMBERS", None)},
     "page lists an unknown element": {("MSG_PAGE_UNKNOWN_ELEMENTS", None)},
     "page repeats an element": {("MSG_PAGE_DUPLICATE_ELEMENT_IDS", None)},
@@ -62,13 +64,51 @@ EXPECTED = {
 _NAMES = {getattr(model, name): name for name in dir(model) if name.startswith("MSG_")}
 
 
-def _findings(change) -> set[tuple[str, str | None]]:
+def _flat() -> dict:
+    """No references and no parents: the shape the cases first assumed."""
     payload = example_document()
+    for element in payload["elements"]:
+        element.update(source_ref=None, parent_ref=None, parent_id=None)
+    return payload
+
+
+def _deeper_hierarchy() -> dict:
+    """The example (the third element a child of the first), plus a fourth
+    that is a child of the second: both elements the cases change have a
+    child, with matching references (review of #591)."""
+    payload = example_document()
+    second, third = payload["elements"][1], payload["elements"][2]
+    fourth = copy.deepcopy(third)
+    fourth.update(
+        id="element-000004", reading_order=4, text="text 4", source_ref="#/texts/3",
+        parent_id=second["id"], parent_ref=second["source_ref"],
+    )
+    payload["elements"].append(fourth)
+    payload["pages"][1]["element_ids"].append(fourth["id"])
+    return payload
+
+
+#: The documents each case is applied to: the example (references and one
+#: child), a flat document, and a deeper hierarchy.
+BASES = {
+    "example": example_document,
+    "flat": _flat,
+    "deeper hierarchy": _deeper_hierarchy,
+}
+
+
+def _findings(change, base: str = "example") -> set[tuple[str, str | None]]:
+    payload = BASES[base]()
     change(payload)
     return {
         (_NAMES.get(message, message), context.get("path"))
         for message, context in document_findings(payload)
     }
+
+
+@pytest.mark.parametrize("base", list(BASES))
+def test_every_base_is_valid(base: str) -> None:
+    assert document_findings(BASES[base]()) == []
 
 
 def test_the_example_is_a_valid_document_part() -> None:
@@ -89,14 +129,16 @@ def test_every_broken_case_has_its_expected_rule() -> None:
     assert set(EXPECTED) == set(BROKEN)
 
 
+@pytest.mark.parametrize("base", list(BASES))
 @pytest.mark.parametrize("case", list(BROKEN))
-def test_a_broken_case_breaks_exactly_its_rule(case: str) -> None:
-    assert _findings(BROKEN[case]) == EXPECTED[case]
+def test_a_broken_case_breaks_exactly_its_rule(case: str, base: str) -> None:
+    assert _findings(BROKEN[case], base) == EXPECTED[case]
 
 
+@pytest.mark.parametrize("base", list(BASES))
 @pytest.mark.parametrize("case", list(SUPPORTED))
-def test_a_supported_case_stays_valid(case: str) -> None:
-    assert _findings(SUPPORTED[case]) == set()
+def test_a_supported_case_stays_valid(case: str, base: str) -> None:
+    assert _findings(SUPPORTED[case], base) == set()
 
 
 @pytest.mark.parametrize("case", list(BROKEN) + list(SUPPORTED))
@@ -118,11 +160,13 @@ def test_a_case_changes_the_document_it_is_given() -> None:
     """The cases work on any document with two pages and two elements, not
     only on the example: here, one with other ids and page numbers."""
     payload = example_document()
-    for index, element in enumerate(payload["elements"]):
-        old = element["id"]
-        element["id"] = f"other-{index}"
-        for page in payload["pages"]:
-            page["element_ids"] = [element["id"] if item == old else item for item in page["element_ids"]]
+    renamed = {element["id"]: f"other-{index}" for index, element in enumerate(payload["elements"])}
+    for element in payload["elements"]:
+        element["id"] = renamed[element["id"]]
+        if element["parent_id"] is not None:
+            element["parent_id"] = renamed[element["parent_id"]]
+    for page in payload["pages"]:
+        page["element_ids"] = [renamed[item] for item in page["element_ids"]]
     assert document_findings(payload) == []
 
     for case, change in BROKEN.items():

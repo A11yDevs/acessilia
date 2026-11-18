@@ -26,6 +26,9 @@ from pydantic import ValidationError
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.schema import processing_manifest_schema
 from docstruct.manifest import (
+    MSG_FIELD_NOT_ALLOWED,
+    MSG_FIELD_OUT_OF_RANGE,
+    MSG_FIELD_WRONG_TYPE,
     WIRE_NAMES,
     StructuredDocument,
     field_specs,
@@ -153,13 +156,37 @@ def test_the_shared_example_is_a_valid_core_manifest() -> None:
     assert _core_accepts(_example_manifest())
 
 
+FIELD_MESSAGES = (MSG_FIELD_WRONG_TYPE, MSG_FIELD_OUT_OF_RANGE, MSG_FIELD_NOT_ALLOWED)
+
+
+def _location(path: str) -> tuple:
+    """``elements[0].provenance[0].bbox`` as a Pydantic error location."""
+    return tuple(int(part) if part.isdigit() else part for part in re.findall(r"[^.\[\]]+", path))
+
+
 @pytest.mark.parametrize("base", list(BASES))
 @pytest.mark.parametrize("case", list(BROKEN))
 def test_core_and_docstruct_reject_the_same_documents(case: str, base: str) -> None:
-    payload = _break(case, base)
+    """For the same reason, not only both (review of #591): a field finding at
+    the same location, an unknown field as one, and an invariant with
+    docstruct's message, which the core raises for its first finding."""
+    from acessilia_core.i18n import t
 
-    assert document_findings(payload) != []
-    assert not _core_accepts(payload)
+    payload = _break(case, base)
+    findings = document_findings(payload)
+    assert findings != []
+    message, context = findings[0]
+
+    with pytest.raises(ValidationError) as raised:
+        ProcessingManifest.model_validate(payload)
+
+    errors = raised.value.errors()
+    if message == "refused":
+        assert any(error["type"] == "extra_forbidden" for error in errors), errors
+    elif message in FIELD_MESSAGES:
+        assert _location(context["path"]) in [tuple(error["loc"]) for error in errors], errors
+    else:
+        assert t(message).format(**context) in str(raised.value)
 
 
 @pytest.mark.parametrize("base", list(BASES))

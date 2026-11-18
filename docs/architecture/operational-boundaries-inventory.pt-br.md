@@ -54,8 +54,10 @@ que já foi aceita:
   desde o docstruct 0.5.5:** o `docstruct.manifest_cases` traz um exemplo
   válido, alterações que quebram uma regra cada e alterações que precisam
   continuar válidas. O teste de contrato do core e o leitor de manifesto do
-  SDK os rodam contra os seus próprios modelos; o teste de contrato da Toolbox
-  os adota junto com a versão do docstruct que ela fixa.
+  SDK os rodam contra os seus próprios modelos. **A Toolbox ainda não os
+  roda:** o teste de contrato dela vai adotá-los quando fixar o docstruct
+  0.5.5, depois de essa release ser publicada, e até lá a parte dos modelos
+  continua em aberto.
 - **O docstruct não tinha job de instalação isolada.** O `test_purity.py`
   recusa imports fora da biblioteca padrão num subprocesso, mas nenhum job de
   CI instalava o docstruct sozinho num ambiente limpo, como o `SDK alone` faz

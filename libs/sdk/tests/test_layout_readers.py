@@ -186,6 +186,11 @@ def test_valid_element_only_fragments_keep_docstruct_page_reference_policy():
 # page, and the cases need two, so they go into docstruct's example document
 # inside the fixture's process fields.
 
+from docstruct.manifest import (  # noqa: E402
+    MSG_FIELD_NOT_ALLOWED,
+    MSG_FIELD_OUT_OF_RANGE,
+    MSG_FIELD_WRONG_TYPE,
+)
 from docstruct.manifest_cases import (  # noqa: E402
     BROKEN,
     SUPPORTED,
@@ -216,10 +221,24 @@ def test_the_shared_example_is_a_valid_toolbox_manifest():
 
 @pytest.mark.parametrize("case", list(BROKEN))
 def test_the_reader_and_docstruct_reject_the_same_documents(case):
+    """For the same reason, not only both (review of #591): a field finding at
+    the same path, an unknown field as unknown properties, and an invariant
+    with docstruct's message."""
     document = _shared_case_manifest(BROKEN[case])
-    assert document_findings(document) != []
-    with pytest.raises(ToolboxContractViolation):
+    findings = document_findings(document)
+    assert findings != []
+    message, context = findings[0]
+
+    with pytest.raises(ToolboxContractViolation) as raised:
         read_manifest(document)
+
+    reported = str(raised.value)
+    if message == "refused":
+        assert "unknown properties" in reported
+    elif message in (MSG_FIELD_WRONG_TYPE, MSG_FIELD_OUT_OF_RANGE, MSG_FIELD_NOT_ALLOWED):
+        assert f"ProcessingManifest.{context['path']}:" in reported
+    else:
+        assert message.format(**context) in reported
 
 
 @pytest.mark.parametrize("case", list(SUPPORTED))
