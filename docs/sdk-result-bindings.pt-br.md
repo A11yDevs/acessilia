@@ -366,7 +366,9 @@ continuam sendo erros explícitos.
 união publicada completa. Retorna os registros compactos gerados ou um manifesto
 com classificações geradas; `regions` oferece caixas do docstruct, páginas
 numeradas a partir de um e confiança opcional. Os índices originais do MinerU
-permanecem em `configuration`, sem inventar confiança. Elementos canônicos e
+permanecem em `configuration`, sem inventar confiança. As caixas de classificação
+têm origem `UNKNOWN`; use a proveniência canônica antes de interpretar suas
+coordenadas como unidades de página. Elementos canônicos e
 origens desconhecidas permanecem no `StructuredDocument` do docstruct.
 
 `ToolboxStructureClient.extract_structure_result` e `read_manifest` usam o mesmo

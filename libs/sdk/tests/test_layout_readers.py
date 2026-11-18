@@ -31,7 +31,9 @@ def test_both_layout_variants_and_extensions(variant):
     layout = read_layout(document)
     assert layout.variant == variant
     assert isinstance(layout.regions[0].bbox, BoundingBox)
-    assert layout.regions[0].bbox.coord_origin == "TOPLEFT"
+    assert layout.regions[0].bbox.coord_origin == (
+        "TOPLEFT" if variant == "docling" else "UNKNOWN"
+    )
     if variant == "docling":
         assert layout.compact.to_dict() == document
         assert layout.regions[0].page_number == 2
@@ -57,6 +59,7 @@ def test_canonical_origin_is_not_invented():
         == "UNKNOWN"
     )
     assert layout.manifest.document.pages[0].width is None
+    assert layout.regions[0].bbox.coord_origin == "UNKNOWN"
 
 
 @pytest.mark.parametrize("variant", ["docling", "mineru"])

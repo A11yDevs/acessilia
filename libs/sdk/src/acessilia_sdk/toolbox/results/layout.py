@@ -85,7 +85,9 @@ def read_layout(document: Any) -> LayoutResult:
     Compact coordinates have a top-left origin. MinerU classification metadata
     uses zero-based page indexes; canonical pages already use one-based numbers.
     MinerU supplies no classification confidence. Original metadata remains in
-    ``configuration`` and ``manifest``; unresolved canonical origins stay UNKNOWN.
+    ``configuration`` and ``manifest``. Classification boxes have no declared
+    origin or guaranteed page units, so they stay UNKNOWN; use canonical element
+    provenance before interpreting their geometry.
     """
     compact_error = None
     try:
@@ -119,7 +121,7 @@ def read_layout(document: Any) -> LayoutResult:
                 region.raw_label,
                 BoundingBox(
                     *(region.bbox[key] for key in ("left", "top", "right", "bottom")),
-                    coord_origin="TOPLEFT",
+                    coord_origin="UNKNOWN",
                 ),
                 None,
                 region.text_preview,

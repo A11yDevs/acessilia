@@ -347,6 +347,8 @@ complete published union. It returns the compact generated records or a manifest
 with generated classification metadata; `regions` provides docstruct bounding
 boxes, one-based page numbers and optional confidence. MinerU's original
 zero-based indexes remain in `configuration`, without invented confidence.
+Classification boxes have `UNKNOWN` origin; use canonical provenance before
+interpreting their coordinates as page units.
 Canonical elements and unresolved origins stay in docstruct's `StructuredDocument`.
 
 `ToolboxStructureClient.extract_structure_result` and `read_manifest` use the
