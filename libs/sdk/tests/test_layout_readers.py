@@ -182,9 +182,9 @@ def test_valid_element_only_fragments_keep_docstruct_page_reference_policy():
 # --- docstruct's shared contract cases (#470, criterion 4) -------------------
 #
 # The core and the Toolbox run the same catalog against their own models; the
-# SDK's reader must agree with docstruct on each case. The fixture has a single
-# page, and the cases need two, so they go into docstruct's example document
-# inside the fixture's process fields.
+# SDK's reader must agree with docstruct on each case. They go into docstruct's
+# example document, which has references and a child, inside the fixture's
+# process fields.
 
 from docstruct.manifest import (  # noqa: E402
     MSG_FIELD_NOT_ALLOWED,

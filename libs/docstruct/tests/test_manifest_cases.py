@@ -88,12 +88,26 @@ def _deeper_hierarchy() -> dict:
     return payload
 
 
+def _one_page() -> dict:
+    """Everything on a single page, as in some of the Toolbox's snapshots:
+    the cases need one page, not two (review of acessilia-toolbox#164)."""
+    payload = example_document()
+    moved = payload["pages"].pop()
+    payload["pages"][0]["element_ids"].extend(moved["element_ids"])
+    for element in payload["elements"]:
+        element["page_number"] = 1
+        for provenance in element["provenance"]:
+            provenance["page_number"] = 1
+    return payload
+
+
 #: The documents each case is applied to: the example (references and one
-#: child), a flat document, and a deeper hierarchy.
+#: child), a flat document, a deeper hierarchy, and a single page.
 BASES = {
     "example": example_document,
     "flat": _flat,
     "deeper hierarchy": _deeper_hierarchy,
+    "one page": _one_page,
 }
 
 
@@ -157,7 +171,7 @@ def test_a_case_changes_only_the_document_fields(case: str) -> None:
 
 
 def test_a_case_changes_the_document_it_is_given() -> None:
-    """The cases work on any document with two pages and two elements, not
+    """The cases work on any document with a page and two elements, not
     only on the example: here, one with other ids and page numbers."""
     payload = example_document()
     renamed = {element["id"]: f"other-{index}" for index, element in enumerate(payload["elements"])}

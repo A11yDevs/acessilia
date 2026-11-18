@@ -18,8 +18,8 @@ module is the one catalog they all run:
 The changes edit the document fields of a payload in place, so a component
 applies them to its own manifest (with its own process fields) and compares
 its model's verdict with ``document_findings``. A change only needs a document
-with at least two pages, two elements, the first element listed on a page and
-holding a provenance entry: ``example_document()`` is one, and so are the
+with at least one page and two elements, the first element listed on a page
+and holding a provenance entry: ``example_document()`` is one, and so are the
 golden manifests of the core and the Toolbox's snapshots. The changes keep a
 hierarchy consistent: a new parent link carries the parent's ``source_ref``
 as ``parent_ref``, and the children of an element whose id changes follow it.
