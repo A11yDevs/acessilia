@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "acessilia-core"
-version = "0.1.1"
+version = "0.2.0"
 description = "Acessilia's core: the PDDL pipeline that plans and executes a document's accessibility, with its agents, enrichment stages and exporters (ADR-0016)."
 readme = "README.md"
 requires-python = ">=3.11"

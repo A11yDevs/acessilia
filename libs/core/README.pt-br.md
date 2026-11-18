@@ -44,6 +44,17 @@ do SDK.
 O worker do serviço define ordem, flags, falhas opcionais, progresso e pacote
 em `backend.api.export_plan`; o Core não importa código do serviço. PDF legado
 é apenas baixável, Markdown de benchmark é interno e ZIP é empacotamento.
-Filtros de perfil e validação existentes são preservados. Níveis de detalhe
+Filtros de perfil existentes são preservados. Níveis de detalhe
 descrevem a capacidade do formato, não a seleção de perfil. Veja o
 [ADR 0025](../../docs/adr/0025-format-catalogue-ownership.pt-br.md).
+
+## Gate canônico estrito de exportação (0.2.0)
+
+Exportadores públicos TXT/HTML/DOCX/PDF/UA compartilham
+`export_accessible_document`. Após normalização e auditoria existentes, o Core
+injeta `jsonschema.validate` na API de schema do docstruct antes de perfil, AST
+ou renderer. Mappings inválidos antes aceitos passam a gerar `ValueError`
+localizado; não há nova flag de estrito. Serializadores puros mantêm fallback.
+Veja a [migração incompatível](CHANGELOG.pt-br.md), o
+[corpus de compatibilidade](../../tests/fixtures/export_schema_gate/README.pt-br.md)
+e o [ADR 0026](../../docs/adr/0026-strict-canonical-export-gate.pt-br.md).

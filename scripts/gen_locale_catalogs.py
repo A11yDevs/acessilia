@@ -309,6 +309,7 @@ from acessilia_core.pipeline.validators import (
 )
 from acessilia_core.export.messages import (
     MSG_AUDIT_FAILED,
+    MSG_CANONICAL_SCHEMA_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
@@ -768,6 +769,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
     MSG_AUDIT_FAILED,
+    MSG_CANONICAL_SCHEMA_FAILED,
     MSG_UNSUPPORTED_EXPORT_FORMAT,
     # HTML renderer UI chrome (libs/core/src/acessilia_core/export/renderers/html_renderer.py).
     MSG_HTML_TABLE_OF_CONTENTS,
@@ -1666,6 +1668,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "A exportação PDF/UA está desativada (TOOLBOX_PDF_UA_ENABLED=false)"
         ),
         MSG_AUDIT_FAILED: "Auditoria falhou: {findings}",
+        MSG_CANONICAL_SCHEMA_FAILED: "O documento canônico não corresponde ao seu schema em {path} ({rule})",
         MSG_UNSUPPORTED_EXPORT_FORMAT: (
             "Formato de exportação não suportado: {format_name}"
         ),

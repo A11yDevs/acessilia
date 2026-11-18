@@ -17,6 +17,8 @@ MSG_DOCX_DISABLED: str = "DOCX export is disabled (TOOLBOX_DOCX_ENABLED=false)"
 MSG_PDF_UA_DISABLED: str = "PDF/UA export is disabled (TOOLBOX_PDF_UA_ENABLED=false)"
 #: Canonical English msgid template for an audit failure; {findings} is substituted by callers after lookup.
 MSG_AUDIT_FAILED: str = "Audit failed: {findings}"
+#: Canonical English diagnostic: JSON Pointer and schema keyword only, never document content.
+MSG_CANONICAL_SCHEMA_FAILED: str = "Canonical document does not match its schema at {path} ({rule})"
 #: Canonical English msgid template for an unsupported export format; {format_name} is substituted by callers after lookup.
 MSG_UNSUPPORTED_EXPORT_FORMAT: str = "Unsupported export format: {format_name}"
 
@@ -32,6 +34,7 @@ MSG_FORMAT_ZIP = "Complete Package (ZIP)"
 
 __all__ = [
     "MSG_AUDIT_FAILED",
+    "MSG_CANONICAL_SCHEMA_FAILED",
     "MSG_DEFAULT_ACCESSIBLE_TITLE",
     "MSG_DOCX_DISABLED",
     "MSG_PDF_UA_DISABLED",

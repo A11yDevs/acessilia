@@ -54,8 +54,9 @@ note over Builder, Export
   The builder returns dictionaries; legacy dataclasses remain
   compatibility exports, deprecated since 0.5.3 (ADR-0024).
   Builder/schema parity is tested, including child sections.
-  Existing export audit applies; strict schema-gate activation
-  remains separate (E1.2b, ADR-0023).
+  Normalization and existing audit precede schema validation.
+  Core 0.2.0 rejects schema-invalid documents before profile
+  selection or rendering (E1.2b, ADR-0026).
 end note
 
 Orchestrator -> Export: render formats

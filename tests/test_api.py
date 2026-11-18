@@ -1313,3 +1313,39 @@ async def test_a_timeout_after_cancellation_is_reported_as_cancellation(
     assert task is not None
     # The worker turns this into "cancelled"; service must not report an error.
     assert task["status"] == "cancelling"
+
+
+@pytest.mark.asyncio
+async def test_schema_invalid_job_fails_before_download_registration(api_paths, monkeypatch):
+    from backend.agents.state_manager import state_manager
+    from backend.api.worker import ApiJob, JobExecutor
+    from backend.services.history_service import registrar_conversao, listar_historico
+    from docstruct.canonical import build_canonical_document
+
+    task_id = 'schema-invalid-job'
+    source = api_paths / 'invalid.pdf'
+    source.write_bytes(_fake_pdf_bytes())
+    output = api_paths / 'output' / task_id
+    state_manager._tasks.clear()
+    state_manager._cancel_events.clear()
+
+    async def process(*args, **kwargs):
+        state_manager.criar_tarefa(source, task_id=task_id)
+        document = build_canonical_document('# Main\n\nBody.')
+        document['sections'][0]['blocks'][0]['type'] = 'custom'
+        return document
+
+    async def register_token(*args, **kwargs):
+        pytest.fail('Schema-invalid job registered a download token')
+
+    monkeypatch.setattr('backend.service.process', process)
+    monkeypatch.setattr('backend.api.worker.criar_token', register_token)
+    await registrar_conversao(task_id=task_id, arquivo=source.name, extensao=source.suffix,
+        tamanho_bytes=source.stat().st_size, modo='normal')
+    await JobExecutor().run(ApiJob(task_id=task_id, file_path=source,
+        filename=source.name, output_dir=output))
+    assert state_manager.obter(task_id)['status'] == 'error'
+    assert not output.exists()
+    [row] = [row for row in await listar_historico(10) if row['task_id'] == task_id]
+    assert row['status'] == 'error'
+    assert '/sections/0/blocks/0/type' in row['erro']

@@ -1082,6 +1082,10 @@ msgid "Audit failed: {findings}"
 msgstr "Auditoria falhou: {findings}"
 
 #, python-brace-format
+msgid "Canonical document does not match its schema at {path} ({rule})"
+msgstr "O documento canônico não corresponde ao seu schema em {path} ({rule})"
+
+#, python-brace-format
 msgid "Unsupported export format: {format_name}"
 msgstr "Formato de exportação não suportado: {format_name}"
 

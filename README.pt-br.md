@@ -29,8 +29,9 @@ Downloads de PDF legado e benchmark interno mantêm seus papéis distintos.
 Veja o [ADR 0025](docs/adr/0025-format-catalogue-ownership.pt-br.md).
 
 O JSON Schema de documento acessível acompanha o wheel da docstruct. Os
-consumidores podem validar explicitamente com um motor injetado; a auditoria
-atual continua governando os exports. O schema da raiz é uma cópia gerada e
+consumidores podem validar com motor injetado. O Core 0.2.0 também exige
+conformidade após normalização/auditoria e antes da seleção/renderização
+([mudança incompatível](libs/core/CHANGELOG.pt-br.md)). O schema da raiz é uma cópia gerada e
 conferida da fonte empacotada. Veja a
 [API de schema](libs/docstruct/README.pt-br.md#schema-canônico-docstructschemas-docstructvalidation).
 

@@ -41,6 +41,7 @@ ones here instead of restating them.
 | [0023](0023-packaged-canonical-schema.md) | Package the canonical schema with an injected validation engine | Accepted |
 | [0024](0024-legacy-canonical-type-deprecation.md) | Deprecate legacy canonical dataclasses while retaining compatibility | Accepted |
 | [0025](0025-format-catalogue-ownership.md) | Share format identity and delivery metadata with a worker-owned plan | Accepted |
+| [0026](0026-strict-canonical-export-gate.md) | Validate the canonical schema at the Core export gate | Accepted |
 
 ## Process
 

@@ -69,7 +69,11 @@ uv run python scripts/sync_accessible_document_schema.py
 uv run python scripts/sync_accessible_document_schema.py --check
 ```
 
-Schema validation is opt-in; mandatory export-gate activation is E1.2b. See the
+Core 0.2.0 applies schema validation after normalization/audit and before profile
+selection. `test_export_schema_gate.py` exercises 68 old/new format outcomes,
+normalization, nested/filtered cases, no side effects and localized diagnostics.
+The worker regression verifies cleanup and no download token after rejection.
+See the [compatibility corpus](fixtures/export_schema_gate/README.md) and the
 [schema API](../libs/docstruct/README.md#canonical-schema-docstructschemas-docstructvalidation).
 
 ## Export characterization

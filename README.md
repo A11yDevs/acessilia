@@ -29,8 +29,9 @@ Legacy PDF downloads and internal benchmark output keep their distinct roles.
 See [ADR 0025](docs/adr/0025-format-catalogue-ownership.md).
 
 The accessible-document JSON Schema ships in the docstruct wheel. Consumers
-can validate explicitly with an injected engine; the existing export audit
-continues to govern exports. The root schema is a checked, generated copy of
+can validate explicitly with an injected engine. Core 0.2.0 also requires schema
+conformance after normalization/audit and before profile selection or rendering
+([breaking validation change](libs/core/CHANGELOG.md)). The root schema is a checked, generated copy of
 the packaged source. See the [schema API](libs/docstruct/README.md#canonical-schema-docstructschemas-docstructvalidation).
 
 The legacy `CanonicalDocument` and `CanonicalSection` dataclasses are deprecated

@@ -44,6 +44,18 @@ msgids. DOCX/PDF/UA bind to the public SDK capability registry.
 The service worker owns order, flags, optional failures, progress and packaging
 through `backend.api.export_plan`; Core imports no service code. Legacy PDF is
 download-only, benchmark Markdown is internal, and ZIP is packaging. Existing
-profile filters and export validation remain unchanged. Detail levels describe
+profile filters remain unchanged. Detail levels describe
 format capacity, not profile selection. See
 [ADR 0025](../../docs/adr/0025-format-catalogue-ownership.md).
+
+## Strict canonical export gate (0.2.0)
+
+All public TXT/HTML/DOCX/PDF/UA exporters share
+`export_accessible_document`. After existing normalization and audit, Core
+injects `jsonschema.validate` into docstruct's packaged-schema API before
+profile selection, AST construction or rendering. Previously accepted invalid
+canonical mappings now fail with localized `ValueError`; no strictness flag is
+added. Pure serializers retain their fallback behavior. See the
+[breaking-change migration](CHANGELOG.md),
+[compatibility corpus](../../tests/fixtures/export_schema_gate/README.md) and
+[ADR 0026](../../docs/adr/0026-strict-canonical-export-gate.md).
