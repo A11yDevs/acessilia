@@ -62,6 +62,9 @@ async def inspect_source_media(
     finally:
         if owned_client:
             await inspect_client.close()
+    # ``ToolboxMediaInspectClient.inspect`` already refuses an answer without
+    # a document object; this check is for a client the caller passes in,
+    # which may not be that one (#470, phase 4).
     if not isinstance(result, dict):
         raise ToolboxContractViolation(
             "media.inspect returned no inspection document"
