@@ -1,4 +1,4 @@
-"""Core consumes docstruct's schema without enabling the future strict export gate."""
+"""Core consumes docstruct's schema with a strict export gate."""
 
 from importlib.resources import files
 from pathlib import Path
@@ -31,7 +31,7 @@ def test_core_builder_output_matches_the_packaged_schema(source):
     validate_against_schema(document, validate)
 
 
-def test_strict_schema_remains_opt_in_and_custom_blocks_still_export(tmp_path):
+def test_strict_core_gate_rejects_custom_blocks_while_the_pure_renderer_keeps_its_fallback(tmp_path):
     document = build_canonical_document('# Main\n\nBody.', math_enricher=None)
     document['sections'][0]['blocks'].append({
         'id': 'custom-1', 'type': 'custom', 'text': 'Accepted fallback text',
@@ -39,5 +39,8 @@ def test_strict_schema_remains_opt_in_and_custom_blocks_still_export(tmp_path):
     with pytest.raises(ValidationError):
         validate_against_schema(document, validate)
     path = tmp_path / 'output.txt'
-    assert export_accessible_document(document, path, format_name='txt') == path
-    assert 'Accepted fallback text' in path.read_text(encoding='utf-8')
+    with pytest.raises(ValueError, match="/sections/0/blocks/1/type"):
+        export_accessible_document(document, path, format_name='txt')
+    assert not path.exists()
+    from docstruct.export.txt import document_to_txt_lines
+    assert "Accepted fallback text" in "\n".join(document_to_txt_lines(document))

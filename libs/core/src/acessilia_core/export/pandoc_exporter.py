@@ -1,8 +1,8 @@
 """Export of a canonical document to the target format.
 
-Renders the canonical document after a deterministic structural audit and an export-profile
-verbosity check, so that only compliant documents ever reach the exporter. HTML, PDF and TXT
-render in-process; DOCX and PDF/UA are rendered from the Pandoc AST by the Toolbox, which pins
+Renders the normalized canonical document after the existing audit, strict schema
+validation and export-profile check. HTML and TXT render in-process; DOCX and
+PDF/UA are rendered from the Pandoc AST by the Toolbox, which pins
 Pandoc in its own image (docs/adr/0003). Every user-visible error string is resolved through the
 active locale strings files via :func:`acessilia_core.i18n.t`, with the canonical English msgid
 constants below acting as the single source of truth consumed by scripts/gen_locale_catalogs
@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+from jsonschema import ValidationError, validate
+from docstruct.validation import validate_against_schema
 
 from docstruct.export.filters import strip_internal_audit_blocks
 from docstruct.export.pandoc_ast import build_pandoc_ast
@@ -26,6 +29,7 @@ from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from acessilia_core.export.messages import (
     MSG_AUDIT_FAILED,
+    MSG_CANONICAL_SCHEMA_FAILED,
     MSG_DEFAULT_ACCESSIBLE_TITLE,
     MSG_DOCX_DISABLED,
     MSG_PDF_UA_DISABLED,
@@ -179,6 +183,24 @@ def _render_pdf_ua(
     return output_path
 
 
+def _validate_export_schema(document: dict[str, Any]) -> None:
+    """Validate normalized, audited input before selection or renderer side effects.
+
+    The packaged schema remains owned by docstruct; Core injects its engine.
+    Diagnostics expose the JSON Pointer and keyword, not the document value or
+    jsonschema's verbose exception (which embeds the document).
+    """
+    try:
+        validate_against_schema(document, validate)
+    except ValidationError as exc:
+        pointer = "/" + "/".join(
+            str(part).replace("~", "~0").replace("/", "~1") for part in exc.absolute_path
+        )
+        raise ValueError(t(MSG_CANONICAL_SCHEMA_FAILED).format(
+            path=pointer, rule=exc.validator,
+        )) from None
+
+
 def export_accessible_document(
     source_text_or_document: str | dict[str, Any],
     output_path: Path,
@@ -204,7 +226,7 @@ def export_accessible_document(
         Path: The output_path where the formatted document was written.
 
     Raises:
-        ValueError: When the deterministic audit reports BLOCKER findings, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
+        ValueError: When the deterministic audit reports BLOCKER findings, when the normalized document fails its JSON Schema, when the export profile forbids any block, or when format_name is not a recognized export format; the messages are localized.
         RuntimeError: When format_name is "pdf_ua" or "docx" and the run's ExportConfig disables it.
         TypeError: When format_name is "pdf_ua" or "docx" and no ExportConfig or ToolboxConfig is given, or when text is given without a ToolboxConfig (its formulas are enriched on the Toolbox).
         acessilia_sdk.toolbox.errors.ToolboxError: When format_name is "pdf_ua" or "docx" and the Toolbox cannot render or deliver the file.
@@ -219,6 +241,8 @@ def export_accessible_document(
         raise ValueError(
             t(MSG_AUDIT_FAILED).format(findings="; ".join(audit_report["BLOCKER"]))
         )
+
+    _validate_export_schema(document)
 
     profile = profile_name or format_name
     filtered = strip_internal_audit_blocks(document, profile)

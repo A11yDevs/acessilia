@@ -127,9 +127,10 @@ uv run python scripts/sync_accessible_document_schema.py --check
 ```
 
 The core checks copy parity and builder output, including children. CI also
-validates the schema from the installed wheel outside the checkout. Existing
-audits/exporters do not call this opt-in API; strict export validation is the
-separate E1.2b compatibility decision. Existing export snapshots stay unchanged.
+validates the schema from the installed wheel outside the checkout. Core 0.2.0
+uses this API as a strict export gate with its injected engine (E1.2b,
+[ADR 0026](../../docs/adr/0026-strict-canonical-export-gate.md)). Pure serializers
+retain their fallback behavior and existing export snapshots stay unchanged.
 
 ### Export walker (`docstruct.export.walk`)
 

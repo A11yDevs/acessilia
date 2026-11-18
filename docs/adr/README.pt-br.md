@@ -41,6 +41,7 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0023](0023-packaged-canonical-schema.pt-br.md) | Empacotar o schema canônico com motor de validação injetado | Aceita |
 | [0024](0024-legacy-canonical-type-deprecation.pt-br.md) | Descontinuar dataclasses canônicas legadas preservando compatibilidade | Aceita |
 | [0025](0025-format-catalogue-ownership.pt-br.md) | Compartilhar identidade e entrega de formatos com plano do worker | Aceita |
+| [0026](0026-strict-canonical-export-gate.pt-br.md) | Validar o schema canônico no gate de exportação do Core | Aceita |
 
 ## Processo
 

@@ -80,8 +80,9 @@ Pipeline ..> CanonicalSchema : builder/schema contract tests
 CanonicalSchema ..> SchemaCopy : sync/check developer tooling
 note right of CanonicalSchema
   Wheel includes the fixed resource (ADR-0023).
-  Validator engine is injected; validation is opt-in.
-  Strict export-gate activation is separate (E1.2b).
+  Validator engine is injected (ADR-0023).
+  Core 0.2.0 validates after normalization/audit,
+  before profile/renderer (E1.2b, ADR-0026).
 end note
 note right of Exporters
   ADR-0025: docstruct owns FormatSpec identity.

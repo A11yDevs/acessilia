@@ -127,9 +127,10 @@ uv run python scripts/sync_accessible_document_schema.py --check
 ```
 
 O core verifica a paridade da cópia e saídas do builder, incluindo filhos. A CI
-também valida o schema do wheel instalado fora do checkout. Auditorias/exports
-existentes não chamam esta API optativa; validação estrita no export é a decisão
-de compatibilidade E1.2b separada. Snapshots dos exports permanecem inalterados.
+também valida o schema do wheel instalado fora do checkout. O Core 0.2.0 usa
+essa API no gate estrito, com motor injetado (E1.2b,
+[ADR 0026](../../docs/adr/0026-strict-canonical-export-gate.pt-br.md)).
+Serializadores puros mantêm fallback e snapshots dos exports inalterados.
 
 ### Walker de exportação (`docstruct.export.walk`)
 
