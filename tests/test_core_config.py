@@ -25,6 +25,7 @@ from backend.config import settings as settings_module
 from backend.config.core_config import core_config_from_settings
 from acessilia_core.config import CoreConfig
 from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline.checkpointing import RunCheckpoints
 from acessilia_core.ports import RunPorts
 from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
 from tests.core_config_support import core_config
@@ -535,7 +536,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
 
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
     monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: ("plan", None))
-    monkeypatch.setattr("acessilia_core.pipeline.orchestrator._save_plan", no_save)
+    monkeypatch.setattr(RunCheckpoints, "save_plan", no_save)
 
     await orchestrator._replan_until_done(
         manifest,
@@ -545,7 +546,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         [],
         None,
         asyncio.get_running_loop(),
-        checkpoints=None,
+        checkpoints=RunCheckpoints(None, core_config()),
         planning_manifest=manifest,
         availability=None,
         replans=0,

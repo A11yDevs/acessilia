@@ -18,41 +18,59 @@ from collections.abc import Callable, Coroutine, Iterable
 from pathlib import Path
 from typing import Any
 
-
-from acessilia_core.blocking import run_blocking
-from acessilia_core.agents.provider_breaker import ProviderBreaker
-from acessilia_core.config import CoreConfig, DocumentConfig, FusionConfig, PathsConfig, ToolboxConfig
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
+from acessilia_core.agents.model_calls import ModelCallRunner, model_call_scope
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.blocking import run_blocking
+from acessilia_core.config import (
+    CoreConfig,
+    DocumentConfig,
+    FusionConfig,
+    PathsConfig,
+    ToolboxConfig,
+)
 from acessilia_core.execution.executor import (
     ExecutionResume,
     ExecutorAgent,
     StepProgress,
 )
 from acessilia_core.execution.models import ExecutionReport, ExecutionStepResult
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
-from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from acessilia_core.planning.domain_bundle import DomainBundle
-from acessilia_core.planning.models import NominalPlan, PlanningComparison, PlanStep
-from acessilia_core.planning import toolbox_gate
-from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_PREFERRED_PLAN_MISSING,
 )
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
-    STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
-    STAGE_GENERATING_PDDL_PLAN,
-    STAGE_VALIDATING_PLAN_DRY_RUN,
     STAGE_EXECUTING_PLAN,
     STAGE_EXECUTING_PLAN_STEP,
+    STAGE_GENERATING_PDDL_PLAN,
+    STAGE_STRUCTURAL_EXTRACTION_FAILED,
+    STAGE_VALIDATING_PLAN_DRY_RUN,
 )
 from acessilia_core.logger import logger
-from acessilia_core.toolbox.toolbox_client import ToolboxError
+from acessilia_core.manifest.models import (
+    ProcessingManifest,
+)
+from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
+from acessilia_core.pipeline.enrichment.formulas import (
+    _classify_formula_regions,
+    _enrich_formula_latex,
+)
+from acessilia_core.pipeline.enrichment.inline_math import (
+    _mark_inline_math,
+    _mark_table_inline_math,
+    _TextSpanReader,
+)
+from acessilia_core.pipeline.enrichment.pictures import (
+    _enrich_picture_descriptions,
+)
+from acessilia_core.pipeline.enrichment.tables import (
+    _enrich_table_structures,
+)
+from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
     _pages_label,
@@ -63,40 +81,27 @@ from acessilia_core.pipeline.obligations import (
 from acessilia_core.pipeline.payload import (
     build_pddl_structured_payload,
 )
-from acessilia_core.pipeline.enrichment.pictures import (
-    _enrich_picture_descriptions,
-)
-from acessilia_core.pipeline.enrichment.tables import (
-    _enrich_table_structures,
-)
-from acessilia_core.pipeline.enrichment.inline_math import (
-    _TextSpanReader,
-    _mark_inline_math,
-    _mark_table_inline_math,
-)
 from acessilia_core.pipeline.preflight import (
     _check_page_limit,
     _check_page_limit_before_extraction,
     _inspect_media,
     _is_presentation,
 )
-from acessilia_core.pipeline.enrichment.formulas import (
-    _classify_formula_regions,
-    _enrich_formula_latex,
-)
-from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
-from acessilia_core.agents.model_calls import ModelCallRunner, model_call_scope
+from acessilia_core.planning import toolbox_gate
+from acessilia_core.planning.domain_bundle import DomainBundle
+from acessilia_core.planning.models import NominalPlan, PlanningComparison, PlanStep
+from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.ports import (
     PHASE_ENRICHED,
     PHASE_EXECUTION,
     PHASE_MANIFEST,
     PHASE_MEDIA,
     PHASE_PLAN,
-    JobCheckpoints,
     RemoteOperations,
     RunPorts,
     region_cache_for,
 )
+from acessilia_core.toolbox.toolbox_client import ToolboxError
 
 
 class StructuralExtractionError(RuntimeError):
@@ -232,9 +237,9 @@ class PddlAccessibilityOrchestrator:
         source_path = file_path.resolve()
         # Inside a job the service gives the run its checkpoints; a benchmark
         # or the CLI runs without one and keeps the old behaviour.
-        checkpoints = ports.checkpoints
+        checkpoints = RunCheckpoints(ports.checkpoints, config)
 
-        media_state = _load_checkpoint(checkpoints, PHASE_MEDIA)
+        media_state = checkpoints.load(PHASE_MEDIA)
         if media_state is not None:
             media_inspection = media_state.get("inspection")
             media_configuration = dict(media_state.get("configuration") or {})
@@ -244,15 +249,14 @@ class PddlAccessibilityOrchestrator:
             media_inspection, media_configuration = await _inspect_media(
                 source_path, config.toolbox
             )
-            await _save_checkpoint(
-                checkpoints,
+            await checkpoints.save(
                 PHASE_MEDIA,
                 lambda: {"inspection": media_inspection, "configuration": media_configuration},
             )
         _check_page_limit_before_extraction(media_inspection, config.document)
         presentation = _is_presentation(media_inspection)
 
-        manifest_state = _load_checkpoint(checkpoints, PHASE_MANIFEST)
+        manifest_state = checkpoints.load(PHASE_MANIFEST)
         resumed_manifest = manifest_state is not None
         if manifest_state is not None:
             manifest = ProcessingManifest.model_validate(manifest_state["manifest"])
@@ -269,13 +273,9 @@ class PddlAccessibilityOrchestrator:
         if not resumed_manifest:
             # Saved after the page limit and the media configuration: an
             # oversized document must not leave a checkpoint to resume from.
-            await _save_checkpoint(
-                checkpoints,
-                PHASE_MANIFEST,
-                lambda: {"manifest": _manifest_payload(manifest)},
-            )
+            await checkpoints.save_manifest(manifest, enriching=False)
 
-        enriched_state = _load_checkpoint(checkpoints, PHASE_ENRICHED)
+        enriched_state = checkpoints.load(PHASE_ENRICHED)
         if enriched_state is not None:
             manifest = ProcessingManifest.model_validate(enriched_state["manifest"])
             # An enrichment checkpoint is complete for the mode it ran in; the
@@ -285,15 +285,11 @@ class PddlAccessibilityOrchestrator:
         else:
             await self._enrich_before_planning(
                 manifest, file_path, source_path, effective_mode, media_inspection, status_callback,
-                config, ports,
+                config, ports, checkpoints,
             )
-            await _save_checkpoint(
-                checkpoints,
-                PHASE_ENRICHED,
-                lambda: {"manifest": _manifest_payload(manifest)},
-            )
+            await checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
 
-        plan_state = _load_checkpoint(checkpoints, PHASE_PLAN)
+        plan_state = checkpoints.load(PHASE_PLAN)
         if plan_state is not None:
             plan = NominalPlan.model_validate(plan_state["plan"])
             comparison = (
@@ -320,11 +316,11 @@ class PddlAccessibilityOrchestrator:
             )
             planning_manifest = manifest
             replans = 0
-            await _save_plan(
-                checkpoints, plan, comparison, planning_manifest, availability, gated, replans
+            await checkpoints.save_plan(
+                plan, comparison, planning_manifest, availability, gated, replans
             )
 
-        execution_state = _load_checkpoint(checkpoints, PHASE_EXECUTION)
+        execution_state = checkpoints.load(PHASE_EXECUTION)
         if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
             # The plan checkpoint was replaced after this execution checkpoint
             # was written (a replan that crashed before it started). The old
@@ -385,7 +381,7 @@ class PddlAccessibilityOrchestrator:
         plan: NominalPlan,
         planning_manifest: ProcessingManifest,
         execution_state: dict[str, Any] | None,
-        checkpoints: JobCheckpoints | None,
+        checkpoints: RunCheckpoints,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         loop: asyncio.AbstractEventLoop,
         *,
@@ -403,8 +399,8 @@ class PddlAccessibilityOrchestrator:
                 replan_required=bool(execution_state.get("replan_required")),
             )
         on_step = (
-            _execution_saver(checkpoints, plan)
-            if checkpoints is not None and not self.execute_dry_run
+            checkpoints.execution_saver(plan)
+            if checkpoints.active and not self.execute_dry_run
             else None
         )
         return await run_blocking(
@@ -461,6 +457,7 @@ class PddlAccessibilityOrchestrator:
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         config: CoreConfig,
         ports: RunPorts,
+        checkpoints: RunCheckpoints,
     ) -> None:
         """Describe pictures, recognize formulas and inline math, read tables.
 
@@ -479,31 +476,30 @@ class PddlAccessibilityOrchestrator:
         # every remaining object.
         breaker = ProviderBreaker(config.vision.breaker_threshold)
         region_cache = region_cache_for(ports, config.vision)
-        checkpoints = ports.checkpoints
-        progress = _EnrichmentCheckpoint(checkpoints, manifest).save
+        progress = checkpoints.enrichment_progress(manifest)
         await _classify_formula_regions(
             manifest, source_path, mode=effective_mode, vision=config.vision,
             toolbox=config.toolbox, models=config.models, region_cache=region_cache,
             breaker=breaker, on_progress=progress,
         )
-        await _checkpoint_enrichment(checkpoints, manifest)
+        await checkpoints.save_manifest(manifest, enriching=True)
         await _enrich_picture_descriptions(
             manifest, source_path, mode=effective_mode, vision=config.vision,
             toolbox=config.toolbox, models=config.models, region_cache=region_cache,
             media_inspection=media_inspection, status_callback=status_callback,
             breaker=breaker, on_progress=progress,
         )
-        await _checkpoint_enrichment(checkpoints, manifest)
+        await checkpoints.save_manifest(manifest, enriching=True)
         text_spans = _TextSpanReader(manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
-        await _checkpoint_enrichment(checkpoints, manifest)
+        await checkpoints.save_manifest(manifest, enriching=True)
         await _enrich_formula_latex(
             manifest, source_path, mode=effective_mode, document=config.document,
             vision=config.vision, toolbox=config.toolbox, models=config.models,
             region_cache=region_cache, status_callback=status_callback,
             breaker=breaker, on_progress=progress,
         )
-        await _checkpoint_enrichment(checkpoints, manifest)
+        await checkpoints.save_manifest(manifest, enriching=True)
 
         if status_callback:
             await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
@@ -517,10 +513,10 @@ class PddlAccessibilityOrchestrator:
             breaker=breaker,
             on_progress=progress,
         )
-        await _checkpoint_enrichment(checkpoints, manifest)
+        await checkpoints.save_manifest(manifest, enriching=True)
         # After the table enrichment, which can replace a table's cells.
         await _mark_table_inline_math(manifest, source_path, config.document, text_spans)
-        await _checkpoint_enrichment(checkpoints, manifest)
+        await checkpoints.save_manifest(manifest, enriching=True)
 
     async def _replan_until_done(
         self,
@@ -532,7 +528,7 @@ class PddlAccessibilityOrchestrator:
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         loop: asyncio.AbstractEventLoop,
         *,
-        checkpoints: JobCheckpoints | None,
+        checkpoints: RunCheckpoints,
         planning_manifest: ProcessingManifest,
         availability: Any,
         replans: int,
@@ -582,11 +578,11 @@ class PddlAccessibilityOrchestrator:
                 extra_unavailable=gated,
                 selected_roots=roots,
             )
-            await _save_plan(
-                checkpoints, plan, comparison, planning_manifest, availability, gated, replans
+            await checkpoints.save_plan(
+                plan, comparison, planning_manifest, availability, gated, replans
             )
             # The previous execution checkpoint belongs to the previous plan.
-            _remove_checkpoint(checkpoints, PHASE_EXECUTION)
+            checkpoints.remove(PHASE_EXECUTION)
             manifest, execution_report = await self._run_plan(
                 plan,
                 planning_manifest,
@@ -688,102 +684,6 @@ class PddlAccessibilityOrchestrator:
         return sorted(requested - registered)
 
 
-class _EnrichmentCheckpoint:
-    """Coalesced manifest checkpoints during one enrichment stage (#407).
-
-    Each completed object calls :meth:`save`. One write runs at a time and a
-    burst of completions during a write produces one more write with the latest
-    manifest, so every object becomes durable without one full checkpoint per
-    object. The manifest snapshot is taken synchronously before the write is
-    handed to a thread, so concurrent folds never race with serialization.
-    """
-
-    def __init__(self, checkpoints: JobCheckpoints | None, manifest: ProcessingManifest) -> None:
-        self._checkpoints = checkpoints
-        self._manifest = manifest
-        self._lock = asyncio.Lock()
-        self._pending = 0
-
-    async def save(self) -> None:
-        if self._checkpoints is None:
-            return
-        self._pending += 1
-        if self._lock.locked():
-            # The running writer sees the increment and writes again.
-            return
-        async with self._lock:
-            while self._pending:
-                self._pending = 0
-                await _save_checkpoint(
-                    self._checkpoints,
-                    PHASE_MANIFEST,
-                    lambda: {"manifest": _manifest_payload(self._manifest)},
-                )
-
-
-def _manifest_payload(manifest: ProcessingManifest) -> dict[str, Any]:
-    return manifest.model_dump(mode="json", by_alias=True)
-
-
-def _load_checkpoint(checkpoints: JobCheckpoints | None, phase: str) -> dict[str, Any] | None:
-    if checkpoints is None:
-        return None
-    return checkpoints.load(phase)
-
-
-async def _save_checkpoint(
-    checkpoints: JobCheckpoints | None, phase: str, build: Callable[[], dict[str, Any]]
-) -> None:
-    """Persist one phase off the event loop (``build`` runs only inside a job);
-    a failed write never fails the job."""
-    if checkpoints is None:
-        return
-    payload = build()
-    try:
-        await run_blocking(checkpoints.save, phase, payload)
-    except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail the job
-        logger.warning("Job {}: {} checkpoint not written: {}", checkpoints.job_id, phase, exc)
-
-
-async def _checkpoint_enrichment(
-    checkpoints: JobCheckpoints | None, manifest: ProcessingManifest
-) -> None:
-    """Keep the manifest checkpoint current between enrichment steps (#407)."""
-    await _save_checkpoint(checkpoints, PHASE_MANIFEST, lambda: {"manifest": _manifest_payload(manifest)})
-
-
-def _remove_checkpoint(checkpoints: JobCheckpoints | None, phase: str) -> None:
-    if checkpoints is not None:
-        checkpoints.remove(phase)
-
-
-async def _save_plan(
-    checkpoints: JobCheckpoints | None,
-    plan: NominalPlan,
-    comparison: PlanningComparison | None,
-    manifest: ProcessingManifest,
-    availability: toolbox_gate.AvailabilityDecision,
-    gated: Iterable[str],
-    replans: int,
-) -> None:
-    await _save_checkpoint(
-        checkpoints,
-        PHASE_PLAN,
-        lambda: {
-            "plan": plan.model_dump(mode="json", by_alias=True),
-            "comparison": (
-                comparison.model_dump(mode="json", by_alias=True)
-                if comparison is not None
-                else None
-            ),
-            "manifest": _manifest_payload(manifest),
-            "availability": availability.to_metadata(),
-            "gated": sorted(gated),
-            "replans": replans,
-        },
-    )
-
-
 def _availability_from(
     metadata: dict[str, Any], toolbox: ToolboxConfig
 ) -> toolbox_gate.AvailabilityDecision:
@@ -801,23 +701,6 @@ def _availability_from(
         },
         catalog_error=metadata.get("catalog_error"),
     )
-
-
-def _execution_saver(checkpoints: JobCheckpoints, plan: NominalPlan):
-    """A callback the executor calls after each step, writing the checkpoint."""
-
-    def save(snapshot: dict[str, Any]) -> None:
-        if snapshot.get("plan_id") != plan.plan_id:
-            # A snapshot from another plan must never overwrite this one.
-            return
-        try:
-            checkpoints.save(PHASE_EXECUTION, snapshot)
-        except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail a step
-            logger.warning(
-                "Job {}: execution checkpoint not written: {}", checkpoints.job_id, exc
-            )
-
-    return save
 
 
 def _plan_progress(

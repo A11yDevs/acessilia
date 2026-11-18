@@ -49,6 +49,20 @@ sabe ler.
 Checkpoints existem apenas dentro de um job. O benchmark e a CLI chamam o
 orchestrator sem task id e não gravam nenhum, mantendo o comportamento atual.
 
+Um checkpoint só é reaproveitado sob a configuração em que foi gravado
+(#549). Cada fase registra um digest da configuração das etapas que ela
+contém (`run_identity.STAGE_FIELDS`, os campos da identidade de
+processamento, portanto sem credenciais): a inspeção de mídia, depois a
+extração (as opções de fusão e de documento), o enriquecimento (os modelos e
+as opções de visão), o plano (o gate de disponibilidade) e a execução (todas
+elas), cada uma com o deployment e os providers da Toolbox. O checkpoint do
+manifesto gravado durante o enriquecimento também leva a etapa do
+enriquecimento, pois carrega o progresso dele. Uma execução retomada cuja
+configuração mudou refaz a primeira fase que contém uma etapa alterada e todas
+as fases depois dela, mantém as anteriores e registra no log quais etapas
+mudaram. Um checkpoint gravado antes desses digests é reaproveitado com um
+aviso, como antes.
+
 Os payloads dos checkpoints são os documentos pydantic que o pipeline já carrega
 (`ProcessingManifest`, `NominalPlan`, `PlanningComparison`, passos do
 `ExecutionReport`); nenhuma segunda representação é introduzida.

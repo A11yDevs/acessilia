@@ -17,6 +17,8 @@ cannot be left out by omission.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -138,6 +140,46 @@ def processing_identity(config: CoreConfig) -> dict[str, Any]:
     return identity
 
 
+#: The deployment and providers every stage that calls the Toolbox depends on.
+_TOOLBOX = frozenset({"toolbox.base_url", "toolbox.base_urls", "toolbox.providers"})
+
+#: What each stage of a run depends on, by ``PROCESSING_FIELDS`` name (#549).
+#: A job's checkpoint records the identity of the stages its phase holds, so
+#: a resumed run redoes the first phase whose stages changed and every phase
+#: after it. Execution runs the handlers, which may read any of them.
+STAGE_FIELDS: dict[str, frozenset[str]] = {
+    "media": _TOOLBOX | {"toolbox.media_inspect_enabled"},
+    "extraction": _TOOLBOX | {
+        "fusion.mode",
+        "fusion.secondary_provider",
+        "fusion.apply_page_routes",
+        "fusion.judge_max_pages",
+        "document.max_pages",
+        "document.legacy_unicode_repair",
+        "document.slide_visual_coverage",
+        "document.slide_fold_figure_labels",
+    },
+    "enrichment": _TOOLBOX | {
+        field for field in PROCESSING_FIELDS if field.startswith("models.")
+    } | {
+        "vision.table_visual_review",
+        "document.inline_math_detection",
+        "document.formula_text_agreement_min",
+    },
+    "planning": _TOOLBOX | {"toolbox.availability_gate"},
+    "execution": PROCESSING_FIELDS,
+}
+
+
+def stage_identity(config: CoreConfig, stage: str) -> str:
+    """A digest of what ``stage`` depends on in ``config``; no credentials,
+    since ``processing_identity`` holds none."""
+    identity = processing_identity(config)
+    subset = {name: identity[name] for name in sorted(STAGE_FIELDS[stage])}
+    encoded = json.dumps(subset, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
 def _processing_providers(toolbox: ToolboxConfig) -> dict[str, str]:
     return {
         key: toolbox.providers[key]
@@ -172,7 +214,9 @@ __all__ = [
     "NOT_PROCESSING_PROVIDERS",
     "PROCESSING_FIELDS",
     "PROCESSING_PROVIDERS",
+    "STAGE_FIELDS",
     "config_fields",
     "fusion_reuse_identity",
     "processing_identity",
+    "stage_identity",
 ]
