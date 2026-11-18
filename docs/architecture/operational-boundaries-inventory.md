@@ -106,10 +106,29 @@ operations, with the decision part staying in the core:
 | Text spans | `libs/core/src/acessilia_core/toolbox/text_spans.py` | already `ToolboxPdfClient.text_spans_by_page` (#455) | which pages, the per-document cache |
 | Pandoc export | `libs/core/src/acessilia_core/export/pandoc_exporter.py` | `document.export.pdf_ua`, `document.export.docx` | which profile, which formats |
 
+**Phase 4 outcome (#470).** Two of these are SDK operations, and the core
+calls their steps: the formula chain (#504, #507, #509) and the page judge
+(#605, #607). Each was a fixed sequence of mechanical steps that the core
+used to run itself. The other four are not operations, and stay as they are.
+The last column repeats each row's decision from the table above, which stays
+in the core, then the plumbing that comes with it:
+
+| Row | The mechanism is already | What stays in the core |
+|---|---|---|
+| Media inspection | one client method, `ToolboxMediaInspectClient.inspect` (one `media.inspect` call), which also refuses an answer without a document object | **Decision:** what a slide deck or a page limit means for the job. **Plumbing:** whether the step runs (`media_inspect_enabled`), the remote cache choice, the check that the source file exists, the check of a client the caller passes in, the localized log |
+| PDF/UA audit | one client method, `ToolboxPdfValidateClient.validate` (one `pdf.validate.pdf_ua` call) | **Decision:** what a failed audit does to the job. **Plumbing:** whether the audit runs (`pdf_validate_enabled`), the remote cache choice, the client's lifetime, the localized log, and `summarize_audit`, the localized e-mail lines of the verdict and the failed rules |
+| Text spans | one client method, `ToolboxPdfClient.text_spans_by_page` (#455), which batches the pages into `document.text.spans` calls of at most `TEXT_SPANS_MAX_PAGES` | **Decision:** which pages, the per-document cache |
+| Pandoc export | one client method per format, the export clients' `export`; `degrade_math_to_text` is already docstruct's | **Decision:** which profile, which formats, and the retry of a rejected PDF/UA with its math as literal text, a degradation policy (P6). **Plumbing:** whether a format is enabled, the client's lifetime, writing the file |
+
+An SDK operation for any of them would wrap one client method. It would take
+nothing out of the core, and moving what the core keeps would put a decision
+or a localized presentation in the SDK, which ADR-0017 rules out.
+
 ## Open, for ADR-0017 and its follow-ups
 
-- Which of these operations become SDK operations, and in which order. The
-  formula chain is the proof of concept #402 and #470 both name.
+- ~~Which of these operations become SDK operations, and in which order.~~
+  Settled by phase 4 of #470: the formula chain and the page judge (see the
+  outcome above).
 - What docstruct's stable public API is.
 - How a docstruct change reaches the Toolbox, and how the two are checked
   against each other.
