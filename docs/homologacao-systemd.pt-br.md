@@ -131,7 +131,7 @@ cd /caminho/para/acessilia
 
 Um monitor que só deve acompanhar a prontidão pode usar `curl -fsS http://localhost:8000/api/v1/ready`; o endpoint responde 503 quando um provider da cadeia está fora. O check permite 30 s para o `/ready` porque a rota consulta os providers em sequência (3 s cada) e pode fazer failover entre endpoints da Toolbox; um limite de 5 s alertaria com a aplicação ainda pronta. Aumente `OPS_READY_TIMEOUT` quando a instalação tiver mais endpoints do que esse orçamento cobre.
 
-Para testar o alerta com o `FUSION_MODE=single` da homologação, em uma instância de teste defina `TOOLBOX_PROVIDER` com um id inválido (o provider primário é sempre consultado), reinicie a API e rode o comando: ele deve reportar `readiness endpoint does not answer or reports unavailable` e sair com 1. Restaure o valor depois. Para exercitar o provider secundário, defina `FUSION_MODE=dual` e invalide `FUSION_SECONDARY_PROVIDER`, restaurando os dois depois.
+Para testar o alerta com o `FUSION_MODE=dual` da homologação, em uma instância de teste defina `FUSION_SECONDARY_PROVIDER` com um id inválido, recrie o container (veja [Alterar um limite](#alterar-um-limite)) e rode o comando: ele deve reportar `readiness endpoint does not answer or reports unavailable` e sair com 1. Restaure o valor depois. Invalidar o `TOOLBOX_PROVIDER` exercita do mesmo jeito o provider primário, que é consultado nos dois modos.
 
 ## Limites de processamento e modo de fusão
 
@@ -141,8 +141,27 @@ O `MAX_PAGES` e o `FUSION_MODE` efetivos são os valores dentro do container em 
 docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
 ```
 
-- **Decisão do preflight:** a checagem antecipada recusa apenas PDF cuja contagem veio do `pymupdf` (`page_count_source == "pymupdf"`). Sem contagem confiável — inspeção falhou, varredura de content stream, formato não-PDF — recusar antes da extração rejeitaria documentos digitalizados legítimos, então o limite vale de forma autoritativa depois da extração (`_check_page_limit(manifest)`). Não há teto separado para extração dual: o mesmo limite vale para o manifesto extraído e os timeouts dos providers limitam o trabalho remoto.
-- **Decisão do modo de fusão:** a homologação usa `FUSION_MODE=single`. Com `dual`, o `/ready` também depende do MinerU, então a queda de um provider derruba a prontidão e degrada todos os jobs; `dual` só é usado durante avaliação da fusão, com os dois providers monitorados. Esta é uma decisão do ambiente de homologação, não um padrão do produto.
+### Alterar um limite
+
+O container só lê o `.env` quando é criado (`env_file` no `docker-compose.staging.yml`), então `docker restart` mantém os valores antigos. Edite o `.env` do clone e recrie o container:
+
+```bash
+cd /caminho/para/acessilia            # o clone: docker-compose.staging.yml e .env
+cp .env ".env.bak-$(date +%F)"
+sed -i 's/^MAX_PAGES=.*/MAX_PAGES=50/' .env
+grep -q '^FUSION_MODE=' .env && sed -i 's/^FUSION_MODE=.*/FUSION_MODE=dual/' .env \
+  || echo 'FUSION_MODE=dual' >> .env
+grep -nE '^(MAX_PAGES|FUSION_MODE|FUSION_SECONDARY_PROVIDER)=' .env   # uma linha de cada
+docker compose -f docker-compose.staging.yml up -d --force-recreate acessilia
+docker exec acessilia-staging printenv MAX_PAGES FUSION_MODE
+./scripts/ops.sh auto-update check
+```
+
+Rode a partir do clone: o `.env` define o `COMPOSE_PROJECT_NAME` (`acessilia-staging` numa instalação nova; uma migrada pode manter o nome anterior, que o `auto-update check` mostra), e o compose só o lê no diretório do projeto. Quando uma variável aparece duas vezes no `.env`, vale a última linha. Recriar o container interrompe o job em andamento, que é retomado do último checkpoint; quando der, espere a fila esvaziar. O timer de atualização roda `docker compose up -d` com o mesmo `.env`, então mantém a alteração.
+
+- **Decisão do preflight:** a checagem antecipada recusa apenas PDF cuja contagem veio do `pymupdf` (`page_count_source == "pymupdf"`). Sem contagem confiável — inspeção falhou, varredura de content stream, formato não-PDF — recusar antes da extração rejeitaria documentos digitalizados legítimos, então o limite vale de forma autoritativa depois da extração (`_check_page_limit` em `libs/core/src/acessilia_core/pipeline/preflight.py`). Não há teto separado para extração dual: o mesmo limite vale para o manifesto extraído e os timeouts dos providers limitam o trabalho remoto.
+- **Decisão do limite de páginas:** a homologação usa `MAX_PAGES=50`, o padrão do `.env.example`. Em 2026-11-18 o container tinha `MAX_PAGES=2000`. Um documento desse tamanho passa pela checagem antecipada e, no modo dual, ocupa os dois providers até o prazo da extração (`TOOLBOX_EXTRACTION_TIMEOUT_SECONDS`, 1500 s): a falha de 30/10, com 201 páginas. Aumente o limite só depois de medir, no modo dual, quantas páginas uma extração completa dentro do prazo com folga.
+- **Decisão do modo de fusão:** a homologação usa `FUSION_MODE=dual` (2026-11-18, no lugar de `single`). A qualidade por adjudicação entre os dois providers é uma hipótese de pesquisa em avaliação, então a homologação roda a fusão. O `/ready` passa a depender também do MinerU: uma queda dele falha a prontidão e dispara o alerta acima. Os jobs continuam rodando, porque uma extração cujo secundário falha degrada para o primário (`fusion.status = "degraded"`) e perde só a adjudicação daquele documento; um secundário que trava degrada do mesmo jeito quando o primário está completo (#603). Monitore os dois providers. Esta é uma decisão do ambiente de homologação, não um padrão do produto.
 
 ## Solução de problemas
 
