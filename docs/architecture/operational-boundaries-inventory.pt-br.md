@@ -111,16 +111,17 @@ candidatos a operações do SDK, com a parte da decisão ficando no core:
 chama os passos delas: a cadeia de fórmula (#504, #507, #509) e o juiz de
 página (#605, #607). Cada uma era uma sequência fixa de passos mecânicos que o
 core executava por conta própria. As outras quatro não são operações e ficam
-como estão:
+como estão. A última coluna repete a decisão de cada linha da tabela acima, que
+fica no core, e depois o encanamento que vem com ela:
 
-| Linha | A mecânica já é | O que fica no core é |
+| Linha | A mecânica já é | O que fica no core |
 |---|---|---|
-| Inspeção de mídia | uma chamada, `ToolboxMediaInspectClient.inspect`, que também recusa uma resposta sem objeto de documento | se a etapa roda (`media_inspect_enabled`), a escolha do cache remoto, o log traduzido |
-| Auditoria PDF/UA | uma chamada, `ToolboxPdfValidateClient.validate` | `summarize_audit`: as linhas traduzidas do e-mail com o veredito e as regras reprovadas |
-| Text spans | uma chamada, `ToolboxPdfClient.text_spans_by_page` (#455) | quais páginas, o cache por documento |
-| Exportação Pandoc | uma chamada por formato, o `export` dos clientes de exportação; o `degrade_math_to_text` é do docstruct | se um formato está ligado, e a nova tentativa de um PDF/UA recusado com as fórmulas em texto literal, uma política de degradação (P6) |
+| Inspeção de mídia | um método de cliente, `ToolboxMediaInspectClient.inspect` (uma chamada a `media.inspect`), que também recusa uma resposta sem objeto de documento | **Decisão:** o que uma apresentação ou um limite de páginas significa para o job. **Encanamento:** se a etapa roda (`media_inspect_enabled`), a escolha do cache remoto, a conferência de que o arquivo de origem existe, a conferência de um cliente passado pelo chamador, o log traduzido |
+| Auditoria PDF/UA | um método de cliente, `ToolboxPdfValidateClient.validate` (uma chamada a `pdf.validate.pdf_ua`) | **Decisão:** o que uma auditoria reprovada faz com o job. **Encanamento:** se a auditoria roda (`pdf_validate_enabled`), a escolha do cache remoto, o tempo de vida do cliente, o log traduzido e o `summarize_audit`, as linhas traduzidas do e-mail com o veredito e as regras reprovadas |
+| Text spans | um método de cliente, `ToolboxPdfClient.text_spans_by_page` (#455), que agrupa as páginas em chamadas a `document.text.spans` de no máximo `TEXT_SPANS_MAX_PAGES` | **Decisão:** quais páginas, o cache por documento |
+| Exportação Pandoc | um método de cliente por formato, o `export` dos clientes de exportação; o `degrade_math_to_text` já é do docstruct | **Decisão:** qual perfil, quais formatos, e a nova tentativa de um PDF/UA recusado com as fórmulas em texto literal, uma política de degradação (P6). **Encanamento:** se um formato está ligado, o tempo de vida do cliente, a gravação do arquivo |
 
-Uma operação do SDK para qualquer uma delas embrulharia uma chamada de cliente.
+Uma operação do SDK para qualquer uma delas embrulharia um método de cliente.
 Não tiraria nada do core, e mover o que o core mantém poria no SDK uma decisão
 ou uma apresentação traduzida, o que a ADR-0017 não permite.
 
