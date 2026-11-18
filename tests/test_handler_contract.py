@@ -38,6 +38,7 @@ EXPECTED_RUN_PARAMETERS = {
     "dual-provider-fusion": ("config",),
     "single-provider": ("config",),
     "vlm-pairwise-judge": ("config",),
+    "rescue-omitted": ("config",),
     "pymupdf-region": ("config", "ports"),
     "vision-page-inspection": ("config", "ports"),
 }

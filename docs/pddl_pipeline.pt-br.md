@@ -279,6 +279,19 @@ Em caso de falha:
 - uma nova compilação emite `(tried obrigação método)`;
 - o planner escolhe outra alternativa, quando houver.
 
+Um handler que acrescenta conteúdo pode acrescentar também as necessidades de
+processamento dele: depois que o `rescue-omitted` restaura um bloco, as
+obrigações do próprio bloco (`normalize-text`, `repair-legacy-unicode`,
+`repair-heading-hierarchy`, ...) entram no manifesto (#594). Nenhum plano as
+cobre ainda, então, quando o handler tem sucesso, o executor as seleciona e,
+se alguma continua aberta, informa `replan-required`. O resto do plano roda
+antes, como depois de um método que falhou, e o `complete-job` confere todas
+as obrigações selecionadas, inclusive essas. O replanejamento as toma como
+raízes, dentro do mesmo limite `max_replans`. Ao retomar de um checkpoint,
+vale a seleção que o checkpoint gravou para uma obrigação que o manifesto
+do plano não tem: selecionada se o handler que a acrescentou teve sucesso, não
+selecionada se ele falhou.
+
 ### 5.1 Método `dual-provider-fusion`
 
 O método `dual-provider-fusion` (Fase 5) representa a extração fundida de dois

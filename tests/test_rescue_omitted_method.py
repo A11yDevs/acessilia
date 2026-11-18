@@ -26,6 +26,7 @@ from acessilia_core.manifest.models import (
     ManifestElement,
     ManifestSummary,
     Obligation,
+    ObligationAttempt,
     PageDescriptor,
     ProcessingManifest,
     Provenance,
@@ -37,6 +38,8 @@ from acessilia_core.pipeline.handlers.rescue import (
     is_legitimate_text,
 )
 from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
+
+from tests.core_config_support import core_config
 
 NOW = datetime(2026, 11, 18, tzinfo=UTC)
 W, H = 600.0, 800.0
@@ -167,6 +170,11 @@ def _manifest(
     )
 
 
+def _rescue(manifest, obligation_id="o-1", *, legacy_unicode_repair="off"):
+    config = core_config(document={"legacy_unicode_repair": legacy_unicode_repair})
+    return _handle_rescue_omitted_method(manifest, obligation_id, config=config)
+
+
 def _routed_page(tmp_path, **kwargs):
     """Page 1 taken from MinerU, page 2 kept from Docling."""
     elements = [
@@ -199,7 +207,7 @@ def test_the_method_is_registered_and_its_kind_is_critical():
 def test_restores_the_primary_block_a_routed_page_lost(tmp_path):
     manifest = _routed_page(tmp_path)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert result.success and result.validated
     assert "Blocks restored from the primary provider: 1 (pages 1)" in result.message
@@ -219,10 +227,10 @@ def test_restores_the_primary_block_a_routed_page_lost(tmp_path):
 
 def test_a_second_run_restores_nothing(tmp_path):
     manifest = _routed_page(tmp_path)
-    _handle_rescue_omitted_method(manifest, "o-1")
+    _rescue(manifest)
     before = [e.id for e in manifest.elements]
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert result.success
     assert "already carry the primary provider's text" in result.message
@@ -238,7 +246,7 @@ def test_text_the_secondary_merged_into_another_block_is_not_duplicated(tmp_path
     ]}
     manifest = _manifest(tmp_path, elements, replaced=replaced)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert result.success
     assert _texts(manifest) == [f"{first} {second}"]
@@ -253,7 +261,7 @@ def test_text_inside_a_primary_picture_is_not_rescued(tmp_path):
     ]}
     manifest = _manifest(tmp_path, elements, replaced=replaced)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert result.success
     assert len(manifest.elements) == 1
@@ -267,7 +275,7 @@ def test_a_block_omitted_at_the_top_goes_before_the_first_element(tmp_path):
     ]}
     manifest = _manifest(tmp_path, elements, replaced=replaced)
 
-    _handle_rescue_omitted_method(manifest, "o-1")
+    _rescue(manifest)
 
     assert _texts(manifest) == [LOST, "The body text of the page."]
 
@@ -276,7 +284,7 @@ def test_a_page_that_kept_the_primary_extraction_is_left_alone(tmp_path):
     elements = [_el("d-1", "paragraph", "Text from Docling.", MIDDLE, 1)]
     manifest = _manifest(tmp_path, elements)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert result.success and result.validated
     assert "Pages 1 keep the primary provider's extraction" in result.message
@@ -289,7 +297,7 @@ def test_does_not_require_the_calibrated_pair(tmp_path):
         if element.metadata.get("provider") == "mineru":
             element.metadata["provider"] = "mineru-hyb"
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert result.success
     assert LOST in _texts(manifest)
@@ -302,7 +310,7 @@ def test_a_page_the_text_fusion_rewrote_fails(tmp_path):
     ]
     manifest = _manifest(tmp_path, elements)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert not result.success
     assert "rewritten by the text fusion" in result.message
@@ -312,7 +320,7 @@ def test_an_adopted_page_without_the_replaced_primary_fails(tmp_path):
     elements = [_adopted("m-1", "paragraph", "Text from MinerU.", MIDDLE, 1)]
     manifest = _manifest(tmp_path, elements)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert not result.success
     assert "came from mineru" in result.message
@@ -338,7 +346,7 @@ def test_a_failure_on_one_page_leaves_every_page_unchanged(tmp_path):
     )
     before = manifest.model_dump()
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert not result.success
     assert "Pages 2 came from mineru" in result.message
@@ -349,7 +357,7 @@ def test_fails_without_the_secondary_extraction(tmp_path):
     elements = [_el("d-1", "paragraph", "Some text.", MIDDLE, 1)]
     manifest = _manifest(tmp_path, elements, with_artifact=False)
 
-    result = _handle_rescue_omitted_method(manifest, "o-1")
+    result = _rescue(manifest)
 
     assert not result.success
 
@@ -357,7 +365,7 @@ def test_fails_without_the_secondary_extraction(tmp_path):
 def test_an_unknown_obligation_fails(tmp_path):
     manifest = _routed_page(tmp_path)
 
-    assert not _handle_rescue_omitted_method(manifest, "o-missing").success
+    assert not _rescue(manifest, "o-missing").success
 
 
 @pytest.mark.parametrize(
@@ -374,3 +382,126 @@ def test_an_unknown_obligation_fails(tmp_path):
 )
 def test_is_legitimate_text(text, expected):
     assert is_legitimate_text(text) is expected
+
+
+# --- processing needs of the restored blocks (#594) -------------------------
+
+
+def _single_rescue(tmp_path, row, *, extra=(), obligations=()):
+    """Page 1 taken from MinerU, which lost the primary block ``row``."""
+    elements = [
+        _adopted("m-1", "paragraph", "The first paragraph of the body text.", MIDDLE, 1),
+        *extra,
+    ]
+    replaced = {1: [
+        _row("d-1", "paragraph", "The first paragraph of the body text.", MIDDLE, 1),
+        row,
+    ]}
+    manifest = _manifest(tmp_path, elements, replaced=replaced, targets=["m-1"])
+    manifest.obligations.extend(obligations)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    return manifest
+
+
+def _new_obligations(manifest):
+    return [item for item in manifest.obligations if item.id != "o-1"]
+
+
+def test_a_restored_block_gets_its_text_normalized(tmp_path):
+    manifest = _single_rescue(
+        tmp_path, _row("d-2", "paragraph", "A restored\u00a0paragraph of text.", LOWER, 2)
+    )
+
+    assert _rescue(manifest).success
+
+    [obligation] = _new_obligations(manifest)
+    assert obligation.kind == "normalize-text"
+    assert obligation.target_ids == ["element-rescued-p1-d-2"]
+    assert any(item.kind == "normalize-text-detected" for item in manifest.observations)
+    assert manifest.summary.obligation_count == len(manifest.obligations)
+
+
+@pytest.mark.parametrize(("mode", "expected"), [("repair", True), ("off", False)])
+def test_a_restored_block_gets_its_legacy_unicode_repaired(tmp_path, mode, expected):
+    legacy = "The capital moved to Bras\u0131\u0301lia in the sixties."
+    manifest = _single_rescue(tmp_path, _row("d-2", "paragraph", legacy, LOWER, 2))
+
+    assert _rescue(manifest, legacy_unicode_repair=mode).success
+
+    repairs = [
+        item for item in _new_obligations(manifest) if item.kind == "repair-legacy-unicode"
+    ]
+    assert bool(repairs) is expected
+    if expected:
+        assert repairs[0].target_ids == ["element-rescued-p1-d-2"]
+
+
+def test_page_level_needs_are_not_derived_over_the_restored_blocks(tmp_path):
+    """Two restored blocks out of XY order would be a reading-order need."""
+    elements = [_adopted("m-1", "paragraph", "The body text of the page.", MIDDLE, 1)]
+    replaced = {1: [
+        _row("d-1", "paragraph", "A first restored block, on the right.", (320, 400, 560, 500), 1),
+        _row("d-2", "paragraph", "A second restored block, on the left.", (40, 400, 280, 500), 2),
+        _row("d-3", "paragraph", "The body text of the page.", MIDDLE, 3),
+    ]}
+    manifest = _manifest(tmp_path, elements, replaced=replaced)
+
+    assert _rescue(manifest).success
+
+    assert len(manifest.elements) == 3
+    assert _new_obligations(manifest) == []
+
+
+def test_a_restored_heading_that_skips_a_level_gets_its_repair(tmp_path):
+    heading = _row("d-2", "heading", "Background", LOWER, 2)
+    heading["hierarchy_level"] = 3
+    manifest = _single_rescue(tmp_path, heading)
+
+    assert _rescue(manifest).success
+
+    [obligation] = _new_obligations(manifest)
+    assert obligation.kind == "repair-heading-hierarchy"
+    assert obligation.target_ids == ["element-rescued-p1-d-2"]
+
+
+def test_an_obligation_an_enrichment_removed_does_not_come_back(tmp_path):
+    """A picture with no describe-image obligation keeps having none."""
+    picture = _el("d-9", "picture", "", MIDDLE, 2, page=2)
+    manifest = _single_rescue(
+        tmp_path, _row("d-2", "paragraph", LOST, LOWER, 2), extra=[picture]
+    )
+
+    assert _rescue(manifest).success
+
+    assert _new_obligations(manifest) == []
+
+
+def test_an_existing_obligation_and_its_attempts_are_kept(tmp_path):
+    """The derivation finds the gap again; the live obligation is not replaced."""
+    gap = _adopted("m-h", "heading", "Results", BOTTOM, 2)
+    gap.hierarchy_level = 3
+    existing = Obligation(
+        id="obligation-repair-heading-m-h",
+        kind="repair-heading-hierarchy",
+        target_ids=["m-h"],
+        admissible_methods=["deterministic-heading-repair", "human-review"],
+        method_costs={"deterministic-heading-repair": 5, "human-review": 100},
+        rationale="gap",
+        status="pending",
+        attempts=[ObligationAttempt(
+            method="deterministic-heading-repair", status="failed",
+            started_at=NOW, completed_at=NOW, message="kept",
+        )],
+    )
+    manifest = _single_rescue(
+        tmp_path,
+        _row("d-2", "paragraph", LOST, LOWER, 2),
+        extra=[gap],
+        obligations=[existing],
+    )
+
+    assert _rescue(manifest).success
+
+    same = [item for item in manifest.obligations if item.kind == "repair-heading-hierarchy"]
+    assert same == [existing]
+    assert same[0].attempts[0].message == "kept"

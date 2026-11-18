@@ -267,6 +267,18 @@ On failure:
 - the report flags a failure or `replan-required`; a fresh compilation emits `(tried obligation method)`;
 - the planner picks an alternate, when any remains.
 
+A handler that adds content may also add its processing needs: after
+`rescue-omitted` restores a block, the block's own obligations
+(`normalize-text`, `repair-legacy-unicode`, `repair-heading-hierarchy`, ...)
+join the manifest (#594). No plan covers them yet, so when the handler
+succeeds the executor selects them and, if one is still open, reports
+`replan-required`. The rest of the plan still runs first, as after a failed
+method, and `complete-job` checks every selected obligation, these included.
+The replan takes them as roots, within the same `max_replans` budget. A
+checkpoint resume keeps the selection the checkpoint recorded for an
+obligation the plan's manifest does not have: selected if the handler that
+added it succeeded, not selected if it failed.
+
 ### 5.1 `dual-provider-fusion` method
 
 The `dual-provider-fusion` method (Phase 5) represents extraction fused from
