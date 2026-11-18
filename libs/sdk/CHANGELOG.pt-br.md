@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido** um `502` que a Toolbox responde com
+  `code: "provider_execution_failed"` (o provider foi alcançado e falhou no
+  documento) levantando `ToolboxProviderUnavailable`. Agora ele levanta um
+  `ToolboxError` simples, como um `500`, e por isso não é repetido nem enviado a
+  outro endpoint. Um `502` sem esse código, de um gateway que não alcança a
+  Toolbox, continua levantando `ToolboxProviderUnavailable` (#608).
+
 - **Adicionado** o juiz de página, a segunda operação do SDK (ADR-0017, #470
   fase 4): `acessilia_sdk.operations.page_judge`. O `render_judge_page`
   renderiza uma página inteira para o juiz (`pdf.render`, 144 dpi, lado maior

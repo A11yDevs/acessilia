@@ -7,6 +7,13 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** a `502` the Toolbox answers with `code: "provider_execution_failed"`
+  (the provider was reached and failed on the document) raising
+  `ToolboxProviderUnavailable`. It now raises a plain `ToolboxError`, as a `500`
+  does, so it is neither retried nor failed over to another endpoint. A `502`
+  without that code, from a gateway that cannot reach the Toolbox, still raises
+  `ToolboxProviderUnavailable` (#608).
+
 - **Added** the page judge, the SDK's second operation (ADR-0017, #470 phase 4):
   `acessilia_sdk.operations.page_judge`. `render_judge_page` renders a whole
   page for the judge (`pdf.render`, 144 dpi, longest side 1600 px);

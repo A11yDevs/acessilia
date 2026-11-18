@@ -16,6 +16,7 @@ from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient,
     ToolboxCapabilityError,
     ToolboxContractViolation,
+    ToolboxError,
     ToolboxInvalidInput,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -112,6 +113,14 @@ async def test_file_upload_uses_the_extension_media_type(tmp_path: Path) -> None
         (httpx.Response(401, json={"detail": "no"}), ToolboxAuthenticationError, "Autenticação"),
         (httpx.Response(404, json={"detail": "x"}), ToolboxArtifactNotFound, "não encontrado"),
         (httpx.Response(502, json={"detail": "gateway"}), ToolboxProviderUnavailable, "gateway"),
+        (
+            httpx.Response(
+                502,
+                json={"code": "provider_execution_failed", "message": "mineru-api rejected the document"},
+            ),
+            ToolboxError,
+            "Erro HTTP 502.*mineru-api rejected the document",
+        ),
         (httpx.Response(503, json={"detail": "x"}), ToolboxProviderUnavailable, "indisponível"),
         (
             httpx.Response(400, json={"code": "invalid_input", "message": "LaTeX rejected"}),

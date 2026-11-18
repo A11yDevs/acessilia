@@ -20,6 +20,7 @@ import respx
 from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient,
     ToolboxContractViolation,
+    ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     parse_endpoints,
@@ -232,6 +233,62 @@ async def test_an_idempotent_execute_call_keeps_its_retries_and_failover(sleeps)
             assert await client._execute("document.ocr", artifact_id="a1") == SUCCEEDED
         assert (primary.call_count, secondary.call_count) == (2, 1)
         assert len(sleeps) == 1
+    finally:
+        await client.close()
+
+
+#: The Toolbox's answer when the provider was reached and failed on the document.
+PROVIDER_FAILED = {
+    "code": "provider_execution_failed",
+    "message": "mineru-api rejected the document: HTTP 409",
+}
+
+
+@pytest.mark.asyncio
+async def test_a_provider_that_failed_on_the_document_is_not_retried(sleeps) -> None:
+    """#608: a 502 ``provider_execution_failed`` is not an unavailable provider."""
+    class OcrClient(ToolboxCapabilityClient):
+        provider_key = "toolbox_ocr_provider"
+
+    client = OcrClient(endpoints=parse_endpoints(f"{PRIMARY}, {SECONDARY}"), retries=1)
+    try:
+        # The secondary is never contacted, not even for its catalog.
+        with respx.mock(assert_all_called=False) as router:
+            primary = router.post(PRIMARY + EXECUTE).mock(
+                return_value=httpx.Response(502, json=PROVIDER_FAILED)
+            )
+            _publish(router, SECONDARY, "document.ocr")
+            secondary = router.post(SECONDARY + EXECUTE).mock(
+                return_value=httpx.Response(200, json=SUCCEEDED)
+            )
+            with pytest.raises(ToolboxError) as info:
+                await client._execute("document.ocr", artifact_id="a1")
+        assert type(info.value) is ToolboxError
+        assert "mineru-api rejected the document" in str(info.value)
+        assert (primary.call_count, secondary.call_count) == (1, 0)
+        assert sleeps == []
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_a_gateway_502_is_still_retried_and_failed_over(sleeps) -> None:
+    """A 502 without the Toolbox's code is a gateway that cannot reach it."""
+    class OcrClient(ToolboxCapabilityClient):
+        provider_key = "toolbox_ocr_provider"
+
+    client = OcrClient(endpoints=parse_endpoints(f"{PRIMARY}, {SECONDARY}"), retries=1)
+    try:
+        with respx.mock() as router:
+            primary = router.post(PRIMARY + EXECUTE).mock(
+                return_value=httpx.Response(502, text="Bad Gateway")
+            )
+            _publish(router, SECONDARY, "document.ocr")
+            secondary = router.post(SECONDARY + EXECUTE).mock(
+                return_value=httpx.Response(200, json=SUCCEEDED)
+            )
+            assert await client._execute("document.ocr", artifact_id="a1") == SUCCEEDED
+        assert (primary.call_count, secondary.call_count) == (2, 1)
     finally:
         await client.close()
 
