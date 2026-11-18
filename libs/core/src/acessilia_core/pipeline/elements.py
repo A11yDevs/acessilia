@@ -20,6 +20,7 @@ from docstruct.blocks.lists import (
 from docstruct.geometry import is_bottom_left
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
+    table_ast_from_rows,
 )
 from docstruct.text.code_reflow import normalize_code_text
 
@@ -200,7 +201,7 @@ def _element_to_block(
         if not rows:
             rows = [[text]] if text else [[_TABLE_PLACEHOLDER_TEXT]]
             if table_ast is None:
-                table_ast = _table_ast_from_rows(rows)
+                table_ast = table_ast_from_rows(rows)
         block.update(
             {
                 "type": "table",
@@ -294,20 +295,6 @@ def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
         table_ast["metadata"] = metadata_obj
 
     return table_ast if table_ast.get("body") else None
-
-
-def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
-    body: list[dict[str, Any]] = []
-    for row in rows:
-        if not isinstance(row, list):
-            continue
-        cells = []
-        for cell in row:
-            text = str(cell).strip()
-            cells.append({"text": text})
-        if cells:
-            body.append({"cells": cells})
-    return {"body": body}
 
 
 #: Slack, in PDF points, when finding the element a negation slash lies in.

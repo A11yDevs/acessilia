@@ -23,6 +23,7 @@ from docstruct.tables.ast import (
 )
 from docstruct.tables.ast import (
     table_ast_column_count,
+    table_ast_from_rows,
 )
 from docstruct.tables.garble import table_garble_reason
 from docstruct.tables.text_rows import rows_from_visual_table_text
@@ -36,7 +37,6 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
 from acessilia_core.pipeline.elements import (
-    _table_ast_from_rows,
     _table_element_has_structured_content,
 )
 from acessilia_core.pipeline.enrichment.common import (
@@ -401,7 +401,7 @@ def _backfill_table_from_existing_text(element: ManifestElement) -> bool:
     if not rows:
         return False
 
-    table_ast = _table_ast_from_rows(rows)
+    table_ast = table_ast_from_rows(rows)
     if table_ast is None:
         return False
 

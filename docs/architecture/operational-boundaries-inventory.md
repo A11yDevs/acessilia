@@ -84,7 +84,7 @@ The rest, with the duplicates already on record:
 
 | Core | docstruct | Finding |
 |---|---|---|
-| `_table_ast_from_rows` (orchestrator) | `docstruct.tables.ast.table_ast_from_rows` | Near-duplicate with different behaviour: `{"body": []}` against `None` for no rows. Recorded in the orchestrator inventory; merging it is a behaviour decision. |
+| `_table_ast_from_rows` (orchestrator) | `docstruct.tables.ast.table_ast_from_rows` | Near-duplicate with different behaviour: `{"body": []}` against `None` for no rows. Recorded in the orchestrator inventory; merging it is a behaviour decision. **Resolved:** the core uses docstruct's (#470, phase 4); the only difference, blank rows, is recorded in `tests/test_table_ast_from_rows_parity.py`. |
 | `_block_kind` (orchestrator) | `docstruct.fusion.convert.classify_kind` | Near-duplicate with different behaviour. Recorded in the orchestrator inventory. |
 | `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | The same computation, for a box that is present. **Resolved:** `slides.py` uses docstruct's (#470, phase 4). |
 | `_overlaps`, `_union_area` (`slides.py`) | none | Pure box geometry. **Moved** to `docstruct.geometry.boxes` as `boxes_overlap` and `union_area` (docstruct 0.5.6, #470, phase 4). (docstruct's `_overlaps` compares text spans, not boxes.) |
