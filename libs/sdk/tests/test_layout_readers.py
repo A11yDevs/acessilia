@@ -182,9 +182,11 @@ def test_valid_element_only_fragments_keep_docstruct_page_reference_policy():
 # --- docstruct's shared contract cases (#470, criterion 4) -------------------
 #
 # The core and the Toolbox run the same catalog against their own models; the
-# SDK's reader must agree with docstruct on each case. The fixture has a single
-# page, and the cases need two, so they go into docstruct's example document
-# inside the fixture's process fields.
+# SDK's reader must agree with docstruct on each case. They go into docstruct's
+# example document, which has references and a child, inside the fixture's
+# producer fields. The fixture's observations and obligations target its own
+# elements, so the manifest goes without them, and stays a valid one for the
+# Toolbox's model too (review of #593).
 
 from docstruct.manifest import (  # noqa: E402
     MSG_FIELD_NOT_ALLOWED,
@@ -201,7 +203,7 @@ from docstruct.manifest_cases import (  # noqa: E402
 
 def _shared_case_manifest(change):
     document = example("mineru")
-    document.update(example_document())
+    document.update(example_document(), observations=[], obligations=[])
     change(document)
     types = {}
     for element in document["elements"]:
@@ -209,6 +211,8 @@ def _shared_case_manifest(change):
     document["summary"].update(
         page_count=len(document["pages"]),
         element_count=len(document["elements"]),
+        observation_count=0,
+        obligation_count=0,
         element_types=dict(sorted(types.items())),
     )
     return document
