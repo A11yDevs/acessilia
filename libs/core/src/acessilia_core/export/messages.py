@@ -20,6 +20,15 @@ MSG_AUDIT_FAILED: str = "Audit failed: {findings}"
 #: Canonical English msgid template for an unsupported export format; {format_name} is substituted by callers after lookup.
 MSG_UNSUPPORTED_EXPORT_FORMAT: str = "Unsupported export format: {format_name}"
 
+# Display msgids shared with the download panel; existing translations apply.
+MSG_FORMAT_TXT = "Text (TXT)"
+MSG_FORMAT_DOCX = "Word Document (DOCX)"
+MSG_FORMAT_PDF = "Accessible PDF"
+MSG_FORMAT_PDF_UA = "Accessible PDF (PDF/UA)"
+MSG_FORMAT_HTML = "Web Page (HTML)"
+MSG_FORMAT_MP3 = "Audio Description (MP3)"
+MSG_FORMAT_ZIP = "Complete Package (ZIP)"
+
 
 __all__ = [
     "MSG_AUDIT_FAILED",
@@ -27,4 +36,12 @@ __all__ = [
     "MSG_DOCX_DISABLED",
     "MSG_PDF_UA_DISABLED",
     "MSG_UNSUPPORTED_EXPORT_FORMAT",
+    "MSG_FORMAT_TXT",
+    "MSG_FORMAT_DOCX",
+    "MSG_FORMAT_PDF",
+    "MSG_FORMAT_PDF_UA",
+    "MSG_FORMAT_HTML",
+    "MSG_FORMAT_MP3",
+    "MSG_FORMAT_ZIP",
+
 ]

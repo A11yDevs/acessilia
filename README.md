@@ -21,6 +21,13 @@ selection and rendering policy. The core's TXT/HTML adapters resolve labels and
 write files; DOCX and PDF/UA rendering runs on the Toolbox. See the
 [export architecture](docs/architecture.md#2-canonical-document--export-pipeline-libscoresrcacessilia_corepipeline-libscoresrcacessilia_coreexport).
 
+
+Format metadata is shared by export dispatch, the worker and download surfaces.
+`docstruct.export.formats.FormatSpec` owns pure identity; the Core catalogue owns
+delivery roles and public filenames; the worker owns execution order and flags.
+Legacy PDF downloads and internal benchmark output keep their distinct roles.
+See [ADR 0025](docs/adr/0025-format-catalogue-ownership.md).
+
 The accessible-document JSON Schema ships in the docstruct wheel. Consumers
 can validate explicitly with an injected engine; the existing export audit
 continues to govern exports. The root schema is a checked, generated copy of

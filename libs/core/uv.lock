@@ -4,7 +4,7 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "acessilia-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "acessilia-docstruct" },
@@ -46,7 +46,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "acessilia-docstruct"
-version = "0.5.3"
+version = "0.5.4"
 source = { editable = "../docstruct" }
 
 [package.metadata]

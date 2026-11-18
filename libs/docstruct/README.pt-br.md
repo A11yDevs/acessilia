@@ -59,6 +59,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (de `docstruct.text.latex`) — documento canônico → markdown de benchmark (tabelas HTML, matemática `$$`) |
 | `docstruct.export.page_text` | `blocks_text`, `pages_text` — o texto simples do payload PDDL, página a página (quem chama dá o texto de uma imagem sem descrição) |
 | `docstruct.export.walk` | `walk`, `Visitor`, `SectionContext`, `BlockContext`, `BLOCK_TYPES`, aliases de tipos de callback — travessia ordenada de seções com seleção e renderização definidas pelo consumidor |
+| `docstruct.export.formats` | `FormatSpec`, `Execution` — identidade imutável de formato; sem catálogo, renderização ou I/O; consumidores definem entrega e execução (ADR 0025) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.schemas` | `accessible_document_schema` — um dicionário novo do JSON Schema de documento acessível empacotado |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding`; `validate_against_schema`, `SchemaValidator` — validação de schema optativa com motor injetado |

@@ -7,6 +7,18 @@ canonical English string; callers resolve it at render time through
 like the Telegram and API surfaces.
 """
 
+# Compatibility names for the catalogue-owned, unchanged display msgids.
+from acessilia_core.export import messages as export_messages
+
+WEB_FORMAT_TXT = export_messages.MSG_FORMAT_TXT
+WEB_FORMAT_DOCX = export_messages.MSG_FORMAT_DOCX
+WEB_FORMAT_PDF = export_messages.MSG_FORMAT_PDF
+WEB_FORMAT_PDF_UA = export_messages.MSG_FORMAT_PDF_UA
+WEB_FORMAT_HTML = export_messages.MSG_FORMAT_HTML
+WEB_FORMAT_MP3 = export_messages.MSG_FORMAT_MP3
+WEB_FORMAT_ZIP = export_messages.MSG_FORMAT_ZIP
+
+
 #: Shown when the global exception handler renders a 500 response.
 WEB_ERROR_INTERNAL: str = "Internal server error. Please try again."
 #: Shown when the API rejects a web upload with a non-success code; {status_code} and {detail} replaced at render time.
@@ -74,20 +86,7 @@ WEB_DOWNLOAD_NO_FORMATS: str = (
 )
 #: Footnote stating how long a download link stays active.
 WEB_DOWNLOAD_VALID_NOTE: str = "Link valid for 7 days."
-#: File-type label for the plain-text (TXT) rendition.
-WEB_FORMAT_TXT: str = "Text (TXT)"
-#: File-type label for the accessible Word document (DOCX) rendition.
-WEB_FORMAT_DOCX: str = "Word Document (DOCX)"
-#: File-type label for the PDF a job made before PDF/UA became the only PDF; download links stay valid for TOKEN_EXPIRY_DAYS.
-WEB_FORMAT_PDF: str = "Accessible PDF"
-#: File-type label for the tagged accessible PDF/UA rendition.
-WEB_FORMAT_PDF_UA: str = "Accessible PDF (PDF/UA)"
-#: File-type label for the semantic HTML page rendition.
-WEB_FORMAT_HTML: str = "Web Page (HTML)"
-#: File-type label for the audio-description (MP3) rendition.
-WEB_FORMAT_MP3: str = "Audio Description (MP3)"
-#: File-type label for the full package (ZIP) rendition.
-WEB_FORMAT_ZIP: str = "Complete Package (ZIP)"
+
 
 # --- Agent showcase server (frontend/agent_os.py, panel at os.agno.com) ---
 #: Description line for the AgentOS instance itself shown in the showcase panel.

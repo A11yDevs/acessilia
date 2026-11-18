@@ -19,6 +19,7 @@ from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.pandoc_ast import degrade_math_to_text
 
 from acessilia_core.config import ExportConfig, ToolboxConfig
+from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
@@ -224,27 +225,29 @@ def export_accessible_document(
     profile_errors = validate_export_profile(profile, filtered)
     if profile_errors:
         raise ValueError("; ".join(profile_errors))
-    if format_name == "html":
-        from acessilia_core.export.renderers.html_renderer import render_html
+    from acessilia_core.export.renderers.html_renderer import render_html
+    from acessilia_core.export.renderers.txt_renderer import render_txt
 
-        return render_html(filtered, output_path, profile_name=profile)
-    ast = build_pandoc_ast(filtered, target_format=format_name)
+    # Preserve the existing AST/error boundary: HTML bypasses AST construction;
+    # TXT and unsupported format requests still build it after the audit gate.
+    ast = None if format_name == HTML.spec.id else build_pandoc_ast(filtered, target_format=format_name)
     lang = filtered.get("language") or DEFAULT_EXPORT_LANG
-    if format_name == "docx":
-        enabled = _export_config(export, format_name).toolbox_docx_enabled
-        return _render_docx(
-            ast, output_path, enabled=enabled, toolbox=_toolbox_config(toolbox, format_name), lang=lang
-        )
-    if format_name == "pdf_ua":
-        enabled = _export_config(export, format_name).toolbox_pdf_ua_enabled
-        return _render_pdf_ua(
-            ast, output_path, enabled=enabled, toolbox=_toolbox_config(toolbox, format_name), lang=lang
-        )
-    if format_name == "txt":
-        from acessilia_core.export.renderers.txt_renderer import render_txt
-
-        return render_txt(filtered, output_path, profile_name=profile)
-    raise ValueError(t(MSG_UNSUPPORTED_EXPORT_FORMAT).format(format_name=format_name))
+    renderers = {
+        HTML.spec.id: lambda: render_html(filtered, output_path, profile_name=profile),
+        TXT.spec.id: lambda: render_txt(filtered, output_path, profile_name=profile),
+        DOCX.spec.id: lambda: _render_docx(
+            ast, output_path, enabled=_export_config(export, format_name).toolbox_docx_enabled,
+            toolbox=_toolbox_config(toolbox, format_name), lang=lang,
+        ),
+        PDF_UA.spec.id: lambda: _render_pdf_ua(
+            ast, output_path, enabled=_export_config(export, format_name).toolbox_pdf_ua_enabled,
+            toolbox=_toolbox_config(toolbox, format_name), lang=lang,
+        ),
+    }
+    render = renderers.get(format_name)
+    if render is None:
+        raise ValueError(t(MSG_UNSUPPORTED_EXPORT_FORMAT).format(format_name=format_name))
+    return render()
 
 
 def _export_config(export: ExportConfig | None, format_name: str) -> ExportConfig:

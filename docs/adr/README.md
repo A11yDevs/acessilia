@@ -40,6 +40,7 @@ ones here instead of restating them.
 | [0022](0022-export-walker-contract.md) | A shared export walker with consumer-owned rendering policy | Accepted |
 | [0023](0023-packaged-canonical-schema.md) | Package the canonical schema with an injected validation engine | Accepted |
 | [0024](0024-legacy-canonical-type-deprecation.md) | Deprecate legacy canonical dataclasses while retaining compatibility | Accepted |
+| [0025](0025-format-catalogue-ownership.md) | Share format identity and delivery metadata with a worker-owned plan | Accepted |
 
 ## Process
 

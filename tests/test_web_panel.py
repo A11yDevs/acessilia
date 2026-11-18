@@ -390,3 +390,28 @@ def test_receipt_cookie_requires_https_when_served_over_https(web_client):
         data={"email": "test@example.com"}, follow_redirects=False)
     assert response.status_code == 303
     assert "; Secure" in response.headers["set-cookie"]
+
+
+@pytest.mark.parametrize("status", ["internal", "experimental"])
+def test_download_page_does_not_offer_unavailable_catalogue_entries(web_client, monkeypatch, status):
+    from dataclasses import replace
+    from acessilia_core.export import catalog
+
+    hidden = replace(catalog.TXT, spec=replace(catalog.TXT.spec, id="hidden"), status=status)
+    monkeypatch.setattr(catalog, "CATALOG", {**catalog.CATALOG, "hidden": hidden})
+
+    async def info(_token):
+        return {
+            "filename": "sample.pdf", "stem": "sample", "criado_em": None,
+            "formats": [
+                {"ext": "txt", "label": "texto", "size": "1 KB", "url": "/download/tok/txt"},
+                {"ext": "hidden", "label": "Hidden format", "size": "1 KB", "url": "/download/tok/hidden"},
+            ],
+        }
+
+    monkeypatch.setattr(web_client.fake, "get_download_info", info)
+    response = web_client.get("/download/tok")
+    assert response.status_code == 200
+    assert "/api/v1/download/tok/txt" in response.text
+    assert "/download/tok/hidden" not in response.text
+    assert [item["ext"] for item in response.context["formats"]] == ["txt"]

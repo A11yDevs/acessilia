@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
+from backend.api.export_plan import AUDIO_STEP, PACKAGE_ORDER, PACKAGE_STEP, SERIAL_EXPORT_STEPS
+from acessilia_core.export.catalog import CATALOG, DOCX, DRBENCH_MD, HTML, PDF_UA, TXT
 from backend.config.core_config import core_config_from_settings
 from acessilia_core.config import ToolboxConfig
 from backend.config.settings import settings
@@ -43,12 +45,6 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_CANCELLATION_WAITING,
     STAGE_AUDITING_PDF_UA,
     STAGE_CANCELLED_BY_USER,
-    STAGE_EXPORTING_DOCX,
-    STAGE_EXPORTING_DRBENCH_MD,
-    STAGE_EXPORTING_HTML,
-    STAGE_EXPORTING_PDF_UA,
-    STAGE_EXPORTING_TXT,
-    STAGE_GENERATING_AUDIO,
     STAGE_PROCESSING_COMPLETED,
     STAGE_PROCESSING_FAILURE,
     STAGE_QUEUE_WAITING_POSITION,
@@ -290,6 +286,7 @@ class JobExecutor:
         skipped_log: str,
         completed_formats: list[str],
         optional_errors: list[str],
+        optional: bool = True,
     ) -> Path | None:
         """Runs an export that only the Toolbox renders; returns its path, or None.
 
@@ -304,6 +301,8 @@ class JobExecutor:
         try:
             await self._run_in_executor(export_fn, canonical, path, filename)
         except Exception as exc:
+            if not optional:
+                raise
             error_msg = t(failed_log).format(error=str(exc))
             logger.warning(error_msg)
             optional_errors.append(error_msg)
@@ -452,77 +451,58 @@ class JobExecutor:
             # the audit read the values the pipeline ran with.
             export, toolbox = job_config.export, job_config.toolbox
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_TXT), progresso=0.85)
-            txt_path = out_dir / f"{base}.txt"
-            # The formats a reader gets carry the object markers when the job
-            # asks for them; the benchmark markdown and the stored result do not.
-            delivered = with_object_markers(canonical, job.object_markers, export)
-            await self._run_in_executor(export_txt, delivered, txt_path, job.filename)
-            completed_formats.append("txt")
-            state_manager.verificar_cancelamento(task_id)
+            paths: dict[str, Path | None] = {}
+            delivered = canonical
+            local_exports = {
+                TXT.spec.id: lambda path: self._run_in_executor(export_txt, delivered, path, job.filename),
+                DRBENCH_MD.spec.id: lambda path: self._run_in_executor(export_drbench_md, canonical, path, job.filename),
+                HTML.spec.id: lambda path: self._run_in_executor(
+                    export_accessible_document, delivered, path,
+                    format_name=HTML.spec.id, title=base, profile_name=HTML.spec.id,
+                ),
+            }
+            remote_exports = {
+                DOCX.spec.id: (export_docx, LOG_DOCX_GENERATION_FAILED, LOG_DOCX_SKIPPED_DISABLED),
+                PDF_UA.spec.id: (export_pdf_ua, LOG_PDF_UA_GENERATION_FAILED, LOG_PDF_UA_SKIPPED_DISABLED),
+            }
+            # The five serial exports keep their existing order. Audio and
+            # audit still run concurrently afterwards, followed by packaging.
+            for step in SERIAL_EXPORT_STEPS:
+                delivery = CATALOG[step.format_id]
+                path = out_dir / delivery.output_filename(base)
+                if delivery.spec.execution == "remote":
+                    exporter, failed_log, skipped_log = remote_exports[step.format_id]
+                    paths[step.format_id] = await self._optional_toolbox_export(
+                        task_id, enabled=getattr(export, step.requires_flag),
+                        stage=step.stage_msgid, progress=step.progress,
+                        export_fn=functools.partial(exporter, export=export, toolbox=toolbox),
+                        canonical=delivered, path=path, filename=job.filename,
+                        format_name=step.format_id, failed_log=failed_log, skipped_log=skipped_log,
+                        completed_formats=completed_formats, optional_errors=optional_errors,
+                        optional=step.optional,
+                    )
+                else:
+                    state_manager.atualizar(task_id, etapa=t(step.stage_msgid), progresso=step.progress)
+                    if step.format_id == TXT.spec.id:
+                        # Internal benchmark output and stored result keep the
+                        # original canonical; delivered formats carry markers.
+                        delivered = with_object_markers(canonical, job.object_markers, export)
+                    try:
+                        await local_exports[step.format_id](path)
+                    except Exception as exc:
+                        if not step.optional:
+                            raise
+                        logger.warning("{} export failed: {}", step.format_id, exc)
+                        _remove_partial_output(path)
+                        paths[step.format_id] = None
+                    else:
+                        paths[step.format_id] = path
+                        if delivery.downloadable:
+                            completed_formats.append(step.format_id)
+                state_manager.verificar_cancelamento(task_id)
 
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_DRBENCH_MD), progresso=0.86)
-            drbench_md_path = out_dir / f"{base}.drbench.md"
-            try:
-                await self._run_in_executor(
-                    export_drbench_md, canonical, drbench_md_path, job.filename
-                )
-            except Exception as exc:
-                logger.warning("drbench_md export failed: {}", exc)
-                _remove_partial_output(drbench_md_path)
-                drbench_md_path = None
-            state_manager.verificar_cancelamento(task_id)
-
-            state_manager.atualizar(task_id, etapa=t(STAGE_EXPORTING_HTML), progresso=0.90)
-            html_path = out_dir / f"{base}.html"
-            await self._run_in_executor(
-                export_accessible_document,
-                delivered,
-                html_path,
-                format_name="html",
-                title=base,
-                profile_name="html",
-            )
-            completed_formats.append("html")
-            state_manager.verificar_cancelamento(task_id)
-
-            # DOCX and PDF/UA run only on the Toolbox (docs/adr/0003) and come
-            # after the required formats, so a hung Toolbox cannot hold back
-            # TXT/HTML. PDF/UA is the only PDF: a failure leaves the job
-            # without one, with a warning in the result e-mail.
-            docx_path = await self._optional_toolbox_export(
-                task_id,
-                enabled=export.toolbox_docx_enabled,
-                stage=STAGE_EXPORTING_DOCX,
-                progress=0.92,
-                export_fn=functools.partial(export_docx, export=export, toolbox=toolbox),
-                canonical=delivered,
-                path=out_dir / f"{base}.docx",
-                filename=job.filename,
-                format_name="docx",
-                failed_log=LOG_DOCX_GENERATION_FAILED,
-                skipped_log=LOG_DOCX_SKIPPED_DISABLED,
-                completed_formats=completed_formats,
-                optional_errors=optional_errors,
-            )
-            state_manager.verificar_cancelamento(task_id)
-
-            pdf_ua_path = await self._optional_toolbox_export(
-                task_id,
-                enabled=export.toolbox_pdf_ua_enabled,
-                stage=STAGE_EXPORTING_PDF_UA,
-                progress=0.93,
-                export_fn=functools.partial(export_pdf_ua, export=export, toolbox=toolbox),
-                canonical=delivered,
-                path=out_dir / f"{base}.pdf_ua.pdf",
-                filename=job.filename,
-                format_name="pdf_ua",
-                failed_log=LOG_PDF_UA_GENERATION_FAILED,
-                skipped_log=LOG_PDF_UA_SKIPPED_DISABLED,
-                completed_formats=completed_formats,
-                optional_errors=optional_errors,
-            )
-            state_manager.verificar_cancelamento(task_id)
+            txt_path, pdf_ua_path = paths[TXT.spec.id], paths[PDF_UA.spec.id]
+            audio_step, package_step = AUDIO_STEP, PACKAGE_STEP
 
             async def audit() -> tuple[list[str], Path | None]:
                 if not isinstance(pdf_ua_path, Path):
@@ -535,14 +515,14 @@ class JobExecutor:
             async def mp3() -> Path | None:
                 if not txt_path.exists():
                     return None
-                mp3_path = out_dir / f"{base}.mp3"
+                mp3_path = out_dir / CATALOG[audio_step.format_id].output_filename(base)
                 clean_text = txt_path.read_text(encoding="utf-8")
 
                 async def audio_progress(percent: int) -> None:
                     state_manager.atualizar(
                         task_id,
-                        etapa=t(STAGE_GENERATING_AUDIO).format(percent=percent),
-                        progresso=0.95,
+                        etapa=t(audio_step.stage_msgid).format(percent=percent),
+                        progresso=audio_step.progress,
                     )
 
                 try:
@@ -555,13 +535,15 @@ class JobExecutor:
                 except TaskCancelledError:
                     raise
                 except Exception as e:
+                    if not audio_step.optional:
+                        raise
                     error_msg = t(LOG_MP3_GENERATION_FAILED).format(error=str(e))
                     logger.error(error_msg)
                     optional_errors.append(error_msg)
                     state_manager.atualizar(task_id, erro=error_msg)
                     _remove_partial_output(mp3_path)
                     return None
-                completed_formats.append("mp3")
+                completed_formats.append(audio_step.format_id)
                 return mp3_path
 
             # The MP3 needs only the TXT, so it runs alongside the audit: a slow
@@ -570,14 +552,12 @@ class JobExecutor:
             (audit_lines, audit_path), mp3_path = await asyncio.gather(audit(), mp3())
             state_manager.verificar_cancelamento(task_id)
 
-            zip_path = out_dir / f"{base}_acessivel.zip"
-            package_paths = [txt_path, html_path]
-            if isinstance(docx_path, Path):
-                package_paths.append(docx_path)
-            if isinstance(mp3_path, Path):
-                package_paths.append(mp3_path)
-            if isinstance(pdf_ua_path, Path):
-                package_paths.append(pdf_ua_path)
+            paths[audio_step.format_id] = mp3_path
+            zip_path = out_dir / CATALOG[package_step.format_id].output_filename(base)
+            package_paths = [
+                paths[format_id] for format_id in PACKAGE_ORDER
+                if CATALOG[format_id].packaged_in_zip and isinstance(paths.get(format_id), Path)
+            ]
             if isinstance(audit_path, Path):
                 package_paths.append(audit_path)
 
@@ -586,7 +566,7 @@ class JobExecutor:
                 zip_path,
                 package_paths,
             )
-            completed_formats.append("zip")
+            completed_formats.append(package_step.format_id)
             state_manager.verificar_cancelamento(task_id)
 
             token = await criar_token(

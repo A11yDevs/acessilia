@@ -153,3 +153,16 @@ ACESSILIA_TEST_DATASET_DIR="$PWD/tests/dataset" uv run pytest -m e2e -v
 - [Arquitetura](../docs/architecture.md)
 - [Pipeline PDDL + Agno](../docs/pmv_agno_pddl.md)
 - [Internacionalização (i18n)](../docs/i18n.pt-br.md) — veja a suíte de testes de internacionalização em [test_i18n.py](test_i18n.py)
+
+## Compatibilidade do catálogo de formatos
+
+`test_export_catalog.py` fixa identidades, labels da API, MIME types, nomes,
+papéis de entrega distintos, referências ao SDK e plano do worker em E1.9.
+`test_download_token_service.py` verifica arquivos existentes, incluindo PDF
+legado, nos dois idiomas. `test_web_panel.py` exclui entradas internas e
+experimentais dos formatos oferecidos. Regressões do worker cobrem falhas
+obrigatórias de TXT/HTML/ZIP, falhas opcionais de benchmark/remotos/áudio, flags,
+ordem de formatos concluídos e de entradas do pacote.
+`libs/docstruct/tests/test_format_spec.py` também roda contra o wheel isolado.
+Os goldens E1.0 permanecem iguais. Veja o
+[ADR 0025](../docs/adr/0025-format-catalogue-ownership.pt-br.md).

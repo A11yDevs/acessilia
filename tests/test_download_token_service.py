@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -183,3 +184,28 @@ def test_download_size_formatting(tmp_path, size_bytes, expected):
     assert info is not None
     assert len(info["formats"]) == 1
     assert info["formats"][0]["size"] == expected
+
+
+@pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
+def test_catalogue_preserves_existing_token_listing_and_wire_labels(tmp_path, locale):
+    from acessilia_core.i18n import set_request_locale, reset_request_locale
+
+    # Files from old jobs may include both legacy PDF and the new PDF/UA.
+    baseline = [
+        ("txt", "texto", "sample.txt"), ("docx", "word", "sample.docx"),
+        ("pdf", "pdf", "sample.pdf"), ("pdf_ua", "pdf/ua", "sample.pdf_ua.pdf"),
+        ("html", "html", "sample.html"), ("mp3", "audio", "sample.mp3"),
+        ("zip", "completo", "sample_acessivel.zip"),
+    ]
+    output = tmp_path / "output" / "catalogue"
+    output.mkdir(parents=True)
+    for _, _, filename in baseline:
+        (output / filename).write_bytes(b"existing artifact")
+    (output / "sample.drbench.md").write_text("Internal benchmark", encoding="utf-8")
+    token = asyncio.run(token_service.criar_token(output, "sample"))
+    context = set_request_locale(locale)
+    try:
+        info = asyncio.run(token_service.obter_info_token(token))
+    finally:
+        reset_request_locale(context)
+    assert [(item["ext"], item["label"], Path(item["file_path"]).name) for item in info["formats"]] == baseline

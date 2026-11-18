@@ -732,8 +732,9 @@ def test_job_executor_records_job(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failed_format", ["txt", "html", "zip"])
 async def test_job_executor_marks_history_error_when_export_fails(
-    api_paths, monkeypatch
+    api_paths, monkeypatch, failed_format
 ):
     import backend.services.history_service as hs
     from backend.agents.state_manager import state_manager
@@ -750,13 +751,27 @@ async def test_job_executor_marks_history_error_when_export_fails(
         state_manager.criar_tarefa(input_path, task_id=task_id)
         return {"title": "Documento", "sections": []}
 
-    def fail_export_txt(*args, **kwargs):
-        output_path = args[1]
+    def fail_export(*args, **kwargs):
+        output_path = args[0] if failed_format == "zip" else args[1]
         output_path.write_text("parcial", encoding="utf-8")
         raise OSError("disk full")
 
     monkeypatch.setattr("backend.service.process", fake_process)
-    monkeypatch.setattr("backend.api.worker.export_txt", fail_export_txt)
+
+    def write_export(_canonical, destination, *args, **kwargs):
+        destination.write_text("Output", encoding="utf-8")
+
+    async def write_audio(_text, destination, *args, **kwargs):
+        destination.write_bytes(b"audio")
+
+    from backend.config.settings import settings
+    monkeypatch.setattr(settings, "toolbox_docx_enabled", False)
+    monkeypatch.setattr(settings, "toolbox_pdf_ua_enabled", False)
+    for name in ("export_txt", "export_drbench_md", "export_accessible_document"):
+        monkeypatch.setattr(f"backend.api.worker.{name}", write_export)
+    monkeypatch.setattr("backend.api.worker.export_mp3", write_audio)
+    failing_function = {"txt": "export_txt", "html": "export_accessible_document", "zip": "_build_zip_package"}[failed_format]
+    monkeypatch.setattr(f"backend.api.worker.{failing_function}", fail_export)
 
     await registrar_conversao(
         task_id=task_id,
@@ -977,7 +992,7 @@ async def test_job_executor_keeps_original_filename_in_status(
 # default order, not only under a different test selection.
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "failed_format", [None, "DOCX disabled", "MP3", "PDF/UA", "PDF/UA disabled", "DOCX"]
+    "failed_format", [None, "DOCX disabled", "MP3", "PDF/UA", "PDF/UA disabled", "DOCX", "benchmark"]
 )
 async def test_job_executor_reports_optional_export_failure(
     tmp_path, monkeypatch, failed_format, fake_pdf_ua_audit
@@ -1009,6 +1024,10 @@ async def test_job_executor_reports_optional_export_failure(
 
     def write_file(_canonical, destination, _filename=None, **_kwargs):
         destination.write_text("conteudo", encoding="utf-8")
+
+    def fail_benchmark(_canonical, destination, *args, **kwargs):
+        destination.write_text("Partial benchmark", encoding="utf-8")
+        raise RuntimeError("benchmark unavailable")
 
     async def fail_mp3(*args, **kwargs):
         raise RuntimeError("tts offline")
@@ -1049,6 +1068,8 @@ async def test_job_executor_reports_optional_export_failure(
     monkeypatch.setattr("backend.service.process", fake_process)
     monkeypatch.setattr("backend.api.worker.export_txt", write_file)
     monkeypatch.setattr("backend.api.worker.export_drbench_md", write_file)
+    if failed_format == "benchmark":
+        monkeypatch.setattr("backend.api.worker.export_drbench_md", fail_benchmark)
     toolbox_exports: dict[str, object] = {}
 
     def toolbox_export(name):
@@ -1096,7 +1117,7 @@ async def test_job_executor_reports_optional_export_failure(
     assert task is not None
     assert task["status"] == "done"
     assert task["download_url"]
-    if failed_format is None:
+    if failed_format in (None, "benchmark"):
         expected_errors: list[str] = []
     else:
         assert len(task["erros"]) == 1
@@ -1136,8 +1157,11 @@ async def test_job_executor_reports_optional_export_failure(
     if pdf_ua_produced:
         expected_formats.add("pdf_ua")
     assert set(registered_formats) == expected_formats
+    assert registered_formats == [
+        name for name in ("txt", "html", "docx", "pdf_ua", "mp3", "zip") if name in expected_formats
+    ]
 
-    assert (output_dir / "audio.drbench.md").is_file()
+    assert (output_dir / "audio.drbench.md").is_file() is (failed_format != "benchmark")
     with zipfile.ZipFile(output_dir / "audio_acessivel.zip") as archive:
         expected_files = {"audio.txt", "audio.html"}
         if docx_produced:
@@ -1147,6 +1171,12 @@ async def test_job_executor_reports_optional_export_failure(
         if pdf_ua_produced:
             expected_files.update({"audio.pdf_ua.pdf", "audio.pdf_ua.verapdf.json"})
         assert set(archive.namelist()) == expected_files
+        assert archive.namelist() == [
+            name for name in (
+                "audio.txt", "audio.html", "audio.docx", "audio.mp3",
+                "audio.pdf_ua.pdf", "audio.pdf_ua.verapdf.json",
+            ) if name in expected_files
+        ]
 
     assert len(sent_emails) == 1
     assert sent_emails[0]["download_url"].endswith("/download/tok")

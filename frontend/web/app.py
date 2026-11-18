@@ -26,6 +26,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
+from acessilia_core.export import catalog as format_catalog
 from acessilia_core.i18n import t, active_locale
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
 from acessilia_core.i18n.log_messages import (
@@ -53,13 +54,6 @@ from frontend.web.messages import (
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_ERROR_INTERNAL,
     WEB_ERROR_UPLOAD_GENERIC,
-    WEB_FORMAT_DOCX,
-    WEB_FORMAT_HTML,
-    WEB_FORMAT_MP3,
-    WEB_FORMAT_PDF,
-    WEB_FORMAT_PDF_UA,
-    WEB_FORMAT_TXT,
-    WEB_FORMAT_ZIP,
     WEB_FOOTER,
     WEB_INDEX_DOC_LABEL,
     WEB_INDEX_EMAIL_HELP,
@@ -112,21 +106,9 @@ client = default_client
 WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
 WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-DOWNLOAD_MEDIA_TYPES = {
-    "txt": "text/plain; charset=utf-8",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    # Only PDF/UA is produced now; "pdf" serves links issued before that,
-    # which stay valid for TOKEN_EXPIRY_DAYS.
-    "pdf": "application/pdf",
-    "pdf_ua": "application/pdf",
-    "html": "text/html; charset=utf-8",
-    "mp3": "audio/mpeg",
-    "zip": "application/zip",
-}
-DOWNLOAD_SUFFIXES = {
-    "pdf_ua": "pdf_ua.pdf",
-    "zip": "_acessivel.zip",
-}
+# Compatibility names remain projections of the catalogue.
+DOWNLOAD_MEDIA_TYPES = format_catalog.DOWNLOAD_MEDIA_TYPES
+DOWNLOAD_SUFFIXES = format_catalog.DOWNLOAD_SUFFIXES
 
 
 def _route_path(request: Request) -> str:
@@ -207,13 +189,7 @@ def _web_strings() -> dict:
         "download_subhead": t(WEB_DOWNLOAD_SUBHEAD),
         "download_no_formats": t(WEB_DOWNLOAD_NO_FORMATS),
         "download_valid_note": t(WEB_DOWNLOAD_VALID_NOTE),
-        "format_txt": t(WEB_FORMAT_TXT),
-        "format_docx": t(WEB_FORMAT_DOCX),
-        "format_pdf": t(WEB_FORMAT_PDF),
-        "format_pdf_ua": t(WEB_FORMAT_PDF_UA),
-        "format_html": t(WEB_FORMAT_HTML),
-        "format_mp3": t(WEB_FORMAT_MP3),
-        "format_zip": t(WEB_FORMAT_ZIP),
+        **{f"format_{item.spec.id}": t(item.label_msgid) for item in format_catalog.downloadable_formats()},
     }
 
 
@@ -421,6 +397,8 @@ async def download_page(request: Request, token: str):
             )
         )
         raise HTTPException(status_code=502, detail=t(WEB_ERROR_DOWNLOAD_UNAVAILABLE))
+    public = {item.spec.id for item in format_catalog.downloadable_formats()}
+    info["formats"] = [f for f in info["formats"] if f["ext"] in public]
     for f in info["formats"]:
         f["url"] = f"/api/v1{f['url']}"
     return templates.TemplateResponse(
@@ -448,9 +426,7 @@ async def proxy_download(request: Request, token: str, format: str):
         _remove_file(destination)
         logger.error("Falha no download via web: {}", e)
         raise HTTPException(status_code=502, detail="Serviço de download indisponível")
-    suffix = DOWNLOAD_SUFFIXES.get(format, format)
-    separator = "" if suffix.startswith("_") else "."
-    filename = f"{info['stem']}{separator}{suffix}"
+    filename = format_catalog.CATALOG[format].output_filename(info["stem"])
     return FileResponse(
         destination,
         background=BackgroundTask(_remove_file, destination),

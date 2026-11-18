@@ -59,6 +59,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.export.markdown` | `document_to_markdown`, `render_table`, `bare_latex` (from `docstruct.text.latex`) — canonical document → benchmark markdown (HTML tables, `$$` math) |
 | `docstruct.export.page_text` | `blocks_text`, `pages_text` — the PDDL payload's plain text, page by page (the caller names an image without alt text) |
 | `docstruct.export.walk` | `walk`, `Visitor`, `SectionContext`, `BlockContext`, `BLOCK_TYPES`, callback type aliases — ordered section traversal with consumer-owned selection and rendering |
+| `docstruct.export.formats` | `FormatSpec`, `Execution` — immutable format identity; no catalogue, rendering or I/O; consumers own delivery and execution policy (ADR 0025) |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
 | `docstruct.schemas` | `accessible_document_schema` — a fresh dictionary from the bundled accessible-document JSON Schema |
 | `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding`; `validate_against_schema`, `SchemaValidator` — opt-in schema validation with an injected engine |

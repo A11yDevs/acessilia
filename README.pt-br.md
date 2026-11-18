@@ -21,6 +21,13 @@ seleção e renderização de cada formato. Os adaptadores TXT/HTML do core reso
 rótulos e escrevem arquivos; DOCX e PDF/UA são renderizados na Toolbox. Veja a
 [arquitetura de exportação](docs/architecture.pt-br.md#2-pipeline-de-documento-canônico-e-exportação-libscoresrcacessilia_corepipeline-libscoresrcacessilia_coreexport).
 
+
+Os metadados de formatos são compartilhados entre despacho, worker e downloads.
+`docstruct.export.formats.FormatSpec` define a identidade pura; o catálogo do Core
+define os papéis de entrega e nomes públicos; o worker define ordem e flags.
+Downloads de PDF legado e benchmark interno mantêm seus papéis distintos.
+Veja o [ADR 0025](docs/adr/0025-format-catalogue-ownership.pt-br.md).
+
 O JSON Schema de documento acessível acompanha o wheel da docstruct. Os
 consumidores podem validar explicitamente com um motor injetado; a auditoria
 atual continua governando os exports. O schema da raiz é uma cópia gerada e
