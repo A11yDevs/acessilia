@@ -50,8 +50,14 @@ que já foi aceita:
   versão fixada no branch pareado da Toolbox, confere com a release publicada e
   com o SHA-256 do wheel dela, e acusa uma Toolbox atrás da release mais nova
   para a versão do core. Ele avisa nos pull requests e faz falhar o
-  monitoramento agendado. Se os dois ainda concordam sobre os modelos
-  compartilhados (fixtures compartilhadas) continua em aberto.
+  monitoramento agendado. **A parte dos modelos tem casos compartilhados
+  desde o docstruct 0.5.5:** o `docstruct.manifest_cases` traz um exemplo
+  válido, alterações que quebram uma regra cada e alterações que precisam
+  continuar válidas. O teste de contrato do core e o leitor de manifesto do
+  SDK os rodam contra os seus próprios modelos. **A Toolbox ainda não os
+  roda:** o teste de contrato dela vai adotá-los quando fixar o docstruct
+  0.5.5, depois de essa release ser publicada, e até lá a parte dos modelos
+  continua em aberto.
 - **O docstruct não tinha job de instalação isolada.** O `test_purity.py`
   recusa imports fora da biblioteca padrão num subprocesso, mas nenhum job de
   CI instalava o docstruct sozinho num ambiente limpo, como o `SDK alone` faz

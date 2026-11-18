@@ -50,8 +50,13 @@ which is accepted:
   #470:** `scripts/check_docstruct_pin.py` reads the pin on the paired Toolbox
   branch, checks it against the published release and its wheel's SHA-256,
   and reports a Toolbox behind the newest release for the core's version. It
-  warns in pull requests and fails the scheduled monitoring. Whether the two
-  still agree on the shared models (shared fixtures) is still open.
+  warns in pull requests and fails the scheduled monitoring. **The models
+  half has shared cases since docstruct 0.5.5:** `docstruct.manifest_cases`
+  holds a valid example, changes that break one rule each, and changes that
+  must stay valid. The core's contract test and the SDK's manifest reader run
+  them against their own models. **The Toolbox does not run them yet:** its
+  contract test will adopt them when it pins docstruct 0.5.5, after that
+  release is published, and until then the models half stays open.
 - **docstruct had no isolated install job.** `test_purity.py` refuses
   non-standard imports in a subprocess, but no CI job installed docstruct alone
   in a clean environment, as `SDK alone` does for the SDK. **Closed by phase 2
