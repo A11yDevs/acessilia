@@ -26,9 +26,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from backend.config.settings import settings
-from acessilia_core.export.catalog import (
-    CATALOG, DOWNLOAD_MEDIA_TYPES, DOWNLOAD_SUFFIXES, downloadable_formats,
-)
+from acessilia_core.export import catalog as format_catalog
 from acessilia_core.i18n import t, active_locale
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
 from acessilia_core.i18n.log_messages import (
@@ -107,6 +105,10 @@ client = default_client
 
 WEB_UPLOAD_DIR = settings.temp_dir / "web_uploads"
 WEB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Compatibility names remain projections of the catalogue.
+DOWNLOAD_MEDIA_TYPES = format_catalog.DOWNLOAD_MEDIA_TYPES
+DOWNLOAD_SUFFIXES = format_catalog.DOWNLOAD_SUFFIXES
 
 
 def _route_path(request: Request) -> str:
@@ -187,7 +189,7 @@ def _web_strings() -> dict:
         "download_subhead": t(WEB_DOWNLOAD_SUBHEAD),
         "download_no_formats": t(WEB_DOWNLOAD_NO_FORMATS),
         "download_valid_note": t(WEB_DOWNLOAD_VALID_NOTE),
-        **{f"format_{item.spec.id}": t(item.label_msgid) for item in downloadable_formats()},
+        **{f"format_{item.spec.id}": t(item.label_msgid) for item in format_catalog.downloadable_formats()},
     }
 
 
@@ -395,7 +397,7 @@ async def download_page(request: Request, token: str):
             )
         )
         raise HTTPException(status_code=502, detail=t(WEB_ERROR_DOWNLOAD_UNAVAILABLE))
-    public = {item.spec.id for item in downloadable_formats()}
+    public = {item.spec.id for item in format_catalog.downloadable_formats()}
     info["formats"] = [f for f in info["formats"] if f["ext"] in public]
     for f in info["formats"]:
         f["url"] = f"/api/v1{f['url']}"
@@ -424,7 +426,7 @@ async def proxy_download(request: Request, token: str, format: str):
         _remove_file(destination)
         logger.error("Falha no download via web: {}", e)
         raise HTTPException(status_code=502, detail="Serviço de download indisponível")
-    filename = CATALOG[format].output_filename(info["stem"])
+    filename = format_catalog.CATALOG[format].output_filename(info["stem"])
     return FileResponse(
         destination,
         background=BackgroundTask(_remove_file, destination),

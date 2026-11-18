@@ -8,15 +8,16 @@ like the Telegram and API surfaces.
 """
 
 # Compatibility names for the catalogue-owned, unchanged display msgids.
-from acessilia_core.export.messages import (
-    MSG_FORMAT_TXT as WEB_FORMAT_TXT,
-    MSG_FORMAT_DOCX as WEB_FORMAT_DOCX,
-    MSG_FORMAT_PDF as WEB_FORMAT_PDF,
-    MSG_FORMAT_PDF_UA as WEB_FORMAT_PDF_UA,
-    MSG_FORMAT_HTML as WEB_FORMAT_HTML,
-    MSG_FORMAT_MP3 as WEB_FORMAT_MP3,
-    MSG_FORMAT_ZIP as WEB_FORMAT_ZIP,
-)
+from acessilia_core.export import messages as export_messages
+
+WEB_FORMAT_TXT = export_messages.MSG_FORMAT_TXT
+WEB_FORMAT_DOCX = export_messages.MSG_FORMAT_DOCX
+WEB_FORMAT_PDF = export_messages.MSG_FORMAT_PDF
+WEB_FORMAT_PDF_UA = export_messages.MSG_FORMAT_PDF_UA
+WEB_FORMAT_HTML = export_messages.MSG_FORMAT_HTML
+WEB_FORMAT_MP3 = export_messages.MSG_FORMAT_MP3
+WEB_FORMAT_ZIP = export_messages.MSG_FORMAT_ZIP
+
 
 #: Shown when the global exception handler renders a 500 response.
 WEB_ERROR_INTERNAL: str = "Internal server error. Please try again."

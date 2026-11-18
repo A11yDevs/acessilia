@@ -7,11 +7,7 @@ import threading
 import shutil
 from pathlib import Path
 
-from acessilia_core.export.catalog import (
-    DOWNLOAD_LABELS as FORMAT_EXTENSIONS,
-    DOWNLOAD_SUFFIXES as FORMAT_OUTPUT_SUFFIX,
-    downloadable_formats,
-)
+from acessilia_core.export import catalog
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_DOWNLOAD_TOKEN_CREATED,
@@ -27,6 +23,10 @@ _connection = None
 _connection_lock = threading.Lock()
 
 TOKEN_EXPIRY_DAYS = 7
+
+# Compatibility names derive from the catalogue, without a second table.
+FORMAT_EXTENSIONS = catalog.DOWNLOAD_LABELS
+FORMAT_OUTPUT_SUFFIX = catalog.DOWNLOAD_SUFFIXES
 
 
 def _get_connection():
@@ -122,7 +122,7 @@ def obter_info_token(token: str) -> dict | None:
     allowed_formats = set(formats_list) if isinstance(formats_list, list) else set()
     base = str(row["filename"])
     formats = []
-    for delivery in downloadable_formats():
+    for delivery in catalog.downloadable_formats():
         ext, label = delivery.spec.id, delivery.api_label
         if allowed_formats and ext not in allowed_formats:
             continue
