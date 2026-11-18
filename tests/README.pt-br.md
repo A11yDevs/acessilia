@@ -42,6 +42,17 @@ uv run pytest tests/test_pddl_planning.py
 
 `fixtures/` guarda os PDFs e imagens de exemplo, usados tanto pelos testes quanto pelos cenários de carga e benchmarks em `scripts/`. `fixtures/failures/` guarda documentos corrompidos inertes usados por `test_job_failure_e2e.py` para reproduzir a falha do pipeline e o e-mail de falha; veja o [README](fixtures/failures/README.md). Não há flag de debug envolvida: os arquivos vivem apenas na árvore de testes.
 
+## Compatibilidade de tipos canônicos legados
+
+A compatibilidade E1.3 é coberta por
+`libs/docstruct/tests/test_legacy_canonical_types.py`: metadados de descontinuação,
+identidade dos reexports da raiz, compatibilidade de construtores/campos, defaults,
+estado serializado, leitura de pickle anterior à descontinuação (0.5.2) e imports/
+construção em processo novo tratando warnings como erros. Esses testes também
+rodam contra o wheel instalado. As suítes existentes de tipos e caracterização
+dos exports mantêm sua cobertura. Veja o
+[ADR 0024](../docs/adr/0024-legacy-canonical-type-deprecation.pt-br.md).
+
 ## Contrato de schema canônico
 
 O contrato de schema canônico é conferido separadamente:
