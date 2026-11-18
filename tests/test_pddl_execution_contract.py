@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.core.planning.models import NominalPlan, PlanStep
+from acessilia_core.planning.models import NominalPlan, PlanStep
 from tests.pddl_support import (
     build_element as _element,
     build_manifest as _manifest,

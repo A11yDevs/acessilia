@@ -344,7 +344,16 @@ Proposed: option 2.
        (`PathsConfig.data_dir / "pddl-sandbox"`), and its file tools refuse
        to run without it. `plan` and `compare`, which the pipeline calls,
        work in memory and need none.
-     - **The move and the import rename**, mechanical, with no bridge.
+     - **The move and the import rename (done).** `backend/core` is now
+       the package `acessilia_core` in `libs/core/src/acessilia_core`
+       (`libs/core/pyproject.toml`, version 0.1.0), installed editable like
+       the SDK and docstruct, and every `backend.core` import is
+       `acessilia_core`, with no bridge left. The steps above name
+       `backend/core` as it was when they were done. The boundary test now
+       scans the package, which may import itself but nothing from
+       `backend`; the guards that scanned `backend/` scan the package too,
+       and the SDK's purity test and both libraries' CI isolation jobs also
+       refuse `acessilia_core`.
      - **The clean installation, its smoke test, and the proof of concept.**
 
      The tests stay in `tests/`; only the boundary test and the smoke test

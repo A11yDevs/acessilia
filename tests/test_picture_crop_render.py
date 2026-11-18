@@ -13,11 +13,11 @@ import io
 
 from PIL import Image
 
-from backend.core.pipeline.enrichment.common import (
+from acessilia_core.pipeline.enrichment.common import (
     _PICTURE_MAX_SIDE,
     _extract_picture_bytes,
 )
-from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
 from tests.core_config_support import toolbox_config
 
 

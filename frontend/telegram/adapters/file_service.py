@@ -3,12 +3,12 @@ from pathlib import Path
 from aiogram import Bot
 from aiogram.types import FSInputFile
 
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_TELEGRAM_FILE_DOWNLOADING,
     LOG_TELEGRAM_FILE_DOWNLOADED,
 )
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 
 
 async def download_file(bot: Bot, file_id: str, destination: Path) -> Path:

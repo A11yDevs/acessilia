@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from backend.core import i18n
-from backend.core.manifest.builder import (
+from acessilia_core import i18n
+from acessilia_core.manifest.builder import (
     reconcile_reclassified_element_processing_needs,
 )
-from backend.core.i18n.log_messages import MSG_OBLIGATION_IMAGE, MSG_OBLIGATION_TABLE
+from acessilia_core.i18n.log_messages import MSG_OBLIGATION_IMAGE, MSG_OBLIGATION_TABLE
 from tests.test_manifest_characterization import FIXTURES, _build
 
 

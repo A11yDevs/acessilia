@@ -107,7 +107,7 @@ def test_the_cache_key_follows_the_job_config_not_the_settings(monkeypatch):
 
 @pytest.mark.parametrize("cancel", [False, True])
 def test_audio_failure_or_cancellation_joins_siblings_before_cleanup(monkeypatch, tmp_path, cancel):
-    from backend.core.export.exporters import audio_exporter
+    from acessilia_core.export.exporters import audio_exporter
     finished = []
     started = asyncio.Event()
     sibling_started = asyncio.Event()

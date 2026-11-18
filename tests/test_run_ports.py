@@ -7,14 +7,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.ports import NoRegionCache, RunPorts, region_cache_for
 
-from backend.core.agents.model_calls import current_model_calls
-from backend.core.ports import NoRegionCache, RunPorts, region_cache_for
 from tests.core_config_support import core_config, vision_config
 from tests.pddl_support import build_orchestrator
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "backend" / "core"
+CORE = ROOT / "libs" / "core" / "src" / "acessilia_core"
 
 def _service_imports(path: Path) -> set[str]:
     found = set()
@@ -32,7 +32,7 @@ def _service_imports(path: Path) -> set[str]:
 def test_the_core_imports_nothing_from_the_service() -> None:
     """Inside functions included: the caches, ``run_blocking``, the job
     checkpoints and the registry of remote operations reach a run as
-    ports, so ``backend/core`` imports nothing from ``backend.services``."""
+    ports, so ``libs/core/src/acessilia_core`` imports nothing from ``backend.services``."""
     found = {
         path.relative_to(ROOT).as_posix(): imports
         for path in sorted(CORE.rglob("*.py"))
@@ -70,7 +70,8 @@ class MemoryCheckpoints:
 
 def _stopped_before_execution(monkeypatch, counts):
     """An orchestrator whose stages are stubs and whose plan run stops the job."""
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
+
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -106,7 +107,7 @@ def _stopped_before_execution(monkeypatch, counts):
 async def test_a_run_checkpoints_and_resumes_through_its_port(monkeypatch, tmp_path) -> None:
     """Any ``JobCheckpoints`` works: the phases go to the run's port, in
     order, and a second run of the same job resumes from them."""
-    from backend.core.ports import CHECKPOINT_PHASES
+    from acessilia_core.ports import CHECKPOINT_PHASES
 
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
@@ -131,7 +132,7 @@ async def test_a_run_without_a_job_neither_reads_nor_writes_checkpoints(
     monkeypatch, tmp_path
 ) -> None:
     """Not even the manifest is serialized for a checkpoint (review of #565)."""
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
 
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
@@ -266,7 +267,8 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
 ) -> None:
     """Through ``execute``: each vision stage gets the run's cache (or ``None``
     when its config turns it off), and the inspection handlers get the ports."""
-    from backend.core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import orchestrator as pddl
+
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -324,8 +326,8 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
 
 
 def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
-    from backend.core.execution.executor import MethodRegistry
-    from backend.core.pipeline.handlers.registry import bind_run
+    from acessilia_core.execution.executor import MethodRegistry
+    from acessilia_core.pipeline.handlers.registry import bind_run
 
     def with_ports(manifest, obligation_id, *, ports):
         return ports
@@ -390,7 +392,7 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
 
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
     monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: ("plan", None))
-    monkeypatch.setattr("backend.core.pipeline.orchestrator._save_plan", no_save)
+    monkeypatch.setattr("acessilia_core.pipeline.orchestrator._save_plan", no_save)
 
     await orchestrator._replan_until_done(
         manifest,
@@ -432,13 +434,13 @@ class MemoryOperations:
 def _extractor(seen, *, fail_primary=False):
     from unittest.mock import AsyncMock
 
+    from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from acessilia_sdk.toolbox.clients import (
         ToolboxArtifactClient,
         ToolboxStructureClient,
     )
     from acessilia_sdk.toolbox.operation import current_operation
 
-    from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
     def labelled(kind, answer):

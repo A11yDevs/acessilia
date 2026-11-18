@@ -20,9 +20,9 @@ from acessilia_sdk.toolbox.clients.pdf import RenderedPage
 
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip
-from backend.core.manifest.models import BoundingBox, Provenance
+from acessilia_core.manifest.models import BoundingBox, Provenance
 from tests.pddl_support import build_element
-from backend.core.pipeline.enrichment import common as enrichment_common
+from acessilia_core.pipeline.enrichment import common as enrichment_common
 from tests.core_config_support import toolbox_config
 
 

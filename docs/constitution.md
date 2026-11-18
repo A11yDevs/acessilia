@@ -93,7 +93,7 @@ Deliver document and image conversion to accessible formats through:
    - PDDL domain (v2.2+) encodes task dependencies and ordering constraints
    - Plan is deterministic output from planner (internal or fast-downward backend)
    - Execution report validates plan adherence and records task outcomes
-3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `backend/core/agents/prompts` and to verbosity profiles in `docstruct.profiles`.
+3. Processing mode changes prompt and verbosity behavior. The accepted values are `detalhado`, `medio` (with `normal` as an alias), `baixo` and `ocr`; an unknown value falls back to `medio`. They map to prompts in `libs/core/src/acessilia_core/agents/prompts` and to verbosity profiles in `docstruct.profiles`.
 4. Extraction is hybrid: deterministic text extraction first, then AI vision for scanned/no-text pages and image inputs (see principle 2.5).
 5. Page and file cache are optimizations, not source of truth.
 6. Renderers must only consume validated canonical data.
@@ -258,7 +258,7 @@ The unversioned text before 2026-10-18 counts as **1.0.0**.
   preserves P8's regression, contract and integration tests, records the
   lockfile installation delivered by #405 / PR #539, and leaves coverage
   reporting to #366.
-- **2.0.7 (2026-11-14):** section 4.3 names `backend/core/agents/prompts`
+- **2.0.7 (2026-11-14):** section 4.3 names `libs/core/src/acessilia_core/agents/prompts`
   for the mode prompts, which ADR-0016's step 2 moved there from
   `backend/ai/prompts`. No principle changes.
 - **2.0.6 (2026-11-09):** P5's "Checked by" names the tests that now exist

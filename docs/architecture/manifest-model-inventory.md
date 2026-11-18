@@ -4,7 +4,7 @@
 
 This is the first step of stage 5 of [#203](https://github.com/A11yDevs/acessilia/issues/203). It sorts every class and field of the processing manifest into four domains. That sorting decides what moves to docstruct ([ADR-0007](../adr/0007-manifest-model-and-mathml-conversion.md), decision 1), what stays in the core, and what the Toolbox wraps in its own envelope. It also lists how the two copies of the model differ today. Each difference has to be settled before one shared definition can replace them.
 
-- **Snapshot:** `acessilia` `develop` at `316e49c`, `backend/core/manifest/models.py`; `acessilia-toolbox` `develop` at `85a53dd`, `src/acessilia_toolbox/core/normalization/models.py`.
+- **Snapshot:** `acessilia` `develop` at `316e49c`, `libs/core/src/acessilia_core/manifest/models.py`; `acessilia-toolbox` `develop` at `85a53dd`, `src/acessilia_toolbox/core/normalization/models.py`.
 - **Wire contract:** `urn:a11y-devs:schema:processing-manifest:1.1.0`. The Toolbox also exposes it as `artifact/structured-document@1`. Neither version changes because of this migration ([ADR-0007](../adr/0007-manifest-model-and-mathml-conversion.md), scope of decision 1).
 
 ## Domains

@@ -17,16 +17,16 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Saída: TXT, DOCX, PDF/UA, HTML e MP3, entregues no chat, como link de download ou por e-mail.
 - Implementação:
   - entrada/validação: [frontend/telegram/handlers/document.py](../frontend/telegram/handlers/document.py), [backend/services/validators.py](../backend/services/validators.py)
-  - processamento: [backend/service.py](../backend/service.py) executa o orquestrador PDDL [backend/core/pipeline/orchestrator.py](../backend/core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; o motor legado está desativado), que alimenta o [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py)
-  - exportação: [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py), [backend/core/export/exporters](../backend/core/export/exporters), [backend/core/export/renderers](../backend/core/export/renderers)
+  - processamento: [backend/service.py](../backend/service.py) executa o orquestrador PDDL [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py) (`PIPELINE_ENGINE=pddl`; o motor legado está desativado), que alimenta o [libs/core/src/acessilia_core/pipeline/canonical_builder.py](../libs/core/src/acessilia_core/pipeline/canonical_builder.py)
+  - exportação: [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py), [libs/core/src/acessilia_core/export/exporters](../libs/core/src/acessilia_core/export/exporters), [libs/core/src/acessilia_core/export/renderers](../libs/core/src/acessilia_core/export/renderers)
 
 ## UC-02 Selecionar nível de descrição
 - Ator principal: Usuário final.
 - Objetivo: escolher o nível de descrição — `detalhado`, `medio` (alias `normal`), `baixo` ou `ocr`.
 - Implementação:
   - comandos: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
-  - prompts por modo: [backend/core/agents/prompts](../backend/core/agents/prompts)
-  - aplicação no processamento: [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py)
+  - prompts por modo: [libs/core/src/acessilia_core/agents/prompts](../libs/core/src/acessilia_core/agents/prompts)
+  - aplicação no processamento: [libs/core/src/acessilia_core/agents/vision_agent.py](../libs/core/src/acessilia_core/agents/vision_agent.py)
 
 ## UC-03 Consultar status e cancelar
 - Ator principal: Usuário final.
@@ -47,7 +47,7 @@ Também disponível em **inglês (EUA)**: [English version](use_cases.md)
 - Objetivo: verificar a disponibilidade do backend de IA e dos recursos locais.
 - Implementação:
   - comando /health: [frontend/telegram/handlers/start.py](../frontend/telegram/handlers/start.py)
-  - cliente do backend de IA: [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py)
+  - cliente do backend de IA: [libs/core/src/acessilia_core/agents/ai_client.py](../libs/core/src/acessilia_core/agents/ai_client.py)
 
 ## UC-06 Submeter feedback
 - Ator principal: Usuário final.

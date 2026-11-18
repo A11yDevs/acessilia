@@ -5,7 +5,7 @@ directly so the tests run without Agno installed.
 """
 from __future__ import annotations
 
-from backend.core.agents.adjudication_agent import AdjudicationAgent
+from acessilia_core.agents.adjudication_agent import AdjudicationAgent
 
 
 def agent() -> AdjudicationAgent:

@@ -5,7 +5,7 @@ directly so the tests run without Agno installed.
 """
 from __future__ import annotations
 
-from backend.core.agents.page_level_agent import PageLevelAgent
+from acessilia_core.agents.page_level_agent import PageLevelAgent
 
 
 def agent() -> PageLevelAgent:

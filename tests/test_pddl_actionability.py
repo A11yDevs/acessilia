@@ -22,31 +22,31 @@ from __future__ import annotations
 import pytest
 
 from tests.core_config_support import core_config
-from backend.core.pipeline.handlers.registry import bind_run
-from backend.core.ports import RunPorts
-from backend.core.pipeline.handlers.registry import METHOD_HANDLERS
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.handlers import content as content_handlers
-from backend.core.pipeline.handlers import fusion as fusion_handlers
-from backend.core.pipeline.handlers import inspection as inspection_handlers
-from backend.core.pipeline.handlers import order as order_handlers
-from backend.core.pipeline.handlers import review as review_handlers
-from backend.core.pipeline.handlers import text as text_handlers
-from backend.core.pipeline.handlers.content import (
+from acessilia_core.pipeline.handlers.registry import bind_run
+from acessilia_core.ports import RunPorts
+from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.pipeline.handlers import content as content_handlers
+from acessilia_core.pipeline.handlers import fusion as fusion_handlers
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.pipeline.handlers import order as order_handlers
+from acessilia_core.pipeline.handlers import review as review_handlers
+from acessilia_core.pipeline.handlers import text as text_handlers
+from acessilia_core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
     _handle_vision_description_method,
 )
-from backend.core.pipeline.handlers.review import _handle_human_review_method
-from backend.core.i18n import reset_request_locale, set_request_locale
-from backend.core.pipeline.handlers.text import (
+from acessilia_core.pipeline.handlers.review import _handle_human_review_method
+from acessilia_core.i18n import reset_request_locale, set_request_locale
+from acessilia_core.pipeline.handlers.text import (
     _handle_repetition_guard_method,
     _tailjoin_position,
 )
-from backend.core.execution.models import MethodResult
-from backend.core.pipeline.obligations import _unsatisfied_obligations
-from backend.core.manifest.builder import DEFAULT_METHOD_COSTS
-from backend.core.manifest.models import (
+from acessilia_core.execution.models import MethodResult
+from acessilia_core.pipeline.obligations import _unsatisfied_obligations
+from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
+from acessilia_core.manifest.models import (
     BoundingBox,
     ManifestElement,
     Obligation,
@@ -497,7 +497,7 @@ class TestReplanning:
 
     @staticmethod
     def _handler(*, succeed: bool):
-        from backend.core.execution.models import MethodResult
+        from acessilia_core.execution.models import MethodResult
 
         def handler(manifest, obligation_id):
             if not succeed:
@@ -855,7 +855,7 @@ class TestTailjoinPosition:
         assert self._position(self._element("p", "paragraph", "12", 760, 780, order=1)) is None
 
     def test_only_page_number_furniture_reads_a_box(self, monkeypatch) -> None:
-        from backend.core.pipeline.handlers import text as text_handlers
+        from acessilia_core.pipeline.handlers import text as text_handlers
 
         calls = []
         original = text_handlers._element_bbox

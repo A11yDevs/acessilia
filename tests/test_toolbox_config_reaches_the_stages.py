@@ -9,9 +9,9 @@ settings. The run's config is a distinct object, so only identity passes.
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 from dataclasses import replace
 from pathlib import Path
@@ -19,10 +19,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.agents.provider_breaker import ProviderBreaker
-from backend.core.pipeline.enrichment import formulas as formula_stage
-from backend.core.pipeline.enrichment import pictures as picture_stage
-from backend.core.pipeline.enrichment import tables as table_stage
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
 from tests.core_config_support import core_config, document_config, model_config, toolbox_config, vision_config
 from tests.pddl_support import build_element, build_manifest
 
@@ -147,7 +147,7 @@ async def test_the_formula_recognition_gives_its_agent_crops_and_recognizer_the_
 def test_a_formula_crop_renders_with_the_run_config(monkeypatch) -> None:
     from docstruct.geometry.boxes import PageBox  # noqa: F401 - the type the box has
 
-    from backend.core.manifest.models import BoundingBox, Provenance
+    from acessilia_core.manifest.models import BoundingBox, Provenance
 
     seen: list = []
 
@@ -171,8 +171,8 @@ def test_a_formula_crop_renders_with_the_run_config(monkeypatch) -> None:
 async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     monkeypatch, tmp_path
 ) -> None:
-    from backend.core.pipeline import orchestrator as pddl
-    from backend.core.pipeline import preflight
+    from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import preflight
     from tests.pddl_support import build_orchestrator
 
     seen: dict[str, object] = {}
@@ -204,7 +204,7 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
 
 
 def test_the_judge_renders_and_asks_with_the_run_config(monkeypatch) -> None:
-    from backend.core.pipeline import judge
+    from acessilia_core.pipeline import judge
 
     seen: list = []
 
@@ -227,7 +227,7 @@ def test_the_judge_renders_and_asks_with_the_run_config(monkeypatch) -> None:
 
 
 def test_the_judge_handler_gives_the_judge_the_run_config(monkeypatch) -> None:
-    from backend.core.pipeline.handlers import judge as judge_handlers
+    from acessilia_core.pipeline.handlers import judge as judge_handlers
 
     seen: list = []
 
@@ -262,7 +262,7 @@ def test_the_judge_handler_gives_the_judge_the_run_config(monkeypatch) -> None:
 def test_the_math_handlers_call_the_toolbox_with_the_run_config(
     monkeypatch, handler, helper
 ) -> None:
-    from backend.core.pipeline.handlers import formula as formula_handlers
+    from acessilia_core.pipeline.handlers import formula as formula_handlers
 
     seen: list = []
 
@@ -284,7 +284,7 @@ def test_the_math_handlers_call_the_toolbox_with_the_run_config(
 
 
 def test_the_canonical_enricher_calls_the_toolbox_with_the_run_config(monkeypatch) -> None:
-    from backend.core.pipeline import canonical_builder
+    from acessilia_core.pipeline import canonical_builder
 
     seen: list = []
 
@@ -300,7 +300,7 @@ def test_the_canonical_enricher_calls_the_toolbox_with_the_run_config(monkeypatc
 
 
 def test_the_canonical_builder_refuses_to_enrich_without_a_toolbox_config() -> None:
-    from backend.core.pipeline.canonical_builder import build_canonical_document
+    from acessilia_core.pipeline.canonical_builder import build_canonical_document
 
     with pytest.raises(TypeError, match="ToolboxConfig"):
         build_canonical_document("# Title\n\n$x$\n", title="Title")

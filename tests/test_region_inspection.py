@@ -11,20 +11,20 @@ from types import SimpleNamespace
 
 import fitz
 import pytest
-
-from backend.core.agents.model_calls import current_model_calls
-from backend.core.agents.output_schemas import VisionOutput
-from backend.core.manifest.models import (
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.manifest.models import (
     BoundingBox,
     PageDescriptor,
     ProcessingManifest,
     Provenance,
 )
-from backend.core.pipeline import payload as pipeline_payload
-from backend.core.pipeline import preflight as pipeline_preflight
-from backend.core.pipeline.enrichment import common as enrichment_common
-from backend.core.pipeline.handlers import inspection as inspection_handlers
-from backend.core.ports import NoRegionCache, RunPorts
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline.enrichment import common as enrichment_common
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.ports import NoRegionCache, RunPorts
+
 from tests.core_config_support import core_config, model_config, toolbox_config
 from tests.pddl_support import (
     build_element as _element,

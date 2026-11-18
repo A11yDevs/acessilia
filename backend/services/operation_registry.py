@@ -15,7 +15,8 @@ import time
 import uuid
 from dataclasses import dataclass, replace
 
-from backend.core.ports import OperationKind
+from acessilia_core.ports import OperationKind
+
 from backend.services import operation_journal
 
 

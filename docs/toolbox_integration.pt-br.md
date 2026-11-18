@@ -18,7 +18,7 @@ cenários possíveis e define a política de implementação entre **tools locai
 
 ## 1. Contrato da Toolbox visto pelo core
 
-O core conversa com a Toolbox por HTTP. Todos os adaptadores dele vivem em `backend/core/toolbox/` e
+O core conversa com a Toolbox por HTTP. Todos os adaptadores dele vivem em `libs/core/src/acessilia_core/toolbox/` e
 compartilham o mesmo padrão:
 
 | Endpoint | Método | Uso |
@@ -57,7 +57,7 @@ falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 ### Hierarquia de exceções
 
-Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `backend/core/toolbox/toolbox_client.py`):
+Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `libs/core/src/acessilia_core/toolbox/toolbox_client.py`):
 
 - `ToolboxProviderUnavailable` — serviço/provedor indisponível (HTTP 502, 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
@@ -226,7 +226,7 @@ class Toolbox<X>Client(ToolboxCapabilityClient):
         )
 ```
 
-**3. Criá-lo no core** com `make_toolbox_client` (`backend/core/toolbox/toolbox_client.py`)
+**3. Criá-lo no core** com `make_toolbox_client` (`libs/core/src/acessilia_core/toolbox/toolbox_client.py`)
 e a `ToolboxConfig` da execução (passo 3 da ADR-0016). Ela preenche os
 endpoints, o provider que a config indica para o `provider_key`, o timeout, a
 chave de API e um hook que registra os failovers no log; argumentos nomeados
@@ -235,7 +235,7 @@ que chama a capacidade recebe a `toolbox` da execução e a repassa.
 
 ```python
 from acessilia_sdk.toolbox.clients import Toolbox<X>Client
-from backend.core.toolbox.toolbox_client import make_toolbox_client
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 
 client = make_toolbox_client(Toolbox<X>Client, toolbox)
 try:
@@ -258,15 +258,15 @@ fixar uma rota `:execute` no código ou usar um ID não registrado.
 
 ### 4.2 Wrapper de tool Agno (opcional)
 
-Para expor a capacidade a um agente, crie `backend/core/toolbox/toolbox_<x>_tools.py`
+Para expor a capacidade a um agente, crie `libs/core/src/acessilia_core/toolbox/toolbox_<x>_tools.py`
 chamando o cliente da seção 4.1 e convertendo `ToolboxError` no resultado de
 falha da tool. Não acrescente uma implementação local por trás dele (veja 2.3).
 
 ### 4.3 Integração no pipeline (se aplicável)
 
-- **Fusão dual** (`backend/core/pipeline/fusion.py`): se a capacidade produz blocos
+- **Fusão dual** (`libs/core/src/acessilia_core/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
-- **Método PDDL** (`backend/core/planning/toolbox_gate.py`): se o handler de um
+- **Método PDDL** (`libs/core/src/acessilia_core/planning/toolbox_gate.py`): se o handler de um
   método de planejamento chama a capacidade, declare-a em
   `METHOD_TOOLBOX_REQUIREMENTS`. Cada entrada é uma função do `CoreConfig` da
   execução que devolve os requisitos (capacidade e provider), para que o provider
@@ -319,16 +319,16 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
 
 - **Cliente:** `acessilia_sdk.toolbox.clients.ToolboxMediaInspectClient`
   (`ToolboxMediaInspectClient` → `POST /v1/capabilities/media.inspect:execute`).
-- **Wrapper no core:** `backend/core/toolbox/media_inspect.py` (`inspect_source_media`)
+- **Wrapper no core:** `libs/core/src/acessilia_core/toolbox/media_inspect.py` (`inspect_source_media`)
   chama só a Toolbox; não há fallback local (ADR-0003, F3 da #150). Ele recebe
   a `ToolboxConfig` da execução: com `media_inspect_enabled` falso
   (`TOOLBOX_MEDIA_INSPECT_ENABLED=false`), devolve `None` sem chamar a Toolbox,
   e uma falha na Toolbox levanta `ToolboxError`.
-- **Integração:** o `backend/core/pipeline/preflight.py` (`_inspect_media`, que o
+- **Integração:** o `libs/core/src/acessilia_core/pipeline/preflight.py` (`_inspect_media`, que o
   `PddlAccessibilityOrchestrator.execute()` roda primeiro) chama `inspect_source_media()` **antes** da extração e usa três sinais:
   - `document_genre` (`pure-media-inspect` 1.1.0+): um PDF informado como
     `presentation` é extraído só pelo provider configurado (sem fusão dual) e
-    estruturado slide a slide (`backend/core/manifest/slides.py`): um H1 para a
+    estruturado slide a slide (`libs/core/src/acessilia_core/manifest/slides.py`): um H1 para a
     apresentação, um H2 "Slide N de T: <título>" (ou "Slide N de T") por slide,
     ordem de leitura restrita a cada slide. Um slide cujas imagens cobrem ao
     menos `SLIDE_VISUAL_COVERAGE` (0,5) dele (a união delas, sem contar um fundo
@@ -493,7 +493,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 ```
 service.py: _build_orchestrator()
   └─ PddlAccessibilityOrchestrator(extractor_backend="toolbox")
-       └─ ToolboxManifestExtractor (backend/core/manifest/toolbox_extractor.py)
+       └─ ToolboxManifestExtractor (libs/core/src/acessilia_core/manifest/toolbox_extractor.py)
             ├─ [artifact store, uma implantação] upload_artifact() → /v1/artifacts
             │    (falha transitória → envio direto)
             ├─ extract_structure(artifact_id=... | file_path=..., use_remote_cache=...)
@@ -510,15 +510,15 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes, failover, artefatos e hierarquia de exceções (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — um cliente por família de capacidades; `layout.py` é o modelo do Cenário B
-- `backend/core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir da `ToolboxConfig` da execução) e os tipos de erro reexportados
+- `libs/core/src/acessilia_core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir da `ToolboxConfig` da execução) e os tipos de erro reexportados
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — extração de estrutura, armazenamento de artefatos e as rotas de datasets
-- `backend/core/toolbox/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
-- `backend/core/toolbox/media_inspect.py`, `backend/core/toolbox/pdf_ua_audit.py`, `backend/core/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK
+- `libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
+- `libs/core/src/acessilia_core/toolbox/media_inspect.py`, `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py`, `libs/core/src/acessilia_core/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK
 - `clients/page_ocr.py` — `document.ocr.page` (VLM de página inteira)
 - `clients/adjudicate.py` — `document.adjudicate.page` / `.region`
 - `clients/orientation.py` — `image.page.orient`
-- `backend/core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
-- `backend/core/pipeline/fusion.py` — `extract_fused()` (fusão dual)
+- `libs/core/src/acessilia_core/manifest/toolbox_extractor.py` — `ToolboxManifestExtractor`
+- `libs/core/src/acessilia_core/pipeline/fusion.py` — `extract_fused()` (fusão dual)
 - `backend/config/settings.py` — configuração da Toolbox
 - `docs/drbench.pt-br.md` — benchmark de providers (Docling vs MinerU)
 

@@ -1,4 +1,4 @@
-"""No import cycle among the core's modules (backend/core).
+"""No import cycle among the core's modules (libs/core/src/acessilia_core).
 
 CodeQL found one between ``export/pandoc_exporter`` and
 ``export/renderers/html_renderer`` (code scanning #291, #292): the renderer
@@ -14,7 +14,7 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "backend" / "core"
+CORE = ROOT / "libs" / "core" / "src" / "acessilia_core"
 
 
 def _module_name(path: Path, root: Path) -> str:
@@ -66,7 +66,7 @@ def cycles(graph: dict[str, set[str]]) -> list[list[str]]:
 
 def test_the_core_has_no_import_cycle() -> None:
     found = cycles(import_graph(CORE, ROOT))
-    assert not found, "import cycles in backend/core:\n" + "\n".join(
+    assert not found, "import cycles in libs/core/src/acessilia_core:\n" + "\n".join(
         " -> ".join([*cycle, cycle[0]]) for cycle in found
     )
 

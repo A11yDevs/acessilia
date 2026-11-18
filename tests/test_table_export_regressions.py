@@ -1,6 +1,6 @@
 """Regression cases for structured table export."""
 
-from backend.core.agents.output_schemas import DataOutput
+from acessilia_core.agents.output_schemas import DataOutput
 from docstruct.export.html import document_to_html
 from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines

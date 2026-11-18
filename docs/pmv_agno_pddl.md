@@ -269,8 +269,8 @@ On failure:
 
 The `dual-provider-fusion` method (Phase 5) represents extraction fused from
 two toolbox providers (default `docling` + `mineru`) via `docstruct.fusion`.
-The handler registered in `METHOD_HANDLERS` (`backend/core/pipeline/handlers/registry.py`)
-reuses `backend.core.pipeline.fusion.extract_fused`, persists the fused payload to
+The handler registered in `METHOD_HANDLERS` (`libs/core/src/acessilia_core/pipeline/handlers/registry.py`)
+reuses `acessilia_core.pipeline.fusion.extract_fused`, persists the fused payload to
 `data_dir/artifacts/fusion/<obligation_id>.json`, and returns it in
 `MethodResult.artifacts`. The `ExecutorAgent` then incorporates the artifact
 into the manifest and associates its `artifact_id` with the executed attempt
@@ -290,7 +290,7 @@ Compilation rules:
 - the PDDL domain itself is unchanged — `dual-provider-fusion` is just another
   `method` symbol with its own `supports`/`admissible`/`execution-cost`.
 
-The `FusionAgent` (`backend/core/agents/fusion_agent.py`) exposes the
+The `FusionAgent` (`libs/core/src/acessilia_core/agents/fusion_agent.py`) exposes the
 deterministic tools `fuse_providers`, `audit_document`, `classify_block` and
 `needs_reinfer` over the pure `docstruct` library, following the same
 deterministic-core + optional-Agno-envelope pattern as the

@@ -76,7 +76,7 @@ def test_docstruct_runs_alone_from_its_wheel() -> None:
     assert check["working-directory"] == "libs/docstruct"
     assert "uv run --locked --extra dev --no-editable" in check["run"]
     assert '--project "$GITHUB_WORKSPACE/libs/docstruct"' in check["run"]
-    for name in ("backend", "acessilia_sdk", "acessilia_toolbox", "rapidfuzz"):
+    for name in ("backend", "acessilia_core", "acessilia_sdk", "acessilia_toolbox", "rapidfuzz"):
         assert f'"{name}"' in check["run"]
     assert "site-packages" in check["run"]
     suite = steps["Run the docstruct test suite"]
@@ -96,7 +96,7 @@ def test_sdk_runs_alone_with_docstruct_only() -> None:
     assert '".[dev]"' not in install
     check = steps["Check that the core is not importable"]["run"]
     assert '"$GITHUB_WORKSPACE/libs/sdk"' in check
-    for name in ("backend", "acessilia_toolbox", "agno", "fastapi"):
+    for name in ("backend", "acessilia_core", "acessilia_toolbox", "agno", "fastapi"):
         assert f'"{name}"' in check
     assert '"docstruct"' not in check
     assert "skipped" in steps["Reject unexpected skipped tests"]["run"]

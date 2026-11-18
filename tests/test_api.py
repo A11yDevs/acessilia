@@ -17,7 +17,7 @@ from backend.api.limiter import limiter
 from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
 from backend.services.access_log_filter import AccessLogFilter
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 
 pytest.importorskip("fastapi.testclient")
 
@@ -257,8 +257,8 @@ def test_cache_clear_requires_configured_operations_token(client, monkeypatch):
     use_server_locale(monkeypatch, "pt_BR")
     resp_pt = client.post("/api/v1/cache/clear")
     assert resp_pt.status_code == 503
-    from backend.core.i18n import t
-    from backend.core.i18n.log_messages import API_OPERATIONS_NOT_CONFIGURED
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.log_messages import API_OPERATIONS_NOT_CONFIGURED
 
     assert resp_pt.json()["detail"] == t(API_OPERATIONS_NOT_CONFIGURED)
 
@@ -529,8 +529,8 @@ def test_queued_position_is_recalculated(client, monkeypatch):
 
     status = client.get("/api/v1/jobs/queuedsecond")
     assert status.status_code == 200
-    from backend.core.i18n import t
-    from backend.core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
 
     assert status.json()["etapa_atual"] == t(STAGE_QUEUE_WAITING_POSITION).format(position=1)
 
@@ -1154,8 +1154,8 @@ async def test_job_executor_reports_optional_export_failure(
     assert sent_emails[0]["warnings"] == expected_errors
     # Only a PDF/UA that exists is audited, and its verdict reaches the e-mail.
     assert fake_pdf_ua_audit == ([output_dir / "audio.pdf_ua.pdf"] if pdf_ua_produced else [])
-    from backend.core.i18n import t
-    from backend.core.i18n.log_messages import EMAIL_AUDIT_COMPLIANT
+    from acessilia_core.i18n import t
+    from acessilia_core.i18n.log_messages import EMAIL_AUDIT_COMPLIANT
 
     compliant = t(EMAIL_AUDIT_COMPLIANT).format(profile="PDF/UA-1")
     assert sent_emails[0]["audit"] == ([compliant] if pdf_ua_produced else [])

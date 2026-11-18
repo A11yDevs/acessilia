@@ -10,11 +10,11 @@ from frontend.telegram.handlers.start import router as start_router
 from frontend.telegram.handlers.document import router as document_router
 from frontend.telegram.handlers.errors import router as error_router
 from backend.config.process_setup import setup_process
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
     LOG_BOT_STARTING_POLLING,

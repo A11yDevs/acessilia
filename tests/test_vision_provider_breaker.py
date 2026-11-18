@@ -9,19 +9,19 @@ deadlines before it degraded.
 from __future__ import annotations
 
 import asyncio
-from backend.core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import payload as pipeline_payload
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from backend.core.agents.output_schemas import DataOutput, VisionOutput
-from backend.core.pipeline.enrichment import common as enrichment_common
-from backend.core.pipeline.enrichment.formulas import _enrich_formula_latex
+from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
+from acessilia_core.pipeline.enrichment import common as enrichment_common
+from acessilia_core.pipeline.enrichment.formulas import _enrich_formula_latex
 from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
-from backend.core.pipeline.enrichment.tables import _enrich_table_structures
-from backend.core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from backend.core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.agents.provider_breaker import ProviderBreaker
 from tests.pddl_support import build_element as _element
 from tests.pddl_support import build_manifest as _manifest
 from tests.pddl_support import install_formula_recognizer
@@ -76,13 +76,13 @@ def _vision(monkeypatch, answers, failure: str = "TimeoutError: no answer"):
                 errors.append(failure)
             return answer
 
-    monkeypatch.setattr("backend.core.pipeline.enrichment.formulas.VisionAgent", FakeVision)
-    monkeypatch.setattr("backend.core.pipeline.enrichment.pictures.VisionAgent", FakeVision)
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.formulas.VisionAgent", FakeVision)
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.pictures.VisionAgent", FakeVision)
     # Pictures and tables crop through two modules now; the tests that run both
     # stages, or the formula fallback, need the fakes in both.
     for crop_user in (
-        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
-        "backend.core.pipeline.enrichment.pictures._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.tables._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.pictures._extract_picture_bytes",
     ):
         monkeypatch.setattr(crop_user, lambda *_args, **_kwargs: (b"image-bytes", 1))
     return calls
@@ -100,7 +100,7 @@ def _data(monkeypatch, answers):
             calls.append(kwargs)
             return answers[len(calls) - 1]
 
-    monkeypatch.setattr("backend.core.pipeline.enrichment.tables.DataAgent", FakeDataAgent)
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.tables.DataAgent", FakeDataAgent)
     return calls
 
 
@@ -210,7 +210,7 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_tables(monkeypatch, tm
 @pytest.mark.asyncio
 async def test_a_table_the_provider_failed_is_read_on_the_second_pass(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.tables._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
     )
     data_calls = _data(monkeypatch, [None, _TABLE])
@@ -261,7 +261,7 @@ async def test_an_unused_answer_on_the_second_pass_is_not_left_as_a_failure(
     unusable = DataOutput(kind="formula", latex="E=mc^2", language="pt-BR", confidence=0.9)
     data_calls = _data(monkeypatch, [None, unusable])
     monkeypatch.setattr(
-        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.tables._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
     )
     tables = _manifest([_element("t-1", "table", text="")], [])
@@ -289,7 +289,7 @@ async def test_a_refused_reading_on_the_second_pass_clears_the_failure_and_sums_
         monkeypatch, [None, None, None, not_the_table, not_the_table, not_the_table]
     )
     monkeypatch.setattr(
-        "backend.core.pipeline.enrichment.tables._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.tables._extract_picture_bytes",
         lambda *_args, **_kwargs: (b"image-bytes", 1),
     )
     tables = _manifest(
@@ -317,7 +317,7 @@ async def test_a_table_skipped_by_the_breaker_is_not_cropped(monkeypatch, tmp_pa
         crops.append(True)
         return (b"image-bytes", 1)
 
-    monkeypatch.setattr("backend.core.pipeline.enrichment.tables._extract_picture_bytes", fake_crop)
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.tables._extract_picture_bytes", fake_crop)
     _data(monkeypatch, [None] * 10)
     tables = _manifest(
         [_element(f"t-{n}", "table", text="") for n in range(1, 4)], []
@@ -351,7 +351,7 @@ async def test_a_breaker_opened_by_the_pictures_skips_the_formula_fallback(
 
     install_formula_recognizer(monkeypatch, recognize)
     monkeypatch.setattr(
-        "backend.core.pipeline.enrichment.formulas._formula_recognition_crop",
+        "acessilia_core.pipeline.enrichment.formulas._formula_recognition_crop",
         lambda *_args, **_kwargs: (b"png", 1),
     )
     pictures = _manifest([_element("pic-1", "picture"), _element("pic-2", "picture")], [])

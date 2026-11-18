@@ -12,17 +12,17 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.manifest.models import (
+from acessilia_core.manifest.models import (
     BoundingBox,
     ProcessingManifest,
     Provenance,
 )
-from backend.core.pipeline.handlers.text import (
+from acessilia_core.pipeline.handlers.text import (
     _handle_chunk_verse_method,
     _handle_extract_line_numbers_method,
     _handle_tailjoin_method,
 )
-from backend.core.pipeline.payload import build_pddl_structured_payload
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
 
 from tests.pddl_support import (
     build_element as _element,

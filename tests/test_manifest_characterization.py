@@ -20,21 +20,21 @@ import pytest
 from docstruct.geometry import is_bottom_left
 from docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL
 
-from backend.core import i18n
-from backend.core.manifest.builder import (
+from acessilia_core import i18n
+from acessilia_core.manifest.builder import (
     _element_bbox,
     _normalized_element_bbox,
     _refine_reading_order,
     build_processing_manifest,
     is_unstructured_page_placeholder,
 )
-from backend.core.manifest.models import (
+from acessilia_core.manifest.models import (
     BoundingBox,
     ManifestElement,
     ProcessingManifest,
     Provenance,
 )
-from backend.core.manifest.toolbox_extractor import ToolboxExtraction
+from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
 
 FIXTURES = Path(__file__).parent / "fixtures"
 GOLDEN_MANIFESTS = FIXTURES / "manifests"
@@ -505,7 +505,7 @@ GOLDEN_CASES = {
 @pytest.mark.parametrize("name", list(GOLDEN_CASES))
 def test_manifest_wire_payload_matches_the_golden_file(tmp_path: Path, name: str) -> None:
     response, refine = GOLDEN_CASES[name]
-    from backend.core.i18n import reset_request_locale, set_request_locale
+    from acessilia_core.i18n import reset_request_locale, set_request_locale
 
     token = set_request_locale("en_US")
     try:
@@ -532,8 +532,8 @@ def test_golden_manifest_round_trips_unchanged(name: str) -> None:
 
 @pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
 def test_processing_need_messages_follow_the_request_locale(tmp_path, locale):
-    from backend.core.i18n import reset_request_locale, set_request_locale, t
-    from backend.core.i18n.log_messages import MSG_OBLIGATION_IMAGE
+    from acessilia_core.i18n import reset_request_locale, set_request_locale, t
+    from acessilia_core.i18n.log_messages import MSG_OBLIGATION_IMAGE
 
     response, refine = GOLDEN_CASES["toolbox-v2-contract"]
     token = set_request_locale(locale)

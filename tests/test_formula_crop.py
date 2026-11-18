@@ -19,9 +19,9 @@ import fitz
 import pytest
 from loguru import logger
 
-from backend.core.pipeline import orchestrator as pddl
-from backend.core.pipeline.enrichment import formulas as formula_stage
-from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
 from tests.pddl_support import build_element
 from tests.core_config_support import toolbox_config
 

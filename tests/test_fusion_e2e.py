@@ -29,14 +29,14 @@ import httpx
 from tests.core_config_support import core_config, toolbox_config
 import pytest
 
-from backend.core.pipeline.handlers.registry import bind_run
-from backend.core.ports import RunPorts
-from backend.core.i18n import reset_request_locale, set_request_locale
+from acessilia_core.pipeline.handlers.registry import bind_run
+from acessilia_core.ports import RunPorts
+from acessilia_core.i18n import reset_request_locale, set_request_locale
 from acessilia_sdk.toolbox.transport import auth_headers
 
-from backend.core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
-from backend.core.execution.executor import ExecutorAgent, MethodRegistry
-from backend.core.manifest.models import (
+from acessilia_core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
+from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
+from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -44,7 +44,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from backend.core.planning.planner_agent import PlannerAgent
+from acessilia_core.planning.planner_agent import PlannerAgent
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ def test_handler_returns_artifact_in_method_result(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
@@ -163,7 +163,7 @@ def test_handler_fails_when_single_provider(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
     result = _handle_dual_provider_fusion_method(manifest, "o-fuse", config=core_config())
 
@@ -185,7 +185,7 @@ async def test_handler_inside_running_event_loop_without_warning(
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
 
     with warnings.catch_warnings():
@@ -206,7 +206,7 @@ def test_executor_wires_fusion_artifact_into_attempt(tmp_path, monkeypatch):
         return _dual_payload()
 
     monkeypatch.setattr(
-        "backend.core.pipeline.fusion.extract_fused", _fake_extract_fused
+        "acessilia_core.pipeline.fusion.extract_fused", _fake_extract_fused
     )
 
     registry = MethodRegistry()
@@ -284,7 +284,7 @@ def _get_small_pdf() -> Path:
 async def test_extract_fused_against_real_toolbox():
     """Real dual-provider extraction via the Toolbox (docling + mineru)."""
     _require_fusion_providers()
-    from backend.core.pipeline.fusion import extract_fused
+    from acessilia_core.pipeline.fusion import extract_fused
 
     pdf = _get_small_pdf()
     payload = await extract_fused(pdf, secondary_provider="mineru", toolbox=toolbox_config())

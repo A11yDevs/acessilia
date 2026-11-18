@@ -1,19 +1,19 @@
 """
 What this suite verifies: the pure-Python fallback renderers in
-backend/core/export/renderers (txt, html, pdf) turn a canonical document mapping into
+libs/core/src/acessilia_core/export/renderers (txt, html, pdf) turn a canonical document mapping into
 rendered files while honoring the export profile's block filtering; the txt renderer uses the
-localized table captions/row lines from backend/core/pipeline/table_ast, and the html renderer emits
+localized table captions/row lines from libs/core/src/acessilia_core/pipeline/table_ast, and the html renderer emits
 the localized table-of-contents and technical-metadata markup.
 """
 
 import tempfile
 from pathlib import Path
 
+import acessilia_core.i18n as i8n
 import pytest
+from acessilia_core.export.renderers.html_renderer import render_html
+from acessilia_core.export.renderers.txt_renderer import render_txt
 
-import backend.core.i18n as i8n
-from backend.core.export.renderers.html_renderer import render_html
-from backend.core.export.renderers.txt_renderer import render_txt
 from tests.locale_support import use_server_locale
 
 

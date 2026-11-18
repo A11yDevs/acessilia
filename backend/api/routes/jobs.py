@@ -21,9 +21,9 @@ from backend.api.worker import (
     register_queued_job,
 )
 from backend.config.settings import settings
-from backend.core.i18n import t
-from backend.core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
+from acessilia_core.i18n.log_messages import (
     API_CANCEL_STATE_INVALID,
     API_JOB_QUEUED,
     API_OPTIONS_UNAVAILABLE,
@@ -31,12 +31,12 @@ from backend.core.i18n.log_messages import (
     API_TASK_NOT_FOUND,
     LOG_API_JOB_ENQUEUED,
 )
-from backend.core.blocking import run_blocking
+from acessilia_core.blocking import run_blocking
 from backend.services.job_store import delete_request, save_request, save_status
 from backend.services.operation_registry import operation_registry
 from backend.services.queue_service import QueueItem, unified_queue
 from backend.services.remote_cancellation import cancel_task_operations
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.services.validators import (
     MSG_FILE_TOO_LARGE,
     MSG_INVALID_EMAIL_ADDRESS,

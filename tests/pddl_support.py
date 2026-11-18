@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from backend.core.pipeline.handlers.registry import bind_run
-from backend.core.ports import RunPorts
+from acessilia_core.pipeline.handlers.registry import bind_run
+from acessilia_core.ports import RunPorts
 from tests.core_config_support import core_config
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.manifest.models import (
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -21,7 +21,7 @@ from backend.core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from backend.core.planning.planner_agent import PlannerAgent
+from acessilia_core.planning.planner_agent import PlannerAgent
 
 NOW = datetime(2026, 10, 14, tzinfo=timezone.utc)
 
@@ -146,7 +146,7 @@ def install_formula_recognizer(monkeypatch, answer) -> None:
     """
     from docstruct.text.latex import ranked_latex_candidates
 
-    from backend.core.pipeline.enrichment import formulas as formula_stage
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
 
     def recognize(image, *, toolbox, **kwargs):
         # The stand-in requires the run's ToolboxConfig, as the real function does.

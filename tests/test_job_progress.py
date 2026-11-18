@@ -12,13 +12,13 @@ import asyncio
 
 import pytest
 
-from backend.core.pipeline.orchestrator import _plan_progress
-from backend.core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.orchestrator import _plan_progress
+from acessilia_core.pipeline.obligations import _pages_label
 from backend.agents.state_manager import describe_failure, state_manager
 from backend.config.settings import settings
-from backend.core.planning.models import PlanStep
-from backend.core.i18n import t
-from backend.core.i18n.stage_messages import (
+from acessilia_core.planning.models import PlanStep
+from acessilia_core.i18n import t
+from acessilia_core.i18n.stage_messages import (
     STAGE_DESCRIBING_IMAGE,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_PAGE,
@@ -102,7 +102,7 @@ class TestPagesLabel:
 
 
 def test_the_image_progress_message_names_the_location_with_the_page_total():
-    from backend.core.i18n import reset_request_locale, set_request_locale
+    from acessilia_core.i18n import reset_request_locale, set_request_locale
 
     token = set_request_locale("en_US")
     try:
@@ -210,7 +210,7 @@ async def test_a_broken_label_translation_does_not_fail_the_step(monkeypatch):
 
     # A catalog entry with a placeholder the code does not pass.
     monkeypatch.setattr(
-        "backend.core.pipeline.orchestrator.t", lambda msgid: "{missing} {current}"
+        "acessilia_core.pipeline.orchestrator.t", lambda msgid: "{missing} {current}"
     )
     report = _plan_progress(manifest, status_callback, asyncio.get_running_loop())
     step = PlanStep(

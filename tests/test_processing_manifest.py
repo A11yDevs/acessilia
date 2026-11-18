@@ -7,9 +7,9 @@ its own observations and obligations.
 
 from __future__ import annotations
 
-from backend.core.ports import RunPorts
+from acessilia_core.ports import RunPorts
 
-from backend.core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import current_model_calls
 
 import json
 from datetime import datetime, timezone
@@ -18,11 +18,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.agents.informational_structural import InformationalStructuralAgent
+from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 from tests.core_config_support import document_config, fusion_config, paths_config, toolbox_config
-from backend.core.manifest.builder import build_processing_manifest
-from backend.core.manifest.schema import processing_manifest_schema, validate_manifest
-from backend.core.manifest.toolbox_extractor import ToolboxExtraction
+from acessilia_core.manifest.builder import build_processing_manifest
+from acessilia_core.manifest.schema import processing_manifest_schema, validate_manifest
+from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
 
 
 SCHEMA_PATH = (
@@ -103,7 +103,7 @@ def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
 
 @pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
 def test_formula_number_is_preserved_before_planning(tmp_path, suffix):
-    from backend.core.pipeline.elements import _element_to_block
+    from acessilia_core.pipeline.elements import _element_to_block
     from docstruct.canonical import build_canonical_document
     from docstruct.export.markdown import document_to_markdown
 
@@ -194,7 +194,7 @@ def test_the_legacy_unicode_mode_reaches_the_needs(tmp_path, mode, obligation):
 
 def test_process_passes_the_run_document_config_to_the_builder(tmp_path, monkeypatch):
     """Each of the three fields arrives under its own name."""
-    from backend.core.agents import informational_structural
+    from acessilia_core.agents import informational_structural
 
     received: dict = {}
 
@@ -222,7 +222,7 @@ def test_process_passes_the_run_document_config_to_the_builder(tmp_path, monkeyp
 @pytest.mark.asyncio
 async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monkeypatch):
     """``execute`` hands ``config.document`` to ``process``; the run stops there."""
-    from backend.core.pipeline import preflight
+    from acessilia_core.pipeline import preflight
     from tests.core_config_support import core_config
     from tests.pddl_support import build_orchestrator
 
@@ -252,7 +252,7 @@ async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monk
 def test_process_passes_the_run_fusion_config_to_the_extractor_and_the_builder(
     tmp_path, monkeypatch
 ):
-    from backend.core.agents import informational_structural
+    from acessilia_core.agents import informational_structural
 
     built: dict = {}
     operations = SimpleNamespace(job_id="job-1")  # the job's registry, passed through

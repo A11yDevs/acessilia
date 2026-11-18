@@ -97,7 +97,7 @@ chave ausente mantém o padrão de `PROVIDER_DEFAULTS`. `timeouts` liga a
 vale o `timeout_seconds` compartilhado. Argumentos nomeados de `make_client`
 sobrepõem a configuração; `None` é ignorado, e `base_url` substitui os
 endpoints configurados. O core monta o mesmo objeto a partir dos seus
-`settings` (`backend/core/toolbox/toolbox_client.py`).
+`settings` (`libs/core/src/acessilia_core/toolbox/toolbox_client.py`).
 
 ## Disponibilidade e failover
 
@@ -278,7 +278,7 @@ capacidade nem altera o tipo de retorno de um cliente.
    e deixa `provider_key` sem valor. Os dois caminhos seguem as mesmas regras de
    failover e retry. Exportar o cliente em `acessilia_sdk.toolbox.clients` e
    testá-lo em `tests/clients/` com um `base_url` explícito.
-3. No core, criá-lo com `backend.core.toolbox.toolbox_client.make_toolbox_client`, que
+3. No core, criá-lo com `acessilia_core.toolbox.toolbox_client.make_toolbox_client`, que
    repassa a `ToolboxConfig` da execução.
 
 ## Testes

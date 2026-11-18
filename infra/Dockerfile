@@ -21,6 +21,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.17@sha256:03bdc89bb9798628846e60c3a9ad1900
 COPY pyproject.toml uv.lock .python-version README.md ./
 COPY libs/docstruct ./libs/docstruct
 COPY libs/sdk ./libs/sdk
+COPY libs/core ./libs/core
 RUN uv sync --locked --no-dev --no-editable --no-install-project
 
 # The application, still installed from the lock and not editably. The final

@@ -14,15 +14,15 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.i18n import reset_request_locale, set_request_locale
+from acessilia_core.i18n import reset_request_locale, set_request_locale
 
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.manifest.builder import (
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.manifest.builder import (
     DEFAULT_METHOD_COSTS,
     SECONDARY_EXTRACTION_ARTIFACT_ID,
     SECONDARY_EXTRACTION_KIND,
 )
-from backend.core.manifest.models import (
+from acessilia_core.manifest.models import (
     Artifact,
     BoundingBox,
     ExtractorRun,
@@ -34,13 +34,13 @@ from backend.core.manifest.models import (
     Provenance,
     SourceDocument,
 )
-from backend.core.pipeline import secondary as pipeline_secondary
-from backend.core.pipeline.handlers.fusion import (
+from acessilia_core.pipeline import secondary as pipeline_secondary
+from acessilia_core.pipeline.handlers.fusion import (
     _handle_agreement_rule_method,
     _handle_table_smart_fusion_method,
 )
-from backend.core.pipeline.handlers.order import _handle_skeleton_order_method
-from backend.core.planning.planner_agent import PlannerAgent
+from acessilia_core.pipeline.handlers.order import _handle_skeleton_order_method
+from acessilia_core.planning.planner_agent import PlannerAgent
 from tests.core_config_support import core_config, toolbox_config
 
 NOW = datetime(2026, 10, 16, tzinfo=timezone.utc)
@@ -536,11 +536,11 @@ class TestVlmPairwiseJudge:
                 return {"document": document}
             return {"document": {"pB": p_b, "pB_ab": p_b, "pA_ba": 1 - p_b, "model": "qwen3-vl-8b"}}
 
-        monkeypatch.setattr("backend.core.pipeline.judge._judge_page", judge)
+        monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", judge)
         return seen
 
     def test_keeps_the_primary_page(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path)
         seen = self._fake_judge(monkeypatch, 0.1)
@@ -571,7 +571,7 @@ class TestVlmPairwiseJudge:
     def test_a_page_taken_from_mineru_is_judged_against_docling(
         self, tmp_path, monkeypatch, p_b, confirmed
     ) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._routed_manifest(tmp_path)
         seen = self._fake_judge(monkeypatch, p_b)
@@ -593,7 +593,7 @@ class TestVlmPairwiseJudge:
         MinerU page itself, and comparing it with itself would report a
         confirmation.
         """
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path, primary=self.TEXT + " (mineru)")
         manifest.elements[0].metadata["provider"] = "mineru"
@@ -606,7 +606,7 @@ class TestVlmPairwiseJudge:
         assert "page_judgement" not in manifest.elements[0].metadata
 
     def test_preferred_secondary_is_recorded_and_escalated(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path)
         self._fake_judge(monkeypatch, 0.9)
@@ -619,15 +619,15 @@ class TestVlmPairwiseJudge:
         assert manifest.elements[0].text == self.TEXT
 
     def test_toolbox_failure_lets_the_planner_move_on(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
-        from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
         manifest = self._manifest(tmp_path)
 
         def down(*_args, **_kwargs):
             raise ToolboxProviderUnavailable("VLM offline")
 
-        monkeypatch.setattr("backend.core.pipeline.judge._judge_page", down)
+        monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", down)
 
         result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
@@ -642,7 +642,7 @@ class TestVlmPairwiseJudge:
     def test_answer_without_valid_pb_fails_instead_of_keeping_the_primary(
         self, tmp_path, monkeypatch, document
     ) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path)
         self._fake_judge(monkeypatch, None, document=document)
@@ -656,7 +656,7 @@ class TestVlmPairwiseJudge:
     def test_agreeing_pages_keep_the_primary_without_calling_the_judge(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path, secondary=self.TEXT)
         seen = self._fake_judge(monkeypatch, 0.9)
@@ -673,7 +673,7 @@ class TestVlmPairwiseJudge:
     # Characterization (#402), written on develop before the handler was split.
 
     def test_a_page_that_cannot_be_rendered_fails_the_method(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path)
         seen = self._fake_judge(monkeypatch, 0.1)
@@ -681,7 +681,7 @@ class TestVlmPairwiseJudge:
         def broken(*args, **kwargs):
             raise RuntimeError("broken source")
 
-        monkeypatch.setattr("backend.core.pipeline.judge._render_page_png", broken)
+        monkeypatch.setattr("acessilia_core.pipeline.judge._render_page_png", broken)
 
         result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
@@ -691,7 +691,7 @@ class TestVlmPairwiseJudge:
         assert "page_judgement" not in manifest.elements[0].metadata
 
     def test_the_confirmation_names_each_page_and_how_it_was_confirmed(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path)
         second = manifest.elements[0].model_copy(deep=True)
@@ -699,17 +699,17 @@ class TestVlmPairwiseJudge:
         second.provenance[0].page_number = 2
         manifest.elements.append(second)
         manifest.obligations[0].target_ids.append("p-2")
-        monkeypatch.setattr("backend.core.pipeline.judge._render_page_png", lambda *a, **k: b"\x89PNG")
+        monkeypatch.setattr("acessilia_core.pipeline.judge._render_page_png", lambda *a, **k: b"\x89PNG")
         calls = []
 
         def judge(image, candidate_a, candidate_b, *, toolbox):
             calls.append(candidate_a)
             return {"document": {"pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7, "model": "m"}}
 
-        monkeypatch.setattr("backend.core.pipeline.judge._judge_page", judge)
+        monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", judge)
         secondary, _ = pipeline_secondary._secondary_or_failure(manifest)
         monkeypatch.setattr(
-            "backend.core.pipeline.handlers.judge._secondary_or_failure",
+            "acessilia_core.pipeline.handlers.judge._secondary_or_failure",
             lambda m: (pipeline_secondary._SecondaryExtraction(secondary.provider, {1: secondary.pages[1], 2: [
                 {"type": "paragraph", "text": manifest.elements[1].text}]}, secondary.sizes), None),
         )
@@ -726,7 +726,7 @@ class TestVlmPairwiseJudge:
         }
 
     def test_page_without_both_transcriptions_is_not_judged(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path, secondary="")
         seen = self._fake_judge(monkeypatch, 0.1)
@@ -738,15 +738,15 @@ class TestVlmPairwiseJudge:
         assert not seen
 
     def test_rejected_call_is_not_reported_as_unavailable(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
-        from backend.core.toolbox.toolbox_client import ToolboxAuthenticationError
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.toolbox.toolbox_client import ToolboxAuthenticationError
 
         manifest = self._manifest(tmp_path)
 
         def rejected(*_args, **_kwargs):
             raise ToolboxAuthenticationError("401")
 
-        monkeypatch.setattr("backend.core.pipeline.judge._judge_page", rejected)
+        monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", rejected)
 
         result = _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
 
@@ -756,14 +756,14 @@ class TestVlmPairwiseJudge:
     def test_unexpected_judge_error_is_not_labelled_as_rendering(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         manifest = self._manifest(tmp_path)
 
         def broken(*_args):
             raise TypeError("resposta inesperada")
 
-        monkeypatch.setattr("backend.core.pipeline.judge._judge_page", broken)
+        monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", broken)
 
         with pytest.raises(TypeError):
             _handle_vlm_pairwise_judge_method(manifest, "o-1", config=core_config())
@@ -771,8 +771,8 @@ class TestVlmPairwiseJudge:
     @pytest.mark.slow
     @pytest.mark.timeout(300)  # CPU-heavy: 60-80s under xdist; headroom over 180s
     def test_long_page_is_flagged_as_truncated(self, tmp_path, monkeypatch) -> None:
-        from backend.core.pipeline.judge import _JUDGE_MAX_CHARS
-        from backend.core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
+        from acessilia_core.pipeline.judge import _JUDGE_MAX_CHARS
+        from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 
         words = [f"palavra{i}" for i in range(_JUDGE_MAX_CHARS // 8)]
         manifest = self._manifest(
@@ -787,7 +787,7 @@ class TestVlmPairwiseJudge:
     def test_judge_page_sends_the_png_through_the_adjudicate_client(
         self, tmp_path, monkeypatch
     ) -> None:
-        from backend.core.pipeline.judge import _judge_page
+        from acessilia_core.pipeline.judge import _judge_page
 
         calls = {}
 
@@ -808,7 +808,7 @@ class TestVlmPairwiseJudge:
             return FakeClient()
 
         monkeypatch.setattr(
-            "backend.core.toolbox.toolbox_client.make_toolbox_client", fake_factory
+            "acessilia_core.toolbox.toolbox_client.make_toolbox_client", fake_factory
         )
 
         result = _judge_page(b"\x89PNG-fake", "A", "B", toolbox=toolbox_config())
@@ -822,7 +822,7 @@ class TestVlmPairwiseJudge:
     def test_rendered_page_fits_the_server_slot(self, tmp_path) -> None:
         import fitz
 
-        from backend.core.pipeline.judge import (
+        from acessilia_core.pipeline.judge import (
             _JUDGE_PAGE_MAX_SIDE,
             _render_page_png,
         )

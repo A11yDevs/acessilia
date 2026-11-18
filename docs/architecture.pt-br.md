@@ -15,14 +15,14 @@ O antigo motor **`legacy`** (`AccessibilityOrchestrator`: Reader → Vision/Data
 
 ### 0. Backend (`backend/`) — lógica de negócio agnóstica de interface e pipeline de IA
 
-#### 0.1. Pipeline Multiagente e Orquestração (`backend/core/agents/`)
-- [backend/core/agents/vision_agent.py](../backend/core/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
-- [backend/core/agents/data_agent.py](../backend/core/agents/data_agent.py): `DataAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades do LLM para converter tabelas complexas e fórmulas matemáticas em representações Markdown e LaTeX estruturadas.
+#### 0.1. Pipeline Multiagente e Orquestração (`libs/core/src/acessilia_core/agents/`)
+- [libs/core/src/acessilia_core/agents/vision_agent.py](../libs/core/src/acessilia_core/agents/vision_agent.py): `VisionAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades multimodais do LLM (`agno.media.Image`) para produzir alt-text detalhado e descrições em áudio para elementos visuais e páginas escaneadas.
+- [libs/core/src/acessilia_core/agents/data_agent.py](../libs/core/src/acessilia_core/agents/data_agent.py): `DataAgent` utiliza o Agno (`agno.agent.Agent`) e as capacidades do LLM para converter tabelas complexas e fórmulas matemáticas em representações Markdown e LaTeX estruturadas.
 - [backend/agents/state_manager.py](../backend/agents/state_manager.py): máquina de estados em memória para tarefas com suporte a cancelamento cooperativo (o estado dos jobs do serviço; fica fora do core).
 
-#### 0.2. Integração do Cliente de IA (`backend/core/agents/ai_client.py`)
-- [backend/core/agents/ai_client.py](../backend/core/agents/ai_client.py): inicializador central `get_agno_model(models, toolbox)` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) a partir da `ModelConfig` e da `ToolboxConfig` da execução ([ADR-0016](adr/0016-core-package.pt-br.md), passo 3).
-- [backend/core/agents/prompt_tools.py](../backend/core/agents/prompt_tools.py): carregador de prompt e resolutor de templates sobre os prompts em [backend/core/agents/prompts/](../backend/core/agents/prompts/).
+#### 0.2. Integração do Cliente de IA (`libs/core/src/acessilia_core/agents/ai_client.py`)
+- [libs/core/src/acessilia_core/agents/ai_client.py](../libs/core/src/acessilia_core/agents/ai_client.py): inicializador central `get_agno_model(models, toolbox)` que instancia envelopes de Model do Agno para Ollama, OpenRouter ou o gateway VLM da Toolbox (`AI_CLIENT=toolbox`, [ADR-0012](adr/0012-agents-reach-the-vlm-through-the-toolbox.pt-br.md)) a partir da `ModelConfig` e da `ToolboxConfig` da execução ([ADR-0016](adr/0016-core-package.pt-br.md), passo 3).
+- [libs/core/src/acessilia_core/agents/prompt_tools.py](../libs/core/src/acessilia_core/agents/prompt_tools.py): carregador de prompt e resolutor de templates sobre os prompts em [libs/core/src/acessilia_core/agents/prompts/](../libs/core/src/acessilia_core/agents/prompts/).
 
 **Deadline de chamada do DataAgent (#276, etapa 1).** Cada chamada de
 `process_region` aguarda `Agent.run` por até `DATA_AGENT_TIMEOUT_SECONDS + 30`
@@ -106,25 +106,25 @@ criam e fecham seu runner explicitamente. Veja a
 - [backend/services/validators.py](../backend/services/validators.py): validação de upload (extensão e tamanho de arquivo).
 - [backend/services/access_log_filter.py](../backend/services/access_log_filter.py) e [backend/services/filenames.py](../backend/services/filenames.py): o filtro do log de acesso e os nomes de arquivo de saída limitados.
 
-#### 0.4. Utilitários do Core e Adaptadores da Toolbox (`backend/core/`)
-- [backend/core/toolbox/](../backend/core/toolbox/): os adaptadores do core sobre a Toolbox, pelo SDK (cliente a partir das configurações, matemática, inspeção de mídia, auditoria PDF/UA, spans de texto, payload de visão).
-- [backend/core/config.py](../backend/core/config.py): o `CoreConfig`, a configuração do core em grupos congelados, que o serviço monta a partir das suas configurações em [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, passo 3).
-- [backend/core/ports.py](../backend/core/ports.py): o `RunPorts`, o estado do serviço que uma execução alcança (o cache de regiões, os checkpoints do job e o seu registro de operações remotas), montado pelo serviço para cada job em [backend/services/run_ports.py](../backend/services/run_ports.py); o `RunPorts.none()` não guarda estado (ADR-0016, passo 4).
-- [backend/core/logger.py](../backend/core/logger.py): configuração centralizada do logger loguru; o nível e o diretório de logs são passados no início do processo por [backend/config/process_setup.py](../backend/config/process_setup.py), junto com os idiomas oferecidos (ADR-0016, passo 3).
-- [backend/core/formula_tools.py](../backend/core/formula_tools.py): normalização de LaTeX e o rótulo da fórmula falada.
+#### 0.4. Utilitários do Core e Adaptadores da Toolbox (`libs/core/src/acessilia_core/`)
+- [libs/core/src/acessilia_core/toolbox/](../libs/core/src/acessilia_core/toolbox/): os adaptadores do core sobre a Toolbox, pelo SDK (cliente a partir das configurações, matemática, inspeção de mídia, auditoria PDF/UA, spans de texto, payload de visão).
+- [libs/core/src/acessilia_core/config.py](../libs/core/src/acessilia_core/config.py): o `CoreConfig`, a configuração do core em grupos congelados, que o serviço monta a partir das suas configurações em [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, passo 3).
+- [libs/core/src/acessilia_core/ports.py](../libs/core/src/acessilia_core/ports.py): o `RunPorts`, o estado do serviço que uma execução alcança (o cache de regiões, os checkpoints do job e o seu registro de operações remotas), montado pelo serviço para cada job em [backend/services/run_ports.py](../backend/services/run_ports.py); o `RunPorts.none()` não guarda estado (ADR-0016, passo 4).
+- [libs/core/src/acessilia_core/logger.py](../libs/core/src/acessilia_core/logger.py): configuração centralizada do logger loguru; o nível e o diretório de logs são passados no início do processo por [backend/config/process_setup.py](../backend/config/process_setup.py), junto com os idiomas oferecidos (ADR-0016, passo 3).
+- [libs/core/src/acessilia_core/formula_tools.py](../libs/core/src/acessilia_core/formula_tools.py): normalização de LaTeX e o rótulo da fórmula falada.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): normalização de texto e parsing de Markdown.
 
-#### 0.5. Camada de Planejamento (`backend/core/`) — motor PDDL
+#### 0.5. Camada de Planejamento (`libs/core/src/acessilia_core/`) — motor PDDL
 
 Este é o único motor ativo. Ele transforma a estrutura do documento em um plano explícito antes de qualquer IA rodar, de modo que a ordem e as dependências das tarefas sejam determinísticas e auditáveis.
 
-- `backend/core/manifest/`: o agente Informacional-Estrutural extrai um `processing-manifest.json` do documento (regiões, tipos e obrigações de processamento) pela Toolbox (`ToolboxManifestExtractor`, capacidade `document.structure.extract`). Os extratores locais Docling/PyMuPDF estão desativados neste motor.
-- `backend/core/planning/`: o `PlannerAgent` compila o manifesto mais um domínio PDDL em um problema, gera um `nominal-plan.json` (planejador interno ou backend Fast Downward) e o valida. A geração do problema PDDL é determinística — nenhum LLM escreve PDDL.
-- `backend/core/execution/`: o Executor aplica o plano validado como um Agno Workflow, invocando os agentes Vision/Data onde o plano os exige, e produz um `execution-report.json`.
-- `backend/core/agents/fusion_agent.py`: o `FusionAgent` expõe ferramentas Agno determinísticas sobre a biblioteca pura `docstruct` — `fuse_providers`, `audit_document`, `classify_block` e `needs_reinfer`. O método PDDL `dual-provider-fusion` reutiliza `backend.core.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para saber como funcionam esses algoritmos.
-- `backend/core/pipeline/orchestrator.py`: `PddlAccessibilityOrchestrator.execute()` coordena as fases manifesto → plano → execução. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística. O [inventário](architecture/pddl-orchestrator-inventory.pt-br.md) dele atribui cada parte ao core, ao docstruct ou ao SDK (#402).
+- `libs/core/src/acessilia_core/manifest/`: o agente Informacional-Estrutural extrai um `processing-manifest.json` do documento (regiões, tipos e obrigações de processamento) pela Toolbox (`ToolboxManifestExtractor`, capacidade `document.structure.extract`). Os extratores locais Docling/PyMuPDF estão desativados neste motor.
+- `libs/core/src/acessilia_core/planning/`: o `PlannerAgent` compila o manifesto mais um domínio PDDL em um problema, gera um `nominal-plan.json` (planejador interno ou backend Fast Downward) e o valida. A geração do problema PDDL é determinística — nenhum LLM escreve PDDL.
+- `libs/core/src/acessilia_core/execution/`: o Executor aplica o plano validado como um Agno Workflow, invocando os agentes Vision/Data onde o plano os exige, e produz um `execution-report.json`.
+- `libs/core/src/acessilia_core/agents/fusion_agent.py`: o `FusionAgent` expõe ferramentas Agno determinísticas sobre a biblioteca pura `docstruct` — `fuse_providers`, `audit_document`, `classify_block` e `needs_reinfer`. O método PDDL `dual-provider-fusion` reutiliza `acessilia_core.pipeline.fusion.extract_fused` e só é admissível quando `FUSION_MODE=dual`. Veja [docstruct_algorithms.pt-br.md](docstruct_algorithms.pt-br.md) para saber como funcionam esses algoritmos.
+- `libs/core/src/acessilia_core/pipeline/orchestrator.py`: `PddlAccessibilityOrchestrator.execute()` coordena as fases manifesto → plano → execução. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística. O [inventário](architecture/pddl-orchestrator-inventory.pt-br.md) dele atribui cada parte ao core, ao docstruct ou ao SDK (#402).
 
-O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pmv_schemas.py`.
+O domínio PDDL vive em `libs/core/src/acessilia_core/planning/domains/`. Os esquemas JSON (manifesto, plano, comparação, relatório de execução) ficam em `schemas/` na raiz do repositório e são gerados por `scripts/generate_pmv_schemas.py`.
 
 ---
 
@@ -152,14 +152,14 @@ O domínio PDDL vive em `backend/core/planning/domains/`. Os esquemas JSON (mani
 
 ---
 
-### 2. Pipeline de Documento Canônico e Exportação (`backend/core/pipeline/`, `backend/core/export/`)
+### 2. Pipeline de Documento Canônico e Exportação (`libs/core/src/acessilia_core/pipeline/`, `libs/core/src/acessilia_core/export/`)
 
-- [backend/core/pipeline/canonical_builder.py](../backend/core/pipeline/canonical_builder.py): constrói o documento canônico e a árvore de seções.
+- [libs/core/src/acessilia_core/pipeline/canonical_builder.py](../libs/core/src/acessilia_core/pipeline/canonical_builder.py): constrói o documento canônico e a árvore de seções.
 - [docstruct.text.sanitize](../libs/docstruct/src/docstruct/text/sanitize.py): limpa o texto bruto, remove vazamentos de prompt e artefatos de Markdown.
-- [backend/core/pipeline/validators.py](../backend/core/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
-- [backend/core/export/pandoc_exporter.py](../backend/core/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
-- [backend/core/export/renderers/](../backend/core/export/renderers/): renderizadores para TXT e HTML (DOCX e PDF/UA são renderizados na Toolbox).
-- [backend/core/export/exporters/](../backend/core/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz o PDF/UA, o único PDF. [backend/core/toolbox/pdf_ua_audit.py](../backend/core/toolbox/pdf_ua_audit.py) o audita com o veraPDF na Toolbox (`pdf.validate.pdf_ua`) para o e-mail de resultado.
+- [libs/core/src/acessilia_core/pipeline/validators.py](../libs/core/src/acessilia_core/pipeline/validators.py): valida esquema, hierarquia de títulos, links e texto de saída; `audit_canonical_document` classifica problemas estruturais e de acessibilidade como `BLOCKER` ou `WARNING`.
+- [libs/core/src/acessilia_core/export/pandoc_exporter.py](../libs/core/src/acessilia_core/export/pandoc_exporter.py): coordenador único de exportação para validação, filtragem, criação do AST e despacho de renderizador; atua como guardiã determinística que interrompe a exportação quando a auditoria retorna qualquer `BLOCKER`.
+- [libs/core/src/acessilia_core/export/renderers/](../libs/core/src/acessilia_core/export/renderers/): renderizadores para TXT e HTML (DOCX e PDF/UA são renderizados na Toolbox).
+- [libs/core/src/acessilia_core/export/exporters/](../libs/core/src/acessilia_core/export/exporters/): os adaptadores de exportação chamados pelo worker, incluindo `audio_exporter.py`, que produz o MP3 via edge-tts, e `pdf_exporter.py`, que produz o PDF/UA, o único PDF. [libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py](../libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py) o audita com o veraPDF na Toolbox (`pdf.validate.pdf_ua`) para o e-mail de resultado.
 
 ---
 
@@ -226,6 +226,6 @@ O runtime AgentOS não faz parte de `ENABLED_INTERFACES`; ele é iniciado separa
 
 ## Decisões Arquiteturais Principais
 
-1. **Domínio independente de interface:** os pacotes de domínio — `backend/core` (manifesto, planejamento, execução, pipeline, agentes, adaptadores da Toolbox, exportação e i18n), `backend/services`, `backend/config` e `backend/agents` (o estado dos jobs) — não têm dependência de frameworks de interface (sem aiogram, sem FastAPI). A única exceção é `backend/api`, que é a camada FastAPI que expõe o domínio via HTTP; tudo em `frontend/` é um cliente dessa API. Manter a fronteira ali significa que uma nova interface nunca exige tocar no domínio.
+1. **Domínio independente de interface:** os pacotes de domínio — `libs/core/src/acessilia_core` (manifesto, planejamento, execução, pipeline, agentes, adaptadores da Toolbox, exportação e i18n), `backend/services`, `backend/config` e `backend/agents` (o estado dos jobs) — não têm dependência de frameworks de interface (sem aiogram, sem FastAPI). A única exceção é `backend/api`, que é a camada FastAPI que expõe o domínio via HTTP; tudo em `frontend/` é um cliente dessa API. Manter a fronteira ali significa que uma nova interface nunca exige tocar no domínio.
 2. **Arquitetura Multiagente Modular:** Separa leitura estrutural, descrição visual, formatação de dados e edição de texto em agentes distintos.
 3. **Documento Canônico Fonte da Verdade:** Todos os renderizadores consomem o esquema do documento canônico validado para garantir compatibilidade com leitores de tela.

@@ -1,7 +1,7 @@
 """The service builds the core's configuration from its settings (ADR-0016, step 3).
 
 ``core_config_from_settings`` is the one place where the service's
-environment becomes a :class:`~backend.core.config.CoreConfig`. It reads the
+environment becomes a :class:`~acessilia_core.config.CoreConfig`. It reads the
 settings when it is called, so a run sees the settings of its start (and a
 test's monkeypatch).
 """
@@ -9,7 +9,7 @@ test's monkeypatch).
 from __future__ import annotations
 
 from backend.config.settings import Settings, settings as default_settings
-from backend.core.config import (
+from acessilia_core.config import (
     CoreConfig,
     DocumentConfig,
     ExportConfig,
@@ -19,7 +19,7 @@ from backend.core.config import (
     ToolboxConfig,
     VisionConfig,
 )
-from backend.core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
+from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
 
 
 def core_config_from_settings(settings: Settings | None = None) -> CoreConfig:

@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from backend.core.pipeline.payload import build_pddl_structured_payload
-from backend.core.manifest.models import (
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
+from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
     ManifestSummary,
@@ -390,8 +390,8 @@ def test_one_paragraph_that_fits_two_empty_lists_feeds_neither() -> None:
 
 
 def test_dropped_empty_list_items_are_logged() -> None:
-    from backend.core import i18n
-    from backend.core.logger import logger
+    from acessilia_core import i18n
+    from acessilia_core.logger import logger
 
     warnings: list[str] = []
     sink = logger.add(warnings.append, level="WARNING", format="{message}")

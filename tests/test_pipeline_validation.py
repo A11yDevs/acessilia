@@ -1,5 +1,5 @@
 """
-What this suite verifies: backend/core/pipeline/validators structural checks (document shape, block
+What this suite verifies: libs/core/src/acessilia_core/pipeline/validators structural checks (document shape, block
 id/heading rules, table and table_ast payloads, export-profile verbosity, final-text scan rules)
 report localized findings, and the verbosity-manager helpers pick the expected block filters and
 verbosity defaults. Locale is pinned to en_US for deterministic canonical-English assertions.
@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-import backend.core.i18n as i8n
-from backend.core.pipeline.validators import validate_canonical_document
-from backend.core.pipeline.validators import validate_export_profile
-from backend.core.pipeline.validators import validate_output_text
+import acessilia_core.i18n as i8n
+from acessilia_core.pipeline.validators import validate_canonical_document
+from acessilia_core.pipeline.validators import validate_export_profile
+from acessilia_core.pipeline.validators import validate_output_text
 from docstruct.profiles import filter_blocks_for_profile
 from docstruct.profiles import normalize_profile
 from docstruct.profiles import verbosity_for_mode
@@ -23,7 +23,7 @@ from tests.locale_support import use_server_locale
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.
 
-    The validators resolve every finding through backend.core.i18n.t, so assertions on the
+    The validators resolve every finding through acessilia_core.i18n.t, so assertions on the
     localized text need a deterministic locale; en_US returns the canonical English msgids.
     """
     use_server_locale(monkeypatch, "en_US")

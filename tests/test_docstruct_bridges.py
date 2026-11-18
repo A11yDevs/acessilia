@@ -30,12 +30,12 @@ DOCSTRUCT = ROOT / "libs" / "docstruct" / "src" / "docstruct"
 ADAPTER = "compatibility_adapter"
 
 BRIDGES = {
-    "backend/core/export/renderers/html_renderer.py": ADAPTER,
-    "backend/core/export/renderers/txt_renderer.py": ADAPTER,
-    "backend/core/pipeline/canonical_builder.py": ADAPTER,
-    "backend/core/pipeline/table_ast.py": ADAPTER,
-    "backend/core/pipeline/validators.py": ADAPTER,
-    "backend/core/formula_tools.py": ADAPTER,
+    "libs/core/src/acessilia_core/export/renderers/html_renderer.py": ADAPTER,
+    "libs/core/src/acessilia_core/export/renderers/txt_renderer.py": ADAPTER,
+    "libs/core/src/acessilia_core/pipeline/canonical_builder.py": ADAPTER,
+    "libs/core/src/acessilia_core/pipeline/table_ast.py": ADAPTER,
+    "libs/core/src/acessilia_core/pipeline/validators.py": ADAPTER,
+    "libs/core/src/acessilia_core/formula_tools.py": ADAPTER,
 }
 
 #: A bridge says so in its docstring; this keeps the registry complete.
@@ -91,7 +91,7 @@ def _statement_count(function: ast.AST) -> int:
 def test_every_bridge_is_registered() -> None:
     marked = {
         path.relative_to(ROOT).as_posix()
-        for base in ("backend", "frontend")
+        for base in ("backend", "frontend", "libs/core/src")
         for path in (ROOT / base).rglob("*.py")
         if BRIDGE_MARKER in (ast.get_docstring(ast.parse(path.read_text("utf-8"))) or "")
     }
@@ -146,7 +146,7 @@ def test_no_module_is_a_pure_docstruct_reexport() -> None:
     """The re-export category is closed (#191): callers import docstruct directly."""
     offenders = sorted(
         path.relative_to(ROOT).as_posix()
-        for base in ("backend", "frontend")
+        for base in ("backend", "frontend", "libs/core/src")
         for path in (ROOT / base).rglob("*.py")
         if _is_pure_docstruct_reexport(ast.parse(path.read_text("utf-8")))
     )
@@ -260,7 +260,7 @@ def _function_bodies(paths) -> dict[str, list[str]]:
 def test_core_holds_no_copy_of_a_docstruct_function() -> None:
     library = _function_bodies(DOCSTRUCT.rglob("*.py"))
     core = _function_bodies(
-        path for base in ("backend", "frontend") for path in (ROOT / base).rglob("*.py")
+        path for base in ("backend", "frontend", "libs/core/src") for path in (ROOT / base).rglob("*.py")
     )
 
     copies = {
@@ -280,7 +280,7 @@ def test_the_builder_does_not_re_export_the_placeholder_label() -> None:
     unstructured-page placeholder; it no longer exposes it as its own name.
     """
     import docstruct.placeholders
-    from backend.core.manifest import builder
+    from acessilia_core.manifest import builder
 
     assert not hasattr(builder, "UNSTRUCTURED_PAGE_LABEL")
     assert builder._UNSTRUCTURED_PAGE_LABEL is docstruct.placeholders.UNSTRUCTURED_PAGE_LABEL
@@ -288,6 +288,6 @@ def test_the_builder_does_not_re_export_the_placeholder_label() -> None:
 
 def test_manifest_models_do_not_re_export_geometry() -> None:
     """Geometry callers import docstruct directly (#191, step 3)."""
-    from backend.core.manifest import models
+    from acessilia_core.manifest import models
 
     assert not hasattr(models, "is_bottom_left")

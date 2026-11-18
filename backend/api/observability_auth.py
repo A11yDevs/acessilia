@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config.settings import settings
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     API_OBSERVABILITY_NOT_CONFIGURED,
     API_TOKEN_INVALID,
     API_TOKEN_READ_ONLY,

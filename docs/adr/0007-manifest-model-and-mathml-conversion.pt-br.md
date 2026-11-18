@@ -20,12 +20,12 @@ A auditoria encontrou duas questões que precisavam de decisão:
 
 1. **Qual componente mantém a definição única do modelo semântico do
    manifesto de processamento.** Hoje o modelo existe duas vezes, em
-   `backend/core/manifest/models.py` e em `core/normalization/models.py` da
+   `libs/core/src/acessilia_core/manifest/models.py` e em `core/normalization/models.py` da
    Toolbox, com o mesmo id de schema; a Toolbox o publica como
    `artifact/structured-document@1` (achado A1).
 2. **Onde ocorrem a conversão LaTeX → MathML e a verbalização de fórmulas.**
    Hoje o core converte com o `latex2mathml` e verbaliza com regras próprias
-   em pt-BR, ambos em `backend/core/formula_tools.py`, enquanto a Toolbox tem
+   em pt-BR, ambos em `libs/core/src/acessilia_core/formula_tools.py`, enquanto a Toolbox tem
    implementações próprias por trás do `math.convert` e do `math.verbalize`;
    os dois verbalizadores divergiram (achado A3).
 
@@ -167,7 +167,7 @@ Implementação e critérios de aceite:
 - Só o modelo semântico vai para a docstruct. O `ProcessingManifest` do core
   também carrega estado de processo (obrigações, tentativas, status,
   dependências, histórico); esse estado, e o manifesto como um todo, ficam no
-  core, que divide o `backend/core/manifest/models.py` em vez de
+  core, que divide o `libs/core/src/acessilia_core/manifest/models.py` em vez de
   substituí-lo. Campos de identificação e origem são classificados um a um;
   eles não são semântica estrutural por padrão.
 - Três versões são independentes: o schema `processing-manifest:1.1.0` do

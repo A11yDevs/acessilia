@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from backend.core.manifest.builder import build_processing_manifest
-from backend.core.manifest.builder import _derive_v23_processing_needs
-from backend.core.manifest.models import BoundingBox, ManifestElement, Provenance
+from acessilia_core.manifest.builder import build_processing_manifest
+from acessilia_core.manifest.builder import _derive_v23_processing_needs
+from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
 from tests.pddl_support import build_orchestrator
 
 

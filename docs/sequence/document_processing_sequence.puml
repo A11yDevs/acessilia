@@ -5,14 +5,14 @@ title Processing sequence — PDDL engine
 
 actor User
 participant "Frontend\n(Web/Telegram/CLI, via REST API)" as Front
-participant "PddlAccessibilityOrchestrator\nbackend/core/pipeline/orchestrator.py" as Orchestrator
-participant "ToolboxManifestExtractor\nbackend/core/manifest" as Manifest
-participant "PlannerAgent\nbackend/core/planning" as Planner
+participant "PddlAccessibilityOrchestrator\nlibs/core/src/acessilia_core/pipeline/orchestrator.py" as Orchestrator
+participant "ToolboxManifestExtractor\nlibs/core/src/acessilia_core/manifest" as Manifest
+participant "PlannerAgent\nlibs/core/src/acessilia_core/planning" as Planner
 participant "ExecutorAgent\n(Agno Workflow)" as Executor
 participant "VisionAgent / DataAgent\n(Agno LLM)" as Agents
 participant "Acessilia Toolbox\n(via acessilia-sdk)" as Toolbox
-participant "Canonical builder\nbackend/core/pipeline" as Builder
-participant "Renderers\nbackend/core/export" as Export
+participant "Canonical builder\nlibs/core/src/acessilia_core/pipeline" as Builder
+participant "Renderers\nlibs/core/src/acessilia_core/export" as Export
 
 User -> Front: Upload a document (PDF/image)
 Front -> Orchestrator: execute(file_path)

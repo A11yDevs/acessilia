@@ -5,7 +5,7 @@ directly so the tests run without Agno installed.
 """
 from __future__ import annotations
 
-from backend.core.agents.table_specialist_agent import (
+from acessilia_core.agents.table_specialist_agent import (
     TableSpecialistAgent,
     overlap_similarity,
 )

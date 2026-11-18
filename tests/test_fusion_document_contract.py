@@ -7,9 +7,9 @@ from tests.core_config_support import core_config, toolbox_config
 import pytest
 
 from backend.config.settings import settings
-from backend.core.manifest.models import PageDescriptor, ProcessingManifest
-from backend.core.pipeline import payload as pipeline_payload
-from backend.core.pipeline.handlers import fusion as fusion_handlers
+from acessilia_core.manifest.models import PageDescriptor, ProcessingManifest
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline.handlers import fusion as fusion_handlers
 from tests.pddl_support import (
     build_element as _element,
     build_manifest as _manifest,
@@ -125,7 +125,7 @@ def test_recovered_pages_and_extra_blocks_reach_output(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
-    from backend.core.pipeline.fusion import extract_fused
+    from acessilia_core.pipeline.fusion import extract_fused
 
     class Client:
         def __init__(self, provider, _toolbox):
@@ -142,7 +142,7 @@ async def test_fusion_preserves_processing_manifest_page_numbers(monkeypatch):
                 ]
             }}
 
-    monkeypatch.setattr("backend.core.pipeline.fusion._structure_client", Client)
+    monkeypatch.setattr("acessilia_core.pipeline.fusion._structure_client", Client)
     result = await extract_fused("doc.pdf", primary_provider="docling", secondary_provider="mineru", toolbox=toolbox_config())
     elements = result["document"]["elements"]
     assert {element["page_number"] for element in elements} == {1, 2}

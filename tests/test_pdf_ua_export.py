@@ -26,8 +26,8 @@ from acessilia_sdk.toolbox.errors import (
 )
 from tests.core_config_support import export_config, toolbox_config
 from backend.config.settings import settings
-from backend.core.export import pandoc_exporter
-from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
+from acessilia_core.export import pandoc_exporter
+from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
 
 BASE_URL = "http://localhost:8002"
 EXECUTE_URL = f"{BASE_URL}/v1/capabilities/document.export.pdf_ua:execute"
@@ -68,7 +68,7 @@ def test_client_uses_the_pdf_ua_timeout_not_the_shared_one(monkeypatch):
 
 
 def test_same_document_yields_the_same_upload_so_the_toolbox_cache_hits():
-    from backend.core.export.pandoc_exporter import _ensure_document
+    from acessilia_core.export.pandoc_exporter import _ensure_document
     from docstruct.export.pandoc_ast import build_pandoc_ast
 
     markdown = "# Relatório\n\nParágrafo.\n"
@@ -106,7 +106,7 @@ def test_exporter_renders_on_the_toolbox(monkeypatch, tmp_path):
         return {"artifact_id": PDF_ID}
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
     )
 
     output = _export_pdf_ua(tmp_path)
@@ -129,7 +129,7 @@ def test_a_toolbox_failure_propagates_without_a_local_fallback(
         raise error
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
     with pytest.raises(type(error), match=str(error)):
         _export_pdf_ua(tmp_path)
@@ -141,7 +141,7 @@ def test_the_format_is_unavailable_when_disabled(monkeypatch, tmp_path):
         raise AssertionError("Toolbox called although TOOLBOX_PDF_UA_ENABLED=false")
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
     )
 
     with pytest.raises(RuntimeError, match="TOOLBOX_PDF_UA_ENABLED=false"):
@@ -157,7 +157,7 @@ def test_exporter_takes_the_language_from_the_document(monkeypatch, tmp_path):
         return {}
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
     )
     document = pandoc_exporter._ensure_document("# Report\n\nParagraph.\n", title="Report", toolbox=toolbox_config())
     document["language"] = "en-US"
@@ -214,7 +214,7 @@ def test_the_core_has_no_local_pdf_ua_toolchain():
 
 @pytest.mark.respx(base_url=BASE_URL)
 def test_sync_wrapper_runs_without_an_event_loop(respx_mock, monkeypatch, tmp_path):
-    from backend.core.export.pandoc_exporter import toolbox_export_pdf_ua
+    from acessilia_core.export.pandoc_exporter import toolbox_export_pdf_ua
 
     monkeypatch.setattr(settings, "toolbox_base_url", BASE_URL)
     monkeypatch.setattr(settings, "toolbox_base_urls", "")
@@ -234,7 +234,7 @@ def test_sync_wrapper_runs_without_an_event_loop(respx_mock, monkeypatch, tmp_pa
 def test_sync_wrapper_forwards_the_remote_cache_setting(
     respx_mock, monkeypatch, tmp_path, use_remote_cache
 ):
-    from backend.core.export.pandoc_exporter import toolbox_export_pdf_ua
+    from acessilia_core.export.pandoc_exporter import toolbox_export_pdf_ua
 
     monkeypatch.setattr(settings, "toolbox_base_url", BASE_URL)
     monkeypatch.setattr(settings, "toolbox_base_urls", "")
@@ -317,7 +317,7 @@ def test_a_math_rejection_degrades_to_text_and_retries_once(monkeypatch, tmp_pat
         return {"artifact_id": PDF_ID}
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
     )
 
     output = _export_math_document(tmp_path)
@@ -354,7 +354,7 @@ def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
         raise error
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
 
     with pytest.raises(type(error), match=re.escape(str(error))):
@@ -373,7 +373,7 @@ def test_a_second_rejection_propagates(monkeypatch, tmp_path):
         raise ToolboxInvalidInput(f"pandoc failed (attempt {len(calls)})")
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
 
     with pytest.raises(
@@ -395,7 +395,7 @@ def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
         raise ToolboxInvalidInput("pandoc failed")
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
 
     with pytest.raises(ToolboxInvalidInput, match="pandoc failed"):
@@ -418,7 +418,7 @@ def test_the_format_needs_the_run_export_config(monkeypatch, tmp_path):
         raise AssertionError("the Toolbox ran without an export config")
 
     monkeypatch.setattr(
-        "backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_must_not_run
     )
 
     with pytest.raises(TypeError, match="ExportConfig"):

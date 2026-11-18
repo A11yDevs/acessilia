@@ -1,8 +1,8 @@
 """
-What this suite verifies: backend/core/pipeline/canonical_builder builds a well-formed, sanitized
+What this suite verifies: libs/core/src/acessilia_core/pipeline/canonical_builder builds a well-formed, sanitized
 canonical document from raw markdown or structured payloads (inferring titles, ids, sections and a
-fallback minimum section for non-textual sources), backend/core/pipeline/validators flags markdown and
-prompt-leak artifacts in final output text, and backend/core/export/pandoc_exporter exports those
+fallback minimum section for non-textual sources), libs/core/src/acessilia_core/pipeline/validators flags markdown and
+prompt-leak artifacts in final output text, and libs/core/src/acessilia_core/export/pandoc_exporter exports those
 documents to txt/html while enforcing the deterministic audit and export-profile checks.
 """
 
@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-import backend.core.i18n as i8n
+import acessilia_core.i18n as i8n
 from tests.core_config_support import export_config, toolbox_config
-from backend.core.export.pandoc_exporter import export_accessible_document
-from backend.core.pipeline.canonical_builder import build_canonical_document
-from backend.core.pipeline.validators import validate_canonical_document
-from backend.core.pipeline.validators import validate_output_text
+from acessilia_core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.validators import validate_canonical_document
+from acessilia_core.pipeline.validators import validate_output_text
 from tests.locale_support import use_server_locale
 
 
@@ -24,7 +24,7 @@ from tests.locale_support import use_server_locale
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.
 
-    The exporter and validators resolve every user-visible string through backend.core.i18n.t, so
+    The exporter and validators resolve every user-visible string through acessilia_core.i18n.t, so
     error-message assertions need a deterministic locale; en_US returns the canonical English
     msgids the assertions below are written against.
     """
@@ -362,13 +362,13 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
 
 def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
     """PDF/UA is rendered only by the Toolbox (docs/adr/0003)."""
-    from backend.core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
 
     def toolbox_down(ast, output_path, *, lang, toolbox):
         raise ToolboxProviderUnavailable("pdf-ua-render offline")
 
-    monkeypatch.setattr("backend.core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_down)
+    monkeypatch.setattr("acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", toolbox_down)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / "saida.pdf_ua.pdf"

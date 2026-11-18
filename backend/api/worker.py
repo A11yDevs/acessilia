@@ -13,13 +13,13 @@ from typing import Any
 
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
 from backend.config.core_config import core_config_from_settings
-from backend.core.config import ToolboxConfig
+from acessilia_core.config import ToolboxConfig
 from backend.config.settings import settings
 from backend.services import job_checkpoint, shutdown
 from backend.services.job_store import load_record, save_status, pending_records
-from backend.core.blocking import run_blocking
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.blocking import run_blocking
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,
     LOG_DOCX_GENERATION_FAILED,
     LOG_DOCX_SKIPPED_DISABLED,
@@ -33,7 +33,7 @@ from backend.core.i18n.log_messages import (
     LOG_PDF_UA_GENERATION_FAILED,
     LOG_PDF_UA_SKIPPED_DISABLED,
 )
-from backend.core.i18n.stage_messages import (
+from acessilia_core.i18n.stage_messages import (
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_INTERRUPTED_DURING,
@@ -53,22 +53,22 @@ from backend.core.i18n.stage_messages import (
     STAGE_PROCESSING_FAILURE,
     STAGE_QUEUE_WAITING_POSITION,
 )
-from backend.core.export.exporters.audio_exporter import export_mp3
-from backend.core.export.exporters.docx_exporter import export_docx
-from backend.core.export.exporters.pdf_exporter import export_pdf_ua
-from backend.core.export.exporters.txt_exporter import export_txt
-from backend.core.export.exporters.drbench_md_exporter import export_drbench_md
-from backend.core.export.markers import with_object_markers
-from backend.core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.export.exporters.audio_exporter import export_mp3
+from acessilia_core.export.exporters.docx_exporter import export_docx
+from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
+from acessilia_core.export.exporters.txt_exporter import export_txt
+from acessilia_core.export.exporters.drbench_md_exporter import export_drbench_md
+from acessilia_core.export.markers import with_object_markers
+from acessilia_core.export.pandoc_exporter import export_accessible_document
 from backend.services.download_token_service import criar_token
-from backend.core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
+from acessilia_core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from backend.services.email_service import (
     send_confirmation_email,
     send_failure_email,
     send_result_email,
 )
 from backend.services.history_service import finalizar_conversao, registrar_conversao
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 from backend.services.filenames import output_stem
 
 queued_jobs: dict[str, dict[str, Any]] = {}

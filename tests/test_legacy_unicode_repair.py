@@ -6,11 +6,11 @@ deterministic method that fixes NFD and dotless-i without touching formulas.
 """
 from __future__ import annotations
 
-from backend.core.pipeline.handlers import text as text_handlers
-from backend.core.pipeline import payload as pipeline_payload
-from backend.core.manifest.builder import _derive_v23_processing_needs
-from backend.core.manifest.models import BoundingBox, Observation, Obligation, Provenance
-from backend.core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
+from acessilia_core.pipeline.handlers import text as text_handlers
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.manifest.builder import _derive_v23_processing_needs
+from acessilia_core.manifest.models import BoundingBox, Observation, Obligation, Provenance
+from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
 BRASILIA = "Bras\u0131\u0301lia"

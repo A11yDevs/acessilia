@@ -171,7 +171,7 @@ docker compose logs -f
 docker compose down
 
 # Executar comando interativo no container
-docker compose exec acessilia python -c "from backend.core.version import __version__; print(__version__)"
+docker compose exec acessilia python -c "from acessilia_core.version import __version__; print(__version__)"
 
 # Verificar health check da API
 curl http://localhost:8000/api/v1/health

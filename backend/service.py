@@ -9,15 +9,15 @@ from docstruct.profiles import verbosity_for_mode
 from docstruct.text.paragraphs import merge_broken_paragraphs
 
 from backend.agents.state_manager import TaskCancelledError, state_manager
-from backend.core.config import CoreConfig
+from acessilia_core.config import CoreConfig
 from backend.config.settings import settings
-from backend.core.pipeline.canonical_builder import build_canonical_document
-from backend.core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.core.pipeline.payload import (
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.pipeline.payload import (
     records_extraction_degradation,
     records_visual_failures,
 )
-from backend.core.cache_keys import options_cache_key
+from acessilia_core.cache_keys import options_cache_key
 from backend.services.cache import (
     drop_cache,
     get_cached,
@@ -28,14 +28,14 @@ from backend.services.history_service import (
     finalizar_conversao,
     registrar_conversao,
 )
-from backend.core.i18n import t
-from backend.core.i18n.log_messages import (
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
     LOG_CANONICAL_JSON_SAVE_FAILED,
     LOG_ORCHESTRATOR_EMPTY_AGENT_RESPONSE,
     LOG_PIPELINE_ERROR,
     LOG_TASK_CANCELLED_BY_USER,
 )
-from backend.core.i18n.stage_messages import (
+from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_FILE,
     STAGE_CANCELLED_BY_USER,
     STAGE_PREPARING_FILE,
@@ -47,7 +47,7 @@ from backend.services.model_calls import get_model_calls
 from backend.services.run_ports import service_run_ports
 from backend.services.operation_registry import operation_registry
 from backend.services import shutdown
-from backend.core.logger import logger
+from acessilia_core.logger import logger
 
 
 def _normalized_engine() -> str:

@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 from backend.config.core_config import core_config_from_settings
-from backend.core.agents.informational_structural import InformationalStructuralAgent
-from backend.core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from backend.core.manifest.schema import validate_manifest
+from acessilia_core.agents.informational_structural import InformationalStructuralAgent
+from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+from acessilia_core.manifest.schema import validate_manifest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

@@ -94,7 +94,7 @@ Entregar a conversão de documentos e imagens para formatos acessíveis por meio
    - O domínio PDDL (v2.2+) codifica dependências e restrições de ordem entre tarefas
    - O plano é saída determinística do planejador (backend interno ou fast-downward)
    - O relatório de execução valida a aderência ao plano e registra o resultado das tarefas
-3. O modo de processamento muda o comportamento dos prompts e da verbosidade. Os valores aceitos são `detalhado`, `medio` (com `normal` como alias), `baixo` e `ocr`; um valor desconhecido cai para `medio`. Eles correspondem aos prompts em `backend/core/agents/prompts` e aos perfis de verbosidade em `docstruct.profiles`.
+3. O modo de processamento muda o comportamento dos prompts e da verbosidade. Os valores aceitos são `detalhado`, `medio` (com `normal` como alias), `baixo` e `ocr`; um valor desconhecido cai para `medio`. Eles correspondem aos prompts em `libs/core/src/acessilia_core/agents/prompts` e aos perfis de verbosidade em `docstruct.profiles`.
 4. A extração é híbrida: extração de texto determinística primeiro, depois visão por IA para páginas escaneadas ou sem texto e para entradas de imagem (veja o princípio 2.5).
 5. Os caches de página e de arquivo são otimizações, não fonte de verdade.
 6. Os renderizadores só devem consumir dados canônicos validados.
@@ -262,7 +262,7 @@ O texto sem versão anterior a 2026-10-18 conta como **1.0.0**.
   da P8, registra a instalação por lockfile entregue pela #405 / PR #539 e
   deixa a publicação de cobertura para a #366.
 - **2.0.7 (2026-11-14):** a seção 4.3 passa a citar
-  `backend/core/agents/prompts` para os prompts dos modos, que o passo 2 da
+  `libs/core/src/acessilia_core/agents/prompts` para os prompts dos modos, que o passo 2 da
   ADR-0016 moveu de `backend/ai/prompts`. Nenhum princípio muda.
 - **2.0.6 (2026-11-09):** o "Verificado por" da P5 passa a citar os testes que
   agora existem para o `artifact/reference@1` (#185). Nenhum princípio muda.
