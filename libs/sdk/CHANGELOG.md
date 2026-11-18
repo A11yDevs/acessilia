@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** typed structure and MinerU layout readers now run docstruct's
+  canonical document validation after wire validation. Duplicate element IDs,
+  missing parent/page references and other canonical findings raise
+  `ToolboxContractViolation` (#585).
+
 - **Added** typed layout and structure readers that reuse docstruct canonical documents and geometry, retain producer metadata and validate both published layout variants (#213).
 
 - **Fixed** `ToolboxMathClient.recognize_result` now reports malformed response

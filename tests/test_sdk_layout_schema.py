@@ -118,3 +118,20 @@ def test_changed_parent_branch_cannot_be_silently_ignored(tmp_path):
     spec.loader.exec_module(module)
     with pytest.raises(ValueError, match="containing constraints"):
         module.render_layout(None, tmp_path)
+
+
+@pytest.mark.parametrize("issue", ["duplicate", "parent", "page", "provenance"])
+def test_wire_valid_manifests_must_also_satisfy_canonical_invariants(issue):
+    document = example("mineru")
+    if issue == "duplicate":
+        document["elements"][1]["id"] = document["elements"][0]["id"]
+    elif issue == "parent":
+        document["elements"][0]["parent_id"] = "missing-parent"
+    elif issue == "page":
+        document["elements"][0]["page_number"] = 999
+    else:
+        document["elements"][0]["provenance"][0]["page_number"] = 999
+    # JSON Schema checks the wire shape; docstruct owns cross-field semantics.
+    VALIDATOR.validate(document)
+    with pytest.raises(ToolboxContractViolation):
+        read_layout(document)

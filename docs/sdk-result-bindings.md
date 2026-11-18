@@ -354,7 +354,11 @@ Canonical elements and unresolved origins stay in docstruct's `StructuredDocumen
 `ToolboxStructureClient.extract_structure_result` and `read_manifest` use the
 same canonical adapter and retain producer/process metadata separately. Full
 manifest wire constraints are generated as validation data, without generating
-canonical SDK classes. The layout adapter additionally enforces the containing
+canonical SDK classes. After adapting the document, the shared reader runs
+`docstruct.manifest.validate_structured_document`; canonical findings, including
+duplicate IDs and missing parent/page references, raise `ToolboxContractViolation`.
+A payload can therefore satisfy JSON Schema and still fail canonical validation.
+The layout adapter additionally enforces the containing
 MinerU branch: a generic manifest without layout metadata is rejected. Only the
 manifest's explicit nullable pattern is normalized; general union/intersection
 compilation stays unsupported. Date-time formats remain schema annotations.

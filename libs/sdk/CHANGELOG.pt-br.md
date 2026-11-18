@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido** os leitores tipados de estrutura e layout MinerU agora executam
+  a validação canônica do docstruct após validar o payload. IDs de elementos
+  duplicados, referências a pais ou páginas inexistentes e outros problemas
+  canônicos geram `ToolboxContractViolation` (#585).
+
 - **Adicionado** leitores tipados de layout e estrutura que reutilizam documentos e geometria canônicos do docstruct, preservam metadados do produtor e validam as duas variantes publicadas de layout (#213).
 
 - **Corrigido** `ToolboxMathClient.recognize_result` agora informa envelopes ou

@@ -70,6 +70,13 @@ def test_empty_results(variant):
     else:
         document["extractor"]["configuration"].update(layout_regions=[], region_count=0)
         document["elements"] = []
+        for page in document["pages"]:
+            page["element_ids"] = []
+        document["observations"] = []
+        document["obligations"] = []
+        document["summary"].update(
+            element_count=0, observation_count=0, obligation_count=0, element_types={}
+        )
     assert read_layout(document).regions == ()
 
 
@@ -112,3 +119,61 @@ async def test_typed_accessors_and_legacy_page_maps():
     finally:
         await layout.close()
         await structure.close()
+
+
+@pytest.mark.parametrize("reader", [read_manifest, read_layout])
+@pytest.mark.parametrize(
+    "issue, message",
+    [
+        ("duplicate", "Duplicate element ids"),
+        ("parent", "missing parent: missing-parent"),
+        ("page", "references missing page 999"),
+        ("provenance", "references missing page 999"),
+    ],
+)
+def test_canonical_readers_reject_invalid_document_references(reader, issue, message):
+    document = example("mineru")
+    if issue == "duplicate":
+        document["elements"][1]["id"] = document["elements"][0]["id"]
+    elif issue == "parent":
+        document["elements"][0]["parent_id"] = "missing-parent"
+    elif issue == "page":
+        document["elements"][0]["page_number"] = 999
+    else:
+        document["elements"][0]["provenance"][0]["page_number"] = 999
+    original = copy.deepcopy(document)
+    with pytest.raises(ToolboxContractViolation, match=message):
+        reader(document)
+    assert document == original
+
+
+@pytest.mark.parametrize("kind", ["layout", "structure"])
+@pytest.mark.asyncio
+async def test_typed_accessors_propagate_canonical_validation_errors(kind):
+    document = example("mineru")
+    document["elements"][0]["parent_id"] = "missing-parent"
+    response = {"document": document}
+    if kind == "layout":
+        client = ToolboxLayoutClient(base_url="http://toolbox")
+        raw, typed = client.analyze, client.analyze_result
+    else:
+        client = ToolboxStructureClient(base_url="http://toolbox")
+        raw, typed = client.extract_structure, client.extract_structure_result
+    try:
+        client._execute = AsyncMock(return_value=response)
+        assert await raw() == response
+        with pytest.raises(ToolboxContractViolation, match="missing parent"):
+            await typed()
+        assert await raw() == response
+    finally:
+        await client.close()
+
+
+def test_valid_element_only_fragments_keep_docstruct_page_reference_policy():
+    document = example("mineru")
+    document["pages"] = []
+    document["summary"]["page_count"] = 0
+    for result in (read_manifest(document), read_layout(document).manifest):
+        assert result.document.pages == []
+        assert result.document.elements[0].page_number == 1
+        assert result.to_dict() == document

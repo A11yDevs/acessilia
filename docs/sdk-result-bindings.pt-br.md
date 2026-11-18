@@ -374,7 +374,11 @@ origens desconhecidas permanecem no `StructuredDocument` do docstruct.
 `ToolboxStructureClient.extract_structure_result` e `read_manifest` usam o mesmo
 adaptador canônico e preservam metadados do produtor e processo separadamente.
 As restrições do manifesto são geradas como dados de validação, sem gerar classes
-canônicas no SDK. O adaptador também exige os metadados do ramo MinerU: um
+canônicas no SDK. Após adaptar o documento, o leitor compartilhado executa
+`docstruct.manifest.validate_structured_document`; problemas canônicos, incluindo
+IDs duplicados e referências a pais ou páginas inexistentes, geram
+`ToolboxContractViolation`. Assim, um payload pode satisfazer o JSON Schema e
+falhar na validação canônica. O adaptador também exige os metadados do ramo MinerU: um
 manifesto genérico sem esses metadados é rejeitado. Somente o padrão anulável
 explícito do manifesto é normalizado; uniões e interseções genéricas continuam
 sem suporte. Formatos date-time permanecem anotações do schema. Os leitores

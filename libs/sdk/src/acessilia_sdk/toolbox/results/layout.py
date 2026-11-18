@@ -14,6 +14,7 @@ from docstruct.manifest import (
     BoundingBox,
     StructuredDocument,
     structured_document_from_payload,
+    validate_structured_document,
 )
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.results._layout_generated import (
@@ -60,12 +61,21 @@ def read_manifest(document: Any) -> ManifestResult:
     """Read structured-document@1, reusing docstruct instead of a new model.
 
     Wire validation enforces the pinned producer schema, including required
-    process metadata. Date-time format annotations are not asserted (the same
-    policy as JSON Schema's default validator without a FormatChecker).
+    process metadata. The canonical document must also satisfy docstruct field
+    constraints and document invariants. Date-time formats remain annotations,
+    as with JSON Schema's default validator without a FormatChecker.
     """
     try:
         checked = decode(document, MANIFEST_RULE, {}, "ProcessingManifest", strict=True)
         canonical = structured_document_from_payload(checked)
+        findings = validate_structured_document(canonical)
+        if findings:
+            details = "; ".join(
+                message.format(**context) for message, context in findings
+            )
+            raise ValueError(
+                f"ProcessingManifest: invalid canonical document: {details}"
+            )
         return ManifestResult(
             canonical,
             {
