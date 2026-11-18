@@ -242,12 +242,7 @@ def _pdf_ua_failure_prefixes() -> tuple[str, ...]:
     """
     prefixes: list[str] = []
     for locale in SUPPORTED_LOCALES:
-        translations = get_translations(locale)
-        message = (
-            translations.gettext(LOG_PDF_UA_GENERATION_FAILED)
-            if translations is not None
-            else LOG_PDF_UA_GENERATION_FAILED
-        )
+        message = get_translations(locale).gettext(LOG_PDF_UA_GENERATION_FAILED)
         prefix = message.split("{error}")[0]
         if prefix not in prefixes:
             prefixes.append(prefix)

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate Babel locale string catalogs (.po sources and .mo binaries) for every supported runtime locale.
 
-Catalogs are written to ``backend/core/i18n/locales/<LOCALE>/LC_MESSAGES/messages.po`` (human-editable translation source)
-after compiling each into the matching ``messages.mo`` consumed at runtime by :mod:`backend.core.i18n`. Adding a new
+Catalogs are written to ``backend/core/i18n/locales/<LOCALE>/LC_MESSAGES/messages.po`` (human-editable translation source),
+the file :mod:`backend.core.i18n` reads: it compiles each ``.po`` in memory on first use (ADR-0016, step 6). The matching
+``messages.mo`` is still written beside it for tools that want a binary catalog; the runtime does not read it. Adding a new
 locale later only requires extending TRANSLATIONS with its mapping and rerunning this script, which matches the
 project i18n goal of requiring zero or minimal code changes per added language.
 """

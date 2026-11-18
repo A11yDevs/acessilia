@@ -333,7 +333,23 @@ Proposed: option 2.
 
      `tempfile` honours `TMPDIR` inside the standard library; that is not
      the core reading its environment, so the test allows it.
-  6. **The extraction:**
+  6. **The extraction**, in three pull requests:
+     - **Resources prepared in place (done).** Two resources were located
+       through the module's own path, which an installed package breaks.
+       The translation catalogs compiled `messages.mo` next to their `.po`
+       sources at import, and a read-only package left every message in
+       English: they now compile in memory, on first use. The planner's
+       sandbox was `<repo>/temp/pddl-sandbox`, four folders up from the
+       module: `PlannerAgent(sandbox_dir=)` now takes it from its caller
+       (`PathsConfig.data_dir / "pddl-sandbox"`), and its file tools refuse
+       to run without it. `plan` and `compare`, which the pipeline calls,
+       work in memory and need none.
+     - **The move and the import rename**, mechanical, with no bridge.
+     - **The clean installation, its smoke test, and the proof of concept.**
+
+     The tests stay in `tests/`; only the boundary test and the smoke test
+     go to `libs/core/tests`. When the three are done:
+
      - the modules move to `libs/core`, and `backend/core` disappears;
      - the PDDL domains, the prompts and the catalogs are declared as package
        data;

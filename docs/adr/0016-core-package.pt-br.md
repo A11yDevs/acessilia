@@ -340,7 +340,24 @@ Proposta: a opção 2.
 
      O `tempfile` respeita o `TMPDIR` dentro da biblioteca padrão; isso não
      é o core lendo o seu ambiente, então o teste o permite.
-  6. **A extração:**
+  6. **A extração**, em três pull requests:
+     - **Recursos preparados no lugar (feito).** Dois recursos eram
+       localizados pelo caminho do próprio módulo, o que um pacote instalado
+       quebra. Os catálogos de tradução compilavam o `messages.mo` ao lado
+       dos `.po` na importação, e um pacote somente leitura deixava toda
+       mensagem em inglês: agora eles são compilados em memória, no primeiro
+       uso. O sandbox do planejador era `<repo>/temp/pddl-sandbox`, quatro
+       pastas acima do módulo: o `PlannerAgent(sandbox_dir=)` agora o recebe
+       de quem o chama (`PathsConfig.data_dir / "pddl-sandbox"`), e as suas
+       ferramentas de arquivo se recusam a rodar sem ele. O `plan` e o
+       `compare`, que o pipeline chama, trabalham em memória e não precisam
+       dele.
+     - **A mudança e a renomeação dos imports**, mecânica, sem ponte.
+     - **A instalação limpa, o seu teste de fumaça e a prova de conceito.**
+
+     Os testes ficam em `tests/`; só o teste de fronteira e o de fumaça vão
+     para `libs/core/tests`. Quando os três estiverem feitos:
+
      - os módulos vão para `libs/core`, e o `backend/core` some;
      - os domínios PDDL, os prompts e os catálogos são declarados como dados
        do pacote;
