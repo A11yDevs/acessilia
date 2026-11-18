@@ -8,7 +8,9 @@ contract test checks the two mechanically instead:
   the manifest itself, have exactly the fields, types, nullability, defaults,
   bounds and enums that ``docstruct.manifest.field_specs`` declares;
 - the golden manifests convert to docstruct and back without loss;
-- the core and docstruct accept and reject the same documents.
+- the core and docstruct accept and reject the same documents: the cases are
+  docstruct's shared catalog (``docstruct.manifest_cases``), which the SDK and
+  the Toolbox run too (#470, criterion 4).
 """
 
 from __future__ import annotations
@@ -30,6 +32,12 @@ from docstruct.manifest import (
     structured_document_from_payload,
     structured_document_to_payload,
     validate_structured_document,
+)
+from docstruct.manifest_cases import (
+    BROKEN,
+    SUPPORTED,
+    document_findings,
+    example_document,
 )
 from tests.locale_support import use_server_locale
 
@@ -104,71 +112,69 @@ def _golden(name: str = "two-pages-refined") -> dict:
     return json.loads(path.read_text("utf-8"))
 
 
-def _break(change) -> dict:
-    payload = copy.deepcopy(_golden())
-    change(payload)
+def _with_summary(payload: dict) -> dict:
+    """The core's summary follows the document: a case changes the document
+    only, so the counts are recomputed after it."""
+    summary = payload["summary"]
+    summary["page_count"] = len(payload["pages"])
+    summary["element_count"] = len(payload["elements"])
+    types: dict[str, int] = {}
+    for element in payload["elements"]:
+        types[element["type"]] = types.get(element["type"], 0) + 1
+    summary["element_types"] = dict(sorted(types.items()))
     return payload
 
 
-def _set(path: str, value):
-    def change(payload):
-        target = payload
-        keys = path.split(".")
-        for key in keys[:-1]:
-            target = target[int(key)] if key.isdigit() else target[key]
-        target[keys[-1]] = value
-
-    return change
+def _example_manifest() -> dict:
+    """docstruct's shared example document, inside a core manifest."""
+    return _with_summary({**_golden(), **example_document()})
 
 
-def _duplicate_element(payload):
-    payload["elements"][1]["id"] = payload["elements"][0]["id"]
+#: The two documents the shared cases are applied to: a golden manifest and
+#: docstruct's example.
+BASES = {"golden": _golden, "docstruct example": _example_manifest}
 
 
-def _empty_id(payload):
-    # The page drops the id too, so only the length bound is broken.
-    payload["elements"][0]["id"] = ""
-    payload["pages"][0]["element_ids"].pop(0)
+def _break(case: str, base: str = "golden") -> dict:
+    payload = copy.deepcopy(BASES[base]())
+    BROKEN[case](payload)
+    return _with_summary(payload)
 
 
-def _cycle(payload):
-    first, second = payload["elements"][0], payload["elements"][1]
-    first["parent_id"], second["parent_id"] = second["id"], first["id"]
-
-
-BROKEN = {
-    "duplicate element id": _duplicate_element,
-    "missing parent": _set("elements.0.parent_id", "nowhere"),
-    "own parent": lambda p: p["elements"][0].update(parent_id=p["elements"][0]["id"]),
-    "parent cycle": _cycle,
-    "duplicate page number": _set("pages.1.page_number", 1),
-    "page lists an unknown element": lambda p: p["pages"][0]["element_ids"].append("ghost"),
-    "reading order below 1": _set("elements.0.reading_order", 0),
-    "negative hierarchy level": _set("elements.0.hierarchy_level", -1),
-    "empty id": _empty_id,
-    "unknown element type": _set("elements.0.type", "sidebar"),
-    "confidence above 1": _set("elements.0.confidence", 1.5),
-    "zero page width": _set("pages.0.width", 0),
-    "page number 0 in provenance": _set("elements.0.provenance.0.page_number", 0),
-    "unknown coordinate origin": _set("elements.0.provenance.0.bbox.coord_origin", "CENTER"),
-    "negative char offset": _set("elements.0.provenance.0.char_start", -1),
-    "reversed char range": lambda p: p["elements"][0]["provenance"][0].update(char_start=5, char_end=2),
-    "one-letter language": _set("language", "p"),
-    "empty title": _set("title", ""),
-}
-
-
-@pytest.mark.parametrize("case", list(BROKEN))
-def test_core_and_docstruct_reject_the_same_documents(case: str) -> None:
-    payload = _break(BROKEN[case])
-
-    with pytest.raises(ValidationError):
+def _core_accepts(payload: dict) -> bool:
+    try:
         ProcessingManifest.model_validate(payload)
-    assert validate_structured_document(structured_document_from_payload(payload)) != []
+    except ValidationError:
+        return False
+    return True
+
+
+def test_the_shared_example_is_a_valid_core_manifest() -> None:
+    assert _core_accepts(_example_manifest())
+
+
+@pytest.mark.parametrize("base", list(BASES))
+@pytest.mark.parametrize("case", list(BROKEN))
+def test_core_and_docstruct_reject_the_same_documents(case: str, base: str) -> None:
+    payload = _break(case, base)
+
+    assert document_findings(payload) != []
+    assert not _core_accepts(payload)
+
+
+@pytest.mark.parametrize("base", list(BASES))
+@pytest.mark.parametrize("case", list(SUPPORTED))
+def test_core_and_docstruct_keep_the_same_documents(case: str, base: str) -> None:
+    payload = copy.deepcopy(BASES[base]())
+    SUPPORTED[case](payload)
+    _with_summary(payload)
+
+    assert document_findings(payload) == []
+    assert _core_accepts(payload)
 
 
 def test_unknown_fields_are_refused_as_by_the_schema() -> None:
-    payload = _break(lambda p: p["elements"][0].update(colour="red"))
+    payload = _break("unknown element field")
 
     with pytest.raises(ValidationError):
         ProcessingManifest.model_validate(payload)
@@ -235,7 +241,7 @@ def test_core_reports_docstruct_invariants_in_the_active_locale(monkeypatch, loc
 
     assert t(msgid).format(**kwargs) == expected
     with pytest.raises(ValidationError, match=re.escape(expected)):
-        ProcessingManifest.model_validate(_break(BROKEN[case]))
+        ProcessingManifest.model_validate(_break(case))
 
 
 MIXED_INTERVALS = {
@@ -253,12 +259,12 @@ def test_mixed_timezones_are_a_validation_error_not_a_type_error(case) -> None:
     started_at, completed_at = MIXED_INTERVALS[case]
     expected = re.escape(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))
 
-    def mix(payload: dict) -> None:
-        payload["extractor"]["started_at"] = started_at
-        payload["extractor"]["completed_at"] = completed_at
+    payload = _golden()
+    payload["extractor"]["started_at"] = started_at
+    payload["extractor"]["completed_at"] = completed_at
 
     with pytest.raises(ValidationError, match=expected):
-        ProcessingManifest.model_validate(_break(mix))
+        ProcessingManifest.model_validate(payload)
     with pytest.raises(ValidationError, match=expected):
         ExtractorRun.model_validate(
             {"version": "1", "started_at": started_at, "completed_at": completed_at, "duration_ms": 0}

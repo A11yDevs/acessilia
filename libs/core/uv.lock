@@ -46,7 +46,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "acessilia-docstruct"
-version = "0.5.4"
+version = "0.5.5"
 source = { editable = "../docstruct" }
 
 [package.metadata]

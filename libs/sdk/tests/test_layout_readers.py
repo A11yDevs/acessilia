@@ -177,3 +177,53 @@ def test_valid_element_only_fragments_keep_docstruct_page_reference_policy():
         assert result.document.pages == []
         assert result.document.elements[0].page_number == 1
         assert result.to_dict() == document
+
+
+# --- docstruct's shared contract cases (#470, criterion 4) -------------------
+#
+# The core and the Toolbox run the same catalog against their own models; the
+# SDK's reader must agree with docstruct on each case. The fixture has a single
+# page, and the cases need two, so they go into docstruct's example document
+# inside the fixture's process fields.
+
+from docstruct.manifest_cases import (  # noqa: E402
+    BROKEN,
+    SUPPORTED,
+    document_findings,
+    example_document,
+)
+
+
+def _shared_case_manifest(change):
+    document = example("mineru")
+    document.update(example_document())
+    change(document)
+    types = {}
+    for element in document["elements"]:
+        types[element["type"]] = types.get(element["type"], 0) + 1
+    document["summary"].update(
+        page_count=len(document["pages"]),
+        element_count=len(document["elements"]),
+        element_types=dict(sorted(types.items())),
+    )
+    return document
+
+
+def test_the_shared_example_is_a_valid_toolbox_manifest():
+    document = _shared_case_manifest(lambda payload: None)
+    assert read_manifest(document).to_dict() == document
+
+
+@pytest.mark.parametrize("case", list(BROKEN))
+def test_the_reader_and_docstruct_reject_the_same_documents(case):
+    document = _shared_case_manifest(BROKEN[case])
+    assert document_findings(document) != []
+    with pytest.raises(ToolboxContractViolation):
+        read_manifest(document)
+
+
+@pytest.mark.parametrize("case", list(SUPPORTED))
+def test_the_reader_and_docstruct_keep_the_same_documents(case):
+    document = _shared_case_manifest(SUPPORTED[case])
+    assert document_findings(document) == []
+    assert read_manifest(document).to_dict() == document
