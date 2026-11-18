@@ -190,12 +190,19 @@ def test_settings_pmv_aliases_reflect_pddl_values(monkeypatch):
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "lama-first")
     monkeypatch.setattr(settings, "pddl_fast_downward_search", "custom()")
 
-    assert settings.pmv_execute_dry_run is False
-    assert settings.pmv_planner_backend == "fast-downward"
-    assert settings.pmv_preferred_plan == "fast-downward"
-    assert settings.pmv_fast_downward == "/usr/bin/downward"
-    assert settings.pmv_fast_downward_alias == "lama-first"
-    assert settings.pmv_fast_downward_search == "custom()"
+    # Deprecated: each read warns, naming its replacement.
+    with pytest.warns(DeprecationWarning, match="use Settings.pddl_execute_dry_run"):
+        assert settings.pmv_execute_dry_run is False
+    with pytest.warns(DeprecationWarning, match="use Settings.pddl_planner_backend"):
+        assert settings.pmv_planner_backend == "fast-downward"
+    with pytest.warns(DeprecationWarning, match="use Settings.pddl_preferred_plan"):
+        assert settings.pmv_preferred_plan == "fast-downward"
+    with pytest.warns(DeprecationWarning, match="use Settings.pddl_fast_downward$"):
+        assert settings.pmv_fast_downward == "/usr/bin/downward"
+    with pytest.warns(DeprecationWarning, match="use Settings.pddl_fast_downward_alias"):
+        assert settings.pmv_fast_downward_alias == "lama-first"
+    with pytest.warns(DeprecationWarning, match="use Settings.pddl_fast_downward_search"):
+        assert settings.pmv_fast_downward_search == "custom()"
 
 
 def test_settings_api_defaults():

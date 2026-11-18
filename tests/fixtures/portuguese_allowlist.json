@@ -1,7 +1,7 @@
 {
   "_comment": "Portuguese lines that predate the repository-wide scan (#187), counted per file. A count may only go down: lower it when you clean its file, and remove the entry at 0. Intentional Portuguese gets an exemption in tests/test_no_portuguese.py instead.",
   "files": {
-    ".env.example": 36,
+    ".env.example": 35,
     "backend/config/settings.py": 2,
     "libs/core/src/acessilia_core/agents/adjudication_agent.py": 35,
     "libs/core/src/acessilia_core/agents/fusion_agent.py": 40,

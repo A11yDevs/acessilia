@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Purpose
 This documentation details the architecture of **Acessilia**, a document accessibility system that combines **deterministic planning** (PDDL-based task ordering and validation) with **Agno-coordinated multi-agent AI** for vision, data, and description tasks. Deterministic functions are the source of truth; LLMs provide interpretation and description.
 
-The system runs the `pddl` pipeline engine (the manifest → plan → execution flow), selected by the `PIPELINE_ENGINE` setting, whose default is `pddl`. The former `legacy` engine is disabled: `backend/service.py` accepts only `pddl` (the old `pmv` alias is normalized to it) and refuses any other value; its code has been removed. See [architecture.md](architecture.md).
+The system runs the `pddl` pipeline engine (the manifest → plan → execution flow), selected by the `PIPELINE_ENGINE` setting, whose default is `pddl`. The former `legacy` engine is disabled: `backend/service.py` accepts only `pddl` (the old `pmv` alias is normalized to it, and is deprecated: it logs a warning at startup and will be removed) and refuses any other value; its code has been removed. See [architecture.md](architecture.md).
 
 ---
 

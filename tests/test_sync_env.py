@@ -30,7 +30,7 @@ UNDOCUMENTED_SETTINGS = frozenset(
         "GIT_COMMIT",
         "IMAGE_TAG",
         "IMAGE_DIGEST",
-        # Legacy aliases of the PDDL_* keys.
+        # Deprecated aliases of the PDDL_* keys (DEPRECATED_ENV_ALIASES).
         "PMV_EXECUTE_DRY_RUN",
         "PMV_PLANNER_BACKEND",
         "PMV_PREFERRED_PLAN",

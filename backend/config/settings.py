@@ -1,5 +1,7 @@
 import os
 import tempfile
+import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -583,29 +585,36 @@ class Settings:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
-    # Backward-compatible aliases for the old PMV-prefixed configuration.
+    # Deprecated aliases for the old PMV-prefixed configuration: they warn,
+    # and will be removed (see ``deprecated_configuration``).
     @property
     def pmv_execute_dry_run(self) -> bool:
+        _warn_deprecated_property("pmv_execute_dry_run", "pddl_execute_dry_run")
         return self.pddl_execute_dry_run
 
     @property
     def pmv_planner_backend(self) -> str:
+        _warn_deprecated_property("pmv_planner_backend", "pddl_planner_backend")
         return self.pddl_planner_backend
 
     @property
     def pmv_preferred_plan(self) -> str:
+        _warn_deprecated_property("pmv_preferred_plan", "pddl_preferred_plan")
         return self.pddl_preferred_plan
 
     @property
     def pmv_fast_downward(self) -> str:
+        _warn_deprecated_property("pmv_fast_downward", "pddl_fast_downward")
         return self.pddl_fast_downward
 
     @property
     def pmv_fast_downward_alias(self) -> str:
+        _warn_deprecated_property("pmv_fast_downward_alias", "pddl_fast_downward_alias")
         return self.pddl_fast_downward_alias
 
     @property
     def pmv_fast_downward_search(self) -> str:
+        _warn_deprecated_property("pmv_fast_downward_search", "pddl_fast_downward_search")
         return self.pddl_fast_downward_search
 
     @property
@@ -640,6 +649,45 @@ def _path_from_env(env_var: str, default: Path) -> Path:
     if not path.is_absolute():
         path = BASE_DIR / path
     return path
+
+
+#: The deprecated PMV-prefixed environment variables and their replacements.
+#: "PMV" (a minimum viable product) named the first iterations of the PDDL
+#: pipeline; these aliases are still read, with a warning, and will be removed.
+DEPRECATED_ENV_ALIASES: dict[str, str] = {
+    "PMV_EXECUTE_DRY_RUN": "PDDL_EXECUTE_DRY_RUN",
+    "PMV_PLANNER_BACKEND": "PDDL_PLANNER_BACKEND",
+    "PMV_PREFERRED_PLAN": "PDDL_PREFERRED_PLAN",
+    "PMV_FAST_DOWNWARD": "PDDL_FAST_DOWNWARD",
+    "PMV_MAX_REPLANS": "PDDL_MAX_REPLANS",
+    "PMV_FAST_DOWNWARD_ALIAS": "PDDL_FAST_DOWNWARD_ALIAS",
+    "PMV_FAST_DOWNWARD_SEARCH": "PDDL_FAST_DOWNWARD_SEARCH",
+}
+
+
+def deprecated_configuration(environ: Mapping[str, str], pipeline_engine: str) -> list[str]:
+    """One message per deprecated name the configuration still uses.
+
+    ``setup_process`` logs them at startup, so an operator sees what to
+    rename before the aliases are removed.
+    """
+    messages = []
+    for old, new in DEPRECATED_ENV_ALIASES.items():
+        if old not in environ:
+            continue
+        if new in environ:
+            messages.append(f"{old} is deprecated and ignored, since {new} is set: remove {old}")
+        else:
+            messages.append(f"{old} is deprecated: rename it to {new}")
+    if pipeline_engine.strip().lower() == "pmv":
+        messages.append("PIPELINE_ENGINE=pmv is deprecated: set PIPELINE_ENGINE=pddl")
+    return messages
+
+
+def _warn_deprecated_property(old: str, new: str) -> None:
+    warnings.warn(
+        f"Settings.{old} is deprecated: use Settings.{new}", DeprecationWarning, stacklevel=3
+    )
 
 
 def _str_from_env_alias(env_vars: tuple[str, ...], default: str) -> str:

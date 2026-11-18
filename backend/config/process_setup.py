@@ -4,6 +4,8 @@ The logger, the translation catalogs and the server-side locale are set up
 once per process, not per run. ``setup_process`` passes them the settings and
 the environment at startup, so the core reads neither: each entry point (the
 API, the CLI, the frontends' runner, the Telegram bot) calls it first.
+Once the logger is set up, it warns about each deprecated configuration
+name still in use (``deprecated_configuration``).
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ import locale
 import os
 from collections.abc import Mapping
 
-from backend.config.settings import Settings
+from backend.config.settings import Settings, deprecated_configuration
 from backend.config.settings import settings as default_settings
 
 
@@ -29,15 +31,18 @@ def setup_process(
         configure_server_locale,
         negotiate_server_locale,
     )
-    from acessilia_core.logger import setup_logger
+    from acessilia_core.logger import logger, setup_logger
 
     s = default_settings if settings is None else settings
-    hints = dict(os.environ if environ is None else environ)
+    environment = os.environ if environ is None else environ
+    hints = dict(environment)
     if s.locale:
         hints["LOCALE"] = s.locale
     configure_locales(s.i18n_locales_active)
     configure_server_locale(negotiate_server_locale(hints, _process_c_locale()))
     setup_logger(level=s.log_level, logs_dir=s.logs_dir)
+    for message in deprecated_configuration(environment, s.pipeline_engine):
+        logger.warning(message)
 
 
 def _process_c_locale() -> str | None:

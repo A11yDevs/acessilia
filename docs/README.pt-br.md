@@ -5,7 +5,7 @@ Você também pode ler esta documentação em **inglês**: [English](README.md)
 ## Propósito
 Esta documentação detalha a arquitetura do **Acessilia**, um sistema de acessibilidade de documentos que combina **planejamento determinístico** (ordenação e validação de tarefas baseada em PDDL) com **IA multiagente coordenada por Agno** para tarefas de visão, dados e descrição. As funções determinísticas são a fonte de verdade; os LLMs fornecem interpretação e descrição.
 
-O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → execution), selecionado pela opção `PIPELINE_ENGINE`, cujo padrão é `pddl`. O antigo motor `legacy` está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele) e recusa qualquer outro valor; o código dele foi removido. Veja [architecture.pt-br.md](architecture.pt-br.md).
+O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → execution), selecionado pela opção `PIPELINE_ENGINE`, cujo padrão é `pddl`. O antigo motor `legacy` está desativado: `backend/service.py` aceita apenas `pddl` (o antigo alias `pmv` é normalizado para ele, mas está depreciado: gera um aviso no log ao iniciar e será removido) e recusa qualquer outro valor; o código dele foi removido. Veja [architecture.pt-br.md](architecture.pt-br.md).
 
 ---
 
