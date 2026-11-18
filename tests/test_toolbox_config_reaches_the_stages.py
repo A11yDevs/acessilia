@@ -23,6 +23,7 @@ from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline.enrichment import tables as table_stage
+from tests.judge_support import judged
 from tests.core_config_support import core_config, document_config, model_config, toolbox_config, vision_config
 from tests.pddl_support import build_element, build_manifest
 
@@ -214,7 +215,7 @@ def test_the_judge_renders_and_asks_with_the_run_config(monkeypatch) -> None:
 
     def ask(_image, _a, _b, *, toolbox):
         seen.append(("judge", toolbox))
-        return {"document": {"pB": 0.1}}
+        return judged({"pB": 0.1})
 
     monkeypatch.setattr(judge, "_render_page_png", render)
     monkeypatch.setattr(judge, "_judge_page", ask)

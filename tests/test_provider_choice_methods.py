@@ -41,6 +41,7 @@ from acessilia_core.pipeline.handlers.fusion import (
 )
 from acessilia_core.pipeline.handlers.order import _handle_skeleton_order_method
 from acessilia_core.planning.planner_agent import PlannerAgent
+from tests.judge_support import judged
 from tests.core_config_support import core_config, toolbox_config
 
 NOW = datetime(2026, 10, 16, tzinfo=timezone.utc)
@@ -533,8 +534,8 @@ class TestVlmPairwiseJudge:
         def judge(image, candidate_a, candidate_b, *, toolbox):
             seen.update(image=image, a=candidate_a, b=candidate_b)
             if document is not None:
-                return {"document": document}
-            return {"document": {"pB": p_b, "pB_ab": p_b, "pA_ba": 1 - p_b, "model": "qwen3-vl-8b"}}
+                return judged(document)
+            return judged({"pB": p_b, "pB_ab": p_b, "pA_ba": 1 - p_b, "model": "qwen3-vl-8b"})
 
         monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", judge)
         return seen
@@ -704,7 +705,7 @@ class TestVlmPairwiseJudge:
 
         def judge(image, candidate_a, candidate_b, *, toolbox):
             calls.append(candidate_a)
-            return {"document": {"pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7, "model": "m"}}
+            return judged({"pB": 0.25, "pB_ab": 0.2, "pA_ba": 0.7, "model": "m"})
 
         monkeypatch.setattr("acessilia_core.pipeline.judge._judge_page", judge)
         secondary, _ = pipeline_secondary._secondary_or_failure(manifest)
@@ -792,6 +793,8 @@ class TestVlmPairwiseJudge:
         calls = {}
 
         class FakeClient:
+            provider = "qwen3-vl-8b"
+
             async def judge_page(self, candidate_a, candidate_b, file_path=None, **kwargs):
                 calls.update(a=candidate_a, b=candidate_b, kwargs=kwargs)
                 calls["bytes"] = file_path.read_bytes()
@@ -813,7 +816,7 @@ class TestVlmPairwiseJudge:
 
         result = _judge_page(b"\x89PNG-fake", "A", "B", toolbox=toolbox_config())
 
-        assert result == {"document": {"pB": 0.3}}
+        assert result.p_b == 0.3 and result.document == {"pB": 0.3}
         assert calls["bytes"] == b"\x89PNG-fake" and calls["suffix"] == ".png"
         assert (calls["a"], calls["b"]) == ("A", "B")
         assert calls["closed"]
@@ -822,11 +825,10 @@ class TestVlmPairwiseJudge:
     def test_rendered_page_fits_the_server_slot(self, tmp_path) -> None:
         import fitz
 
-        from acessilia_core.pipeline.judge import (
-            _JUDGE_PAGE_MAX_SIDE,
-            _render_page_png,
-        )
+        from acessilia_sdk.operations.page_judge import JUDGE_PAGE_MAX_SIDE
+
+        from acessilia_core.pipeline.judge import _render_page_png
 
         self._manifest(tmp_path)
         pixmap = fitz.Pixmap(_render_page_png(tmp_path / "doc.pdf", 1, toolbox=toolbox_config()))
-        assert max(pixmap.width, pixmap.height) <= _JUDGE_PAGE_MAX_SIDE
+        assert max(pixmap.width, pixmap.height) <= JUDGE_PAGE_MAX_SIDE
