@@ -24,7 +24,10 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+#: The repository root: the scan reads the package's source and the two
+#: libraries beside it, so it runs from the checkout (not from the installed
+#: wheel, which the smoke test checks).
+ROOT = Path(__file__).resolve().parents[3]
 CORE = ROOT / "libs" / "core" / "src" / "acessilia_core"
 
 #: Third-party libraries the core may import, by top-level module (ADR-0016,

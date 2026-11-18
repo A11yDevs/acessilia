@@ -27,7 +27,7 @@ make the full suite itself faster.
 |---|---|---|
 | I changed one file or one test | `make test-file F=tests/test_example.py` | Runs only that path, non-E2E |
 | I fixed a failure and want to confirm it | `make test-failed` | Reruns the failures recorded in the core, docstruct and SDK caches |
-| I want the full local confidence check | `make test-all` | Core with four workers, then docstruct and SDK |
+| I want the full local confidence check | `make test-all` | Main suite with four workers, then docstruct, SDK and `libs/core` |
 | I want the core only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E core with four workers |
 | I need the exact commands `make` uses | `make -n test-all` | Prints the commands without running them |
 
@@ -73,9 +73,10 @@ The supported full local command is:
 make test-all
 ```
 
-It runs the non-E2E core with four workers, then the docstruct and SDK suites
-sequentially. The libraries are fast and have separate package environments, so
-they stay simple. `make test-all` executes all three suites even if one fails,
+It runs the non-E2E main suite with four workers, then the docstruct, SDK and
+`libs/core` suites sequentially (the last one holds the core's boundary and
+smoke tests). The libraries are fast and have separate package environments, so
+they stay simple. `make test-all` executes all four suites even if one fails,
 and returns a non-zero status if any of them failed.
 
 Running plain `uv run pytest` from the repository root is a different thing: it

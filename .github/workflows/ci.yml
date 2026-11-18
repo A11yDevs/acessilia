@@ -140,6 +140,103 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # The core is a package of its own (ADR-0016, step 6): it must install
+  # from its lock without the service or the front ends, and work from the
+  # wheel, with its PDDL domains, prompts and catalogs as package data.
+  core-isolated:
+    name: core alone (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-core-${{ hashFiles('libs/core/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-core-
+
+      - name: Install the core alone from its lock
+        run: |
+          # --no-editable installs the wheel users install, so the package
+          # data must travel in it.
+          uv lock --check --project libs/core
+          uv sync --locked --extra dev --project libs/core --no-editable
+
+      - name: Check that the service is not importable
+        working-directory: ${{ runner.temp }}
+        run: |
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" python - <<'PY'
+          import importlib.util
+          import acessilia_core
+
+          present = [
+              name
+              for name in ("backend", "frontend", "fastapi", "acessilia_toolbox")
+              if importlib.util.find_spec(name) is not None
+          ]
+          if present:
+              raise SystemExit(f"importable next to the core: {present}")
+          if "site-packages" not in (acessilia_core.__file__ or ""):
+              raise SystemExit(f"the core does not come from its wheel: {acessilia_core.__file__}")
+          print("The core is installed alone, from its wheel.")
+          PY
+
+      - name: Run the boundary test on the source
+        working-directory: libs/core
+        run: uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" python -m pytest -rs tests/test_boundary.py
+
+      - name: Run the smoke test outside the checkout
+        run: |
+          # Importing the modules alone would not load the domains, the
+          # prompts or the catalogs: the smoke test uses them all.
+          mkdir -p "$RUNNER_TEMP/core-smoke"
+          cp libs/core/tests/test_smoke.py "$RUNNER_TEMP/core-smoke/"
+          cd "$RUNNER_TEMP/core-smoke"
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" \
+            python -m pytest -rs --junitxml=core-smoke-results.xml test_smoke.py
+
+      - name: Run the table stage from a script
+        run: |
+          # ADR-0016's proof of concept, where the service is not even
+          # installed: an explicit CoreConfig and a runner of its own.
+          cd "$RUNNER_TEMP/core-smoke"
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" \
+            python "$GITHUB_WORKSPACE/libs/core/examples/table_stage.py" \
+            "$GITHUB_WORKSPACE/libs/core/examples/fixtures/tables_manifest.json" \
+            "$RUNNER_TEMP/core-smoke/tables.pdf" "$RUNNER_TEMP/core-smoke/tables.json" \
+            --data-dir "$RUNNER_TEMP/core-smoke/data"
+          grep -q '"table_linearization_hint": "text-heuristic"' "$RUNNER_TEMP/core-smoke/tables.json"
+
+      - name: Reject unexpected skipped tests
+        working-directory: ${{ runner.temp }}/core-smoke
+        run: |
+          uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" python - <<'PY'
+          from xml.etree import ElementTree
+
+          root = ElementTree.parse("core-smoke-results.xml").getroot()
+          skipped = sum(int(s.attrib.get("skipped", "0")) for s in root.iter("testsuite"))
+          if skipped:
+              raise SystemExit(f"{skipped} core smoke test(s) skipped.")
+          print("No core smoke test was skipped.")
+          PY
+
   # docstruct is the pure structural core under the core, the SDK and the
   # Toolbox (ADR-0002, ADR-0017): it must install from its wheel and pass its
   # runtime on the standard library alone, without its optional accelerator.
@@ -407,6 +504,7 @@ jobs:
     needs:
       - tests
       - sdk-isolated
+      - core-isolated
       - docstruct-isolated
       - security
     uses: ./.github/workflows/delivery.yml

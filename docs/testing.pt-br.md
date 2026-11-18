@@ -27,7 +27,7 @@ própria suíte completa mais rápida.
 |---|---|---|
 | Mudei um arquivo ou um teste | `make test-file F=tests/test_example.py` | Roda apenas esse caminho, sem E2E |
 | Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches do core, docstruct e SDK |
-| Quero a confiança local completa | `make test-all` | Core com quatro workers, depois docstruct e SDK |
+| Quero a confiança local completa | `make test-all` | Suíte principal com quatro workers, depois docstruct, SDK e `libs/core` |
 | Quero só o core, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda o core non-E2E com quatro workers |
 | Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
 
@@ -73,9 +73,10 @@ O comando local suportado para a suíte completa é:
 make test-all
 ```
 
-Ele roda o core non-E2E com quatro workers e depois as suítes do docstruct e do
-SDK, sequencialmente. As bibliotecas são rápidas e têm ambientes de pacote
-separados, então permanecem simples. O `make test-all` executa as três suítes
+Ele roda a suíte principal non-E2E com quatro workers e depois as suítes do
+docstruct, do SDK e do `libs/core`, sequencialmente (a última tem os testes de
+fronteira e de fumaça do core). As bibliotecas são rápidas e têm ambientes de
+pacote separados, então permanecem simples. O `make test-all` executa as quatro suítes
 mesmo se uma falhar e retorna status não zero se alguma falhou.
 
 Rodar `uv run pytest` puro na raiz é outra coisa: usa os padrões do pytest,

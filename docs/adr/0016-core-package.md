@@ -354,7 +354,20 @@ Proposed: option 2.
        `backend`; the guards that scanned `backend/` scan the package too,
        and the SDK's purity test and both libraries' CI isolation jobs also
        refuse `acessilia_core`.
-     - **The clean installation, its smoke test, and the proof of concept.**
+     - **The clean installation, its smoke test, and the proof of concept
+       (done).** The CI job `core-isolated` installs `libs/core` from its
+       own lock as a wheel, checks that neither the service, the front ends
+       nor FastAPI is importable, runs the boundary test on the source, and
+       runs `libs/core/tests/test_smoke.py` from a folder outside the
+       checkout: it loads the PDDL domain, every prompt file the loaders
+       name and both catalogs, and plans and executes a fixture manifest
+       (dry run). Each kind of package data left out of the wheel fails it.
+       The proof of concept is `libs/core/examples/table_stage.py`: the
+       table-structure stage runs with an explicit `CoreConfig` and a
+       model-call runner of the script's own, in that job too, where the
+       service is not installed; `tests/test_core_standalone_table_stage.py`
+       checks that it returns the same manifest as the service on the same
+       input and loads neither `backend` nor FastAPI.
 
      The tests stay in `tests/`; only the boundary test and the smoke test
      go to `libs/core/tests`. When the three are done:
