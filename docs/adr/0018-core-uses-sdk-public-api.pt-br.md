@@ -2,7 +2,7 @@
 
 Também disponível em **inglês (EUA)**: [English version](0018-core-uses-sdk-public-api.md)
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-18, evidência abaixo)
 - **Data:** 2026-11-13
 - **Componentes:** core, SDK
 - **Issues:** [#470](https://github.com/A11yDevs/acessilia/issues/470), [#402](https://github.com/A11yDevs/acessilia/issues/402)
@@ -49,7 +49,7 @@ Opções consideradas:
 
 ## Decisão
 
-Proposta: a opção 3.
+A opção 3.
 
 - **A API pública do SDK é o que cada módulo do SDK lista em `__all__`**, mais
   os próprios módulos públicos do SDK. Um nome fora do `__all__` é interno: pode
@@ -75,6 +75,28 @@ Proposta: a opção 3.
   SDK. Quando o core precisa de um nome interno, a correção é exportá-lo (com
   entrada no changelog), e não acrescentar uma exceção.
 
+## Evidência de aceitação
+
+O guarda bloqueia todo pull request desde 2026-11-13 (#501), e a regra se
+manteve enquanto o SDK e o core mais mudaram:
+
+- **Ela se manteve na primeira operação do SDK.** A cadeia de fórmula
+  (`acessilia_sdk.operations.formula`, #504) foi exportada pelo `__all__` e
+  pela tabela do README, e o enriquecimento de fórmulas do core só chegou a
+  ela por esses nomes (#507, #509). É o caso para o qual a regra foi escrita:
+  o core precisou de código novo do SDK e o obteve por exportação, não por
+  exceção.
+- **Ela acompanhou a mudança do core.** Quando o core virou `acessilia_core`
+  em `libs/core` (ADR-0016, #572), a varredura do guarda passou a incluir
+  `libs/core/src`, e o código movido continuou conferido.
+- **Nenhuma exceção foi necessária.** O `ALLOWED` continua vazio. Na develop
+  em 983e8ffd, o guarda confere 204 usos de 97 nomes do SDK em 58 arquivos
+  (18 em `libs/core/src`, 3 em `backend/`, 3 em `scripts/`, 34 em `tests/`),
+  contra o `__all__` de 36 módulos do SDK: todos públicos.
+- **O custo continuou zero.** Onze commits no SDK desde 2026-11-13 não
+  mudaram nenhuma exceção do guarda, e nenhuma mudança do core teve de
+  esperar por uma.
+
 ## Consequências
 
 - **Fica mais fácil:**
@@ -87,7 +109,7 @@ Proposta: a opção 3.
   - um módulo novo do SDK precisa declarar `__all__`.
 - **Conformidade:**
   - `tests/test_sdk_public_api.py` (core): todo uso do SDK em `backend/`,
-    `scripts/` e `tests/` é público; nenhum módulo de API do SDK fica sem
+    `libs/core/src/`, `scripts/` e `tests/` é público; nenhum módulo de API do SDK fica sem
     `__all__`; nenhuma exceção está obsoleta. Um autoteste confere o guarda em
     cada tipo de uso;
   - `libs/sdk/tests/test_public_api.py` (SDK): todo nome de módulo que a

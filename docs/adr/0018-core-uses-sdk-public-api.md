@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0018-core-uses-sdk-public-api.pt-br.md)
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-18, evidence below)
 - **Date:** 2026-11-13
 - **Components:** core, SDK
 - **Issues:** [#470](https://github.com/A11yDevs/acessilia/issues/470), [#402](https://github.com/A11yDevs/acessilia/issues/402)
@@ -49,7 +49,7 @@ Options considered:
 
 ## Decision
 
-Proposed: option 3.
+Option 3.
 
 - **The SDK's public API is what each SDK module lists in `__all__`**, plus the
   public SDK modules themselves. A name outside `__all__` is internal: it may
@@ -75,6 +75,26 @@ Proposed: option 3.
   changelog. When the core needs an internal name, the fix is to export it
   (with a changelog entry), not to add an exception.
 
+## Acceptance evidence
+
+The guard has blocked every pull request since 2026-11-13 (#501), and the
+rule held while the SDK and the core changed the most:
+
+- **It held through the SDK's first operation.** The formula chain
+  (`acessilia_sdk.operations.formula`, #504) was exported through `__all__`
+  and the README table, and the core's formula enrichment reached it only
+  through those names (#507, #509). That is the case the rule was written
+  for: the core needed new SDK code, and got it by export, not by exception.
+- **It followed the core's move.** When the core became `acessilia_core` in
+  `libs/core` (ADR-0016, #572), the guard's scan was extended to
+  `libs/core/src`, so the moved code stayed checked.
+- **No exception was needed.** `ALLOWED` is still empty. On develop at
+  983e8ffd the guard checks 204 uses of 97 SDK names in 58 files (18 in
+  `libs/core/src`, 3 in `backend/`, 3 in `scripts/`, 34 in `tests/`), against
+  the `__all__` of 36 SDK modules: all of them public.
+- **Its cost stayed at zero.** Eleven SDK commits since 2026-11-13 changed no
+  guard exception, and no core change had to wait on one.
+
 ## Consequences
 
 - **Easier:**
@@ -86,7 +106,7 @@ Proposed: option 3.
   - a new SDK module must declare `__all__`.
 - **Compliance:**
   - `tests/test_sdk_public_api.py` (core): every SDK use in `backend/`,
-    `scripts/` and `tests/` is public; no SDK API module lacks `__all__`; no
+    `libs/core/src/`, `scripts/` and `tests/` is public; no SDK API module lacks `__all__`; no
     exception is stale. A self-test checks the guard on each kind of use;
   - `libs/sdk/tests/test_public_api.py` (SDK): every name of a module the
     README table lists is in its `__all__`, the other backticked words are

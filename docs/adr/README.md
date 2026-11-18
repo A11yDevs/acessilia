@@ -33,7 +33,7 @@ ones here instead of restating them.
 | [0015](0015-artifact-reference-v1.md) | The artifact reference contract, `artifact/reference@1`, phased | Accepted |
 | [0016](0016-core-package.md) | The core as a package of its own, `acessilia_core` | Accepted |
 | [0017](0017-operational-sdk-and-agentic-core.md) | Operational SDK and agentic core boundaries | Accepted |
-| [0018](0018-core-uses-sdk-public-api.md) | The core uses only the SDK's public API | Proposed |
+| [0018](0018-core-uses-sdk-public-api.md) | The core uses only the SDK's public API | Accepted |
 | [0019](0019-operation-identifiers-and-cancellation.md) | Operation identifiers and remote cancellation | Accepted |
 | [0020](0020-job-resumption-and-operation-journal.md) | Resuming a job from its durable checkpoint | Accepted |
 | [0021](0021-bounded-model-call-execution.md) | Bounded model-call execution owned by the application | Accepted |
