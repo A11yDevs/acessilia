@@ -359,3 +359,27 @@ preservam sua compatibilidade. Atributos opcionais ausentes retornam `None`, mas
 A construção direta da dataclass não valida: use `from_dict` para entradas
 externas. Uniões e interseções genéricas e referências remotas ou cíclicas
 continuam sendo erros explícitos.
+
+### Leitores de layout e estrutura
+
+`ToolboxLayoutClient.analyze_result` usa `results.layout.read_layout` para a
+união publicada completa. Retorna os registros compactos gerados ou um manifesto
+com classificações geradas; `regions` oferece caixas do docstruct, páginas
+numeradas a partir de um e confiança opcional. Os índices originais do MinerU
+permanecem em `configuration`, sem inventar confiança. As caixas de classificação
+têm origem `UNKNOWN`; use a proveniência canônica antes de interpretar suas
+coordenadas como unidades de página. Elementos canônicos e
+origens desconhecidas permanecem no `StructuredDocument` do docstruct.
+
+`ToolboxStructureClient.extract_structure_result` e `read_manifest` usam o mesmo
+adaptador canônico e preservam metadados do produtor e processo separadamente.
+As restrições do manifesto são geradas como dados de validação, sem gerar classes
+canônicas no SDK. Após adaptar o documento, o leitor compartilhado executa
+`docstruct.manifest.validate_structured_document`; problemas canônicos, incluindo
+IDs duplicados e referências a pais ou páginas inexistentes, geram
+`ToolboxContractViolation`. Assim, um payload pode satisfazer o JSON Schema e
+falhar na validação canônica. O adaptador também exige os metadados do ramo MinerU: um
+manifesto genérico sem esses metadados é rejeitado. Somente o padrão anulável
+explícito do manifesto é normalizado; uniões e interseções genéricas continuam
+sem suporte. Formatos date-time permanecem anotações do schema. Os leitores
+existentes, incluindo mapas legados de páginas, permanecem compatíveis.
