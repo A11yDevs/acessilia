@@ -75,6 +75,16 @@ running or terminal operation instead of executing the provider again; this is
 what keeps an idempotent retry from running twice. The completed response (or
 error) is retained only while the process-local registry retains it.
 
+Joining is only correct once the provider may have run. A request refused
+before the provider starts — for example the execution-slot ceiling answering
+`503`, or an admission check that rejects the input — releases its
+`operation_id` instead of retaining a terminal entry, so a retry with that same
+id can be admitted once a slot is free. Retaining the rejection would turn a
+transient capacity error into a permanent one: the retry would join the old
+failure without ever trying again. Once execution has started, or its outcome
+is unknown (a timeout, a lost response, a broken connection), the operation is
+retained and the retry joins it instead of running the provider twice (#406).
+
 For an interruptible provider, cancellation closes or aborts the upstream
 request. An in-process provider may only check a cooperative flag. Work that
 cannot be interrupted is allowed to finish, but its result is discarded and
@@ -87,16 +97,26 @@ response therefore distinguishes `cancel_requested` from `cancelled`.
 When the user cancels a job, the core:
 
 1. records the local cancellation immediately, as today;
-2. asks the Toolbox to cancel every active operation of the job, with one
-   short wall-clock budget (`TOOLBOX_CANCEL_TIMEOUT_SECONDS`, default 5 s);
-3. records one best-effort state in the job: `none`, `requested`, `finished`,
+2. asks the Toolbox to cancel every active operation of the job. The SDK sends
+   the request to *every* configured endpoint, not only the first that answers,
+   because a failover may have left the operation running in another
+   deployment. All requests share one short wall-clock budget
+   (`TOOLBOX_CANCEL_TIMEOUT_SECONDS`, default 5 s), which also covers closing
+   the HTTP client;
+3. aggregates the endpoint answers: `not_found` only when every endpoint
+   answered `404`, and `failed` when any attempt was inconclusive (timeout,
+   `5xx`, exhausted budget), because that endpoint may still be running the
+   work;
+4. records one best-effort state in the job: `none`, `requested`, `finished`,
    `not_found` or `failed`;
-4. keeps `run_blocking` waiting for the extraction thread, as today.
+5. keeps `run_blocking` waiting for the extraction thread, as today.
 
 A failed or timed-out cancel request is logged and recorded; it is not an
 error, a retry of the original capability, a failover, a download search or an
-input resend. It does not delay the API more than the configured budget. The
-local job can still reach `cancelled` when the extraction deadline ends.
+input resend. It does not delay the API more than the configured budget. A
+failure while closing the cancellation client is logged the same way and
+recorded as `failed`; it never raises from the cancel endpoint. The local job
+can still reach `cancelled` when the extraction deadline ends.
 
 `cancelled` in the core means the local job finished. It does not by itself
 claim that the provider stopped; only a Toolbox state read or a confirmed
@@ -110,8 +130,17 @@ promising a remote abort.
   reports `not_found` or `failed` and keeps working.
 - The registry is in memory and per process. With independent endpoints or a
   load balancer that does not route the cancel request to the replica that owns
-  the operation, cancellation can return `not_found`. A shared, durable
-  operation journal is #407, not this ADR.
+  the operation, cancellation can return `not_found`. The SDK asks every
+  configured endpoint anyway, and reports `not_found` only when all of them
+  answered `404`; an endpoint that does not answer conclusively (timeout,
+  `5xx`, exhausted budget) makes the aggregate `failed`, since the operation
+  may still be running there. A shared, durable operation journal is #407, not
+  this ADR.
+- A capacity rejection (`503`) or any other refusal before execution starts is
+  not retained, so an idempotent retry can be admitted later. Deduplication by
+  `operation_id` applies once the provider may have run, or when its outcome is
+  uncertain; that keeps #406's retry budget without turning a transient
+  capacity limit into a permanent failure.
 - After a Toolbox or core restart, in-flight operations are lost to the
   registry. Recovery keeps today's rule: a job left `cancelling` becomes
   `cancelled`, and remote work is left to its configured timeouts.

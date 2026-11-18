@@ -78,6 +78,17 @@ novo; é isso que impede um retry idempotente de rodar duas vezes. A resposta
 concluída (ou o erro) é mantida apenas enquanto o registro local ao processo a
 retiver.
 
+Juntar-se a uma operação só é correto depois que o provider pode ter executado.
+Uma requisição recusada antes de o provider começar — por exemplo o teto de
+slots de execução respondendo `503`, ou uma checagem de admissão que rejeita a
+entrada — libera seu `operation_id` em vez de reter uma entrada terminal, para
+que um retry com o mesmo id seja admitido quando houver slot. Reter a rejeição
+transformaria um erro transitório de capacidade em permanente: o retry se
+juntaria à falha antiga sem nunca tentar de novo. Depois que a execução começa,
+ou quando o resultado é incerto (timeout, resposta perdida, conexão
+interrompida), a operação é retida e o retry se junta a ela em vez de executar
+o provider duas vezes (#406).
+
 Para um provider interrompível, o cancelamento fecha ou aborta a requisição
 upstream. Um provider em processo pode apenas verificar uma flag cooperativa.
 Trabalho que não pode ser interrompido pode terminar, mas seu resultado é
@@ -91,16 +102,26 @@ de cancelamento responde; por isso a resposta distingue `cancel_requested` de
 Quando o usuário cancela um job, o core:
 
 1. registra o cancelamento local imediatamente, como hoje;
-2. pede à Toolbox para cancelar cada operação ativa do job, com um único
-   orçamento curto de parede (`TOOLBOX_CANCEL_TIMEOUT_SECONDS`, padrão 5 s);
-3. registra um estado de melhor esforço no job: `none`, `requested`,
+2. pede à Toolbox para cancelar cada operação ativa do job. O SDK envia o
+   pedido a *todos* os endpoints configurados, não só ao primeiro que responde,
+   porque um failover pode ter deixado a operação executando em outro
+   deployment. Todos os pedidos compartilham um único orçamento curto de
+   parede (`TOOLBOX_CANCEL_TIMEOUT_SECONDS`, padrão 5 s), que também cobre o
+   fechamento do cliente HTTP;
+3. agrega as respostas dos endpoints: `not_found` somente quando todos
+   responderam `404`, e `failed` quando alguma tentativa foi inconclusiva
+   (timeout, `5xx`, orçamento esgotado), porque aquele endpoint pode ainda estar
+   executando o trabalho;
+4. registra um estado de melhor esforço no job: `none`, `requested`,
    `finished`, `not_found` ou `failed`;
-4. mantém o `run_blocking` esperando a thread de extração, como hoje.
+5. mantém o `run_blocking` esperando a thread de extração, como hoje.
 
 Um pedido de cancelamento que falha ou expira é registrado no log e no status;
 não é erro, retry da capacidade original, failover, busca de download nem
-reenvio da entrada. Ele não atrasa a API além do orçamento configurado. O job
-local ainda pode chegar a `cancelled` quando o prazo da extração terminar.
+reenvio da entrada. Ele não atrasa a API além do orçamento configurado. Uma
+falha ao fechar o cliente de cancelamento é registrada da mesma forma e vira
+`failed`; ela nunca levanta exceção no endpoint de cancelamento. O job local
+ainda pode chegar a `cancelled` quando o prazo da extração terminar.
 
 `cancelled` no core significa que o job local terminou. Isso não afirma, por
 si só, que o provider parou; apenas uma leitura de estado da Toolbox ou uma
@@ -114,8 +135,17 @@ vez de prometer um aborto remoto.
   core relata `not_found` ou `failed` e continua funcionando.
 - O registro é em memória e por processo. Com endpoints independentes ou um
   balanceador que não encaminhe o cancelamento à réplica dona da operação, o
-  cancelamento pode responder `not_found`. Um diário durável e compartilhado é
-  a #407, não esta ADR.
+  cancelamento pode responder `not_found`. O SDK consulta mesmo assim todos os
+  endpoints configurados e só relata `not_found` quando todos responderam
+  `404`; um endpoint sem resposta conclusiva (timeout, `5xx`, orçamento
+  esgotado) torna o agregado `failed`, pois a operação pode continuar
+  executando lá. Um diário durável e compartilhado é a #407, não esta ADR.
+- Uma rejeição por capacidade (`503`) ou qualquer recusa antes do início da
+  execução não é retida, para que um retry idempotente possa ser admitido
+  depois. A deduplicação por `operation_id` vale a partir do momento em que o
+  provider pode ter executado, ou quando o resultado é incerto; isso preserva o
+  orçamento de retries da #406 sem transformar um limite transitório de
+  capacidade em falha permanente.
 - Após reinício da Toolbox ou do core, operações em voo se perdem do registro.
   A recuperação mantém a regra atual: um job deixado em `cancelling` vira
   `cancelled`, e o trabalho remoto fica sujeito aos timeouts configurados.

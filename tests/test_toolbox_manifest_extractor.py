@@ -898,12 +898,12 @@ def test_cancelling_during_upload_refuses_the_next_operation(
         client=mock_client,
         artifact_client=mock_artifact_client,
     )
-    outcomes: list[BaseException] = []
+    outcomes: list[Exception] = []
 
     def run() -> None:
         try:
             extractor.extract(FIXTURE_PDF, fusion=fusion_config(), toolbox=toolbox_config(use_artifact_store=True), paths=paths_config(), operations=JobOperations("task-upload-cancel"))
-        except BaseException as exc:
+        except Exception as exc:  # noqa: BLE001 - record whatever aborts the run
             outcomes.append(exc)
 
     operation_registry.clear("task-upload-cancel")
