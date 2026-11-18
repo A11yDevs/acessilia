@@ -5,14 +5,18 @@
 The reference below is the core's copy as it was on develop at 8ef77f89,
 frozen so the difference stays documented and checked.
 
-The two differ in one way only: docstruct leaves out the rows whose cells are
-all blank, and returns ``None`` when no row is left, where the core's copy
-kept them (``{"body": [...]}`` with empty cells, or ``{"body": []}``). Of the
-core's two callers:
+On the inputs the core gives it, lists of cells, the two differ in one way
+only: docstruct leaves out the rows whose cells are all blank, and returns
+``None`` when no row is left, where the core's copy kept them
+(``{"body": [...]}`` with empty cells, or ``{"body": []}``). On other inputs
+they differ too: the core's copy skipped a row that is not a list, which
+docstruct reads when it is a ``{"cells": [...]}`` row (review of #600). No
+caller of the core passes one. Of the core's two callers:
 
 - the table backfill (``enrichment/tables.py``) reads rows from
   ``rows_from_visual_table_text``, whose cells are never blank, so nothing
-  changes; its ``table_ast is None`` check, dead before, now holds;
+  changes. Its ``table_ast is None`` check fits docstruct's return type, but
+  with these rows it still never holds (review of #600);
 - the payload builder (``_element_to_block``) gets a single row,
   ``[[text]]``. Only a table whose text is all whitespace, with no usable
   table AST, changes: its block has ``table_ast: None`` instead of an AST of
@@ -73,6 +77,16 @@ def test_the_two_agree_unless_a_row_is_all_blank() -> None:
             assert table_ast_from_rows(rows) == expected, rows
             differ += 1
     assert same > 1000 and differ > 1000, (same, differ)
+
+
+def test_a_cells_row_that_is_not_a_list_is_read_now() -> None:
+    """Outside the core's inputs: the copy skipped it, docstruct reads it."""
+    rows = [["x"], {"cells": [{"text": "y"}]}]
+
+    assert _reference(rows) == {"body": [{"cells": [{"text": "x"}]}]}
+    assert table_ast_from_rows(rows) == {
+        "body": [{"cells": [{"text": "x"}]}, {"cells": [{"text": "y"}]}]
+    }
 
 
 def test_the_backfill_rows_never_meet_the_difference() -> None:

@@ -6,8 +6,8 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 
 O construtor do payload e o preenchimento de tabelas montam o AST de uma tabela
 a partir das linhas com o `docstruct.tables.ast.table_ast_from_rows`, em vez da
-cópia do core (#470). As duas só diferem nas linhas em que todas as células
-estão em branco: o docstruct as deixa de fora e devolve `None` quando não sobra
+cópia do core (#470). Nas entradas do core, listas de células, as duas só
+diferem nas linhas em que todas as células estão em branco: o docstruct as deixa de fora e devolve `None` quando não sobra
 nenhuma. A única entrada que chega a isso é uma tabela cujo texto é só espaço
 em branco e que não tem um AST de tabela aproveitável: o bloco dela no payload
 passa a ter `table_ast: None` em vez de um AST de uma célula vazia. A tabela do
