@@ -33,7 +33,6 @@ import copy
 import re
 from collections import Counter
 from collections.abc import Callable
-from itertools import pairwise
 
 from acessilia_core.manifest.models import (
     BoundingBox,
@@ -43,7 +42,9 @@ from acessilia_core.manifest.models import (
 )
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
+from docstruct.fusion.similarity import area
 from docstruct.geometry import is_bottom_left, union
+from docstruct.geometry.boxes import boxes_overlap, union_area
 
 #: Default share of the slide its pictures must cover for the slide to be
 #: described as an image rather than read as text (SLIDE_VISUAL_COVERAGE).
@@ -365,7 +366,7 @@ def _is_visual(
     where it lies is unknown.
     """
     pictures = [box for _, box in _content_pictures(body, page_fractions)]
-    if _union_area(pictures) < threshold:
+    if union_area(pictures) < threshold:
         return False
     outside = []
     for element in body:
@@ -380,7 +381,7 @@ def _is_visual(
             return False
         if not any(_contains(picture, box) for picture in pictures):
             outside.append(box)
-    return _union_area(outside) <= _MAX_TEXT_OUTSIDE
+    return union_area(outside) <= _MAX_TEXT_OUTSIDE
 
 
 def _content_pictures(
@@ -399,7 +400,7 @@ def _content_pictures(
             continue
         left, top, right, bottom = box
         box = (max(left, 0.0), max(top, 0.0), min(right, 1.0), min(bottom, 1.0))
-        if 0 < _area(box) < _BACKGROUND_COVERAGE:
+        if 0 < area(box) < _BACKGROUND_COVERAGE:
             pictures.append((element, box))
     return pictures
 
@@ -448,7 +449,7 @@ def _fold_figure_labels(
         ):
             kept.append(element)
             continue
-        host, _ = min(hosts, key=lambda pair: _area(pair[1]))
+        host, _ = min(hosts, key=lambda pair: area(pair[1]))
         host.metadata.setdefault("figure_labels", []).append(text)
         host.metadata.setdefault("figure_label_ids", []).append(element.id)
     return kept
@@ -503,7 +504,7 @@ def _absorb_near_pictures(
             near = [
                 picture
                 for picture, picture_box in pictures.items()
-                if _overlaps(_expanded(picture_box, _NEAR_MARGIN), box)
+                if boxes_overlap(_expanded(picture_box, _NEAR_MARGIN), box)
             ]
             spanned = [p for p in near if _spans_across(box, pictures[p])]
             near_merged = [
@@ -512,7 +513,7 @@ def _absorb_near_pictures(
             near_own = [
                 picture
                 for picture, picture_box in reach.items()
-                if _overlaps(_expanded(picture_box, _NEAR_MARGIN), box)
+                if boxes_overlap(_expanded(picture_box, _NEAR_MARGIN), box)
             ]
             if (
                 len(spanned) >= 2
@@ -605,15 +606,6 @@ def _expanded(
     return (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)
 
 
-def _overlaps(
-    first: tuple[float, float, float, float], second: tuple[float, float, float, float]
-) -> bool:
-    return (
-        min(first[2], second[2]) > max(first[0], second[0])
-        and min(first[3], second[3]) > max(first[1], second[1])
-    )
-
-
 def _spans_across(
     box: tuple[float, float, float, float], picture: tuple[float, float, float, float]
 ) -> bool:
@@ -637,29 +629,6 @@ def _distance(
 def _reads_as_label(text: str) -> bool:
     words = sum(1 for word in text.split() if sum(char.isalpha() for char in word) >= 3)
     return words <= _LABEL_MAX_WORDS and not (words and _SENTENCE.search(text))
-
-
-def _area(box: tuple[float, float, float, float]) -> float:
-    left, top, right, bottom = box
-    return max(0.0, right - left) * max(0.0, bottom - top)
-
-
-def _union_area(boxes: list[tuple[float, float, float, float]]) -> float:
-    """Area covered by ``boxes``, overlaps counted once."""
-    xs = sorted({x for box in boxes for x in (box[0], box[2])})
-    area = 0.0
-    for left, right in pairwise(xs):
-        spans = sorted(
-            (box[1], box[3]) for box in boxes if box[0] <= left and box[2] >= right
-        )
-        covered, reach = 0.0, 0.0
-        for top, bottom in spans:
-            top = max(top, reach)
-            if bottom > top:
-                covered += bottom - top
-                reach = bottom
-        area += (right - left) * covered
-    return area
 
 
 def _contains(

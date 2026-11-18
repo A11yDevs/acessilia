@@ -18,7 +18,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
 | Exports legados de compatibilidade em `docstruct.types` e `docstruct` | `CanonicalDocument`, `CanonicalSection` — descontinuados desde 0.5.3; mantidos com comportamento inalterado (veja migração abaixo) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
+| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point`, `boxes_overlap`, `union_area` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — o elemento substituto de uma página extraída sem estrutura; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — qual texto extraído conta como conteúdo |
 | `docstruct.data_uri` | `decode_data_uri` — os bytes de uma imagem embutida como URI `data:` em base64, para os tipos de mídia e o tamanho que quem chama aceita; uma URL remota nunca é buscada |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — um callout dividido em vários blocos mantém o título só no primeiro bloco; `callout_titles` — o título de cada callout, lido do seu elemento de título |
@@ -35,7 +35,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
 | `docstruct.fusion.flood` | `flood_guard` |
 | `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3`, `FurnitureBlock` — `page_number_position` lê `DiffBlock`s ou qualquer visão somente leitura de `role`, `md` e `box`, como o payload do core |
-| `docstruct.fusion.similarity` | `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — sobreposição de caixas e semelhança de texto entre blocos, e qual bloco candidato forma par com um bloco |
+| `docstruct.fusion.similarity` | `area`, `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — sobreposição de caixas e semelhança de texto entre blocos, e qual bloco candidato forma par com um bloco |
 | `docstruct.fusion.repetition` | `collapse`, `guard_page`, `is_blank_page`, `strip_comment` |
 | `docstruct.fusion.page_select` | `fuse`, `select_by_agreement`, `swap_low_agreement_pages`, `ratio` |
 | `docstruct.fusion.judge` | `debias`, `decide_pair`, `p2_from_logprobs`, `should_judge` |

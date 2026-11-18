@@ -10,7 +10,9 @@ travels with its ``coord_origin`` (``TOPLEFT``, ``BOTTOMLEFT`` or
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Literal, Protocol
 
 from docstruct.types import BBox
@@ -111,6 +113,49 @@ def holds_point(box: BBox, x: float, y: float, margin: float) -> bool:
     return left - margin <= x <= right + margin and top - margin <= y <= bottom + margin
 
 
+def boxes_overlap(first: BBox, second: BBox) -> bool:
+    """Whether two boxes share an area, not only an edge or a corner.
+
+    Both are ``(left, top, right, bottom)`` in one frame, with
+    ``left <= right`` and ``top <= bottom``. Moved from the core's slide
+    layout (``manifest/slides.py``, #470).
+    """
+    return (
+        min(first[2], second[2]) > max(first[0], second[0])
+        and min(first[3], second[3]) > max(first[1], second[1])
+    )
+
+
+def union_area(boxes: Sequence[BBox]) -> float:
+    """The area ``boxes`` cover together, where they overlap counted once.
+
+    Each box is ``(left, top, right, bottom)`` in one frame, with
+    ``left <= right`` and ``top <= bottom``. A sweep over the boxes' vertical
+    edges: in each band between two of them, the covered height is the union
+    of the spans of the boxes that cross the whole band. Moved from the core's
+    slide layout (``manifest/slides.py``, #470).
+
+    Any coordinates work, including the negative ones of
+    :meth:`OrientedBox.top_down` for a bottom-left box: the vertical sweep
+    starts below every box, not at 0 (review of #596). The core's copy started
+    at 0, which gives the same areas for page coordinates, all of them >= 0.
+    """
+    xs = sorted({x for box in boxes for x in (box[0], box[2])})
+    area = 0.0
+    for left, right in pairwise(xs):
+        spans = sorted(
+            (box[1], box[3]) for box in boxes if box[0] <= left and box[2] >= right
+        )
+        covered, reach = 0.0, -math.inf
+        for top, bottom in spans:
+            top = max(top, reach)
+            if bottom > top:
+                covered += bottom - top
+                reach = bottom
+        area += (right - left) * covered
+    return area
+
+
 def best_effort_clip(
     bbox: PageBox | None,
 ) -> tuple[BBox | None, Literal["TOPLEFT", "BOTTOMLEFT"]]:
@@ -142,8 +187,10 @@ __all__ = [
     "OrientedBox",
     "PageBox",
     "best_effort_clip",
+    "boxes_overlap",
     "VerticalBox",
     "downward_edges",
     "holds_point",
     "is_bottom_left",
+    "union_area",
 ]

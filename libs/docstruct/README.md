@@ -18,7 +18,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
 | Legacy compatibility exports in `docstruct.types` and `docstruct` | `CanonicalDocument`, `CanonicalSection` — deprecated since 0.5.3; retained with unchanged behavior (see migration below) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
+| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point`, `boxes_overlap`, `union_area` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — which extracted text counts as content |
 | `docstruct.data_uri` | `decode_data_uri` — the bytes of an image inline as a base64 `data:` URI, for the media types and size the caller accepts; a remote URL is never fetched |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only; `callout_titles` — each callout's title, read from its title element |
@@ -35,7 +35,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
 | `docstruct.fusion.flood` | `flood_guard` |
 | `docstruct.fusion.tailjoin` | `is_page_number`, `join_tail`, `page_number_position`, `tailjoin3`, `FurnitureBlock` — `page_number_position` reads `DiffBlock`s or any read-only view of `role`, `md` and `box`, like the core's payload |
-| `docstruct.fusion.similarity` | `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — box overlap and text similarity between blocks, and which candidate block pairs with a block |
+| `docstruct.fusion.similarity` | `area`, `iou`, `sim`, `ordered_box`, `pair_block`, `swallows`, `is_duplicate` — box overlap and text similarity between blocks, and which candidate block pairs with a block |
 | `docstruct.fusion.repetition` | `collapse`, `guard_page`, `is_blank_page`, `strip_comment` |
 | `docstruct.fusion.page_select` | `fuse`, `select_by_agreement`, `swap_low_agreement_pages`, `ratio` |
 | `docstruct.fusion.judge` | `debias`, `decide_pair`, `p2_from_logprobs`, `should_judge` |

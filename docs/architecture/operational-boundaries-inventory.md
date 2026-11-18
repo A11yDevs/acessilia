@@ -86,8 +86,8 @@ The rest, with the duplicates already on record:
 |---|---|---|
 | `_table_ast_from_rows` (orchestrator) | `docstruct.tables.ast.table_ast_from_rows` | Near-duplicate with different behaviour: `{"body": []}` against `None` for no rows. Recorded in the orchestrator inventory; merging it is a behaviour decision. |
 | `_block_kind` (orchestrator) | `docstruct.fusion.convert.classify_kind` | Near-duplicate with different behaviour. Recorded in the orchestrator inventory. |
-| `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | The same computation, for a box that is present. |
-| `_overlaps`, `_union_area` (`slides.py`) | none | Pure box geometry; docstruct candidates. (docstruct's `_overlaps` compares text spans, not boxes.) |
+| `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | The same computation, for a box that is present. **Resolved:** `slides.py` uses docstruct's (#470, phase 4). |
+| `_overlaps`, `_union_area` (`slides.py`) | none | Pure box geometry. **Moved** to `docstruct.geometry.boxes` as `boxes_overlap` and `union_area` (docstruct 0.5.6, #470, phase 4). (docstruct's `_overlaps` compares text spans, not boxes.) |
 | `decide` (`planning/toolbox_gate.py`) | `docstruct.fusion.adjudication.decide` | Same name only; unrelated. |
 | callout clustering (Toolbox normalization builder) | `docstruct.regions.grouping` | Known deviation of ADR-0002 ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)). |
 

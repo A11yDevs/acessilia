@@ -87,8 +87,8 @@ O resto, com as duplicações já registradas:
 |---|---|---|
 | `_table_ast_from_rows` (orquestrador) | `docstruct.tables.ast.table_ast_from_rows` | Quase duplicata com comportamento diferente: `{"body": []}` contra `None` sem linhas. Registrada no inventário do orquestrador; unificar é uma decisão de comportamento. |
 | `_block_kind` (orquestrador) | `docstruct.fusion.convert.classify_kind` | Quase duplicata com comportamento diferente. Registrada no inventário do orquestrador. |
-| `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | O mesmo cálculo, para uma caixa presente. |
-| `_overlaps`, `_union_area` (`slides.py`) | nenhuma | Geometria pura de caixas; candidatas ao docstruct. (O `_overlaps` do docstruct compara trechos de texto, não caixas.) |
+| `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | O mesmo cálculo, para uma caixa presente. **Resolvido:** o `slides.py` usa o do docstruct (#470, fase 4). |
+| `_overlaps`, `_union_area` (`slides.py`) | nenhuma | Geometria pura de caixas. **Movidas** para `docstruct.geometry.boxes` como `boxes_overlap` e `union_area` (docstruct 0.5.6, #470, fase 4). (O `_overlaps` do docstruct compara trechos de texto, não caixas.) |
 | `decide` (`planning/toolbox_gate.py`) | `docstruct.fusion.adjudication.decide` | Só o nome é igual; não têm relação. |
 | agrupamento de callouts (builder de normalização da Toolbox) | `docstruct.regions.grouping` | Desvio conhecido da ADR-0002 ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)). |
 

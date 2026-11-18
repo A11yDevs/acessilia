@@ -55,3 +55,71 @@ def test_boxes_are_values():
     assert OrientedBox(1, 2, 3, 4, "TOPLEFT") == OrientedBox(1, 2, 3, 4, "TOPLEFT")
     with pytest.raises(AttributeError):
         TOP_LEFT.left = 0  # type: ignore[misc]
+
+
+# --- boxes_overlap and union_area, moved from the core's slide layout (#470) ---
+
+from docstruct.geometry.boxes import boxes_overlap, union_area  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        ((0, 0, 10, 10), (5, 5, 15, 15), True),
+        ((0, 0, 10, 10), (10, 0, 20, 10), False),  # a shared edge is no overlap
+        ((0, 0, 10, 10), (10, 10, 20, 20), False),  # nor a shared corner
+        ((0, 0, 10, 10), (2, 2, 3, 3), True),  # one inside the other
+        ((0, 0, 10, 10), (20, 20, 30, 30), False),
+    ],
+)
+def test_boxes_overlap_only_when_they_share_an_area(first, second, expected):
+    assert boxes_overlap(first, second) is expected
+    assert boxes_overlap(second, first) is expected
+
+
+@pytest.mark.parametrize(
+    ("boxes", "expected"),
+    [
+        ([], 0.0),
+        ([(0, 0, 10, 10)], 100.0),
+        ([(0, 0, 10, 10), (0, 0, 10, 10)], 100.0),  # the same box counts once
+        ([(0, 0, 10, 10), (5, 5, 15, 15)], 175.0),  # 100 + 100 - 25
+        ([(0, 0, 10, 10), (20, 0, 30, 10)], 200.0),  # apart
+        ([(0, 0, 10, 10), (2, 2, 3, 3)], 100.0),  # one inside the other
+        ([(0, 0, 10, 0)], 0.0),  # no height
+    ],
+)
+def test_union_area_counts_overlaps_once(boxes, expected):
+    assert union_area(boxes) == pytest.approx(expected)
+
+
+def test_union_area_matches_a_grid_count_on_integer_boxes():
+    """An independent oracle: count the unit cells some box covers."""
+    import random
+
+    generator = random.Random(470)
+    for _ in range(300):
+        boxes = []
+        for _ in range(generator.randint(1, 5)):
+            left, top = generator.randint(0, 20), generator.randint(0, 20)
+            boxes.append((left, top, left + generator.randint(0, 8), top + generator.randint(0, 8)))
+        cells = {
+            (x, y)
+            for left, top, right, bottom in boxes
+            for x in range(left, right)
+            for y in range(top, bottom)
+        }
+        assert union_area(boxes) == pytest.approx(len(cells)), boxes
+
+
+def test_union_area_counts_negative_coordinates():
+    """The sweep starts below every box, not at 0 (review of #596)."""
+    assert union_area([(0, -5, 10, 5)]) == pytest.approx(100.0)
+    assert union_area([(0, -20, 10, -10), (5, -15, 15, -5)]) == pytest.approx(175.0)
+
+
+def test_union_area_of_a_bottom_left_box_seen_top_down():
+    """``top_down()`` mirrors a bottom-left box to negative y; its area holds."""
+    box = OrientedBox(0, 700, 10, 690, "BOTTOMLEFT").top_down()
+
+    assert union_area([box]) == pytest.approx(100.0)
