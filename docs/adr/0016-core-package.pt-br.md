@@ -282,7 +282,12 @@ A opção 2.
      `config` (os handlers de fusão de dois providers e de provider único, os
      de inspeção de região e de página, os de fórmula, `mathml` e
      `latex-verbalizer`, e o do juiz VLM), e cada execução vincula a sua config
-     a eles (`bind_run`) numa cópia do registro.
+     a eles (`bind_run`) numa cópia do registro. O parâmetro é um contrato
+     conferido (#543): só por nome (depois do `*`) e anotado,
+     `*, config: CoreConfig` ou `*, ports: RunPorts`. Um handler que o quebra
+     (um parâmetro com nome errado ou sem anotação, ou um que nenhuma execução
+     vincula) falha quando o registro é montado ou vinculado, antes de
+     qualquer passo rodar.
   4. Os caches e o `run_blocking` passam a ser injetados pelos `ports`.
      Feito, em três pull requests:
      - **O cache de regiões e o `run_blocking` (feito).** O

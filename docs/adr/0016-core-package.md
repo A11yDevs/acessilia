@@ -275,7 +275,11 @@ Option 2.
      single-provider fusion handlers, the region and page inspection handlers,
      the `mathml` and `latex-verbalizer` formula handlers, and the VLM
      judge's), and each run binds its config to them (`bind_run`) on a copy
-     of the registry.
+     of the registry. The parameter is a checked contract (#543):
+     keyword-only and annotated, `*, config: CoreConfig` or
+     `*, ports: RunPorts`. A handler that breaks it (a misspelled or
+     unannotated parameter, or one no run binds) fails when the registry is
+     built or bound, before any step runs.
   4. The caches and `run_blocking` are injected through `ports`. Done, in
      three pull requests:
      - **The region cache and `run_blocking` (done).** `backend/core/ports.py`
