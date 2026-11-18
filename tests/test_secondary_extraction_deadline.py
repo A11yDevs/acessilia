@@ -147,3 +147,24 @@ def test_the_secondary_budget_keeps_a_reserve_for_the_fusion(
     )
 
     assert budget == pytest.approx(expected)
+
+
+def test_a_provider_that_failed_on_the_document_still_falls_back():
+    """#608: the SDK's error for ``provider_execution_failed`` is a provider failure.
+
+    So in dual mode a primary that failed on the document still hands over to
+    the secondary, as a 500 does, while the SDK no longer retries it.
+    """
+    import httpx
+    from acessilia_sdk.toolbox.transport import raise_for_error
+
+    response = httpx.Response(
+        502,
+        json={"code": "provider_execution_failed", "message": "mineru-api rejected"},
+        request=httpx.Request("POST", "http://toolbox.test/v1/capabilities/x:execute"),
+    )
+    with pytest.raises(Exception) as info:
+        raise_for_error(response, "document.structure.extract")
+
+    assert type(info.value).__name__ == "ToolboxError"
+    assert toolbox_extractor._provider_failure(info.value)

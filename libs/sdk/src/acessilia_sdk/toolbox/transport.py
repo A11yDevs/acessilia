@@ -74,8 +74,11 @@ def raise_for_error(response: httpx.Response, context: str) -> None:
         detail = response.text[:500]
 
     # 502 is the gateway failing to reach the provider; a 500 may be the
-    # provider failing on this input, so it stays a plain ToolboxError.
-    if status in (502, 503):
+    # provider failing on this input, so it stays a plain ToolboxError. The
+    # Toolbox also answers 502 with ``provider_execution_failed`` when the
+    # provider was reached and failed on the document: that is the 500 case,
+    # not an unavailable one, so it is neither retried nor failed over (#608).
+    if status == 503 or (status == 502 and code != "provider_execution_failed"):
         raise ToolboxProviderUnavailable(
             f"Provedor indisponível ({context}): {detail}"
         )
