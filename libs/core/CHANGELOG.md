@@ -2,6 +2,13 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.2.1 — slide box geometry from docstruct
+
+No behaviour change. The slide layout (`manifest/slides.py`) uses docstruct's
+box geometry instead of its own copies: `boxes_overlap` and `union_area`, new
+in `docstruct.geometry.boxes`, and `docstruct.fusion.similarity.area`. The
+core now requires docstruct 0.5.6 or later (#470).
+
 ## 0.2.0 — strict canonical export validation
 
 **Breaking validation change:** TXT, HTML, DOCX and PDF/UA now require the full

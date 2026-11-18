@@ -2,6 +2,14 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.2.1 — geometria de caixas dos slides vinda do docstruct
+
+Sem mudança de comportamento. O layout de slides (`manifest/slides.py`) usa a
+geometria de caixas do docstruct em vez das suas próprias cópias:
+`boxes_overlap` e `union_area`, novas em `docstruct.geometry.boxes`, e
+`docstruct.fusion.similarity.area`. O core passa a exigir o docstruct 0.5.6 ou
+mais novo (#470).
+
 ## 0.2.0 — validação canônica estrita na exportação
 
 **Mudança incompatível de validação:** TXT, HTML, DOCX e PDF/UA exigem que o
