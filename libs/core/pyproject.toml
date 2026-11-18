@@ -9,7 +9,7 @@ description = "Acessilia's core: the PDDL pipeline that plans and executes a doc
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-# The libraries ADR-0016 allows the core (tests/test_core_boundary.py checks
+# The libraries ADR-0016 allows the core (tests/test_boundary.py checks
 # the imports). openai and ollama are what Agno's model classes load; edge-tts
 # is the audio export's recorded deviation (ADR-0003, acessilia-toolbox#73).
 # docstruct and the SDK are not on an index: install ./libs/docstruct and
@@ -28,6 +28,9 @@ dependencies = [
     "edge-tts>=7.3.1,<8",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=1.4.0,<2"]
+
 [tool.uv.sources]
 acessilia-docstruct = { path = "../docstruct", editable = true }
 acessilia-sdk = { path = "../sdk", editable = true }
@@ -38,3 +41,7 @@ acessilia-sdk = { path = "../sdk", editable = true }
 # runtime does not read them).
 packages = ["src/acessilia_core"]
 exclude = ["**/*.mo", "**/__pycache__"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"

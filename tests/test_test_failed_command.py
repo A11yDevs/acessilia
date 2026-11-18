@@ -70,7 +70,7 @@ def test_failed_tests_lists_node_ids_in_order(tmp_path: Path) -> None:
 
 
 def test_default_suites_read_each_project_cache() -> None:
-    core, docstruct, sdk = test_failed.default_suites()
+    core, docstruct, sdk, package = test_failed.default_suites()
 
     assert core.directory == test_failed.REPO_ROOT
     assert core.cache == core.directory / test_failed.CACHE_RELATIVE
@@ -87,6 +87,14 @@ def test_default_suites_read_each_project_cache() -> None:
     assert sdk.pytest_args == ()
     assert sdk.runner[:1] == ("uv",)
     assert sdk.prefix == "libs/sdk"
+
+    # The core's package suite (ADR-0016, step 6), which make test-all runs.
+    assert package.name == "libs-core"
+    assert package.directory == test_failed.REPO_ROOT / "libs" / "core"
+    assert package.cache == package.directory / test_failed.CACHE_RELATIVE
+    assert package.pytest_args == ()
+    assert package.runner[:1] == ("uv",)
+    assert package.prefix == "libs/core"
 
 
 def test_rerun_without_any_cache_does_not_run_pytest(

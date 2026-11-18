@@ -16,7 +16,20 @@ lê variáveis de ambiente. Seu chamador fornece:
 - a configuração do processo: logger, idiomas oferecidos e idioma do servidor
   (`acessilia_core.logger`, `acessilia_core.i18n`).
 
-`tests/test_core_boundary.py`, na raiz, verifica essa fronteira.
+`tests/test_boundary.py` verifica essa fronteira no código-fonte do pacote, e
+`tests/test_smoke.py` verifica que o pacote instalado funciona sozinho: a CI
+instala a partir do lock, fora do checkout, e executa o teste de smoke de lá.
+Execute ambos com `uv run --extra dev pytest` nesta pasta (`make test-all`
+também os executa).
+
+`examples/table_stage.py` executa a etapa de estruturação de tabelas a partir de
+um script, com `CoreConfig` explícito e executor próprio de chamadas de modelo,
+sem importar o serviço nem FastAPI (prova de conceito do ADR-0016):
+
+```bash
+uv run --extra dev python examples/table_stage.py \
+  examples/fixtures/tables_manifest.json tables.pdf tables.json
+```
 
 ## Catálogo de formatos
 

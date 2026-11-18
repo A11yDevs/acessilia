@@ -18,7 +18,7 @@ As regressões da issue #342 cobrem continuações de listas após parágrafos e
 O fluxo local suportado está descrito em [docs/testing.pt-br.md](../docs/testing.pt-br.md):
 
 ```bash
-# Tudo o que a CI executa, sem E2E (core, docstruct e SDK)
+# Tudo o que a CI executa, sem E2E (suíte principal, docstruct, SDK e libs/core)
 make test-all
 
 # Um arquivo ou um node id

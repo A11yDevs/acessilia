@@ -362,7 +362,22 @@ Proposta: a opção 2.
        guardas que varriam o `backend/` varrem o pacote também, e o teste de
        pureza do SDK e os jobs de CI de isolamento das duas bibliotecas
        também recusam o `acessilia_core`.
-     - **A instalação limpa, o seu teste de fumaça e a prova de conceito.**
+     - **A instalação limpa, o seu teste de fumaça e a prova de conceito
+       (feito).** O job de CI `core-isolated` instala o `libs/core` a partir
+       do seu próprio lock, como wheel, confere que nem o serviço, nem os
+       front-ends, nem o FastAPI podem ser importados, roda o teste de
+       fronteira sobre o código-fonte e roda o
+       `libs/core/tests/test_smoke.py` a partir de uma pasta fora do
+       checkout: ele carrega o domínio PDDL, todo arquivo de prompt que os
+       carregadores citam e os dois catálogos, e planeja e executa um
+       manifesto de fixture (dry run). Cada tipo de dado do pacote deixado
+       fora da wheel o faz falhar. A prova de conceito é o
+       `libs/core/examples/table_stage.py`: a etapa de estrutura de tabelas
+       roda com um `CoreConfig` explícito e um runner de chamadas de modelo
+       do próprio script, também nesse job, onde o serviço não está
+       instalado; o `tests/test_core_standalone_table_stage.py` confere que
+       ela devolve o mesmo manifesto que o serviço para a mesma entrada e não
+       carrega nem o `backend` nem o FastAPI.
 
      Os testes ficam em `tests/`; só o teste de fronteira e o de fumaça vão
      para `libs/core/tests`. Quando os três estiverem feitos:

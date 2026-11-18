@@ -26,8 +26,8 @@ make the full suite itself faster.
 | Situation | Command | What happens |
 |---|---|---|
 | I changed one file or one test | `make test-file F=tests/test_example.py` | Runs only that path, non-E2E |
-| I fixed a failure and want to confirm it | `make test-failed` | Reruns the failures recorded in the core, docstruct and SDK caches |
-| I want the full local confidence check | `make test-all` | Core with four workers, then docstruct and SDK |
+| I fixed a failure and want to confirm it | `make test-failed` | Reruns the failures recorded in the main, docstruct, SDK and `libs/core` caches |
+| I want the full local confidence check | `make test-all` | Main suite with four workers, then docstruct, SDK and `libs/core` |
 | I want the core only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E core with four workers |
 | I need the exact commands `make` uses | `make -n test-all` | Prints the commands without running them |
 
@@ -59,7 +59,13 @@ GitHub Actions workflow `CI`:
 - `tests` and `SDK alone` are required checks in the live rulesets for `main`
   and `develop`. `docstruct alone` is not required yet: making it required is a
   ruleset change, a maintainer decision (CONTRIBUTING.md).
-- Image delivery waits for all three jobs.
+- **`core alone (Python 3.11)`** installs only the core, as a wheel from its
+  own lock (`libs/core/uv.lock`): neither the service, the front ends, FastAPI
+  nor the Toolbox package is importable. It runs the boundary test on the
+  source, the smoke test from a folder outside the checkout, and the table
+  stage from `libs/core/examples/table_stage.py` (ADR-0016, step 6). It is not
+  a required check yet, for the same reason as `docstruct alone`.
+- Image delivery waits for all four jobs.
 
 The core check does not have a separate collection step: the test run collects
 the suite itself. The job name is intentionally kept as `tests (Python 3.11)` so
@@ -73,9 +79,10 @@ The supported full local command is:
 make test-all
 ```
 
-It runs the non-E2E core with four workers, then the docstruct and SDK suites
-sequentially. The libraries are fast and have separate package environments, so
-they stay simple. `make test-all` executes all three suites even if one fails,
+It runs the non-E2E main suite with four workers, then the docstruct, SDK and
+`libs/core` suites sequentially (the last one holds the core's boundary and
+smoke tests). The libraries are fast and have separate package environments, so
+they stay simple. `make test-all` executes all four suites even if one fails,
 and returns a non-zero status if any of them failed.
 
 Running plain `uv run pytest` from the repository root is a different thing: it
@@ -108,7 +115,7 @@ is empty, and it knows nothing about the separate library caches.
 
 `make test-failed` is the supported wrapper. It:
 
-- reads the `lastfailed` cache for the core, docstruct and SDK;
+- reads the `lastfailed` cache for the main suite, docstruct, the SDK and `libs/core`;
 - checks that the recorded files still exist and collects only those files;
 - reruns the explicit node ids that still exist;
 - reports removed or renamed tests instead of falling back to a full run;
