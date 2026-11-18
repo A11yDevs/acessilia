@@ -85,7 +85,7 @@ O resto, com as duplicações já registradas:
 
 | Core | docstruct | Achado |
 |---|---|---|
-| `_table_ast_from_rows` (orquestrador) | `docstruct.tables.ast.table_ast_from_rows` | Quase duplicata com comportamento diferente: `{"body": []}` contra `None` sem linhas. Registrada no inventário do orquestrador; unificar é uma decisão de comportamento. |
+| `_table_ast_from_rows` (orquestrador) | `docstruct.tables.ast.table_ast_from_rows` | Quase duplicata com comportamento diferente: `{"body": []}` contra `None` sem linhas. Registrada no inventário do orquestrador; unificar é uma decisão de comportamento. **Resolvido:** o core usa a do docstruct (#470, fase 4); a única diferença, as linhas em branco, está registrada em `tests/test_table_ast_from_rows_parity.py`. |
 | `_block_kind` (orquestrador) | `docstruct.fusion.convert.classify_kind` | Quase duplicata com comportamento diferente. Registrada no inventário do orquestrador. |
 | `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | O mesmo cálculo, para uma caixa presente. **Resolvido:** o `slides.py` usa o do docstruct (#470, fase 4). |
 | `_overlaps`, `_union_area` (`slides.py`) | nenhuma | Geometria pura de caixas. **Movidas** para `docstruct.geometry.boxes` como `boxes_overlap` e `union_area` (docstruct 0.5.6, #470, fase 4). (O `_overlaps` do docstruct compara trechos de texto, não caixas.) |
