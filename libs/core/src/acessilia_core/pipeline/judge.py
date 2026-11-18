@@ -16,8 +16,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from acessilia_sdk.operations.page_judge import JUDGE_PAGE_MAX_SIDE
-
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.manifest.models import (
@@ -42,12 +40,6 @@ if TYPE_CHECKING:
     from acessilia_sdk.operations.page_judge import PageJudgement
 
 
-#: Longest side of the page image sent to the judge: the SDK operation's.
-#: Two candidates plus the image must fit one 8192-token slot of the
-#: production VLM server.
-_JUDGE_PAGE_MAX_SIDE = JUDGE_PAGE_MAX_SIDE
-
-
 def _render_page_png(
     source_path: Path,
     page_number: int,
@@ -58,8 +50,8 @@ def _render_page_png(
 ) -> bytes:
     """Page ``page_number`` (1-based) of a PDF, PNG or JPEG as PNG, rendered by the Toolbox.
 
-    The SDK's ``render_judge_page`` (144 dpi, longest side bounded by
-    ``_JUDGE_PAGE_MAX_SIDE``) with the run's ``toolbox``. The source is checked
+    The SDK's ``render_judge_page`` (``JUDGE_PAGE_DPI``, longest side bounded
+    by ``JUDGE_PAGE_MAX_SIDE``) with the run's ``toolbox``. The source is checked
     first, as for every render (``ValueError``), and the client resends a
     source the Toolbox lost.
     """

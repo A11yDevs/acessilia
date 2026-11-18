@@ -825,11 +825,10 @@ class TestVlmPairwiseJudge:
     def test_rendered_page_fits_the_server_slot(self, tmp_path) -> None:
         import fitz
 
-        from acessilia_core.pipeline.judge import (
-            _JUDGE_PAGE_MAX_SIDE,
-            _render_page_png,
-        )
+        from acessilia_sdk.operations.page_judge import JUDGE_PAGE_MAX_SIDE
+
+        from acessilia_core.pipeline.judge import _render_page_png
 
         self._manifest(tmp_path)
         pixmap = fitz.Pixmap(_render_page_png(tmp_path / "doc.pdf", 1, toolbox=toolbox_config()))
-        assert max(pixmap.width, pixmap.height) <= _JUDGE_PAGE_MAX_SIDE
+        assert max(pixmap.width, pixmap.height) <= JUDGE_PAGE_MAX_SIDE

@@ -9,8 +9,9 @@ operação do juiz de página do SDK (`acessilia_sdk.operations.page_judge`,
 #470). O core mantém as suas decisões: a conferência da fonte, quais páginas, o
 aviso de truncamento, o limiar e o que cada falha significa. As requisições,
 as escolhas e as mensagens de falha não mudam, exceto num caso. Uma resposta
-cujo documento não é um objeto levantava `AttributeError` para fora do método;
-agora faz o método falhar como uma resposta sem `pB` válido.
+cujo documento não é um objeto (null, lista, texto, número, booleano) levantava
+`AttributeError` para fora do método; agora faz o método falhar como uma
+resposta sem `pB` válido.
 
 ## 0.2.2 — AST de tabela a partir das linhas, pelo docstruct
 

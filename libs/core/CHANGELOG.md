@@ -9,8 +9,9 @@ the SDK's page judge operation (`acessilia_sdk.operations.page_judge`, #470).
 The core keeps its decisions: the source check, which pages, the truncation
 warning, the threshold and what each failure means. Requests, choices and
 failure messages are unchanged, except for one case. An answer whose document
-is not an object used to raise `AttributeError` out of the method; it now
-fails the method as an answer without a valid `pB`.
+is not an object (null, a list, a string, a number, a boolean) used to raise
+`AttributeError` out of the method; it now fails the method as an answer
+without a valid `pB`.
 
 ## 0.2.2 — table AST from rows by docstruct
 

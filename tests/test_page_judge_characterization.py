@@ -158,11 +158,17 @@ def test_a_long_transcription_is_judged_truncated(monkeypatch, manifest) -> None
     assert failure is None and judgement["truncated"] is True
 
 
-@pytest.mark.parametrize("document", [["not", "an", "object"], "text"], ids=["a list", "a string"])
+@pytest.mark.parametrize(
+    "document",
+    [["not", "an", "object"], "text", None, 42, True],
+    ids=["a list", "a string", "null", "a number", "a boolean"],
+)
 def test_a_document_that_is_not_an_object_fails_the_method(monkeypatch, manifest, document) -> None:
     """The one change of the reuse: develop raised ``AttributeError`` here
-    (``document.get`` on a list), out of the method; the SDK reads such an
-    answer as one without ``pB``, so the method fails with that reason."""
+    (``.get`` on a list, a string, ``None``, a number or a boolean), out of
+    the method; the SDK reads such an answer as one without ``pB``, so the
+    method fails with that reason. An answer with no ``document`` key at all
+    is a different case, which develop already failed the method for."""
     judgement, failure = _run(monkeypatch, manifest, _FakeToolbox({"document": document}))
 
     assert judgement is None
