@@ -42,6 +42,22 @@ def camel(name: str) -> str:
     )
 
 
+def without_models(value):
+    if isinstance(value, dict):
+        return {
+            key: without_models(item)
+            for key, item in value.items()
+            if not (
+                key == "model"
+                and isinstance(value.get("type"), list)
+                and isinstance(item, str)
+            )
+        }
+    if isinstance(value, list):
+        return [without_models(item) for item in value]
+    return value
+
+
 class Compiler:
     def __init__(
         self,
@@ -53,12 +69,22 @@ class Compiler:
         self.emit_models = emit_models
         self.nullable_branches = nullable_branches
         self.plain_definitions = plain_definitions
+        self.reference_models: dict[str, str] = {}
+        self.status_discriminator = False
         self.classes: dict[str, dict] = {}
         self.roots: dict[str, dict] = {}
 
     def compile(
-        self, schema: dict, name: str, *, definition: str | None = None
+        self,
+        schema: dict,
+        name: str,
+        *,
+        definition: str | None = None,
+        reference_models: dict[str, str] | None = None,
+        status_discriminator: bool = False,
     ) -> dict:
+        self.reference_models = reference_models or {}
+        self.status_discriminator = status_discriminator
         root = schema
         if definition is not None:
             schema = root["$defs"][definition]
@@ -94,9 +120,55 @@ class Compiler:
                 target = root[section][key]
             except KeyError as exc:
                 raise SchemaError(f"{name}: unresolved reference {ref}") from exc
+            if key in self.reference_models:
+                alias = self.reference_models[key]
+                if alias not in self.classes:
+                    raise SchemaError(
+                        f"{name}: reference model {alias} has not been selected"
+                    )
+                plain_compiler = Compiler(
+                    emit_models=False, nullable_branches=self.nullable_branches
+                )
+                plain_compiler.status_discriminator = self.status_discriminator
+                candidate = plain_compiler._node(target, root, name, (*stack, ref))
+                if without_models(self.classes[alias]) != candidate:
+                    raise SchemaError(
+                        f"{name}: embedded {key} disagrees with selected {alias}"
+                    )
+                return self.classes[alias]
             return self._node(
                 target, root, name, (*stack, ref), key in self.plain_definitions
             )
+        status_required = None
+        if "anyOf" in node and self.status_discriminator:
+            branches = node["anyOf"]
+            if node.get("type") != "object" or "status" not in node.get("required", []):
+                raise SchemaError(
+                    f"{name}: sync status must be a required object discriminator"
+                )
+            if not isinstance(branches, list) or len(branches) != 2:
+                raise SchemaError(f"{name}: unsupported sync status branches")
+            status_required = {}
+            for branch in branches:
+                if (
+                    not isinstance(branch, dict)
+                    or set(branch) != {"properties", "required"}
+                    or set(branch["properties"]) != {"status"}
+                    or set(branch["properties"]["status"]) != {"const"}
+                    or not isinstance(branch["required"], list)
+                    or any(
+                        key not in node.get("properties", {})
+                        for key in branch["required"]
+                    )
+                ):
+                    raise SchemaError(f"{name}: unsupported sync status constraints")
+                status = branch["properties"]["status"]["const"]
+                if status not in ("mirrored", "skipped") or status in status_required:
+                    raise SchemaError(f"{name}: unsupported sync status discriminator")
+                status_required[status] = branch["required"]
+            if set(status_required) != {"mirrored", "skipped"}:
+                raise SchemaError(f"{name}: incomplete sync status discriminator")
+            node = {key: value for key, value in node.items() if key != "anyOf"}
         if "anyOf" in node and self.nullable_branches:
             branches = node["anyOf"]
             if (
@@ -140,6 +212,8 @@ class Compiler:
             if key not in ANNOTATIONS | {"definitions", "$defs"}
         }
         rule["type"] = types
+        if status_required is not None:
+            rule["status_required"] = status_required
         if "pattern" in node:
             try:
                 re.compile(node["pattern"])
@@ -232,5 +306,15 @@ class Compiler:
         ]
         for name, rule in self.classes.items():
             lines += [f"{name}._rule = {rule!r}", f"{name}._models = _MODELS"]
+        for name, rule in self.roots.items():
+            if "model" not in rule:
+                lines += [
+                    f"_{name.upper()}_RULE = {rule!r}",
+                    "",
+                    f"def {name}(data: Any) -> {self.annotation(rule)}:",
+                    "    from acessilia_sdk.toolbox.results._model import decode",
+                    f"    return decode(data, _{name.upper()}_RULE, _MODELS, {name!r})",
+                    "",
+                ]
         lines += ["", "__all__ = " + repr(list(self.roots)), ""]
         return "\n".join(lines)

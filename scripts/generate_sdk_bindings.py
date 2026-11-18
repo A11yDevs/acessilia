@@ -355,7 +355,7 @@ def render_model(schema: dict, class_name: str, schema_file: str) -> str:
     return "\n".join(body)
 
 
-def models() -> dict[Path, str]:
+def models(contract: dict | None = None) -> dict[Path, str]:
     """Every generated model module and its content."""
     generated: dict[Path, str] = {}
     for schema_file, (class_name, target) in MODELS.items():
@@ -383,6 +383,23 @@ def models() -> dict[Path, str]:
         )
     except ValueError as exc:
         raise BindingError(str(exc)) from exc
+    spec = importlib.util.spec_from_file_location(
+        "sdk_dataset_binding", REPO_ROOT / "scripts" / "sdk_dataset_binding.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        generated[SDK_TOOLBOX / "results" / "_dataset_generated.py"] = (
+            module.render_datasets(
+                result_compiler,
+                SCHEMAS_DIR,
+                contract
+                if contract is not None
+                else json.loads(CONTRACT_PATH.read_text()),
+            )
+        )
+    except ValueError as exc:
+        raise BindingError(str(exc)) from exc
     return generated
 
 
@@ -397,7 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     source = REGISTRY_PATH.read_text(encoding="utf-8")
     contract = json.loads(args.contract.read_text(encoding="utf-8"))
     try:
-        outputs = {REGISTRY_PATH: regenerate(source, contract), **models()}
+        outputs = {REGISTRY_PATH: regenerate(source, contract), **models(contract)}
     except BindingError as exc:
         print(f"cannot generate the SDK bindings: {exc}", file=sys.stderr)
         return 1

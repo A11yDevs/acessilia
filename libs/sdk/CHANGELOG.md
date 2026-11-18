@@ -7,6 +7,8 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** generated dataset REST records and array readers, plus additive typed client methods preserving pagination, nulls, artifact paths and raw sync compatibility (#213).
+
 - **Fixed** typed structure and MinerU layout readers now run docstruct's
   canonical document validation after wire validation. Duplicate element IDs,
   missing parent/page references and other canonical findings raise

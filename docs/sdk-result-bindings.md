@@ -363,3 +363,23 @@ MinerU branch: a generic manifest without layout metadata is rejected. Only the
 manifest's explicit nullable pattern is normalized; general union/intersection
 compilation stays unsupported. Date-time formats remain schema annotations.
 Existing raw readers, including legacy layout page maps, are unchanged.
+
+### Dataset REST readers and completion criteria
+
+`results.datasets` exposes the six generated records and the five generated
+collection readers. Dataset client methods gain additive `*_result` counterparts,
+including pagination. Lists remain lists, samples contain `DatasetItem`, and
+sync reports contain `DatasetSyncEntry` (including global skipped events and
+`[]`). Dataset artifact references retain their distinct path semantics.
+Raw sync responses, artifact bytes/path encoding, revision parameters, timeouts
+and failed-page behavior retain their existing compatibility contracts.
+
+The generator checks each selected `dataset_routes` entry, reuses the standalone
+record model only after checking its embedded schema, and checks the shared
+execute union without generating it. Only the published mirrored/skipped status
+pattern is compiled; extra conditional constraints fail generation explicitly.
+REST registry entries still have `output_schema=None`; the SDK allowlist is unchanged.
+
+The four implementation stages now cover the agreed selection through public
+SDK readers and drift/differential tests. Merge them in order after review; #213
+can then be closed. The deferred schema families remain outside this scope.

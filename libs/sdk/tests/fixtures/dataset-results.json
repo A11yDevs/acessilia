@@ -1,0 +1,8 @@
+{
+  "DatasetInfo": {"id": "demo", "name": "Demo", "source": "org/repo", "source_type": "github", "item_count": null, "license": null, "citation": null, "revisions": ["main"], "splits": ["test"]},
+  "SplitInfo": {"id": "test", "item_count": 1, "has_ground_truth": true, "artifact_types": ["application/pdf"]},
+  "ItemSummary": {"id": "page-1", "artifact_count": 1, "has_annotations": true, "metadata": {"nested": [null, {"tags": [1, "x"]}]}},
+  "DatasetArtifactRef": {"path": "input/page #1.pdf", "media_type": "application/pdf", "size": 42, "sha256": null, "artifact_id": null, "mirrored": false},
+  "DatasetItem": {"id": "page-1", "artifacts": [{"path": "input/page #1.pdf", "sha256": null, "artifact_id": null, "mirrored": false}], "annotations": [{"path": "truth/page.md"}], "metadata": {"nested": [null, {"tags": [1, "x"]}]}},
+  "DatasetSyncEntry": {"status": "mirrored", "item": "page-1", "split": "test", "artifact": "input/page.pdf"}
+}
