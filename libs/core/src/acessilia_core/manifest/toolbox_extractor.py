@@ -292,12 +292,26 @@ class ToolboxManifestExtractor:
                     )
                     if artifact_id is not None and secondary_artifact_id is None:
                         logger.info(t(LOG_ARTIFACT_STORE_DIRECT_INPUT))
+                    # With the primary's result in hand, the secondary gets
+                    # only the time left before the extraction-wide deadline,
+                    # so a hung secondary degrades instead of discarding the
+                    # complete primary (#603). Without it, the secondary is
+                    # the only source and keeps the whole deadline.
+                    budget = (
+                        _secondary_budget(toolbox_config, started_clock)
+                        if result is not None
+                        else None
+                    )
                     with self._remote_operation("secondary", operations):
-                        secondary_result = await secondary_client.extract_structure(
-                            file_path=None if secondary_artifact_id else source_path,
-                            artifact_id=secondary_artifact_id,
-                            language="pt-BR",
-                            use_remote_cache=toolbox_config.use_remote_cache,
+                        secondary_result = await _within(
+                            budget,
+                            secondary_client.extract_structure(
+                                file_path=None if secondary_artifact_id else source_path,
+                                artifact_id=secondary_artifact_id,
+                                language="pt-BR",
+                                use_remote_cache=toolbox_config.use_remote_cache,
+                            ),
+                            provider=secondary_provider,
                         )
                 except ToolboxError as exc:
                     # With the primary's result in hand the comparison is only
@@ -455,6 +469,47 @@ def _persist_fusion_reuse(
         logger.warning("Could not persist fusion evidence; extraction will need to run again")
         return {}
     return {"path": str(path), "sha256": digest}
+
+
+#: Time kept back from the extraction-wide deadline, when the secondary has a
+#: complete primary to degrade to, for the work after the secondary answers:
+#: fusing the two payloads, routing pages and writing the evidence. That work
+#: is synchronous, so the deadline cannot interrupt it; at most this many
+#: seconds, and at most a tenth of the deadline.
+SECONDARY_RESERVE_SECONDS = 60.0
+
+
+def _secondary_budget(toolbox: ToolboxConfig, started_clock: float) -> float:
+    """Seconds the secondary may take, given a complete primary result (#603).
+
+    The time left before the extraction-wide deadline, which counts from
+    ``started_clock``, minus the reserve for the fusion that follows.
+    """
+    deadline = max(1, toolbox.extraction_timeout_seconds)
+    reserve = min(SECONDARY_RESERVE_SECONDS, deadline / 10)
+    return deadline - (perf_counter() - started_clock) - reserve
+
+
+async def _within(budget: float | None, call: Any, *, provider: str) -> Any:
+    """Await ``call``, or raise ``ToolboxTimeout`` once ``budget`` seconds pass.
+
+    ``None`` is no budget of its own: the extraction-wide deadline applies.
+    The ``ToolboxTimeout`` is a provider failure, so the caller's degradation
+    handles it as it does a secondary that timed out on its own.
+    """
+    if budget is None:
+        return await call
+    message = (
+        f"{provider} did not answer within the {max(budget, 0):.0f} s left "
+        "before the extraction deadline"
+    )
+    if budget <= 0:
+        call.close()
+        raise ToolboxTimeout(message)
+    try:
+        return await asyncio.wait_for(call, timeout=budget)
+    except TimeoutError as exc:
+        raise ToolboxTimeout(message) from exc
 
 
 def _provider_failure(exc: ToolboxError) -> bool:
