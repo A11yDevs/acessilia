@@ -20,7 +20,8 @@ catch them (the review of #471 reproduced it with a module reading
 The static check also covers code that only runs when called. The import check
 catches what the static one cannot see by name (``getattr`` on a module
 object, aliases). A real need for one of these goes in ``ALLOWED`` with its
-reason, so it stays visible.
+reason, so it stays visible. ADR-0023 permits only the schema accessor's fixed
+bundled resource; it still performs no resource read at import time.
 
 **Scope.** The rule is ADR-0017's: network, environment, files and processes.
 The clock (``time``, ``datetime``), randomness (``random``, ``secrets``,
@@ -77,8 +78,13 @@ SYS_ATTRIBUTES = {
     "stdin": "files", "stdout": "files", "stderr": "files",
     "__stdin__": "files", "__stdout__": "files", "__stderr__": "files",
 }
-#: ``"module.py:name": "reason"`` for a reviewed exception. Empty: none is needed.
-ALLOWED: dict[str, str] = {}
+#: ``"module.py:name": "reason"``; each exception is reviewed with its ADR PR.
+ALLOWED: dict[str, str] = {
+    "schemas/__init__.py:importlib.resources": (
+        "ADR-0023 / #371 E1.2a: load only the fixed bundled accessible-document "
+        "schema; no caller paths, network, writes or import-time resource reads."
+    ),
+}
 
 
 def infrastructure_uses(source: str) -> list[tuple[int, str, str]]:

@@ -6,7 +6,7 @@ Pure document-structure processing core for Acessilia.
 
 ## Principles
 
-- **Pure**: no function touches network, files, subprocess, settings, logger, or dynamic i18n. Zero heavy ML dependencies (`dependencies = []`).
+- **Pure algorithms**: no network, caller files, subprocess, settings, logger, or dynamic i18n. The schema accessor reads only its fixed bundled package resource (ADR 0023). Zero runtime dependencies (`dependencies = []`); validation engines are injected.
 - **Single dependency direction**: `backend → docstruct` or `acessilia-toolbox → docstruct`. The library never imports from `backend/` or `acessilia_toolbox/`.
 - **i18n = msgids**: functions that produce messages return `(msgid, args)`; the consumer translates.
 - **Deterministic or injected IDs**: no `uuid4` inside the lib.
@@ -59,11 +59,48 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.export.page_text` | `blocks_text`, `pages_text` — the PDDL payload's plain text, page by page (the caller names an image without alt text) |
 | `docstruct.export.walk` | `walk`, `Visitor`, `SectionContext`, `BlockContext`, `BLOCK_TYPES`, callback type aliases — ordered section traversal with consumer-owned selection and rendering |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
-| `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
+| `docstruct.schemas` | `accessible_document_schema` — a fresh dictionary from the bundled accessible-document JSON Schema |
+| `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding`; `validate_against_schema`, `SchemaValidator` — opt-in schema validation with an injected engine |
 
 Planned modules (phases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Modules
+
+### Canonical schema (`docstruct.schemas`, `docstruct.validation`)
+
+Added in 0.5.2 for [#371, E1.2a](https://github.com/A11yDevs/acessilia/issues/371)
+([ADR 0023](../../docs/adr/0023-packaged-canonical-schema.md)). The normative
+schema is `src/docstruct/schemas/accessible_document.schema.json`, included in
+the installed wheel. Its bytes, draft and identifier are unchanged. The root
+`schemas/accessible_document.schema.json` is a generated compatibility copy.
+
+```python
+from jsonschema import validate  # installed by the consumer; dev-only here
+from docstruct.schemas import accessible_document_schema
+from docstruct.validation import validate_against_schema
+
+schema = accessible_document_schema()  # independent of the working directory
+validate_against_schema(document, validate)
+```
+
+The injected callable receives `(document, schema)`, returns `None` on success
+and raises on failure. Exceptions propagate unchanged; other return values
+raise `TypeError`, so boolean failures or error iterators cannot be discarded.
+The original document is passed through and must be treated as read-only. Each
+call loads a fresh schema dictionary, so a consumer cannot poison later loads.
+No validation engine is imported at runtime by docstruct.
+
+Regenerate/check the root copy from the repository's locked environment:
+
+```bash
+uv run python scripts/sync_accessible_document_schema.py
+uv run python scripts/sync_accessible_document_schema.py --check
+```
+
+The core checks copy parity and builder output, including children. CI also
+validates the schema from the installed wheel outside the checkout. Existing
+audits/exporters do not call this opt-in API; strict export validation is the
+separate E1.2b compatibility decision. Existing export snapshots stay unchanged.
 
 ### Export walker (`docstruct.export.walk`)
 

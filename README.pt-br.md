@@ -21,6 +21,12 @@ seleção e renderização de cada formato. Os adaptadores TXT/HTML do core reso
 rótulos e escrevem arquivos; DOCX e PDF/UA são renderizados na Toolbox. Veja a
 [arquitetura de exportação](docs/architecture.pt-br.md#2-pipeline-de-documento-canônico-e-exportação-backendcorepipeline-backendcoreexport).
 
+O JSON Schema de documento acessível acompanha o wheel da docstruct. Os
+consumidores podem validar explicitamente com um motor injetado; a auditoria
+atual continua governando os exports. O schema da raiz é uma cópia gerada e
+conferida da fonte empacotada. Veja a
+[API de schema](libs/docstruct/README.pt-br.md#schema-canônico-docstructschemas-docstructvalidation).
+
 ### API standalone
 
 A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.

@@ -6,7 +6,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 
 ## Princípios
 
-- **Pura**: nenhuma função toca rede, arquivos, subprocess, settings, logger ou i18n dinâmico. Zero dependências pesadas de ML (`dependencies = []`).
+- **Algoritmos puros**: sem rede, arquivos do consumidor, subprocess, settings, logger ou i18n dinâmico. O accessor de schema lê apenas seu recurso fixo empacotado (ADR 0023). Zero dependências de runtime (`dependencies = []`); motores de validação são injetados.
 - **Direção única de dependência**: `backend → docstruct` ou `acessilia-toolbox → docstruct`. A lib nunca importa de `backend/` ou `acessilia_toolbox/`.
 - **i18n = msgids**: funções que produzem mensagens retornam `(msgid, args)`; o consumidor traduz.
 - **IDs determinísticos ou injetados**: nada de `uuid4` dentro da lib.
@@ -59,11 +59,48 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.export.page_text` | `blocks_text`, `pages_text` — o texto simples do payload PDDL, página a página (quem chama dá o texto de uma imagem sem descrição) |
 | `docstruct.export.walk` | `walk`, `Visitor`, `SectionContext`, `BlockContext`, `BLOCK_TYPES`, aliases de tipos de callback — travessia ordenada de seções com seleção e renderização definidas pelo consumidor |
 | `docstruct.profiles` | `OUTPUT_PROFILES`, `filter_blocks_for_profile`, `normalize_profile` |
-| `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding` |
+| `docstruct.schemas` | `accessible_document_schema` — um dicionário novo do JSON Schema de documento acessível empacotado |
+| `docstruct.validation` | `validate_canonical_document`, `validate_output_text`, `Finding`; `validate_against_schema`, `SchemaValidator` — validação de schema optativa com motor injetado |
 
 Módulos planejados (fases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Módulos
+
+### Schema canônico (`docstruct.schemas`, `docstruct.validation`)
+
+Adicionado na 0.5.2 para a [#371, E1.2a](https://github.com/A11yDevs/acessilia/issues/371)
+([ADR 0023](../../docs/adr/0023-packaged-canonical-schema.pt-br.md)). O schema
+normativo é `src/docstruct/schemas/accessible_document.schema.json`, incluído no
+wheel instalado. Bytes, draft e identificador permanecem iguais. O arquivo da
+raiz `schemas/accessible_document.schema.json` é uma cópia gerada de compatibilidade.
+
+```python
+from jsonschema import validate  # instalado pelo consumidor; só dev aqui
+from docstruct.schemas import accessible_document_schema
+from docstruct.validation import validate_against_schema
+
+schema = accessible_document_schema()  # independe do diretório de trabalho
+validate_against_schema(document, validate)
+```
+
+O callable injetado recebe `(document, schema)`, retorna `None` no sucesso e
+lança exceção na falha. Exceções são propagadas sem alteração; outros retornos
+causam `TypeError`, evitando descartar falhas booleanas ou iteradores de erros.
+O documento original é repassado e deve ser tratado como somente leitura. Cada
+chamada carrega um novo dicionário de schema, impedindo que uma mutação contamine
+leituras posteriores. A docstruct não importa motor de validação em runtime.
+
+Regenerar/conferir a cópia da raiz no ambiente travado do repositório:
+
+```bash
+uv run python scripts/sync_accessible_document_schema.py
+uv run python scripts/sync_accessible_document_schema.py --check
+```
+
+O core verifica a paridade da cópia e saídas do builder, incluindo filhos. A CI
+também valida o schema do wheel instalado fora do checkout. Auditorias/exports
+existentes não chamam esta API optativa; validação estrita no export é a decisão
+de compatibilidade E1.2b separada. Snapshots dos exports permanecem inalterados.
 
 ### Walker de exportação (`docstruct.export.walk`)
 
