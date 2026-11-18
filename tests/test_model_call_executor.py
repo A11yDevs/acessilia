@@ -499,26 +499,33 @@ async def test_an_already_expired_call_does_not_begin_inference(runner):
 
 
 def test_runs_at_once_share_the_process_bound_across_event_loops():
-    """Several runs, each with its own event loop and its own stage bound,
-    never have more calls in the provider at once than the process's workers
-    (#547): the bound per stage and run adds up, the runner's does not."""
-    workers, stage_bound, runs, calls_per_run = 2, 2, 3, 4
+    """Several runs at once, each on its own event loop with its own stage
+    bound, share the process's workers (#547): their stage bounds add up
+    (3 runs x 1 > 2 workers), the runner's bound does not.
+
+    Deterministic (review of #589): the runs start together (a barrier), and
+    each stage allows one call at a time, so two calls in the provider at once
+    come from two different runs. The first call waits for the second, so the
+    overlap always happens.
+    """
+    workers, stage_bound, runs, calls_per_run = 2, 1, 3, 3
     service = ModelCallExecutor(ModelCallLimits(workers, max_pending=runs * stage_bound))
     lock = threading.Lock()
-    in_provider = {"now": 0, "most": 0}
-    per_run_most = [0] * runs
-    per_run_now = [0] * runs
+    in_provider: list[int] = []
+    most = {"calls": 0, "runs": 0}
+    start = threading.Barrier(runs)
 
     def call(run_index):
         with lock:
-            in_provider["now"] += 1
-            per_run_now[run_index] += 1
-            in_provider["most"] = max(in_provider["most"], in_provider["now"])
-            per_run_most[run_index] = max(per_run_most[run_index], per_run_now[run_index])
-        time.sleep(0.02)
+            in_provider.append(run_index)
+            most["calls"] = max(most["calls"], len(in_provider))
+            most["runs"] = max(most["runs"], len(set(in_provider)))
+        deadline = time.monotonic() + 2
+        while most["calls"] < workers and time.monotonic() < deadline:
+            time.sleep(0.001)
+        time.sleep(0.005)
         with lock:
-            in_provider["now"] -= 1
-            per_run_now[run_index] -= 1
+            in_provider.remove(run_index)
         return run_index
 
     def one_run(run_index, results):
@@ -531,6 +538,7 @@ def test_runs_at_once_share_the_process_bound_across_event_loops():
 
             return await asyncio.gather(*(one() for _ in range(calls_per_run)))
 
+        start.wait(timeout=5)
         results[run_index] = asyncio.run(stage())
 
     results = [None] * runs
@@ -544,5 +552,5 @@ def test_runs_at_once_share_the_process_bound_across_event_loops():
         service.close(wait=True)
 
     assert results == [[index] * calls_per_run for index in range(runs)]
-    assert in_provider["most"] == workers, "the process bound holds, and is reached"
-    assert all(most <= stage_bound for most in per_run_most)
+    assert most["calls"] == workers, "the process bound holds, and is reached"
+    assert most["runs"] == workers, "the calls at once came from different runs"

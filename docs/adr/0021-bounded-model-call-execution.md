@@ -49,11 +49,15 @@ both: `execute(..., config=, model_calls=)` requires the run's runner
 (ADR-0016's step 4 then added the required `ports=`).
 Standalone callers can pass and close their own runner. AgentOS chat agents remain
 outside this execution path.
-Since a process talks to one model provider (`ModelConfig.ai_client`), the
+The service process talks to one model provider (its `AI_CLIENT`), so the
 service's runner is also the bound per provider across runs: runs at once add
 up their stages' `VISION_CONCURRENCY`, but never exceed `MODEL_CALL_WORKERS`
-calls at the provider (#547). A bound across processes or hosts belongs to the
-gateway. See the [architecture](../architecture.md).
+calls at the provider (#547). A standalone caller that runs several
+`ModelConfig` in one process with one runner shares that bound among their
+providers, which is stricter, never looser. A bound across processes or hosts
+is outside the core: with `AI_CLIENT=toolbox`, it belongs to the Toolbox's
+gateway; Ollama and OpenRouter have no gateway of ours, so their own limits
+apply. See the [architecture](../architecture.md).
 
 ## Consequences and verification
 

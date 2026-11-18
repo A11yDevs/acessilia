@@ -48,11 +48,15 @@ quando nenhum era fornecido, como sua ponte de CoreConfig. O passo 3 da
 ADR-0016 removeu as duas: `execute(..., config=, model_calls=)` exige o runner
 da execução (o passo 4 da ADR-0016 depois acrescentou o `ports=` obrigatório). Chamadores independentes podem passar e fechar seu runner. Os agentes do chat
 AgentOS ficam fora desse caminho.
-Como um processo conversa com um só provider de modelo (`ModelConfig.ai_client`),
-o runner do serviço também é o limite por provider entre execuções: execuções
-simultâneas somam o `VISION_CONCURRENCY` das suas etapas, mas nunca passam de
-`MODEL_CALL_WORKERS` chamadas no provider (#547). Um limite entre processos ou
-máquinas cabe ao gateway. Veja a
+O processo do serviço conversa com um só provider de modelo (o seu `AI_CLIENT`),
+então o runner do serviço também é o limite por provider entre execuções:
+execuções simultâneas somam o `VISION_CONCURRENCY` das suas etapas, mas nunca
+passam de `MODEL_CALL_WORKERS` chamadas no provider (#547). Um chamador
+independente que roda várias `ModelConfig` num processo com um só runner
+divide esse limite entre os providers delas, o que é mais restrito, nunca mais
+frouxo. Um limite entre processos ou máquinas fica fora do core: com
+`AI_CLIENT=toolbox`, cabe ao gateway da Toolbox; Ollama e OpenRouter não têm um
+gateway nosso, então valem os limites deles. Veja a
 [arquitetura](../architecture.pt-br.md).
 
 ## Consequências e verificação

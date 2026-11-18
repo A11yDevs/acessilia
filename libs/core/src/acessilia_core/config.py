@@ -89,10 +89,12 @@ class VisionConfig:
 
     ``concurrency`` bounds the calls of one stage of one run: each stage
     builds its own semaphore, so runs at once add up. What bounds the calls
-    across runs is the ``ModelCallRunner`` the caller passes to ``execute``:
-    the service's is one per process, with ``MODEL_CALL_WORKERS`` workers,
-    and a process talks to one provider (``ModelConfig.ai_client``), so that
-    is the bound per provider across runs (ADR-0021, #547).
+    across runs is the ``ModelCallRunner`` the caller passes to ``execute``.
+    The service's is one per process, with ``MODEL_CALL_WORKERS`` workers,
+    and the service process talks to one provider (its ``AI_CLIENT``), so
+    there it is the bound per provider across runs (ADR-0021, #547). A
+    caller that runs several ``ModelConfig`` in one process with one runner
+    shares that bound among their providers: stricter, never looser.
     """
 
     concurrency: int
