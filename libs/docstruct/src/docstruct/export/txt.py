@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Any
 
 from docstruct.blocks.lists import item_label, list_numbering, list_start
-from docstruct.profiles import filter_blocks_for_profile
-from docstruct.sections import section_body_blocks
+from docstruct.export.walk import SectionContext, Visitor, walk
+from docstruct.profiles import normalize_profile
 from docstruct.tables.ast import linearize_table_for_text, table_ast_from_block
 from docstruct.text.equations import numbered_speech
 from docstruct.text.math_spans import inline_math_entries, split_inline_math
@@ -24,67 +24,95 @@ def document_to_txt_lines(
     formula_label: str = DEFAULT_FORMULA_LABEL,
 ) -> list[str]:
     """Render the canonical document into plain-text lines (no file I/O)."""
-    lines: list[str] = []
-    for section in document.get("sections", []):
-        lines.extend(_render_section(section, profile, formula_label))
+    lines = _document_lines(document, profile, formula_label)
     return [line for line in lines if line is not None]
 
 
 def _render_section(section: dict[str, Any], profile_name: str, formula_label: str = DEFAULT_FORMULA_LABEL) -> list[str]:
-    """Renders one section (its title, profile-filtered blocks, and nested children) into text lines.
+    """Compatibility entry point for one section, including its children."""
+    return _document_lines({"sections": [section]}, profile_name, formula_label)
 
-    Args:
-        section (dict): Canonical section mapping with optional "title", "blocks", "children".
-        profile_name (str): Export verbosity profile applied to the section's block filtering.
 
-    Returns:
-        list[str]: The rendered lines for the section and its nested children.
-    """
-    lines: list[str] = []
-    if section.get("title"):
-        lines.append(section["title"])
-    for block in filter_blocks_for_profile(section_body_blocks(section), profile_name):
-        lines.extend(_render_block(block, formula_label))
-    for child in section.get("children", []):
-        lines.extend(_render_section(child, profile_name))
-    return lines
+def _document_lines(document: dict[str, Any], profile: str, formula_label: str) -> list[str]:
+    allowed = set(normalize_profile(profile)["verbosity"])
+    return [line for group in walk(
+        document, _visitor(formula_label),
+        select=lambda block, ctx: not ctx.is_legacy_title and block.get("verbosity", "basic") in allowed,
+    ) for line in group]
+
+
+def _section_title(ctx: SectionContext) -> list[str]:
+    return [ctx.data["title"]] if ctx.data.get("title") else []
+
+
+def _visitor(formula_label: str) -> Visitor[list[str]]:
+    return Visitor(
+        default=lambda block, ctx: _fallback(block),
+        heading=lambda block, ctx: _heading(block),
+        paragraph=lambda block, ctx: _prose(block),
+        list=lambda block, ctx: _list(block),
+        table=lambda block, ctx: _table(block),
+        image=lambda block, ctx: _image(block),
+        code=lambda block, ctx: _plain(block),
+        # Preserve the current child label policy until E1.8 (#161).
+        math=lambda block, ctx: _math(
+            block, formula_label if ctx.section.depth == 0 else DEFAULT_FORMULA_LABEL,
+        ),
+        quote=lambda block, ctx: _prose(block),
+        details=lambda block, ctx: _prose(block),
+        note=lambda block, ctx: _prose(block),
+        warning=lambda block, ctx: _prose(block),
+        enter_section=_section_title,
+    )
 
 
 def _render_block(block: dict[str, Any], formula_label: str = DEFAULT_FORMULA_LABEL) -> list[str]:
-    """Renders one canonical block into plain-text lines, choosing formatting by block type.
+    """Compatibility entry point for one block, using the same visitor."""
+    return [line for group in walk(
+        {"sections": [{"blocks": [block]}]}, _visitor(formula_label),
+    ) for line in group]
 
-    Args:
-        block (dict): Canonical block mapping with at least "type" and the type-specific payload.
 
-    Returns:
-        list[str]: The rendered lines for the block.
-    """
-    block_type = block.get("type")
-    if block_type == "heading":
-        return [block.get("title", block.get("text", ""))]
-    if block_type == "paragraph":
-        return [_prose_text(block.get("text", ""), block)]
-    if block_type == "code":
-        return [block.get("text", "")]
-    if block_type == "list":
-        items = block.get("items", [])
-        if not block.get("ordered"):
-            return [f"- {_prose_text(str(item), block)}" for item in items]
-        numbering = list_numbering(block)
-        return [
-            f"{item_label(number, numbering)}. {_prose_text(str(item), block)}"
-            for number, item in enumerate(items, start=list_start(block))
-        ]
-    if block_type == "table":
-        return linearize_table_for_text(_spoken_table(block))
-    if block_type == "image":
-        return [block.get("alt_text") or block.get("text", "")]
-    if block_type == "math":
-        speech = block.get("alt_text") or formula_label.format(text=block.get('text', ''))
-        return [numbered_speech(speech, block.get("metadata") or {})]
-    if block_type in {"details", "note", "warning", "quote"}:
-        return [_prose_text(block.get("text", ""), block)]
+def _heading(block: dict[str, Any]) -> list[str]:
+    return [block.get("title", block.get("text", ""))]
+
+
+def _prose(block: dict[str, Any]) -> list[str]:
+    return [_prose_text(block.get("text", ""), block)]
+
+
+def _plain(block: dict[str, Any]) -> list[str]:
     return [block.get("text", "")]
+
+
+def _fallback(block: dict[str, Any]) -> list[str]:
+    # Retain the TypeError for unhashable kinds from the former set dispatch.
+    hash(block.get("type"))
+    return _plain(block)
+
+
+def _list(block: dict[str, Any]) -> list[str]:
+    items = block.get("items", [])
+    if not block.get("ordered"):
+        return [f"- {_prose_text(str(item), block)}" for item in items]
+    numbering = list_numbering(block)
+    return [
+        f"{item_label(number, numbering)}. {_prose_text(str(item), block)}"
+        for number, item in enumerate(items, start=list_start(block))
+    ]
+
+
+def _table(block: dict[str, Any]) -> list[str]:
+    return linearize_table_for_text(_spoken_table(block))
+
+
+def _image(block: dict[str, Any]) -> list[str]:
+    return [block.get("alt_text") or block.get("text", "")]
+
+
+def _math(block: dict[str, Any], formula_label: str) -> list[str]:
+    speech = block.get("alt_text") or formula_label.format(text=block.get('text', ''))
+    return [numbered_speech(speech, block.get("metadata") or {})]
 
 
 def _prose_text(text: str, block: dict[str, Any]) -> str:

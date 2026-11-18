@@ -68,8 +68,21 @@ Planned modules (phases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `rend
 ### Export walker (`docstruct.export.walk`)
 
 Added in 0.5.1 for [#371, E1.6](https://github.com/A11yDevs/acessilia/issues/371).
-Existing exporter APIs and output remain unchanged; migrating the four exporters
-is E1.7, after review of this contract ([ADR 0022](../../docs/adr/0022-export-walker-contract.md)).
+TXT, HTML, Pandoc AST and Markdown now use this walker in production (E1.7),
+following review of the contract in PR #570
+([ADR 0022](../../docs/adr/0022-export-walker-contract.md)). Existing exporter
+APIs and output remain unchanged. Each format registers its eleven callbacks
+and explicit fallback, reusing rendering helpers where policies agree.
+
+| Serializer | Selection retained in E1.7 |
+|---|---|
+| TXT | First legacy title omitted; current profile filter; custom formula labels apply only at root depth, as before |
+| HTML | First legacy title omitted; global profile/link filter between collection and rendering; TOC, table numbering and ID allocation scoped to each document |
+| Pandoc AST | First legacy title omitted; no profile filter inside the serializer; DOCX and PDF/UA target behavior retained |
+| Markdown | Every heading whose stripped text matches the section title omitted; no profile filter |
+
+Existing single-section/block helpers used by core adapters delegate to the same
+visitors. The installed library remains pure with no runtime dependencies.
 
 ```python
 from docstruct.export.walk import Visitor, walk

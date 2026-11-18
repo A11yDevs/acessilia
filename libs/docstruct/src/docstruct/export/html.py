@@ -13,8 +13,8 @@ from xml.etree import ElementTree
 
 from docstruct.blocks.lists import list_numbering, list_start
 from docstruct.export.filters import apply_output_profile_filter
+from docstruct.export.walk import BlockContext, SectionContext, Visitor, walk
 from docstruct.profiles import normalize_profile
-from docstruct.sections import section_body_blocks, section_title_alias
 from docstruct.tables.ast import split_header_and_body, table_ast_from_block
 from docstruct.text.equations import equation_number, numbered_speech
 from docstruct.text.math_spans import inline_math_entries, split_inline_math
@@ -35,31 +35,23 @@ class HtmlLabels:
 
 
 def _collect_section(section: dict[str, Any]) -> list[dict[str, Any]]:
-    """Collects the title heading, the direct blocks, and the recursively nested child blocks of one section.
+    """Compatibility entry point for one section, including its children."""
+    return _all_blocks({"sections": [section]})
 
-    Args:
-        section (dict): Canonical section mapping with optional "title", "blocks", and "children".
 
-    Returns:
-        list[dict]: Ordered blocks for the section plus every block of its nested children.
-    """
-    blocks = (
-        [
-            {
-                "type": "heading",
-                "level": section.get("level", 1),
-                "title": section.get("title", ""),
-                "id": section.get("id", ""),
-                "title_alias": section_title_alias(section),
-            }
-        ]
+def _section_title(ctx: SectionContext) -> dict[str, Any] | None:
+    section = ctx.data
+    return (
+        {
+            "type": "heading",
+            "level": section.get("level", 1),
+            "title": section.get("title", ""),
+            "id": section.get("id", ""),
+            "title_alias": ctx.title_alias,
+        }
         if section.get("title")
-        else []
+        else None
     )
-    blocks.extend(section_body_blocks(section))
-    for child in section.get("children", []):
-        blocks.extend(_collect_section(child))
-    return blocks
 
 
 
@@ -72,10 +64,12 @@ def _all_blocks(document: dict[str, Any]) -> list[dict[str, Any]]:
     Returns:
         list[dict]: All blocks (including section title headings) in document order.
     """
-    blocks: list[dict[str, Any]] = []
-    for section in document.get("sections", []):
-        blocks.extend(_collect_section(section))
-    return blocks
+    # Keep collection before the existing global profile filter: it rewrites
+    # links to omitted blocks and needs the complete flat block list.
+    return list(walk(
+        document, Visitor(default=lambda block, ctx: block, enter_section=_section_title),
+        select=lambda block, ctx: not ctx.is_legacy_title,
+    ))
 
 
 
@@ -154,6 +148,45 @@ def _allocate_id(base: str, reserved_ids: set[str] | None) -> str:
     return candidate
 
 
+def _visitor(
+    profile: dict[str, Any],
+    image_description: str,
+    table_region: str,
+    reserved_ids: set[str] | None,
+    *,
+    table_number: int = 0,
+    toc: list[tuple[Any, Any, Any]] | None = None,
+) -> Visitor[str]:
+    def heading(block: dict[str, Any], ctx: BlockContext) -> str:
+        if toc is not None:
+            toc.append((
+                block.get("level", 1),
+                block.get("title", block.get("text", "")),
+                block.get("id", ""),
+            ))
+        return _heading(block)
+
+    def table(block: dict[str, Any], ctx: BlockContext) -> str:
+        nonlocal table_number
+        table_number += 1
+        return _table(block, table_region, table_number, reserved_ids)
+
+    return Visitor(
+        default=lambda block, ctx: _text(block),
+        heading=heading,
+        paragraph=lambda block, ctx: _paragraph(block),
+        list=lambda block, ctx: _list(block),
+        table=table,
+        image=lambda block, ctx: _image(block, image_description),
+        code=lambda block, ctx: _code(block),
+        math=lambda block, ctx: _math(block),
+        quote=lambda block, ctx: _callout(block, reserved_ids),
+        details=lambda block, ctx: _details(block, profile),
+        note=lambda block, ctx: _callout(block, reserved_ids),
+        warning=lambda block, ctx: _callout(block, reserved_ids),
+    )
+
+
 def _render_block(
     block: dict[str, Any],
     profile: dict[str, Any],
@@ -162,147 +195,172 @@ def _render_block(
     table_number: int = 1,
     reserved_ids: set[str] | None = None,
 ) -> str:
-    """Renders one canonical block into its HTML fragment according to the block type and profile.
+    """Compatibility entry point for one block, using the document visitor."""
+    return next(walk({"sections": [{"blocks": [block]}]}, _visitor(
+        profile, image_description, table_region, reserved_ids,
+        table_number=table_number - 1,
+    )), "")
 
-    Args:
-        block (dict): Canonical block mapping with at least "type", "id" and the type-specific payload (text, items, table_ast, ...).
-        profile (dict): Normalized export profile mapping; "collapsible" controls whether explicit details blocks render as <details> or <section>; note, warning and quote blocks are never collapsed.
-        image_description (str): Resolved label for image descriptions.
-        table_region (str): Resolved label template for uncaptioned tables, with optional {number}.
-        table_number (int): One-based table position in document order.
-        reserved_ids (set|None): IDs already used in the page; derived IDs (table captions, callout titles) are allocated outside it and added to it.
 
-    Returns:
-        str: The HTML fragment for the block (empty string when a table block carries no usable table_ast).
-    """
-    block_type = block.get("type")
+def _heading(block: dict[str, Any]) -> str:
     block_id = escape(block.get("id", ""))
-    if block_type == "heading":
-        level = min(max(int(block.get("level", 1)), 1), 6)
-        alias = block.get("title_alias", "")
-        anchor = f'<span id="{escape(alias)}"></span>' if alias else ""
-        return f'{anchor}<h{level} id="{block_id}">{escape(block.get("title", block.get("text", "")))}</h{level}>'
-    if block_type == "paragraph":
-        return f'<p id="{block_id}">{_prose_html(block.get("text", ""), block)}</p>'
-    if block_type == "code":
-        return (
-            f'<pre id="{block_id}"><code>{escape(block.get("text", ""))}</code></pre>'
-        )
-    if block_type == "list":
-        tag = "ol" if block.get("ordered") else "ul"
-        start = list_start(block) if tag == "ol" else 1
-        start_attr = f' start="{start}"' if start != 1 else ""
-        list_type = _OL_TYPES.get(list_numbering(block)) if tag == "ol" else None
-        if list_type:
-            start_attr += f' type="{list_type}"'
-        items = "".join(
-            f"<li>{_prose_html(str(item), block)}</li>" for item in block.get("items", [])
-        )
-        return f'<{tag} id="{block_id}"{start_attr}>{items}</{tag}>'
-    if block_type == "table":
-        table_ast = table_ast_from_block(block)
-        if table_ast is None:
-            return ""
-        header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
+    level = min(max(int(block.get("level", 1)), 1), 6)
+    alias = block.get("title_alias", "")
+    anchor = f'<span id="{escape(alias)}"></span>' if alias else ""
+    return f'{anchor}<h{level} id="{block_id}">{escape(block.get("title", block.get("text", "")))}</h{level}>'
 
-        caption = next((
-            value.strip() for value in (
-                table_ast.get("caption"), block.get("caption"), block.get("title"),
-            ) if isinstance(value, str) and value.strip()
-        ), "")
-        caption_id = (
-            _allocate_id(f"{block_id or f'table-{table_number}'}-caption", reserved_ids)
-            if caption else ""
-        )
-        caption_html = (
-            f'<caption id="{caption_id}">{_prose_html(caption, block)}</caption>'
-            if caption
-            else ""
-        )
-        region_name = (
-            f'aria-labelledby="{caption_id}"'
-            if caption
-            else f'aria-label="{escape(table_region.format(number=table_number))}"'
-        )
 
-        thead = ""
-        if header_rows:
-            thead_rows = "".join(
-                _render_html_table_row(row, header=True, block=block) for row in header_rows
-            )
-            thead = f"<thead>{thead_rows}</thead>"
+def _paragraph(block: dict[str, Any]) -> str:
+    block_id = escape(block.get("id", ""))
+    return f'<p id="{block_id}">{_prose_html(block.get("text", ""), block)}</p>'
 
-        tbody_rows = "".join(
-            _render_html_table_row(row, header=False, block=block) for row in body_rows
-        )
-        tbody = f"<tbody>{tbody_rows}</tbody>" if tbody_rows else ""
 
-        tfoot = ""
-        if footer_rows:
-            tfoot_rows = "".join(
-                _render_html_table_row(row, header=False, block=block) for row in footer_rows
-            )
-            tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
+def _code(block: dict[str, Any]) -> str:
+    block_id = escape(block.get("id", ""))
+    return (
+        f'<pre id="{block_id}"><code>{escape(block.get("text", ""))}</code></pre>'
+    )
 
-        return (
-            f'<div class="table-wrap" tabindex="0" role="region" {region_name}>'
-            f'<table id="{block_id}">'
-            f"{caption_html}{thead}{tbody}{tfoot}</table></div>"
+
+def _list(block: dict[str, Any]) -> str:
+    block_id = escape(block.get("id", ""))
+    tag = "ol" if block.get("ordered") else "ul"
+    start = list_start(block) if tag == "ol" else 1
+    start_attr = f' start="{start}"' if start != 1 else ""
+    list_type = _OL_TYPES.get(list_numbering(block)) if tag == "ol" else None
+    if list_type:
+        start_attr += f' type="{list_type}"'
+    items = "".join(
+        f"<li>{_prose_html(str(item), block)}</li>" for item in block.get("items", [])
+    )
+    return f'<{tag} id="{block_id}"{start_attr}>{items}</{tag}>'
+
+
+def _table(block: dict[str, Any], table_region: str, table_number: int, reserved_ids: set[str] | None) -> str:
+    block_id = escape(block.get("id", ""))
+    table_ast = table_ast_from_block(block)
+    if table_ast is None:
+        return ""
+    header_rows, body_rows, footer_rows = split_header_and_body(table_ast)
+
+    caption = next((
+        value.strip() for value in (
+            table_ast.get("caption"), block.get("caption"), block.get("title"),
+        ) if isinstance(value, str) and value.strip()
+    ), "")
+    caption_id = (
+        _allocate_id(f"{block_id or f'table-{table_number}'}-caption", reserved_ids)
+        if caption else ""
+    )
+    caption_html = (
+        f'<caption id="{caption_id}">{_prose_html(caption, block)}</caption>'
+        if caption
+        else ""
+    )
+    region_name = (
+        f'aria-labelledby="{caption_id}"'
+        if caption
+        else f'aria-label="{escape(table_region.format(number=table_number))}"'
+    )
+
+    thead = ""
+    if header_rows:
+        thead_rows = "".join(
+            _render_html_table_row(row, header=True, block=block) for row in header_rows
         )
-    if block_type == "image":
-        alt = escape(block.get("alt_text", block.get("text", "")))
-        desc = escape(block.get("long_description", ""))
-        details = (
-            f"<details><summary>{escape(image_description)}</summary><p>{desc or alt}</p></details>"
-            if desc
-            else ""
+        thead = f"<thead>{thead_rows}</thead>"
+
+    tbody_rows = "".join(
+        _render_html_table_row(row, header=False, block=block) for row in body_rows
+    )
+    tbody = f"<tbody>{tbody_rows}</tbody>" if tbody_rows else ""
+
+    tfoot = ""
+    if footer_rows:
+        tfoot_rows = "".join(
+            _render_html_table_row(row, header=False, block=block) for row in footer_rows
         )
-        return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
-    if block_type == "math":
-        metadata = block.get("metadata") or {}
-        number = equation_number(metadata)
-        speech = block.get("alt_text") or (block.get("text", "") if number else "")
-        label = numbered_speech(str(speech), metadata)
-        alt = escape(label)
-        number_html = (
-            f'<span class="equation-number" aria-hidden="true">({escape(number)})</span>'
-            if number else ""
-        )
-        mathml = _safe_mathml(
-            metadata.get("mathml", ""), aria_label=label, display="block"
-        )
-        if mathml:
-            # A numbered equation is a row: the formula, its number on the right.
-            css_class = ' class="equation"' if number_html else ""
-            return f'<div id="{block_id}"{css_class}>{mathml}{number_html}</div>'
-        return (
-            f'<p id="{block_id}" role="math" aria-label="{alt}">'
-            f'{escape(block.get("text", ""))}{number_html}</p>'
-        )
-    if block_type in {"note", "warning", "quote"}:
-        title = block.get("title")
-        has_title = isinstance(title, str) and bool(title.strip())
-        content = _prose_html(block.get("text", ""), block)
-        if block_type == "quote":
-            title_html = f"<p><strong>{escape(title)}</strong></p>" if has_title else ""
-            return f'<blockquote id="{block_id}" class="quote">{title_html}<p>{content}</p></blockquote>'
-        # role="note": several unnamed complementary landmarks inside <main>
-        # would be indistinguishable; a callout is a note, not a landmark.
-        title_html, name = "", ""
-        if has_title:
-            title_id = _allocate_id(f"{block_id or block_type}-title", reserved_ids)
-            title_html = f'<p id="{title_id}"><strong>{escape(title)}</strong></p>'
-            name = f' aria-labelledby="{title_id}"'
-        return (
-            f'<aside id="{block_id}" class="{block_type}" role="note"{name}>'
-            f"{title_html}<p>{content}</p></aside>"
-        )
-    if block_type == "details":
-        summary = escape(block.get("title", block_type.title()))
-        content = _prose_html(block.get("text", ""), block)
-        if profile.get("collapsible"):
-            return f'<details id="{block_id}"><summary>{summary}</summary><p>{content}</p></details>'
-        return f'<section id="{block_id}"><h2>{summary}</h2><p>{content}</p></section>'
+        tfoot = f"<tfoot>{tfoot_rows}</tfoot>"
+
+    return (
+        f'<div class="table-wrap" tabindex="0" role="region" {region_name}>'
+        f'<table id="{block_id}">'
+        f"{caption_html}{thead}{tbody}{tfoot}</table></div>"
+    )
+
+
+def _image(block: dict[str, Any], image_description: str) -> str:
+    block_id = escape(block.get("id", ""))
+    alt = escape(block.get("alt_text", block.get("text", "")))
+    desc = escape(block.get("long_description", ""))
+    details = (
+        f"<details><summary>{escape(image_description)}</summary><p>{desc or alt}</p></details>"
+        if desc
+        else ""
+    )
+    return f'<figure id="{block_id}"><img alt="{alt}" src="{escape(block.get("metadata", {}).get("src", ""))}">{details}</figure>'
+
+
+def _math(block: dict[str, Any]) -> str:
+    block_id = escape(block.get("id", ""))
+    metadata = block.get("metadata") or {}
+    number = equation_number(metadata)
+    speech = block.get("alt_text") or (block.get("text", "") if number else "")
+    label = numbered_speech(str(speech), metadata)
+    alt = escape(label)
+    number_html = (
+        f'<span class="equation-number" aria-hidden="true">({escape(number)})</span>'
+        if number else ""
+    )
+    mathml = _safe_mathml(
+        metadata.get("mathml", ""), aria_label=label, display="block"
+    )
+    if mathml:
+        # A numbered equation is a row: the formula, its number on the right.
+        css_class = ' class="equation"' if number_html else ""
+        return f'<div id="{block_id}"{css_class}>{mathml}{number_html}</div>'
+    return (
+        f'<p id="{block_id}" role="math" aria-label="{alt}">'
+        f'{escape(block.get("text", ""))}{number_html}</p>'
+    )
+
+
+def _callout(block: dict[str, Any], reserved_ids: set[str] | None) -> str:
+    block_id = escape(block.get("id", ""))
+    block_type = block.get("type")
+    title = block.get("title")
+    has_title = isinstance(title, str) and bool(title.strip())
+    content = _prose_html(block.get("text", ""), block)
+    if block_type == "quote":
+        title_html = f"<p><strong>{escape(title)}</strong></p>" if has_title else ""
+        return f'<blockquote id="{block_id}" class="quote">{title_html}<p>{content}</p></blockquote>'
+    # role="note": several unnamed complementary landmarks inside <main>
+    # would be indistinguishable; a callout is a note, not a landmark.
+    title_html, name = "", ""
+    if has_title:
+        title_id = _allocate_id(f"{block_id or block_type}-title", reserved_ids)
+        title_html = f'<p id="{title_id}"><strong>{escape(title)}</strong></p>'
+        name = f' aria-labelledby="{title_id}"'
+    return (
+        f'<aside id="{block_id}" class="{block_type}" role="note"{name}>'
+        f"{title_html}<p>{content}</p></aside>"
+    )
+
+
+def _details(block: dict[str, Any], profile: dict[str, Any]) -> str:
+    block_id = escape(block.get("id", ""))
+    block_type = block.get("type")
+    summary = escape(block.get("title", block_type.title()))
+    content = _prose_html(block.get("text", ""), block)
+    if profile.get("collapsible"):
+        return f'<details id="{block_id}"><summary>{summary}</summary><p>{content}</p></details>'
+    return f'<section id="{block_id}"><h2>{summary}</h2><p>{content}</p></section>'
+
+
+def _text(block: dict[str, Any]) -> str:
+    block_id = escape(block.get("id", ""))
+    # Retain the TypeError for unhashable kinds from the former set dispatch.
+    hash(block.get("type"))
     return f'<p id="{block_id}">{escape(block.get("text", ""))}</p>'
 
 
@@ -412,26 +470,12 @@ def document_to_html(
     blocks = apply_output_profile_filter(_all_blocks(document), profile)
 
     toc = []
-    body = []
-    table_number = 0
     reserved_ids = {escape(str(block["id"])) for block in blocks if block.get("id")}
     reserved_ids |= {escape(str(block["title_alias"])) for block in blocks if block.get("title_alias")}
-    for block in blocks:
-        if block.get("type") == "table":
-            table_number += 1
-        if block.get("type") == "heading":
-            toc.append(
-                (
-                    block.get("level", 1),
-                    block.get("title", block.get("text", "")),
-                    block.get("id", ""),
-                )
-            )
-        body.append(_render_block(
-            block, profile_dict, labels.image_description,
-            labels.extra.get("table_region", "Table {number}"), table_number,
-            reserved_ids,
-        ))
+    body = list(walk({"sections": [{"blocks": blocks}]}, _visitor(
+        profile_dict, labels.image_description,
+        labels.extra.get("table_region", "Table {number}"), reserved_ids, toc=toc,
+    )))
 
     title = escape(document.get("title") or labels.default_title)
     toc_label = escape(labels.table_of_contents)

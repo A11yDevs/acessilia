@@ -15,6 +15,12 @@ O projeto segue a camada *Domínio → Aplicação → Interface*:
 - **frontend** – clientes da API: painel web, bot do Telegram e CLI.
 - **tests** – suíte de testes unitários cobrindo a maioria dos módulos.
 
+A serialização de TXT, HTML, AST Pandoc e Markdown de benchmark compartilha a
+travessia pura `docstruct.export.walk`, com um visitor para a política atual de
+seleção e renderização de cada formato. Os adaptadores TXT/HTML do core resolvem
+rótulos e escrevem arquivos; DOCX e PDF/UA são renderizados na Toolbox. Veja a
+[arquitetura de exportação](docs/architecture.pt-br.md#2-pipeline-de-documento-canônico-e-exportação-backendcorepipeline-backendcoreexport).
+
 ### API standalone
 
 A **API** (`http://localhost:8000`) é o núcleo: recebe o arquivo, coloca na fila, processa com o LLM, exporta os formatos acessíveis (TXT, DOCX, PDF/UA, HTML, MP3, ZIP) e disponibiliza o download via token. Os frontends (web, Telegram, CLI) consomem tudo por HTTP usando o cliente compartilhado `frontend.clients.api_client.ApiClient`.

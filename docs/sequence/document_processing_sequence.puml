@@ -13,6 +13,8 @@ participant "VisionAgent / DataAgent\n(Agno LLM)" as Agents
 participant "Acessilia Toolbox\n(via acessilia-sdk)" as Toolbox
 participant "Canonical builder\nlibs/core/src/acessilia_core/pipeline" as Builder
 participant "Renderers\nlibs/core/src/acessilia_core/export" as Export
+participant "Pure serializers\nlibs/docstruct/export" as PureExport
+participant "Shared walker\ndocstruct.export.walk" as Walker
 
 User -> Front: Upload a document (PDF/image)
 Front -> Orchestrator: execute(file_path)
@@ -48,6 +50,18 @@ Orchestrator -> Builder: build_canonical_document()
 Builder --> Orchestrator: validated canonical document
 
 Orchestrator -> Export: render formats
+loop requested pure exports (TXT, HTML, Pandoc AST, benchmark Markdown)
+  Export -> PureExport: canonical document, format options
+  PureExport -> Walker: walk(document, visitor, select)
+  Walker -> PureExport: section hooks and per-type/default callbacks
+  PureExport --> Walker: rendered values (no I/O)
+  Walker --> PureExport: ordered results
+  PureExport --> Export: text / HTML / AST / Markdown
+end
+note over PureExport, Walker
+  Each serializer keeps its current omission/filter policy.
+  HTML filters the collected blocks before rendering.
+end note
 Export -> Toolbox: PDF/UA render
 Export --> Front: accessible files (TXT, DOCX, PDF, PDF/UA, HTML, MP3)
 Front --> User: deliver the accessible document

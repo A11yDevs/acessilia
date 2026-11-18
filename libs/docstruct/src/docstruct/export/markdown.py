@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from docstruct.blocks.lists import list_start
+from docstruct.export.walk import BlockContext, SectionContext, Visitor, walk
 from docstruct.tables.ast import table_ast_from_block
 from docstruct.text.latex import bare_latex
 from docstruct.text.equations import numbered_latex
@@ -33,49 +34,83 @@ def document_to_markdown(document: dict[str, Any]) -> str:
 
 
 def _walk_sections(sections: list[dict[str, Any]]):
-    for section in sections:
-        level = int(section.get("level", 1) or 1)
-        sec_title = (section.get("title") or "").strip()
-        if sec_title:
-            yield f"{'#' * max(1, min(level, 6))} {sec_title}"
-        for block in section.get("blocks", []):
-            # build_canonical_document emits both the section title and its
-            # heading block.
-            if block.get("type") == "heading" and sec_title:
-                if (block.get("text") or "").strip() == sec_title:
-                    continue
-            rendered = _render_block(block)
-            if rendered:
-                yield rendered
-        yield from _walk_sections(section.get("children", []))
+    for rendered in walk({"sections": sections}, _visitor(), select=_select_block):
+        if rendered:
+            yield rendered
+
+
+def _select_block(block: dict[str, Any], ctx: BlockContext) -> bool:
+    # Markdown historically omits every matching heading, regardless of its
+    # position or level. Unifying this with legacy-title selection is E1.8.
+    title = (ctx.section.data.get("title") or "").strip()
+    return not (
+        block.get("type") == "heading" and title
+        and (block.get("text") or "").strip() == title
+    )
+
+
+def _section_title(ctx: SectionContext) -> str | None:
+    level = int(ctx.data.get("level", 1) or 1)
+    title = (ctx.data.get("title") or "").strip()
+    return f"{'#' * max(1, min(level, 6))} {title}" if title else None
+
+
+def _visitor() -> Visitor[str]:
+    return Visitor(
+        default=lambda block, ctx: _text(block),
+        heading=lambda block, ctx: _heading(block),
+        paragraph=lambda block, ctx: _text(block),
+        list=lambda block, ctx: _list(block),
+        table=lambda block, ctx: render_table(block),
+        image=lambda block, ctx: _image(block),
+        code=lambda block, ctx: _code(block),
+        math=lambda block, ctx: _math(block),
+        quote=lambda block, ctx: _text(block),
+        details=lambda block, ctx: _text(block),
+        note=lambda block, ctx: _text(block),
+        warning=lambda block, ctx: _text(block),
+        enter_section=_section_title,
+    )
 
 
 def _render_block(block: dict[str, Any]) -> str:
-    btype = block.get("type", "")
-    if btype == "heading":
-        level = int(block.get("level", 1) or 1)
-        text = (block.get("text") or "").strip()
-        return f"{'#' * max(1, min(level, 6))} {text}" if text else ""
-    if btype == "math":
-        latex = numbered_latex(bare_latex(block.get("text") or ""), block.get("metadata") or {})
-        return f"$$\n{latex}\n$$" if latex else ""
-    if btype == "code":
-        language = (block.get("language") or "").strip()
-        return f"```{language}\n{block.get('text') or ''}\n```"
-    if btype == "table":
-        return render_table(block)
-    if btype == "list":
-        # Numbered by source position, so an empty item dropped here leaves
-        # the same numbers as in the other exports; CommonMark lists are
-        # decimal only, so a lettered or roman list keeps its numbers.
-        lines = []
-        for number, item in enumerate(block.get("items", []), start=list_start(block)):
-            marker = f"{number}." if block.get("ordered") else "-"
-            if str(item).strip():
-                lines.append(f"{marker} {str(item).strip()}")
-        return "\n".join(lines)
-    if btype == "image":
-        return ""
+    """Render one block using the document visitor, without section selection."""
+    return next(walk({"sections": [{"blocks": [block]}]}, _visitor()), "")
+
+
+def _heading(block: dict[str, Any]) -> str:
+    level = int(block.get("level", 1) or 1)
+    text = (block.get("text") or "").strip()
+    return f"{'#' * max(1, min(level, 6))} {text}" if text else ""
+
+
+def _math(block: dict[str, Any]) -> str:
+    latex = numbered_latex(bare_latex(block.get("text") or ""), block.get("metadata") or {})
+    return f"$$\n{latex}\n$$" if latex else ""
+
+
+def _code(block: dict[str, Any]) -> str:
+    language = (block.get("language") or "").strip()
+    return f"```{language}\n{block.get('text') or ''}\n```"
+
+
+def _list(block: dict[str, Any]) -> str:
+    # Numbered by source position, so an empty item dropped here leaves
+    # the same numbers as in the other exports; CommonMark lists are
+    # decimal only, so a lettered or roman list keeps its numbers.
+    lines = []
+    for number, item in enumerate(block.get("items", []), start=list_start(block)):
+        marker = f"{number}." if block.get("ordered") else "-"
+        if str(item).strip():
+            lines.append(f"{marker} {str(item).strip()}")
+    return "\n".join(lines)
+
+
+def _image(block: dict[str, Any]) -> str:
+    return ""
+
+
+def _text(block: dict[str, Any]) -> str:
     return (block.get("text") or "").strip()
 
 
