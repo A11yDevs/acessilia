@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:text-spans:1.0.0",
+  "title": "Text Spans",
+  "description": "Text layer of a PDF as lines of spans with font, size, style flags and geometry. Coordinates are PDF points in the unrotated page space with the origin at the top-left corner (y grows downwards); a rotated page reports its rotation and keeps the unrotated width and height.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["page_count", "coord_origin", "pages"],
+  "definitions": {
+    "bbox": {
+      "type": "array",
+      "description": "[x0, y0, x1, y1] in points.",
+      "items": {"type": "number"},
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "font", "size", "flags", "bbox", "origin"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1, "description": "The PDF's character mapping, trimmed: an OT1-encoded TeX font gives an accented letter as the bare letter and a separate spacing accent."},
+        "font": {
+          "type": "string",
+          "description": "Font name as embedded, without the subset prefix (CMMI12, CMR8, MSBM10)."
+        },
+        "size": {"type": "number", "minimum": 0, "description": "Font size in points."},
+        "flags": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "PyMuPDF style bits: 1 superscript, 2 italic, 4 serif, 8 monospaced, 16 bold."
+        },
+        "bbox": {"$ref": "#/definitions/bbox"},
+        "origin": {
+          "type": "array",
+          "description": "[x, y] of the span's baseline start; a raised or lowered script has another baseline y than the text around it.",
+          "items": {"type": "number"},
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bbox", "spans"],
+      "properties": {
+        "bbox": {"$ref": "#/definitions/bbox"},
+        "spans": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/span"}}
+      }
+    }
+  },
+  "properties": {
+    "page_count": {"type": "integer", "minimum": 0, "description": "Pages in the document."},
+    "coord_origin": {"type": "string", "enum": ["TOPLEFT"]},
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["page_number", "width", "height", "rotation", "lines"],
+        "properties": {
+          "page_number": {"type": "integer", "minimum": 1},
+          "width": {"type": "number", "minimum": 0},
+          "height": {"type": "number", "minimum": 0},
+          "rotation": {"type": "integer", "enum": [0, 90, 180, 270]},
+          "lines": {"type": "array", "items": {"$ref": "#/definitions/line"}}
+        }
+      }
+    }
+  }
+}

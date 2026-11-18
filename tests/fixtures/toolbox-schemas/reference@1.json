@@ -5,13 +5,7 @@
   "description": "A reference to a stored artifact (ADR-0015 in the Acessilia core). The artifact's bytes are retrieved through the artifact API. digest always equals artifact_id; the Toolbox, the only producer, guarantees it, since Draft-07 cannot state equality between properties. scope and provenance come in reference@2.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "artifact_id",
-    "digest",
-    "media_type",
-    "size",
-    "store"
-  ],
+  "required": ["artifact_id", "digest", "media_type", "size", "store"],
   "properties": {
     "artifact_id": {
       "description": "Content-addressed identifier, always in canonical form: sha256: followed by 64 lowercase hex digits. Opaque to clients, stable and immutable.",
@@ -35,10 +29,7 @@
     },
     "store": {
       "description": "Kind of backend that served the reference (for example s3 or filesystem; never failover). It does not identify a deployment and is not used to route a download. null when the response claims no available, verified storage location: a result that was never stored, or a cache hit served inline while the store was unavailable. null is not proof that the artifact does not exist.",
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "minLength": 1
     }
   }

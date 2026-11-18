@@ -1,0 +1,31 @@
+{
+  "repository": "A11yDevs/acessilia-toolbox",
+  "commit": "c536c2007912e0ce2f20bd930215d96e6f4c09be",
+  "sha256": {
+    "toolbox-contract.json": "6881718f9446b07393af4fdb681fcf42a96dfdc8938bc367874d077e38ff447c",
+    "toolbox-schemas/dataset-artifact@1.json": "3fa307b48f9624d178f1545ed4852534afcb7f4d918ed07daebff673dd580fc7",
+    "toolbox-schemas/dataset-info@1.json": "975142318878caf680f3aee366d7d646afe071a9837af2a384af9ed608e17691",
+    "toolbox-schemas/dataset-item-list@1.json": "035d534c94f5cfb77fbb68936be6d6a79a2ab52dd86f47ea41582b9d6932198c",
+    "toolbox-schemas/dataset-item-summary-list@1.json": "10f3c19da147178b8a7dc8a4ff3a2f852ae05e5d3179d641dafeb4e6217fa36b",
+    "toolbox-schemas/dataset-item-summary@1.json": "f012886f2a214025691e1a856886d6f70387265a7a2ae08c6097f1905f91d94f",
+    "toolbox-schemas/dataset-item@1.json": "03d43538fd7aad9bf7062f7079bf59630e9e6ae57fd2b4a4492f3f2b3c924910",
+    "toolbox-schemas/dataset-list@1.json": "e113331e6796457a8661f4c5882db6fd1a9584e011ee38802c92a339d2a5b9ee",
+    "toolbox-schemas/dataset-sample@1.json": "fb3b5fabb6d5333cdfbf012e65dd482d0e2b5034175b63cbb7c889abc102fe93",
+    "toolbox-schemas/dataset-split@1.json": "f1c00a43719018cfac46dca175c8fbaf5042fbf228ebf6ffe9e37de0e8391a0a",
+    "toolbox-schemas/dataset-splits@1.json": "3284ecaf9d2a70c3ed1c65162079597f36e0822bd80c8b71358a89bf351c2d80",
+    "toolbox-schemas/dataset-sync-entry@1.json": "e634af13e0e4a9cccc27df2b0a1910911ac8bdb2d7214036157d697f1a483785",
+    "toolbox-schemas/dataset-sync-report@1.json": "e1180b7ffcbc8ec21cd9f22fdc814edf4b9c521cd3efeebbdc9d165f4f2f5ef8",
+    "toolbox-schemas/image@2.json": "95b97337289374f6414976c432b5a186e6fff0d835009a114a7e14033bad400f",
+    "toolbox-schemas/latex@1.json": "73ebc92731825134389548134bcc39954d398d43d5aa3937bfdf977ebbdb2382",
+    "toolbox-schemas/layout-analysis@1.json": "bab5fb37306cd7a64ebda99fa096fbf15b15be6a2f8c03ebfe5be419a7d2ebf9",
+    "toolbox-schemas/mathml@1.json": "ebb0bec0bb6fbc7ec7bcdce74a7e4db95f9485a7caf1ff05a9e90fe0e0e65ca4",
+    "toolbox-schemas/media-inspection@1.json": "66d723ceac4dfbfaf3ebf482694201cbe5b250b4fe2d573932ea26ea5e3cca18",
+    "toolbox-schemas/page-judgement@1.json": "2077ed0ecd8a9b9947b12368f99213f0c3d571bc3c610659c2815f564e6e4195",
+    "toolbox-schemas/pdf-validation-report@1.json": "a59f60bfb8713b06702831337dc701e80715435635df8a0c6669410e9a4dfb5c",
+    "toolbox-schemas/reference@1.json": "e580aa0cd2740e37a2ea925971e775586e4920c9e4a47e81449f63540fbb64fa",
+    "toolbox-schemas/region-transcription@1.json": "7b3af8cb0e0fba4188eeca13881a0faa19541d5550b6aad648abdb8be3046f56",
+    "toolbox-schemas/structured-document@1.json": "dfc63d45f44c50d2b34f3af6d79c8fa225d88364df8e291fb2f905280da0b472",
+    "toolbox-schemas/text-spans@1.json": "3113fdedef4fbcabc5d0b25531818e1ed28448c0938dabc00282c4e90b09dd97",
+    "toolbox-schemas/verbalized@1.json": "8be5678feea86744a1426dfca2b9b02d72a399cab719cc10cb4dee92862ac2f5"
+  }
+}

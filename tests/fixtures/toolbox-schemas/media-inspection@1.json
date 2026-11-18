@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:media-inspection:1.0.0",
+  "title": "Media Inspection",
+  "description": "Deterministic inspection of a binary artifact: detected format, dimensions, page count and whether visual inspection is required. Fields whose value cannot be measured are reported as null together with the source that produced them, so a consumer can always tell a measured value from a missing one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "media_type",
+    "file_size_bytes",
+    "is_image",
+    "is_pdf",
+    "page_count",
+    "artifact_nature",
+    "requires_visual_inspection"
+  ],
+  "properties": {
+    "media_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MIME type detected from the payload container, not from the filename or the caller's declaration."
+    },
+    "declared_media_type": {
+      "type": ["string", "null"],
+      "description": "MIME type the caller declared for this artifact. Retained so a caller can tell its declaration from the detected container type."
+    },
+    "file_size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total size of the artifact in bytes."
+    },
+    "is_image": {
+      "type": "boolean",
+      "description": "Whether the payload is a recognizable raster image."
+    },
+    "is_pdf": {
+      "type": "boolean",
+      "description": "Whether the payload is a PDF document."
+    },
+    "page_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of pages or frames; 1 for single-frame images and for artifacts whose page count could not be determined."
+    },
+    "page_count_source": {
+      "type": ["string", "null"],
+      "enum": ["pymupdf", "content_stream_scan", "pillow", null],
+      "description": "Mechanism that produced page_count; null when it could not be determined."
+    },
+    "dimensions": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["width", "height", "aspect_ratio"],
+      "description": "Pixel dimensions of the primary image or first page; null when they could not be measured.",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Pixel width."
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Pixel height."
+        },
+        "aspect_ratio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Ratio of width to height."
+        }
+      }
+    },
+    "dimensions_source": {
+      "type": ["string", "null"],
+      "enum": ["pymupdf", "pillow", null],
+      "description": "Mechanism that measured dimensions; null when they are unknown."
+    },
+    "color_mode": {
+      "type": ["string", "null"],
+      "description": "Color model reported by the image container (e.g. RGB, RGBA, L, CMYK); null when not applicable."
+    },
+    "format": {
+      "type": ["string", "null"],
+      "description": "Container format name (e.g. JPEG, PNG, PDF, TIFF); null when unrecognized."
+    },
+    "artifact_nature": {
+      "type": "string",
+      "enum": ["standalone_image", "scanned_page", "paginated_document", "unknown"],
+      "description": "Classification heuristic of the artifact nature."
+    },
+    "document_genre": {
+      "type": ["string", "null"],
+      "enum": ["presentation", "document", null],
+      "description": "Whether a PDF is a slide deck (presentation) or another document; null when it was not measured (images, or PDFs without PyMuPDF). Absent in reports from providers older than pure-media-inspect 1.1.0."
+    },
+    "genre_signals": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Why document_genre is presentation: the producer or creator software (producer:powerpoint) or the page geometry (geometry:landscape-uniform). Empty for a document."
+    },
+    "requires_visual_inspection": {
+      "type": "boolean",
+      "description": "Flag indicating that the artifact is, or contains, prominent visual content the agent must inspect with vision."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Media-specific metadata fields."
+    }
+  }
+}
