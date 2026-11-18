@@ -98,6 +98,25 @@ MSG_SKELETON_CONFIRMED = "Skeleton order confirmed on pages {pages}"
 MSG_XYCUT_NONE = "XY-cut found no reading-order change"
 MSG_XYCUT_APPLIED = "XY-cut reading order applied on pages {pages}"
 
+MSG_RESCUE_RESTORED = (
+    "Blocks restored from the primary provider: {count} (pages {pages})"
+)
+MSG_RESCUE_ROUTED_COMPLETE = (
+    "Pages {pages}, taken from the secondary provider, already carry the "
+    "primary provider's text"
+)
+MSG_RESCUE_PRIMARY_KEPT = (
+    "Pages {pages} keep the primary provider's extraction; no block is missing"
+)
+MSG_RESCUE_FUSED_PAGES = (
+    "Pages {pages} were rewritten by the text fusion; the primary provider's "
+    "blocks are no longer available"
+)
+MSG_RESCUE_REPLACED_UNKNOWN = (
+    "Pages {pages} came from {provider}, but the extraction does not keep the "
+    "primary page they replaced"
+)
+
 MSG_SECONDARY_MISSING = "Secondary provider extraction missing from the manifest"
 MSG_PROVIDER_PAIR_UNCALIBRATED = (
     "Rule calibrated for {expected}; current pair: {primary}+{secondary}"
@@ -208,6 +227,11 @@ SINGLE_MESSAGES: tuple[str, ...] = (
     MSG_SKELETON_CONFIRMED,
     MSG_XYCUT_NONE,
     MSG_XYCUT_APPLIED,
+    MSG_RESCUE_RESTORED,
+    MSG_RESCUE_ROUTED_COMPLETE,
+    MSG_RESCUE_PRIMARY_KEPT,
+    MSG_RESCUE_FUSED_PAGES,
+    MSG_RESCUE_REPLACED_UNKNOWN,
     MSG_SECONDARY_MISSING,
     MSG_PROVIDER_PAIR_UNCALIBRATED,
     MSG_SECONDARY_UNAVAILABLE,

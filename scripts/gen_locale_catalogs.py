@@ -1033,6 +1033,11 @@ HANDLER_SINGLE_TRANSLATIONS: dict[str, str] = {
     handler_messages.MSG_SKELETON_APPLIED: "Ordem do esqueleto aplicada nas páginas {pages}",
     handler_messages.MSG_SKELETON_CONFIRMED: "Ordem do esqueleto confirmada nas páginas {pages}",
     handler_messages.MSG_XYCUT_NONE: "XY-cut não identificou uma mudança de ordem de leitura",
+    handler_messages.MSG_RESCUE_RESTORED: "Blocos restaurados do provider primário: {count} (páginas {pages})",
+    handler_messages.MSG_RESCUE_ROUTED_COMPLETE: "As páginas {pages}, tomadas do provider secundário, já trazem o texto do provider primário",
+    handler_messages.MSG_RESCUE_PRIMARY_KEPT: "As páginas {pages} mantêm a extração do provider primário; nenhum bloco falta",
+    handler_messages.MSG_RESCUE_FUSED_PAGES: "As páginas {pages} foram reescritas pela fusão de texto; os blocos do provider primário não estão mais disponíveis",
+    handler_messages.MSG_RESCUE_REPLACED_UNKNOWN: "As páginas {pages} vieram de {provider}, mas a extração não guarda a página primária que elas substituíram",
     handler_messages.MSG_XYCUT_APPLIED: "Ordem de leitura XY-cut aplicada nas páginas {pages}",
     handler_messages.MSG_SECONDARY_MISSING: (
         "Extração do provider secundário ausente do manifesto"

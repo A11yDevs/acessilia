@@ -193,27 +193,21 @@ async def test_job_finishes_with_warning_when_only_refinements_remain(
 
 
 @pytest.mark.asyncio
-async def test_an_omitted_block_with_no_rescue_method_does_not_fail_the_job(
-    monkeypatch, tmp_path
-):
-    """`rescue-omitted` has no handler, so only human review was left to fail."""
+async def test_an_omitted_block_left_open_fails_the_job(monkeypatch, tmp_path):
+    """`rescue-omitted` restores the block (#236), so one still open lost content.
+
+    Without the secondary extraction the method cannot read the primary page
+    it would restore from; the block is gone from the document, and the job
+    fails instead of delivering it without a word.
+    """
     rescue = _open_obligation(
         "o-rescue", "rescue-omitted-block", ["rescue-omitted", "human-review"]
     )
 
-    payload = await _run(
-        _orchestrator(max_replans=2), _headings_manifest(rescue), monkeypatch, tmp_path
-    )
-
-    assert _open_ids(payload) == ["o-rescue"]
-    # Delivered, not dropped silently: the omitted block is reported, and the
-    # summary the result e-mail carries names it.
-    assert any(
-        "rescue-omitted-block" in warning for warning in payload["technical_warnings"]
-    )
-    assert "rescue-omitted-block" in (
-        payload["canonical_metadata"]["pddl_unsatisfied_summary"]
-    )
+    with pytest.raises(RuntimeError, match="rescue-omitted-block"):
+        await _run(
+            _orchestrator(max_replans=2), _headings_manifest(rescue), monkeypatch, tmp_path
+        )
 
 
 def test_the_job_error_groups_open_obligations_by_kind_and_page():

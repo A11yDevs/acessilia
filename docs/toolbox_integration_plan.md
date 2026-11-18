@@ -57,8 +57,8 @@ obrigações artificiais em cada documento.
 
 ### 3. Tornar os métodos Dr.DocBench executáveis
 
-- Implementar os três métodos ainda explicitamente indisponíveis
-  (`rescue-omitted`, `table-specialist`, `vlm-pairwise-judge`) usando as
+- Implementar o método ainda explicitamente indisponível
+  (`table-specialist`) usando as
   funções/agents Dr.DocBench já existentes ou os clientes Toolbox
   correspondentes. `single-provider` e `rep-guard` já têm handlers registrados;
   a guarda também altera o texto e registra quantos tokens removeu.
@@ -156,7 +156,7 @@ obrigações artificiais em cada documento.
 | Truncamento tabular | corrigido com `DATA_AGENT_MAX_TOKENS=8192`; caso `004.pdf` e suíte E2E completa passaram anteriormente |
 | PDDL/P1 | removido fallback silencioso; execução real e replanejamento limitado cobertos |
 | PDDL/P2 | obrigações v2.3 cobertas; evidência dual por página agora percorre o extrator de produção até `problem.pddl` quando `FUSION_MODE=dual` |
-| Métodos v2.3 | `rep-guard`, `single-provider`, `table-smart-fusion`, `skeleton-order` e `agreement-rule` têm handler; três ainda indisponíveis (`rescue-omitted`, `table-specialist`, `vlm-pairwise-judge`) |
+| Métodos v2.3 | `rep-guard`, `single-provider`, `table-smart-fusion`, `skeleton-order`, `agreement-rule`, `vlm-pairwise-judge` e `rescue-omitted` têm handler; só `table-specialist` segue indisponível |
 | Availability gate | indisponibilidade excluída do PDDL e plano externo inválido rejeitado por teste |
 | Contrato ao vivo atual | OpenAPI 3.1 genérica disponível; 26 capacidades; 3 IDs OCR/adjudicação consultados pelo core retornam 404 |
 | Estado de publicação | alterações deste progresso permanecem locais no core; sem push/deploy nesta etapa |
