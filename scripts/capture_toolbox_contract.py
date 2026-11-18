@@ -5,23 +5,23 @@ repository and on every release (acessilia-toolbox#71); that file is the source
 of truth, and CI checks the SDK registry against it (#186).
 ``tests/fixtures/toolbox-contract.json`` is a copy of it for the offline tests.
 
-``--ref`` copies the published file from a Toolbox branch or tag. ``--url``
-captures a running Toolbox instead, which also shows providers registered only
-in that deployment; when ``TOOLBOX_API_KEY`` is set it is sent as a Bearer
-token. Both paths keep only the fields the checker and the SDK binding
-generator (scripts/generate_sdk_bindings.py) read, with entries and
-lists sorted so repeated captures of the same state produce identical files.
+``--ref`` copies byte-exact public files at an immutable Toolbox commit,
+including route/schema metadata and a checksum manifest. ``--url`` captures
+only a diagnostic snapshot of a running deployment, at an explicit output path.
 
 Usage:
-    python scripts/capture_toolbox_contract.py --ref develop
-    python scripts/capture_toolbox_contract.py --url http://localhost:8002
+    python scripts/capture_toolbox_contract.py --ref <40-character-commit-sha>
+    python scripts/capture_toolbox_contract.py --url http://localhost:8002 --out /tmp/live.json
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
+import tempfile
 import sys
 import urllib.error
 import urllib.request
@@ -35,7 +35,16 @@ PUBLISHED_URL = (
 )
 #: The published schemas the SDK generates models from (#185, #213), copied
 #: from the same ref as the contract so the two snapshots always agree.
-SDK_MODEL_SCHEMAS = ("reference@1.json",)
+SDK_MODEL_SCHEMAS = (
+    "reference@1.json", "structured-document@1.json", "layout-analysis@1.json",
+    "latex@1.json", "mathml@1.json", "verbalized@1.json", "page-judgement@1.json",
+    "region-transcription@1.json", "pdf-validation-report@1.json",
+    "media-inspection@1.json", "image@2.json", "text-spans@1.json",
+    "dataset-info@1.json", "dataset-split@1.json", "dataset-item-summary@1.json",
+    "dataset-item@1.json", "dataset-artifact@1.json", "dataset-sync-entry@1.json",
+    "dataset-list@1.json", "dataset-splits@1.json", "dataset-item-summary-list@1.json",
+    "dataset-sample@1.json", "dataset-sync-report@1.json", "dataset-item-list@1.json",
+)
 SCHEMAS_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-schemas"
 PUBLISHED_SCHEMA_URL = (
     "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/schemas/{name}"
@@ -48,16 +57,20 @@ COMMENT = (
 )
 
 
-def _fetch(url: str) -> object:
+def _fetch_bytes(url: str, *, authenticated: bool = False) -> bytes:
     request = urllib.request.Request(url)
     api_key = os.getenv("TOOLBOX_API_KEY", "")
-    if api_key:
+    if authenticated and api_key:
         request.add_header("Authorization", f"Bearer {api_key}")
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            return json.load(response)
+            return response.read()
     except (urllib.error.URLError, TimeoutError) as exc:
         raise SystemExit(f"cannot reach the Toolbox at {url}: {exc}")
+
+
+def _fetch(url: str) -> object:
+    return json.loads(_fetch_bytes(url, authenticated=True))
 
 
 def _output(entry: dict) -> dict:
@@ -119,61 +132,67 @@ def build(url: str) -> dict:
     return {"_comment": COMMENT, **_normalize(capabilities, providers)}
 
 
-def published(ref: str) -> dict:
-    """The contract the Toolbox publishes at ``ref``, normalized like ``build``."""
-    data = _fetch(PUBLISHED_URL.format(ref=ref))
-    if (
-        not isinstance(data, dict)
-        or not isinstance(data.get("capabilities"), list)
-        or not isinstance(data.get("providers"), list)
-    ):
-        raise SystemExit(f"the Toolbox contract at {ref} is malformed")
-    return {
-        "_comment": (
-            "Copy of the Toolbox's published contract (contract/toolbox-contract.json "
-            f"at {ref}). Refresh with scripts/capture_toolbox_contract.py --ref {ref}; "
-            "CI checks the SDK registry against the published file itself."
-        ),
-        **_normalize(data["capabilities"], data["providers"]),
-    }
-
-
-def published_schemas(ref: str) -> dict[str, dict]:
-    """The schemas in ``SDK_MODEL_SCHEMAS`` as the Toolbox publishes them at ``ref``."""
-    schemas: dict[str, dict] = {}
+def snapshot(ref: str) -> dict[str, bytes]:
+    """Download and validate every input before changing any local file."""
+    if not re.fullmatch(r"[0-9a-f]{40}", ref):
+        raise ValueError("--ref must be an immutable 40-character lowercase commit SHA")
+    files = {"toolbox-contract.json": _fetch_bytes(PUBLISHED_URL.format(ref=ref))}
+    contract = json.loads(files["toolbox-contract.json"])
+    for key in ("capabilities", "providers", "dataset_routes", "schema_refs"):
+        if not isinstance(contract.get(key), list):
+            raise ValueError(f"the Toolbox contract at {ref} is missing {key}")
     for name in SDK_MODEL_SCHEMAS:
-        schema = _fetch(PUBLISHED_SCHEMA_URL.format(ref=ref, name=name))
+        raw = _fetch_bytes(PUBLISHED_SCHEMA_URL.format(ref=ref, name=name))
+        schema = json.loads(raw)
         if not isinstance(schema, dict) or not schema.get("$id"):
-            raise SystemExit(f"the Toolbox schema {name} at {ref} is malformed")
-        schemas[name] = schema
-    return schemas
+            raise ValueError(f"the Toolbox schema {name} at {ref} is malformed")
+        files[f"toolbox-schemas/{name}"] = raw
+    manifest = {
+        "repository": "A11yDevs/acessilia-toolbox",
+        "commit": ref,
+        "sha256": {name: hashlib.sha256(raw).hexdigest() for name, raw in sorted(files.items())},
+    }
+    files["toolbox-snapshot.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
+    return files
+
+
+def write_snapshot(ref: str, out: Path) -> None:
+    files = snapshot(ref)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # Stage the complete validated download on the destination filesystem.
+    # Network/parse failures leave every previous generation input untouched.
+    with tempfile.TemporaryDirectory(dir=out.parent) as temporary:
+        staging = Path(temporary)
+        for name, raw in files.items():
+            target = staging / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+        for name in files:
+            target = out if name == "toolbox-contract.json" else out.parent / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            (staging / name).replace(target)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--ref", help="Toolbox branch or tag whose published contract to copy")
+    source.add_argument("--ref", help="immutable Toolbox commit SHA")
     source.add_argument("--url", help="base URL of a running Toolbox")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args(argv)
 
-    payload = published(args.ref) if args.ref else build(args.url)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
-    print(
-        f"wrote {args.out} "
-        f"({len(payload['capabilities'])} capabilities, "
-        f"{len(payload['providers'])} providers)"
-    )
     if args.ref:
-        SCHEMAS_OUT.mkdir(parents=True, exist_ok=True)
-        for name, schema in published_schemas(args.ref).items():
-            (SCHEMAS_OUT / name).write_text(
-                json.dumps(schema, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-            )
-            print(f"wrote {SCHEMAS_OUT / name}")
+        try:
+            write_snapshot(args.ref, args.out)
+        except (ValueError, TypeError) as exc:
+            parser.error(str(exc))
+    else:
+        if args.out.resolve() == DEFAULT_OUT.resolve():
+            parser.error("--url requires a diagnostic --out outside the generation snapshot")
+        payload = build(args.url)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"wrote {args.out}")
     return 0
 
 

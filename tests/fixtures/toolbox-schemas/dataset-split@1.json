@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:dataset-split:1",
+  "title": "SplitInfo",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "item_count": { "type": "integer", "minimum": 0 },
+    "has_ground_truth": { "type": "boolean" },
+    "artifact_types": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["id", "item_count", "has_ground_truth"]
+}

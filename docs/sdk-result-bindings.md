@@ -314,3 +314,12 @@ not automatically join this generation scope.
 [layout-publication]: https://github.com/A11yDevs/acessilia-toolbox/pull/161
 [dataset-contract]: https://github.com/A11yDevs/acessilia-toolbox/blob/c536c2007912e0ce2f20bd930215d96e6f4c09be/docs/dataset-contracts.md
 [layout-contract]: https://github.com/A11yDevs/acessilia-toolbox/blob/c536c2007912e0ce2f20bd930215d96e6f4c09be/docs/layout-contract.md
+
+## Implementation review sequence
+
+The implementation is split further to keep reviews bounded: pinned snapshot,
+selected execute readers, variant-aware layout reader, then dataset REST readers.
+Each subsequent PR targets the preceding branch until it is merged. The source
+is pinned in `tests/fixtures/toolbox-snapshot.json`; it records byte-level SHA-256
+checksums for the complete public contract and every selected schema. Live
+`--url` captures are diagnostic files and cannot overwrite the generation input.

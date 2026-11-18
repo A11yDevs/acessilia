@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:image:2.0.0",
+  "title": "Rendered page image",
+  "description": "A page rendered to PNG and stored as an artifact, with the transformation that produced it. Page units are PDF points; for raster inputs they are the points PyMuPDF derives from the image resolution (pixels at 72 dpi when the image declares none). Coordinates have a top-left origin.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_id",
+    "media_type",
+    "size_bytes",
+    "page_number",
+    "page_count",
+    "page_width",
+    "page_height",
+    "clip",
+    "scale",
+    "dpi",
+    "width_px",
+    "height_px",
+    "source_media_type",
+    "source_filename"
+  ],
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^(sha256:)?[0-9a-f]{64}$",
+      "description": "Content address of the PNG in the artifact store."
+    },
+    "media_type": {"type": "string", "const": "image/png"},
+    "size_bytes": {"type": "integer", "minimum": 1, "description": "Byte size of the PNG."},
+    "page_number": {"type": "integer", "minimum": 1, "description": "1-based page that was rendered."},
+    "page_count": {"type": "integer", "minimum": 1, "description": "Pages in the source document."},
+    "page_width": {"type": "number", "exclusiveMinimum": 0, "description": "Page width in page units."},
+    "page_height": {"type": "number", "exclusiveMinimum": 0, "description": "Page height in page units."},
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "top", "right", "bottom"],
+      "description": "Region actually rendered, in page units with a top-left origin, already intersected with the page; the whole page when no clip was requested.",
+      "properties": {
+        "left": {"type": "number"},
+        "top": {"type": "number"},
+        "right": {"type": "number"},
+        "bottom": {"type": "number"}
+      }
+    },
+    "scale": {"type": "number", "exclusiveMinimum": 0, "description": "Pixels per page unit applied."},
+    "dpi": {"type": "number", "exclusiveMinimum": 0, "description": "Effective resolution: scale times 72."},
+    "width_px": {"type": "integer", "minimum": 1, "description": "PNG width in pixels."},
+    "height_px": {"type": "integer", "minimum": 1, "description": "PNG height in pixels."},
+    "source_media_type": {"type": "string", "description": "Media type of the input."},
+    "source_filename": {"type": "string", "minLength": 1, "description": "Original filename of the input."}
+  }
+}

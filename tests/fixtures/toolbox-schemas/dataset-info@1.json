@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:dataset-info:1",
+  "title": "DatasetInfo",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "github",
+        "huggingface"
+      ]
+    },
+    "default_revision": {
+      "type": "string"
+    },
+    "revisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "splits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "item_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "license": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "citation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "source",
+    "source_type"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:region-transcription:1.0.0",
+  "title": "Region Transcription",
+  "description": "Exact transcription of the text visible in a region cropped from a page.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["text", "model"],
+  "properties": {
+    "text": {
+      "type": "string",
+      "description": "Plain text exactly as printed in the region; empty when the region has no readable text."
+    },
+    "model": {
+      "type": "string",
+      "description": "Model identifier the server answered with."
+    }
+  }
+}

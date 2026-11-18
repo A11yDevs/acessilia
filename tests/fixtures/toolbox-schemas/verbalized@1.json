@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:a11y-devs:schema:verbalized:1.0.0",
+  "title": "Verbalized Expression",
+  "description": "A mathematical expression verbalized into natural language text for accessibility purposes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verbalized"
+  ],
+  "properties": {
+    "verbalized": {
+      "type": "string",
+      "description": "Natural language verbalization of the mathematical expression."
+    },
+    "latex": {
+      "type": "string",
+      "description": "Original LaTeX source expression."
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+      "description": "Language code of the verbalization (e.g. pt-BR)."
+    }
+  }
+}
