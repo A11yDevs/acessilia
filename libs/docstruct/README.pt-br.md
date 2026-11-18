@@ -15,7 +15,8 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 
 | Módulo | Símbolos |
 |---|---|
-| `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
+| `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
+| Exports legados de compatibilidade em `docstruct.types` e `docstruct` | `CanonicalDocument`, `CanonicalSection` — descontinuados desde 0.5.3; mantidos com comportamento inalterado (veja migração abaixo) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões de cima para baixo e em frações da página |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — o elemento substituto de uma página extraída sem estrutura; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — qual texto extraído conta como conteúdo |
@@ -65,6 +66,33 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 Módulos planejados (fases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Módulos
+
+### Dataclasses canônicas legadas (descontinuadas desde 0.5.3)
+
+`CanonicalDocument` e `CanonicalSection` continuam importáveis por
+`docstruct.types` e pela raiz do pacote `docstruct`. Docstrings e atributos
+informativos de classe `__deprecated__` marcam a descontinuação; imports e
+construção continuam silenciosos. Construtores, campos, defaults, `blocks()`,
+saída de `asdict` e pickles mantêm seu comportamento. A linha 0.5.x preserva
+ambos os nomes; remoção exige decisão separada de versão incompatível e migração
+de consumidores ([ADR 0024](../../docs/adr/0024-legacy-canonical-type-deprecation.pt-br.md)).
+
+Código novo constrói a árvore canônica serializada como dicionários:
+
+```python
+from docstruct.canonical import build_canonical_document
+from docstruct.schemas import accessible_document_schema
+
+document = build_canonical_document("# Title\n\nBody.\n\n## Child\n\nChild text.")
+schema = accessible_document_schema()
+child = document["sections"][0]["children"][0]
+```
+
+O schema empacotado define essa árvore. As dataclasses legadas omitem os campos
+de schema/id/idioma do documento e filhos de seção; convertê-las com `asdict`
+não produz um documento canônico conforme ao schema. Na migração, construa a
+partir do texto original ou payload estruturado. `CanonicalBlock`, `BBox` e os
+demais objetos de valor dos algoritmos continuam ativos.
 
 ### Schema canônico (`docstruct.schemas`, `docstruct.validation`)
 

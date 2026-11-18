@@ -15,7 +15,8 @@ Pure document-structure processing core for Acessilia.
 
 | Module | Symbols |
 |---|---|
-| `docstruct.types` | `BBox`, `CanonicalBlock`, `CanonicalDocument`, `Region`, `BlockPairing`, `OrientationResult` |
+| `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
+| Legacy compatibility exports in `docstruct.types` and `docstruct` | `CanonicalDocument`, `CanonicalSection` — deprecated since 0.5.3; retained with unchanged behavior (see migration below) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — which extracted text counts as content |
@@ -65,6 +66,33 @@ Pure document-structure processing core for Acessilia.
 Planned modules (phases 2–3): `blocks/`, `regions/`, `tables/`, `math/`, `render/`, `validation.py`.
 
 ## Modules
+
+### Legacy canonical dataclasses (deprecated since 0.5.3)
+
+`CanonicalDocument` and `CanonicalSection` remain importable from
+`docstruct.types` and the `docstruct` package root. Their docstrings and
+informational `__deprecated__` class attributes mark them as deprecated; imports
+and construction stay silent. Constructors, fields, defaults, `blocks()`,
+`asdict` output and pickles keep their existing behavior. The 0.5.x line retains
+both names; a removal needs a separate breaking-version decision and consumer
+migration ([ADR 0024](../../docs/adr/0024-legacy-canonical-type-deprecation.md)).
+
+New code builds the serialized canonical tree as dictionaries:
+
+```python
+from docstruct.canonical import build_canonical_document
+from docstruct.schemas import accessible_document_schema
+
+document = build_canonical_document("# Title\n\nBody.\n\n## Child\n\nChild text.")
+schema = accessible_document_schema()
+child = document["sections"][0]["children"][0]
+```
+
+The packaged schema defines that tree. The legacy dataclasses omit document
+schema/id/language fields and nested section children; converting one with
+`asdict` does not produce a schema-conforming canonical document. Build from the
+original text or structured payload when migrating. `CanonicalBlock`, `BBox`
+and the other algorithm value objects remain active.
 
 ### Canonical schema (`docstruct.schemas`, `docstruct.validation`)
 

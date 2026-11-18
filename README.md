@@ -19,12 +19,17 @@ TXT, HTML, Pandoc AST and benchmark Markdown serialization share the pure
 `docstruct.export.walk` traversal, with a visitor for each format's current
 selection and rendering policy. The core's TXT/HTML adapters resolve labels and
 write files; DOCX and PDF/UA rendering runs on the Toolbox. See the
-[export architecture](docs/architecture.md#2-canonical-document--export-pipeline-backendcorepipeline-backendcoreexport).
+[export architecture](docs/architecture.md#2-canonical-document--export-pipeline-libscoresrcacessilia_corepipeline-libscoresrcacessilia_coreexport).
 
 The accessible-document JSON Schema ships in the docstruct wheel. Consumers
 can validate explicitly with an injected engine; the existing export audit
 continues to govern exports. The root schema is a checked, generated copy of
 the packaged source. See the [schema API](libs/docstruct/README.md#canonical-schema-docstructschemas-docstructvalidation).
+
+The legacy `CanonicalDocument` and `CanonicalSection` dataclasses are deprecated
+since docstruct 0.5.3 and retained for compatibility. New document trees use the
+builder's schema-defined dictionaries. See the
+[migration note](libs/docstruct/README.md#legacy-canonical-dataclasses-deprecated-since-053).
 
 ### Standalone API
 
