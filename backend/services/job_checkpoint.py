@@ -25,6 +25,7 @@ import re
 import shutil
 import time
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -173,8 +174,12 @@ class FileJobCheckpoints:
     """The core's ``JobCheckpoints`` port for one job, on these files
     (ADR-0016, step 4)."""
 
-    def __init__(self, job_id: str) -> None:
+    def __init__(
+        self, job_id: str, options: Mapping[str, Mapping[str, Any]] | None = None
+    ) -> None:
         self.job_id = job_id
+        #: The service's own processing options, by stage (#549).
+        self.options = dict(options or {})
 
     def load(self, phase: str) -> dict[str, Any] | None:
         return load(self.job_id, phase)

@@ -137,7 +137,10 @@ async def test_a_run_without_a_job_neither_reads_nor_writes_checkpoints(
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
     serialized = []
-    monkeypatch.setattr(pddl, "_manifest_payload", lambda manifest: serialized.append(manifest))
+    from acessilia_core.pipeline import checkpointing
+
+    monkeypatch.setattr(checkpointing, "manifest_payload", lambda manifest: serialized.append(manifest))
+    monkeypatch.setattr(pddl, "manifest_payload", lambda manifest: serialized.append(manifest))
 
     for _ in range(2):
         with pytest.raises(Stop):
@@ -392,7 +395,9 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
 
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
     monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: ("plan", None))
-    monkeypatch.setattr("acessilia_core.pipeline.orchestrator._save_plan", no_save)
+    from acessilia_core.pipeline.checkpointing import RunCheckpoints
+
+    monkeypatch.setattr(RunCheckpoints, "save_plan", no_save)
 
     await orchestrator._replan_until_done(
         manifest,
@@ -402,7 +407,7 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
         [],
         None,
         asyncio.get_running_loop(),
-        checkpoints=checkpoints,
+        checkpoints=RunCheckpoints(checkpoints, core_config()),
         planning_manifest=manifest,
         availability=None,
         replans=0,

@@ -17,6 +17,9 @@ cannot be left out by omission.
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections.abc import Mapping
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -138,6 +141,53 @@ def processing_identity(config: CoreConfig) -> dict[str, Any]:
     return identity
 
 
+#: The deployment and providers every stage that calls the Toolbox depends on.
+_TOOLBOX = frozenset({"toolbox.base_url", "toolbox.base_urls", "toolbox.providers"})
+
+#: What each stage of a run depends on, by ``PROCESSING_FIELDS`` name (#549).
+#: A job's checkpoint records the identity of the stages its phase holds, so
+#: a resumed run redoes the first phase whose stages changed and every phase
+#: after it. Execution runs the handlers, which may read any of them.
+STAGE_FIELDS: dict[str, frozenset[str]] = {
+    "media": _TOOLBOX | {"toolbox.media_inspect_enabled"},
+    "extraction": _TOOLBOX | {
+        "fusion.mode",
+        "fusion.secondary_provider",
+        "fusion.apply_page_routes",
+        "fusion.judge_max_pages",
+        "document.max_pages",
+        "document.legacy_unicode_repair",
+        "document.slide_visual_coverage",
+        "document.slide_fold_figure_labels",
+    },
+    "enrichment": _TOOLBOX | {
+        field for field in PROCESSING_FIELDS if field.startswith("models.")
+    } | {
+        "vision.table_visual_review",
+        "document.inline_math_detection",
+        "document.formula_text_agreement_min",
+    },
+    # The gate reads the secondary provider of a dual fusion too.
+    "planning": _TOOLBOX | {"toolbox.availability_gate", "fusion.secondary_provider"},
+    "execution": PROCESSING_FIELDS,
+}
+
+
+def stage_identity(
+    config: CoreConfig, stage: str, options: Mapping[str, Any] | None = None
+) -> str:
+    """A digest of what ``stage`` depends on in ``config``, plus the run's
+    ``options`` outside it (the orchestrator's planner and dry run, the
+    service's model revision; review of #578). No credentials: neither
+    ``processing_identity`` nor those options hold any."""
+    identity = processing_identity(config)
+    subset: dict[str, Any] = {name: identity[name] for name in sorted(STAGE_FIELDS[stage])}
+    if options:
+        subset["options"] = {key: options[key] for key in sorted(options)}
+    encoded = json.dumps(subset, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
 def _processing_providers(toolbox: ToolboxConfig) -> dict[str, str]:
     return {
         key: toolbox.providers[key]
@@ -172,7 +222,9 @@ __all__ = [
     "NOT_PROCESSING_PROVIDERS",
     "PROCESSING_FIELDS",
     "PROCESSING_PROVIDERS",
+    "STAGE_FIELDS",
     "config_fields",
     "fusion_reuse_identity",
     "processing_identity",
+    "stage_identity",
 ]

@@ -50,6 +50,28 @@ Checkpoints exist only inside a job. The benchmark and the CLI call the
 orchestrator without a task id and write none, keeping their behaviour
 unchanged.
 
+A checkpoint is reused only under the configuration it was written in
+(#549). Each phase records a digest of the configuration of the stages it
+holds (`run_identity.STAGE_FIELDS`, the fields of the processing identity,
+so no credential): the media inspection, then the extraction (fusion and
+document options), the enrichment (the models and the vision options), the
+plan (the availability gate), and the execution (all of them), each with the
+Toolbox deployment and providers. The manifest checkpoint written during the
+enrichment also holds the enrichment's stage, since it carries its progress.
+The digests also cover the run's options outside its `CoreConfig`: the
+orchestrator's planner options (for the plan and the execution) and dry-run
+switch (for the execution), and the service's model revision
+(`PROCESSING_MODEL_REVISION`, for the enrichment and the execution), which
+the service declares on its checkpoint port. A resumed run whose
+configuration changed redoes the first phase that holds a changed stage and
+every phase after it, keeps the earlier ones, and logs which stages changed;
+an identity missing one of the phase's stages, or unreadable, counts as a
+change. One limit: the enrichment writes its progress into the manifest
+checkpoint (#407), so after a change to the enrichment's stage (a model, for
+example) the extraction runs again too; only the media inspection is kept. A
+checkpoint written before these digests existed is reused with a warning, as
+it was before.
+
 The checkpoint payloads are the pydantic documents the pipeline already carries
 (`ProcessingManifest`, `NominalPlan`, `PlanningComparison`, `ExecutionReport`
 steps); no second representation is introduced.
