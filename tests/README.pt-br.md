@@ -52,12 +52,15 @@ Pandoc. Executa nativamente, contra o wheel isolado e em contêiner de CI travad
 pelo lock. Manter seus arquivos de referência inalterados durante a extração/
 migração do walker.
 
-Para a E1.6, `test_export_walk.py` verifica travessia, despacho por tipo, fallback,
-seleção e metadados dos contextos. `test_export_walk_parity.py` compõe o walker
-com os renderizadores existentes apenas nos testes, comparando todas as 30
-chamadas caracterizadas sem alterar a travessia de produção. Esses testes rodam
-no mesmo contêiner travado, incluindo as diferentes políticas de omissão de
-títulos e os rótulos atuais das fórmulas nos filhos do TXT. Veja a
+`test_export_walk.py` verifica a travessia E1.6, despacho por tipo, fallback,
+seleção e metadados dos contextos. Para a E1.7, `test_export_walk_parity.py`
+observa todas as 30 chamadas caracterizadas usando o walker de produção e
+verifica a renderização pelos onze callbacks e fallback explícito. Substitui as
+antigas trocas de travessia feitas apenas nos testes. Preserva também a rejeição
+existente de tipos de bloco não hasháveis em TXT/HTML/Pandoc, sua aceitação no
+Markdown e a filtragem antes da rejeição. O gate de referência inalterado ainda
+verifica saída exata e políticas distintas de títulos/rótulos nos filhos.
+Esses testes rodam no mesmo contêiner travado. Veja a
 [API do walker](../libs/docstruct/README.pt-br.md#walker-de-exportação-docstructexportwalk).
 
 ## Testes end-to-end

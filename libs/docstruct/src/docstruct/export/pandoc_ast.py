@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Any
 from docstruct.blocks.lists import list_numbering, list_start
-from docstruct.sections import section_body_blocks, section_title_alias
+from docstruct.export.walk import SectionContext, Visitor, walk
 
 from docstruct.tables.ast import effective_section_width, row_header_column_count
 from docstruct.tables.ast import split_header_and_body
@@ -75,9 +75,7 @@ def _has_unsafe_latex_macro(latex: str) -> bool:
 
 def build_pandoc_ast(document: dict[str, Any], *, target_format: str = "latex") -> dict[str, Any]:
     """Build math tags for LaTeX, or portable equation labels for DOCX."""
-    blocks = []
-    for section in document.get("sections", []):
-        blocks.extend(_section_to_blocks(section, target_format=target_format))
+    blocks = _document_blocks(document, target_format)
     return {
         "pandoc-api-version": [1, 23, 1],
         "meta": {
@@ -97,6 +95,18 @@ def build_pandoc_ast(document: dict[str, Any], *, target_format: str = "latex") 
 
 
 def _section_to_blocks(section: dict[str, Any], *, target_format: str = "latex") -> list[dict[str, Any]]:
+    """Compatibility entry point for one section, including its children."""
+    return _document_blocks({"sections": [section]}, target_format)
+
+
+def _document_blocks(document: dict[str, Any], target_format: str) -> list[dict[str, Any]]:
+    return [block for group in walk(
+        document, _visitor(target_format), select=lambda block, ctx: not ctx.is_legacy_title,
+    ) for block in group]
+
+
+def _section_title(ctx: SectionContext) -> list[dict[str, Any]]:
+    section = ctx.data
     # An untitled section (the text before the first heading) gets no Header:
     # an empty one is tagged as an empty H1, as the HTML and text exports skip it.
     blocks = (
@@ -113,94 +123,132 @@ def _section_to_blocks(section: dict[str, Any], *, target_format: str = "latex")
         if section.get("title")
         else []
     )
-    alias = section_title_alias(section)
+    alias = ctx.title_alias
     if alias:
         blocks.insert(0, {"t": "Div", "c": [[alias, [], []], []]})
-    for block in section_body_blocks(section):
-        blocks.extend(_block_to_ast(block, target_format=target_format))
-    for child in section.get("children", []):
-        blocks.extend(_section_to_blocks(child, target_format=target_format))
     return blocks
 
 
+def _visitor(target_format: str) -> Visitor[list[dict[str, Any]]]:
+    return Visitor(
+        default=lambda block, ctx: _text(block),
+        heading=lambda block, ctx: _heading(block),
+        paragraph=lambda block, ctx: _paragraph(block),
+        list=lambda block, ctx: _list(block),
+        table=lambda block, ctx: _table(block),
+        image=lambda block, ctx: _image(block),
+        code=lambda block, ctx: _code(block),
+        math=lambda block, ctx: _math(block, target_format),
+        quote=lambda block, ctx: _quote(block),
+        details=lambda block, ctx: _quote(block),
+        note=lambda block, ctx: _quote(block),
+        warning=lambda block, ctx: _quote(block),
+        enter_section=_section_title,
+    )
+
+
 def _block_to_ast(block: dict[str, Any], *, target_format: str = "latex") -> list[dict[str, Any]]:
-    block_type = block.get("type")
-    if block_type == "heading":
-        return [
-            {
-                "t": "Header",
-                "c": [
-                    block.get("level", 1),
-                    [block.get("id", ""), [], []],
-                    _meta_inlines(block.get("text", "")),
-                ],
-            }
-        ]
-    if block_type == "paragraph":
-        return [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}]
-    if block_type == "code":
-        return [
-            {
-                "t": "CodeBlock",
-                "c": [
-                    [block.get("id", ""), [block.get("language", "")], []],
-                    block.get("text", ""),
-                ],
-            }
-        ]
-    if block_type == "list":
-        items = [
-            [{"t": "Para", "c": _prose_inlines(str(item), block)}]
-            for item in block.get("items", [])
-        ]
-        if block.get("ordered"):
-            style = _ORDERED_LIST_STYLES[list_numbering(block)]
-            attributes = [list_start(block), {"t": style}, {"t": "Period"}]
-            return [{"t": "OrderedList", "c": [attributes, items]}]
-        return [{"t": "BulletList", "c": items}]
-    if block_type == "table":
-        table_ast = table_ast_from_block(block)
-        if table_ast is None:
-            return []
-        return [_table_to_pandoc_ast(table_ast, block)]
-    if block_type == "image":
-        return [
-            {
-                "t": "Para",
-                "c": _meta_inlines(block.get("alt_text", block.get("text", ""))),
-            }
-        ]
-    if block_type == "math":
-        metadata = block.get("metadata") or {}
-        latex = numbered_latex(str(block.get("text", "")), metadata, use_tag=target_format != "docx")
-        if _has_unsafe_latex_macro(latex):
-            return [{"t": "Para", "c": _meta_inlines(_math_as_text(latex))}]
-        # A math block is a formula of its own, so it is display math. This
-        # reaches every Pandoc writer: DOCX typesets it as a display equation
-        # (oMathPara) where it used to be inline. (The HTML export does not go
-        # through this AST.)
-        math = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
-        speech = block.get("alt_text") or (block.get("text", "") if equation_number(metadata) else "")
-        alt_text = numbered_speech(str(speech).strip(), metadata)
-        if alt_text:
-            # The PDF/UA renderer gives a formula in this span its spoken form
-            # as the Formula element's alternate text, instead of the LaTeX
-            # source a screen reader would otherwise announce
-            # (acessilia-toolbox docs/pdf-ua-export.md, "Formula alternate
-            # text"). Other writers ignore the span and render its content;
-            # DOCX keeps no alternate text for equations.
-            math = {
-                "t": "Span",
-                "c": [["", [FORMULA_ALT_CLASS], [["alt", alt_text]]], [math]],
-            }
-        return [{"t": "Para", "c": [math]}]
-    if block_type in {"quote", "details", "note", "warning"}:
-        return [
-            {
-                "t": "BlockQuote",
-                "c": [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}],
-            }
-        ]
+    """Render one block using the document visitor, without section selection."""
+    return [item for group in walk(
+        {"sections": [{"blocks": [block]}]}, _visitor(target_format),
+    ) for item in group]
+
+
+def _heading(block: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "t": "Header",
+            "c": [
+                block.get("level", 1),
+                [block.get("id", ""), [], []],
+                _meta_inlines(block.get("text", "")),
+            ],
+        }
+    ]
+
+
+def _paragraph(block: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}]
+
+
+def _code(block: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "t": "CodeBlock",
+            "c": [
+                [block.get("id", ""), [block.get("language", "")], []],
+                block.get("text", ""),
+            ],
+        }
+    ]
+
+
+def _list(block: dict[str, Any]) -> list[dict[str, Any]]:
+    items = [
+        [{"t": "Para", "c": _prose_inlines(str(item), block)}]
+        for item in block.get("items", [])
+    ]
+    if block.get("ordered"):
+        style = _ORDERED_LIST_STYLES[list_numbering(block)]
+        attributes = [list_start(block), {"t": style}, {"t": "Period"}]
+        return [{"t": "OrderedList", "c": [attributes, items]}]
+    return [{"t": "BulletList", "c": items}]
+
+
+def _table(block: dict[str, Any]) -> list[dict[str, Any]]:
+    table_ast = table_ast_from_block(block)
+    if table_ast is None:
+        return []
+    return [_table_to_pandoc_ast(table_ast, block)]
+
+
+def _image(block: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "t": "Para",
+            "c": _meta_inlines(block.get("alt_text", block.get("text", ""))),
+        }
+    ]
+
+
+def _math(block: dict[str, Any], target_format: str) -> list[dict[str, Any]]:
+    metadata = block.get("metadata") or {}
+    latex = numbered_latex(str(block.get("text", "")), metadata, use_tag=target_format != "docx")
+    if _has_unsafe_latex_macro(latex):
+        return [{"t": "Para", "c": _meta_inlines(_math_as_text(latex))}]
+    # A math block is a formula of its own, so it is display math. This
+    # reaches every Pandoc writer: DOCX typesets it as a display equation
+    # (oMathPara) where it used to be inline. (The HTML export does not go
+    # through this AST.)
+    math = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
+    speech = block.get("alt_text") or (block.get("text", "") if equation_number(metadata) else "")
+    alt_text = numbered_speech(str(speech).strip(), metadata)
+    if alt_text:
+        # The PDF/UA renderer gives a formula in this span its spoken form
+        # as the Formula element's alternate text, instead of the LaTeX
+        # source a screen reader would otherwise announce
+        # (acessilia-toolbox docs/pdf-ua-export.md, "Formula alternate
+        # text"). Other writers ignore the span and render its content;
+        # DOCX keeps no alternate text for equations.
+        math = {
+            "t": "Span",
+            "c": [["", [FORMULA_ALT_CLASS], [["alt", alt_text]]], [math]],
+        }
+    return [{"t": "Para", "c": [math]}]
+
+
+def _quote(block: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "t": "BlockQuote",
+            "c": [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}],
+        }
+    ]
+
+
+def _text(block: dict[str, Any]) -> list[dict[str, Any]]:
+    # Retain the TypeError for unhashable kinds from the former set dispatch.
+    hash(block.get("type"))
     return [{"t": "Para", "c": _meta_inlines(block.get("text", ""))}]
 
 

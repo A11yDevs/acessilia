@@ -50,12 +50,15 @@ export APIs, their current omission/filter policies and both Pandoc targets.
 It runs natively, against the isolated wheel and in a locked CI container.
 Keep its golden files unchanged during the walker extraction/migration.
 
-For E1.6, `test_export_walk.py` checks traversal, per-type dispatch, fallback,
-selection and context metadata. `test_export_walk_parity.py` composes the walker
-with the existing renderers in tests only, comparing all 30 characterized calls
-without changing production traversal. These tests run in the same locked
-container, including the distinct title-omission policies and the current TXT
-child formula labels. See the [walker API](../libs/docstruct/README.md#export-walker-docstructexportwalk).
+`test_export_walk.py` checks the E1.6 traversal, per-type dispatch, fallback,
+selection and context metadata. For E1.7, `test_export_walk_parity.py` observes
+all 30 characterized calls using the production walker and checks that rendering
+goes through the eleven callbacks and explicit fallback. It replaces the former
+test-only traversal substitutions. It also preserves the existing rejection of
+unhashable block kinds in TXT/HTML/Pandoc, acceptance in Markdown, and filtering
+before rejection. The unchanged golden gate still checks exact output and the
+distinct title/child-label policies. These tests run in the same locked container.
+See the [walker API](../libs/docstruct/README.md#export-walker-docstructexportwalk).
 
 ## End-to-end tests
 
