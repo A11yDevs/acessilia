@@ -439,9 +439,9 @@ cumpriram:
     junto com o código que os carrega;
   - a palavra "core" das ADRs passa a nomear um pacote. "O core depende só da
     API pública do SDK" (ADR B da #402, hoje a
-    [ADR-0018](0018-core-uses-sdk-public-api.pt-br.md)) é conferida sobre
-    `backend/`, `scripts/` e `tests/` hoje, e vale na fronteira do pacote depois
-    da extração.
+    [ADR-0018](0018-core-uses-sdk-public-api.pt-br.md)) é conferida sobre o
+    pacote (`libs/core`: código, testes e exemplo), o serviço, os scripts e
+    os testes.
 - **Fica mais difícil:**
   - cada etapa que lê o `settings` muda de assinatura (107 leituras);
   - os caminhos dos módulos que o serviço e os testes importam mudam duas

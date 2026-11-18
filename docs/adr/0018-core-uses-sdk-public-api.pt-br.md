@@ -17,7 +17,8 @@ SDK quebraria o core sem ser uma mudança incompatível da API, e o SDK não
 poderia ser refatorado livremente. A #402 chamava isso de "ADR B": o core
 depende só da API pública do SDK.
 
-O que o código diz hoje, medido na develop em cfa45001:
+O que o código dizia quando esta ADR foi proposta, medido na develop em
+cfa45001:
 
 - **Todo módulo do SDK já declara `__all__`**, menos o próprio pacote
   (`__version__`) e o ponto de entrada de `python -m`
@@ -28,12 +29,13 @@ O que o código diz hoje, medido na develop em cfa45001:
   no `__all__` do módulo, mas ela não lista todo nome exportado (por exemplo, o
   `ToolboxPdfValidateClient` é exportado e faltava na linha dos clientes).
 - **O core usava um nome interno.** Uma varredura de `backend/`, `scripts/` e
-  `tests/` confere 180 usos de nomes do SDK em 51 arquivos. Ela cobre imports,
+  `tests/` encontrou 182 usos de nomes do SDK em 52 arquivos. Ela cobre imports,
   atributos lidos por um módulo do SDK importado, chamadas como
   `getattr`/`setattr` com nome literal e caminhos em string, como os alvos de
   `monkeypatch.setattr`. Um teste fazia patch do `_sleep` interno do cliente
   para pular o backoff entre tentativas; agora ele zera o
-  `TOOLBOX_RETRY_BACKOFF_SECONDS`, que é público. Uma primeira varredura, sem
+  `TOOLBOX_RETRY_BACKOFF_SECONDS`, que é público, e restam 180 usos em 51
+  arquivos. Uma primeira varredura, sem
   as chamadas, não o tinha visto. Todos os outros usos estão no `__all__` de um
   módulo, então ficar na API pública quase não custa nada.
 
@@ -88,14 +90,19 @@ manteve enquanto o SDK e o core mais mudaram:
   exceção.
 - **Ela acompanhou a mudança do core.** Quando o core virou `acessilia_core`
   em `libs/core` (ADR-0016, #572), a varredura do guarda passou a incluir
-  `libs/core/src`, e o código movido continuou conferido.
-- **Nenhuma exceção foi necessária.** O `ALLOWED` continua vazio. Na develop
-  em 983e8ffd, o guarda confere 204 usos de 97 nomes do SDK em 58 arquivos
-  (18 em `libs/core/src`, 3 em `backend/`, 3 em `scripts/`, 34 em `tests/`),
-  contra o `__all__` de 36 módulos do SDK: todos públicos.
-- **O custo continuou zero.** Onze commits no SDK desde 2026-11-13 não
-  mudaram nenhuma exceção do guarda, e nenhuma mudança do core teve de
-  esperar por uma.
+  `libs/core/src`, e o código movido continuou conferido. Os testes e o
+  exemplo do core, que a mudança também tirou dos caminhos varridos, são
+  varridos desde o #580, e um teste falha quando um diretório de `libs/core`
+  com Python não é varrido. Os três usos deles eram públicos.
+- **Nenhuma exceção foi necessária.** O `ALLOWED` continua vazio. Com a
+  varredura do #580, na develop em 983e8ffd, o guarda confere 207 usos de 98
+  nomes do SDK em 60 arquivos (18 em `libs/core/src`, 1 em `libs/core/tests`,
+  1 em `libs/core/examples`, 3 em `backend/`, 3 em `scripts/`, 34 em
+  `tests/`), contra o `__all__` de 36 módulos do SDK: todos públicos.
+- **O custo continuou zero.** Nenhuma exceção foi acrescentada enquanto dez
+  commits mudaram o código do SDK depois do merge do #501
+  (`git log --no-merges d8a7a40b..983e8ffd -- libs/sdk/src`), e nenhuma
+  mudança do core teve de esperar por uma.
 
 ## Consequências
 
@@ -108,15 +115,16 @@ manteve enquanto o SDK e o core mais mudaram:
     antes;
   - um módulo novo do SDK precisa declarar `__all__`.
 - **Conformidade:**
-  - `tests/test_sdk_public_api.py` (core): todo uso do SDK em `backend/`,
-    `libs/core/src/`, `scripts/` e `tests/` é público; nenhum módulo de API do SDK fica sem
+  - `tests/test_sdk_public_api.py` (core): todo uso do SDK no core
+    (`libs/core`: código, testes e exemplo), no serviço (`backend/`,
+    `frontend/`), em `scripts/` e em `tests/` é público; todo diretório de
+    `libs/core` com Python é varrido; nenhum módulo de API do SDK fica sem
     `__all__`; nenhuma exceção está obsoleta. Um autoteste confere o guarda em
-    cada tipo de uso;
+    cada tipo de uso que a decisão lista;
   - `libs/sdk/tests/test_public_api.py` (SDK): todo nome de módulo que a
     tabela do README lista está no `__all__` dele, as outras palavras entre
     crases são atributos de classe ou prosa listada, e as tabelas em inglês e
     em português coincidem. Ele roda também no job `SDK alone`.
 - **Trabalho seguinte:** nenhum obrigatório. O guarda bloqueia desde o início,
   porque o custo medido foi um teste, mudado no mesmo pull request para usar a
-  configuração pública (decisão de 2026-11-13). Se esta ADR for rejeitada, os
-  dois testes saem.
+  configuração pública (decisão de 2026-11-13).

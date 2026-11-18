@@ -6,7 +6,7 @@ Um Registro de Decisão Arquitetural (ADR, do inglês *Architecture Decision
 Record*) documenta uma decisão arquitetural relevante: o contexto, a decisão em
 si e suas consequências. Este diretório é a **fonte única de verdade das
 decisões que atravessam as fronteiras entre componentes** do ecossistema
-Acessilia: o core (`backend/`), o SDK (`libs/sdk`), a docstruct
+Acessilia: o core (`libs/core`, pacote `acessilia_core`), o SDK (`libs/sdk`), a docstruct
 (`libs/docstruct`) e a [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox).
 
 Cada repositório pode manter ADRs sobre seus próprios detalhes internos. Esses

@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 An Architecture Decision Record (ADR) captures one significant architectural
 decision: its context, the decision itself and its consequences. This
 directory is the **single source of truth for decisions that cross component
-boundaries** in the Acessilia ecosystem: the core (`backend/`), the SDK
+boundaries** in the Acessilia ecosystem: the core (`libs/core`, package `acessilia_core`), the SDK
 (`libs/sdk`), docstruct (`libs/docstruct`) and the
 [Acessilia Toolbox](https://github.com/A11yDevs/acessilia-toolbox).
 
