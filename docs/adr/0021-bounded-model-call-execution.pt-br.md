@@ -46,8 +46,13 @@ Closures canceladas podem, assim, reter imagens, agentes e clientes.
 No começo, o orquestrador não exigia um runner e obtinha o executor do serviço
 quando nenhum era fornecido, como sua ponte de CoreConfig. O passo 3 da
 ADR-0016 removeu as duas: `execute(..., config=, model_calls=)` exige o runner
-da execução (o passo 4 da ADR-0016 depois acrescentou o `ports=` obrigatório). Chamadores independentes podem passar e fechar seu runner. Os agentes do chat AgentOS e o
-escalonamento de providers (#547) ficam fora desse caminho. Veja a
+da execução (o passo 4 da ADR-0016 depois acrescentou o `ports=` obrigatório). Chamadores independentes podem passar e fechar seu runner. Os agentes do chat
+AgentOS ficam fora desse caminho.
+Como um processo conversa com um só provider de modelo (`ModelConfig.ai_client`),
+o runner do serviço também é o limite por provider entre execuções: execuções
+simultâneas somam o `VISION_CONCURRENCY` das suas etapas, mas nunca passam de
+`MODEL_CALL_WORKERS` chamadas no provider (#547). Um limite entre processos ou
+máquinas cabe ao gateway. Veja a
 [arquitetura](../architecture.pt-br.md).
 
 ## Consequências e verificação
@@ -55,7 +60,8 @@ escalonamento de providers (#547) ficam fora desse caminho. Veja a
 Capacidade do Core, `VISION_CONCURRENCY`, vagas do gateway/provider e duração de
 todo o job são limites separados. Isso limita retenção local e isola outros
 trabalhos. `tests/test_model_call_executor.py` verifica deadlines, cancelamento,
-saturação, retenção de vagas, resultados tardios, `run_blocking` independente,
+saturação, o limite compartilhado por execuções simultâneas em loops de eventos
+separados (#547), retenção de vagas, resultados tardios, `run_blocking` independente,
 locales simultâneos, handlers síncronos/loops transitórios e shutdown/reinício com
 providers bloqueados por eventos. As suítes de agentes, tabelas e cancelamento
 existentes preservam as políticas em torno do mecanismo.

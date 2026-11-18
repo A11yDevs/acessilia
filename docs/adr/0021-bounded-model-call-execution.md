@@ -47,14 +47,20 @@ The orchestrator required no runner at first and obtained the service owner
 when none was supplied, like its CoreConfig bridge. ADR-0016's step 3 removed
 both: `execute(..., config=, model_calls=)` requires the run's runner
 (ADR-0016's step 4 then added the required `ports=`).
-Standalone callers can pass and close their own runner. AgentOS chat agents and provider scheduling (#547) remain
-outside this execution path. See the [architecture](../architecture.md).
+Standalone callers can pass and close their own runner. AgentOS chat agents remain
+outside this execution path.
+Since a process talks to one model provider (`ModelConfig.ai_client`), the
+service's runner is also the bound per provider across runs: runs at once add
+up their stages' `VISION_CONCURRENCY`, but never exceed `MODEL_CALL_WORKERS`
+calls at the provider (#547). A bound across processes or hosts belongs to the
+gateway. See the [architecture](../architecture.md).
 
 ## Consequences and verification
 
 Core capacity, `VISION_CONCURRENCY`, gateway/provider slots and whole-job duration
 are separate limits. This bounds local retention and isolates unrelated work.
 `tests/test_model_call_executor.py` verifies deadlines, cancellation, saturation,
+the bound shared by runs at once on separate event loops (#547),
 retained reservations, late results, independent `run_blocking`, concurrent
 locales, synchronous handlers/transient loops and owner shutdown/restart with
 event-blocked providers. Existing agent, table and cancellation suites preserve

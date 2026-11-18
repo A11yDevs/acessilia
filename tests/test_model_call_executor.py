@@ -496,3 +496,53 @@ async def test_a_call_requires_a_finite_nonnegative_deadline(runner, timeout):
 async def test_an_already_expired_call_does_not_begin_inference(runner):
     with pytest.raises(ModelCallTimeout):
         await runner.run(lambda: pytest.fail("expired inference ran"), timeout=0, label="expired")
+
+
+def test_runs_at_once_share_the_process_bound_across_event_loops():
+    """Several runs, each with its own event loop and its own stage bound,
+    never have more calls in the provider at once than the process's workers
+    (#547): the bound per stage and run adds up, the runner's does not."""
+    workers, stage_bound, runs, calls_per_run = 2, 2, 3, 4
+    service = ModelCallExecutor(ModelCallLimits(workers, max_pending=runs * stage_bound))
+    lock = threading.Lock()
+    in_provider = {"now": 0, "most": 0}
+    per_run_most = [0] * runs
+    per_run_now = [0] * runs
+
+    def call(run_index):
+        with lock:
+            in_provider["now"] += 1
+            per_run_now[run_index] += 1
+            in_provider["most"] = max(in_provider["most"], in_provider["now"])
+            per_run_most[run_index] = max(per_run_most[run_index], per_run_now[run_index])
+        time.sleep(0.02)
+        with lock:
+            in_provider["now"] -= 1
+            per_run_now[run_index] -= 1
+        return run_index
+
+    def one_run(run_index, results):
+        async def stage():
+            slots = asyncio.Semaphore(stage_bound)  # as the enrichment stages do
+
+            async def one():
+                async with slots:
+                    return await service.run(lambda: call(run_index), timeout=5, label=f"run-{run_index}")
+
+            return await asyncio.gather(*(one() for _ in range(calls_per_run)))
+
+        results[run_index] = asyncio.run(stage())
+
+    results = [None] * runs
+    threads = [threading.Thread(target=one_run, args=(index, results)) for index in range(runs)]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+    finally:
+        service.close(wait=True)
+
+    assert results == [[index] * calls_per_run for index in range(runs)]
+    assert in_provider["most"] == workers, "the process bound holds, and is reached"
+    assert all(most <= stage_bound for most in per_run_most)
