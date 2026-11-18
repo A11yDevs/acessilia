@@ -496,3 +496,61 @@ async def test_a_call_requires_a_finite_nonnegative_deadline(runner, timeout):
 async def test_an_already_expired_call_does_not_begin_inference(runner):
     with pytest.raises(ModelCallTimeout):
         await runner.run(lambda: pytest.fail("expired inference ran"), timeout=0, label="expired")
+
+
+def test_runs_at_once_share_the_process_bound_across_event_loops():
+    """Several runs at once, each on its own event loop with its own stage
+    bound, share the process's workers (#547): their stage bounds add up
+    (3 runs x 1 > 2 workers), the runner's bound does not.
+
+    Deterministic (review of #589): the runs start together (a barrier), and
+    each stage allows one call at a time, so two calls in the provider at once
+    come from two different runs. The first call waits for the second, so the
+    overlap always happens.
+    """
+    workers, stage_bound, runs, calls_per_run = 2, 1, 3, 3
+    service = ModelCallExecutor(ModelCallLimits(workers, max_pending=runs * stage_bound))
+    lock = threading.Lock()
+    in_provider: list[int] = []
+    most = {"calls": 0, "runs": 0}
+    start = threading.Barrier(runs)
+
+    def call(run_index):
+        with lock:
+            in_provider.append(run_index)
+            most["calls"] = max(most["calls"], len(in_provider))
+            most["runs"] = max(most["runs"], len(set(in_provider)))
+        deadline = time.monotonic() + 2
+        while most["calls"] < workers and time.monotonic() < deadline:
+            time.sleep(0.001)
+        time.sleep(0.005)
+        with lock:
+            in_provider.remove(run_index)
+        return run_index
+
+    def one_run(run_index, results):
+        async def stage():
+            slots = asyncio.Semaphore(stage_bound)  # as the enrichment stages do
+
+            async def one():
+                async with slots:
+                    return await service.run(lambda: call(run_index), timeout=5, label=f"run-{run_index}")
+
+            return await asyncio.gather(*(one() for _ in range(calls_per_run)))
+
+        start.wait(timeout=5)
+        results[run_index] = asyncio.run(stage())
+
+    results = [None] * runs
+    threads = [threading.Thread(target=one_run, args=(index, results)) for index in range(runs)]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+    finally:
+        service.close(wait=True)
+
+    assert results == [[index] * calls_per_run for index in range(runs)]
+    assert most["calls"] == workers, "the process bound holds, and is reached"
+    assert most["runs"] == workers, "the calls at once came from different runs"

@@ -88,8 +88,13 @@ class VisionConfig:
     """How the enrichment stages call the vision model.
 
     ``concurrency`` bounds the calls of one stage of one run: each stage
-    builds its own semaphore. Runs at once add up (the service's queue runs
-    one job at a time); a limit per provider shared across runs is #547.
+    builds its own semaphore, so runs at once add up. What bounds the calls
+    across runs is the ``ModelCallRunner`` the caller passes to ``execute``.
+    The service's is one per process, with ``MODEL_CALL_WORKERS`` workers,
+    and the service process talks to one provider (its ``AI_CLIENT``), so
+    there it is the bound per provider across runs (ADR-0021, #547). A
+    caller that runs several ``ModelConfig`` in one process with one runner
+    shares that bound among their providers: stricter, never looser.
     """
 
     concurrency: int
