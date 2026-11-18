@@ -17,7 +17,7 @@ from acessilia_core.manifest.models import (
 )
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.planner_agent import PlannerAgent
-from scripts.pmv import main
+from scripts.pddl_pipeline import main
 
 
 def make_manifest() -> ProcessingManifest:

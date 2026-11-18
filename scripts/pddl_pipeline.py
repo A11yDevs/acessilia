@@ -33,8 +33,8 @@ DEFAULT_MANIFEST_SCHEMA = (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="a11y-pmv",
-        description="PMV Agno + Toolbox + PDDL para processamento acessível.",
+        prog="a11y-pddl-pipeline",
+        description="Pipeline PDDL (Agno + Toolbox + PDDL) para processamento acessível.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

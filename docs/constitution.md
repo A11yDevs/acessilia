@@ -122,13 +122,13 @@ Deliver document and image conversion to accessible formats through:
    - Tool definitions (for deterministic functions like manifest extraction)
    - Dedicated test file validating agent inputs, outputs, and fallback behavior
    - Updates to [architecture.md](architecture.md) and [patterns.md](patterns.md), and relevant sequence diagrams
-   - If adding PDDL artifacts (new domain, new planner): update `schemas/` and `core/planning/domains/` plus `docs/pmv_agno_pddl.md`
+   - If adding PDDL artifacts (new domain, new planner): update `schemas/` and `core/planning/domains/` plus `docs/pddl_pipeline.md`
 3. PDDL/Planning changes (schemas, domain, planner backend):
    - Domain updates: modify `core/planning/domains/domain_vX.Y.pddl`, increment version
    - Schema changes: update `schemas/processing_manifest.schema.json`, `schemas/nominal_plan.schema.json`, `schemas/execution_report.schema.json`
    - Planner backend: register in `core/planning/models.py` (PlannerBackend enum)
    - Validation: run `pytest tests/test_pddl_planning.py` (plan generation) and `pytest tests/test_agno_executor.py` (execution)
-   - Documentation: update `docs/pmv_agno_pddl.md` with new examples
+   - Documentation: update `docs/pddl_pipeline.md` with new examples
 4. Changing the canonical schema or renderers requires updates in [README.md](../README.md), [architecture.md](architecture.md), [tests/README.md](../tests/README.md), and the PlantUML diagrams.
 5. Accessibility regression is treated as a critical defect.
 6. Adding a Toolbox capability or provider follows [toolbox_integration.md](toolbox_integration.md) §4, and decides where each piece of code goes with the guide in [ADR-0002](adr/0002-component-responsibilities.md#decision).

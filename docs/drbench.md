@@ -168,6 +168,6 @@ benchmark preset is a default. Both results are frozen in
 
 - [Benchmark harness](bench.md) — download, run and score Dr.DocBench
 - [Architecture](architecture.md) — pipeline canônico
-- [PMV Agno + PDDL](pmv_agno_pddl.md) — orquestração
+- [The PDDL pipeline](pddl_pipeline.md) — orquestração
 - [Runbook de reprodução](drbench/experiments/RUNBOOK.md) — retomar os testes de performance
 - [Algoritmos do docstruct](docstruct_algorithms.md) — as políticas determinísticas

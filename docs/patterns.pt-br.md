@@ -42,7 +42,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 
 ### 8. Planejamento Determinístico com PDDL
 - Implementação: [libs/core/src/acessilia_core/manifest/](../libs/core/src/acessilia_core/manifest/), [libs/core/src/acessilia_core/planning/](../libs/core/src/acessilia_core/planning/), [libs/core/src/acessilia_core/execution/](../libs/core/src/acessilia_core/execution/), coordenados por [libs/core/src/acessilia_core/pipeline/orchestrator.py](../libs/core/src/acessilia_core/pipeline/orchestrator.py). É o único motor ativo; o manifesto é extraído pela Toolbox.
-- Papel: separar *o que fazer* de *fazer*. Um manifesto determinístico descreve as regiões e obrigações do documento; um planejador PDDL o compila em um plano validado e ordenado; um executor Agno Workflow aplica o plano, chamando os agentes Vision/Data apenas onde o plano exige. Veja [pmv_agno_pddl.md](pmv_agno_pddl.md).
+- Papel: separar *o que fazer* de *fazer*. Um manifesto determinístico descreve as regiões e obrigações do documento; um planejador PDDL o compila em um plano validado e ordenado; um executor Agno Workflow aplica o plano, chamando os agentes Vision/Data apenas onde o plano exige. Veja [pddl_pipeline.pt-br.md](pddl_pipeline.pt-br.md).
 - Benefício: a ordem e as dependências das tarefas ficam explícitas e auditáveis, e o planejamento permanece determinístico (nenhum LLM escreve PDDL) enquanto a IA fica restrita à descrição. Uma falha no planejamento faz a tarefa falhar; não há fallback para extração determinística.
 
 ### 9. API REST com Clientes de Interface
