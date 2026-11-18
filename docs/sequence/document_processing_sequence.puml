@@ -49,6 +49,13 @@ end note
 Orchestrator -> Builder: build_canonical_document()
 Builder --> Orchestrator: validated canonical document
 
+note over Builder, Export
+  The canonical JSON Schema ships in docstruct's wheel.
+  Builder/schema parity is tested, including child sections.
+  Existing export audit applies; strict schema-gate activation
+  remains separate (E1.2b, ADR-0023).
+end note
+
 Orchestrator -> Export: render formats
 loop requested pure exports (TXT, HTML, Pandoc AST, benchmark Markdown)
   Export -> PureExport: canonical document, format options

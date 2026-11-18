@@ -42,6 +42,27 @@ uv run pytest tests/test_pddl_planning.py
 
 `fixtures/` guarda os PDFs e imagens de exemplo, usados tanto pelos testes quanto pelos cenários de carga e benchmarks em `scripts/`. `fixtures/failures/` guarda documentos corrompidos inertes usados por `test_job_failure_e2e.py` para reproduzir a falha do pipeline e o e-mail de falha; veja o [README](fixtures/failures/README.md). Não há flag de debug envolvida: os arquivos vivem apenas na árvore de testes.
 
+## Contrato de schema canônico
+
+O contrato de schema canônico é conferido separadamente:
+`libs/docstruct/tests/test_schema_validation.py` cobre o draft empacotado,
+validador injetado, propagação de falhas e saída do builder incluindo filhos;
+`tests/test_canonical_schema_contract.py` confere a cópia da raiz, o builder do
+core e a aceitação preservada de tipos personalizados no export. A CI também
+valida o schema do wheel instalado fora do checkout. `jsonschema` é apenas dev
+na docstruct; os guards de runtime com biblioteca padrão e de infraestrutura
+continuam rodando, com a exceção do recurso fixo registrada no ADR 0023.
+
+Regenerar/conferir o schema histórico da raiz após editar a fonte do pacote:
+
+```bash
+uv run python scripts/sync_accessible_document_schema.py
+uv run python scripts/sync_accessible_document_schema.py --check
+```
+
+A validação é optativa; ativação obrigatória no gate de exportação é a E1.2b.
+Veja a [API de schema](../libs/docstruct/README.pt-br.md#schema-canônico-docstructschemas-docstructvalidation).
+
 ## Caracterização dos exports
 
 A linha de base de paridade dos exports da #371 fica em

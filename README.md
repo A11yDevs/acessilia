@@ -21,6 +21,11 @@ selection and rendering policy. The core's TXT/HTML adapters resolve labels and
 write files; DOCX and PDF/UA rendering runs on the Toolbox. See the
 [export architecture](docs/architecture.md#2-canonical-document--export-pipeline-backendcorepipeline-backendcoreexport).
 
+The accessible-document JSON Schema ships in the docstruct wheel. Consumers
+can validate explicitly with an injected engine; the existing export audit
+continues to govern exports. The root schema is a checked, generated copy of
+the packaged source. See the [schema API](libs/docstruct/README.md#canonical-schema-docstructschemas-docstructvalidation).
+
 ### Standalone API
 
 The **API** (`http://localhost:8000`) is the core: it receives files, enqueues them, processes them with LLMs, exports the accessible formats (TXT, DOCX, PDF/UA, HTML, MP3, ZIP), and makes downloads available via a token. All frontends (web, Telegram, CLI) consume it over HTTP using the shared client `frontend.clients.api_client.ApiClient`.

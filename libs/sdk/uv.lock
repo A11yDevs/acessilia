@@ -4,11 +4,14 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "acessilia-docstruct"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "../docstruct" }
 
 [package.metadata]
-requires-dist = [{ name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" }]
+requires-dist = [
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.20,<5" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+]
 provides-extras = ["dev"]
 
 [[package]]

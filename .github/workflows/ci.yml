@@ -142,7 +142,8 @@ jobs:
 
   # docstruct is the pure structural core under the core, the SDK and the
   # Toolbox (ADR-0002, ADR-0017): it must install from its wheel and pass its
-  # suite on the standard library alone, without its optional accelerator.
+  # runtime on the standard library alone, without its optional accelerator.
+  # jsonschema is a development-only engine for the injected validation tests.
   docstruct-isolated:
     name: docstruct alone (Python 3.11)
     runs-on: ubuntu-latest
@@ -204,6 +205,33 @@ jobs:
           if "site-packages" not in location.parts:
               raise SystemExit(f"docstruct imported from {location}, not from the wheel")
           print(f"docstruct is installed alone: {location.parent}")
+          PY
+
+      - name: Validate the bundled canonical schema away from the checkout
+        run: |
+          cd "$RUNNER_TEMP"
+          "$GITHUB_WORKSPACE/libs/docstruct/.venv/bin/python" -I - <<'PY'
+          from importlib.resources import files
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, ValidationError, validate
+          from docstruct.canonical import build_canonical_document
+          from docstruct.schemas import accessible_document_schema
+          from docstruct.validation import validate_against_schema
+
+          resource = files("docstruct.schemas").joinpath("accessible_document.schema.json")
+          if "site-packages" not in Path(str(resource)).parts:
+              raise SystemExit(f"schema is not from the installed wheel: {resource}")
+          Draft202012Validator.check_schema(accessible_document_schema())
+          document = build_canonical_document("# Main\n\nBody.\n\n## Child\n\nChild text.")
+          validate_against_schema(document, validate)
+          document["sections"][0]["children"][0]["blocks"][0]["type"] = "custom"
+          try:
+              validate_against_schema(document, validate)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("bundled schema did not reject an invalid child")
+          print(f"Installed canonical schema validated outside the checkout: {resource}")
           PY
 
       - name: Run the docstruct test suite

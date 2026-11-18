@@ -34,6 +34,8 @@ package "Core (Docker container)" {
     component "Canonical builder and sanitizer\nlibs/core/src/acessilia_core/pipeline" as Pipeline
     component "Renderers and exporters\n(TXT/DOCX/PDF/HTML/MP3)\nlibs/core/src/acessilia_core/export" as Exporters
     component "Pure serializers\nTXT / HTML / Pandoc AST / Markdown\nlibs/docstruct/export\nshared walker + format visitors" as PureExports
+    artifact "Normative canonical JSON Schema\ndocstruct/schemas/accessible_document.schema.json" as CanonicalSchema
+    artifact "Generated compatibility copy\nschemas/accessible_document.schema.json" as SchemaCopy
   }
 
   database "SQLite (WAL)\nvar/data/history.db" as DB
@@ -69,6 +71,13 @@ Data --> AI
 
 Executor --> Pipeline : 4. Results
 Pipeline --> Exporters : 5. Canonical document
+Pipeline ..> CanonicalSchema : builder/schema contract tests
+CanonicalSchema ..> SchemaCopy : sync/check developer tooling
+note right of CanonicalSchema
+  Wheel includes the fixed resource (ADR-0023).
+  Validator engine is injected; validation is opt-in.
+  Strict export-gate activation is separate (E1.2b).
+end note
 Exporters --> PureExports : labels, profile/target\npure serialization
 Exporters --> Toolbox : PDF/UA render
 Exporters --> User : 6. Accessible document
