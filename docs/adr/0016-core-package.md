@@ -2,7 +2,7 @@
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0016-core-package.pt-br.md)
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-18, evidence below)
 - **Date:** 2026-11-11
 - **Components:** core
 - **Issues:** [#402](https://github.com/A11yDevs/acessilia/issues/402), [#365](https://github.com/A11yDevs/acessilia/issues/365)
@@ -120,7 +120,7 @@ Options considered:
 
 ## Decision
 
-Proposed: option 2.
+Option 2.
 
 - **The core is a package, `acessilia_core`, in `libs/core`.** Its layout:
 
@@ -383,6 +383,37 @@ Proposed: option 2.
   enrichment stage (for example, the table structures) runs from a script with
   an explicit `CoreConfig`, with neither FastAPI nor `backend.config` imported,
   and returns the same manifest as the service on the same input.
+
+## Acceptance evidence
+
+The six steps were done by 2026-11-18, and the conditions above held:
+
+- **The core is a package of its own.** `acessilia_core` lives in
+  `libs/core` (`acessilia-core` 0.1.0, #572); `backend/core` is gone, with no
+  bridge left. Its wheel carries the PDDL domains and their descriptions, the
+  prompts and the `.po` catalogs, which it locates from its own package and
+  compiles in memory (#569).
+- **Its boundary is checked.** `libs/core/tests/test_boundary.py` (#568, moved
+  in #575) checks, imports inside functions included, that it imports nothing
+  from `backend` or `frontend`, only the allowed libraries with edge-tts as the
+  recorded deviation, and reads no environment variable; and that the SDK and
+  docstruct do not import it. Its caller passes everything it needs: a
+  `CoreConfig` per run (step 3, #537 to #562), the run's `RunPorts` (step 4,
+  #563, #565, #566), the model-call runner, and the process setup once
+  (#562, #568).
+- **It works alone.** The `core alone` CI job (#575) installs the core from
+  its own lock as a wheel, where neither the service, the front ends, FastAPI
+  nor the Toolbox package is importable, and runs the smoke test from outside
+  the checkout: the PDDL domain, every prompt file and both catalogs load, and
+  a fixture manifest is planned and executed (dry run). Leaving the prompts,
+  the catalogs or the domains out of the wheel fails it.
+- **The proof of concept.** `libs/core/examples/table_stage.py` runs the
+  table-structure stage with a `CoreConfig` built field by field and a
+  model-call runner of its own, in that job too.
+  `tests/test_core_standalone_table_stage.py` checks that it returns the same
+  manifest as the service on the same input, imports neither `backend` nor
+  FastAPI, and that a table the model reads goes through the script's runner
+  with the model its config names.
 
 ## Consequences
 
