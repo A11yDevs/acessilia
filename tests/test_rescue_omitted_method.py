@@ -319,6 +319,32 @@ def test_an_adopted_page_without_the_replaced_primary_fails(tmp_path):
     assert len(manifest.elements) == 1
 
 
+def test_a_failure_on_one_page_leaves_every_page_unchanged(tmp_path):
+    """Review of #592: page 1 could be rescued, but page 2 cannot.
+
+    The executor does not roll back a failed attempt, so the method must not
+    leave page 1's rescue behind when it fails for page 2.
+    """
+    elements = [
+        _adopted("m-1", "paragraph", "The first paragraph of the body text.", MIDDLE, 1),
+        _adopted("m-2", "paragraph", "Text from MinerU.", MIDDLE, 2, page=2),
+    ]
+    replaced = {1: [
+        _row("d-1", "paragraph", "The first paragraph of the body text.", MIDDLE, 1),
+        _row("d-2", "paragraph", LOST, LOWER, 2),
+    ]}
+    manifest = _manifest(
+        tmp_path, elements, replaced=replaced, targets=["m-1", "m-2"]
+    )
+    before = manifest.model_dump()
+
+    result = _handle_rescue_omitted_method(manifest, "o-1")
+
+    assert not result.success
+    assert "Pages 2 came from mineru" in result.message
+    assert manifest.model_dump() == before
+
+
 def test_fails_without_the_secondary_extraction(tmp_path):
     elements = [_el("d-1", "paragraph", "Some text.", MIDDLE, 1)]
     manifest = _manifest(tmp_path, elements, with_artifact=False)

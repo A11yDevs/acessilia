@@ -120,30 +120,18 @@ def _handle_rescue_omitted_method(
     if secondary is None:
         return MethodResult(success=False, validated=False, message=problem)
 
-    kept: list[int] = []
-    complete: list[int] = []
-    unknown: list[int] = []
-    restored: dict[int, int] = {}
-    for page in pages:
-        page_elements = _page_elements(manifest, page)
-        if page in secondary.replaced_primary:
-            count = _rescue_page(
-                manifest, page, page_elements, secondary.replaced_primary[page]
-            )
-            if count:
-                restored[page] = count
-            else:
-                complete.append(page)
-        elif any(
+    # Every page is classified before any is changed: a failed method must
+    # leave the manifest as it found it, since the executor does not roll back
+    # a failed attempt.
+    routed = [page for page in pages if page in secondary.replaced_primary]
+    unknown = [
+        page for page in pages
+        if page not in secondary.replaced_primary
+        and any(
             element.metadata.get("provider") == secondary.provider
-            for element in page_elements
-        ):
-            unknown.append(page)
-        else:
-            kept.append(page)
-
-    if restored:
-        _renumber(manifest, set(restored))
+            for element in _page_elements(manifest, page)
+        )
+    ]
     if unknown:
         return MethodResult(
             success=False,
@@ -152,6 +140,24 @@ def _handle_rescue_omitted_method(
                 pages=_pages(unknown), provider=secondary.provider or "?"
             ),
         )
+    kept = [page for page in pages if page not in routed]
+
+    complete: list[int] = []
+    restored: dict[int, int] = {}
+    for page in routed:
+        count = _rescue_page(
+            manifest,
+            page,
+            _page_elements(manifest, page),
+            secondary.replaced_primary[page],
+        )
+        if count:
+            restored[page] = count
+        else:
+            complete.append(page)
+    if restored:
+        _renumber(manifest, set(restored))
+
     parts = []
     if restored:
         parts.append(
