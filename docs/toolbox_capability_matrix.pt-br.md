@@ -150,7 +150,7 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
 
 - **Todo método admissível está contabilizado.** Cada um resolve para um handler
   registrado ou é reportado ao planejador como indisponível;
-  `tests/test_pddl_actionability.py` falha para qualquer método que não seja nenhum
+  `libs/core/tests/test_pddl_actionability.py` falha para qualquer método que não seja nenhum
   dos dois.
 - **19 handlers registrados** (antes: 3 reais + 8 no-op): os 3 com modelo,
   `single-provider` como fallback executável e 14 handlers determinísticos

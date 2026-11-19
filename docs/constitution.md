@@ -61,10 +61,10 @@ Deliver document and image conversion to accessible formats through:
      integration tests must pass in [.github/workflows/ci.yml](../.github/workflows/ci.yml).
      CI uses Python 3.11, checks the root `uv.lock` with `uv lock --check` and
      installs the environment from it with `uv sync --locked --extra dev`.
-     It runs the non-E2E core, docstruct and SDK suites in that root environment
+     It runs the non-E2E main and core library, docstruct and SDK suites in that root environment
      and rejects unexpected skipped tests. Additional isolation jobs install
-     docstruct and the SDK from their own checked lockfiles with `--no-editable`
-     and run their suites.
+     docstruct, the SDK and the core from their own checked lockfiles with
+     `--no-editable` and run their suites.
    - **E2E:** tests marked `e2e` require a running Toolbox or Core API, as
      applicable, and run separately from the regular merge gate. The conditional
      E2E job in [.github/workflows/scheduled-tests.yml](../.github/workflows/scheduled-tests.yml)

@@ -1,4 +1,4 @@
-"""The CI gate keeps its required name and runs the core suite in parallel (#448)."""
+"""The CI gate keeps its required name and runs the main suite in parallel (#448)."""
 
 import json
 import shutil
@@ -11,6 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
 SCHEDULED = ROOT / ".github/workflows/scheduled-tests.yml"
+PRODUCTION = ROOT / ".github/workflows/production-deployment.yml"
 RULESETS = ROOT / ".github/rulesets"
 BYPASS_FILTER = ROOT / "scripts/rulesets-bypass.jq"
 
@@ -43,7 +44,7 @@ def test_core_suite_runs_with_bounded_parallelism() -> None:
     steps = _workflow()["jobs"]["tests"]["steps"]
     names = [step.get("name") for step in steps]
     run = next(
-        step["run"] for step in steps if step.get("name") == "Run complete test suite"
+        step["run"] for step in steps if step.get("name") == "Run main test suite"
     )
 
     assert "-n 4" in run
@@ -105,8 +106,8 @@ def test_sdk_runs_alone_with_docstruct_only() -> None:
 
 
 def test_core_runs_alone_from_its_wheel() -> None:
-    """The core installs from its own lock, without the service, and its
-    smoke test runs outside the checkout (ADR-0016, step 6)."""
+    """The core installs from its own lock, without the service, and its full
+    suite plus the smoke test run from the wheel (ADR-0016, step 6)."""
     job = _workflow()["jobs"]["core-isolated"]
     steps = {step.get("name"): step for step in job["steps"]}
 
@@ -117,7 +118,9 @@ def test_core_runs_alone_from_its_wheel() -> None:
     for name in ("backend", "frontend", "fastapi", "acessilia_toolbox"):
         assert f'"{name}"' in check["run"]
     assert "site-packages" in check["run"]
-    assert "tests/test_boundary.py" in steps["Run the boundary test on the source"]["run"]
+    suite = steps["Run the core library test suite from the wheel"]
+    assert suite["working-directory"] == "libs/core"
+    assert "pytest -rs --junitxml=core-isolated-results.xml tests" in suite["run"]
     smoke = steps["Run the smoke test outside the checkout"]["run"]
     assert '"$RUNNER_TEMP/core-smoke"' in smoke and "cp libs/core/tests/test_smoke.py" in smoke
     assert '--project "$GITHUB_WORKSPACE/libs/core"' in smoke
@@ -145,17 +148,38 @@ def test_ci_installs_the_root_environment_from_the_lock() -> None:
     assert "uv sync --locked --extra dev" in install
 
     for name in (
-        "Run complete test suite",
+        "Run main test suite",
         "Run docstruct library test suite",
         "Run SDK library test suite",
+        "Run core library test suite",
     ):
         assert "uv run --locked" in steps[name]["run"]
-    for name in ("Run docstruct library test suite", "Run SDK library test suite"):
+    for name in (
+        "Run docstruct library test suite",
+        "Run SDK library test suite",
+        "Run core library test suite",
+    ):
         assert '--project "$GITHUB_WORKSPACE"' in steps[name]["run"]
 
     assert not any(
         "pip install" in (step.get("run") or "") for step in job["steps"]
     )
+
+
+def test_production_container_installs_dev_deps_into_the_uv_venv() -> None:
+    """The runtime venv has no pip; install test deps with the base pip."""
+    workflow = yaml.safe_load(PRODUCTION.read_text(encoding="utf-8"))
+    step = next(
+        step
+        for step in workflow["jobs"]["container-tests"]["steps"]
+        if step.get("name", "").startswith("Run the main, core library")
+    )
+    run = step["run"]
+
+    assert "BASE_PYTHON=/usr/local/bin/python3" in run
+    assert '"$BASE_PYTHON" -m pip --python /app/.venv/bin/python install' in run
+    assert "python -m pytest libs/core/tests" in run
+    assert "core-library-results.xml" in run
 
 
 def test_ruleset_templates_require_the_full_gate() -> None:
@@ -214,8 +238,12 @@ def test_scheduled_workflow_covers_both_branches_and_library_results() -> None:
         step for step in steps if step.get("name", "").startswith("Check out")
     )
     assert checkout["with"]["ref"] == "${{ matrix.ref }}"
-    assert any(step.get("name") == "Check docstruct and SDK reports" for step in steps)
-    for name in ("Run docstruct library test suite", "Run SDK library test suite"):
+    assert any(step.get("name") == "Check library reports" for step in steps)
+    for name in (
+        "Run docstruct library test suite",
+        "Run SDK library test suite",
+        "Run core library test suite",
+    ):
         step = next(step for step in steps if step.get("name") == name)
         assert step.get("continue-on-error") is True
 

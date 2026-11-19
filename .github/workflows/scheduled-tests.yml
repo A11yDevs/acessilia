@@ -71,11 +71,11 @@ jobs:
       # The scheduled job changes the execution order and worker count. A test
       # with a different outcome is an order/worker dependency; the comparison
       # step below fails the run.
-      - name: Run core suite serially
+      - name: Run main suite serially
         continue-on-error: true
         run: uv run --locked --extra dev python -m pytest -m "not e2e" --durations=25 --junitxml=serial-results.xml
 
-      - name: Run core suite with four workers
+      - name: Run main suite with four workers
         continue-on-error: true
         run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=parallel-results.xml
 
@@ -89,6 +89,11 @@ jobs:
         working-directory: libs/sdk
         run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
+      - name: Run core library test suite
+        continue-on-error: true
+        working-directory: libs/core
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=core-test-results.xml
+
       - name: Compare outcomes and write the monitoring summary
         if: always()
         run: |
@@ -98,7 +103,7 @@ jobs:
             --json test-monitoring-summary.json \
             --summary "$GITHUB_STEP_SUMMARY"
 
-      - name: Check docstruct and SDK reports
+      - name: Check library reports
         if: always()
         run: |
           uv run --locked --extra dev python - <<'PY'
@@ -110,6 +115,7 @@ jobs:
           for path in (
               Path("libs/docstruct/docstruct-test-results.xml"),
               Path("libs/sdk/sdk-test-results.xml"),
+              Path("libs/core/core-test-results.xml"),
           ):
               try:
                   suite = parse_report(path, str(path))
@@ -145,6 +151,7 @@ jobs:
             parallel-results.xml
             libs/docstruct/docstruct-test-results.xml
             libs/sdk/sdk-test-results.xml
+            libs/core/core-test-results.xml
             test-monitoring-summary.json
           if-no-files-found: ignore
           retention-days: 30

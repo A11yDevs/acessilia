@@ -135,19 +135,21 @@ A direção das dependências é conferida por testes:
 
 | Suíte | Funções de teste, referência → agora | Tempo agora |
 |---|---:|---:|
-| principal (`tests/`, `-n 4`) | 1.512 → 2.211 | 71–88 s |
+| principal (`tests/`, `-n 4`) | 1.512 → 1.497 | 111 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
-| core (`libs/core/tests`) | nenhuma → 15 | 6–10 s |
+| core (`libs/core/tests`) | nenhuma → 735 | 30 s |
 
 - **As suítes das bibliotecas rodam sozinhas em segundos,** então uma mudança
   no docstruct ou no SDK tem retorno sem a suíte principal.
-- **A suíte principal ainda é a maior parte do tempo.** A maioria dos testes
-  do core continua em `tests/`, ao lado dos do serviço, porque foi escrita
-  para o `backend/` antes da mudança. O `libs/core/tests` tem só os testes de
-  fronteira e de fumaça.
+- **A suíte principal ainda é a maior parte do tempo**, mas agora tem os
+  testes do serviço e da API; a suíte do core roda em cerca de 30 s no próprio
+  ambiente. Os testes do core saíram de `tests/` para `libs/core/tests` no
+  #613, junto com o de fronteira e o de fumaça.
 - As suítes da referência não foram cronometradas: o ambiente delas não pode
   ser refeito como era, então só as contagens são comparadas.
+- As contagens e os tempos de principal/core são a medição pós-#613 (uma
+  execução local); o resto desta página está em `ec3ddf0b`.
 
 ## 5. Reaproveitamento das operações
 
@@ -211,8 +213,8 @@ seu pull request:
 1. **Simplificar as funções complexas:** as cinco acima primeiro, começando
    pelo `_derive_v23_processing_needs` (complexidade 71). É a modularização
    interna que a #381 pedia, agora sobre módulos com fronteiras claras.
-2. **Levar para o `libs/core/tests` os testes do core** que testam só o core,
-   para a suíte dele rodar sem o serviço.
+2. ~~**Levar para o `libs/core/tests` os testes do core** que testam só o core,
+   para a suíte dele rodar sem o serviço.~~ Feito no #613.
 3. **Dar uso às operações:** um comando `judge` na linha de comando do SDK, e
    o benchmark de matemática (`scripts/bench`) sobre a cadeia de fórmula em vez
    do core.

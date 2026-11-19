@@ -198,9 +198,9 @@ jobs:
           print("The core is installed alone, from its wheel.")
           PY
 
-      - name: Run the boundary test on the source
+      - name: Run the core library test suite from the wheel
         working-directory: libs/core
-        run: uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" python -m pytest -rs tests/test_boundary.py
+        run: uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" python -m pytest -rs --junitxml=core-isolated-results.xml tests
 
       - name: Run the smoke test outside the checkout
         run: |
@@ -227,13 +227,24 @@ jobs:
         working-directory: ${{ runner.temp }}/core-smoke
         run: |
           uv run --locked --extra dev --no-editable --project "$GITHUB_WORKSPACE/libs/core" python - <<'PY'
+          import os
+          from pathlib import Path
           from xml.etree import ElementTree
 
-          root = ElementTree.parse("core-smoke-results.xml").getroot()
-          skipped = sum(int(s.attrib.get("skipped", "0")) for s in root.iter("testsuite"))
+          reports = [
+              Path("core-smoke-results.xml"),
+              Path(os.environ["GITHUB_WORKSPACE"]) / "libs/core/core-isolated-results.xml",
+          ]
+          skipped = 0
+          for report in reports:
+              root = ElementTree.parse(report).getroot()
+              skipped += sum(
+                  int(suite.attrib.get("skipped", "0"))
+                  for suite in root.iter("testsuite")
+              )
           if skipped:
-              raise SystemExit(f"{skipped} core smoke test(s) skipped.")
-          print("No core smoke test was skipped.")
+              raise SystemExit(f"{skipped} core test(s) skipped.")
+          print("No core test was skipped.")
           PY
 
   # docstruct is the pure structural core under the core, the SDK and the
@@ -432,7 +443,7 @@ jobs:
       # Four workers match the ubuntu-latest four-vCPU runner and keep the
       # slowest test from dominating the tail. The run also collects the suite,
       # so the old standalone `--collect-only` step is redundant.
-      - name: Run complete test suite
+      - name: Run main test suite
         run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=test-results.xml
 
       # The gate is the root environment (#405). A step inside a library points
@@ -446,6 +457,10 @@ jobs:
         working-directory: libs/sdk
         run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=sdk-test-results.xml
 
+      - name: Run core library test suite
+        working-directory: libs/core
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=core-test-results.xml
+
       - name: Reject unexpected skipped tests
         run: |
           uv run --locked --extra dev python - <<'PY'
@@ -456,6 +471,7 @@ jobs:
               Path("test-results.xml"),
               Path("libs/docstruct/docstruct-test-results.xml"),
               Path("libs/sdk/sdk-test-results.xml"),
+              Path("libs/core/core-test-results.xml"),
           ]
           skipped = 0
           for report in reports:
@@ -481,6 +497,7 @@ jobs:
             test-results.xml
             libs/docstruct/docstruct-test-results.xml
             libs/sdk/sdk-test-results.xml
+            libs/core/core-test-results.xml
           if-no-files-found: ignore
           retention-days: 7
 

@@ -16,11 +16,11 @@ lê variáveis de ambiente. Seu chamador fornece:
 - a configuração do processo: logger, idiomas oferecidos e idioma do servidor
   (`acessilia_core.logger`, `acessilia_core.i18n`).
 
-`tests/test_boundary.py` verifica essa fronteira no código-fonte do pacote, e
-`tests/test_smoke.py` verifica que o pacote instalado funciona sozinho: a CI
-instala a partir do lock, fora do checkout, e executa o teste de smoke de lá.
-Execute ambos com `uv run --extra dev pytest` nesta pasta (`make test-all`
-também os executa).
+A suíte em `tests/` verifica a fronteira no código-fonte do pacote e que o pacote
+instalado funciona sozinho; os testes unitários e de integração do core vieram
+para cá do `tests/` do serviço no #613. A CI instala o pacote a partir do lock,
+fora do checkout, e executa o smoke de lá. Execute a suíte inteira com
+`uv run --extra dev pytest` nesta pasta (`make test-all` também a executa).
 
 `examples/table_stage.py` executa a etapa de estruturação de tabelas a partir de
 um script, com `CoreConfig` explícito e executor próprio de chamadas de modelo,

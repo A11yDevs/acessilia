@@ -17,11 +17,11 @@ needs:
 - the process setup, once: the logger, the offered locales and the server
   locale (`acessilia_core.logger`, `acessilia_core.i18n`).
 
-`tests/test_boundary.py` checks the boundary on the package's source, and
-`tests/test_smoke.py` checks that the installed package works on its own: CI
-installs it from its lock, outside the checkout, and runs the smoke test from
-there. Run both with `uv run --extra dev pytest` in this folder (`make test-all`
-runs them too).
+The suite in `tests/` checks the boundary on the package's source and that the
+installed package works on its own; the core's unit and integration tests moved
+here from the service's `tests/` in #613. CI installs the package from its lock,
+outside the checkout, and runs the smoke test from there. Run the whole suite
+with `uv run --extra dev pytest` in this folder (`make test-all` runs it too).
 
 `examples/table_stage.py` runs the table-structure stage from a script,
 with an explicit `CoreConfig` and a model-call runner of its own, and imports

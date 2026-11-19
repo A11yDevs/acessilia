@@ -4,8 +4,8 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 The project's unit test suite covers the canonical pipeline, PDDL engine, API and exporters. Everything is fast and isolated: files go to temporary directories; network and LLM calls are mocked, and async flows run with `pytest-asyncio`.
 
-The merge gate is CI, which runs the non-E2E core, docstruct and SDK suites on
-Python 3.11 in the root `uv.lock` environment. Additional jobs test the libraries
+The merge gate is CI, which runs the non-E2E main, docstruct, SDK and core
+library suites on Python 3.11 in the root `uv.lock` environment. Additional jobs test the libraries
 in isolation from their own locks. The production image carries runtime
 dependencies and passes build, startup and API health smoke checks before
 publication. See the [constitution's testing strategy](../docs/constitution.md#3-architectural-quality-rules).
@@ -56,7 +56,7 @@ See [ADR 0024](../docs/adr/0024-legacy-canonical-type-deprecation.md).
 The canonical schema contract is checked separately:
 `libs/docstruct/tests/test_schema_validation.py` covers the bundled draft,
 injected validator, failure propagation and builder output including children;
-`tests/test_canonical_schema_contract.py` checks the root copy, core builder and
+`libs/core/tests/test_canonical_schema_contract.py` checks the root copy, core builder and
 continued export acceptance of custom block types. CI also validates the schema
 from the installed wheel outside the checkout. `jsonschema` is dev-only in
 docstruct; the standard-library runtime and infrastructure guards still run,
@@ -70,7 +70,7 @@ uv run python scripts/sync_accessible_document_schema.py --check
 ```
 
 Core 0.2.0 applies schema validation after normalization/audit and before profile
-selection. `test_export_schema_gate.py` exercises 68 old/new format outcomes,
+selection. `libs/core/tests/test_export_schema_gate.py` exercises 68 old/new format outcomes,
 normalization, nested/filtered cases, no renderer side effects in direct Core
 calls and localized diagnostics. The worker regression observes job-directory
 creation before export, schema rejection and removal afterward, plus error

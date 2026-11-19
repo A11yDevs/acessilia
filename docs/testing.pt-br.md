@@ -2,8 +2,9 @@
 
 Você também pode ler esta documentação em **inglês**: [English](testing.md).
 
-Na verificação de 2026-11-15, o projeto tem 5.098 testes: 3.313 sem E2E no core,
-1.278 em `libs/docstruct` e 507 em `libs/sdk`. Rodar tudo depois de cada pequena
+Na verificação de 2026-11-18, o projeto tem 6.339 testes: 2.926 sem E2E na suíte
+principal, 1.206 em `libs/core/tests`, 1.587 em `libs/docstruct` e 620 em
+`libs/sdk`. Rodar tudo depois de cada pequena
 edição é caro, tanto localmente quanto na CI. Este guia explica como a suíte está
 organizada, quais comandos usar em cada etapa do ciclo editar–testar–corrigir e
 quais técnicas tornam o ciclo mais rápido sem enfraquecer o gate de regressão. As
@@ -12,7 +13,7 @@ mudanças vieram da issue
 
 ## O problema: suíte grande, ciclo curto
 
-Uma execução serial completa do core leva cerca de 2m23s na máquina de
+Uma execução serial completa da suíte principal leva cerca de 2m23s na máquina de
 referência; o job `tests` da CI levava 1m59s. A maior parte desse tempo não tem
 relação com uma edição de uma linha. Esperar minutos a cada mudança quebra a
 concentração e incentiva pular testes.
@@ -28,7 +29,8 @@ própria suíte completa mais rápida.
 | Mudei um arquivo ou um teste | `make test-file F=tests/test_example.py` | Roda apenas esse caminho, sem E2E |
 | Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches da suíte principal, do docstruct, do SDK e do `libs/core` |
 | Quero a confiança local completa | `make test-all` | Suíte principal com quatro workers, depois docstruct, SDK e `libs/core` |
-| Quero só o core, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda o core non-E2E com quatro workers |
+| Quero só a suíte principal, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda a suíte principal non-E2E com quatro workers |
+| Quero só a biblioteca do core | `(cd libs/core && uv run --extra dev pytest)` | Roda a suíte do core, sem o serviço |
 | Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
 
 `make` sem alvo imprime a lista curta de comandos.
@@ -46,8 +48,9 @@ o workflow `CI` do GitHub Actions:
 
 - **`tests (Python 3.11)`** instala o projeto, confere o contrato de capacidades
   da Toolbox, informa se a versão do docstruct fixada pela Toolbox acompanha o
-  core (só avisos; veja abaixo), roda o core non-E2E com **quatro workers**,
-  roda as suítes do docstruct e do SDK, recusa skips inesperados e publica
+  core (só avisos; veja abaixo), roda a suíte principal non-E2E com **quatro
+  workers**, roda as suítes do docstruct, do SDK e da biblioteca do core, recusa
+  skips inesperados e publica
   relatórios JUnit.
 - **`SDK alone (Python 3.11)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
@@ -61,14 +64,14 @@ o workflow `CI` do GitHub Actions:
   de ruleset, decisão de quem mantém o repositório (CONTRIBUTING.pt-br.md).
 - **`core alone (Python 3.11)`** instala só o core, como wheel, a partir do
   seu próprio lock (`libs/core/uv.lock`): nem o serviço, nem os front-ends, nem
-  o FastAPI, nem o pacote da Toolbox podem ser importados. Ele roda o teste de
-  fronteira sobre o código-fonte, o teste de fumaça a partir de uma pasta fora
-  do checkout e a etapa de tabelas pelo `libs/core/examples/table_stage.py`
+  o FastAPI, nem o pacote da Toolbox podem ser importados. Ele roda a suíte
+  completa do core a partir do wheel, o teste de fumaça a partir de uma pasta
+  fora do checkout e a etapa de tabelas pelo `libs/core/examples/table_stage.py`
   (ADR-0016, passo 6). Ainda não é um check obrigatório, pelo mesmo motivo do
   `docstruct alone`.
 - A entrega da imagem espera pelos quatro jobs.
 
-O check do core não tem mais uma etapa separada de coleta: a própria execução
+O check da suíte principal não tem mais uma etapa separada de coleta: a própria execução
 coleta a suíte. O nome do job é mantido como `tests (Python 3.11)` de propósito,
 para a proteção de branch e os links existentes continuarem funcionando.
 
@@ -81,8 +84,8 @@ make test-all
 ```
 
 Ele roda a suíte principal non-E2E com quatro workers e depois as suítes do
-docstruct, do SDK e do `libs/core`, sequencialmente (a última tem os testes de
-fronteira e de fumaça do core). As bibliotecas são rápidas e têm ambientes de
+docstruct, do SDK e do `libs/core`, sequencialmente (a última tem a suíte da biblioteca do core:
+fronteira, fumaça e os testes migrados do `tests/` no #613). As bibliotecas são rápidas e têm ambientes de
 pacote separados, então permanecem simples. O `make test-all` executa as quatro suítes
 mesmo se uma falhar e retorna status não zero se alguma falhou.
 
@@ -127,9 +130,9 @@ O `make test-failed` é o wrapper suportado. Ele:
 Isso torna o ciclo “corrige uma falha, confirma, segue adiante” rápido e
 previsível.
 
-### 3. Rode o core em paralelo
+### 3. Rode a suíte principal em paralelo
 
-A suíte do core é a grande. O `pytest-xdist` inicia vários processos workers e
+A suíte principal é a grande. O `pytest-xdist` inicia vários processos workers e
 distribui os testes entre eles. O Makefile e a CI usam
 `-n 4 --dist worksteal`:
 
@@ -140,7 +143,7 @@ distribui os testes entre eles. O Makefile e a CI usam
   distribuição fixa por módulo deixa workers ociosos enquanto um termina a
   cauda longa.
 
-O resultado é aproximadamente **1,9x** para o core na máquina de referência de
+O resultado é aproximadamente **1,9x** para a suíte principal na máquina de referência de
 12 núcleos: **143s serial → 74s com quatro workers** em uma execução tranquila.
 `-n 2` é mais lento (124s), `--dist load` é mais lento (178s) e `-n auto` (12
 workers) foi mais lento (96s) porque o teste longo não pode ser dividido e os
@@ -171,10 +174,10 @@ Nenhum teste precisa ser marcado como serial hoje. Se um precisar, o marcador
 
 ### 5. Leve os mesmos ganhos para a CI
 
-A CI usa a mesma execução paralela limitada do core que o `make test-all`.
-Remover a etapa separada de `--collect-only` e paralelizar o core levou o job
+A CI usa a mesma execução paralela limitada da suíte principal que o `make test-all`.
+Remover a etapa separada de `--collect-only` e paralelizar a suíte principal levou o job
 `tests` de **1m59s** para **59s–1m26s** nas execuções de validação; uma execução de
-validação na develop levou **1m11s**, com o core em **32s**. Os outros jobs
+validação na develop levou **1m11s**, com a suíte principal em **32s**. Os outros jobs
 continuam iguais: docstruct e SDK ainda são testados, skips ainda são recusados,
 o contrato ainda é conferido e os artefatos JUnit ainda são publicados mesmo em
 falha.
@@ -183,7 +186,7 @@ falha.
 
 Paralelismo e ordens diferentes podem revelar um teste que depende do que outro
 teste deixou para trás. O workflow `Scheduled test monitoring` roda semanalmente
-(e sob demanda) para `main` e `develop`. Para cada branch, ele roda o core
+(e sob demanda) para `main` e `develop`. Para cada branch, ele roda a suíte principal
 serialmente e de novo com quatro workers, compara os resultados JUnit, falha em
 diferença, falha, erro ou skip inesperado, e escreve um resumo com p50/p95 das
 durações e os testes mais lentos. Ele também confere, de forma estrita, a
@@ -205,7 +208,7 @@ documentação, schemas e fixtures, e que o comando da raiz não executa as suí
 das bibliotecas. Uma mudança de README selecionou zero testes mesmo com um gate
 estático obrigatório falhando; uma mudança central selecionou 246 testes;
 reconstruir o banco de dependências levou 221s na medição tranquila (+55% sobre
-a linha de base serial do core). Ele também adicionou um banco `.testmondata`
+a linha de base serial da suíte principal). Ele também adicionou um banco `.testmondata`
 com estado e mostrou seleção instável entre execuções. Os detalhes e as medições
 estão no registro do experimento da
 [#448](https://github.com/A11yDevs/acessilia/issues/448).
@@ -223,7 +226,7 @@ dependências.
 | Cenário | Antes | Depois |
 |---|---:|---:|
 | Core, serial vs quatro workers | 143s | 74s (~1,9x) |
-| Etapa do core na CI | 60s + 10s de coleta | 26–43s |
+| Etapa da suíte principal na CI | 60s + 10s de coleta | 26–43s |
 | Job `tests` da CI | 1m59s | 59s–1m26s (uma execução: 1m11s) |
 
 `--durations=25` imprime os testes mais lentos de qualquer execução, então você
@@ -231,7 +234,7 @@ pode atualizar a linha de base na sua máquina com:
 
 ```bash
 make test-all
-# ou apenas o core:
+# ou apenas a suíte principal:
 time uv run pytest -m "not e2e" --durations=25
 time uv run pytest -m "not e2e" -n 4 --dist worksteal --durations=25
 ```
@@ -254,11 +257,11 @@ Variáveis úteis:
 
 | Variável | Padrão | Efeito |
 |---|---|---|
-| `CORE_JOBS` | `4` | Número de workers xdist para o core |
+| `CORE_JOBS` | `4` | Número de workers xdist para a suíte principal |
 | `CORE_DIST` | `worksteal` | Estratégia de distribuição do xdist |
 | `DURATIONS` | `25` | Quantidade de testes lentos impressos |
 | `PYTEST` | `uv run pytest` | Comando pytest usado pelo Makefile |
-| `PYTEST_FLAGS` | `-m "not e2e"` | Flags de seleção do core |
+| `PYTEST_FLAGS` | `-m "not e2e"` | Flags de seleção da suíte principal |
 
 Exemplos:
 
@@ -289,7 +292,7 @@ você passe `-m "not e2e"`; use os alvos do Makefile no ciclo normal.
 
 ### Timeouts e marcadores
 
-O `pytest-timeout` dá à suíte do core um limite de 180 segundos por teste. O
+O `pytest-timeout` dá à suíte principal um limite de 180 segundos por teste. O
 teste CPU-heavy do juiz VLM eleva o próprio limite para 300 segundos porque
 quatro workers podem esticá-lo em uma máquina ocupada. O E2E é a outra exceção:
 suas operações e esperas de job podem exceder esse limite legitimamente, então a
@@ -333,8 +336,8 @@ ele não roda a suíte inteira silenciosamente.
 make test-all
 ```
 
-É o equivalente local do gate da CI: core com quatro workers, depois docstruct e
-SDK.
+É o equivalente local do gate da CI: suíte principal com quatro workers, depois
+docstruct, SDK e a biblioteca do core.
 
 ### Preciso investigar um teste lento ou travado
 
@@ -370,7 +373,7 @@ agendada, não um gate de merge.
 
 **Por que `uv run pytest` continua lento?**
 Porque ele é serial por padrão. Use `make test-all` ou adicione
-`-n 4 --dist worksteal` ao comando do core.
+`-n 4 --dist worksteal` ao comando da suíte principal.
 
 **Por que quatro workers e não `-n auto`?**
 Quatro acompanha o runner da CI e foi mais rápido aqui: o teste mais lento não
@@ -406,16 +409,16 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 ## Onde ver os resultados
 
 - **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
-  `Run complete test suite`. O log mostra `created: 4/4 workers` e
+  `Run main test suite`. O log mostra `created: 4/4 workers` e
   `--durations=25`.
-- **Artefatos:** `test-reports` (core, docstruct, SDK),
+- **Artefatos:** `test-reports` (principal, docstruct, SDK e biblioteca do core),
   `sdk-isolated-report` e `docstruct-isolated-report`.
 - **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
   30 dias e uma issue de acompanhamento em falhas agendadas.
 - **Rulesets:** `main` e `develop` exigem `tests (Python 3.11)` e
   `SDK alone (Python 3.11)`.
 - **Localmente:** rode `time make test-all` e compare com o comando serial do
-  core acima na mesma máquina ociosa.
+  suíte principal acima na mesma máquina ociosa.
 
 ## Ambientes suportados
 

@@ -57,7 +57,7 @@ EXEMPT_FILES: set[str] = {
     "tests/test_no_portuguese.py",
     # The #410 tests assert the pt-BR step messages verbatim; the text is the
     # expected user-facing output, not source prose.
-    "tests/test_pddl_messages_i18n.py",
+    "libs/core/tests/test_pddl_messages_i18n.py",
 }
 
 # Local clone of the separate acessilia-dataset repository (git-ignored):
@@ -214,7 +214,7 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     # rule produces, so its code, docs and tests carry it
     ("libs/docstruct/src/docstruct/text/unicode_repair.py", "à"),
     ("libs/docstruct/tests/test_unicode_repair.py", "à"),
-    ("tests/test_legacy_unicode_repair.py", "à medida"),
+    ("libs/core/tests/test_legacy_unicode_repair.py", "à medida"),
     ("docs/docstruct_algorithms.md", "→ `à`"),
 ]
 

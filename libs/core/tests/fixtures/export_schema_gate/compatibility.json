@@ -1,0 +1,616 @@
+{
+  "baseline_commit": "9845d84d1f9e5e69bf4e031965ed67ad4874b3e4",
+  "format": "txt",
+  "stage": "normalized, audited canonical before profile selection",
+  "cases": [
+    {
+      "id": "valid-nested",
+      "normalized_schema_valid": true,
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "exported",
+      "changes": [],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "custom-root",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0,
+        "blocks",
+        0,
+        "type"
+      ],
+      "schema_rule": "enum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "type"
+          ],
+          "value": "custom"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "custom-child",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0,
+        "children",
+        0,
+        "blocks",
+        0,
+        "type"
+      ],
+      "schema_rule": "enum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "children",
+            0,
+            "blocks",
+            0,
+            "type"
+          ],
+          "value": "custom"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "missing-block-id",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0,
+        "blocks",
+        0
+      ],
+      "schema_rule": "required",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "id"
+          ],
+          "remove": true
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "missing-section-id",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0
+      ],
+      "schema_rule": "required",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "id"
+          ],
+          "remove": true
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "invalid-block-verbosity",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0,
+        "blocks",
+        0,
+        "verbosity"
+      ],
+      "schema_rule": "enum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "verbosity"
+          ],
+          "value": "unsupported"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "invalid-document-verbosity",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "verbosity"
+      ],
+      "schema_rule": "enum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "verbosity"
+          ],
+          "value": "unsupported"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "invalid-audience",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "audience",
+        0
+      ],
+      "schema_rule": "enum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "audience",
+            0
+          ],
+          "value": "unsupported"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "invalid-document-id-type",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "id"
+      ],
+      "schema_rule": "type",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "id"
+          ],
+          "value": 123
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "empty-document-title",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "title"
+      ],
+      "schema_rule": "minLength",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "title"
+          ],
+          "value": ""
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "invalid-language",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "language"
+      ],
+      "schema_rule": "minLength",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "language"
+          ],
+          "value": "x"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "invalid-child-level",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0,
+        "children",
+        0,
+        "level"
+      ],
+      "schema_rule": "minimum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "children",
+            0,
+            "level"
+          ],
+          "value": 0
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "metadata-extension",
+      "normalized_schema_valid": true,
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nBody text.\nChild\nChild text.",
+      "strict_outcome": "exported",
+      "changes": [
+        {
+          "path": [
+            "metadata",
+            "page_count"
+          ],
+          "remove": true
+        },
+        {
+          "path": [
+            "metadata",
+            "mode"
+          ],
+          "remove": true
+        },
+        {
+          "path": [
+            "metadata",
+            "pages"
+          ],
+          "remove": true
+        },
+        {
+          "path": [
+            "metadata",
+            "custom"
+          ],
+          "value": {
+            "vendor": "example"
+          }
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "numeric-table-rows",
+      "normalized_schema_valid": true,
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nRow 1: Count: 1; Value: 2\nChild\nChild text.",
+      "strict_outcome": "exported",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "text"
+          ],
+          "remove": true
+        },
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "id"
+          ],
+          "value": "table"
+        },
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "type"
+          ],
+          "value": "table"
+        },
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "rows"
+          ],
+          "value": [
+            [
+              "Count",
+              "Value"
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    },
+    {
+      "id": "existing-duplicate-id",
+      "normalized_schema_valid": true,
+      "baseline_outcome": "audit-rejected",
+      "strict_outcome": "audit-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "children",
+            0,
+            "blocks",
+            0,
+            "id"
+          ],
+          "value": "body"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "audit-rejected",
+        "html": "audit-rejected",
+        "docx": "audit-rejected",
+        "pdf_ua": "audit-rejected"
+      }
+    },
+    {
+      "id": "existing-no-sections",
+      "normalized_schema_valid": true,
+      "baseline_outcome": "audit-rejected",
+      "strict_outcome": "audit-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections"
+          ],
+          "value": []
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "audit-rejected",
+        "html": "audit-rejected",
+        "docx": "audit-rejected",
+        "pdf_ua": "audit-rejected"
+      }
+    },
+    {
+      "id": "custom-filtered",
+      "normalized_schema_valid": false,
+      "schema_path": [
+        "sections",
+        0,
+        "blocks",
+        0,
+        "type"
+      ],
+      "schema_rule": "enum",
+      "baseline_outcome": "exported",
+      "baseline_text": "Main\nChild\nChild text.",
+      "strict_outcome": "schema-rejected",
+      "changes": [
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "type"
+          ],
+          "value": "custom"
+        },
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "text"
+          ],
+          "value": "Filtered content"
+        },
+        {
+          "path": [
+            "sections",
+            0,
+            "blocks",
+            0,
+            "verbosity"
+          ],
+          "value": "technical"
+        }
+      ],
+      "baseline_by_format": {
+        "txt": "exported",
+        "html": "exported",
+        "docx": "exported",
+        "pdf_ua": "exported"
+      }
+    }
+  ],
+  "base_document": {
+    "schema_version": "1.0.0",
+    "id": "doc-schema-gate",
+    "title": "Main",
+    "language": "pt-BR",
+    "verbosity": "detailed",
+    "audience": [
+      "reader"
+    ],
+    "metadata": {
+      "page_count": null,
+      "mode": null,
+      "pages": []
+    },
+    "source": {
+      "name": "",
+      "path": "",
+      "type": ""
+    },
+    "accessibility": {
+      "navigation": true,
+      "semantic_headings": true,
+      "internal_links": true
+    },
+    "technical_warnings": [],
+    "audit": {
+      "generated_by": "canonical_builder",
+      "input_length": 41,
+      "block_count": 4
+    },
+    "sections": [
+      {
+        "id": "main",
+        "title": "Main",
+        "level": 1,
+        "source_location": {},
+        "metadata": {},
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "Body text.",
+            "id": "body"
+          }
+        ],
+        "children": [
+          {
+            "id": "child",
+            "title": "Child",
+            "level": 2,
+            "source_location": {},
+            "metadata": {},
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Child text.",
+                "id": "child-body"
+              }
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

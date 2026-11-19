@@ -30,6 +30,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "tests" / "fixtures" / "toolbox-contract.json"
+CORE_OUT = REPO_ROOT / "libs" / "core" / "tests" / "fixtures" / "toolbox-contract.json"
 #: Public contract URL, always addressed by an immutable commit SHA.
 PUBLISHED_URL = "https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/{ref}/contract/toolbox-contract.json"
 #: The published schemas the SDK generates models from (#185, #213), copied
@@ -223,6 +224,11 @@ def main(argv: list[str] | None = None) -> int:
         args.out.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
+    if args.ref and args.out.resolve() == DEFAULT_OUT.resolve():
+        # The core suite carries its own copy so it can run without the service
+        # test tree; keep both snapshots in lockstep on every capture.
+        CORE_OUT.parent.mkdir(parents=True, exist_ok=True)
+        CORE_OUT.write_bytes(DEFAULT_OUT.read_bytes())
     print(f"wrote {args.out}")
     return 0
 

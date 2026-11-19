@@ -1,0 +1,377 @@
+{
+  "$schema": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+  "schema_version": "1.1.0",
+  "manifest_id": "manifest-3c87d37f1dbea690-r1",
+  "revision": 1,
+  "status": "extracted",
+  "created_at": "2026-09-06T00:00:00Z",
+  "source": {
+    "document_id": "doc-3c87d37f1dbea690",
+    "filename": "sample.pdf",
+    "path": "<source>",
+    "media_type": "application/pdf",
+    "byte_size": 9,
+    "sha256": "3c87d37f1dbea6909f917ce437c390fb8e655a774387d9e69301c0b2283d5b63"
+  },
+  "extractor": {
+    "name": "docling",
+    "version": "toolbox-test",
+    "started_at": "2026-10-20T00:00:00Z",
+    "completed_at": "2026-10-20T00:00:00Z",
+    "duration_ms": 5,
+    "configuration": {
+      "ocr": false
+    }
+  },
+  "title": "toolbox_v2_input",
+  "language": "en-US",
+  "pages": [
+    {
+      "page_number": 1,
+      "width": 100.0,
+      "height": 100.0,
+      "element_ids": [
+        "element-000001",
+        "element-000002",
+        "element-000003",
+        "element-000004",
+        "element-000005"
+      ]
+    }
+  ],
+  "elements": [
+    {
+      "id": "element-000001",
+      "type": "paragraph",
+      "raw_label": "text",
+      "reading_order": 1,
+      "hierarchy_level": 1,
+      "text": "Before table",
+      "source_ref": "#/texts/0",
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": null,
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {
+        "docling_class": "_ItemProxy"
+      }
+    },
+    {
+      "id": "element-000002",
+      "type": "table",
+      "raw_label": "table",
+      "reading_order": 2,
+      "hierarchy_level": 1,
+      "text": null,
+      "source_ref": "#/tables/0",
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": null,
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {
+        "docling_class": "_ItemProxy",
+        "table_ast": {
+          "header": [
+            {
+              "cells": [
+                {
+                  "text": "Name",
+                  "header": true,
+                  "scope": "col",
+                  "rowspan": 1,
+                  "colspan": 1
+                },
+                {
+                  "text": "Age",
+                  "header": true,
+                  "scope": "col",
+                  "rowspan": 1,
+                  "colspan": 1
+                },
+                {
+                  "text": "City",
+                  "header": true,
+                  "scope": "col",
+                  "rowspan": 1,
+                  "colspan": 1
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "cells": [
+                {
+                  "text": "Ana",
+                  "header": false,
+                  "scope": "none",
+                  "rowspan": 1,
+                  "colspan": 1
+                },
+                {
+                  "text": "",
+                  "header": false,
+                  "scope": "none",
+                  "rowspan": 1,
+                  "colspan": 1
+                },
+                {
+                  "text": "Recife",
+                  "header": false,
+                  "scope": "none",
+                  "rowspan": 1,
+                  "colspan": 1
+                }
+              ]
+            }
+          ]
+        },
+        "table_row_count": 2,
+        "table_column_count": 3,
+        "table_has_header": true,
+        "table_linearization_hint": "docling-structured"
+      }
+    },
+    {
+      "id": "element-000003",
+      "type": "picture",
+      "raw_label": "picture",
+      "reading_order": 3,
+      "hierarchy_level": 1,
+      "text": "A labelled map",
+      "source_ref": "#/pictures/0",
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": null,
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {
+        "docling_class": "_ItemProxy"
+      }
+    },
+    {
+      "id": "element-000004",
+      "type": "paragraph",
+      "raw_label": "text",
+      "reading_order": 4,
+      "hierarchy_level": 1,
+      "text": "After picture",
+      "source_ref": "#/texts/1",
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": null,
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {
+        "docling_class": "_ItemProxy"
+      }
+    },
+    {
+      "id": "element-000005",
+      "type": "formula",
+      "raw_label": "formula",
+      "reading_order": 5,
+      "hierarchy_level": 1,
+      "text": "x=1",
+      "source_ref": "#/texts/2",
+      "parent_ref": null,
+      "parent_id": null,
+      "page_number": 1,
+      "confidence": null,
+      "provenance": [
+        {
+          "page_number": 1,
+          "bbox": null,
+          "char_start": null,
+          "char_end": null
+        }
+      ],
+      "metadata": {
+        "docling_class": "_ItemProxy"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "observation-linearize-table-000002",
+      "kind": "table-requires-processing",
+      "severity": "warning",
+      "message": "The table must have verifiable headers and reading order.",
+      "target_ids": [
+        "element-000002"
+      ],
+      "evidence": {
+        "raw_label": "table",
+        "page_number": 1
+      }
+    },
+    {
+      "id": "observation-describe-image-000003",
+      "kind": "picture-requires-processing",
+      "severity": "warning",
+      "message": "The image must receive a description or be marked decorative.",
+      "target_ids": [
+        "element-000003"
+      ],
+      "evidence": {
+        "raw_label": "picture",
+        "page_number": 1
+      }
+    },
+    {
+      "id": "observation-verbalize-formula-000005",
+      "kind": "formula-requires-processing",
+      "severity": "warning",
+      "message": "The formula must carry an accessible mathematical representation plus verbalization.",
+      "target_ids": [
+        "element-000005"
+      ],
+      "evidence": {
+        "raw_label": "formula",
+        "page_number": 1
+      }
+    },
+    {
+      "id": "observation-normalize-formula-000005",
+      "kind": "normalize-formula-detected",
+      "severity": "warning",
+      "message": "Fórmula exige normalização de delimitadores e símbolos.",
+      "target_ids": [
+        "element-000005"
+      ],
+      "evidence": {
+        "before": "x=1",
+        "after": "x = 1"
+      }
+    }
+  ],
+  "obligations": [
+    {
+      "id": "obligation-linearize-table-000002",
+      "kind": "linearize-table",
+      "status": "candidate",
+      "selected": false,
+      "target_ids": [
+        "element-000002"
+      ],
+      "dependencies": [],
+      "admissible_methods": [
+        "pandoc-table",
+        "human-review"
+      ],
+      "method_costs": {
+        "pandoc-table": 15,
+        "human-review": 100
+      },
+      "attempts": [],
+      "rationale": "The table must have verifiable headers and reading order."
+    },
+    {
+      "id": "obligation-describe-image-000003",
+      "kind": "describe-image",
+      "status": "candidate",
+      "selected": false,
+      "target_ids": [
+        "element-000003"
+      ],
+      "dependencies": [],
+      "admissible_methods": [
+        "vision-description",
+        "human-review"
+      ],
+      "method_costs": {
+        "vision-description": 20,
+        "human-review": 100
+      },
+      "attempts": [],
+      "rationale": "The image must receive a description or be marked decorative."
+    },
+    {
+      "id": "obligation-verbalize-formula-000005",
+      "kind": "verbalize-formula",
+      "status": "candidate",
+      "selected": false,
+      "target_ids": [
+        "element-000005"
+      ],
+      "dependencies": [],
+      "admissible_methods": [
+        "mathml",
+        "latex-verbalizer",
+        "human-review"
+      ],
+      "method_costs": {
+        "mathml": 10,
+        "latex-verbalizer": 20,
+        "human-review": 100
+      },
+      "attempts": [],
+      "rationale": "The formula must carry an accessible mathematical representation plus verbalization."
+    },
+    {
+      "id": "obligation-normalize-formula-000005",
+      "kind": "normalize-formula",
+      "status": "candidate",
+      "selected": false,
+      "target_ids": [
+        "element-000005"
+      ],
+      "dependencies": [],
+      "admissible_methods": [
+        "latex-normalizer",
+        "mathml",
+        "human-review"
+      ],
+      "method_costs": {
+        "latex-normalizer": 10,
+        "mathml": 10,
+        "human-review": 100
+      },
+      "attempts": [],
+      "rationale": "Fórmula exige normalização de delimitadores e símbolos."
+    }
+  ],
+  "artifacts": [],
+  "summary": {
+    "page_count": 1,
+    "element_count": 5,
+    "observation_count": 4,
+    "obligation_count": 4,
+    "element_types": {
+      "formula": 1,
+      "paragraph": 2,
+      "picture": 1,
+      "table": 1
+    }
+  }
+}

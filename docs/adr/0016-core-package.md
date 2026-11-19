@@ -373,8 +373,9 @@ Option 2.
        checks that it returns the same manifest as the service on the same
        input and loads neither `backend` nor FastAPI.
 
-     The tests stay in `tests/`; only the boundary test and the smoke test
-     go to `libs/core/tests`. When the three are done:
+     The service's tests stay in `tests/`; the core's tests moved to
+     `libs/core/tests` in #613, with the boundary and smoke tests. When the three
+     are done:
 
      - the modules move to `libs/core`, and `backend/core` disappears;
      - the PDDL domains, the prompts and the catalogs are declared as package
