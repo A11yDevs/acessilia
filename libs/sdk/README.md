@@ -59,7 +59,7 @@ Each module's `__all__` is the SDK's public API ([ADR-0018](../../docs/adr/0018-
 | `acessilia_sdk.operations.formula` | `formula_chain` — crop a formula's box (`pdf.render`, never the whole page), recognize it (`math.recognize`, candidates ranked by docstruct), convert and verbalize the chosen candidate; each step is a function of its own (`crop_formula_region`, `recognize_formula`, `convert_formula`, `verbalize_formula`, and `speak_formula` for both) that reports a `Step` (capability, provider, parameters) and raises the typed errors unchanged; `FormulaCrop`, `FormulaCandidates`, `FormulaText`, `FormulaSpeech`, `FormulaChain`, `FORMULA_CROP_DPI`, `FORMULA_CROP_MIN_SIDE` ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) |
 | `acessilia_sdk.operations.page_judge` | `page_judgement` — render a whole page for the judge (`pdf.render`, 144 dpi, longest side 1600 px), then ask `document.adjudicate.page` which of two transcriptions it holds and read its answer; each step is a function of its own (`render_judge_page`, `judge_page`) that reports a step (capability, provider, parameters) and raises the typed errors unchanged; an answer without a valid probability is a judgement whose `p_b` is None, not a decision; `JudgePage`, `PageJudgement`, `PageJudgementChain`, `JUDGE_PAGE_DPI`, `JUDGE_PAGE_MAX_SIDE` ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop |
-| `acessilia_sdk.cli` | `main` — the command line, `python -m acessilia_sdk` (see [Command line](#command-line)); `formula_document`, the JSON its formula command prints |
+| `acessilia_sdk.cli` | `main` — the command line, `python -m acessilia_sdk` (see [Command line](#command-line)); `formula_document`, the JSON its formula command prints; `judge_document`, the JSON its judge command prints |
 
 ## Configuring a client
 
@@ -201,6 +201,9 @@ python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_
 
 # The formula chain on one box of page 3: crop, recognize, convert, verbalize
 python -m acessilia_sdk $TB formula --file doc.pdf --page 3 --box 72,410,310,438 --crop-output crop.png
+
+# The page judge on page 2: render the page and compare two transcriptions
+python -m acessilia_sdk $TB judge --file doc.pdf --page 2 --candidate-a-file a.md --candidate-b-file b.md --page-output page2.png
 ```
 
 **`formula` runs `acessilia_sdk.operations.formula.formula_chain`**
@@ -212,6 +215,18 @@ MathML and spoken text, and each step's capability, provider and parameters.
 inferred from the edges. A box that cannot be used is no crop and no request,
 never the whole page. `--recognize-provider` and `--transform-provider`
 override the registry's providers.
+
+**`judge` runs `acessilia_sdk.operations.page_judge.page_judgement`**
+([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) and
+prints the rendered page summary (page number and PNG size), `p_b`
+(probability that candidate B is more faithful, or `null` when absent or
+outside `[0, 1]`), `p_b_ab`, `p_a_ba`, `model`, the raw `document` object and
+each step's capability, provider and parameters. Each candidate comes from inline text (`--candidate-a`,
+`--candidate-b`) or a UTF-8 file (`--candidate-a-file`, `--candidate-b-file`).
+`--provider` and `--render-provider` override the registry's providers,
+`--prompt` picks the prompt variant, `--dpi` and `--max-side` bound the render,
+and `--page-output` saves the rendered PNG. The command reports `p_b` without
+applying a decision threshold.
 
 **`run` dispatches by transport.** It calls the registry's `execute`
 capabilities through `POST /v1/capabilities/{id}:execute`, with the

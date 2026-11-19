@@ -2,28 +2,98 @@
 
 Port of the conversion in ``scripts/drbench/run_pipeline.py`` (tag
 drbench-2026-snapshot). The payload is ``structured-document@1``: a flat
-``elements`` list in reading order.
+``elements`` list in reading order. Builds canonical documents with
+``docstruct.canonical`` and enriches formulas directly through the SDK's
+``acessilia_sdk.operations.formula`` operation (ADR-0017, #614), without
+importing ``acessilia_core`` or ``backend``.
 """
 
 from __future__ import annotations
 
 import html
 from typing import Any
+from uuid import uuid4
 
-from acessilia_core.pipeline.canonical_builder import (
+from acessilia_sdk.toolbox.errors import ToolboxError, ToolboxInvalidInput
+from docstruct.canonical import (
+    MathEnricher,
     build_canonical_document,
     sanitize_canonical_document,
 )
-from docstruct.export.markdown import bare_latex
+from docstruct.text.latex import bare_latex
 
-from backend.config.core_config import core_config_from_settings
+from scripts.bench import toolbox
 
 _PLACEHOLDER_TITLE = "Benchmark page"
 _HEADING_TYPES = ("heading", "title", "section_header")
 _HEADER_SCOPES = {"row", "col", "rowgroup", "colgroup"}
 
 
-def payload_to_canonical(result: dict[str, Any]) -> dict[str, Any]:
+class _SdkMathEnricher(MathEnricher):
+    """Enrich math blocks directly via ``acessilia_sdk.operations.formula``.
+
+    Calls ``convert_formula`` and ``verbalize_formula`` through
+    :mod:`scripts.bench.toolbox`. Normalization uses ``bare_latex`` (matching
+    ``acessilia_core.formula_tools.normalize_latex``: delimiters and whitespace
+    only). Display-formula speech intentionally keeps the raw ``math.verbalize``
+    output without the core's ``label_spoken_formula`` presentation prefix
+    (ADR-0017: presentation labeling stays in the core). A rejected expression
+    (``ToolboxInvalidInput``) degrades to empty text; the first outage of a
+    capability stops further calls to it for the rest of the document and
+    records a technical warning.
+    """
+
+    def __init__(self, *, language: str = "pt-BR") -> None:
+        self.language = language
+        self.unavailable: dict[str, str] = {}
+        self.rejected: dict[str, int] = {}
+
+    def normalize(self, latex: str) -> str:
+        # Matches acessilia_core.formula_tools.normalize_latex (bare_latex alias).
+        return bare_latex(latex)
+
+    def to_mathml(self, latex: str) -> str:
+        return self._call("math.convert", toolbox.convert_latex, latex)
+
+    def verbalize(self, latex: str) -> str:
+        return self._call("math.verbalize", self._verbalize, latex).strip()
+
+    def verbalize_inline(self, latex: str) -> str:
+        return self._call("math.verbalize", self._verbalize, latex).strip()
+
+    def _verbalize(self, latex: str) -> str:
+        return toolbox.verbalize_latex(latex, language=self.language)
+
+    def _call(self, capability: str, fn: Any, latex: str) -> str:
+        if not latex or capability in self.unavailable:
+            return ""
+        try:
+            result = fn(latex)
+        except ToolboxInvalidInput:
+            self.rejected[capability] = self.rejected.get(capability, 0) + 1
+            return ""
+        except ToolboxError as exc:
+            self.unavailable[capability] = type(exc).__name__
+            return ""
+        if not result:
+            self.rejected[capability] = self.rejected.get(capability, 0) + 1
+        return result
+
+    def warnings(self) -> list[str]:
+        out = [
+            f"{capability} unavailable ({reason}): formulas kept without enrichment"
+            for capability, reason in self.unavailable.items()
+        ]
+        out += [
+            f"{capability} rejected the LaTeX of {count} formula(s)"
+            for capability, count in self.rejected.items()
+        ]
+        return out
+
+
+def payload_to_canonical(
+    result: dict[str, Any], *, math_enricher: MathEnricher | None = None
+) -> dict[str, Any]:
     """Map manifest elements to canonical blocks and build the document.
 
     Block types come from the provider's layout model, not from the heuristic
@@ -37,13 +107,18 @@ def payload_to_canonical(result: dict[str, Any]) -> dict[str, Any]:
         "text": doc.get("text") or "",
         "pages": result.get("pages", []),
     }
+    enricher = _SdkMathEnricher() if math_enricher is None else math_enricher
     document = build_canonical_document(
         payload,
-        toolbox=core_config_from_settings().toolbox,
         title=_PLACEHOLDER_TITLE,
         language=result.get("language") or "en",
         verbosity="detailed",
+        math_enricher=enricher,
+        id_factory=lambda: f"doc-{uuid4().hex[:12]}",
     )
+    if isinstance(enricher, _SdkMathEnricher):
+        if warnings := enricher.warnings():
+            document.setdefault("technical_warnings", []).extend(warnings)
     if document.get("title") == _PLACEHOLDER_TITLE:
         # No heading on the page: do not emit a synthetic "# ..." line.
         document["title"] = ""

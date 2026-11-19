@@ -11,6 +11,11 @@
     formula (--file PATH | --artifact ID) --page N --box L,T,R,B [--origin ...]
                                  the formula chain: crop, recognize, convert,
                                  verbalize; prints every step as JSON
+    judge (--file PATH | --artifact ID) --page N
+          (--candidate-a TEXT | --candidate-a-file PATH)
+          (--candidate-b TEXT | --candidate-b-file PATH)
+                                 the page judge: render a page and ask which
+                                 transcription it holds; prints every step as JSON
     dataset list | describe | splits | items | item | artifact | sample | sync
                                  the dataset routes; JSON, or the artifact's bytes
 
@@ -36,6 +41,12 @@ of a page (ADR-0017): the proof that the chain needs neither the core nor its
 settings. Providers are the registry's unless ``--recognize-provider`` or
 ``--transform-provider`` say otherwise; ``--crop-output`` keeps the crop.
 
+``judge`` runs ``acessilia_sdk.operations.page_judge.page_judgement`` on one
+page with two candidate transcriptions (ADR-0017): it renders the page and asks
+``document.adjudicate.page`` for ``pB`` (without deciding what ``pB`` means).
+Providers are the registry's unless ``--provider`` or ``--render-provider`` say
+otherwise; ``--page-output`` keeps the rendered PNG.
+
 Exit status: 0 on success, 1 when the Toolbox or the file system fails
 (the typed error is printed on standard error), 2 for invalid arguments.
 """
@@ -54,6 +65,12 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from acessilia_sdk.operations.formula import FORMULA_CROP_DPI, FormulaChain, formula_chain
+from acessilia_sdk.operations.page_judge import (
+    JUDGE_PAGE_DPI,
+    JUDGE_PAGE_MAX_SIDE,
+    PageJudgementChain,
+    page_judgement,
+)
 from acessilia_sdk.toolbox.artifacts import ARTIFACT_ID_RE
 from acessilia_sdk.toolbox.capabilities import (
     PROVIDER_DEFAULTS,
@@ -62,6 +79,7 @@ from acessilia_sdk.toolbox.capabilities import (
 )
 from acessilia_sdk.toolbox.catalog import CatalogSnapshot, read_catalog
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.clients.adjudicate import ToolboxAdjudicateClient
 from acessilia_sdk.toolbox.clients.artifact import ToolboxArtifactClient
 from acessilia_sdk.toolbox.clients.dataset import MAX_PAGE_SIZE, ToolboxDatasetClient
 from acessilia_sdk.toolbox.clients.math import ToolboxMathClient
@@ -150,6 +168,7 @@ def _parser() -> argparse.ArgumentParser:
     download.add_argument("output", type=Path, help="file to write; its directory must exist")
     _dataset_parser(commands)
     _formula_parser(commands)
+    _judge_parser(commands)
     return parser
 
 
@@ -181,6 +200,49 @@ def _formula_parser(commands) -> None:
     formula.add_argument("--transform-provider", help="math.convert and math.verbalize provider")
     formula.add_argument("--crop-output", type=Path, metavar="PATH", help="also write the crop")
     formula.add_argument(
+        "--no-cache", action="store_true", help="do not reuse cached Toolbox results"
+    )
+
+
+def _judge_parser(commands) -> None:
+    judge = commands.add_parser(
+        "judge",
+        help="render a page and ask which of two transcriptions it holds; prints each step",
+    )
+    source = judge.add_mutually_exclusive_group(required=True)
+    source.add_argument("--file", type=Path, metavar="PATH", help="PDF, PNG or JPEG to upload")
+    source.add_argument(
+        "--artifact", metavar="ID", help="source already stored in the Toolbox (see 'upload')"
+    )
+    judge.add_argument("--page", type=int, required=True, metavar="N", help="1-based page")
+    cand_a = judge.add_mutually_exclusive_group(required=True)
+    cand_a.add_argument("--candidate-a", metavar="TEXT", help="transcription A, as text")
+    cand_a.add_argument(
+        "--candidate-a-file", type=Path, metavar="PATH", help="UTF-8 file holding transcription A"
+    )
+    cand_b = judge.add_mutually_exclusive_group(required=True)
+    cand_b.add_argument("--candidate-b", metavar="TEXT", help="transcription B, as text")
+    cand_b.add_argument(
+        "--candidate-b-file", type=Path, metavar="PATH", help="UTF-8 file holding transcription B"
+    )
+    judge.add_argument(
+        "--prompt",
+        default="base",
+        help="prompt variant, e.g. base, para or err (default: base)",
+    )
+    judge.add_argument("--dpi", type=int, default=JUDGE_PAGE_DPI, help="page render resolution")
+    judge.add_argument(
+        "--max-side",
+        type=int,
+        default=JUDGE_PAGE_MAX_SIDE,
+        help="longest side of the rendered page in pixels",
+    )
+    judge.add_argument("--provider", help="document.adjudicate.page provider")
+    judge.add_argument("--render-provider", help="pdf.render provider")
+    judge.add_argument(
+        "--page-output", type=Path, metavar="PATH", help="also write the rendered page PNG"
+    )
+    judge.add_argument(
         "--no-cache", action="store_true", help="do not reuse cached Toolbox results"
     )
 
@@ -304,6 +366,30 @@ def formula_document(chain: FormulaChain) -> dict[str, Any]:
         "latex": chain.latex,
         "mathml": chain.speech.mathml if chain.speech is not None else None,
         "verbalization": chain.speech.verbalization if chain.speech is not None else None,
+        "steps": [asdict(step) for step in chain.steps],
+    }
+
+
+def _candidate_text(text: str | None, path: Path | None) -> str:
+    if path is not None:
+        return _input_file(path).read_text(encoding="utf-8")
+    return text if text is not None else ""
+
+
+def judge_document(chain: PageJudgementChain) -> dict[str, Any]:
+    """The JSON the ``judge`` command prints: the rendered page, judgement and steps."""
+    page = chain.page
+    judgement = chain.judgement
+    return {
+        "page": {
+            "page_number": page.page_number,
+            "size_bytes": len(page.image),
+        },
+        "p_b": judgement.p_b,
+        "p_b_ab": judgement.p_b_ab,
+        "p_a_ba": judgement.p_a_ba,
+        "model": judgement.model,
+        "document": judgement.document,
         "steps": [asdict(step) for step in chain.steps],
     }
 
@@ -512,6 +598,39 @@ async def _formula(ctx: _Context, args: argparse.Namespace, box: _Box) -> None:
     ctx.stdout.write("\n")
 
 
+async def _judge(
+    ctx: _Context,
+    args: argparse.Namespace,
+    candidate_a: str,
+    candidate_b: str,
+) -> None:
+    render = {"provider": args.render_provider} if args.render_provider else {}
+    adjudicate_kwargs = {"provider": args.provider} if args.provider else {}
+    pdf = ctx.client(ToolboxPdfClient, **render)
+    adjudicate = ctx.client(ToolboxAdjudicateClient, **adjudicate_kwargs)
+    try:
+        chain = await page_judgement(
+            pdf,
+            adjudicate,
+            args.file,
+            artifact_id=args.artifact,
+            page_number=args.page,
+            candidate_a=candidate_a,
+            candidate_b=candidate_b,
+            prompt=args.prompt,
+            dpi=args.dpi,
+            max_side=args.max_side,
+            use_remote_cache=False if args.no_cache else None,
+        )
+    finally:
+        await pdf.close()
+        await adjudicate.close()
+    if args.page_output is not None:
+        _write_atomically(args.page_output, chain.page.image)
+    json.dump(judge_document(chain), ctx.stdout, indent=2, ensure_ascii=False)
+    ctx.stdout.write("\n")
+
+
 async def _download(ctx: _Context, artifact_id: str, output: Path) -> None:
     client = ctx.client(ToolboxArtifactClient)
     try:
@@ -578,6 +697,22 @@ def main(
             if args.dpi <= 0:
                 raise ValueError("--dpi must be positive")
             asyncio.run(_formula(ctx, args, _box(args.box, args.origin)))
+        elif args.command == "judge":
+            if args.file:
+                _input_file(args.file)
+            if args.artifact:
+                _artifact_id(args.artifact)
+            if args.page < 1:
+                raise ValueError("--page is 1-based")
+            if args.dpi <= 0:
+                raise ValueError("--dpi must be positive")
+            if args.max_side <= 0:
+                raise ValueError("--max-side must be positive")
+            if not args.prompt.strip():
+                raise ValueError("--prompt must not be empty")
+            candidate_a = _candidate_text(args.candidate_a, args.candidate_a_file)
+            candidate_b = _candidate_text(args.candidate_b, args.candidate_b_file)
+            asyncio.run(_judge(ctx, args, candidate_a, candidate_b))
         else:
             asyncio.run(_download(ctx, _artifact_id(args.artifact_id), args.output))
     except ToolboxError as exc:
@@ -598,5 +733,6 @@ __all__ = [
     "catalog_document",
     "executable_capability",
     "formula_document",
+    "judge_document",
     "main",
 ]

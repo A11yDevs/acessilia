@@ -1,12 +1,15 @@
 """Scorecard of a whole-document math case (acessilia-dataset ``math-reference``).
 
-    python -m scripts.bench.math_case score   --canonical doc.json --txt doc.txt [--pdf-ua doc.pdf_ua.pdf]
-    python -m scripts.bench.math_case run     [--pdf input.pdf] [--out var/bench/math-reference/<run>]
-    python -m scripts.bench.math_case compare base/canonical.json candidate/canonical.json [--out DIR]
+    python -m scripts.bench.math_case score    --canonical doc.json --txt doc.txt [--pdf-ua doc.pdf_ua.pdf]
+    python -m scripts.bench.math_case run      [--pdf input.pdf] [--out var/bench/math-reference/<run>]
+    python -m scripts.bench.math_case formulas [--pdf input.pdf] [--out var/bench/math-reference/<run>]
+    python -m scripts.bench.math_case compare  base/canonical.json candidate/canonical.json [--out DIR]
 
 ``score`` reads a job's canonical document and plain-text output; ``run``
 processes the reference PDF through the core first (it needs a running
-Toolbox and model provider) and then scores it. The ground truth is
+Toolbox and model provider) and then scores it; ``formulas`` evaluates the
+PDF's display formulas directly via the SDK's ``acessilia_sdk.operations.formula``
+chain (no core or agent stack needed). The ground truth is
 ``input/math-reference/{ground_truth.csv,expectations.json}`` of the dataset
 clone at ``$ACESSILIA_TEST_DATASET_DIR`` (default ``tests/dataset``).
 
@@ -46,7 +49,7 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -598,6 +601,191 @@ def pdf_text(path: Path) -> str:
 # ── Commands ────────────────────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class _FormulaBox:
+    """Bounding box passed to ``acessilia_sdk.operations.formula.formula_chain``."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+    coord_origin: str | None = None
+
+
+def _formula_box(bbox: Any) -> _FormulaBox | None:
+    if not isinstance(bbox, dict):
+        return None
+    try:
+        return _FormulaBox(
+            left=float(bbox["left"]),
+            top=float(bbox["top"]),
+            right=float(bbox["right"]),
+            bottom=float(bbox["bottom"]),
+            coord_origin=bbox.get("coord_origin"),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _first_provenance(element: dict[str, Any]) -> dict[str, Any]:
+    raw = element.get("provenance")
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, list):
+        for entry in raw:
+            if isinstance(entry, dict):
+                return entry
+    return {}
+
+
+def _parse_page_number(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 1 else None
+    if isinstance(value, float):
+        return int(value) if value.is_integer() and value >= 1 else None
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except ValueError:
+            return None
+        return parsed if parsed >= 1 else None
+    return None
+
+
+def run_formula_evaluation(
+    pdf: Path,
+    *,
+    provider: str | None = None,
+    recognize_provider: str | None = None,
+    transform_provider: str | None = None,
+    language: str = "pt-BR",
+) -> dict[str, Any]:
+    """Evaluate a PDF's display formulas via the SDK's ``formula_chain`` operation.
+
+    Extracts layout elements with ``document.structure.extract`` and runs
+    ``acessilia_sdk.operations.formula.formula_chain`` on every ``formula``
+    element, without importing ``acessilia_core`` or ``backend``.
+
+    A rejected formula (``ToolboxInvalidInput``) degrades that formula to the
+    extractor text and records the error; any other ``ToolboxError`` stops
+    further ``formula_chain`` calls for the rest of the document so partial
+    results and ``technical_warnings`` are still written.
+    """
+    from acessilia_sdk.toolbox.errors import ToolboxError, ToolboxInvalidInput
+
+    from scripts.bench import toolbox
+
+    extracted = toolbox.extract_structure(pdf, provider=provider)
+    doc = extracted.get("document", extracted)
+    elements = sorted(
+        doc.get("elements") or [], key=lambda element: element.get("reading_order") or 0
+    )
+    blocks: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    outage: str | None = None
+    for index, element in enumerate(elements, start=1):
+        if str(element.get("type", "")).lower() != "formula":
+            continue
+        provenance = _first_provenance(element)
+        raw_page = provenance.get("page_number")
+        if raw_page is None:
+            raw_page = element.get("page_number")
+        parsed_page = _parse_page_number(raw_page)
+        if raw_page is not None and parsed_page is None:
+            warnings.append(f"formula {index}: unusable page_number {raw_page!r}")
+        page_number = parsed_page or 0
+        box = _formula_box(provenance.get("bbox"))
+        fallback_latex = bare_latex(str(element.get("text") or ""))
+        if outage is not None:
+            blocks.append({
+                "id": element.get("id") or f"formula-{index}",
+                "type": "math",
+                "text": fallback_latex,
+                "alt_text": "",
+                "source_location": {"page_number": page_number} if page_number >= 1 else {},
+                "metadata": {
+                    "mathml": "",
+                    "formula_recognition": {
+                        "method": "extractor",
+                        "skipped_after_outage": outage,
+                        "steps": [],
+                    },
+                },
+            })
+            continue
+        try:
+            chain = toolbox.run_formula_chain(
+                pdf,
+                page_number=page_number,
+                box=box,
+                language=language,
+                recognize_provider=recognize_provider,
+                transform_provider=transform_provider,
+            )
+        except ToolboxInvalidInput as exc:
+            error_text = f"{type(exc).__name__}: {exc}"
+            warnings.append(f"formula {index} (p. {page_number}): {error_text}")
+            blocks.append({
+                "id": element.get("id") or f"formula-{index}",
+                "type": "math",
+                "text": fallback_latex,
+                "alt_text": "",
+                "source_location": {"page_number": page_number} if page_number >= 1 else {},
+                "metadata": {
+                    "mathml": "",
+                    "formula_recognition": {
+                        "method": "extractor",
+                        "error": error_text,
+                        "steps": [],
+                    },
+                },
+            })
+            continue
+        except ToolboxError as exc:
+            error_text = f"{type(exc).__name__}: {exc}"
+            outage = type(exc).__name__
+            warnings.append(f"formula {index} (p. {page_number}): {error_text}")
+            blocks.append({
+                "id": element.get("id") or f"formula-{index}",
+                "type": "math",
+                "text": fallback_latex,
+                "alt_text": "",
+                "source_location": {"page_number": page_number} if page_number >= 1 else {},
+                "metadata": {
+                    "mathml": "",
+                    "formula_recognition": {
+                        "method": "extractor",
+                        "error": error_text,
+                        "steps": [],
+                    },
+                },
+            })
+            continue
+        latex = chain.latex or fallback_latex
+        method = "math.recognize" if chain.latex else "extractor"
+        blocks.append({
+            "id": element.get("id") or f"formula-{index}",
+            "type": "math",
+            "text": latex,
+            "alt_text": chain.speech.verbalization if chain.speech is not None else "",
+            "source_location": {"page_number": page_number} if page_number >= 1 else {},
+            "metadata": {
+                "mathml": chain.speech.mathml if chain.speech is not None else "",
+                "formula_recognition": {
+                    "method": method,
+                    "crop_reason": chain.crop.reason,
+                    "steps": [asdict(step) for step in chain.steps],
+                },
+            },
+        })
+    result: dict[str, Any] = {"sections": [{"id": "s1", "title": "", "level": 1, "blocks": blocks}]}
+    if warnings:
+        result["technical_warnings"] = warnings
+    return result
+
+
 async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, Path | None]:
     """Run the core on ``pdf`` and write the canonical document, TXT and PDF/UA."""
     from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
@@ -773,6 +961,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--pdf", type=Path, help="input PDF (default: the dataset's copy)")
     p.add_argument("--out", type=Path, default=REPO / "var" / "bench" / "math-reference" / "latest")
     p.add_argument("--no-pdf-ua", action="store_true", help="skip the PDF/UA export")
+    p = sub.add_parser(
+        "formulas",
+        help="evaluate display formulas via the SDK formula_chain operation (no core)",
+    )
+    p.add_argument("--pdf", type=Path, help="input PDF (default: the dataset's copy)")
+    p.add_argument("--provider", help="Toolbox structure provider override")
+    p.add_argument("--recognize-provider", help="math.recognize provider override")
+    p.add_argument("--transform-provider", help="math.convert and math.verbalize provider override")
+    p.add_argument("--language", default="pt-BR", help="recognition and speech language")
+    p.add_argument("--out", type=Path, default=REPO / "var" / "bench" / "math-reference" / "formulas")
     p = sub.add_parser("compare", help="field-by-field agreement of two outputs; exit 1 on a difference")
     p.add_argument("base", type=Path, help="canonical document JSON of the base run")
     p.add_argument("candidate", type=Path, help="canonical document JSON of the candidate run")
@@ -795,6 +993,37 @@ def main(argv: list[str] | None = None) -> int:
 
     root = args.dataset or dataset_dir()
     rows, expectations = load_case(root)
+
+    if args.command == "formulas":
+        from acessilia_sdk.toolbox.errors import ToolboxError
+
+        pdf = args.pdf or root / CASE_DIR / CASE_PDF
+        try:
+            document = run_formula_evaluation(
+                pdf,
+                provider=args.provider,
+                recognize_provider=args.recognize_provider,
+                transform_provider=args.transform_provider,
+                language=args.language,
+            )
+        except ToolboxError as exc:
+            print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        if args.out is not None:
+            args.out.mkdir(parents=True, exist_ok=True)
+            (args.out / "canonical.json").write_text(
+                json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+        display_rows = [row for row in rows if row["kind"] == "display"]
+        card = score_case(
+            display_rows,
+            {"speech": expectations.get("speech", {})},
+            document,
+            txt="",
+        )
+        card.outputs = ["formula_chain"]
+        _write(card, args.out)
+        return 0
 
     if args.command == "run":
         import asyncio

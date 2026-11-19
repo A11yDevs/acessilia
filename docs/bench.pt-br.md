@@ -28,7 +28,10 @@ A Toolbox precisa estar acessível. O harness configura os próprios clientes do
 SDK (`scripts/bench/toolbox.py`), a partir do ambiente ou do `.env`, com os
 mesmos nomes de variáveis e padrões do core: `TOOLBOX_BASE_URLS` (ou então
 `TOOLBOX_BASE_URL`), `TOOLBOX_API_KEY`, `TOOLBOX_TIMEOUT_SECONDS`,
-`TOOLBOX_RETRIES`, `TOOLBOX_RETRY_BACKOFF_SECONDS` e `TOOLBOX_PROVIDER`.
+`TOOLBOX_RETRIES`, `TOOLBOX_RETRY_BACKOFF_SECONDS`, `TOOLBOX_PROVIDER`,
+`TOOLBOX_PDF_PROVIDER`, `TOOLBOX_MATH_RECOGNIZE_PROVIDER` e
+`TOOLBOX_MATH_PROVIDER`. O enriquecimento e a avaliação de fórmulas chamam
+`acessilia_sdk.operations.formula` diretamente, sem importar o core.
 
 ```bash
 # 1. Materializa um split localmente: var/bench/<dataset>/<split>/data
@@ -121,6 +124,9 @@ fórmulas não cobrem (`expectations.json`).
 ```bash
 # Processa o PDF no core e pontua (precisa do Toolbox e do provedor de modelo)
 uv run python -m scripts.bench.math_case run --out var/bench/math-reference/<run>
+
+# Avalia fórmulas display diretamente pela operação formula_chain do SDK (só Toolbox, sem core)
+uv run python -m scripts.bench.math_case formulas --out var/bench/math-reference/<run>
 
 # Pontua saídas que você já tem: o JSON do documento canônico e o TXT,
 # opcionalmente o PDF/UA (precisa do pdftotext)

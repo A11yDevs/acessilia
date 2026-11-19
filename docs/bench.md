@@ -27,7 +27,10 @@ The Toolbox must be reachable. The harness configures its SDK clients itself
 (`scripts/bench/toolbox.py`), from the environment or `.env`, with the core's
 variable names and defaults: `TOOLBOX_BASE_URLS` (else `TOOLBOX_BASE_URL`),
 `TOOLBOX_API_KEY`, `TOOLBOX_TIMEOUT_SECONDS`, `TOOLBOX_RETRIES`,
-`TOOLBOX_RETRY_BACKOFF_SECONDS` and `TOOLBOX_PROVIDER`.
+`TOOLBOX_RETRY_BACKOFF_SECONDS`, `TOOLBOX_PROVIDER`, `TOOLBOX_PDF_PROVIDER`,
+`TOOLBOX_MATH_RECOGNIZE_PROVIDER` and `TOOLBOX_MATH_PROVIDER`. Formula
+enrichment and evaluation call `acessilia_sdk.operations.formula` directly,
+without importing the core.
 
 ```bash
 # 1. Materialize a split locally: var/bench/<dataset>/<split>/data
@@ -118,6 +121,9 @@ structure and speech checks formulas do not cover (`expectations.json`).
 ```bash
 # Process the PDF through the core, then score it (Toolbox and model provider needed)
 uv run python -m scripts.bench.math_case run --out var/bench/math-reference/<run>
+
+# Evaluate display formulas directly via the SDK's formula_chain operation (Toolbox only, no core)
+uv run python -m scripts.bench.math_case formulas --out var/bench/math-reference/<run>
 
 # Score outputs you already have: the canonical document JSON and the TXT,
 # optionally the PDF/UA (needs pdftotext)

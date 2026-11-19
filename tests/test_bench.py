@@ -199,3 +199,71 @@ def test_compare_prints_strict_json(tmp_path, capsys):
 
     out = json.loads(capsys.readouterr().out, parse_constant=lambda c: pytest.fail(f"non-JSON {c}"))
     assert out["metric_deltas"]["tune_teds"] is None or out["metric_deltas"]["hold_teds"] is None
+
+
+def test_payload_to_canonical_enriches_math_via_sdk_operations(monkeypatch):
+    import httpx
+    import respx
+
+    monkeypatch.setenv("TOOLBOX_BASE_URL", "http://toolbox-bench.test")
+    monkeypatch.delenv("TOOLBOX_BASE_URLS", raising=False)
+    monkeypatch.setenv("TOOLBOX_RETRIES", "0")
+    result = {"document": {"elements": [{"type": "formula", "text": "$$x^2$$", "reading_order": 0}]}}
+
+    with respx.mock() as router:
+        convert = router.post("http://toolbox-bench.test/v1/capabilities/math.convert:execute").mock(
+            return_value=httpx.Response(
+                200, json={"status": "succeeded", "document": {"mathml": "<math><msup/></math>"}}
+            )
+        )
+        verbalize = router.post(
+            "http://toolbox-bench.test/v1/capabilities/math.verbalize:execute"
+        ).mock(
+            return_value=httpx.Response(
+                200, json={"status": "succeeded", "document": {"verbalized": "x squared"}}
+            )
+        )
+        canonical = core.payload_to_canonical(result)
+
+    assert convert.called and verbalize.called
+    block = canonical["sections"][0]["blocks"][0]
+    assert block["type"] == "math"
+    assert block["metadata"]["mathml"] == "<math><msup/></math>"
+    assert block["alt_text"] == "x squared"
+
+
+def test_payload_to_canonical_skips_further_math_calls_after_an_outage(monkeypatch):
+    import httpx
+    import respx
+
+    monkeypatch.setenv("TOOLBOX_BASE_URL", "http://toolbox-bench.test")
+    monkeypatch.delenv("TOOLBOX_BASE_URLS", raising=False)
+    monkeypatch.setenv("TOOLBOX_RETRIES", "0")
+    result = {
+        "document": {
+            "elements": [
+                {"type": "formula", "text": "$$a$$", "reading_order": 0},
+                {"type": "formula", "text": "$$b$$", "reading_order": 1},
+            ]
+        }
+    }
+
+    with respx.mock() as router:
+        convert = router.post("http://toolbox-bench.test/v1/capabilities/math.convert:execute").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
+        verbalize = router.post(
+            "http://toolbox-bench.test/v1/capabilities/math.verbalize:execute"
+        ).mock(
+            return_value=httpx.Response(
+                400, json={"code": "invalid_input", "message": "bad latex"}
+            )
+        )
+        canonical = core.payload_to_canonical(result)
+
+    # Convert stops after the first outage; invalid_input only rejects each formula.
+    assert convert.call_count == 1
+    assert verbalize.call_count == 2
+    warnings = canonical.get("technical_warnings") or []
+    assert any("math.convert unavailable" in w for w in warnings)
+    assert any("math.verbalize rejected" in w for w in warnings)
