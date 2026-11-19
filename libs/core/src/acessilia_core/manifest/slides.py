@@ -489,52 +489,100 @@ def _absorb_near_pictures(
         for element in body:
             if element.id in removed or element.id in pictures:
                 continue
-            text = (element.text or "").strip()
-            box = page_fractions(element)
-            if (
-                not text
-                or box is None
-                or element.type not in _NEAR_LABEL_TYPES | {"caption"}
-                or element.raw_label in _DECORATION
-                or element.metadata.get("split_from")
+            if _absorb_element_into_picture(
+                element,
+                page_fractions,
+                pictures=pictures,
+                reach=reach,
+                by_id=by_id,
+                removed=removed,
             ):
-                continue
-            label = _reads_as_label(text)
-            caption = element.type == "caption"
-            near = [
-                picture
-                for picture, picture_box in pictures.items()
-                if boxes_overlap(_expanded(picture_box, _NEAR_MARGIN), box)
-            ]
-            spanned = [p for p in near if _spans_across(box, pictures[p])]
-            near_merged = [
-                p for p in spanned if by_id[p].metadata.get("merged_picture_ids")
-            ]
-            near_own = [
-                picture
-                for picture, picture_box in reach.items()
-                if boxes_overlap(_expanded(picture_box, _NEAR_MARGIN), box)
-            ]
-            if (
-                len(spanned) >= 2
-                and (label or caption)
-                and _side_by_side([pictures[p] for p in spanned])
-            ):
-                host = _merge_pictures([by_id[p] for p in spanned], pictures, reach, removed)
-            elif near_merged and (label or caption):
-                host = by_id[min(near_merged, key=lambda p: _distance(pictures[p], box))]
-            elif near_own and label and not caption:
-                host = by_id[min(near_own, key=lambda p: _distance(reach[p], box))]
-            else:
-                continue
-            if host is None or not _grow(host, element):
-                continue
-            pictures[host.id] = union(pictures[host.id], box)
-            host.metadata.setdefault("figure_labels", []).append(text)
-            host.metadata.setdefault("figure_label_ids", []).append(element.id)
-            removed.add(element.id)
-            changed = True
+                changed = True
     return [element for element in body if element.id not in removed]
+
+
+def _is_near_picture_candidate(
+    element: ManifestElement,
+    text: str,
+    box: tuple[float, float, float, float] | None,
+) -> bool:
+    return bool(
+        text
+        and box is not None
+        and element.type in _NEAR_LABEL_TYPES | {"caption"}
+        and element.raw_label not in _DECORATION
+        and not element.metadata.get("split_from")
+    )
+
+
+def _pictures_near(
+    boxes: dict[str, tuple[float, float, float, float]],
+    box: tuple[float, float, float, float],
+) -> list[str]:
+    return [
+        picture_id
+        for picture_id, picture_box in boxes.items()
+        if boxes_overlap(_expanded(picture_box, _NEAR_MARGIN), box)
+    ]
+
+
+def _select_picture_host(
+    box: tuple[float, float, float, float],
+    *,
+    label: bool,
+    caption: bool,
+    pictures: dict[str, tuple[float, float, float, float]],
+    reach: dict[str, tuple[float, float, float, float]],
+    by_id: dict[str, ManifestElement],
+    removed: set[str],
+) -> ManifestElement | None:
+    near = _pictures_near(pictures, box)
+    spanned = [p for p in near if _spans_across(box, pictures[p])]
+    if (
+        len(spanned) >= 2
+        and (label or caption)
+        and _side_by_side([pictures[p] for p in spanned])
+    ):
+        return _merge_pictures([by_id[p] for p in spanned], pictures, reach, removed)
+    near_merged = [p for p in spanned if by_id[p].metadata.get("merged_picture_ids")]
+    if near_merged and (label or caption):
+        return by_id[min(near_merged, key=lambda p: _distance(pictures[p], box))]
+    near_own = _pictures_near(reach, box)
+    if near_own and label and not caption:
+        return by_id[min(near_own, key=lambda p: _distance(reach[p], box))]
+    return None
+
+
+def _absorb_element_into_picture(
+    element: ManifestElement,
+    page_fractions: PageFractions,
+    *,
+    pictures: dict[str, tuple[float, float, float, float]],
+    reach: dict[str, tuple[float, float, float, float]],
+    by_id: dict[str, ManifestElement],
+    removed: set[str],
+) -> bool:
+    text = (element.text or "").strip()
+    box = page_fractions(element)
+    if not _is_near_picture_candidate(element, text, box):
+        return False
+    assert box is not None
+    host = _select_picture_host(
+        box,
+        label=_reads_as_label(text),
+        caption=element.type == "caption",
+        pictures=pictures,
+        reach=reach,
+        by_id=by_id,
+        removed=removed,
+    )
+    if host is None or not _grow(host, element):
+        return False
+    pictures[host.id] = union(pictures[host.id], box)
+    host.metadata.setdefault("figure_labels", []).append(text)
+    host.metadata.setdefault("figure_label_ids", []).append(element.id)
+    removed.add(element.id)
+    return True
 
 
 def _merge_pictures(

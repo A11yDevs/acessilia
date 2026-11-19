@@ -138,7 +138,7 @@ A direção das dependências é conferida por testes:
 | principal (`tests/`, `-n 4`) | 1.512 → 1.497 | 111 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
-| core (`libs/core/tests`) | nenhuma → 735 | 30 s |
+| core (`libs/core/tests`) | nenhuma → 755 | 30 s |
 
 - **As suítes das bibliotecas rodam sozinhas em segundos,** então uma mudança
   no docstruct ou no SDK tem retorno sem a suíte principal.
@@ -148,7 +148,7 @@ A direção das dependências é conferida por testes:
   #613, junto com o de fronteira e o de fumaça.
 - As suítes da referência não foram cronometradas: o ambiente delas não pode
   ser refeito como era, então só as contagens são comparadas.
-- As contagens e os tempos de principal/core são a medição pós-#613 (uma
+- As contagens e os tempos de principal/core são a medição pós-#613/#612 (uma
   execução local); o resto desta página está em `ec3ddf0b`.
 
 ## 5. Reaproveitamento das operações
@@ -210,9 +210,13 @@ seu pull request:
 
 ## Próximos passos sugeridos
 
-1. **Simplificar as funções complexas:** as cinco acima primeiro, começando
+1. ~~**Simplificar as funções complexas:** as cinco acima primeiro, começando
    pelo `_derive_v23_processing_needs` (complexidade 71). É a modularização
-   interna que a #381 pedia, agora sobre módulos com fronteiras claras.
+   interna que a #381 pedia, agora sobre módulos com fronteiras claras.~~
+   Cinco funções do topo feitas no #612 (`_derive_v23_processing_needs` →
+   `manifest/detectors/`, mais `apply_page_routes`, `_execute_step`,
+   `_absorb_near_pictures` e `_extract_with`; funções acima de 15 no core:
+   41 → 36; `manifest/builder.py` abaixo do limite de 900 linhas).
 2. ~~**Levar para o `libs/core/tests` os testes do core** que testam só o core,
    para a suíte dele rodar sem o serviço.~~ Feito no #613.
 3. **Dar uso às operações:** um comando `judge` na linha de comando do SDK, e

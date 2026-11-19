@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from acessilia_core.manifest.builder import build_processing_manifest
-from acessilia_core.manifest.builder import _derive_v23_processing_needs
+from acessilia_core.manifest.builder import inspect_document_needs
 from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
 from pddl_support import build_orchestrator
 
@@ -108,7 +108,7 @@ def test_v23_obligations_require_concrete_signals_and_cover_catalog():
         ]
     }
 
-    observations, obligations = _derive_v23_processing_needs(
+    observations, obligations = inspect_document_needs(
         elements,
         page_sizes={1: (100, 100), 3: (100, 100)},
         fusion_evidence=evidence,
@@ -134,7 +134,7 @@ def test_v23_obligations_require_concrete_signals_and_cover_catalog():
 
 
 def test_v23_obligations_do_not_emit_without_a_trigger():
-    observations, obligations = _derive_v23_processing_needs(
+    observations, obligations = inspect_document_needs(
         [_element("element-clean", "paragraph", "Clean text.", 1, 1)]
     )
 

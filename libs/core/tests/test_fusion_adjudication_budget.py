@@ -16,10 +16,10 @@ import pytest
 from docstruct.fusion.judge import should_judge
 from docstruct.fusion.page_select import page_norm, ratio
 
-from acessilia_core.manifest.builder import (
+from acessilia_core.manifest.builder import inspect_document_needs
+from acessilia_core.manifest.detectors import (
     MAX_ID_SUFFIX,
     VLM_JUDGE_METHODS,
-    _derive_v23_processing_needs,
 )
 from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.pipeline.fusion import (
@@ -142,7 +142,7 @@ def _page(number: int, *, route: str, reason: str, similarity: float) -> dict:
 
 
 def _obligations(pages: list[dict], budget: int):
-    _, obligations = _derive_v23_processing_needs(
+    _, obligations = inspect_document_needs(
         _page_elements(len(pages)),
         fusion_evidence={"pages": pages},
         fusion_judge_max_pages=budget,
@@ -199,7 +199,7 @@ class TestAdjudicationBudget:
             _page(n, route="docling", reason="default_docling", similarity=0.5)
             for n in range(1, 51)
         ]
-        _, obligations = _derive_v23_processing_needs(
+        _, obligations = inspect_document_needs(
             [
                 ManifestElement(
                     id=f"element-{page:03d}{index:03d}",
@@ -279,7 +279,7 @@ class TestBudgetOverRealEvidence:
                 page_number=1,
             ),
         ]
-        _, obligations = _derive_v23_processing_needs(
+        _, obligations = inspect_document_needs(
             elements,
             fusion_evidence=fused["fusion_evidence"],
             fusion_judge_max_pages=5,

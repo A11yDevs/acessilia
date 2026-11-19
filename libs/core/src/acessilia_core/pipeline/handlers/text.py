@@ -35,9 +35,7 @@ from docstruct.text.unicode_repair import (
 )
 
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.manifest.builder import (
-    unicode_repair_text,
-)
+from acessilia_core.manifest.detectors import unicode_repair_text
 from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,

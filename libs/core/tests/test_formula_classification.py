@@ -176,10 +176,10 @@ async def test_a_classification_without_an_answer_keeps_the_formula_path(monkeyp
 
 @pytest.mark.asyncio
 async def test_a_reclassified_drawing_leaves_no_formula_obligation_behind(monkeypatch):
-    from acessilia_core.manifest.builder import _derive_v23_processing_needs
+    from acessilia_core.manifest.builder import inspect_document_needs
 
     manifest = manifest_for("Na+ + Cl-")
-    observations, obligations = _derive_v23_processing_needs(manifest.elements)
+    observations, obligations = inspect_document_needs(manifest.elements)
     manifest.observations.extend(observations)
     manifest.obligations.extend(obligations)
     assert {o.kind for o in manifest.obligations} == {"verbalize-formula", "normalize-formula"}
@@ -211,10 +211,10 @@ async def test_a_reclassified_drawing_leaves_no_formula_obligation_behind(monkey
 
 @pytest.mark.asyncio
 async def test_an_unresolved_region_drops_its_normalization(monkeypatch):
-    from acessilia_core.manifest.builder import _derive_v23_processing_needs
+    from acessilia_core.manifest.builder import inspect_document_needs
 
     manifest = manifest_for("OH-")
-    _, obligations = _derive_v23_processing_needs(manifest.elements)
+    _, obligations = inspect_document_needs(manifest.elements)
     manifest.obligations.extend(obligations)
     install_vision(monkeypatch, VisionOutput(
         kind="description", description="Unclear.", language="und",

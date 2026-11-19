@@ -46,7 +46,7 @@ from acessilia_core.i18n import t
 from acessilia_core.manifest.builder import (
     _append_processing_needs,
     _derive_processing_needs,
-    _derive_v23_processing_needs,
+    inspect_document_needs,
 )
 from acessilia_core.manifest.models import (
     ManifestElement,
@@ -237,7 +237,7 @@ def _add_restored_needs(
         item for item in base_obligations
         if targets_restored(item) or item.kind in _SEQUENCE_KINDS
     ]
-    v23_observations, v23_obligations = _derive_v23_processing_needs(
+    v23_observations, v23_obligations = inspect_document_needs(
         restored,
         page_sizes={
             page.page_number: (page.width, page.height) for page in manifest.pages
