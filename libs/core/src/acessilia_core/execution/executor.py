@@ -364,121 +364,11 @@ class ExecutorAgent:
 
         try:
             if step.action == "start-job":
-                if state.manifest.status not in {"extracted", "planned"}:
-                    raise ValueError(
-                        t(EXE_START_JOB_INVALID_STATE).format(
-                            status=state.manifest.status
-                        )
-                    )
-                state.manifest.status = "processing"
+                self._execute_start_job(state)
             elif step.action == "execute-obligation":
-                assert step.obligation_id is not None
-                assert step.obligation_kind is not None
-                assert step.method is not None
-                obligation = next(
-                    (
-                        item
-                        for item in state.manifest.obligations
-                        if item.id == step.obligation_id
-                    ),
-                    None,
-                )
-                if obligation is None:
-                    raise ValueError(
-                        t(EXE_OBLIGATION_NOT_FOUND).format(
-                            obligation_id=step.obligation_id
-                        )
-                    )
-                self._check_obligation_preconditions(
-                    obligation,
-                    step,
-                    state.manifest,
-                )
-                if state.dry_run:
-                    obligation.status = "satisfied"
-                    message = t(EXE_DRY_RUN_SIMULATED)
-                else:
-                    handler = self.registry.get(step.method)
-                    if handler is None:
-                        raise RuntimeError(
-                            t(EXE_NO_HANDLER_REGISTERED).format(
-                                method=step.method
-                            )
-                        )
-                    attempt_started = datetime.now(timezone.utc)
-                    known = {item.id for item in state.manifest.obligations}
-                    try:
-                        result = handler(state.manifest, obligation.id)
-                    except Exception as exc:
-                        attempt_completed = datetime.now(timezone.utc)
-                        self._record_obligation_attempt(
-                            obligation=obligation,
-                            method=step.method,
-                            started_at=attempt_started,
-                            completed_at=attempt_completed,
-                            status="failed",
-                            message=f"{type(exc).__name__}: {exc}",
-                            artifact_ids=[],
-                        )
-                        alternatives = set(obligation.admissible_methods) & set(self.registry.names()) - {
-                            attempt.method
-                            for attempt in obligation.attempts
-                            if attempt.status in {"failed", "rejected"}
-                        }
-                        obligation.status = "pending" if alternatives else "failed"
-                        state.replan_required = state.replan_required or bool(alternatives)
-                        raise RuntimeError(
-                            f"{type(exc).__name__}: {exc}"
-                        ) from exc
-
-                    attempt_completed = datetime.now(timezone.utc)
-                    artifact_ids = [artifact.id for artifact in result.artifacts]
-                    self._record_obligation_attempt(
-                        obligation=obligation,
-                        method=step.method,
-                        started_at=attempt_started,
-                        completed_at=attempt_completed,
-                        status="succeeded" if result.success else "failed",
-                        message=result.message,
-                        artifact_ids=artifact_ids,
-                    )
-                    existing_artifacts = {
-                        artifact.id for artifact in state.manifest.artifacts
-                    }
-                    state.manifest.artifacts.extend(
-                        artifact
-                        for artifact in result.artifacts
-                        if artifact.id not in existing_artifacts
-                    )
-                    if not result.success or not result.validated:
-                        alternatives = set(obligation.admissible_methods) & set(self.registry.names()) - {
-                            attempt.method
-                            for attempt in obligation.attempts
-                            if attempt.status in {"failed", "rejected"}
-                        }
-                        obligation.status = "pending" if alternatives else "failed"
-                        state.replan_required = state.replan_required or bool(alternatives)
-                        raise RuntimeError(
-                            result.message or t(EXE_RESULT_REJECTED)
-                        )
-                    obligation.status = "satisfied"
-                    message = result.message
-                    self._select_discovered(state, known)
+                message = self._execute_obligation_step(step, state, artifact_ids)
             elif step.action == "complete-job":
-                # `selected`, not the plan's list: it also holds what a
-                # handler added during this execution.
-                unsatisfied = [
-                    item.id
-                    for item in state.manifest.obligations
-                    if item.selected and item.status != "satisfied"
-                ]
-                if unsatisfied:
-                    raise ValueError(
-                        t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
-                            unsatisfied=unsatisfied
-                        )
-                    )
-                state.manifest.status = "completed"
+                self._execute_complete_job(state)
             else:
                 raise ValueError(
                     t(EXE_UNKNOWN_ACTION).format(action=step.action)
@@ -512,6 +402,130 @@ class ExecutorAgent:
         )
         state.results.append(result)
         return result
+
+    @staticmethod
+    def _execute_start_job(state: _ExecutionState) -> None:
+        if state.manifest.status not in {"extracted", "planned"}:
+            raise ValueError(
+                t(EXE_START_JOB_INVALID_STATE).format(
+                    status=state.manifest.status
+                )
+            )
+        state.manifest.status = "processing"
+
+    @staticmethod
+    def _execute_complete_job(state: _ExecutionState) -> None:
+        # `selected`, not the plan's list: it also holds what a
+        # handler added during this execution.
+        unsatisfied = [
+            item.id
+            for item in state.manifest.obligations
+            if item.selected and item.status != "satisfied"
+        ]
+        if unsatisfied:
+            raise ValueError(
+                t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
+                    unsatisfied=unsatisfied
+                )
+            )
+        state.manifest.status = "completed"
+
+    @staticmethod
+    def _find_obligation(state: _ExecutionState, obligation_id: str) -> Obligation:
+        for item in state.manifest.obligations:
+            if item.id == obligation_id:
+                return item
+        raise ValueError(
+            t(EXE_OBLIGATION_NOT_FOUND).format(obligation_id=obligation_id)
+        )
+
+    def _mark_obligation_failed(
+        self,
+        obligation: Obligation,
+        state: _ExecutionState,
+    ) -> None:
+        failed_methods = {
+            attempt.method
+            for attempt in obligation.attempts
+            if attempt.status in {"failed", "rejected"}
+        }
+        alternatives = (
+            set(obligation.admissible_methods) & set(self.registry.names())
+        ) - failed_methods
+        obligation.status = "pending" if alternatives else "failed"
+        state.replan_required = state.replan_required or bool(alternatives)
+
+    def _execute_obligation_step(
+        self,
+        step: PlanStep,
+        state: _ExecutionState,
+        artifact_ids: list[str],
+    ) -> str | None:
+        assert step.obligation_id is not None
+        assert step.obligation_kind is not None
+        assert step.method is not None
+        obligation = self._find_obligation(state, step.obligation_id)
+        self._check_obligation_preconditions(obligation, step, state.manifest)
+        if state.dry_run:
+            obligation.status = "satisfied"
+            return t(EXE_DRY_RUN_SIMULATED)
+        return self._run_obligation_handler(obligation, step.method, state, artifact_ids)
+
+    def _run_obligation_handler(
+        self,
+        obligation: Obligation,
+        method: str,
+        state: _ExecutionState,
+        artifact_ids: list[str],
+    ) -> str | None:
+        handler = self.registry.get(method)
+        if handler is None:
+            raise RuntimeError(t(EXE_NO_HANDLER_REGISTERED).format(method=method))
+        attempt_started = datetime.now(timezone.utc)
+        known = {item.id for item in state.manifest.obligations}
+        try:
+            result = handler(state.manifest, obligation.id)
+        except Exception as exc:
+            self._record_obligation_attempt(
+                obligation=obligation,
+                method=method,
+                started_at=attempt_started,
+                completed_at=datetime.now(timezone.utc),
+                status="failed",
+                message=f"{type(exc).__name__}: {exc}",
+                artifact_ids=[],
+            )
+            self._mark_obligation_failed(obligation, state)
+            raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc
+
+        produced_ids = [artifact.id for artifact in result.artifacts]
+        artifact_ids.extend(produced_ids)
+        self._record_obligation_attempt(
+            obligation=obligation,
+            method=method,
+            started_at=attempt_started,
+            completed_at=datetime.now(timezone.utc),
+            status="succeeded" if result.success else "failed",
+            message=result.message,
+            artifact_ids=produced_ids,
+        )
+        self._append_new_artifacts(state.manifest, result.artifacts)
+        if not result.success or not result.validated:
+            self._mark_obligation_failed(obligation, state)
+            raise RuntimeError(result.message or t(EXE_RESULT_REJECTED))
+        obligation.status = "satisfied"
+        self._select_discovered(state, known)
+        return result.message
+
+    @staticmethod
+    def _append_new_artifacts(
+        manifest: ProcessingManifest,
+        artifacts: list[Any],
+    ) -> None:
+        existing = {artifact.id for artifact in manifest.artifacts}
+        manifest.artifacts.extend(
+            artifact for artifact in artifacts if artifact.id not in existing
+        )
 
     @staticmethod
     def _select_discovered(state: _ExecutionState, known: set[str]) -> None:

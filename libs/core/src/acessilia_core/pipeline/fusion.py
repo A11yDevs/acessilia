@@ -359,27 +359,15 @@ def apply_page_routes(
     primary_doc = primary_res.get("document") or {}
     secondary_doc = secondary_res.get("document") or {}
     secondary_by_page = _elements_by_page(secondary_doc.get("elements") or [])
-    preferred = {
-        page.get("page_number")
-        for page in page_evidence
-        if (page.get("stats") or {}).get("route") == "mineru"
-    }
-    routed = {number for number in preferred if secondary_by_page.get(number)}
-    if preferred - routed:
-        logger.warning(
-            "Fusion: {} has no elements on pages {} the router sent to it; "
-            "they stay with the primary provider",
-            secondary_provider,
-            sorted(preferred - routed, key=str),
-        )
+    routed = _select_routed_pages(
+        page_evidence, secondary_by_page, secondary_provider=secondary_provider
+    )
     if not routed:
         return primary_res, {}
 
-    primary_by_page = _elements_by_page(primary_doc.get("elements") or [])
-    unpaged = [
-        element for element in primary_doc.get("elements") or []
-        if isinstance(element, dict) and _element_page_number(element) is None
-    ]
+    primary_elements = primary_doc.get("elements") or []
+    primary_by_page = _elements_by_page(primary_elements)
+    unpaged = _unpaged_elements(primary_elements)
     scales = _page_scales(
         primary_doc.get("pages") or [], secondary_doc.get("pages") or [], routed
     )
@@ -388,6 +376,67 @@ def apply_page_routes(
         secondary_provider,
         scales,
     )
+    elements, replaced = _merge_routed_elements(
+        primary_by_page, unpaged, adopted, routed
+    )
+    _mark_routed_evidence(page_evidence, routed, secondary_provider)
+    rebuilt_pages = _rebuild_routed_pages(primary_doc, secondary_doc, elements, routed)
+
+    document = {
+        **primary_doc,
+        "elements": elements,
+        "pages": rebuilt_pages,
+    }
+    summary = _updated_document_summary(primary_doc, len(rebuilt_pages), elements)
+    if summary is not None:
+        document["summary"] = summary
+
+    logger.info(
+        "Fusion: {} pages taken from {} by the deterministic router: {}",
+        len(routed),
+        secondary_provider,
+        sorted(routed),
+    )
+    return {**primary_res, "document": document}, replaced
+
+
+def _select_routed_pages(
+    page_evidence: list[dict[str, Any]],
+    secondary_by_page: dict[int, list[dict[str, Any]]],
+    *,
+    secondary_provider: str,
+) -> set[int]:
+    preferred = {
+        page.get("page_number")
+        for page in page_evidence
+        if (page.get("stats") or {}).get("route") == "mineru"
+    }
+    routed = {number for number in preferred if secondary_by_page.get(number)}
+    missing = preferred - routed
+    if missing:
+        logger.warning(
+            "Fusion: {} has no elements on pages {} the router sent to it; "
+            "they stay with the primary provider",
+            secondary_provider,
+            sorted(missing, key=str),
+        )
+    return routed
+
+
+def _unpaged_elements(elements: list[Any]) -> list[dict[str, Any]]:
+    return [
+        element
+        for element in elements
+        if isinstance(element, dict) and _element_page_number(element) is None
+    ]
+
+
+def _merge_routed_elements(
+    primary_by_page: dict[int, list[dict[str, Any]]],
+    unpaged: list[dict[str, Any]],
+    adopted: dict[int, list[dict[str, Any]]],
+    routed: set[int],
+) -> tuple[list[dict[str, Any]], dict[int, list[dict[str, Any]]]]:
     replaced: dict[int, list[dict[str, Any]]] = {}
     elements: list[dict[str, Any]] = []
     for page_number in sorted(set(primary_by_page) | routed):
@@ -399,10 +448,25 @@ def apply_page_routes(
     elements.extend(dict(element) for element in unpaged)
     for order, element in enumerate(elements, start=1):
         element["reading_order"] = order
+    return elements, replaced
+
+
+def _mark_routed_evidence(
+    page_evidence: list[dict[str, Any]],
+    routed: set[int],
+    secondary_provider: str,
+) -> None:
     for page in page_evidence:
         if page.get("page_number") in routed:
             page.setdefault("stats", {})["applied"] = secondary_provider
 
+
+def _rebuild_routed_pages(
+    primary_doc: dict[str, Any],
+    secondary_doc: dict[str, Any],
+    elements: list[dict[str, Any]],
+    routed: set[int],
+) -> list[dict[str, Any]]:
     pages = {
         page["page_number"]: dict(page)
         for page in primary_doc.get("pages") or []
@@ -411,29 +475,31 @@ def apply_page_routes(
     for page in secondary_doc.get("pages") or []:
         if isinstance(page, dict) and page.get("page_number") in routed:
             pages.setdefault(page["page_number"], dict(page))
+
+    ids_by_page: dict[int, list[Any]] = {}
+    for element in elements:
+        page_number = _element_page_number(element)
+        if page_number is not None:
+            ids_by_page.setdefault(page_number, []).append(element["id"])
     for number, page in pages.items():
-        page["element_ids"] = [
-            element["id"] for element in elements if _element_page_number(element) == number
-        ]
-    document = {
-        **primary_doc,
-        "elements": elements,
-        "pages": [pages[number] for number in sorted(pages)],
+        page["element_ids"] = ids_by_page.get(number, [])
+    return [pages[number] for number in sorted(pages)]
+
+
+def _updated_document_summary(
+    primary_doc: dict[str, Any],
+    page_count: int,
+    elements: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    summary = primary_doc.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    return {
+        **summary,
+        "page_count": page_count,
+        "element_count": len(elements),
+        "element_types": dict(Counter(str(e.get("type")) for e in elements)),
     }
-    if isinstance(primary_doc.get("summary"), dict):
-        document["summary"] = {
-            **primary_doc["summary"],
-            "page_count": len(pages),
-            "element_count": len(elements),
-            "element_types": dict(Counter(str(e.get("type")) for e in elements)),
-        }
-    logger.info(
-        "Fusion: {} pages taken from {} by the deterministic router: {}",
-        len(routed),
-        secondary_provider,
-        sorted(routed),
-    )
-    return {**primary_res, "document": document}, replaced
 
 
 def _element_page_number(element: dict[str, Any]) -> int | None:
