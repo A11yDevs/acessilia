@@ -7,6 +7,13 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** the `judge` subcommand to `python -m acessilia_sdk` and its
+  `judge_document` helper in `acessilia_sdk.cli` (ADR-0017, #614): renders a
+  page with `page_judgement`, sends two candidate transcriptions (inline or
+  from UTF-8 files) to `document.adjudicate.page`, optionally saves the
+  rendered PNG (`--page-output`), and prints the judgement and step provenance
+  as JSON without applying a decision threshold.
+
 - **Fixed** a `502` the Toolbox answers with `code: "provider_execution_failed"`
   (the provider was reached and failed on the document) raising
   `ToolboxProviderUnavailable`. It now raises a plain `ToolboxError`, as a `500`

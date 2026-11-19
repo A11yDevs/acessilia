@@ -741,6 +741,7 @@ def test_python_m_acessilia_sdk_runs_with_the_core_blocked() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "catalog" in result.stdout and "download" in result.stdout
+    assert "formula" in result.stdout and "judge" in result.stdout
 
 
 def test_an_unreachable_toolbox_is_typed_in_a_fresh_interpreter() -> None:
@@ -893,3 +894,264 @@ def test_a_failed_recognition_is_reported_typed_with_status_1(pdf) -> None:
     assert (status, out) == (1, "")
     assert err.startswith("error: ToolboxProviderUnavailable: ")
     assert not routes["convert"].called
+
+
+# judge
+
+
+JUDGE_PAGE = b"\x89PNG\r\n\x1a\njudge-page"
+JUDGE_PAGE_ID = "sha256:" + hashlib.sha256(JUDGE_PAGE).hexdigest()
+JUDGE_RENDERED = {
+    "status": "succeeded",
+    "capability": "pdf.render@2",
+    "provider": "pymupdf-pdf",
+    "document": {
+        "artifact_id": JUDGE_PAGE_ID,
+        "media_type": "image/png",
+        "size_bytes": len(JUDGE_PAGE),
+        "page_number": 2,
+        "page_count": 4,
+        "page_width": 595,
+        "page_height": 842,
+        "clip": {"left": 0, "top": 0, "right": 595, "bottom": 842},
+        "scale": 1.9,
+        "dpi": 137.0,
+        "width_px": 1131,
+        "height_px": 1600,
+        "source_media_type": "application/pdf",
+        "source_filename": "source.pdf",
+    },
+}
+
+
+def _serve_page_judge(
+    router: respx.MockRouter,
+    document: object = None,
+) -> dict[str, respx.Route]:
+    if document is None:
+        document = {"pB": 0.83, "pB_ab": 0.9, "pA_ba": 0.24, "model": "qwen3-vl-8b"}
+    router.get(f"{A}/v1/artifacts/{JUDGE_PAGE_ID}").mock(
+        return_value=httpx.Response(200, content=JUDGE_PAGE)
+    )
+    return {
+        "render": router.post(f"{A}/v1/capabilities/pdf.render:execute").mock(
+            return_value=httpx.Response(200, json=JUDGE_RENDERED)
+        ),
+        "judge": router.post(f"{A}/v1/capabilities/document.adjudicate.page:execute").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "status": "succeeded",
+                    "capability": "document.adjudicate.page@1",
+                    "provider": "qwen3-vl-8b",
+                    "document": document,
+                },
+            )
+        ),
+    }
+
+
+def _multipart_parameters(request: httpx.Request) -> dict:
+    body = _form(request)
+    if 'name="parameters"\r\n\r\n' in body:
+        return json.loads(body.split('name="parameters"\r\n\r\n', 1)[1].split("\r\n", 1)[0])
+    from urllib.parse import parse_qs
+
+    return json.loads(parse_qs(body)["parameters"][0])
+
+
+def test_judge_runs_the_chain_with_inline_candidates_and_saves_page(pdf, tmp_path) -> None:
+    page_out = tmp_path / "page2.png"
+    with respx.mock() as router:
+        routes = _serve_page_judge(router)
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "2",
+            "--candidate-a", "first reading", "--candidate-b", "second reading",
+            "--prompt", "para", "--dpi", "96", "--max-side", "1000",
+            "--provider", "custom-vlm", "--render-provider", "custom-pdf",
+            "--page-output", str(page_out), "--no-cache",
+        )
+
+    assert (status, err) == (0, "")
+    document = json.loads(out)
+    assert document["page"] == {"page_number": 2, "size_bytes": len(JUDGE_PAGE)}
+    assert document["p_b"] == pytest.approx(0.83)
+    assert document["p_b_ab"] == pytest.approx(0.9)
+    assert document["p_a_ba"] == pytest.approx(0.24)
+    assert document["model"] == "qwen3-vl-8b"
+    assert document["document"] == {
+        "pB": 0.83, "pB_ab": 0.9, "pA_ba": 0.24, "model": "qwen3-vl-8b",
+    }
+    assert document["steps"] == [
+        {
+            "capability": "pdf.render",
+            "provider": "custom-pdf",
+            "parameters": {"page_number": 2, "dpi": 96, "max_side": 1000},
+        },
+        {
+            "capability": "document.adjudicate.page",
+            "provider": "custom-vlm",
+            "parameters": {"prompt": "para"},
+        },
+    ]
+    assert page_out.read_bytes() == JUDGE_PAGE
+    render_req = routes["render"].calls.last.request
+    judge_req = routes["judge"].calls.last.request
+    assert 'filename="source.pdf"' in _form(render_req)
+    assert _field("provider", "custom-pdf") in _form(render_req)
+    assert 'name="no_cache"' in _form(render_req)
+    assert _field("provider", "custom-vlm") in _form(judge_req)
+    assert 'name="no_cache"' in _form(judge_req)
+    assert _multipart_parameters(judge_req) == {
+        "candidate_a": "first reading",
+        "candidate_b": "second reading",
+        "prompt": "para",
+    }
+    assert JUDGE_PAGE in judge_req.content
+
+
+def test_judge_reads_candidate_files_and_accepts_a_stored_artifact(tmp_path) -> None:
+    cand_a = tmp_path / "a.md"
+    cand_b = tmp_path / "b.md"
+    cand_a.write_text("# Heading\n\nVersion A\n", encoding="utf-8")
+    cand_b.write_text("# Heading\n\nVersion B\n", encoding="utf-8")
+    with respx.mock() as router:
+        routes = _serve_page_judge(router)
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--artifact", ARTIFACT_ID, "--page", "2",
+            "--candidate-a-file", str(cand_a), "--candidate-b-file", str(cand_b),
+        )
+
+    assert (status, err) == (0, "")
+    document = json.loads(out)
+    assert document["p_b"] == pytest.approx(0.83)
+    render_body = _form(routes["render"].calls.last.request)
+    assert f"artifact_id={ARTIFACT_ID.replace(':', '%3A')}" in render_body
+    assert "filename=" not in render_body
+    assert _multipart_parameters(routes["judge"].calls.last.request) == {
+        "candidate_a": "# Heading\n\nVersion A\n",
+        "candidate_b": "# Heading\n\nVersion B\n",
+        "prompt": "base",
+    }
+
+
+def test_judge_reports_invalid_pb_as_null_without_deciding(pdf) -> None:
+    with respx.mock() as router:
+        _serve_page_judge(router, document={"pB": "n/a", "model": "qwen3-vl-8b"})
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "2",
+            "--candidate-a", "A", "--candidate-b", "B",
+        )
+
+    assert (status, err) == (0, "")
+    document = json.loads(out)
+    assert document["p_b"] is None
+    assert document["document"] == {"pB": "n/a", "model": "qwen3-vl-8b"}
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (("--page", "0"), "--page is 1-based"),
+        (("--page", "1", "--dpi", "0"), "--dpi must be positive"),
+        (("--page", "1", "--max-side", "0"), "--max-side must be positive"),
+        (("--page", "1", "--prompt", "   "), "--prompt must not be empty"),
+    ],
+)
+def test_judge_checks_its_arguments_before_any_request(pdf, arguments, message) -> None:
+    with respx.mock() as router:
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--file", str(pdf),
+            "--candidate-a", "A", "--candidate-b", "B", *arguments,
+        )
+        assert not router.calls
+
+    assert (status, out) == (2, "")
+    assert err.startswith(f"error: {message}")
+
+
+def test_judge_rejects_missing_candidate_file_before_any_request(pdf) -> None:
+    with respx.mock() as router:
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "1",
+            "--candidate-a-file", "/no/such/candidate.md", "--candidate-b", "B",
+        )
+        assert not router.calls
+
+    assert (status, out) == (2, "")
+    assert err.startswith("error: not a file: ")
+
+
+def test_judge_requires_exactly_one_source_and_each_candidate(pdf) -> None:
+    bad_invocations = [
+        ["--file", str(pdf), "--page", "1", "--candidate-a", "A"],
+        ["--file", str(pdf), "--page", "1", "--candidate-b", "B"],
+        [
+            "--file", str(pdf), "--page", "1",
+            "--candidate-a", "A", "--candidate-a-file", str(pdf), "--candidate-b", "B",
+        ],
+    ]
+    for argv in bad_invocations:
+        with pytest.raises(SystemExit) as raised:
+            cli.main(["--endpoint", A, "judge", *argv], stderr=io.StringIO())
+        assert raised.value.code == 2
+
+
+def test_judge_reports_render_and_adjudication_failures_typed(pdf) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        routes = _serve_page_judge(router)
+        routes["render"].mock(
+            return_value=httpx.Response(400, json={"code": "invalid_input", "message": "bad page"})
+        )
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "99",
+            "--candidate-a", "A", "--candidate-b", "B",
+        )
+
+    assert (status, out) == (1, "")
+    assert err.startswith("error: ToolboxInvalidInput: ")
+    assert not routes["judge"].called
+
+    with respx.mock() as router:
+        routes = _serve_page_judge(router)
+        routes["judge"].mock(return_value=httpx.Response(503, json={"detail": "busy"}))
+        status, out, err = _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "2",
+            "--candidate-a", "A", "--candidate-b", "B",
+        )
+
+    assert (status, out) == (1, "")
+    assert err.startswith("error: ToolboxProviderUnavailable: ")
+
+
+def test_judge_closes_its_clients_on_success_and_on_failure(pdf, monkeypatch) -> None:
+    from acessilia_sdk.toolbox.clients.adjudicate import ToolboxAdjudicateClient
+    from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient
+
+    closed: list[str] = []
+    orig_pdf_close = ToolboxPdfClient.close
+    orig_adj_close = ToolboxAdjudicateClient.close
+
+    async def rec_pdf(self) -> None:
+        await orig_pdf_close(self)
+        closed.append("pdf")
+
+    async def rec_adj(self) -> None:
+        await orig_adj_close(self)
+        closed.append("adjudicate")
+
+    monkeypatch.setattr(ToolboxPdfClient, "close", rec_pdf)
+    monkeypatch.setattr(ToolboxAdjudicateClient, "close", rec_adj)
+    with respx.mock() as router:
+        routes = _serve_page_judge(router)
+        assert _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "2",
+            "--candidate-a", "A", "--candidate-b", "B",
+        )[0] == 0
+        routes["judge"].mock(side_effect=httpx.ReadTimeout("slow"))
+        assert _run(
+            "--endpoint", A, "judge", "--file", str(pdf), "--page", "2",
+            "--candidate-a", "A", "--candidate-b", "B",
+        )[0] == 1
+
+    assert closed == ["pdf", "adjudicate", "pdf", "adjudicate"]

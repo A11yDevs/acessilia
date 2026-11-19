@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** o subcomando `judge` em `python -m acessilia_sdk` e o auxiliar
+  `judge_document` em `acessilia_sdk.cli` (ADR-0017, #614): renderiza uma
+  página com `page_judgement`, envia duas transcrições candidatas (em texto
+  direto ou a partir de arquivos UTF-8) para `document.adjudicate.page`, grava
+  opcionalmente o PNG renderizado (`--page-output`) e imprime o julgamento e a
+  proveniência dos passos em JSON sem aplicar um limiar de decisão.
+
 - **Corrigido** um `502` que a Toolbox responde com
   `code: "provider_execution_failed"` (o provider foi alcançado e falhou no
   documento) levantando `ToolboxProviderUnavailable`. Agora ele levanta um

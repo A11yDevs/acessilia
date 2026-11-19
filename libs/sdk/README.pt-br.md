@@ -60,7 +60,7 @@ O `__all__` de cada módulo é a API pública do SDK ([ADR-0018](../../docs/adr/
 | `acessilia_sdk.operations.formula` | `formula_chain` — recorta a caixa de uma fórmula (`pdf.render`, nunca a página inteira), reconhece (`math.recognize`, candidatos ordenados pelo docstruct), converte e verbaliza o candidato escolhido; cada passo é uma função própria (`crop_formula_region`, `recognize_formula`, `convert_formula`, `verbalize_formula`, e `speak_formula` para os dois) que informa um `Step` (capacidade, provider, parâmetros) e levanta os erros tipados sem alteração; `FormulaCrop`, `FormulaCandidates`, `FormulaText`, `FormulaSpeech`, `FormulaChain`, `FORMULA_CROP_DPI`, `FORMULA_CROP_MIN_SIDE` ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)) |
 | `acessilia_sdk.operations.page_judge` | `page_judgement` — renderiza uma página inteira para o juiz (`pdf.render`, 144 dpi, lado maior de 1600 px) e pergunta ao `document.adjudicate.page` qual de duas transcrições ela contém, lendo a resposta; cada passo é uma função própria (`render_judge_page`, `judge_page`) que informa um passo (capacidade, provider, parâmetros) e levanta os erros tipados sem alteração; uma resposta sem probabilidade válida é um julgamento cujo `p_b` é None, não uma decisão; `JudgePage`, `PageJudgement`, `PageJudgementChain`, `JUDGE_PAGE_DPI`, `JUDGE_PAGE_MAX_SIDE` ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)) |
 | `acessilia_sdk.runtime` | `run_sync` — executa uma coroutine a partir de código síncrono, dentro ou fora de um event loop |
-| `acessilia_sdk.cli` | `main` — a linha de comando, `python -m acessilia_sdk` (veja [Linha de comando](#linha-de-comando)); `formula_document`, o JSON que o comando formula imprime |
+| `acessilia_sdk.cli` | `main` — a linha de comando, `python -m acessilia_sdk` (veja [Linha de comando](#linha-de-comando)); `formula_document`, o JSON que o comando formula imprime; `judge_document`, o JSON que o comando judge imprime |
 
 ## Configurar um cliente
 
@@ -205,6 +205,9 @@ python -m acessilia_sdk $TB dataset artifact dr-docbench dev <item> images/page_
 
 # A cadeia de fórmula numa caixa da página 3: recorte, reconhecimento, conversão, verbalização
 python -m acessilia_sdk $TB formula --file doc.pdf --page 3 --box 72,410,310,438 --crop-output crop.png
+
+# O juiz de página na página 2: renderiza a página e compara duas transcrições
+python -m acessilia_sdk $TB judge --file doc.pdf --page 2 --candidate-a-file a.md --candidate-b-file b.md --page-output page2.png
 ```
 
 **O `formula` roda o `acessilia_sdk.operations.formula.formula_chain`**
@@ -217,6 +220,18 @@ capacidade, o provider e os parâmetros de cada passo. O `--box` é
 origem inferida das bordas. Uma caixa inutilizável não gera recorte nem
 requisição, e nunca vira a página inteira. `--recognize-provider` e
 `--transform-provider` substituem os providers do registro.
+
+**O `judge` roda o `acessilia_sdk.operations.page_judge.page_judgement`**
+([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)) e
+imprime os metadados da página renderizada, `p_b` (probabilidade de o candidato
+B ser mais fiel, ou `null` quando ausente ou fora de `[0, 1]`), `p_b_ab`,
+`p_a_ba`, `model`, o objeto `document` bruto e a capacidade, o provider e os
+parâmetros de cada passo. Cada candidato vem de texto direto (`--candidate-a`,
+`--candidate-b`) ou de arquivo UTF-8 (`--candidate-a-file`,
+`--candidate-b-file`). `--provider` e `--render-provider` substituem os
+providers do registro, `--prompt` escolhe a variante de prompt, `--dpi` e
+`--max-side` limitam a renderização e `--page-output` grava o PNG renderizado.
+O comando informa `p_b` sem aplicar um limiar de decisão.
 
 **`run` despacha pelo transporte.** Chama as capacidades `execute` do registro
 por `POST /v1/capabilities/{id}:execute`, com o provider e a versão de contrato
