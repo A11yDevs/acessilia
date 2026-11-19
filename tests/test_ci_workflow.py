@@ -177,8 +177,7 @@ def test_production_container_installs_dev_deps_into_the_uv_venv() -> None:
     run = step["run"]
 
     assert "BASE_PYTHON=/usr/local/bin/python3" in run
-    assert '"$BASE_PYTHON" -m pip install' in run
-    assert "--python /app/.venv/bin/python" in run
+    assert '"$BASE_PYTHON" -m pip --python /app/.venv/bin/python install' in run
     assert "python -m pytest libs/core/tests" in run
     assert "core-library-results.xml" in run
 

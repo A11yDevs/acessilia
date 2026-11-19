@@ -62,12 +62,13 @@ jobs:
             acessilia-production-checks sh -ec '
               apt-get update
               apt-get install -y --no-install-recommends git jq
-              # The runtime venv is created by uv and ships without pip. Use
-              # the base image has pip; use it to install the test dependencies into it.
+              # The runtime venv is created by uv and ships without pip. The
+              # base image has pip; use it to install the test dependencies
+              # into the venv. pip 24 requires --python before the subcommand.
               BASE_PYTHON=/usr/local/bin/python3
               [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python
               [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python3.11
-              "$BASE_PYTHON" -m pip install --no-cache-dir --python /app/.venv/bin/python ".[dev]" PyYAML
+              "$BASE_PYTHON" -m pip --python /app/.venv/bin/python install --no-cache-dir ".[dev]" PyYAML
               groupadd --gid "$CHECK_GID" checks
               useradd --uid "$CHECK_UID" --gid "$CHECK_GID" --create-home checks
               runuser -u checks -- python -m pytest -m "not e2e" --junitxml=/tmp/core-results.xml
