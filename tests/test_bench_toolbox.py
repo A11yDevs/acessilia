@@ -9,6 +9,8 @@ Toolbox errors reach the caller typed; nothing turns them into empty data.
 from __future__ import annotations
 
 import ast
+import hashlib
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
@@ -22,7 +24,12 @@ from acessilia_sdk.toolbox import (
     make_client,
 )
 from acessilia_sdk.toolbox.capabilities import provider_default
-from acessilia_sdk.toolbox.clients import ToolboxDatasetClient, ToolboxStructureClient
+from acessilia_sdk.toolbox.clients import (
+    ToolboxDatasetClient,
+    ToolboxMathClient,
+    ToolboxPdfClient,
+    ToolboxStructureClient,
+)
 from backend.config.core_config import core_config_from_settings
 from backend.config.settings import Settings, settings
 from acessilia_core.toolbox import toolbox_client
@@ -180,6 +187,9 @@ TOOLBOX_VARIABLES = (
     "TOOLBOX_RETRIES",
     "TOOLBOX_RETRY_BACKOFF_SECONDS",
     "TOOLBOX_PROVIDER",
+    "TOOLBOX_PDF_PROVIDER",
+    "TOOLBOX_MATH_RECOGNIZE_PROVIDER",
+    "TOOLBOX_MATH_PROVIDER",
 )
 
 ENVIRONMENTS = {
@@ -194,13 +204,23 @@ ENVIRONMENTS = {
         "TOOLBOX_RETRIES": "3",
         "TOOLBOX_RETRY_BACKOFF_SECONDS": "1.5",
     },
-    "provider": {"TOOLBOX_PROVIDER": "mineru"},
-    "empty provider": {"TOOLBOX_PROVIDER": ""},
+    "provider": {
+        "TOOLBOX_PROVIDER": "mineru",
+        "TOOLBOX_PDF_PROVIDER": "custom-pdf",
+        "TOOLBOX_MATH_RECOGNIZE_PROVIDER": "rapid-latex-ocr",
+        "TOOLBOX_MATH_PROVIDER": "custom-math",
+    },
+    "empty provider": {
+        "TOOLBOX_PROVIDER": "",
+        "TOOLBOX_PDF_PROVIDER": "",
+        "TOOLBOX_MATH_RECOGNIZE_PROVIDER": "",
+        "TOOLBOX_MATH_PROVIDER": "",
+    },
 }
 
 
 def _shape(client) -> dict:
-    return {
+    shape = {
         "endpoints": client.endpoints,
         "provider": client.provider,
         "api_key": client.api_key,
@@ -208,11 +228,17 @@ def _shape(client) -> dict:
         "retries": client.retries,
         "retry_backoff_seconds": client.retry_backoff_seconds,
     }
+    if isinstance(client, ToolboxMathClient):
+        shape["transform_provider"] = client.transform_provider
+    return shape
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("environment", ENVIRONMENTS.values(), ids=ENVIRONMENTS.keys())
-@pytest.mark.parametrize("client_cls", [ToolboxDatasetClient, ToolboxStructureClient])
+@pytest.mark.parametrize(
+    "client_cls",
+    [ToolboxDatasetClient, ToolboxStructureClient, ToolboxPdfClient, ToolboxMathClient],
+)
 async def test_the_harness_configures_clients_like_the_core(
     monkeypatch, environment, client_cls
 ) -> None:
@@ -307,3 +333,113 @@ def test_the_harness_reaches_the_toolbox_without_the_core_s_toolbox_modules() ->
         for name in _forbidden_imports(path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_bench_core_and_toolbox_do_not_import_core_or_backend() -> None:
+    """#614: Dr.DocBench canonical conversion and SDK helpers stay free of acessilia_core and backend."""
+    for name in ("core.py", "toolbox.py"):
+        source = (BENCH_DIR / name).read_text(encoding="utf-8")
+        imported: list[str] = []
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import):
+                imported.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                imported.append(node.module)
+        forbidden = [
+            mod for mod in imported if mod.split(".")[0] in ("acessilia_core", "backend")
+        ]
+        assert forbidden == [], f"scripts/bench/{name} imported {forbidden}"
+
+
+def test_convert_and_verbalize_latex_use_sdk_formula_operations() -> None:
+    with respx.mock() as router:
+        convert_route = router.post(f"{PRIMARY}/v1/capabilities/math.convert:execute").mock(
+            return_value=httpx.Response(
+                200, json={"status": "succeeded", "document": {"mathml": "<math><mi>x</mi></math>"}}
+            )
+        )
+        verbalize_route = router.post(f"{PRIMARY}/v1/capabilities/math.verbalize:execute").mock(
+            return_value=httpx.Response(
+                200, json={"status": "succeeded", "document": {"verbalized": "x"}}
+            )
+        )
+        assert toolbox.convert_latex("x") == "<math><mi>x</mi></math>"
+        assert toolbox.verbalize_latex("x", language="pt-BR") == "x"
+
+    assert convert_route.called and verbalize_route.called
+
+
+def test_run_formula_chain_runs_every_sdk_step(tmp_path) -> None:
+    @dataclass(frozen=True)
+    class Box:
+        left: float
+        top: float
+        right: float
+        bottom: float
+        coord_origin: str = "TOPLEFT"
+
+    pdf = tmp_path / "doc.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n")
+    crop = b"\x89PNG\r\n\x1a\ncrop"
+    crop_id = "sha256:" + hashlib.sha256(crop).hexdigest()
+    with respx.mock() as router:
+        router.post(f"{PRIMARY}/v1/capabilities/pdf.render:execute").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "status": "succeeded",
+                    "capability": "pdf.render@2",
+                    "provider": "pymupdf-pdf",
+                    "document": {
+                        "artifact_id": crop_id,
+                        "media_type": "image/png",
+                        "size_bytes": len(crop),
+                        "page_number": 1,
+                        "page_count": 1,
+                        "page_width": 595,
+                        "page_height": 842,
+                        "clip": {"left": 10, "top": 20, "right": 110, "bottom": 60},
+                        "scale": 2.78,
+                        "dpi": 200.0,
+                        "width_px": 278,
+                        "height_px": 111,
+                        "source_media_type": "application/pdf",
+                        "source_filename": "doc.pdf",
+                    },
+                },
+            )
+        )
+        router.get(f"{PRIMARY}/v1/artifacts/{crop_id}").mock(
+            return_value=httpx.Response(200, content=crop)
+        )
+        router.post(f"{PRIMARY}/v1/capabilities/math.recognize:execute").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "status": "succeeded",
+                    "document": {"formulas": [{"latex": r"x^2", "confidence": 0.95}]},
+                },
+            )
+        )
+        router.post(f"{PRIMARY}/v1/capabilities/math.convert:execute").mock(
+            return_value=httpx.Response(
+                200, json={"status": "succeeded", "document": {"mathml": "<math><msup/></math>"}}
+            )
+        )
+        router.post(f"{PRIMARY}/v1/capabilities/math.verbalize:execute").mock(
+            return_value=httpx.Response(
+                200, json={"status": "succeeded", "document": {"verbalized": "x squared"}}
+            )
+        )
+        chain = toolbox.run_formula_chain(pdf, page_number=1, box=Box(10, 20, 110, 60))
+
+    assert chain.latex == "x^2"
+    assert chain.speech is not None
+    assert chain.speech.mathml == "<math><msup/></math>"
+    assert chain.speech.verbalization == "x squared"
+    assert [step.capability for step in chain.steps] == [
+        "pdf.render",
+        "math.recognize",
+        "math.convert",
+        "math.verbalize",
+    ]
