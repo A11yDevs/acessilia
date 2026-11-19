@@ -218,10 +218,10 @@ override the registry's providers.
 
 **`judge` runs `acessilia_sdk.operations.page_judge.page_judgement`**
 ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) and
-prints the rendered page metadata, `p_b` (probability that candidate B is more
-faithful, or `null` when absent or outside `[0, 1]`), `p_b_ab`, `p_a_ba`,
-`model`, the raw `document` object and each step's capability, provider and
-parameters. Each candidate comes from inline text (`--candidate-a`,
+prints the rendered page summary (page number and PNG size), `p_b`
+(probability that candidate B is more faithful, or `null` when absent or
+outside `[0, 1]`), `p_b_ab`, `p_a_ba`, `model`, the raw `document` object and
+each step's capability, provider and parameters. Each candidate comes from inline text (`--candidate-a`,
 `--candidate-b`) or a UTF-8 file (`--candidate-a-file`, `--candidate-b-file`).
 `--provider` and `--render-provider` override the registry's providers,
 `--prompt` picks the prompt variant, `--dpi` and `--max-side` bound the render,

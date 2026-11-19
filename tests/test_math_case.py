@@ -571,3 +571,144 @@ def test_formulas_command_evaluates_display_formulas_via_sdk_formula_chain(
         step["capability"]
         for step in canonical["sections"][0]["blocks"][0]["metadata"]["formula_recognition"]["steps"]
     ] == ["pdf.render", "math.recognize", "math.convert", "math.verbalize"]
+
+
+def test_run_formula_evaluation_handles_provenance_shapes_and_page_coercion(
+    tmp_path, monkeypatch
+) -> None:
+    from acessilia_sdk.operations.formula import FormulaChain, FormulaCrop
+    from scripts.bench import toolbox
+
+    pdf = tmp_path / "doc.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n")
+    box = {"left": 10, "top": 20, "right": 110, "bottom": 60, "coord_origin": "TOPLEFT"}
+    monkeypatch.setattr(
+        toolbox,
+        "extract_structure",
+        lambda path, provider=None: {
+            "document": {
+                "elements": [
+                    {
+                        "id": "f-dict",
+                        "type": "formula",
+                        "text": "$a$",
+                        "reading_order": 0,
+                        "provenance": {"page_number": "2", "bbox": box},
+                    },
+                    {
+                        "id": "f-float",
+                        "type": "formula",
+                        "text": "$b$",
+                        "reading_order": 1,
+                        "provenance": [None, {"page_number": 3.0, "bbox": box}],
+                    },
+                    {
+                        "id": "f-bad-page",
+                        "type": "formula",
+                        "text": "$c$",
+                        "reading_order": 2,
+                        "provenance": [{"page_number": "abc", "bbox": box}],
+                    },
+                ]
+            }
+        },
+    )
+    seen_pages: list[int] = []
+
+    def fake_chain(source, *, page_number, box, **_kwargs):
+        seen_pages.append(page_number)
+        return FormulaChain(FormulaCrop(None, page_number, reason="stub"), None, "", None)
+
+    monkeypatch.setattr(toolbox, "run_formula_chain", fake_chain)
+
+    document = math_case.run_formula_evaluation(pdf)
+
+    assert seen_pages == [2, 3, 0]
+    blocks = document["sections"][0]["blocks"]
+    assert blocks[0]["source_location"] == {"page_number": 2}
+    assert blocks[1]["source_location"] == {"page_number": 3}
+    assert blocks[2]["source_location"] == {}
+    assert any("unusable page_number 'abc'" in w for w in document.get("technical_warnings", []))
+
+
+def test_run_formula_evaluation_degrades_on_invalid_input_and_stops_after_outage(
+    tmp_path, monkeypatch
+) -> None:
+    from acessilia_sdk.operations.formula import FormulaChain, FormulaCrop
+    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput, ToolboxProviderUnavailable
+    from scripts.bench import toolbox
+
+    pdf = tmp_path / "doc.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n")
+    box = {"left": 10, "top": 20, "right": 110, "bottom": 60, "coord_origin": "TOPLEFT"}
+    monkeypatch.setattr(
+        toolbox,
+        "extract_structure",
+        lambda path, provider=None: {
+            "document": {
+                "elements": [
+                    {"id": "f1", "type": "formula", "text": "$a$", "reading_order": 0,
+                     "provenance": [{"page_number": 1, "bbox": box}]},
+                    {"id": "f2", "type": "formula", "text": "$b$", "reading_order": 1,
+                     "provenance": [{"page_number": 1, "bbox": box}]},
+                    {"id": "f3", "type": "formula", "text": "$c$", "reading_order": 2,
+                     "provenance": [{"page_number": 2, "bbox": box}]},
+                    {"id": "f4", "type": "formula", "text": "$d$", "reading_order": 3,
+                     "provenance": [{"page_number": 2, "bbox": box}]},
+                ]
+            }
+        },
+    )
+
+    calls = 0
+
+    def fake_chain(source, *, page_number, box, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ToolboxInvalidInput("bad crop")
+        if calls == 2:
+            return FormulaChain(FormulaCrop(b"\x89PNG", page_number, (10.0, 20.0, 110.0, 60.0)), None, "b_rec", None)
+        raise ToolboxProviderUnavailable("down")
+
+    monkeypatch.setattr(toolbox, "run_formula_chain", fake_chain)
+
+    document = math_case.run_formula_evaluation(pdf)
+
+    # f1 invalid input does not stop f2; f3 outage skips f4.
+    assert calls == 3
+    blocks = document["sections"][0]["blocks"]
+    assert blocks[0]["text"] == "a"
+    assert "ToolboxInvalidInput" in blocks[0]["metadata"]["formula_recognition"]["error"]
+    assert blocks[1]["text"] == "b_rec"
+    assert blocks[1]["metadata"]["formula_recognition"]["method"] == "math.recognize"
+    assert blocks[2]["text"] == "c"
+    assert "ToolboxProviderUnavailable" in blocks[2]["metadata"]["formula_recognition"]["error"]
+    assert blocks[3]["text"] == "d"
+    assert blocks[3]["metadata"]["formula_recognition"]["skipped_after_outage"] == "ToolboxProviderUnavailable"
+    assert len(document.get("technical_warnings", [])) == 2
+
+
+def test_formulas_command_reports_structure_extraction_failure_typed(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    from acessilia_sdk.toolbox.errors import ToolboxProviderUnavailable
+    from scripts.bench import toolbox
+
+    case = tmp_path / "dataset" / "input" / "math-reference"
+    case.mkdir(parents=True)
+    (case / math_case.CASE_PDF).write_bytes(b"%PDF-1.7\n")
+    (case / "ground_truth.csv").write_text(
+        "id,manifest_id,page,kind,expected_latex,context,notes\n", encoding="utf-8"
+    )
+    (case / "expectations.json").write_text("{}", encoding="utf-8")
+
+    def fail_extract(path, provider=None):
+        raise ToolboxProviderUnavailable("unreachable")
+
+    monkeypatch.setattr(toolbox, "extract_structure", fail_extract)
+
+    code = math_case.main(["--dataset", str(tmp_path / "dataset"), "formulas", "--out", str(tmp_path / "out")])
+
+    assert code == 1
+    assert capsys.readouterr().err.startswith("error: ToolboxProviderUnavailable: ")

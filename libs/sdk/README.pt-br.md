@@ -223,10 +223,10 @@ requisição, e nunca vira a página inteira. `--recognize-provider` e
 
 **O `judge` roda o `acessilia_sdk.operations.page_judge.page_judgement`**
 ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.pt-br.md)) e
-imprime os metadados da página renderizada, `p_b` (probabilidade de o candidato
-B ser mais fiel, ou `null` quando ausente ou fora de `[0, 1]`), `p_b_ab`,
-`p_a_ba`, `model`, o objeto `document` bruto e a capacidade, o provider e os
-parâmetros de cada passo. Cada candidato vem de texto direto (`--candidate-a`,
+imprime o resumo da página renderizada (número da página e tamanho do PNG),
+`p_b` (probabilidade de o candidato B ser mais fiel, ou `null` quando ausente
+ou fora de `[0, 1]`), `p_b_ab`, `p_a_ba`, `model`, o objeto `document` bruto e
+a capacidade, o provider e os parâmetros de cada passo. Cada candidato vem de texto direto (`--candidate-a`,
 `--candidate-b`) ou de arquivo UTF-8 (`--candidate-a-file`,
 `--candidate-b-file`). `--provider` e `--render-provider` substituem os
 providers do registro, `--prompt` escolhe a variante de prompt, `--dpi` e

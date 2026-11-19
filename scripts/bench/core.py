@@ -33,9 +33,14 @@ class _SdkMathEnricher(MathEnricher):
     """Enrich math blocks directly via ``acessilia_sdk.operations.formula``.
 
     Calls ``convert_formula`` and ``verbalize_formula`` through
-    :mod:`scripts.bench.toolbox`. A rejected expression (``ToolboxInvalidInput``)
-    degrades to empty text; the first outage of a capability stops further calls
-    to it for the rest of the document and records a technical warning.
+    :mod:`scripts.bench.toolbox`. Normalization uses ``bare_latex`` (matching
+    ``acessilia_core.formula_tools.normalize_latex``: delimiters and whitespace
+    only). Display-formula speech intentionally keeps the raw ``math.verbalize``
+    output without the core's ``label_spoken_formula`` presentation prefix
+    (ADR-0017: presentation labeling stays in the core). A rejected expression
+    (``ToolboxInvalidInput``) degrades to empty text; the first outage of a
+    capability stops further calls to it for the rest of the document and
+    records a technical warning.
     """
 
     def __init__(self, *, language: str = "pt-BR") -> None:
@@ -44,13 +49,14 @@ class _SdkMathEnricher(MathEnricher):
         self.rejected: dict[str, int] = {}
 
     def normalize(self, latex: str) -> str:
+        # Matches acessilia_core.formula_tools.normalize_latex (bare_latex alias).
         return bare_latex(latex)
 
     def to_mathml(self, latex: str) -> str:
         return self._call("math.convert", toolbox.convert_latex, latex)
 
     def verbalize(self, latex: str) -> str:
-        return self._call("math.verbalize", self._verbalize, latex)
+        return self._call("math.verbalize", self._verbalize, latex).strip()
 
     def verbalize_inline(self, latex: str) -> str:
         return self._call("math.verbalize", self._verbalize, latex).strip()

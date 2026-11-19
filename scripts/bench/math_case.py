@@ -627,6 +627,33 @@ def _formula_box(bbox: Any) -> _FormulaBox | None:
         return None
 
 
+def _first_provenance(element: dict[str, Any]) -> dict[str, Any]:
+    raw = element.get("provenance")
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, list):
+        for entry in raw:
+            if isinstance(entry, dict):
+                return entry
+    return {}
+
+
+def _parse_page_number(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 1 else None
+    if isinstance(value, float):
+        return int(value) if value.is_integer() and value >= 1 else None
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except ValueError:
+            return None
+        return parsed if parsed >= 1 else None
+    return None
+
+
 def run_formula_evaluation(
     pdf: Path,
     *,
@@ -640,7 +667,14 @@ def run_formula_evaluation(
     Extracts layout elements with ``document.structure.extract`` and runs
     ``acessilia_sdk.operations.formula.formula_chain`` on every ``formula``
     element, without importing ``acessilia_core`` or ``backend``.
+
+    A rejected formula (``ToolboxInvalidInput``) degrades that formula to the
+    extractor text and records the error; any other ``ToolboxError`` stops
+    further ``formula_chain`` calls for the rest of the document so partial
+    results and ``technical_warnings`` are still written.
     """
+    from acessilia_sdk.toolbox.errors import ToolboxError, ToolboxInvalidInput
+
     from scripts.bench import toolbox
 
     extracted = toolbox.extract_structure(pdf, provider=provider)
@@ -649,22 +683,87 @@ def run_formula_evaluation(
         doc.get("elements") or [], key=lambda element: element.get("reading_order") or 0
     )
     blocks: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    outage: str | None = None
     for index, element in enumerate(elements, start=1):
         if str(element.get("type", "")).lower() != "formula":
             continue
-        provenance = (element.get("provenance") or [{}])[0]
-        page = provenance.get("page_number") or element.get("page_number")
+        provenance = _first_provenance(element)
+        raw_page = provenance.get("page_number")
+        if raw_page is None:
+            raw_page = element.get("page_number")
+        parsed_page = _parse_page_number(raw_page)
+        if raw_page is not None and parsed_page is None:
+            warnings.append(f"formula {index}: unusable page_number {raw_page!r}")
+        page_number = parsed_page or 0
         box = _formula_box(provenance.get("bbox"))
-        page_number = int(page) if isinstance(page, int) and not isinstance(page, bool) else 0
-        chain = toolbox.run_formula_chain(
-            pdf,
-            page_number=page_number,
-            box=box,
-            language=language,
-            recognize_provider=recognize_provider,
-            transform_provider=transform_provider,
-        )
-        latex = chain.latex or bare_latex(str(element.get("text") or ""))
+        fallback_latex = bare_latex(str(element.get("text") or ""))
+        if outage is not None:
+            blocks.append({
+                "id": element.get("id") or f"formula-{index}",
+                "type": "math",
+                "text": fallback_latex,
+                "alt_text": "",
+                "source_location": {"page_number": page_number} if page_number >= 1 else {},
+                "metadata": {
+                    "mathml": "",
+                    "formula_recognition": {
+                        "method": "extractor",
+                        "skipped_after_outage": outage,
+                        "steps": [],
+                    },
+                },
+            })
+            continue
+        try:
+            chain = toolbox.run_formula_chain(
+                pdf,
+                page_number=page_number,
+                box=box,
+                language=language,
+                recognize_provider=recognize_provider,
+                transform_provider=transform_provider,
+            )
+        except ToolboxInvalidInput as exc:
+            error_text = f"{type(exc).__name__}: {exc}"
+            warnings.append(f"formula {index} (p. {page_number}): {error_text}")
+            blocks.append({
+                "id": element.get("id") or f"formula-{index}",
+                "type": "math",
+                "text": fallback_latex,
+                "alt_text": "",
+                "source_location": {"page_number": page_number} if page_number >= 1 else {},
+                "metadata": {
+                    "mathml": "",
+                    "formula_recognition": {
+                        "method": "extractor",
+                        "error": error_text,
+                        "steps": [],
+                    },
+                },
+            })
+            continue
+        except ToolboxError as exc:
+            error_text = f"{type(exc).__name__}: {exc}"
+            outage = type(exc).__name__
+            warnings.append(f"formula {index} (p. {page_number}): {error_text}")
+            blocks.append({
+                "id": element.get("id") or f"formula-{index}",
+                "type": "math",
+                "text": fallback_latex,
+                "alt_text": "",
+                "source_location": {"page_number": page_number} if page_number >= 1 else {},
+                "metadata": {
+                    "mathml": "",
+                    "formula_recognition": {
+                        "method": "extractor",
+                        "error": error_text,
+                        "steps": [],
+                    },
+                },
+            })
+            continue
+        latex = chain.latex or fallback_latex
         method = "math.recognize" if chain.latex else "extractor"
         blocks.append({
             "id": element.get("id") or f"formula-{index}",
@@ -681,7 +780,10 @@ def run_formula_evaluation(
                 },
             },
         })
-    return {"sections": [{"id": "s1", "title": "", "level": 1, "blocks": blocks}]}
+    result: dict[str, Any] = {"sections": [{"id": "s1", "title": "", "level": 1, "blocks": blocks}]}
+    if warnings:
+        result["technical_warnings"] = warnings
+    return result
 
 
 async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, Path | None]:
@@ -893,14 +995,20 @@ def main(argv: list[str] | None = None) -> int:
     rows, expectations = load_case(root)
 
     if args.command == "formulas":
+        from acessilia_sdk.toolbox.errors import ToolboxError
+
         pdf = args.pdf or root / CASE_DIR / CASE_PDF
-        document = run_formula_evaluation(
-            pdf,
-            provider=args.provider,
-            recognize_provider=args.recognize_provider,
-            transform_provider=args.transform_provider,
-            language=args.language,
-        )
+        try:
+            document = run_formula_evaluation(
+                pdf,
+                provider=args.provider,
+                recognize_provider=args.recognize_provider,
+                transform_provider=args.transform_provider,
+                language=args.language,
+            )
+        except ToolboxError as exc:
+            print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
         if args.out is not None:
             args.out.mkdir(parents=True, exist_ok=True)
             (args.out / "canonical.json").write_text(
