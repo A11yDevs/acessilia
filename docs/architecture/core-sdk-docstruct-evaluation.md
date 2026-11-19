@@ -139,7 +139,7 @@ The direction of the dependencies is checked by tests:
 | main (`tests/`, `-n 4`) | 1,512 → 1,497 | 111 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
-| core (`libs/core/tests`) | none → 735 | 30 s |
+| core (`libs/core/tests`) | none → 755 | 30 s |
 
 - **The libraries' suites run in seconds on their own,** so a change to
   docstruct or the SDK gets its feedback without the main suite.
@@ -149,7 +149,7 @@ The direction of the dependencies is checked by tests:
   #613, with the boundary and smoke tests.
 - The baseline's suites were not timed: their environment cannot be rebuilt
   as it was, so only the counts are compared.
-- The main/core counts and times are the post-#613 measurement (one local
+- The main/core counts and times are the post-#613/#612 measurement (one local
   run); the rest of this page is at `ec3ddf0b`.
 
 ## 5. Reuse of operations

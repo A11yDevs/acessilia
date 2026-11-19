@@ -138,7 +138,7 @@ A direção das dependências é conferida por testes:
 | principal (`tests/`, `-n 4`) | 1.512 → 1.497 | 111 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
-| core (`libs/core/tests`) | nenhuma → 735 | 30 s |
+| core (`libs/core/tests`) | nenhuma → 755 | 30 s |
 
 - **As suítes das bibliotecas rodam sozinhas em segundos,** então uma mudança
   no docstruct ou no SDK tem retorno sem a suíte principal.
@@ -148,7 +148,7 @@ A direção das dependências é conferida por testes:
   #613, junto com o de fronteira e o de fumaça.
 - As suítes da referência não foram cronometradas: o ambiente delas não pode
   ser refeito como era, então só as contagens são comparadas.
-- As contagens e os tempos de principal/core são a medição pós-#613 (uma
+- As contagens e os tempos de principal/core são a medição pós-#613/#612 (uma
   execução local); o resto desta página está em `ec3ddf0b`.
 
 ## 5. Reaproveitamento das operações

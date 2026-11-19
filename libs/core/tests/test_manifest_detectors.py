@@ -405,8 +405,7 @@ def test_materialize_needs_deduplicates_filters_skeleton_order_and_hashes_long_i
     assert suffix.startswith("40-targets-")
 
 
-def test_inspect_document_needs_and_legacy_alias_are_identical() -> None:
-    assert builder._derive_v23_processing_needs is builder.inspect_document_needs
+def test_builder_inspect_document_needs_materializes_with_default_catalog() -> None:
     formula = _element("el-1", "formula", text=r"\( x^2 \)")
     obs, obls = builder.inspect_document_needs([formula])
     assert [o.kind for o in obs] == ["normalize-formula-detected"]

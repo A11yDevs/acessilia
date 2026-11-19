@@ -24,16 +24,9 @@ from acessilia_core.i18n.log_messages import (
 from acessilia_core.logger import logger
 
 from acessilia_core.manifest.detectors import (
-    MAX_ID_SUFFIX,
-    UNICODE_REPAIR_ELEMENT_TYPES,
-    VLM_JUDGE_METHODS,
     inspect_document_needs as _inspect_document_needs,
-    needs_vlm_judge as _needs_vlm_judge,
     normalized_element_bbox as _normalized_element_bbox,
-    obligation_suffix as _obligation_suffix,
     oriented_bbox as _oriented_bbox,
-    pages_for_vlm_judge as _pages_for_vlm_judge,
-    unicode_repair_text,
 )
 from acessilia_core.manifest.models import (
     Artifact,
@@ -645,10 +638,6 @@ def inspect_document_needs(
         legacy_unicode_repair=legacy_unicode_repair,
         secondary_extraction_available=secondary_extraction_available,
     )
-
-
-#: Historical name kept for callers and tests written during the v2.3 migration.
-_derive_v23_processing_needs = inspect_document_needs
 
 
 def _append_processing_needs(
