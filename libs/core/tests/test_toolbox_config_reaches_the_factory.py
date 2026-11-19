@@ -9,9 +9,10 @@ would hand the factory another object and fail its test.
 from __future__ import annotations
 
 import asyncio
+import struct
+import zlib
 from pathlib import Path
 
-import fitz
 import pytest
 from acessilia_core.toolbox import toolbox_client
 
@@ -58,10 +59,29 @@ def received(monkeypatch):
     return seen
 
 
-def _png(tmp_path: Path) -> bytes:
-    with fitz.open() as pdf:
-        page = pdf.new_page(width=200, height=100)
-        return page.get_pixmap().tobytes("png")
+def _chunk(kind: bytes, data: bytes) -> bytes:
+    return (
+        struct.pack(">I", len(data))
+        + kind
+        + data
+        + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    )
+
+
+def _png(width: int = 200, height: int = 100) -> bytes:
+    """A valid RGB PNG built with the standard library.
+
+    The recording factory stops the helpers before any real processing; the
+    image only needs enough pixels for the downscale helper to reach it.
+    """
+    raw = b"".join(b"\x00" + b"\x00\x00\x00" * width for _ in range(height))
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", header)
+        + _chunk(b"IDAT", zlib.compress(raw))
+        + _chunk(b"IEND", b"")
+    )
 
 
 def _call(run_toolbox, tmp_path):
@@ -79,7 +99,7 @@ def _call(run_toolbox, tmp_path):
         vision_payload,
     )
 
-    png = _png(tmp_path)
+    png = _png()
     picture = build_element("pic-1", "picture")
     picture.page_number = 1
     return {

@@ -136,7 +136,7 @@ The direction of the dependencies is checked by tests:
 
 | Suite | Test functions, baseline → now | Time now |
 |---|---:|---:|
-| main (`tests/`, `-n 4`) | 1,512 → 1,495 | 163 s |
+| main (`tests/`, `-n 4`) | 1,512 → 1,497 | 111 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
 | core (`libs/core/tests`) | none → 735 | 30 s |

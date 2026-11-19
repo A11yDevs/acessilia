@@ -150,7 +150,7 @@ gap.
 
 - **Every admissible method is accounted for.** Each one now resolves to a
   registered handler or is reported to the planner as unavailable;
-  `tests/test_pddl_actionability.py` fails on any method that is neither.
+  `libs/core/tests/test_pddl_actionability.py` fails on any method that is neither.
 - **19 handlers registered** (was 3 real + 8 no-op): the 3 model-backed ones,
   the single-provider fallback, the
   14 deterministic handlers covering `vision-description`, `pandoc-table`,

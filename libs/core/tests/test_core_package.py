@@ -14,7 +14,14 @@ def test_the_core_is_a_regular_package() -> None:
     """Not a namespace package, which a stale ``acessilia_core`` left in
     site-packages could silently merge with (review of #572)."""
     assert acessilia_core.__file__ is not None
-    assert Path(acessilia_core.__file__).parent == ROOT / "libs" / "core" / "src" / "acessilia_core"
+    installed = Path(acessilia_core.__file__).resolve().parent
+    editable = (ROOT / "libs" / "core" / "src" / "acessilia_core").resolve()
+    # The checkout suite imports the editable install; the wheel jobs
+    # (core alone and the production image) import from site-packages.
+    assert installed == editable or installed.parent.name in {
+        "site-packages",
+        "dist-packages",
+    }
     assert len(list(acessilia_core.__path__)) == 1
 
 

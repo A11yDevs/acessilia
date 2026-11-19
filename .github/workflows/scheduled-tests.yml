@@ -71,11 +71,11 @@ jobs:
       # The scheduled job changes the execution order and worker count. A test
       # with a different outcome is an order/worker dependency; the comparison
       # step below fails the run.
-      - name: Run core suite serially
+      - name: Run main suite serially
         continue-on-error: true
         run: uv run --locked --extra dev python -m pytest -m "not e2e" --durations=25 --junitxml=serial-results.xml
 
-      - name: Run core suite with four workers
+      - name: Run main suite with four workers
         continue-on-error: true
         run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=parallel-results.xml
 
@@ -92,7 +92,7 @@ jobs:
       - name: Run core library test suite
         continue-on-error: true
         working-directory: libs/core
-        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE/libs/core" python -m pytest --durations=25 --junitxml=core-test-results.xml
+        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=core-test-results.xml
 
       - name: Compare outcomes and write the monitoring summary
         if: always()

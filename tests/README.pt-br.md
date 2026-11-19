@@ -4,8 +4,8 @@ Também disponível em **inglês (EUA)**: [English version](README.md)
 
 A suíte de testes unitários do projeto cobre o pipeline canônico, o motor PDDL, a API e os exportadores. Tudo é rápido e isolado: arquivos vão para diretórios temporários; chamadas de rede e de LLM são simuladas (mock), e os fluxos assíncronos rodam com `pytest-asyncio`.
 
-O gate de merge é o CI, que executa as suítes do core sem E2E, da docstruct e do
-SDK no Python 3.11, no ambiente do `uv.lock` da raiz. Jobs adicionais testam as
+O gate de merge é o CI, que executa as suítes principal, da biblioteca do core,
+da docstruct e do SDK no Python 3.11, no ambiente do `uv.lock` da raiz. Jobs adicionais testam as
 bibliotecas isoladamente a partir dos próprios locks. A imagem de produção
 carrega dependências de runtime e passa por verificações de build, inicialização
 e saúde da API por smoke tests antes da publicação. Veja a
@@ -58,7 +58,7 @@ dos exports mantêm sua cobertura. Veja o
 O contrato de schema canônico é conferido separadamente:
 `libs/docstruct/tests/test_schema_validation.py` cobre o draft empacotado,
 validador injetado, propagação de falhas e saída do builder incluindo filhos;
-`tests/test_canonical_schema_contract.py` confere a cópia da raiz, o builder do
+`libs/core/tests/test_canonical_schema_contract.py` confere a cópia da raiz, o builder do
 core e a aceitação preservada de tipos personalizados no export. A CI também
 valida o schema do wheel instalado fora do checkout. `jsonschema` é apenas dev
 na docstruct; os guards de runtime com biblioteca padrão e de infraestrutura
@@ -72,7 +72,7 @@ uv run python scripts/sync_accessible_document_schema.py --check
 ```
 
 O Core 0.2.0 valida após normalização/auditoria e antes do perfil.
-`test_export_schema_gate.py` verifica 68 resultados antes/depois, normalização,
+`libs/core/tests/test_export_schema_gate.py` verifica 68 resultados antes/depois, normalização,
 filhos/blocos filtrados, ausência de efeitos do renderer em chamadas diretas
 ao Core e diagnóstico localizado. O teste do worker observa criação do
 diretório antes do export, rejeição e remoção posterior, além de histórico

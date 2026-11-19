@@ -14,7 +14,6 @@ from docstruct.schemas import accessible_document_schema
 from jsonschema import Draft202012Validator
 from core_config_support import export_config, toolbox_config
 
-ROOT = Path(__file__).resolve().parents[1]
 MATRIX = json.loads((Path(__file__).parent / 'fixtures/export_schema_gate/compatibility.json').read_text())
 
 

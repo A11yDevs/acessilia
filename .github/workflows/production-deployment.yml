@@ -62,7 +62,9 @@ jobs:
             acessilia-production-checks sh -ec '
               apt-get update
               apt-get install -y --no-install-recommends git jq
-              python -m pip install ".[dev]" PyYAML
+              # The runtime venv is created by uv and ships without pip. Use
+              # the base image's pip to install the test dependencies into it.
+              /usr/local/bin/python -m pip install --no-cache-dir --python /app/.venv/bin/python ".[dev]" PyYAML
               groupadd --gid "$CHECK_GID" checks
               useradd --uid "$CHECK_UID" --gid "$CHECK_GID" --create-home checks
               runuser -u checks -- python -m pytest -m "not e2e" --junitxml=/tmp/core-results.xml

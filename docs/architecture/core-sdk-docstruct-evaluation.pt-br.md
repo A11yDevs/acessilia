@@ -135,7 +135,7 @@ A direção das dependências é conferida por testes:
 
 | Suíte | Funções de teste, referência → agora | Tempo agora |
 |---|---:|---:|
-| principal (`tests/`, `-n 4`) | 1.512 → 1.495 | 163 s |
+| principal (`tests/`, `-n 4`) | 1.512 → 1.497 | 111 s |
 | docstruct (`libs/docstruct/tests`) | 808 → 978 | 6–9 s |
 | SDK (`libs/sdk/tests`) | 203 → 388 | 11–17 s |
 | core (`libs/core/tests`) | nenhuma → 735 | 30 s |

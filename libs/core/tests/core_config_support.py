@@ -6,6 +6,7 @@ the core suite runs alone. A test replaces only the fields it exercises.
 
 from __future__ import annotations
 
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -20,23 +21,13 @@ from acessilia_core.config import (
     ToolboxConfig,
     VisionConfig,
 )
+from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS
 
-_TOOLBOX_PROVIDERS = {
-    "toolbox_adjudicate_provider": "qwen3-vl-8b",
-    "toolbox_docx_provider": "pandoc-docx",
-    "toolbox_layout_provider": "docling-layout",
-    "toolbox_math_provider": "math-speech",
-    "toolbox_math_recognize_provider": "pp-formulanet",
-    "toolbox_media_inspect_provider": "pure-media-inspect",
-    "toolbox_ocr_provider": "docling-ocr",
-    "toolbox_orientation_provider": "rapidocr-orient",
-    "toolbox_page_ocr_provider": "qwen3-vl-8b",
-    "toolbox_pdf_provider": "pymupdf-pdf",
-    "toolbox_pdf_ua_provider": "pandoc-pdf-ua",
-    "toolbox_pdf_validate_provider": "verapdf",
-    "toolbox_provider": "docling",
-    "toolbox_table_provider": "qwen3-vl-8b",
-}
+#: A process-local scratch directory, so tests that forget ``tmp_path`` do not
+#: share a fixed path with another process or user.
+_TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="acessilia-core-tests-"))
+
+_TOOLBOX_PROVIDERS = dict(PROVIDER_DEFAULTS)
 
 _TOOLBOX_TIMEOUTS = {
     "toolbox_docx_timeout_seconds": 300,
@@ -112,7 +103,7 @@ def default_core_config() -> CoreConfig:
             toolbox_docx_enabled=True,
             toolbox_pdf_ua_enabled=True,
         ),
-        paths=PathsConfig(data_dir=Path("/tmp/acessilia-core-tests")),
+        paths=PathsConfig(data_dir=_TEST_DATA_DIR),
     )
 
 
