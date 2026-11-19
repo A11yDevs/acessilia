@@ -63,7 +63,7 @@ jobs:
               apt-get update
               apt-get install -y --no-install-recommends git jq
               # The runtime venv is created by uv and ships without pip. Use
-              # the base image's pip to install the test dependencies into it.
+              # the base image has pip; use it to install the test dependencies into it.
               BASE_PYTHON=/usr/local/bin/python3
               [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python
               [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python3.11
