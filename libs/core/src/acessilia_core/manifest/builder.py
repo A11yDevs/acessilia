@@ -23,6 +23,18 @@ from acessilia_core.i18n.log_messages import (
 )
 from acessilia_core.logger import logger
 
+from acessilia_core.manifest.detectors import (
+    MAX_ID_SUFFIX,
+    UNICODE_REPAIR_ELEMENT_TYPES,
+    VLM_JUDGE_METHODS,
+    inspect_document_needs as _inspect_document_needs,
+    needs_vlm_judge as _needs_vlm_judge,
+    normalized_element_bbox as _normalized_element_bbox,
+    obligation_suffix as _obligation_suffix,
+    oriented_bbox as _oriented_bbox,
+    pages_for_vlm_judge as _pages_for_vlm_judge,
+    unicode_repair_text,
+)
 from acessilia_core.manifest.models import (
     Artifact,
     BoundingBox,
@@ -34,7 +46,6 @@ from acessilia_core.manifest.models import (
 from acessilia_core.manifest.slides import (
     DEFAULT_FOLD_FIGURE_LABELS,
     DEFAULT_VISUAL_COVERAGE,
-    is_slide_heading,
     split_across_slides,
     structure_as_slides,
 )
@@ -44,12 +55,10 @@ from docstruct.placeholders import (
     is_unstructured_page_placeholder as _is_placeholder,
 )
 from docstruct.geometry import (
-    OrientedBox,
     ReadingItem,
     order_reading_items,
     reading_role,
 )
-from docstruct.tables.ast import raw_rows_from_table_ast as _rows_from_table_ast
 
 if TYPE_CHECKING:
     from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
@@ -354,7 +363,7 @@ def _build_from_toolbox_json(
             page_fractions=lambda element: _normalized_element_bbox(element, page_sizes),
         )
     observations, obligations = _derive_processing_needs(manifest.elements)
-    v23_observations, v23_obligations = _derive_v23_processing_needs(
+    document_observations, document_obligations = inspect_document_needs(
         manifest.elements,
         page_sizes={
             page.page_number: (page.width, page.height) for page in manifest.pages
@@ -365,8 +374,8 @@ def _build_from_toolbox_json(
         fusion_judge_max_pages=fusion_judge_max_pages,
         secondary_extraction_available=secondary_extraction_readable,
     )
-    observations.extend(v23_observations)
-    obligations.extend(v23_obligations)
+    observations.extend(document_observations)
+    obligations.extend(document_obligations)
     _append_processing_needs(manifest, observations, obligations)
     append_unstructured_page_needs(manifest)
     if has_secondary_extraction:
@@ -380,19 +389,6 @@ def _build_from_toolbox_json(
             )
         )
     return manifest
-
-
-def _raw_bbox(element: ManifestElement) -> BoundingBox | None:
-    if not element.provenance:
-        return None
-    return element.provenance[0].bbox
-
-
-def _oriented_bbox(element: ManifestElement) -> OrientedBox | None:
-    bbox = _raw_bbox(element)
-    if bbox is None:
-        return None
-    return OrientedBox(bbox.left, bbox.top, bbox.right, bbox.bottom, bbox.coord_origin)
 
 
 def _element_bbox(element: ManifestElement) -> tuple[float, float, float, float] | None:
@@ -619,47 +615,7 @@ def _derive_processing_needs(
     return observations, obligations
 
 
-#: Element types whose text the Unicode repair may rewrite. Tables carry their
-#: content in the cell AST and are read through ``unicode_repair_text``.
-UNICODE_REPAIR_ELEMENT_TYPES = frozenset(
-    {
-        "paragraph",
-        "heading",
-        "title",
-        "list_item",
-        "caption",
-        "footnote",
-        "page_header",
-        "page_footer",
-        "table",
-    }
-)
-
-
-def unicode_repair_text(element: ManifestElement) -> str:
-    """Text the Unicode detection/repair sees for ``element``.
-
-    Page headers/footers are ordinary prose. A table has no ``element.text``:
-    its content lives in the cell AST (plus an optional caption).
-    """
-    if element.type == "table":
-        table_ast = element.metadata.get("table_ast")
-        if not isinstance(table_ast, dict):
-            return ""
-        parts = [
-            value
-            for row in _rows_from_table_ast(table_ast)
-            for value in row
-            if value
-        ]
-        caption = table_ast.get("caption")
-        if isinstance(caption, str) and caption.strip():
-            parts.append(caption)
-        return " ".join(parts)
-    return element.text or ""
-
-
-def _derive_v23_processing_needs(
+def inspect_document_needs(
     elements: list[ManifestElement],
     *,
     page_sizes: dict[int, tuple[float | None, float | None]] | None = None,
@@ -669,7 +625,7 @@ def _derive_v23_processing_needs(
     legacy_unicode_repair: str = "off",
     secondary_extraction_available: bool = False,
 ) -> tuple[list[Observation], list[Obligation]]:
-    """Emit v2.3 needs only when deterministic checks or fusion evidence support them.
+    """Emit document-level needs when deterministic checks or fusion evidence support them.
 
     ``fusion_judge_max_pages`` caps how many pages get the VLM judge
     (the run's ``FusionConfig``; 0, no judge). ``legacy_unicode_repair`` is
@@ -678,380 +634,21 @@ def _derive_v23_processing_needs(
     ``skeleton-order`` is admissible only when the secondary extraction file
     the extractor recorded for this document can be read.
     """
-    from docstruct.fusion.line_numbers import extract_line_numbers
-    from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
-    from docstruct.fusion.types import DiffBlock
-    from docstruct.fusion.verse import verse_blocks
-    from docstruct.fusion.xycut import xycut_order
-    from docstruct.text.latex import normalize_latex
-    from docstruct.text.norm_fix import norm_fix
-    from docstruct.text.unicode_repair import detect_legacy_unicode
-
-    candidates: list[
-        tuple[str, list[ManifestElement], dict[str, Any], list[str] | None, bool]
-    ] = []
-    by_page: dict[int | None, list[ManifestElement]] = {}
-    for element in elements:
-        by_page.setdefault(element.page_number, []).append(element)
-
-    def add(
-        kind: str,
-        targets: list[ManifestElement],
-        evidence: dict[str, Any],
-        methods: list[str] | None = None,
-        *,
-        obligation: bool = True,
-    ) -> None:
-        valid_targets = [item for item in targets if item.id]
-        if valid_targets:
-            candidates.append((kind, valid_targets, evidence, methods, obligation))
-
-    for element in elements:
-        text = element.text or ""
-        if element.type == "formula" and text:
-            normalized = normalize_latex(text)
-            if normalized != text:
-                add("normalize-formula", [element], {"before": text, "after": normalized})
-        elif element.type in {"paragraph", "heading", "title", "list_item", "caption"} and text:
-            normalized = norm_fix(text)
-            if normalized != text:
-                add("normalize-text", [element], {"before": text, "after": normalized})
-
-    unicode_mode = str(legacy_unicode_repair or "off").strip().lower()
-    if unicode_mode not in {"off", "detect", "repair"}:
-        unicode_mode = "off"
-    if unicode_mode != "off":
-        legacy_targets: list[ManifestElement] = []
-        legacy_evidence: Counter = Counter()
-        for element in elements:
-            if element.type not in UNICODE_REPAIR_ELEMENT_TYPES:
-                continue
-            text = unicode_repair_text(element)
-            if not text:
-                continue
-            detection = detect_legacy_unicode(text)
-            if not detection.has_signal:
-                continue
-            repairable = bool(
-                detection.combining_runs
-                or detection.dotless
-                or detection.spacing_diacritics
-            )
-            # Phase B rewrites NFC, dotless-i and spacing diacritics; the
-            # handler limits standalone accents to documents with enough
-            # word-internal evidence. Replacement characters stay report-only.
-            if unicode_mode == "repair" and not repairable:
-                continue
-            legacy_targets.append(element)
-            legacy_evidence["elements"] += 1
-            legacy_evidence["combining_runs"] += detection.combining_runs
-            legacy_evidence["combining_marks"] += detection.combining_marks
-            legacy_evidence["dotless"] += detection.dotless
-            legacy_evidence["spacing_diacritics"] += detection.spacing_diacritics
-            legacy_evidence["spacing_word_internal"] += detection.spacing_word_internal
-            legacy_evidence["replacement_characters"] += (
-                detection.replacement_characters
-            )
-        if legacy_targets:
-            add(
-                "repair-legacy-unicode",
-                legacy_targets,
-                dict(legacy_evidence),
-                obligation=unicode_mode == "repair",
-            )
-
-    for page_number, page_elements in by_page.items():
-        # A slide's own heading opens the slide whatever its box, folding on
-        # or off: a picture whose crop grew above-left of it would otherwise
-        # be read first (slides.py, _absorb_near_pictures). The deck title has
-        # no box, so it is never positioned.
-        positioned = [
-            item for item in page_elements
-            if _normalized_element_bbox(item, page_sizes) is not None
-            and not is_slide_heading(item)
-        ]
-        if len(positioned) > 1:
-            current = sorted(positioned, key=lambda item: item.reading_order)
-            boxes = [_normalized_element_bbox(item, page_sizes) for item in current]
-            order = xycut_order([box for box in boxes if box is not None])
-            if order != list(range(len(current))):
-                reordered_ids = [current[index].id for index in order]
-                add(
-                    "refine-reading-order",
-                    current,
-                    {
-                        "page_number": page_number,
-                        "order_before": [item.id for item in current],
-                        "order_after": reordered_ids,
-                    },
-                )
-
-        text_elements = [
-            item for item in page_elements
-            if item.text and item.type not in {"formula", "table", "picture"}
-        ]
-        if not text_elements:
-            continue
-        blocks = [
-            DiffBlock(
-                md=item.text or "",
-                kind="text",
-                box=_normalized_element_bbox(item, page_sizes),
-                text=item.text or "",
-                type=item.type,
-                role=(
-                    "header" if item.type == "page_header"
-                    else "footer" if item.type == "page_footer"
-                    else "page_number" if item.type == "page_number"
-                    else None
-                ),
-            )
-            for item in text_elements
-        ]
-
-        verse_stats: Counter = Counter()
-        verse_blocks(blocks, verse_stats, "manifest", 300, "records")
-        if verse_stats.get("verse-manifest-split", 0):
-            add(
-                "chunk-verse",
-                text_elements,
-                {"chunks": verse_stats["verse-manifest-chunks"]},
-            )
-
-        line_stats: Counter = Counter()
-        extract_line_numbers(blocks, line_stats, "manifest")
-        if line_stats.get("line-numbers-manifest-count", 0):
-            add(
-                "extract-line-numbers",
-                text_elements,
-                {"count": line_stats["line-numbers-manifest-count"]},
-            )
-
-        page_text = [item.text or "" for item in text_elements]
-        position = page_number_position(blocks)
-        if position is not None:
-            joined = tailjoin3(page_text, position, 50, 3, "keep")
-        else:
-            joined = join_tail(page_text, "end", 50, 3)
-        if joined != page_text:
-            tail_targets = text_elements[len(text_elements) - (len(page_text) - len(joined) + 1):]
-            add(
-                "join-tail-blocks",
-                tail_targets,
-                {"position": position, "before_count": len(page_text), "after_count": len(joined)},
-            )
-
-    stats = fusion_stats
-    if not isinstance(stats, dict) and isinstance(fusion_evidence, dict):
-        stats = fusion_evidence.get("stats")
-    if isinstance(fusion_evidence, dict):
-        pages = fusion_evidence.get("pages")
-        if isinstance(pages, list):
-            entries: list[tuple[int, dict[str, Any], list[ManifestElement]]] = []
-            for page_data in pages:
-                if not isinstance(page_data, dict):
-                    continue
-                page_stats = page_data.get("stats")
-                page_number = page_data.get("page_number")
-                page_targets = by_page.get(page_number, [])
-                if not isinstance(page_stats, dict) or not page_targets:
-                    continue
-                entries.append((page_number, page_stats, page_targets))
-            judged = _pages_for_vlm_judge(entries, fusion_judge_max_pages)
-            fused_targets: list[ManifestElement] = []
-            fused_pages: list[int] = []
-            for page_number, page_stats, page_targets in entries:
-                _add_fusion_observations(
-                    add,
-                    page_targets,
-                    page_stats,
-                    page_number,
-                    judge=page_number in judged,
-                )
-                if page_stats.get("provider_divergence"):
-                    fused_targets.extend(page_targets)
-                    fused_pages.append(page_number)
-            # One obligation per document: each fuse-providers step works on the
-            # whole document, so one per page repeated the same extraction.
-            if fused_targets:
-                add("fuse-providers", fused_targets, {"pages": fused_pages})
-    elif isinstance(stats, dict):
-        targets = [element for element in elements if element.text]
-        if targets:
-            _add_fusion_observations(
-                add,
-                targets,
-                stats,
-                None,
-                judge=fusion_judge_max_pages > 0 and _needs_vlm_judge(stats),
-            )
-            if stats.get("provider_divergence"):
-                add("fuse-providers", targets, {"page_number": None, "fusion_stats": stats})
-
-    observations: list[Observation] = []
-    obligations: list[Obligation] = []
-    seen: set[tuple[str, tuple[str, ...]]] = set()
-    for kind, targets, evidence, methods_override, emit_obligation in candidates:
-        target_ids = list(dict.fromkeys(item.id for item in targets))
-        key = (kind, tuple(target_ids))
-        if key in seen:
-            continue
-        seen.add(key)
-        rationale, default_methods = V23_OBLIGATION_BY_KIND[kind]
-        methods = list(methods_override or default_methods)
-        if kind == "refine-reading-order" and not secondary_extraction_available:
-            methods = [method for method in methods if method != "skeleton-order"]
-        suffix = _obligation_suffix(target_ids)
-        observations.append(
-            Observation(
-                id=f"observation-{kind}-{suffix}",
-                kind=f"{kind}-detected",
-                severity="warning",
-                message=rationale,
-                target_ids=target_ids,
-                evidence=evidence,
-            )
-        )
-        if not emit_obligation:
-            continue
-        obligations.append(
-            Obligation(
-                id=f"obligation-{kind}-{suffix}",
-                kind=kind,
-                target_ids=target_ids,
-                admissible_methods=methods,
-                method_costs={
-                    method: DEFAULT_METHOD_COSTS.get(method, 50)
-                    for method in methods
-                },
-                rationale=rationale,
-            )
-        )
-    return observations, obligations
-
-
-#: Longest id suffix spelled out from the target ids; past it the suffix is a
-#: digest, since a document-level obligation targets every element of every
-#: divergent page and its id goes into the manifest, the PDDL problem and plan.
-MAX_ID_SUFFIX = 80
-
-
-def _obligation_suffix(target_ids: list[str]) -> str:
-    suffix = "-".join(item.removeprefix("element-") for item in target_ids)
-    if len(suffix) <= MAX_ID_SUFFIX:
-        return suffix
-    digest = hashlib.sha256("\n".join(target_ids).encode("utf-8")).hexdigest()
-    return f"{len(target_ids)}-targets-{digest[:12]}"
-
-
-#: Methods of an adjudicate-page obligation. The deterministic router already
-#: ran on the evidence (``route``), and re-running it as agreement-rule would
-#: only repeat its answer, so the obligation goes straight to the VLM judge.
-VLM_JUDGE_METHODS = ["vlm-pairwise-judge", "human-review"]
-
-
-def _needs_vlm_judge(stats: dict[str, Any]) -> bool:
-    """Whether the deterministic router leaves the page to the VLM judge.
-
-    ``decide_v1`` settles a page from a structural fact (one side nearly empty,
-    a table or formula only one provider found) or keeps docling by default;
-    only its preference rules, where both providers have a table or a formula
-    (``both_table->mineru``, ``both_formula->mineru``), are worth a model call,
-    and only when the two pages differ (``provider_divergence``, over all the
-    page's content: ``text_divergence`` leaves tables and formulas out, so a
-    page whose prose matches and whose tables differ would never be judged).
-    Evidence recorded before the router ran has no ``route`` and stays eligible
-    on ``text_divergence``, as before.
-    """
-    route = stats.get("route")
-    if route is None:
-        return bool(stats.get("text_divergence"))
-    if stats.get("route_reason") == "structure_ambiguous":
-        return True
-    return (
-        bool(stats.get("provider_divergence"))
-        and route != "docling"
-        and str(stats.get("route_reason", "")).startswith("both_")
+    return _inspect_document_needs(
+        elements,
+        obligation_specs=V23_OBLIGATION_BY_KIND,
+        method_costs=DEFAULT_METHOD_COSTS,
+        page_sizes=page_sizes,
+        fusion_evidence=fusion_evidence,
+        fusion_stats=fusion_stats,
+        fusion_judge_max_pages=fusion_judge_max_pages,
+        legacy_unicode_repair=legacy_unicode_repair,
+        secondary_extraction_available=secondary_extraction_available,
     )
 
 
-def _pages_for_vlm_judge(
-    entries: list[tuple[int, dict[str, Any], list[ManifestElement]]],
-    budget: int,
-) -> set[int]:
-    """The ``budget`` ambiguous pages the providers disagree on the most.
-
-    Ranked by ``similarity``, the measure ``_needs_vlm_judge`` gates on
-    (``text_similarity`` for evidence recorded before the router ran).
-    """
-    ambiguous = sorted(
-        (
-            float(
-                stats.get("similarity" if "route" in stats else "text_similarity", 0.0)
-            ),
-            page_number,
-        )
-        for page_number, stats, _ in entries
-        if isinstance(page_number, int) and _needs_vlm_judge(stats)
-    )
-    return {page_number for _, page_number in ambiguous[: max(budget, 0)]}
-
-
-def _add_fusion_observations(
-    add: Any,
-    targets: list[ManifestElement],
-    stats: dict[str, Any],
-    page_number: int | None,
-    *,
-    judge: bool,
-) -> None:
-    """Per-page fusion needs; ``fuse-providers`` is emitted once by the caller."""
-    if not stats:
-        return
-    if judge:
-        add(
-            "adjudicate-page",
-            targets,
-            {"page_number": page_number, "fusion_stats": stats},
-            VLM_JUDGE_METHODS,
-        )
-    elif stats.get("route_reason") == "structure_ambiguous":
-        add(
-            "adjudicate-page",
-            targets,
-            {"page_number": page_number, "fusion_stats": stats},
-            ["human-review"],
-        )
-    if any(key.startswith("dropped-") and value for key, value in stats.items()):
-        add("rescue-omitted-block", targets, {"page_number": page_number, "fusion_stats": stats})
-    if stats.get("table_divergence"):
-        table_targets = [item for item in targets if item.type == "table"]
-        if table_targets:
-            add(
-                "select-table-source",
-                table_targets,
-                {"page_number": page_number, "fusion_stats": stats},
-            )
-    cut_count = stats.get("repetition_tokens_cut", 0)
-    if cut_count:
-        add(
-            "guard-repetition",
-            targets,
-            {"page_number": page_number, "tokens_cut": cut_count},
-        )
-
-
-def _normalized_element_bbox(
-        element: ManifestElement,
-        page_sizes: dict[int, tuple[float | None, float | None]] | None,
-) -> tuple[float, float, float, float] | None:
-        box = _oriented_bbox(element)
-        if box is None or element.page_number is None or page_sizes is None:
-            return None
-        size = page_sizes.get(element.page_number)
-        if size is None:
-            return None
-        return box.page_fractions(*size)
+#: Historical name kept for callers and tests written during the v2.3 migration.
+_derive_v23_processing_needs = inspect_document_needs
 
 
 def _append_processing_needs(
