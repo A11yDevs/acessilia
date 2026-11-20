@@ -487,9 +487,7 @@ def _select_routed_and_missing(
         if (entry.get("stats") or {}).get("route") == "mineru"
     }
     routed = {
-        number
-        for number in preferred
-        if isinstance(number, int) and secondary_by_page.get(number)
+        number for number in preferred if secondary_by_page.get(number)
     }
     missing = tuple(sorted(preferred - routed, key=str))
     return routed, missing
@@ -642,9 +640,9 @@ def apply_page_routes(
 
 
 __all__ = [
-    "PageRouteResult",
     "STRUCTURAL_TYPES",
     "TEXT_KINDS",
+    "PageRouteResult",
     "adopt_elements",
     "apply_page_routes",
     "element_to_canonical_block",

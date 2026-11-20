@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
+import importlib
 
+import pytest
 from docstruct.fusion import payload as fusion_payload
 from docstruct.fusion.payload import (
     STRUCTURAL_TYPES,
@@ -102,12 +103,15 @@ class TestPageSimilarity:
             ("Short alpha beta gamma", "Short alpha delta gamma"),
             ("Completely unrelated text", "Another different passage altogether"),
             ("<table><tr><td>A</td></tr></table>", "A"),
+            # Half-rounding boundary at 4 decimals (0.01875): must match bit for bit.
+            ("a" * 3 + "b" * 157, "a" * 3 + "c" * 157),
         ]
         fast_scores = [page_similarity(a, b) for a, b in pairs]
         monkeypatch.setattr(fusion_payload, "_rapidfuzz_fuzz", None)
         pure_scores = [page_similarity(a, b) for a, b in pairs]
         for fast, pure in zip(fast_scores, pure_scores, strict=True):
-            assert fast == pytest.approx(pure, abs=1e-12)
+            assert fast == pure
+            assert round(fast, 4) == round(pure, 4)
 
 
 class TestBlockConversionAndSignatures:
@@ -182,7 +186,7 @@ class TestBlockConversionAndSignatures:
         assert "text" in TEXT_KINDS
 
     def test_top_level_docstruct_fusion_reexports(self) -> None:
-        import docstruct.fusion as fusion_pkg
+        fusion_pkg = importlib.import_module("docstruct.fusion")
 
         assert fusion_pkg.fuse_extraction_payloads is fuse_extraction_payloads
         assert fusion_pkg.route_pages is route_pages
@@ -473,3 +477,16 @@ class TestRoutePagesAndApplyPageRoutes:
         )
         assert list(replaced) == [2]
         assert payload["document"]["pages"][1]["element_ids"] == ["mineru-s2", "mineru-s3"]
+
+    def test_float_page_number_in_evidence_routes_matching_integer_page(self) -> None:
+        evidence = [
+            {"page_number": 1, "stats": {"route": "docling"}},
+            {"page_number": 2.0, "stats": {"route": "mineru"}},
+        ]
+        result = route_pages(
+            self.PRIMARY, self.SECONDARY, evidence, secondary_provider="mineru"
+        )
+        assert result.routed_pages == (2.0,)
+        assert result.missing_pages == ()
+        assert [e["id"] for e in result.replaced[2]] == ["p2"]
+        assert evidence[1]["stats"]["applied"] == "mineru"
