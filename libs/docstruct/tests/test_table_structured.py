@@ -31,11 +31,12 @@ def test_rows_look_like_placeholder():
 
 
 def test_table_ast_has_structured_content():
-    assert table_ast_has_structured_content(None) is False
-    assert table_ast_has_structured_content({}) is False
+    assert table_ast_has_structured_content(None, placeholder="Detected table") is False
+    assert table_ast_has_structured_content({}, placeholder="Detected table") is False
     placeholder_ast = {"body": [{"cells": [{"text": "Detected table"}]}]}
     assert table_ast_has_structured_content(placeholder_ast, placeholder="Detected table") is False
-    assert table_ast_has_structured_content(placeholder_ast) is True
+    single_cell = {"body": [{"cells": [{"text": "Only cell"}]}]}
+    assert table_ast_has_structured_content(single_cell, placeholder="Detected table") is True
     real_ast = {
         "header": [{"cells": [{"text": "A"}, {"text": "B"}]}],
         "body": [{"cells": [{"text": "1"}, {"text": "2"}]}],

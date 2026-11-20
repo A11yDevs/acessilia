@@ -23,7 +23,12 @@ from docstruct.fusion.hf_end import (
     move_body_hf_to_tail,
     move_hf_to_end,
 )
-from docstruct.fusion.noise import is_junk, is_legitimate_text, quality
+from docstruct.fusion.noise import (
+    MIN_LEGITIMATE_QUALITY,
+    is_junk,
+    is_legitimate_text,
+    quality,
+)
 from docstruct.fusion.oracle import (
     best_score,
     gt_text_blocks,
@@ -90,6 +95,7 @@ from docstruct.fusion.verse import (
 __all__ = [
     "DEFAULT_MIN_SKELETON_MATCH",
     "DiffBlock",
+    "MIN_LEGITIMATE_QUALITY",
     "ProviderBlocks",
     "block_to_diff",
     "blocks",

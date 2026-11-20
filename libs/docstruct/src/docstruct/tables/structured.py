@@ -40,9 +40,14 @@ def rows_look_like_placeholder(
 
 
 def table_ast_has_structured_content(
-    table_ast: Any, *, placeholder: str | None = None
+    table_ast: Any, *, placeholder: str
 ) -> bool:
-    """Whether ``table_ast`` holds real table cells rather than a single placeholder cell."""
+    """Whether ``table_ast`` holds real table cells rather than a single placeholder cell.
+
+    ``placeholder`` is required because the label the core writes into a table
+    it could not read is localized: a default here would answer the opposite of
+    ``_table_element_has_structured_content`` for a table made only of it.
+    """
     if not isinstance(table_ast, dict):
         return False
     rows = raw_rows_from_table_ast(table_ast)
@@ -51,7 +56,7 @@ def table_ast_has_structured_content(
     width = max((len(row) for row in rows), default=0)
     if len(rows) >= 2 and width >= 2:
         return True
-    if placeholder is not None and rows_look_like_placeholder(rows, placeholder):
+    if rows_look_like_placeholder(rows, placeholder):
         return False
     return True
 
@@ -100,6 +105,11 @@ def normalize_strict_table_ast(raw: Any) -> dict[str, Any] | None:
     with ``header``/``body``/``footer`` sections whose cells explicitly carry a
     ``text`` key, coerces cell text with ``str(...).strip()``, and returns
     ``None`` unless ``body`` is non-empty.
+
+    A span is kept only when it is a real ``int``: a ``rowspan``/``colspan``
+    carrying a JSON boolean is dropped. The core's ``_table_ast_from_metadata``
+    kept it through ``isinstance(span, int)``; the stricter rule here is
+    deliberate.
     """
     if not isinstance(raw, dict):
         return None
