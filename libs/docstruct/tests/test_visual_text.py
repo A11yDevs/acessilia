@@ -10,6 +10,7 @@ from docstruct.visual_text import (
     MAX_CONTEXT_ITEM_CHARS,
     MAX_CONTEXT_ITEMS,
     MAX_CONTEXT_TOTAL_CHARS,
+    SCENE_TEXT_TRANSCRIBED_SHARE,
     analyze_visual_text_ownership,
     collect_picture_context,
     deduplicate_picture_description,
@@ -21,6 +22,7 @@ from docstruct.visual_text import (
     is_scene_ocr_collection,
     is_scene_text_covered,
     is_scene_text_fragment,
+    scene_text_residue,
 )
 
 #: The 41 OCR fragments extracted from IMG-20261108-WA0017.jpg (#398).
@@ -329,6 +331,53 @@ def test_is_confirmed_logo_description(
         is_confirmed_logo_description(description, mentioned, described=described)
         is expected
     )
+
+
+def test_scene_text_residue_keeps_every_meaningful_fragment_without_a_description() -> None:
+    """Vision failure or dry run: meaningful fragments are kept once, noise is dropped."""
+    residue = scene_text_residue(
+        ["MINHA GENTE", "R:T", "\u4e2d", "PAZ NO MUNDO", "MINHA GENTE"],
+        None,
+        described=False,
+    )
+    assert residue == ("MINHA GENTE", "PAZ NO MUNDO")
+
+
+def test_scene_text_residue_drops_misreads_when_the_description_transcribes_the_scene() -> None:
+    """A description covering most fragments transcribes the scene; the uncovered rest is OCR misreading."""
+    description = (
+        "Painted bricks with 'Favela Vive', 'Minha Gente', 'Vila Isabel', "
+        "'Zeca Pagodinho' and 'Paz no Mundo'."
+    )
+    fragments = [
+        "FAVELA VIVE",
+        "MINHA GENTE",
+        "VILA ISABEL",
+        "ZECA PAGODINHO",
+        "PAZ NO MUNDO",
+        "OPORQUE PREFERE",
+    ]
+    assert scene_text_residue(fragments, description, described=True) == ()
+
+
+def test_scene_text_residue_keeps_uncovered_fragments_of_a_generic_description() -> None:
+    """A description that covers less than the transcription share keeps what it omits."""
+    fragments = ["FAVELA VIVE", "PAZ NO MUNDO", "VILA ISABEL"]
+    description = "A night photo of a painted installation reading 'Vila Isabel'."
+    residue = scene_text_residue(fragments, description, described=True)
+    assert 1 / 3 < SCENE_TEXT_TRANSCRIBED_SHARE
+    assert residue == ("FAVELA VIVE", "PAZ NO MUNDO")
+
+
+def test_scene_text_residue_uses_mentioned_elements_as_coverage() -> None:
+    """Text the vision model lists in ``mentioned_elements`` counts as conveyed."""
+    residue = scene_text_residue(
+        ["FAVELA VIVE", "PAZ NO MUNDO"],
+        "A colorful art installation.",
+        ["Favela Vive", "Paz no Mundo"],
+        described=True,
+    )
+    assert residue == ()
 
 
 @pytest.mark.parametrize(

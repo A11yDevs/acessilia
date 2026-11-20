@@ -9,9 +9,10 @@ visual regions on a page (#263, #325, #398):
   tables, formulas, code); preserved as accessible text.
 - ``scene_text``: OCR fragments read off a photograph, illustration, or map
   (signage, painted inscriptions, scattered labels on a standalone image or
-  geometrically contained inside a picture); associated with their owner
-  picture and omitted as separate blocks only when the picture has a usable
-  visual description that covers the fragment.
+  geometrically contained inside a picture). Text inside an image belongs to
+  the image: it is never emitted as a document-level block. What the image's
+  description does not already convey is carried by the image itself (see
+  :func:`scene_text_residue`).
 - ``figure_label``: short labels folded into a chart or diagram by slide or
   figure structuring; preserved within the figure's description.
 - ``caption``: independent figure/table caption or source line; preserved as
@@ -54,6 +55,12 @@ Box = tuple[float, float, float, float]
 MAX_CONTEXT_ITEM_CHARS = 160
 MAX_CONTEXT_TOTAL_CHARS = 480
 MAX_CONTEXT_ITEMS = 6
+
+#: Share of an owner picture's meaningful scene-text fragments that its
+#: description must cover for the description to count as a transcription of
+#: the scene; the uncovered remainder is then OCR misreading, not content
+#: (#398: 39 of 42 real fragments covered, the rest garbled).
+SCENE_TEXT_TRANSCRIBED_SHARE = 0.6
 
 #: Media-inspection natures whose pages are documents, not scenes: their short
 #: text lines (form labels, headings) are document text even on a photo.
@@ -320,6 +327,51 @@ def is_scene_text_covered(
         1 for tok in frag_tokens if tok in desc_tokens or (len(tok) >= 4 and tok in spaceless_desc)
     )
     return matched * 2 >= len(frag_tokens)
+
+
+def scene_text_residue(
+    fragments: Iterable[str | None],
+    description: str | None,
+    mentioned_elements: Iterable[str] = (),
+    *,
+    described: bool,
+) -> tuple[str, ...]:
+    """The scene text an image must still carry beyond its description (#398, #653).
+
+    Scene text is never a document block; this decides what of it the image
+    keeps, once each, in reading order:
+
+    - OCR noise and placeholders are dropped;
+    - without a usable description (vision failure, dry run) every meaningful
+      fragment is kept, so the text is not lost;
+    - fragments the description covers are dropped;
+    - when the description covers at least ``SCENE_TEXT_TRANSCRIBED_SHARE`` of
+      the meaningful fragments, it transcribes the scene and the uncovered
+      remainder is OCR misreading (``WUNIDADES``, ``TINHO DAVILA``): dropped;
+    - otherwise (a generic description) the uncovered fragments are kept.
+    """
+    meaningful: list[str] = []
+    for fragment in fragments:
+        normalized = " ".join((fragment or "").split())
+        if (
+            normalized
+            and not is_ocr_noise(normalized)
+            and not is_placeholder_text(normalized)
+            and normalized not in meaningful
+        ):
+            meaningful.append(normalized)
+    if not meaningful or not described:
+        return tuple(meaningful)
+    mentioned = tuple(str(item) for item in mentioned_elements)
+    uncovered = [
+        fragment
+        for fragment in meaningful
+        if not is_scene_text_covered(fragment, description, mentioned)
+    ]
+    covered_share = 1 - len(uncovered) / len(meaningful)
+    if covered_share >= SCENE_TEXT_TRANSCRIBED_SHARE:
+        return ()
+    return tuple(uncovered)
 
 
 def _is_standalone_scene_fragment(text: str) -> bool:
@@ -717,6 +769,7 @@ __all__ = [
     "MAX_CONTEXT_ITEMS",
     "MAX_CONTEXT_ITEM_CHARS",
     "MAX_CONTEXT_TOTAL_CHARS",
+    "SCENE_TEXT_TRANSCRIBED_SHARE",
     "PictureTextContext",
     "TextOwnership",
     "VisualTextRole",
@@ -731,4 +784,5 @@ __all__ = [
     "is_scene_ocr_collection",
     "is_scene_text_covered",
     "is_scene_text_fragment",
+    "scene_text_residue",
 ]

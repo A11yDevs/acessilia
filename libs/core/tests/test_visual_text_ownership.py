@@ -119,76 +119,230 @@ async def test_case_398_scene_ocr_fragments_including_list_items_are_suppressed_
     assert page["text"] == photo_description
 
 
-@pytest.mark.asyncio
-async def test_case_398_generic_description_preserves_unmentioned_scene_text() -> None:
-    """Note 2: When the VLM returns a generic description that omits the inscriptions, they are not lost."""
-    elements = [
-        build_element("el-1", "paragraph", text="FAVELA VIVE"),
-        build_element("el-2", "paragraph", text="PAZ NO MUNDO"),
-    ]
-    elements[0].reading_order, elements[1].reading_order = 1, 2
-    manifest = build_manifest(elements, [])
-    manifest.pages = [
-        PageDescriptor(
-            page_number=1, width=800.0, height=600.0, element_ids=["el-1", "el-2"]
-        )
-    ]
-    RecordingVision.answers = {
-        "element-injected-picture-000003": _vision_answer(
-            "A colorful art installation photographed at night."
-        )
-    }
-
+async def _enrich_photo(
+    manifest,
+    *,
+    media_inspection: dict | None = None,
+) -> None:
     await picture_stage._enrich_picture_descriptions(
         manifest,
         Path("IMG-20261108-WA0017.jpg"),
         mode="medio",
-        media_inspection={"is_image": True, "requires_visual_inspection": True},
+        media_inspection=media_inspection
+        or {"is_image": True, "requires_visual_inspection": True},
         vision=vision_config(retry_pass_delay_seconds=0),
         toolbox=toolbox_config(),
         models=model_config(),
         region_cache=None,
     )
 
+
+def _photo_manifest(texts: list[str], *, element_type: str = "paragraph", language: str = "en"):
+    elements = [
+        build_element(f"el-{idx}", element_type, text=text)
+        for idx, text in enumerate(texts, start=1)
+    ]
+    for idx, element in enumerate(elements, start=1):
+        element.reading_order = idx
+    manifest = build_manifest(elements, [])
+    manifest.language = language
+    manifest.pages = [
+        PageDescriptor(
+            page_number=1,
+            width=1600.0,
+            height=739.0,
+            element_ids=[element.id for element in elements],
+        )
+    ]
+    picture_id = f"element-injected-picture-{len(elements) + 1:06d}"
+    return manifest, picture_id
+
+
+def _block_texts(page: dict) -> list[str]:
+    return [b.get("text") or b.get("alt_text") or "" for b in page["blocks"]]
+
+
+def _assert_no_scene_text_block(manifest, page: dict) -> None:
+    """Invariant (#398, #653): text owned by a picture is never a document-level block."""
+    owned = {
+        (el.text or "").strip()
+        for el in manifest.elements
+        if (el.metadata.get("visual_text_ownership") or {}).get("role") == "scene_text"
+    }
+    assert owned
+    for block in page["blocks"]:
+        if block["type"] != "image":
+            assert (block.get("text") or "").strip() not in owned
+
+
+#: The real OCR fragments and final description attached to issue #398
+#: (``IMG-20261108-WA0017.jpg``): 42 fragment lines, then the description.
+ISSUE_398_LINES = (
+    Path(__file__).parent / "fixtures" / "visual_text" / "issue_398_ocr_and_description.txt"
+).read_text(encoding="utf-8").splitlines()
+ISSUE_398_FRAGMENTS = ISSUE_398_LINES[:-1]
+ISSUE_398_DESCRIPTION = ISSUE_398_LINES[-1]
+
+
+@pytest.mark.asyncio
+async def test_case_398_real_ocr_and_description_emit_only_the_image() -> None:
+    """#398 golden case: the real 42 OCR fragments and description yield only the image description.
+
+    The three fragments the description does not mention (``WUNIDADES``,
+    ``TINHO DAVILA``, ``OPORQUE PREFERE``) are OCR misreads of inscriptions it
+    already transcribes; they are neither paragraphs nor appended to the alt.
+    """
+    assert len(ISSUE_398_FRAGMENTS) == 42
+    manifest, picture_id = _photo_manifest(ISSUE_398_FRAGMENTS, language="pt-BR")
+    RecordingVision.answers = {picture_id: _vision_answer(ISSUE_398_DESCRIPTION)}
+
+    await _enrich_photo(manifest)
+
     [page] = _manifest_pages_to_payload(manifest)
-    texts = [b.get("text") or b.get("alt_text") for b in page["blocks"]]
-    assert texts == [
-        "FAVELA VIVE",
-        "PAZ NO MUNDO",
-        "A colorful art installation photographed at night.",
+    assert [b["type"] for b in page["blocks"]] == ["image"]
+    assert page["blocks"][0]["alt_text"] == ISSUE_398_DESCRIPTION
+    _assert_no_scene_text_block(manifest, page)
+
+
+@pytest.mark.asyncio
+async def test_case_398_real_ocr_is_carried_once_by_the_image_when_vision_fails() -> None:
+    """#398: with no description, the real inscriptions stay with the image, once, never as a preamble."""
+    manifest, _picture_id = _photo_manifest(ISSUE_398_FRAGMENTS)
+
+    await _enrich_photo(manifest)
+
+    [page] = _manifest_pages_to_payload(manifest)
+    assert [b["type"] for b in page["blocks"]] == ["image"]
+    alt = page["blocks"][0]["alt_text"]
+    assert alt.startswith("Image without a text description. Text visible in the image: ")
+    for fragment in ("MINHA GENTE", "VILA ISABEL", "PAZ NO MUNDO", "MESTRE FULEIRO"):
+        assert alt.count(fragment) == 1
+    # Pure OCR noise (a stray CJK glyph, ``R:T``) is not carried.
+    assert "中" not in alt and "R:T" not in alt
+    _assert_no_scene_text_block(manifest, page)
+
+
+@pytest.mark.asyncio
+async def test_case_398_generic_description_carries_unmentioned_scene_text_in_alt_text() -> None:
+    """A generic description that omits the inscriptions keeps them, inside the image's alt text."""
+    manifest, picture_id = _photo_manifest(["FAVELA VIVE", "PAZ NO MUNDO"])
+    RecordingVision.answers = {
+        picture_id: _vision_answer("A colorful art installation photographed at night.")
+    }
+
+    await _enrich_photo(manifest)
+
+    [page] = _manifest_pages_to_payload(manifest)
+    assert _block_texts(page) == [
+        "A colorful art installation photographed at night. "
+        "Text visible in the image: FAVELA VIVE; PAZ NO MUNDO."
+    ]
+    _assert_no_scene_text_block(manifest, page)
+
+
+@pytest.mark.asyncio
+async def test_case_398_scene_text_follows_the_document_language() -> None:
+    """The sentence that carries scene text is written in the document's language."""
+    manifest, picture_id = _photo_manifest(["FAVELA VIVE", "PAZ NO MUNDO"], language="pt-BR")
+    RecordingVision.answers = {
+        picture_id: _vision_answer("Instalacao artistica colorida fotografada a noite.")
+    }
+
+    await _enrich_photo(manifest)
+
+    [page] = _manifest_pages_to_payload(manifest)
+    assert _block_texts(page) == [
+        "Instalacao artistica colorida fotografada a noite. "
+        "Texto vis\u00edvel na imagem: FAVELA VIVE; PAZ NO MUNDO."
     ]
 
 
 @pytest.mark.asyncio
 async def test_case_398_scene_ocr_is_preserved_once_without_duplication_when_vision_fails() -> None:
-    """Note 2: When the vision model fails to describe the photo, scene OCR is emitted once (never duplicated)."""
-    elements = [
-        build_element("el-1", "paragraph", text="MINHA GENTE"),
-        build_element("el-2", "paragraph", text="PAZ NO MUNDO"),
+    """When the vision model fails, scene OCR is carried once by the image, never as paragraphs."""
+    manifest, _picture_id = _photo_manifest(["MINHA GENTE", "PAZ NO MUNDO"])
+
+    await _enrich_photo(manifest)
+
+    [page] = _manifest_pages_to_payload(manifest)
+    assert _block_texts(page) == [
+        "Image without a text description. Text visible in the image: MINHA GENTE; PAZ NO MUNDO."
     ]
-    elements[0].reading_order, elements[1].reading_order = 1, 2
-    manifest = build_manifest(elements, [])
+    _assert_no_scene_text_block(manifest, page)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("element_type", ["paragraph", "list_item", "heading"])
+@pytest.mark.parametrize(
+    "description",
+    [
+        None,
+        "A colorful art installation photographed at night.",
+        "Painted bricks reading 'Favela Vive' and 'Paz no Mundo'.",
+    ],
+)
+async def test_scene_text_owned_by_a_picture_is_never_a_document_block(
+    element_type: str, description: str | None
+) -> None:
+    """Property: whatever the description and element type, owned scene text never becomes a block."""
+    manifest, picture_id = _photo_manifest(
+        ["FAVELA VIVE", "PAZ NO MUNDO", "SAMBA"], element_type=element_type
+    )
+    if description is not None:
+        RecordingVision.answers = {picture_id: _vision_answer(description)}
+
+    await _enrich_photo(manifest)
+
+    [page] = _manifest_pages_to_payload(manifest)
+    assert [b["type"] for b in page["blocks"]] == ["image"]
+    _assert_no_scene_text_block(manifest, page)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("nature", ["scanned_page", "paginated_document"])
+async def test_photographed_document_page_keeps_its_short_lines_as_document_text(nature: str) -> None:
+    """Role by artifact nature: a photographed form's uppercase labels are document text, not scene text."""
+    manifest, picture_id = _photo_manifest(["NAME", "ADDRESS", "DATE OF BIRTH"])
+    RecordingVision.answers = {picture_id: _vision_answer("A printed registration form.")}
+
+    await _enrich_photo(
+        manifest,
+        media_inspection={
+            "is_image": True,
+            "requires_visual_inspection": True,
+            "artifact_nature": nature,
+        },
+    )
+
+    assert all(
+        "visual_text_ownership" not in el.metadata
+        for el in manifest.elements
+        if el.type != "picture"
+    )
+    [page] = _manifest_pages_to_payload(manifest)
+    assert _block_texts(page)[:3] == ["NAME", "ADDRESS", "DATE OF BIRTH"]
+
+
+def test_slide_with_uppercase_title_and_picture_preserves_the_title() -> None:
+    """Note 1: an uppercase slide title beside a described picture stays document text."""
+    title = build_element("title-1", "heading", text="RESULTS")
+    pic = build_element(
+        "pic-1",
+        "picture",
+        text="Bar chart of accuracy per model.",
+        metadata={"vision_description_complete": True},
+    )
+    title.reading_order, pic.reading_order = 1, 2
+    manifest = build_manifest([title, pic], [])
     manifest.pages = [
         PageDescriptor(
-            page_number=1, width=800.0, height=600.0, element_ids=["el-1", "el-2"]
+            page_number=1, width=WIDTH, height=HEIGHT, element_ids=["title-1", "pic-1"]
         )
     ]
 
-    await picture_stage._enrich_picture_descriptions(
-        manifest,
-        Path("IMG-20261108-WA0017.jpg"),
-        mode="medio",
-        media_inspection={"is_image": True, "requires_visual_inspection": True},
-        vision=vision_config(retry_pass_delay_seconds=0),
-        toolbox=toolbox_config(),
-        models=model_config(),
-        region_cache=None,
-    )
-
     [page] = _manifest_pages_to_payload(manifest)
-    texts = [b.get("text") or b.get("alt_text") for b in page["blocks"]]
-    assert texts.count("MINHA GENTE") == 1
-    assert texts.count("PAZ NO MUNDO") == 1
+    assert [b["type"] for b in page["blocks"]] == ["heading", "image"]
+    assert _block_texts(page) == ["RESULTS", "Bar chart of accuracy per model."]
 
 
 @pytest.mark.asyncio
@@ -480,3 +634,54 @@ def test_scanned_document_ocr_paragraphs_are_preserved_in_payload() -> None:
         page["blocks"][1]["text"]
         == "The derivative measures the instantaneous rate of change of a function."
     )
+
+
+def test_scene_text_of_a_letterhead_logo_stays_in_the_flow() -> None:
+    """A logo merged into a letterhead is not rendered as an image, so text inside it is not dropped."""
+    line_1 = _placed(
+        "line-1",
+        "page_header",
+        "University of Brasilia",
+        LINE_1_BOX,
+        metadata=FURNITURE,
+        reading_order=1,
+    )
+    logo = _placed(
+        "logo",
+        "picture",
+        "University logo with converging arrows.",
+        LOGO_BOX,
+        metadata={"vision_description_complete": True},
+        reading_order=2,
+    )
+    inside_logo = _placed(
+        "inside-logo",
+        "paragraph",
+        "CAMPUS DARCY",
+        (66.0, 700.0, 112.0, 696.0),
+        reading_order=3,
+    )
+    line_2 = _placed(
+        "line-2",
+        "page_header",
+        "Department of Mathematics",
+        LINE_2_BOX,
+        metadata=FURNITURE,
+        reading_order=4,
+    )
+    body = _placed(
+        "body",
+        "paragraph",
+        "Lecture notes on calculus.",
+        (72, 650, 540, 600),
+        reading_order=5,
+    )
+    manifest = build_manifest([line_1, logo, inside_logo, line_2, body], [])
+    manifest.language = "en"
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+
+    [page] = _manifest_pages_to_payload(manifest)
+    texts = _block_texts(page)
+
+    assert texts[0].startswith("Logo. ")
+    assert "CAMPUS DARCY" in texts

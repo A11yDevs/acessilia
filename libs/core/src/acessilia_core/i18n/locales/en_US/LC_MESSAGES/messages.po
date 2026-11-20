@@ -1085,6 +1085,10 @@ msgstr "Image without a text description."
 msgid "Logo. {lines}."
 msgstr "Logo. {lines}."
 
+#, python-brace-format
+msgid "Text visible in the image: {fragments}."
+msgstr "Text visible in the image: {fragments}."
+
 msgid "image"
 msgstr "image"
 

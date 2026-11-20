@@ -320,6 +320,7 @@ from acessilia_core.export.messages import (
 from acessilia_core.pipeline.payload import (
     MSG_PICTURES_NOT_DESCRIBED,
     MSG_LETTERHEAD_TEXT,
+    MSG_SCENE_TEXT_IN_PICTURE,
     MSG_TABLES_NOT_READ,
 )
 from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
@@ -777,6 +778,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_HTML_TABLE_OF_CONTENTS,
     MSG_UNDESCRIBED_PICTURE_ALT,
     MSG_LETTERHEAD_TEXT,
+    MSG_SCENE_TEXT_IN_PICTURE,
     MSG_OBJECT_MARKER_IMAGE,
     MSG_OBJECT_MARKER_TABLE,
     MSG_OBJECT_MARKER_FORMULA,
@@ -1685,6 +1687,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_HTML_TABLE_OF_CONTENTS: "Sumário",
         MSG_UNDESCRIBED_PICTURE_ALT: "Imagem sem descrição textual.",
         MSG_LETTERHEAD_TEXT: "Logotipo. {lines}.",
+        MSG_SCENE_TEXT_IN_PICTURE: "Texto visível na imagem: {fragments}.",
         MSG_OBJECT_MARKER_IMAGE: "imagem",
         MSG_OBJECT_MARKER_TABLE: "tabela",
         MSG_OBJECT_MARKER_FORMULA: "fórmula",
