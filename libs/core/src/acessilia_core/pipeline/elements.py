@@ -10,6 +10,7 @@ passing the core's localized placeholder label explicitly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from docstruct.blocks.lists import (
@@ -18,6 +19,8 @@ from docstruct.blocks.lists import (
 from docstruct.geometry import OrientedBox
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
+)
+from docstruct.tables.ast import (
     table_ast_from_rows,
 )
 from docstruct.tables.structured import (
@@ -26,11 +29,11 @@ from docstruct.tables.structured import (
 )
 from docstruct.text.code_reflow import normalize_code_text
 
+from acessilia_core.i18n import t
 from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
 )
-from acessilia_core.i18n import t
 
 #: Canonical English msgid for the alt text of a picture the vision model left
 #: undescribed; why it was left so goes to the operator, not the reader.
@@ -109,10 +112,13 @@ def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
     ]
 
 
-def _element_to_block(
-    element: ManifestElement, callout_titles: dict[str, str] | None = None
-) -> dict[str, Any]:
-    provenance = element.provenance[0] if element.provenance else None
+_WARNING_CALLOUT_TYPES = frozenset({"warning", "aviso", "importante", "caution"})
+_NON_CALLOUT_SLIDE_ROLES = frozenset({"slide_heading", "deck_title"})
+
+_BlockFieldBuilder = Callable[[ManifestElement, str, dict[str, Any]], dict[str, Any]]
+
+
+def _build_block_metadata(element: ManifestElement) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "raw_label": element.raw_label,
         "source_ref": element.source_ref,
@@ -122,102 +128,140 @@ def _element_to_block(
     }
     if element.metadata:
         metadata.update(element.metadata)
-    metadata = _normalize_metadata_links(metadata)
+    return _normalize_metadata_links(metadata)
 
-    source_location: dict[str, Any] = {}
-    if provenance is not None:
-        source_location["page_number"] = provenance.page_number
-        if provenance.bbox is not None:
-            source_location["bbox"] = {
-                "left": provenance.bbox.left,
-                "top": provenance.bbox.top,
-                "right": provenance.bbox.right,
-                "bottom": provenance.bbox.bottom,
-            }
 
-    text = element.text or ""
+def _build_source_location(element: ManifestElement) -> dict[str, Any]:
+    provenance = element.provenance[0] if element.provenance else None
+    if provenance is None:
+        return {}
+    location: dict[str, Any] = {"page_number": provenance.page_number}
+    if provenance.bbox is not None:
+        location["bbox"] = {
+            "left": provenance.bbox.left,
+            "top": provenance.bbox.top,
+            "right": provenance.bbox.right,
+            "bottom": provenance.bbox.bottom,
+        }
+    return location
+
+
+def _callout_block_fields(
+    metadata: dict[str, Any],
+    text: str,
+    callout_titles: dict[str, str] | None,
+) -> dict[str, Any] | None:
     callout_id = metadata.get("callout_id")
     callout_role = str(metadata.get("callout_role", "")).lower()
+    if (
+        not callout_id
+        or callout_role == "title"
+        or metadata.get("slide_role") in _NON_CALLOUT_SLIDE_ROLES
+    ):
+        return None
     callout_type = str(metadata.get("callout_type", "note")).lower()
     callout_title = (callout_titles or {}).get(str(callout_id)) or str(
         metadata.get("callout_title", "")
     ).strip()
-    callout_block_type = "warning" if callout_type in {"warning", "aviso", "importante", "caution"} else "note"
-    block: dict[str, Any] = {
-        "id": element.id,
-        "source_location": source_location,
-        "metadata": metadata,
+    block_type = "warning" if callout_type in _WARNING_CALLOUT_TYPES else "note"
+    return {"type": block_type, "title": callout_title, "text": text}
+
+
+def _build_heading_fields(
+    element: ManifestElement, text: str, _metadata: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "type": "heading",
+        "level": 1 if element.type == "title" else max(1, element.hierarchy_level),
+        "text": text or element.raw_label,
     }
 
-    if (
-        callout_id
-        and callout_role != "title"
-        and metadata.get("slide_role") not in {"slide_heading", "deck_title"}
-    ):
-        block.update(
-            {
-                "type": callout_block_type,
-                "title": callout_title,
-                "text": text,
-            }
-        )
+
+def _build_list_item_fields(
+    _element: ManifestElement, text: str, metadata: dict[str, Any]
+) -> dict[str, Any]:
+    ordered = bool(metadata.get("enumerated"))
+    fields: dict[str, Any] = {
+        "type": "list",
+        "ordered": ordered,
+        "items": [text] if text else [],
+    }
+    numbering = marker_numbering(metadata.get("marker")) if ordered else None
+    if numbering is not None:
+        start, style = numbering
+        if start > 1:
+            fields["start"] = start
+        if style != "decimal":
+            fields["numbering"] = style
+    return fields
+
+
+def _build_table_fields(
+    _element: ManifestElement, text: str, metadata: dict[str, Any]
+) -> dict[str, Any]:
+    table_ast = _table_ast_from_metadata(metadata)
+    rows = _rows_from_table_ast(table_ast) if table_ast else None
+    if not rows:
+        rows = [[text]] if text else [[_TABLE_PLACEHOLDER_TEXT]]
+        if table_ast is None:
+            table_ast = table_ast_from_rows(rows)
+    return {"type": "table", "rows": rows, "table_ast": table_ast}
+
+
+def _build_picture_fields(
+    _element: ManifestElement, text: str, _metadata: dict[str, Any]
+) -> dict[str, Any]:
+    return {"type": "image", "alt_text": text or t(MSG_UNDESCRIBED_PICTURE_ALT)}
+
+
+def _build_code_fields(
+    _element: ManifestElement, text: str, _metadata: dict[str, Any]
+) -> dict[str, Any]:
+    return {"type": "code", "text": normalize_code_text(text)}
+
+
+def _build_formula_fields(
+    _element: ManifestElement, text: str, _metadata: dict[str, Any]
+) -> dict[str, Any]:
+    if text:
+        return {"type": "math", "text": text}
+    return {"type": "paragraph", "text": "Formula detectada."}
+
+
+def _build_paragraph_fields(
+    element: ManifestElement, text: str, _metadata: dict[str, Any]
+) -> dict[str, Any]:
+    return {"type": "paragraph", "text": text or element.raw_label}
+
+
+_BLOCK_BUILDERS: dict[str, _BlockFieldBuilder] = {
+    "title": _build_heading_fields,
+    "heading": _build_heading_fields,
+    "list_item": _build_list_item_fields,
+    "table": _build_table_fields,
+    "picture": _build_picture_fields,
+    "code": _build_code_fields,
+    "formula": _build_formula_fields,
+}
+
+
+def _element_to_block(
+    element: ManifestElement, callout_titles: dict[str, str] | None = None
+) -> dict[str, Any]:
+    metadata = _build_block_metadata(element)
+    block: dict[str, Any] = {
+        "id": element.id,
+        "source_location": _build_source_location(element),
+        "metadata": metadata,
+    }
+    text = element.text or ""
+    callout_fields = _callout_block_fields(metadata, text, callout_titles)
+    if callout_fields is not None:
+        block.update(callout_fields)
         return block
 
-    if element.type in {"title", "heading"}:
-        block.update(
-            {
-                "type": "heading",
-                "level": 1 if element.type == "title" else max(1, element.hierarchy_level),
-                "text": text or element.raw_label,
-            }
-        )
-    elif element.type == "list_item":
-        ordered = bool(metadata.get("enumerated"))
-        block.update(
-            {
-                "type": "list",
-                "ordered": ordered,
-                "items": [text] if text else [],
-            }
-        )
-        numbering = marker_numbering(metadata.get("marker")) if ordered else None
-        if numbering is not None:
-            start, style = numbering
-            if start > 1:
-                block["start"] = start
-            if style != "decimal":
-                block["numbering"] = style
-    elif element.type == "table":
-        table_ast = _table_ast_from_metadata(metadata)
-        rows = _rows_from_table_ast(table_ast) if table_ast else None
-        if not rows:
-            rows = [[text]] if text else [[_TABLE_PLACEHOLDER_TEXT]]
-            if table_ast is None:
-                table_ast = table_ast_from_rows(rows)
-        block.update(
-            {
-                "type": "table",
-                "rows": rows,
-                "table_ast": table_ast,
-            }
-        )
-    elif element.type == "picture":
-        block.update(
-            {
-                "type": "image",
-                "alt_text": text or t(MSG_UNDESCRIBED_PICTURE_ALT),
-            }
-        )
-    elif element.type == "code":
-        block.update({"type": "code", "text": normalize_code_text(text)})
-    elif element.type == "formula":
-        if text:
-            block.update({"type": "math", "text": text})
-        else:
-            block.update({"type": "paragraph", "text": "Formula detectada."})
-    else:
-        block.update({"type": "paragraph", "text": text or element.raw_label})
-
+    builder = _BLOCK_BUILDERS.get(element.type, _build_paragraph_fields)
+    block.update(builder(element, text, metadata))
     return block
 
 
