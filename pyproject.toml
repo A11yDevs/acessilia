@@ -111,3 +111,16 @@ known-first-party = [
     "frontend",
     "scripts",
 ]
+
+[tool.coverage.run]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+precision = 1
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
