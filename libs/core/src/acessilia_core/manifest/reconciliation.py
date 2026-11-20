@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from acessilia_core.i18n import t
 from acessilia_core.manifest.models import (
@@ -18,6 +19,16 @@ from acessilia_core.manifest.models import (
 )
 
 ObligationSpec = tuple[str, str, list[str]]
+
+
+@dataclass(frozen=True)
+class _ReconcilePlan:
+    current_kind: str
+    methods: list[str]
+    method_costs: Mapping[str, int]
+    rationale: str
+    obsolete_obligation_kinds: frozenset[str]
+    obsolete_observation_kinds: frozenset[str]
 
 
 def build_element_observation(
@@ -59,6 +70,31 @@ def build_element_obligation(
     )
 
 
+def _build_reconcile_plan(
+    *,
+    previous_type: str,
+    current_spec: ObligationSpec,
+    previous_spec: ObligationSpec | None,
+    type_bound_v23_kinds: Mapping[str, frozenset[str]],
+    method_costs: Mapping[str, int],
+) -> _ReconcilePlan:
+    current_kind, msgid, methods = current_spec
+    bound_kinds = type_bound_v23_kinds.get(previous_type, frozenset())
+    obsolete_obligations = set(bound_kinds)
+    obsolete_observations = {f"{kind}-detected" for kind in bound_kinds}
+    if previous_spec is not None:
+        obsolete_obligations.add(previous_spec[0])
+        obsolete_observations.add(f"{previous_type}-requires-processing")
+    return _ReconcilePlan(
+        current_kind=current_kind,
+        methods=methods,
+        method_costs=method_costs,
+        rationale=t(msgid),
+        obsolete_obligation_kinds=frozenset(obsolete_obligations),
+        obsolete_observation_kinds=frozenset(obsolete_observations),
+    )
+
+
 def _rewire_removed_dependencies(
     obligations: list[Obligation],
     *,
@@ -75,43 +111,41 @@ def _rewire_removed_dependencies(
 def _reconcile_element_obligations(
     obligations: list[Obligation],
     element: ManifestElement,
-    *,
-    obsolete_kinds: set[str],
-    current_kind: str,
-    methods: list[str],
-    method_costs: Mapping[str, int],
-    rationale: str,
+    plan: _ReconcilePlan,
 ) -> list[Obligation]:
     removed_ids: set[str] = set()
     retained: list[Obligation] = []
     has_current = False
     for obligation in obligations:
         if obligation.target_ids == [element.id]:
-            if obligation.kind == current_kind:
+            if obligation.kind == plan.current_kind:
                 has_current = True
-            if obligation.kind in obsolete_kinds:
+            if obligation.kind in plan.obsolete_obligation_kinds:
                 removed_ids.add(obligation.id)
                 continue
         retained.append(obligation)
 
-    new_obligation = build_element_obligation(
-        element,
-        kind=current_kind,
-        methods=methods,
-        method_costs=method_costs,
-        rationale=rationale,
-    )
+    suffix = element.id.removeprefix("element-")
+    default_id = f"obligation-{plan.current_kind}-{suffix}"
     if not has_current:
-        retained.append(new_obligation)
+        retained.append(
+            build_element_obligation(
+                element,
+                kind=plan.current_kind,
+                methods=plan.methods,
+                method_costs=plan.method_costs,
+                rationale=plan.rationale,
+            )
+        )
 
     replacement_id = next(
         (
             obligation.id
             for obligation in retained
             if obligation.target_ids == [element.id]
-            and obligation.kind == current_kind
+            and obligation.kind == plan.current_kind
         ),
-        new_obligation.id,
+        default_id,
     )
     _rewire_removed_dependencies(
         retained, removed_ids=removed_ids, replacement_id=replacement_id
@@ -122,10 +156,7 @@ def _reconcile_element_obligations(
 def _reconcile_element_observations(
     observations: list[Observation],
     element: ManifestElement,
-    *,
-    obsolete_kinds: set[str],
-    current_kind: str,
-    rationale: str,
+    plan: _ReconcilePlan,
 ) -> list[Observation]:
     current_observation_kind = f"{element.type}-requires-processing"
     retained: list[Observation] = []
@@ -134,13 +165,15 @@ def _reconcile_element_observations(
         if observation.target_ids == [element.id]:
             if observation.kind == current_observation_kind:
                 has_current = True
-            if observation.kind in obsolete_kinds:
+            if observation.kind in plan.obsolete_observation_kinds:
                 continue
         retained.append(observation)
 
     if not has_current:
         retained.append(
-            build_element_observation(element, kind=current_kind, rationale=rationale)
+            build_element_observation(
+                element, kind=plan.current_kind, rationale=plan.rationale
+            )
         )
     return retained
 
@@ -162,32 +195,18 @@ def reconcile_reclassified_element(
     if current_spec is None:
         return
 
-    previous_spec = obligation_by_type.get(previous_type)
-    current_kind, msgid, methods = current_spec
-    rationale = t(msgid)
-    bound_kinds = type_bound_v23_kinds.get(previous_type, frozenset())
-
-    obsolete_obligation_kinds = set(bound_kinds)
-    obsolete_observation_kinds = {f"{kind}-detected" for kind in bound_kinds}
-    if previous_spec is not None:
-        obsolete_obligation_kinds.add(previous_spec[0])
-        obsolete_observation_kinds.add(f"{previous_type}-requires-processing")
-
-    manifest.obligations = _reconcile_element_obligations(
-        manifest.obligations,
-        element,
-        obsolete_kinds=obsolete_obligation_kinds,
-        current_kind=current_kind,
-        methods=methods,
+    plan = _build_reconcile_plan(
+        previous_type=previous_type,
+        current_spec=current_spec,
+        previous_spec=obligation_by_type.get(previous_type),
+        type_bound_v23_kinds=type_bound_v23_kinds,
         method_costs=method_costs,
-        rationale=rationale,
+    )
+    manifest.obligations = _reconcile_element_obligations(
+        manifest.obligations, element, plan
     )
     manifest.observations = _reconcile_element_observations(
-        manifest.observations,
-        element,
-        obsolete_kinds=obsolete_observation_kinds,
-        current_kind=current_kind,
-        rationale=rationale,
+        manifest.observations, element, plan
     )
     manifest.summary.observation_count = len(manifest.observations)
     manifest.summary.obligation_count = len(manifest.obligations)

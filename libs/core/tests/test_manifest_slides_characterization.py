@@ -201,6 +201,50 @@ class TestValidateReferencesCharacterization:
         with pytest.raises(ValidationError, match="summary.page_count=99"):
             ProcessingManifest.model_validate(data)
 
+    def test_validation_error_precedence_across_multiple_violations(self) -> None:
+        # Extractor interval is checked before observation targets and summary counts.
+        data = _manifest_dict()
+        data["extractor"]["completed_at"] = NOW - timedelta(seconds=1)
+        data["observations"] = [
+            Observation(
+                id="obs-bad",
+                kind="k",
+                severity="info",
+                message="msg",
+                target_ids=["missing-el"],
+            ).model_dump(mode="python")
+        ]
+        data["summary"]["page_count"] = 99
+        with pytest.raises(ValidationError) as exc_info:
+            ProcessingManifest.model_validate(data)
+        err = str(exc_info.value)
+        assert "missing-el" not in err
+        assert "summary.page_count" not in err
+
+        # Observation target check precedes obligation targets and summary counts.
+        data = _manifest_dict()
+        data["observations"] = [
+            Observation(
+                id="obs-first",
+                kind="k",
+                severity="info",
+                message="msg",
+                target_ids=["missing-obs-el"],
+            ).model_dump(mode="python")
+        ]
+        data["obligations"] = [
+            build_obligation(
+                "describe-image", ["missing-ob-el"], ["vision-description"]
+            )
+            .model_copy(update={"id": "ob-second"})
+            .model_dump(mode="python")
+        ]
+        data["summary"]["page_count"] = 99
+        with pytest.raises(ValidationError, match="missing-obs-el") as exc_info:
+            ProcessingManifest.model_validate(data)
+        assert "missing-ob-el" not in str(exc_info.value)
+        assert "summary.page_count" not in str(exc_info.value)
+
 
 class TestReconcileAndBuildFromToolboxCharacterization:
     def test_reconcile_replaces_standard_and_type_bound_needs_and_rewires_deps(
@@ -295,7 +339,32 @@ class TestReconcileAndBuildFromToolboxCharacterization:
         )
         assert manifest.obligations == []
 
-    def test_build_from_toolbox_json_attaches_secondary_artifact_when_present(
+    def test_reconcile_from_untracked_previous_type_and_existing_target_obligation(
+        self,
+    ) -> None:
+        el = build_element("element-010", "paragraph", text="Caption")
+        manifest = build_manifest([el], [])
+
+        # Reclassify paragraph (no OBLIGATION_BY_TYPE spec) -> picture.
+        el.type = "picture"
+        reconcile_reclassified_element_processing_needs(
+            manifest, el, previous_type="paragraph"
+        )
+        assert [ob.kind for ob in manifest.obligations] == ["describe-image"]
+        assert [obs.kind for obs in manifest.observations] == [
+            "picture-requires-processing"
+        ]
+
+        # When target obligation/observation already exist, keep them without duplicating.
+        existing_ob = manifest.obligations[0]
+        existing_obs = manifest.observations[0]
+        reconcile_reclassified_element_processing_needs(
+            manifest, el, previous_type="table"
+        )
+        assert manifest.obligations == [existing_ob]
+        assert manifest.observations == [existing_obs]
+
+    def test_build_from_toolbox_json_handles_present_missing_and_blank_secondary(
         self, tmp_path: Path
     ) -> None:
         source = tmp_path / "doc.pdf"
@@ -303,25 +372,42 @@ class TestReconcileAndBuildFromToolboxCharacterization:
         secondary_file = tmp_path / "secondary.json"
         secondary_file.write_text("{}", encoding="utf-8")
 
-        response = json.loads(TOOLBOX_FIXTURE.read_text(encoding="utf-8"))
-        response["secondary_extraction"] = {
-            "path": str(secondary_file),
-            "sha256": "a" * 64,
-        }
-        extraction = ToolboxExtraction(
-            document=response,
-            started_at=NOW,
-            completed_at=NOW,
-            duration_ms=3,
-            version="test",
-            configuration={"toolbox_provider": "docling"},
+        def run(secondary_payload: dict | None) -> ProcessingManifest:
+            response = json.loads(TOOLBOX_FIXTURE.read_text(encoding="utf-8"))
+            if secondary_payload is not None:
+                response["secondary_extraction"] = secondary_payload
+            extraction = ToolboxExtraction(
+                document=response,
+                started_at=NOW,
+                completed_at=NOW,
+                duration_ms=3,
+                version="test",
+                configuration={"toolbox_provider": "docling"},
+            )
+            return build_processing_manifest(source, extraction)
+
+        present_manifest = run(
+            {"path": str(secondary_file), "sha256": "a" * 64}
         )
-        manifest = build_processing_manifest(source, extraction)
         assert any(
             art.id == SECONDARY_EXTRACTION_ARTIFACT_ID
             and art.path == str(secondary_file)
             and art.sha256 == "a" * 64
-            for art in manifest.artifacts
+            for art in present_manifest.artifacts
+        )
+
+        # Recorded path missing on disk still attaches artifact, but is not readable.
+        missing_path = str(tmp_path / "deleted-secondary.json")
+        missing_manifest = run({"path": missing_path, "sha256": "b" * 64})
+        assert any(
+            art.id == SECONDARY_EXTRACTION_ARTIFACT_ID and art.path == missing_path
+            for art in missing_manifest.artifacts
+        )
+
+        blank_manifest = run({"path": "   ", "sha256": "c" * 64})
+        assert not any(
+            art.id == SECONDARY_EXTRACTION_ARTIFACT_ID
+            for art in blank_manifest.artifacts
         )
 
 
@@ -454,3 +540,42 @@ class TestSlidesCharacterization:
         assert [el.reading_order for el in manifest.elements] == list(
             range(1, len(manifest.elements) + 1)
         )
+
+    def test_structure_as_slides_converts_visual_slide_and_falls_back_deck_title(
+        self,
+    ) -> None:
+        pic = build_element("s1-pic", "picture", text="", reading_order=1).model_copy(
+            update={"page_number": 1}
+        )
+        caption = build_element(
+            "s1-cap", "paragraph", text="Figure note", reading_order=2
+        ).model_copy(update={"page_number": 1})
+        manifest = build_manifest([pic, caption], [])
+        manifest.pages = [
+            PageDescriptor(
+                page_number=1,
+                width=960.0,
+                height=540.0,
+                element_ids=["s1-pic", "s1-cap"],
+            )
+        ]
+        manifest.summary.page_count = 1
+
+        boxes = {
+            "s1-pic": (0.05, 0.05, 0.90, 0.85),
+            "s1-cap": (0.05, 0.88, 0.25, 0.93),
+        }
+        structure_as_slides(
+            manifest,
+            page_fractions=lambda el: boxes.get(el.id),
+        )
+
+        # Slide 1 has no title, so deck title falls back to source filename stem.
+        assert manifest.elements[0].id == "element-slide-deck-title"
+        assert manifest.elements[0].text == manifest.source.filename.rsplit(".", 1)[0]
+        visual = next(
+            el for el in manifest.elements if el.metadata.get("slide_visual")
+        )
+        assert visual.type == "picture"
+        assert visual.metadata["replaced_element_ids"] == ["s1-pic", "s1-cap"]
+        assert visual.metadata["replaced_text"] == "Figure note"

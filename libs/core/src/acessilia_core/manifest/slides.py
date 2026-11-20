@@ -152,6 +152,13 @@ class _SlideStructureOptions:
     page_fractions: PageFractions
 
 
+@dataclass(frozen=True)
+class _StructuredSlide:
+    heading: ManifestElement
+    body: list[ManifestElement]
+    title_text: str | None
+
+
 def _structure_single_slide(
     slide: list[ManifestElement],
     *,
@@ -159,7 +166,7 @@ def _structure_single_slide(
     position: int,
     total: int,
     options: _SlideStructureOptions,
-) -> tuple[ManifestElement, list[ManifestElement], str | None]:
+) -> _StructuredSlide:
     title = _slide_title(slide)
     title_text = (title.text or "").strip() if title is not None else ""
     heading = _slide_heading(slide, title, number, position, total)
@@ -179,7 +186,9 @@ def _structure_single_slide(
     elif options.fold_figure_labels:
         body = _fold_figure_labels(body, options.page_fractions)
         body = _absorb_near_pictures(body, options.page_fractions)
-    return heading, body, title_text or None
+    return _StructuredSlide(
+        heading=heading, body=body, title_text=title_text or None
+    )
 
 
 def _finalize_slide_manifest(
@@ -243,17 +252,17 @@ def structure_as_slides(
     deck_title: str | None = None
     ordered: list[ManifestElement] = []
     for position, number in enumerate(numbers, start=1):
-        heading, body, title_text = _structure_single_slide(
+        structured = _structure_single_slide(
             by_page[number],
             number=number,
             position=position,
             total=total,
             options=options,
         )
-        if position == 1 and title_text is not None:
-            deck_title = title_text
-        ordered.append(heading)
-        ordered.extend(body)
+        if position == 1 and structured.title_text is not None:
+            deck_title = structured.title_text
+        ordered.append(structured.heading)
+        ordered.extend(structured.body)
 
     _finalize_slide_manifest(
         manifest,
