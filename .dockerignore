@@ -25,6 +25,8 @@
 .gitignore
 .idea/
 .vscode/
+**/.claude/
+**/CLAUDE.local.md
 
 # Runtime, output and scratch directories (the image mounts /app/var)
 var/
