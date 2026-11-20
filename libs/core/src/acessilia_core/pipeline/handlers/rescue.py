@@ -59,6 +59,7 @@ from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
 )
+from acessilia_core.pipeline.handlers.structure import unique_element_id
 from acessilia_core.pipeline.handlers.messages import (
     MSG_RESCUE_FUSED_PAGES,
     MSG_RESCUE_PRIMARY_KEPT,
@@ -320,8 +321,7 @@ def _rescue_page(
         if not _omitted(element, page_text, parent_types):
             continue
         rescued = element.model_copy(deep=True)
-        rescued.id = _unique_id(f"element-rescued-p{page}-{element.id}", existing)
-        existing.add(rescued.id)
+        rescued.id = unique_element_id(f"element-rescued-p{page}-{element.id}", existing)
         rescued.parent_id = None
         rescued.parent_ref = None
         rescued.metadata = {
@@ -362,13 +362,6 @@ def _omitted(
     if not is_legitimate_text(text):
         return False
     return not is_duplicate(text, [page_text], min_len=_MIN_CONTAINED_TEXT)
-
-
-def _unique_id(base: str, existing: set[str]) -> str:
-    candidate, suffix = base, 2
-    while candidate in existing:
-        candidate, suffix = f"{base}-{suffix}", suffix + 1
-    return candidate
 
 
 def _renumber(manifest: ProcessingManifest, pages: set[int]) -> None:

@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from docstruct.fusion.similarity import ordered_box, pair_block
-from docstruct.geometry import is_bottom_left
+from docstruct.geometry import OrientedBox
 
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.manifest.builder import (
@@ -77,18 +77,18 @@ class _SecondaryExtraction:
             box = item["bbox"]
             page = _page_number(item.get("page_number", element.get("page_number")))
             width, height = self.sizes.get(page, (0.0, 0.0)) if page else (0.0, 0.0)
-            if not width or not height:
-                return None
             try:
-                left, right = float(box["left"]), float(box["right"])
-                top, bottom = float(box["top"]), float(box["bottom"])
+                oriented = OrientedBox(
+                    float(box["left"]),
+                    float(box["top"]),
+                    float(box["right"]),
+                    float(box["bottom"]),
+                    box.get("coord_origin"),
+                )
             except (KeyError, TypeError, ValueError):
                 return None
-            if is_bottom_left(box.get("coord_origin"), top, bottom):
-                top, bottom = height - top, height - bottom
-            return ordered_box(
-                left / width, top / height, right / width, bottom / height
-            )
+            fractions = oriented.page_fractions(width, height)
+            return ordered_box(*fractions) if fractions is not None else None
         return None
 
 

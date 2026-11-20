@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from docstruct.blocks.lists import (
     marker_numbering,
 )
-from docstruct.geometry import is_bottom_left
+from docstruct.geometry import OrientedBox
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
     table_ast_from_rows,
@@ -56,17 +56,11 @@ def _element_bbox(
             ),
             None,
         )
-        if page is None or not page.width or not page.height:
+        if page is None:
             return None
-        top, bottom = box.top, box.bottom
-        if is_bottom_left(box.coord_origin, top, bottom):
-            top, bottom = page.height - top, page.height - bottom
-        return (
-            box.left / page.width,
-            top / page.height,
-            box.right / page.width,
-            bottom / page.height,
-        )
+        return OrientedBox(
+            box.left, box.top, box.right, box.bottom, box.coord_origin
+        ).page_fractions(page.width, page.height)
     return None
 
 

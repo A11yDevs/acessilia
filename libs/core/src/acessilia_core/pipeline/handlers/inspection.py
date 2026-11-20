@@ -14,12 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextvars
 import hashlib
 import json
 import math
-import contextvars
-import os
-import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -40,6 +38,7 @@ from acessilia_core.manifest.models import (
 from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
+    write_atomic_artifact,
 )
 from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
@@ -133,21 +132,14 @@ def _save_region_artifact(
     content: bytes, scope: str, kind: str, suffix: str, media_type: str, *, data_dir: Path
 ) -> Artifact:
     """Write ``content`` atomically under the run's ``data_dir``, named by its digest."""
-    digest = hashlib.sha256(content).hexdigest()
-    path = data_dir / "artifacts" / "regions" / scope / f"{digest}.{suffix}"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(content)
-        os.replace(temporary, path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    return Artifact(
-        id=f"artifact-{kind}-{scope[:16]}-{digest[:16]}", kind=kind,
-        path=str(path), media_type=media_type, sha256=digest,
+    return write_atomic_artifact(
+        content,
+        category="regions",
+        scope=scope,
+        kind=kind,
+        suffix=suffix,
+        media_type=media_type,
+        data_dir=data_dir,
     )
 
 
