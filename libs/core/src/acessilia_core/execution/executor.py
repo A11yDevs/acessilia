@@ -38,6 +38,7 @@ from acessilia_core.execution.models import (
     MethodResult,
 )
 from acessilia_core.manifest.models import (
+    Obligation,
     ObligationAttempt,
     ProcessingManifest,
 )

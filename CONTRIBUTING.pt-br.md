@@ -89,11 +89,17 @@ git rebase origin/develop
 
 ### 4. Enviar para revisão
 
-Antes de abrir o Pull Request, garanta que os testes estão passando:
+Antes de abrir o Pull Request, execute o lint, a verificação de tipos e a suíte completa de testes:
 
 ```bash
+make lint
+make typecheck
 make test-all
 ```
+
+- `make lint` executa o **Ruff** (regras `F` e `E` exceto `E501`) via `scripts/check_ruff_baseline.py` contra a baseline em `tests/fixtures/ruff_baseline.json`, que só pode diminuir. Qualquer violação nova falha a verificação; ao corrigir violações preexistentes em um arquivo, reduza a baseline com `uv run python scripts/check_ruff_baseline.py --update`. A ordenação de imports (`uv run ruff check --select I`) fica em modo consultivo até uma varredura dedicada.
+- `make typecheck` executa o **Mypy** no escopo configurado de `docstruct` e `acessilia_sdk` no `pyproject.toml` (todos os módulos exceto os overrides legados explicitamente listados, além de qualquer módulo novo).
+- Opcional localmente (roda automaticamente no CI): `make coverage` executa as quatro suítes com cobertura de desvios (*branch coverage* via `pytest-cov`) e grava relatórios XML, JSON e HTML separados em `var/coverage/{app,core,sdk,docstruct}/`, sem exigir um percentual mínimo obrigatório nesta etapa.
 
 Durante o desenvolvimento, `make test-file F=tests/test_example.py` executa um
 arquivo ou node id e `make test-failed` reexecuta os testes que falharam na
@@ -451,7 +457,7 @@ Durante um ciclo de refatoração, `is:open -type:Feature` mostra o backlog do c
 
 A esteira de CI/CD está definida em três workflows:
 
-- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), roda as suítes de teste do core, da docstruct e do SDK no Python 3.11 e rejeita testes pulados inesperados.
+- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), executa a verificação da baseline do Ruff e o Mypy no escopo configurado de `docstruct`/SDK, roda as suítes principal, da docstruct, do SDK e do core no Python 3.11 com relatórios de cobertura de desvios por componente publicados no artefato `coverage-reports`, e rejeita testes pulados inesperados.
 - **`.github/workflows/delivery.yml`** — depois que o CI passa num push, constrói a imagem, roda um smoke test de saúde e uma verificação de tamanho, e a publica no GHCR.
 - **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria a GitHub Release.
 

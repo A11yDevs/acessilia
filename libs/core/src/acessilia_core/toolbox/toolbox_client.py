@@ -37,7 +37,6 @@ from acessilia_sdk.toolbox import (
     parse_endpoints,
 )
 from acessilia_sdk.toolbox import clients as _sdk_clients
-from acessilia_sdk.toolbox.transport import media_type_for as _media_type
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.logger import logger
 

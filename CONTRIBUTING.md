@@ -89,11 +89,17 @@ git rebase origin/develop
 
 ### 4. Sending it for review
 
-Before opening the Pull Request, make sure all tests pass:
+Before opening the Pull Request, run linting, type checking and the full test suite:
 
 ```bash
+make lint
+make typecheck
 make test-all
 ```
+
+- `make lint` runs **Ruff** (rules `F` and `E` excluding `E501`) via `scripts/check_ruff_baseline.py` against the shrinking baseline in `tests/fixtures/ruff_baseline.json`. Any new violation fails the check; when you clean existing violations in a file, shrink the baseline with `uv run python scripts/check_ruff_baseline.py --update`. Import sorting (`uv run ruff check --select I`) is configured as advisory until a dedicated cleanup sweep lands.
+- `make typecheck` runs **Mypy** on the configured `docstruct` and `acessilia_sdk` scope in `pyproject.toml` (all modules except the explicitly listed legacy overrides, plus any newly added modules).
+- Optional locally (runs automatically in CI): `make coverage` runs all four suites with branch coverage (`pytest-cov`) and writes separate XML, JSON and HTML reports under `var/coverage/{app,core,sdk,docstruct}/` without enforcing a minimum threshold yet.
 
 While iterating, `make test-file F=tests/test_example.py` runs one file or node
 id and `make test-failed` reruns the tests that failed last time.
@@ -447,7 +453,7 @@ During a refactoring cycle, `is:open -type:Feature` shows the cycle's backlog, a
 
 The CI/CD pipeline is defined by three workflows:
 
-- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the core, docstruct and SDK test suites on Python 3.11 and rejects unexpected skipped tests.
+- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the Ruff baseline check and Mypy on the configured `docstruct`/SDK scope, executes the main, docstruct, SDK and core test suites on Python 3.11 with per-component branch coverage reports uploaded as the `coverage-reports` artifact, and rejects unexpected skipped tests.
 - **`.github/workflows/delivery.yml`** — after CI passes on a push, builds the image, runs a health smoke test and a size guardrail, and publishes it to GHCR.
 - **`.github/workflows/release.yml`** — when a maintainer creates a `v*` tag, builds, publishes and creates the GitHub Release.
 

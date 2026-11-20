@@ -29,6 +29,9 @@ make the full suite itself faster.
 | I changed one file or one test | `make test-file F=tests/test_example.py` | Runs only that path, non-E2E |
 | I fixed a failure and want to confirm it | `make test-failed` | Reruns the failures recorded in the main, docstruct, SDK and `libs/core` caches |
 | I want the full local confidence check | `make test-all` | Main suite with four workers, then docstruct, SDK and `libs/core` |
+| I want to check linting (Ruff baseline) | `make lint` | Runs Ruff (`F`, `E` without `E501`) via `scripts/check_ruff_baseline.py` |
+| I want to check static types (Mypy) | `make typecheck` | Runs Mypy on the configured `docstruct` and `acessilia_sdk` scope |
+| I want per-component coverage reports | `make coverage` | Runs all four suites with branch coverage into `var/coverage/{app,core,sdk,docstruct}/` |
 | I want the main suite only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E main suite with four workers |
 | I want only the core library | `(cd libs/core && uv run --extra dev pytest)` | Runs the core library suite, without the service |
 | I need the exact commands `make` uses | `make -n test-all` | Prints the commands without running them |
@@ -46,11 +49,14 @@ make the full suite itself faster.
 Every pull request and push to `develop`, `main` or a release branch runs the
 GitHub Actions workflow `CI`:
 
-- **`tests (Python 3.11)`** installs the project, checks the Toolbox capability
-  contract, reports whether the Toolbox's docstruct pin follows the core
-  (warnings only; see below), runs the non-E2E main suite with **four
-  workers**, runs the docstruct, SDK and core library suites, rejects unexpected skipped
-  tests and uploads JUnit reports.
+- **`tests (Python 3.11)`** installs the project, runs Ruff against the
+  shrinking baseline and Mypy on the configured `docstruct`/SDK scope (#366),
+  checks the Toolbox capability contract, reports whether the Toolbox's
+  docstruct pin follows the core (warnings only; see below), runs the non-E2E
+  main suite with **four workers**, runs the docstruct, SDK and core library
+  suites with branch coverage, summarizes per-component coverage in the job
+  summary, rejects unexpected skipped tests and uploads JUnit (`test-reports`)
+  and coverage (`coverage-reports`) artifacts.
 - **`SDK alone (Python 3.11)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,
   pytest-asyncio, respx), and proves that it works without the core.
@@ -242,6 +248,9 @@ make test-file F=tests/test_example.py
 make test-file F=tests/test_api.py::test_health
 make test-failed
 make test-all
+make lint
+make typecheck
+make coverage
 ```
 
 `make -n test-all` prints the exact commands without running them.

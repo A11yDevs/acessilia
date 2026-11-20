@@ -409,6 +409,12 @@ jobs:
           uv lock --check
           uv sync --locked --extra dev
 
+      - name: Run Ruff against the shrinking baseline
+        run: uv run --locked --extra dev python scripts/check_ruff_baseline.py
+
+      - name: Run Mypy on docstruct and SDK
+        run: uv run --locked --extra dev mypy --no-incremental
+
       # The SDK registry must match the contract the Toolbox publishes on the
       # branch this code is deployed with (#186): main runs against the
       # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
@@ -444,22 +450,95 @@ jobs:
       # slowest test from dominating the tail. The run also collects the suite,
       # so the old standalone `--collect-only` step is redundant.
       - name: Run main test suite
-        run: uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 --junitxml=test-results.xml
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/app/.coverage
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/var/coverage/app"
+          uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 \
+            --junitxml=test-results.xml \
+            --cov=backend --cov=frontend --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/app/coverage.xml" \
+            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/app/coverage.json"
 
       # The gate is the root environment (#405). A step inside a library points
       # at that project explicitly, so `uv run` neither selects the library's
       # own lock nor updates one.
       - name: Run docstruct library test suite
         working-directory: libs/docstruct
-        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=docstruct-test-results.xml
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/docstruct/.coverage
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/var/coverage/docstruct"
+          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 \
+            --junitxml=docstruct-test-results.xml \
+            --cov=docstruct --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/docstruct/coverage.xml" \
+            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/docstruct/coverage.json"
 
       - name: Run SDK library test suite
         working-directory: libs/sdk
-        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=sdk-test-results.xml
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/sdk/.coverage
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/var/coverage/sdk"
+          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 \
+            --junitxml=sdk-test-results.xml \
+            --cov=acessilia_sdk --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/sdk/coverage.xml" \
+            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/sdk/coverage.json"
 
       - name: Run core library test suite
         working-directory: libs/core
-        run: uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 --junitxml=core-test-results.xml
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/core/.coverage
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/var/coverage/core"
+          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 \
+            --junitxml=core-test-results.xml \
+            --cov=acessilia_core --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/core/coverage.xml" \
+            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/core/coverage.json"
+
+      - name: Summarize per-component coverage
+        if: always()
+        run: |
+          uv run --locked --extra dev python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          components = (
+              ("Application (backend + frontend)", Path("var/coverage/app/coverage.json")),
+              ("Core (acessilia_core)", Path("var/coverage/core/coverage.json")),
+              ("SDK (acessilia_sdk)", Path("var/coverage/sdk/coverage.json")),
+              ("Docstruct (docstruct)", Path("var/coverage/docstruct/coverage.json")),
+          )
+          lines = [
+              "## Test coverage (branch)",
+              "",
+              "| Component | Coverage | Statements | Branches |",
+              "|---|---:|---:|---:|",
+          ]
+          for label, report in components:
+              if not report.exists():
+                  lines.append(f"| {label} | — | — | — |")
+                  continue
+              totals = json.loads(report.read_text(encoding="utf-8")).get("totals", {})
+              pct = totals.get("percent_covered_display", "—")
+              stmts = f"{totals.get('covered_lines', 0)}/{totals.get('num_statements', 0)}"
+              branches = f"{totals.get('covered_branches', 0)}/{totals.get('num_branches', 0)}"
+              lines.append(f"| {label} | {pct}% | {stmts} | {branches} |")
+          summary = "\n".join(lines) + "\n"
+          print(summary)
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as fh:
+                  fh.write(summary)
+          PY
 
       - name: Reject unexpected skipped tests
         run: |
@@ -498,6 +577,23 @@ jobs:
             libs/docstruct/docstruct-test-results.xml
             libs/sdk/sdk-test-results.xml
             libs/core/core-test-results.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-reports
+          path: |
+            var/coverage/app/coverage.xml
+            var/coverage/app/coverage.json
+            var/coverage/core/coverage.xml
+            var/coverage/core/coverage.json
+            var/coverage/sdk/coverage.xml
+            var/coverage/sdk/coverage.json
+            var/coverage/docstruct/coverage.xml
+            var/coverage/docstruct/coverage.json
           if-no-files-found: ignore
           retention-days: 7
 

@@ -49,6 +49,7 @@ Issues = "https://github.com/A11yDevs/acessilia/issues"
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1.1,<10",
+    "pytest-cov>=6.0,<8",
     "respx>=0.23.1,<0.24",
     "pytest-asyncio>=1.4.0,<2",
     # Builds the page images the Toolbox end-to-end tests send.
@@ -59,6 +60,9 @@ dev = [
     "pytest-timeout>=2.4,<3",
     # Runs the core suite in parallel; the isolation fixes are in #448.
     "pytest-xdist>=3.8,<4",
+    # Static analysis and formatting checks (#366).
+    "ruff>=0.15,<1",
+    "mypy>=1.15,<2",
 ]
 
 [project.scripts]
@@ -87,3 +91,75 @@ markers = [
     "e2e: requires a running Acessilia Toolbox at TOOLBOX_BASE_URL or Core API at CORE_BASE_URL",
     "slow: expensive test; still part of make test-all and CI",
 ]
+
+[tool.ruff]
+target-version = "py311"
+extend-exclude = ["var", "tests/dataset", "docs/notebooks"]
+
+[tool.ruff.lint]
+# Initial enforced rule set (#366): Pyflakes (F) and pycodestyle errors (E),
+# excluding line-length (E501) so existing files are not mass-reformatted.
+# Import sorting (I) is configured below for advisory runs (`ruff check --select I`)
+# and deferred to a dedicated low-conflict cleanup sweep so the count-based
+# baseline never hides a newly misordered import block.
+select = ["F", "E"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "acessilia_core",
+    "acessilia_sdk",
+    "backend",
+    "docstruct",
+    "frontend",
+    "scripts",
+]
+
+[tool.coverage.run]
+branch = true
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+precision = 1
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = ["libs/docstruct/src", "libs/sdk/src"]
+files = [
+    "libs/docstruct/src/docstruct",
+    "libs/sdk/src/acessilia_sdk",
+]
+explicit_package_bases = true
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+
+# Pre-existing modules in docstruct and sdk deferred to incremental follow-up (#366).
+# Every other module — and every newly added module in either package — is checked.
+[[tool.mypy.overrides]]
+module = [
+    "docstruct.canonical",
+    "docstruct.evaluation.metrics.text_ed",
+    "docstruct.export.html",
+    "docstruct.export.pandoc_ast",
+    "docstruct.fusion.differ",
+    "docstruct.fusion.noise",
+    "docstruct.fusion.payload",
+    "docstruct.fusion.table_specialist",
+    "docstruct.manifest",
+    "docstruct.regions.grouping",
+    "docstruct.validation",
+    "acessilia_sdk.cli",
+    "acessilia_sdk.toolbox.clients.pdf",
+    "acessilia_sdk.toolbox.results.layout",
+    "acessilia_sdk.toolbox.transport",
+]
+ignore_errors = true
