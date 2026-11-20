@@ -76,8 +76,11 @@ GitHub Actions workflow `CI`:
 - Image delivery waits for all four jobs.
 
 The main suite check does not have a separate collection step: the test run collects
-the suite itself. The job name is intentionally kept as `tests (Python 3.11)` so
-branch protection and existing links keep working.
+the suite itself. The job name template `tests (Python ${{ matrix.python-version }})`
+intentionally keeps the 3.11 leg as `tests (Python 3.11)` (while running
+`tests (Python 3.12)` alongside it, with `UV_PYTHON` pinned to each leg's
+matrix version) so branch protection and existing links keep working during the
+transition.
 
 ### Locally
 
@@ -390,9 +393,10 @@ The test run collects the suite itself, so the separate `--collect-only` step
 was redundant.
 
 **Where are the slow-test reports?**
-`make` and CI pass `--durations=25`. CI also uploads JUnit reports as
-`test-reports`, `sdk-isolated-report` and `docstruct-isolated-report`, with
-7-day retention.
+`make` and CI pass `--durations=25`. CI also uploads JUnit and coverage reports
+per matrix leg as `test-reports-py*`, `coverage-reports-py*`,
+`sdk-isolated-report-py*` and `docstruct-isolated-report-py*`, with 7-day
+retention.
 
 **Where do I see the scheduled comparison?**
 After the workflow reaches the default branch, open Actions →
@@ -407,11 +411,12 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 
 ## Where to see the results
 
-- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
-  `Run main test suite`. The log shows `created: 4/4 workers` and
-  `--durations=25`.
-- **Artifacts:** `test-reports` (main, docstruct, SDK and core library),
-  `sdk-isolated-report` and `docstruct-isolated-report`.
+- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` /
+  `tests (Python 3.12)` → step `Run main test suite`. The log shows
+  `created: 4/4 workers` and `--durations=25`.
+- **Artifacts:** `test-reports-py*` (main, docstruct, SDK and core library),
+  `coverage-reports-py*`, `sdk-isolated-report-py*` and
+  `docstruct-isolated-report-py*`.
 - **Scheduled:** workflow `Scheduled test monitoring`, with artifacts retained
   for 30 days and a tracking issue on scheduled failures.
 - **Rulesets:** both `main` and `develop` require `tests (Python 3.11)` and

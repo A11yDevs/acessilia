@@ -77,8 +77,11 @@ o workflow `CI` do GitHub Actions:
 - A entrega da imagem espera pelos quatro jobs.
 
 O check da suíte principal não tem mais uma etapa separada de coleta: a própria execução
-coleta a suíte. O nome do job é mantido como `tests (Python 3.11)` de propósito,
-para a proteção de branch e os links existentes continuarem funcionando.
+coleta a suíte. O template do nome do job `tests (Python ${{ matrix.python-version }})`
+mantém a perna 3.11 como `tests (Python 3.11)` de propósito (rodando
+`tests (Python 3.12)` em paralelo, com `UV_PYTHON` fixado na versão de cada
+perna da matriz), para a proteção de branch e os links existentes continuarem
+funcionando durante a transição.
 
 ### Localmente
 
@@ -400,8 +403,9 @@ A execução de testes coleta a suíte sozinha, então a etapa separada de
 
 **Onde estão os relatórios de testes lentos?**
 O `make` e a CI passam `--durations=25`. A CI também publica os relatórios JUnit
-como `test-reports`, `sdk-isolated-report` e `docstruct-isolated-report`, com
-retenção de 7 dias.
+e de cobertura por perna da matriz como `test-reports-py*`,
+`coverage-reports-py*`, `sdk-isolated-report-py*` e
+`docstruct-isolated-report-py*`, com retenção de 7 dias.
 
 **Onde vejo a comparação agendada?**
 Depois que o workflow chega ao branch padrão, abra Actions →
@@ -416,11 +420,12 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 
 ## Onde ver os resultados
 
-- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
-  `Run main test suite`. O log mostra `created: 4/4 workers` e
-  `--durations=25`.
-- **Artefatos:** `test-reports` (principal, docstruct, SDK e biblioteca do core),
-  `sdk-isolated-report` e `docstruct-isolated-report`.
+- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` /
+  `tests (Python 3.12)` → step `Run main test suite`. O log mostra
+  `created: 4/4 workers` e `--durations=25`.
+- **Artefatos:** `test-reports-py*` (principal, docstruct, SDK e biblioteca do
+  core), `coverage-reports-py*`, `sdk-isolated-report-py*` e
+  `docstruct-isolated-report-py*`.
 - **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
   30 dias e uma issue de acompanhamento em falhas agendadas.
 - **Rulesets:** `main` e `develop` exigem `tests (Python 3.11)` e

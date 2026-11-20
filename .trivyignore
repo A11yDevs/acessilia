@@ -1,6 +1,4 @@
-# The pinned python:3.12-slim base records setuptools 70.3.0 in pip's vendored
-# inventory (pip/_vendor/vendor.txt), and Trivy reports CVE-2025-47273 against
-# it even after the image upgrades pip, setuptools and wheel. Track the
-# base-image update (Dependabot docker ecosystem) and remove this exception
-# once that inventory is >= 78.1.1.
-CVE-2025-47273
+# Trivy ignore file read by .github/workflows/security.yml (container-scan).
+# No active CVE exceptions are required on the pinned python:3.12-slim base
+# image; the former CVE-2025-47273 exception for python:3.11-slim's preinstalled
+# setuptools 70.3.0 was retired with the Python 3.12 image migration (#170).

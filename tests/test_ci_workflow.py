@@ -51,6 +51,7 @@ def test_required_check_names_are_unchanged() -> None:
     jobs = _workflow()["jobs"]
     for job_id in ("tests", "sdk-isolated", "core-isolated", "docstruct-isolated"):
         assert jobs[job_id]["strategy"]["matrix"]["python-version"] == ["3.11", "3.12"]
+        assert jobs[job_id]["env"]["UV_PYTHON"] == "${{ matrix.python-version }}"
     assert _rendered_job_names(jobs["tests"]) == {
         "tests (Python 3.11)",
         "tests (Python 3.12)",
