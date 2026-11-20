@@ -16,11 +16,14 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   contra `RENDER_MEDIA_TYPES` e redução de escala de PNG/JPEG compondo
   `docstruct.imaging.image_dimensions` com `ToolboxPdfClient.render`.
 - **Adicionado** `acessilia_sdk.operations.fusion` (`extract_dual_fused`,
-  `DualFusionResult`, ADR-0017, #612): extração paralela com dois provedores
-  em `document.structure.extract` (reutilizando `artifact_id` com fallback para
-  upload em `ToolboxArtifactNotFound`) composta com
-  `docstruct.fusion.payload.fuse_extraction_payloads`. Piso da dependência
-  `acessilia-docstruct` ajustado para `>=0.5.8,<0.6`.
+  `DualFusionResult`, `DualFusionUnavailable`, ADR-0017, #612): extração
+  paralela com dois provedores em `document.structure.extract` (reutilizando
+  `artifact_id` com fallback para upload em `ToolboxArtifactNotFound`) composta
+  com `docstruct.fusion.payload.fuse_extraction_payloads`; quando os dois
+  provedores falham com `ToolboxError`, levanta `DualFusionUnavailable`
+  (subclasse de `ToolboxProviderUnavailable`) preservando `failures` e
+  `artifact_fallbacks`. Piso da dependência `acessilia-docstruct` ajustado para
+  `>=0.5.8,<0.6`.
 
 - **Adicionado** o subcomando `judge` em `python -m acessilia_sdk` e o auxiliar
   `judge_document` em `acessilia_sdk.cli` (ADR-0017, #614): renderiza uma

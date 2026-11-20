@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import pickle
 from urllib.parse import parse_qs
 
 import httpx
 import pytest
 from acessilia_sdk.operations.formula import Step
-from acessilia_sdk.operations.fusion import DualFusionResult, extract_dual_fused
+from acessilia_sdk.operations.fusion import (
+    DualFusionResult,
+    DualFusionUnavailable,
+    extract_dual_fused,
+)
 from acessilia_sdk.toolbox import (
     ToolboxArtifactNotFound,
     ToolboxError,
@@ -302,11 +307,61 @@ async def test_both_providers_failing_raises_provider_unavailable(respx_mock, tm
 
     primary, secondary = _clients()
     try:
-        with pytest.raises(ToolboxProviderUnavailable, match="No provider available"):
+        with pytest.raises(ToolboxProviderUnavailable, match="No provider available") as caught:
             await extract_dual_fused(primary, secondary, doc)
     finally:
         await primary.close()
         await secondary.close()
+
+    assert isinstance(caught.value, DualFusionUnavailable)
+    assert set(caught.value.failures) == {"docling", "mineru"}
+    assert all(isinstance(exc, ToolboxProviderUnavailable) for exc in caught.value.failures.values())
+    assert caught.value.artifact_fallbacks == ()
+
+
+@pytest.mark.asyncio
+async def test_both_providers_failing_after_artifact_fallback_preserves_diagnostics_and_pickles(
+    respx_mock, tmp_path
+) -> None:
+    doc = tmp_path / "sample.pdf"
+    doc.write_bytes(b"%PDF-1.4")
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        if _has_artifact_id(request):
+            return httpx.Response(
+                404,
+                json={"status": "failed", "error": {"code": "artifact_not_found", "message": "gone"}},
+            )
+        status = 503 if _provider_of(request) == "docling" else 500
+        code = "provider_unavailable" if status == 503 else "provider_error"
+        return httpx.Response(
+            status,
+            json={"status": "failed", "error": {"code": code, "message": "failed"}},
+        )
+
+    respx_mock.post(f"{BASE}/v1/capabilities/document.structure.extract:execute").mock(
+        side_effect=responder
+    )
+
+    primary, secondary = _clients()
+    try:
+        with pytest.raises(DualFusionUnavailable) as caught:
+            await extract_dual_fused(primary, secondary, doc, artifact_id=SOURCE_ID)
+    finally:
+        await primary.close()
+        await secondary.close()
+
+    err = caught.value
+    assert err.artifact_fallbacks == ("docling", "mineru")
+    assert set(err.failures) == {"docling", "mineru"}
+    assert isinstance(err.failures["docling"], ToolboxProviderUnavailable)
+    assert isinstance(err.failures["mineru"], ToolboxError)
+
+    restored = pickle.loads(pickle.dumps(err))
+    assert isinstance(restored, DualFusionUnavailable)
+    assert str(restored) == str(err)
+    assert set(restored.failures) == {"docling", "mineru"}
+    assert restored.artifact_fallbacks == ("docling", "mineru")
 
 
 @pytest.mark.asyncio

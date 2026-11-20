@@ -35,6 +35,32 @@ from acessilia_sdk.toolbox.errors import (
 )
 
 
+class DualFusionUnavailable(ToolboxProviderUnavailable):
+    """Both structure providers failed during :func:`extract_dual_fused`.
+
+    Preserves each provider's :class:`~acessilia_sdk.toolbox.errors.ToolboxError`
+    in ``failures`` and any ``artifact_id`` upload fallbacks in
+    ``artifact_fallbacks``, so callers that log (such as the core) can record
+    per-provider diagnostics without coupling the SDK to a logger (ADR-0017).
+    """
+
+    def __init__(
+        self,
+        failures: dict[str, ToolboxError],
+        artifact_fallbacks: tuple[str, ...] = (),
+        message: str = "No provider available for extraction",
+    ) -> None:
+        self.failures = dict(failures)
+        self.artifact_fallbacks = tuple(artifact_fallbacks)
+        super().__init__(message)
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return (
+            type(self),
+            (self.failures, self.artifact_fallbacks, str(self)),
+        )
+
+
 @dataclass(frozen=True)
 class DualFusionResult:
     """Outcome of :func:`extract_dual_fused` across two structure providers.
@@ -124,7 +150,7 @@ def _collect_outcomes(
     steps = tuple(step for step in (primary_step, secondary_step) if step is not None)
 
     if primary_res is None and secondary_res is None:
-        raise ToolboxProviderUnavailable("No provider available for extraction")
+        raise DualFusionUnavailable(failures, fallbacks)
     if primary_res is None or secondary_res is None:
         surviving = secondary_res if primary_res is None else primary_res
         assert surviving is not None
@@ -177,9 +203,10 @@ async def extract_dual_fused(
     If one provider raises a :class:`~acessilia_sdk.toolbox.errors.ToolboxError`,
     returns the other provider's payload with ``fused=False`` and records the
     error in :attr:`DualFusionResult.failures`. If both fail with
-    ``ToolboxError``, raises
-    :class:`~acessilia_sdk.toolbox.errors.ToolboxProviderUnavailable`.
-    Unexpected (non-``ToolboxError``) exceptions propagate unchanged.
+    ``ToolboxError``, raises :class:`DualFusionUnavailable` (a subclass of
+    :class:`~acessilia_sdk.toolbox.errors.ToolboxProviderUnavailable`) carrying
+    ``failures`` and ``artifact_fallbacks``. Unexpected (non-``ToolboxError``)
+    exceptions propagate unchanged.
     """
     if file_path is None and not artifact_id:
         raise ValueError("Provide file_path or artifact_id")
@@ -215,5 +242,6 @@ async def extract_dual_fused(
 
 __all__ = [
     "DualFusionResult",
+    "DualFusionUnavailable",
     "extract_dual_fused",
 ]

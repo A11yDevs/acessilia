@@ -16,11 +16,13 @@ can see are recorded here, newest first.
   types against `RENDER_MEDIA_TYPES` and PNG/JPEG downscaling composing
   `docstruct.imaging.image_dimensions` with `ToolboxPdfClient.render`.
 - **Added** `acessilia_sdk.operations.fusion` (`extract_dual_fused`,
-  `DualFusionResult`, ADR-0017, #612): parallel dual-provider
-  `document.structure.extract` with `artifact_id` reuse and upload fallback on
-  `ToolboxArtifactNotFound`, composed with
-  `docstruct.fusion.payload.fuse_extraction_payloads`. Tightened the
-  `acessilia-docstruct` dependency floor to `>=0.5.8,<0.6`.
+  `DualFusionResult`, `DualFusionUnavailable`, ADR-0017, #612): parallel
+  dual-provider `document.structure.extract` with `artifact_id` reuse and
+  upload fallback on `ToolboxArtifactNotFound`, composed with
+  `docstruct.fusion.payload.fuse_extraction_payloads`; when both providers fail
+  with `ToolboxError`, raises `DualFusionUnavailable` (subclass of
+  `ToolboxProviderUnavailable`) preserving `failures` and `artifact_fallbacks`.
+  Tightened the `acessilia-docstruct` dependency floor to `>=0.5.8,<0.6`.
 
 - **Added** the `judge` subcommand to `python -m acessilia_sdk` and its
   `judge_document` helper in `acessilia_sdk.cli` (ADR-0017, #614): renders a
