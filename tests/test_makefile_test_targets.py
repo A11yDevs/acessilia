@@ -28,6 +28,9 @@ def test_help_lists_the_supported_commands() -> None:
     assert "make test-file F=tests/test_example.py" in completed.stdout
     assert "make test-failed" in completed.stdout
     assert "make test-all" in completed.stdout
+    assert "make lint" in completed.stdout
+    assert "make typecheck" in completed.stdout
+    assert "make coverage" in completed.stdout
 
 
 def test_test_file_runs_one_path_without_e2e() -> None:
@@ -79,3 +82,32 @@ def test_test_file_without_a_path_is_refused() -> None:
     )
     assert completed.returncode == 2
     assert "usage: make test-file" in completed.stderr
+
+
+def test_lint_runs_ruff_baseline_guard() -> None:
+    completed = _dry_run("lint")
+    assert completed.returncode == 0, completed.stderr
+    assert "scripts/check_ruff_baseline.py" in completed.stdout
+
+
+def test_typecheck_runs_mypy() -> None:
+    completed = _dry_run("typecheck")
+    assert completed.returncode == 0, completed.stderr
+    assert "mypy" in completed.stdout
+
+
+def test_coverage_covers_all_four_components_with_branch_reports() -> None:
+    completed = _dry_run("coverage")
+    assert completed.returncode == 0, completed.stderr
+    for expected in (
+        "--cov=backend --cov=frontend",
+        "--cov=docstruct",
+        "--cov=acessilia_sdk",
+        "--cov=acessilia_core",
+        "--cov-branch",
+        "var/coverage/app/coverage.xml",
+        "var/coverage/docstruct/coverage.xml",
+        "var/coverage/sdk/coverage.xml",
+        "var/coverage/core/coverage.xml",
+    ):
+        assert expected in completed.stdout

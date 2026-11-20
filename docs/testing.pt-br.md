@@ -29,6 +29,9 @@ própria suíte completa mais rápida.
 | Mudei um arquivo ou um teste | `make test-file F=tests/test_example.py` | Roda apenas esse caminho, sem E2E |
 | Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches da suíte principal, do docstruct, do SDK e do `libs/core` |
 | Quero a confiança local completa | `make test-all` | Suíte principal com quatro workers, depois docstruct, SDK e `libs/core` |
+| Quero verificar o lint (baseline do Ruff) | `make lint` | Executa o Ruff (`F`, `I`, `E` sem `E501`) via `scripts/check_ruff_baseline.py` |
+| Quero verificar tipos estáticos (Mypy) | `make typecheck` | Executa o Mypy no escopo configurado de `docstruct` e `acessilia_sdk` |
+| Quero relatórios de cobertura por componente | `make coverage` | Executa as quatro suítes com cobertura de desvios em `var/coverage/{app,core,sdk,docstruct}/` |
 | Quero só a suíte principal, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda a suíte principal non-E2E com quatro workers |
 | Quero só a biblioteca do core | `(cd libs/core && uv run --extra dev pytest)` | Roda a suíte do core, sem o serviço |
 | Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
@@ -46,12 +49,14 @@ própria suíte completa mais rápida.
 Todo pull request e push para `develop`, `main` ou uma branch de release executa
 o workflow `CI` do GitHub Actions:
 
-- **`tests (Python 3.11)`** instala o projeto, confere o contrato de capacidades
-  da Toolbox, informa se a versão do docstruct fixada pela Toolbox acompanha o
-  core (só avisos; veja abaixo), roda a suíte principal non-E2E com **quatro
-  workers**, roda as suítes do docstruct, do SDK e da biblioteca do core, recusa
-  skips inesperados e publica
-  relatórios JUnit.
+- **`tests (Python 3.11)`** instala o projeto, executa o Ruff contra a baseline
+  que só diminui e o Mypy no escopo configurado de `docstruct`/SDK (#366),
+  confere o contrato de capacidades da Toolbox, informa se a versão do
+  docstruct fixada pela Toolbox acompanha o core (só avisos; veja abaixo), roda
+  a suíte principal non-E2E com **quatro workers**, roda as suítes do
+  docstruct, do SDK e da biblioteca do core com cobertura de desvios, resume a
+  cobertura por componente no resumo do job, recusa skips inesperados e publica
+  os artefatos JUnit (`test-reports`) e de cobertura (`coverage-reports`).
 - **`SDK alone (Python 3.11)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
   (pytest, pytest-asyncio, respx), e prova que ele funciona sem o core.
@@ -249,6 +254,9 @@ make test-file F=tests/test_example.py
 make test-file F=tests/test_api.py::test_health
 make test-failed
 make test-all
+make lint
+make typecheck
+make coverage
 ```
 
 `make -n test-all` imprime os comandos exatos sem executar.
