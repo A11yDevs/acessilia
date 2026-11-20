@@ -7,6 +7,23 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Changed** `acessilia_sdk.runtime.run_sync` now copies the caller's
+  `contextvars` context into its worker thread when called inside a running
+  event loop, so `operation_context` and request-scoped variables propagate
+  across the sync/async boundary (#612).
+- **Added** `check_renderable` and `downscale_image` in
+  `acessilia_sdk.toolbox.clients.pdf` (#612): pre-validation of source media
+  types against `RENDER_MEDIA_TYPES` and PNG/JPEG downscaling composing
+  `docstruct.imaging.image_dimensions` with `ToolboxPdfClient.render`.
+- **Added** `acessilia_sdk.operations.fusion` (`extract_dual_fused`,
+  `DualFusionResult`, `DualFusionUnavailable`, ADR-0017, #612): parallel
+  dual-provider `document.structure.extract` with `artifact_id` reuse and
+  upload fallback on `ToolboxArtifactNotFound`, composed with
+  `docstruct.fusion.payload.fuse_extraction_payloads`; when both providers fail
+  with `ToolboxError`, raises `DualFusionUnavailable` (subclass of
+  `ToolboxProviderUnavailable`) preserving `failures` and `artifact_fallbacks`.
+  Tightened the `acessilia-docstruct` dependency floor to `>=0.5.8,<0.6`.
+
 - **Added** the `judge` subcommand to `python -m acessilia_sdk` and its
   `judge_document` helper in `acessilia_sdk.cli` (ADR-0017, #614): renders a
   page with `page_judgement`, sends two candidate transcriptions (inline or

@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 import math
+import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from docstruct.imaging import image_dimensions
+
 from acessilia_sdk.toolbox.artifacts import ArtifactRef, read_artifact
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
+from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.results import (
     RenderedPageMetadata,
     TextSpansResult,
     read_result,
 )
-from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.transport import media_type_for
 
 SPLIT_CAPABILITY = "pdf.split"
 RENDER_CAPABILITY = "pdf.render"
@@ -303,6 +307,67 @@ def _check_text_spans_page(page: Any, context: str) -> None:
                 )
 
 
+def check_renderable(source: Path, media_type: str | None = None) -> str:
+    """Refuse, before any request, a source ``pdf.render@2`` would not open.
+
+    The upload is labelled from the file extension via
+    :func:`~acessilia_sdk.toolbox.transport.media_type_for`. When
+    ``media_type`` is provided, it must agree with that label, and the label
+    must belong to :data:`RENDER_MEDIA_TYPES`. Returns the validated media type
+    or raises :class:`ValueError`.
+    """
+    sent_as = media_type_for(source)
+    if media_type is not None and media_type != sent_as:
+        raise ValueError(f"Source is {media_type} but would be sent as {sent_as}")
+    if sent_as not in RENDER_MEDIA_TYPES:
+        raise ValueError(
+            f"pdf.render@2 renders PDF, PNG and JPEG inputs, not {sent_as}"
+        )
+    return sent_as
+
+
+async def downscale_image(
+    client: ToolboxPdfClient,
+    payload: bytes,
+    scale: float = 0.5,
+    *,
+    use_remote_cache: bool | None = None,
+) -> bytes | None:
+    """Render ``payload`` on the Toolbox with its longest side scaled by ``scale``.
+
+    Reads PNG/JPEG dimensions with :func:`docstruct.imaging.image_dimensions`
+    and delegates resizing to :meth:`ToolboxPdfClient.render` (ADR-0003).
+    Returns ``None`` when ``payload`` is not a PNG/JPEG with readable positive
+    dimensions or when scaling would not shrink the longest side. Raises
+    :class:`ValueError` if ``scale`` is not a finite positive number; Toolbox
+    and filesystem errors propagate unchanged.
+    """
+    if (
+        isinstance(scale, bool)
+        or not isinstance(scale, (int, float))
+        or not math.isfinite(scale)
+        or scale <= 0
+    ):
+        raise ValueError(f"scale must be a finite positive number, got {scale!r}")
+    size = image_dimensions(payload)
+    if size is None:
+        return None
+    width, height, suffix = size
+    longest = max(width, height)
+    max_side = max(1, int(longest * scale))
+    if max_side >= longest:
+        return None
+    with tempfile.TemporaryDirectory(prefix="acessilia-downscale-") as directory:
+        source = Path(directory) / f"image{suffix}"
+        source.write_bytes(payload)
+        rendered = await client.render(
+            file_path=source,
+            max_side=max_side,
+            use_remote_cache=use_remote_cache,
+        )
+    return rendered.image
+
+
 __all__ = [
     "RENDER_CAPABILITY",
     "RENDER_MEDIA_TYPES",
@@ -312,4 +377,6 @@ __all__ = [
     "ClipOrigin",
     "RenderedPage",
     "ToolboxPdfClient",
+    "check_renderable",
+    "downscale_image",
 ]
