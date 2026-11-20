@@ -1,6 +1,6 @@
 """Characterization tests for pipeline/elements.py and pipeline/payload.py (#612, PR 7).
 
-Pins every branch of ``_element_to_block``, ``build_pddl_structured_payload``,
+Pins the key branches of ``_element_to_block``, ``build_pddl_structured_payload``,
 and ``_manifest_pages_to_payload`` so modularization keeps output blocks,
 technical warnings, canonical metadata, and cacheability identical.
 """
@@ -12,7 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 from acessilia_core.execution.models import ExecutionReport
-from acessilia_core.i18n import t
+from acessilia_core.i18n import n, t
+from acessilia_core.i18n.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
 from acessilia_core.manifest.models import (
     BoundingBox,
     ManifestElement,
@@ -27,6 +28,8 @@ from acessilia_core.pipeline.elements import (
     _element_to_block,
 )
 from acessilia_core.pipeline.payload import (
+    MSG_PICTURES_NOT_DESCRIBED,
+    MSG_TABLES_NOT_READ,
     _manifest_pages_to_payload,
     build_pddl_structured_payload,
 )
@@ -303,11 +306,18 @@ class TestBuildPddlStructuredPayloadCharacterization:
             comparison=comparison,
         )
         assert payload["cacheable"] is False
-        warnings_text = "\n".join(payload["technical_warnings"])
-        assert "Executor nao foi executado" in warnings_text
-        assert "Comparacao de planners: equivalent." in warnings_text
-        assert "LEGACY_UNICODE_REPAIR=detect" in warnings_text
-        assert len(payload["technical_warnings"]) == 6
+        warnings = payload["technical_warnings"]
+        assert len(warnings) == 6
+        assert warnings[0] == (
+            "Executor nao foi executado; somente manifesto e plano foram gerados."
+        )
+        assert warnings[1] == "Comparacao de planners: equivalent."
+        assert warnings[2] == n(*MSG_PICTURES_NOT_DESCRIBED, 1).format(count=1)
+        assert warnings[3] == n(*MSG_TABLES_NOT_READ, 1).format(count=1)
+        assert "LEGACY_UNICODE_REPAIR=detect" in warnings[4]
+        assert warnings[5] == t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
+            provider="docling"
+        )
         meta = payload["canonical_metadata"]
         assert meta["pddl_extraction_degraded"] is True
         assert meta["pddl_extraction_failures"] == {"mineru": "timeout"}
@@ -359,6 +369,90 @@ class TestBuildPddlStructuredPayloadCharacterization:
         )
         assert retry_payload["cacheable"] is False
 
+    def test_status_fusion_toolbox_availability_and_formula_failures_branches(
+        self,
+    ) -> None:
+        base_manifest = _manifest(
+            [_element("e1", "paragraph", "Body")],
+            configuration={"fusion": {"status": "fused", "pages": 1}},
+        )
+        dry_run_payload = build_pddl_structured_payload(
+            file_path=Path("/tmp/doc.pdf"),
+            manifest=base_manifest,
+            plan=_plan(),
+            planner_backend="heuristic",
+            execution_report=_report("dry-run-completed"),
+            comparison=None,
+            toolbox_availability={"docling": True, "mineru": False},
+        )
+        assert dry_run_payload["cacheable"] is True
+        assert dry_run_payload["technical_warnings"] == []
+        dry_meta = dry_run_payload["canonical_metadata"]
+        assert dry_meta["pddl_toolbox_availability"] == {
+            "docling": True,
+            "mineru": False,
+        }
+        assert dry_meta["pddl_fusion"] == {"status": "fused", "pages": 1}
+
+        replan_payload = build_pddl_structured_payload(
+            file_path=Path("/tmp/doc.pdf"),
+            manifest=_manifest([_element("e1", "paragraph", "Body")]),
+            plan=_plan(),
+            planner_backend="heuristic",
+            execution_report=_report("replan-required"),
+            comparison=None,
+        )
+        assert replan_payload["cacheable"] is False
+        assert len(replan_payload["technical_warnings"]) == 1
+
+        degraded_fusion_payload = build_pddl_structured_payload(
+            file_path=Path("/tmp/doc.pdf"),
+            manifest=_manifest(
+                [_element("e1", "paragraph", "Body")],
+                configuration={"fusion": {"status": "degraded", "reason": "fallback"}},
+            ),
+            plan=_plan(),
+            planner_backend="heuristic",
+            execution_report=_report("completed"),
+            comparison=None,
+        )
+        assert degraded_fusion_payload["cacheable"] is False
+        assert degraded_fusion_payload["canonical_metadata"]["pddl_fusion"] == {
+            "status": "degraded",
+            "reason": "fallback",
+        }
+
+        formula_rec_failed = _element(
+            "f1",
+            "formula",
+            "",
+            metadata={"formula_recognition_failure": "recognizer_unavailable"},
+        )
+        formula_cls_failed = _element(
+            "f2",
+            "formula",
+            "",
+            metadata={
+                "formula_classification": {
+                    "status": "unclassified",
+                    "reason": "provider_blocked",
+                }
+            },
+        )
+        formula_payload = build_pddl_structured_payload(
+            file_path=Path("/tmp/doc.pdf"),
+            manifest=_manifest([formula_rec_failed, formula_cls_failed]),
+            plan=_plan(),
+            planner_backend="heuristic",
+            execution_report=_report("completed"),
+            comparison=None,
+        )
+        assert formula_payload["cacheable"] is False
+        assert formula_payload["technical_warnings"] == []
+        assert formula_payload["canonical_metadata"]["pddl_visual_failures"] == {
+            "formulas": {"recognizer_unavailable": 1, "provider_blocked": 1}
+        }
+
 
 class TestManifestPagesToPayloadCharacterization:
     def test_with_page_descriptors_falls_back_when_element_ids_empty_and_keeps_blank_page(
@@ -385,6 +479,100 @@ class TestManifestPagesToPayloadCharacterization:
         assert [p["page_number"] for p in pages] == [1, 2]
         assert [b["text"] for b in pages[0]["blocks"]] == ["First", "Second"]
         assert pages[1]["blocks"] == []
+
+    def test_explicit_page_descriptors_keep_valid_ids_without_fallback_and_drop_unlisted_pages(
+        self,
+    ) -> None:
+        e1 = _element("e1", "paragraph", "Listed", page_number=1, reading_order=1)
+        e2 = _element("e2", "paragraph", "Unlisted on p1", page_number=1, reading_order=2)
+        e3 = _element("e3", "paragraph", "Unlisted page 2", page_number=2, reading_order=3)
+        manifest = _manifest(
+            [e1, e2, e3],
+            pages=[PageDescriptor(page_number=1, element_ids=["missing-id", "e1"])],
+        )
+        pages = _manifest_pages_to_payload(manifest)
+        assert [p["page_number"] for p in pages] == [1]
+        assert [b["text"] for b in pages[0]["blocks"]] == ["Listed"]
+
+    def test_excludes_page_numbers_and_merges_letterhead_members(self) -> None:
+        logo = _element(
+            "logo",
+            "picture",
+            "Institution crest",
+            page_number=1,
+            reading_order=1,
+            provenance=[
+                Provenance(
+                    page_number=1,
+                    bbox=BoundingBox(
+                        left=5.0,
+                        top=2.0,
+                        right=15.0,
+                        bottom=10.0,
+                        coord_origin="TOPLEFT",
+                    ),
+                )
+            ],
+        )
+        header_line = _element(
+            "hdr",
+            "page_header",
+            "Federal Institute",
+            page_number=1,
+            reading_order=2,
+            provenance=[
+                Provenance(
+                    page_number=1,
+                    bbox=BoundingBox(
+                        left=17.0,
+                        top=3.0,
+                        right=70.0,
+                        bottom=9.0,
+                        coord_origin="TOPLEFT",
+                    ),
+                )
+            ],
+        )
+        body = _element("body", "paragraph", "Main content", page_number=1, reading_order=3)
+        footer_num = _element(
+            "pnum",
+            "page_footer",
+            "- 1 -",
+            page_number=1,
+            reading_order=4,
+            provenance=[
+                Provenance(
+                    page_number=1,
+                    bbox=BoundingBox(
+                        left=45.0,
+                        top=92.0,
+                        right=55.0,
+                        bottom=97.0,
+                        coord_origin="TOPLEFT",
+                    ),
+                )
+            ],
+        )
+        manifest = _manifest(
+            [logo, header_line, body, footer_num],
+            pages=[
+                PageDescriptor(
+                    page_number=1,
+                    width=100.0,
+                    height=100.0,
+                    element_ids=["logo", "hdr", "body", "pnum"],
+                )
+            ],
+        )
+        pages = _manifest_pages_to_payload(manifest)
+        assert len(pages) == 1
+        blocks = pages[0]["blocks"]
+        assert len(blocks) == 2
+        assert blocks[0]["type"] == "paragraph"
+        assert blocks[0]["metadata"]["role"] == "header"
+        assert blocks[0]["metadata"]["letterhead_members"] == ["logo", "hdr"]
+        assert "Federal Institute" in blocks[0]["text"]
+        assert blocks[1]["text"] == "Main content"
 
     def test_without_page_descriptors_groups_by_page_and_skips_excluded_only_pages(
         self,
