@@ -203,12 +203,52 @@ def test_structure_recall_sees_set_braces():
         (r"\operatorname{sin}x", r"\sin x"),
         (r"\operatorname{l o g}_2 x + \operatorname{l n} x", r"\log_2 x + \ln x"),
         (r"\operatorname*{m a x}_{x \in A} f(x)", r"\max_{x \in A} f(x)"),
+        # Portuguese operator aliases from docstruct.text.latex._FUNCTION_ALIASES.
+        (r"\operatorname{s e n} x + \operatorname{t g} x", r"\sin x + \tan x"),
+        (r"\sin x", r"\operatorname{sen} x"),
+        ("\\operatorname*{m \u00e1 x}_{x \\in A} f(x)", r"\max_{x \in A} f(x)"),
     ],
 )
 def test_structure_recall_normalizes_operatorname_named_operators(predicted, expected):
-    """#266: PP-FormulaNet's ``\\operatorname*?{l i m}`` (and sin/cos/log/...)
+    """#266: PP-FormulaNet's ``\\operatorname*?{l i m}`` (and sin/cos/log/... + pt-BR aliases)
     counts as the equivalent LaTeX operator command in structure recall."""
     assert math_case.structure_recall(predicted, expected) == 100.0
+
+
+@pytest.mark.parametrize(
+    "predicted, expected",
+    [
+        # Real p3-d04 LaTeX with \rightarrow instead of \to.
+        (
+            r"\operatorname{l i m}_{h \rightarrow 0} vm_2(h) = \operatorname{l i m}_{h \rightarrow 0} \frac{s(2 + h) - s(2)}{h} = 12.",
+            r"\lim_{h \to 0} vm_2(h) = \lim_{h \to 0} \frac{s(2 + h) - s(2)}{h} = 12.",
+        ),
+        # Real p5-d02 LaTeX with \ldots instead of \cdots.
+        (
+            r"\frac{s(3 + h) - s(3)}{h} = \frac{\frac{1}{3 + h} - \frac{1}{3}}{h} = \ldots = -\frac{1}{(3 + h)3}.",
+            r"\frac{s(3 + h) - s(3)}{h} = \frac{\frac{1}{3 + h} - \frac{1}{3}}{h} = \cdots = -\frac{1}{(3 + h)3}.",
+        ),
+        # Real p5-d03 LaTeX with \operatorname*, \rightarrow, \dots, and \dfrac.
+        (
+            r"v(t) = \operatorname*{l i m}_{h \rightarrow 0} \dfrac{s(t + h) - s(t)}{h} = \dots = \operatorname*{l i m}_{h \rightarrow 0} \dfrac{-1}{(t + h)t},",
+            r"v(t) = \lim_{h \to 0} \frac{s(t + h) - s(t)}{h} = \cdots = \lim_{h \to 0} \frac{-1}{(t + h)t},",
+        ),
+        (r"h \ge -2 \text{ e } h \ne 0", r"h \geq -2 \text{ e } h \neq 0"),
+        (r"\left(x \le 1\right)", r"\left(x \leq 1\right)"),
+    ],
+)
+def test_structure_recall_equates_equivalent_commands(predicted, expected):
+    """#266: equivalent LaTeX macros (\\rightarrow/\\to, \\ldots/\\dots/\\cdots,
+    \\dfrac/\\tfrac/\\frac, \\ne/\\neq, \\ge/\\geq, \\le/\\leq) score 100%."""
+    assert math_case.structure_recall(predicted, expected) == 100.0
+
+
+def test_structure_recall_keeps_text_and_mathrm_distinct_and_preserves_command_prefixes():
+    # \mathrm{e} vs \text{ e } is a content difference, not a macro synonym.
+    assert math_case.structure_recall(r"\mathrm{e}", r"\text{ e }") == 0.0
+    # \left must not be rewritten by \le -> \leq, nor \rightarrowtail by \rightarrow.
+    assert math_case.structure_recall(r"\left(x\right)", r"\leq x") == 0.0
+    assert math_case.structure_recall(r"a \rightarrowtail b", r"a \to b") == 0.0
 
 
 def test_structure_recall_still_penalizes_flattened_named_operators():
@@ -235,9 +275,7 @@ def test_structure_recall_equates_operatorname_and_mathrm(predicted, expected):
         (r"v(t) = v_0 + a t \quad(1)", r"v(t) = v_0 + a t \tag{1}"),
         (r"v(t) = v_0 + a t \quad (2.1)", r"v(t) = v_0 + a t \tag{2.1}"),
         (r"v(t) = v_0 + a t \qquad(1)", r"v(t) = v_0 + a t \tag{1}"),
-        (r"v(t) = v_0 + a t \quad\quad(1)", r"v(t) = v_0 + a t \tag{1}"),
         (r"v(t) = v_0 + a t \qquad\text{(1)}", r"v(t) = v_0 + a t \tag{1}"),
-        (r"v(t) = v_0 + a t \quad\mathrm{(1)}", r"v(t) = v_0 + a t \tag{1}"),
         (r"v(t) = v_0 + a t \tag{1}", r"v(t) = v_0 + a t \quad(1)"),
         (r"$$v(t) = v_0 + a t \quad(1)$$", r"$$v(t) = v_0 + a t \tag{1}$$"),
     ],
@@ -252,6 +290,10 @@ def test_structure_recall_does_not_turn_non_label_quad_or_bare_parens_into_tag()
     assert math_case.structure_recall(r"x = 1 \quad y = 2", r"x = 1 \tag{2}") == 0.0
     # Non-numeric parenthesized expression after \quad is not an equation tag.
     assert math_case.structure_recall(r"x = 1 \quad (a + b)", r"x = 1 \tag{1}") == 0.0
+    # Trailing operator before \quad(1) is refused by split_equation_number too.
+    assert math_case.structure_recall(r"x = 1 + \quad(1)", r"x = 1 + \tag{1}") == 0.0
+    # \qquad\mathrm{(1)} is not accepted by split_equation_number, so scorer matches it.
+    assert math_case.structure_recall(r"x = 1 \qquad\mathrm{(1)}", r"x = 1 \tag{1}") == 0.0
     # Line break \\ followed by literal quad(1) is not \quad(1).
     assert math_case.structure_recall(r"x = 1 \\quad(1)", r"x = 1 \tag{1}") == 0.0
     # Bare (1) without LaTeX markup does not get free credit for \tag{1}.
