@@ -8,9 +8,10 @@ visual regions on a page (#263, #325, #398):
 - ``document_text``: independent textual content (prose, headings, lists,
   tables, formulas, code); preserved as accessible text.
 - ``scene_text``: OCR fragments read off a photograph, illustration, or map
-  (signage, painted inscriptions, scattered labels on a standalone image);
-  associated with their owner picture and omitted as separate blocks once the
-  picture has a complete visual description.
+  (signage, painted inscriptions, scattered labels on a standalone image or
+  geometrically contained inside a picture); associated with their owner
+  picture and omitted as separate blocks only when the picture has a usable
+  visual description that covers the fragment.
 - ``figure_label``: short labels folded into a chart or diagram by slide or
   figure structuring; preserved within the figure's description.
 - ``caption``: independent figure/table caption or source line; preserved as
@@ -31,7 +32,7 @@ from typing import Any, Literal
 
 from docstruct.geometry.boxes import box_contains_center
 from docstruct.placeholders import (
-     TEXT_ELEMENT_TYPES,
+    TEXT_ELEMENT_TYPES,
     ExtractedElement,
     is_ocr_noise,
     is_placeholder_text,
@@ -49,9 +50,19 @@ VisualTextRole = Literal[
 
 Box = tuple[float, float, float, float]
 
+#: Per-item and total character bounds for surrounding page context sent to the VLM (#653).
+MAX_CONTEXT_ITEM_CHARS = 160
+MAX_CONTEXT_TOTAL_CHARS = 480
+MAX_CONTEXT_ITEMS = 6
+
 _SENTENCE_END_RE = re.compile(r"[.!?;\u2026]$")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+_SCENE_CANDIDATE_TYPES = frozenset(
+    {"paragraph", "heading", "title", "list_item", "unknown"}
+)
 
 _CAPTION_PREFIXES = (
     "figura ",
@@ -67,53 +78,16 @@ _CAPTION_PREFIXES = (
     "source:",
 )
 
-_LOGO_MARKERS = (
-    "logo",
-    "logotipo",
-    "brasao",
-    "emblema",
-    "selo",
-    "simbolo institucional",
-    "marca institucional",
-    "insignia",
-    "monograma",
-    "coat of arms",
-    "emblem",
-    "seal",
-    "crest",
+_LOGO_MARKER_RE = re.compile(
+    r"\b(?:logo|logotipo|logomarca|brasao|emblema|selo|simbolo|insignia|monograma|"
+    r"crest|emblem|seal)\b|coat of arms|marca institucional"
 )
 
-_NON_LOGO_MARKERS = (
-    "fotografia",
-    "foto de",
-    "foto do",
-    "foto da",
-    "retrato",
-    "autor",
-    "pessoa",
-    "homem",
-    "mulher",
-    "rosto",
-    "qr code",
-    "codigo qr",
-    "codigo de barras",
-    "grafico",
-    "diagrama",
-    "fluxograma",
-    "organograma",
-    "tabela",
-    "mapa",
-    "equacao",
-    "formula",
-    "photograph",
-    "photo of",
-    "portrait",
-    "author",
-    "person",
-    "chart",
-    "diagram",
-    "plot",
-    "barcode",
+_NON_LOGO_MARKER_RE = re.compile(
+    r"\b(?:fotografia|foto|retrato|autor|pessoa|homem|mulher|rosto|icone|icon|"
+    r"grafico|diagrama|fluxograma|organograma|tabela|mapa|map|equacao|formula|"
+    r"photograph|photo|portrait|author|person|chart|diagram|plot|barcode)\b|"
+    r"qr code|codigo qr|codigo de barras"
 )
 
 _TRANSCRIPTION_BOILERPLATE = frozenset(
@@ -235,6 +209,14 @@ def _is_all_upper(text: str) -> bool:
     return bool(cased) and all(ch.isupper() for ch in cased)
 
 
+def _truncate_context_item(text: str, max_chars: int = MAX_CONTEXT_ITEM_CHARS) -> str:
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= max_chars:
+        return collapsed
+    cut = collapsed[:max_chars].rsplit(" ", 1)[0]
+    return cut or collapsed[:max_chars]
+
+
 def is_caption_text(
     text: str | None, raw_label: str = "", element_type: str = ""
 ) -> bool:
@@ -291,6 +273,35 @@ def is_scene_ocr_collection(elements: Iterable[ExtractedElement]) -> bool:
     return len(text_items) >= 2
 
 
+def is_scene_text_covered(
+    fragment: str | None,
+    description: str | None,
+    mentioned_elements: Iterable[str] = (),
+) -> bool:
+    """Whether ``fragment`` is covered by ``description`` (or is pure OCR noise)."""
+    normalized = (fragment or "").strip()
+    if is_ocr_noise(normalized) or is_placeholder_text(normalized):
+        return True
+    combined_desc = " ".join(
+        [description or "", *(str(item) for item in mentioned_elements)]
+    ).strip()
+    if not combined_desc:
+        return False
+    folded_desc = _ascii_fold(combined_desc)
+    spaceless_desc = _ALNUM_RE.sub("", folded_desc)
+    spaceless_frag = _ALNUM_RE.sub("", _ascii_fold(normalized))
+    if len(spaceless_frag) >= 4 and spaceless_frag in spaceless_desc:
+        return True
+    frag_tokens = _tokens(normalized)
+    if not frag_tokens:
+        return False
+    desc_tokens = set(_tokens(combined_desc))
+    matched = sum(
+        1 for tok in frag_tokens if tok in desc_tokens or (len(tok) >= 4 and tok in spaceless_desc)
+    )
+    return matched * 2 >= len(frag_tokens)
+
+
 def _is_standalone_scene_fragment(text: str) -> bool:
     """On a confirmed standalone image with an injected picture, short non-prose labels are scene OCR."""
     normalized = text.strip()
@@ -308,7 +319,7 @@ def _page_has_document_prose(
         text = (element.text or "").strip()
         if not text:
             continue
-        if element.type in {"table", "formula", "code"}:
+        if element.type in {"table", "formula", "code"} or element.metadata.get("slide_role"):
             return True
         if is_prose_sentence(text):
             return True
@@ -328,10 +339,16 @@ def _find_containing_picture(
     if box is None:
         return None
     for picture in pictures:
-        pic_box = page_boxes.get(getattr(picture, "id", ""))
+        pic_box = page_boxes.get(str(getattr(picture, "id", "")))
         if pic_box is not None and box_contains_center(pic_box, box):
             return str(getattr(picture, "id", ""))
     return None
+
+
+def _is_contained_scene_candidate(element: ExtractedElement) -> bool:
+    if element.type in {"paragraph", "unknown"}:
+        return True
+    return element.type == "list_item" and not element.metadata.get("enumerated")
 
 
 def _classify_page_element(
@@ -346,6 +363,12 @@ def _classify_page_element(
 ) -> TextOwnership:
     element_id = str(getattr(element, "id", ""))
     text = (element.text or "").strip()
+    if element.metadata.get("slide_role"):
+        return TextOwnership(
+            element_id=element_id,
+            role="document_text",
+            reason="slide_structure",
+        )
     if is_caption_text(text, element.raw_label, element.type):
         return TextOwnership(
             element_id=element_id,
@@ -359,7 +382,7 @@ def _classify_page_element(
             if standalone_image
             else is_scene_text_fragment(text)
         )
-        if is_fragment and element.type in {"paragraph", "heading", "title", "unknown"}:
+        if is_fragment and element.type in _SCENE_CANDIDATE_TYPES:
             return TextOwnership(
                 element_id=element_id,
                 role="scene_text",
@@ -367,7 +390,7 @@ def _classify_page_element(
                 reason="standalone_scene_ocr",
             )
     host_id = _find_containing_picture(element_id, pictures, page_boxes)
-    if host_id is not None and element.type in {"paragraph", "unknown"}:
+    if host_id is not None and _is_contained_scene_candidate(element):
         if is_scene_text_fragment(text):
             return TextOwnership(
                 element_id=element_id,
@@ -392,20 +415,13 @@ def _classify_page_element(
 
 def _full_page_picture_id(
     pictures: Sequence[ExtractedElement],
-    non_pictures: Sequence[ExtractedElement],
     *,
-    single_page: bool,
     standalone_image: bool,
 ) -> str | None:
+    """A picture owns unboxed page-level scene OCR only on an explicit standalone/injected image."""
     for pic in pictures:
-        if (
-            pic.metadata.get("injected_picture")
-            or pic.metadata.get("slide_visual")
-            or standalone_image
-        ):
+        if pic.metadata.get("injected_picture") or standalone_image:
             return str(getattr(pic, "id", ""))
-    if single_page and len(pictures) == 1 and is_scene_ocr_collection(non_pictures):
-        return str(getattr(pictures[0], "id", ""))
     return None
 
 
@@ -413,7 +429,6 @@ def _analyze_page_elements(
     page_elements: Sequence[ExtractedElement],
     *,
     boxes: Mapping[str, Box],
-    single_page: bool,
     standalone_image: bool,
 ) -> dict[str, TextOwnership]:
     pictures = [el for el in page_elements if el.type == "picture"]
@@ -421,8 +436,6 @@ def _analyze_page_elements(
     primary_id = str(getattr(pictures[0], "id", "")) if pictures else None
     full_page_pic = _full_page_picture_id(
         pictures,
-        non_pictures,
-        single_page=single_page,
         standalone_image=standalone_image,
     )
     effective_standalone = standalone_image or full_page_pic is not None
@@ -457,14 +470,12 @@ def analyze_visual_text_ownership(
         page = int(getattr(element, "page_number", None) or 1)
         by_page.setdefault(page, []).append(element)
 
-    single_page = len(by_page) == 1
     decisions: dict[str, TextOwnership] = {}
     for page_elements in by_page.values():
         decisions.update(
             _analyze_page_elements(
                 page_elements,
                 boxes=boxes,
-                single_page=single_page,
                 standalone_image=standalone_image,
             )
         )
@@ -506,6 +517,26 @@ def _page_items_for_picture(
     return page_items, target_idx
 
 
+def _bound_surrounding_items(items: Sequence[str]) -> tuple[str, ...]:
+    """Cap surrounding context items by count, per-item length, and total length."""
+    bounded: list[str] = []
+    total_chars = 0
+    for raw in items:
+        clipped = _truncate_context_item(raw, MAX_CONTEXT_ITEM_CHARS)
+        if not clipped or clipped in bounded:
+            continue
+        if total_chars + len(clipped) > MAX_CONTEXT_TOTAL_CHARS:
+            remaining = MAX_CONTEXT_TOTAL_CHARS - total_chars
+            if remaining < 24:
+                break
+            clipped = _truncate_context_item(clipped, remaining)
+        bounded.append(clipped)
+        total_chars += len(clipped)
+        if len(bounded) >= MAX_CONTEXT_ITEMS:
+            break
+    return tuple(bounded)
+
+
 def _accumulate_context_item(
     el: ExtractedElement,
     *,
@@ -515,7 +546,7 @@ def _accumulate_context_item(
     resolved: Mapping[str, TextOwnership],
     headers: list[str],
     captions: list[str],
-    surrounding: list[str],
+    nearby: list[str],
     scene: list[str],
 ) -> None:
     text = (el.text or "").strip()
@@ -534,8 +565,8 @@ def _accumulate_context_item(
         captions.append(text)
     if is_hdr:
         headers.append(text)
-    if (abs(idx - target_idx) <= 4 or role == "caption" or is_hdr) and text not in surrounding:
-        surrounding.append(text)
+    if abs(idx - target_idx) <= 4 and not is_hdr and role != "caption":
+        nearby.append(text)
 
 
 def collect_picture_context(
@@ -543,7 +574,7 @@ def collect_picture_context(
     elements: Sequence[ExtractedElement],
     ownership: Mapping[str, TextOwnership] | None = None,
 ) -> PictureTextContext:
-    """Gather surrounding independent document text and owned scene text for ``picture_id``."""
+    """Gather bounded surrounding document text and owned scene text for ``picture_id``."""
     resolved = (
         ownership
         if ownership is not None
@@ -555,7 +586,7 @@ def collect_picture_context(
 
     headers: list[str] = []
     captions: list[str] = []
-    surrounding: list[str] = []
+    nearby: list[str] = []
     scene: list[str] = []
     for idx, el in enumerate(page_items):
         _accumulate_context_item(
@@ -566,12 +597,14 @@ def collect_picture_context(
             resolved=resolved,
             headers=headers,
             captions=captions,
-            surrounding=surrounding,
+            nearby=nearby,
             scene=scene,
         )
+    # Prioritize headers and captions before nearby body paragraphs.
+    ordered_candidates = [*headers, *captions, *nearby]
     return PictureTextContext(
         picture_id=picture_id,
-        surrounding_text=tuple(surrounding[:6]),
+        surrounding_text=_bound_surrounding_items(ordered_candidates),
         header_text=tuple(headers),
         caption_text=tuple(captions),
         scene_text=tuple(scene),
@@ -633,22 +666,30 @@ def is_confirmed_logo_description(
     *,
     described: bool = False,
 ) -> bool:
-    """Whether a header-adjacent picture is confirmed (or not contradicted) as a logo (#325)."""
-    if not described:
-        return True
+    """Whether a header-adjacent picture is confirmed as an institutional logo (#325).
+
+    When ``described=True`` (the VLM ran on the picture), an explicit positive
+    logo/emblem/crest marker is required so icons, author photos, maps, QR
+    codes, or arbitrary shapes are never called ``Logo.``. When
+    ``described=False`` (dry-run or VLM unavailable), existing extractor text
+    is still checked for non-logo markers before falling back to geometry.
+    """
     combined = _ascii_fold(
         " ".join([description or "", *(str(item) for item in mentioned_elements)])
-    )
-    if not combined.strip():
-        return True
-    if any(marker in combined for marker in _LOGO_MARKERS):
-        return True
-    if any(marker in combined for marker in _NON_LOGO_MARKERS):
+    ).strip()
+    has_logo = bool(_LOGO_MARKER_RE.search(combined))
+    has_non_logo = bool(_NON_LOGO_MARKER_RE.search(combined))
+    if described:
+        return has_logo and not (has_non_logo and not has_logo)
+    if has_non_logo and not has_logo:
         return False
     return True
 
 
 __all__ = [
+    "MAX_CONTEXT_ITEMS",
+    "MAX_CONTEXT_ITEM_CHARS",
+    "MAX_CONTEXT_TOTAL_CHARS",
     "PictureTextContext",
     "TextOwnership",
     "VisualTextRole",
@@ -659,5 +700,6 @@ __all__ = [
     "is_confirmed_logo_description",
     "is_prose_sentence",
     "is_scene_ocr_collection",
+    "is_scene_text_covered",
     "is_scene_text_fragment",
 ]

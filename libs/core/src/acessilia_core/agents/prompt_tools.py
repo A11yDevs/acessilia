@@ -70,8 +70,12 @@ def load_chemistry_prompt() -> str:
 
 
 def build_surrounding_text_prompt(surrounding_text: Sequence[str]) -> str:
-    """Build the page-context instruction listing text already present near an image (#263, #653)."""
-    items = [text.strip() for text in surrounding_text if text and text.strip()]
+    """Build the bounded page-context instruction listing text near an image (#263, #653)."""
+    from docstruct.visual_text import _bound_surrounding_items
+
+    items = _bound_surrounding_items(
+        [text.strip() for text in surrounding_text if text and text.strip()]
+    )
     if not items:
         return ""
     prompt_path = PROMPTS_DIR / SURROUNDING_TEXT_PROMPT
@@ -80,7 +84,7 @@ def build_surrounding_text_prompt(surrounding_text: Sequence[str]) -> str:
         if prompt_path.exists()
         else ""
     )
-    bullets = "\n".join(f"- {item}" for item in items[:6])
+    bullets = "\n".join(f"- {item}" for item in items)
     return f"{header}\n{bullets}" if header else bullets
 
 
