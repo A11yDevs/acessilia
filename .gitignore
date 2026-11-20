@@ -46,8 +46,10 @@ temp/
 # PDFs temporarios gerados durante benchmark em fixtures
 tests/fixtures/tutorials/pagina_*.pdf
 
-# Agentes Copilot locais (nao devem ir para PR)
+# Local AI assistant workspaces and personal settings (must not be committed)
 .github/agents/
+.claude/
+CLAUDE.local.md
 
 *.egg-info
 .venv-1
@@ -59,4 +61,3 @@ scripts/drbench/builds
 tests/dataset/
 .mypy_cache/
 .ruff_cache/
-.claude/
