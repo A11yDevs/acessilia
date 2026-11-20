@@ -66,19 +66,36 @@ CASE_PDF = "velocidade-instantanea.pdf"
 #: different expression sharing a few letters.
 MATCH_CDM = 80.0
 
+#: Standard LaTeX named operators that recognizers like PP-FormulaNet often
+#: spell as ``\operatorname{l i m}`` or ``\operatorname*{l i m}`` (#266).
+_NAMED_OPERATORS = frozenset({
+    "lim", "sin", "cos", "tan", "cot", "sec", "csc",
+    "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh",
+    "log", "ln", "exp", "max", "min", "sup", "inf", "det",
+})
+
 #: Tokens that carry 2-D or symbolic structure. Text-layer extraction keeps
 #: the letters and digits of a formula but drops these, so their recall is
 #: what separates real LaTeX from a flattened formula.
 STRUCTURE_TOKENS = frozenset({
-    "^", "_", "\\frac", "\\dfrac", "\\tfrac", "\\lim", "\\to", "\\mathbb", "\\neq", "\\ne",
+    "^", "_", "\\frac", "\\dfrac", "\\tfrac", "\\to", "\\mathbb", "\\neq", "\\ne",
     "\\geq", "\\ge", "\\leq", "\\le", "\\in", "\\cup", "\\infty", "\\cdot", "\\cdots",
     "\\tag", "\\mathrm", "\\text", "\\quad", "\\lbrace", "\\rbrace",
+    *(f"\\{name}" for name in _NAMED_OPERATORS),
 })
 
 #: Set braces as commands. The CDM tokenizer turns every brace, escaped ones
 #: included, into a token boundary, so ``\{``/``\}`` would never reach the
 #: recall; their command spellings survive it.
 _SET_BRACES = (("\\{", "\\lbrace "), ("\\}", "\\rbrace "))
+
+_OPERATORNAME_RE = re.compile(r"\\operatorname\*?\s*\{([^{}]*)\}")
+_OPERATOR_SPACE_RE = re.compile(r"(?:\\[,;:! ]|\s)+")
+_EQUATION_NUMBER = r"(?:[A-Za-z]\.)?[0-9]+(?:\.[0-9]+)*[A-Za-z]?"
+_TRAILING_SPACED_TAG_RE = re.compile(
+    rf"(?<!\\)(?:\\(?:qquad|quad)\s*)+"
+    rf"(?:\(\s*({_EQUATION_NUMBER})\s*\)|\\(?:text|mathrm)\s*\{{\s*\(\s*({_EQUATION_NUMBER})\s*\)\s*\}})\s*$"
+)
 
 #: A math span in a text: ``$$...$$``, ``\[...\]``, ``$...$`` or ``\(...\)``.
 #: Display delimiters count too, because a cell or a paragraph that carries
@@ -268,13 +285,41 @@ def _inline_spans(text: str) -> list[str]:
 # ── Scoring ─────────────────────────────────────────────────────────
 
 
+def _normalize_structure_latex(latex: str) -> str:
+    """Normalize equivalent LaTeX spellings before counting structural tokens (#266).
+
+    - ``\\operatorname*?{l i m}`` (spaces / thin spaces ignored) -> ``\\lim``
+      (and likewise for the other standard ``_NAMED_OPERATORS``);
+    - any other ``\\operatorname*?{X}`` -> ``\\mathrm{X}``;
+    - trailing ``\\quad(n)`` / ``\\qquad(n)`` / ``\\qquad\\text{(n)}`` -> ``\\tag{n}``;
+    - escaped set braces ``\\{`` / ``\\}`` -> ``\\lbrace`` / ``\\rbrace``.
+
+    Applied to ``structure_recall`` only; CDM keeps the raw tokens so bench
+    scores remain comparable across runs.
+    """
+    latex = bare_latex(latex)
+
+    def replace_operatorname(match: re.Match[str]) -> str:
+        body = match.group(1)
+        name = _OPERATOR_SPACE_RE.sub("", body)
+        if name in _NAMED_OPERATORS:
+            return f"\\{name} "
+        return f"\\mathrm{{{body}}}"
+
+    latex = _OPERATORNAME_RE.sub(replace_operatorname, latex)
+    latex = _TRAILING_SPACED_TAG_RE.sub(
+        lambda m: f"\\tag{{{m.group(1) or m.group(2)}}}", latex
+    )
+    for brace, command in _SET_BRACES:
+        latex = latex.replace(brace, command)
+    return latex
+
+
 def structure_recall(predicted: str, expected: str) -> float | None:
     """Share of the expected structural tokens the prediction keeps (0-100)."""
 
     def structural(latex: str) -> Counter[str]:
-        for brace, command in _SET_BRACES:
-            latex = latex.replace(brace, command)
-        return Counter(t for t in _tokens(latex) if t in STRUCTURE_TOKENS)
+        return Counter(t for t in _tokens(_normalize_structure_latex(latex)) if t in STRUCTURE_TOKENS)
 
     wanted = structural(expected)
     if not wanted:

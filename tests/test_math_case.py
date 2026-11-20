@@ -191,6 +191,98 @@ def test_structure_recall_sees_set_braces():
     assert math_case.structure_recall(r"\{h \in R : h \geq 0\}", r"\{h \in R : h \geq 0\}") == 100.0
 
 
+@pytest.mark.parametrize(
+    "predicted, expected",
+    [
+        (r"\operatorname{l i m}_{h \to 0} f(h)", r"\lim_{h \to 0} f(h)"),
+        (r"\operatorname*{l i m}_{h \to 0} f(h)", r"\lim_{h \to 0} f(h)"),
+        (r"\operatorname{lim}_{h \to 0} f(h)", r"\lim_{h \to 0} f(h)"),
+        (r"\operatorname{l\,i\,m}_{h \to 0} f(h)", r"\lim_{h \to 0} f(h)"),
+        (r"\lim_{h \to 0} f(h)", r"\operatorname*{l i m}_{h \to 0} f(h)"),
+        (r"\operatorname{s i n} x + \operatorname{c o s} x", r"\sin x + \cos x"),
+        (r"\operatorname{sin}x", r"\sin x"),
+        (r"\operatorname{l o g}_2 x + \operatorname{l n} x", r"\log_2 x + \ln x"),
+        (r"\operatorname*{m a x}_{x \in A} f(x)", r"\max_{x \in A} f(x)"),
+    ],
+)
+def test_structure_recall_normalizes_operatorname_named_operators(predicted, expected):
+    """#266: PP-FormulaNet's ``\\operatorname*?{l i m}`` (and sin/cos/log/...)
+    counts as the equivalent LaTeX operator command in structure recall."""
+    assert math_case.structure_recall(predicted, expected) == 100.0
+
+
+def test_structure_recall_still_penalizes_flattened_named_operators():
+    assert math_case.structure_recall("sin x", r"\sin x") == 0.0
+    assert math_case.structure_recall("lim h -> 0", r"\lim_{h \to 0}") == 0.0
+
+
+@pytest.mark.parametrize(
+    "predicted, expected",
+    [
+        (r"\operatorname{D o m}(f) = \mathbb{R}", r"\mathrm{Dom}(f) = \mathbb{R}"),
+        (r"\operatorname*{D o m}(f) = \mathbb{R}", r"\mathrm{Dom}(f) = \mathbb{R}"),
+        (r"\mathrm{Dom}(f) = \mathbb{R}", r"\operatorname{D o m}(f) = \mathbb{R}"),
+    ],
+)
+def test_structure_recall_equates_operatorname_and_mathrm(predicted, expected):
+    """#266: custom ``\\operatorname{X}`` and ``\\mathrm{X}`` are equivalent."""
+    assert math_case.structure_recall(predicted, expected) == 100.0
+
+
+@pytest.mark.parametrize(
+    "predicted, expected",
+    [
+        (r"v(t) = v_0 + a t \quad(1)", r"v(t) = v_0 + a t \tag{1}"),
+        (r"v(t) = v_0 + a t \quad (2.1)", r"v(t) = v_0 + a t \tag{2.1}"),
+        (r"v(t) = v_0 + a t \qquad(1)", r"v(t) = v_0 + a t \tag{1}"),
+        (r"v(t) = v_0 + a t \quad\quad(1)", r"v(t) = v_0 + a t \tag{1}"),
+        (r"v(t) = v_0 + a t \qquad\text{(1)}", r"v(t) = v_0 + a t \tag{1}"),
+        (r"v(t) = v_0 + a t \quad\mathrm{(1)}", r"v(t) = v_0 + a t \tag{1}"),
+        (r"v(t) = v_0 + a t \tag{1}", r"v(t) = v_0 + a t \quad(1)"),
+        (r"$$v(t) = v_0 + a t \quad(1)$$", r"$$v(t) = v_0 + a t \tag{1}$$"),
+    ],
+)
+def test_structure_recall_equates_trailing_quad_label_with_tag(predicted, expected):
+    """#266: trailing ``\\quad(n)`` / ``\\qquad(n)`` counts as ``\\tag{n}``."""
+    assert math_case.structure_recall(predicted, expected) == 100.0
+
+
+def test_structure_recall_does_not_turn_non_label_quad_or_bare_parens_into_tag():
+    # Mid-expression \quad is spacing, not an equation tag.
+    assert math_case.structure_recall(r"x = 1 \quad y = 2", r"x = 1 \tag{2}") == 0.0
+    # Non-numeric parenthesized expression after \quad is not an equation tag.
+    assert math_case.structure_recall(r"x = 1 \quad (a + b)", r"x = 1 \tag{1}") == 0.0
+    # Line break \\ followed by literal quad(1) is not \quad(1).
+    assert math_case.structure_recall(r"x = 1 \\quad(1)", r"x = 1 \tag{1}") == 0.0
+    # Bare (1) without LaTeX markup does not get free credit for \tag{1}.
+    assert math_case.structure_recall(r"v(t) = v_0 + a t (1)", r"v(t) = v_0 + a t \tag{1}") == 50.0
+
+
+def test_pp_formulanet_equivalences_match_vision_structure_recall_without_changing_cdm():
+    """#266 acceptance: PP-FormulaNet spellings score the same structure recall
+    as vision spellings while CDM stays untouched for bench comparability."""
+    rows = [
+        {"id": "f1", "page": "1", "kind": "display", "expected_latex": r"\lim_{h \to 0} \frac{f(h)}{h} \tag{1}"},
+        {"id": "f2", "page": "1", "kind": "display", "expected_latex": r"\mathrm{Dom}(f) = \{x \in \mathbb{R} : x \geq 0\}"},
+    ]
+    pp_doc = _document([
+        _block("m1", "math", 1, text=r"\operatorname*{l i m}_{h \to 0} \frac{f(h)}{h} \quad(1)"),
+        _block("m2", "math", 1, text=r"\operatorname{D o m}(f) = \{x \in \mathbb{R} : x \geq 0\}"),
+    ])
+    vision_doc = _document([
+        _block("m1", "math", 1, text=r"\lim_{h \to 0} \frac{f(h)}{h} \tag{1}"),
+        _block("m2", "math", 1, text=r"\mathrm{Dom}(f) = \{x \in \mathbb{R} : x \geq 0\}"),
+    ])
+
+    pp_card = math_case.score_case(rows, {}, pp_doc, txt="")
+    vision_card = math_case.score_case(rows, {}, vision_doc, txt="")
+
+    assert pp_card.summary()["display_structure_recall"] == 100.0
+    assert pp_card.summary()["display_structure_recall"] == vision_card.summary()["display_structure_recall"]
+    # CDM keeps raw tokenization so it remains comparable with the bench harness.
+    assert pp_card.display[0]["cdm"] < vision_card.display[0]["cdm"]
+
+
 def test_display_delimiters_in_a_table_cell_count_as_math():
     for cell in (r"$$h \neq 0$$", r"\[h \neq 0\]"):
         document = _document([_table(2, [[cell, "v"], ["1", "2"]])])
