@@ -204,6 +204,66 @@ def _handler_name(handler: Callable[..., object]) -> str:
     return getattr(target, "__qualname__", repr(target))
 
 
+def _signature_parameters(handler: Callable[..., MethodResult]) -> list[inspect.Parameter]:
+    try:
+        return list(inspect.signature(handler).parameters.values())
+    except (TypeError, ValueError) as exc:
+        raise HandlerContractError(
+            f"method handler {_handler_name(handler)}: its signature cannot be read ({exc})"
+        ) from exc
+
+
+def _positional_problems(parameters: list[inspect.Parameter]) -> list[str]:
+    positional = [
+        p for p in parameters
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    takes_any = any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in parameters)
+    problems = []
+    if len(positional) < 2 and not takes_any:
+        problems.append("it must accept (manifest, obligation_id) positionally")
+    required = [p.name for p in positional if p.default is inspect.Parameter.empty]
+    if len(required) > 2:
+        problems.append(
+            f"it requires {len(required)} positional parameters ({', '.join(required)}); "
+            "the executor passes two"
+        )
+    return problems
+
+
+def _classify_parameter(
+    parameter: inspect.Parameter, namespace: dict[str, object]
+) -> tuple[str | None, str | None]:
+    """``(declared run parameter, problem)`` of one handler parameter."""
+    expected = RUN_PARAMETERS.get(parameter.name)
+    if expected is not None:
+        if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
+            return None, f"`{parameter.name}` must be keyword-only (after `*`)"
+        if _resolve(parameter.annotation, namespace) is not expected:
+            return None, (
+                f"`{parameter.name}` must be annotated `{expected.__name__}` "
+                f"(`{expected.__module__}.{expected.__qualname__}`)"
+            )
+        return parameter.name, None
+    misnamed = _names_a_run_type(
+        parameter.annotation, _resolve(parameter.annotation, namespace)
+    )
+    if misnamed:
+        return None, (
+            f"`{parameter.name}` is annotated `{RUN_PARAMETERS[misnamed].__name__}`, "
+            f"but a run binds it only as `{misnamed}`"
+        )
+    if (
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        and parameter.default is inspect.Parameter.empty
+    ):
+        return None, (
+            f"`{parameter.name}` is a required keyword-only parameter that no run binds "
+            f"(a run binds {', '.join(f'`{name}`' for name in RUN_PARAMETERS)})"
+        )
+    return None, None
+
+
 def run_parameters(handler: Callable[..., MethodResult]) -> tuple[str, ...]:
     """The run parameters ``handler`` declares, after checking its contract (#543).
 
@@ -224,57 +284,16 @@ def run_parameters(handler: Callable[..., MethodResult]) -> tuple[str, ...]:
     Raises ``HandlerContractError`` naming every broken rule, and when the
     handler's signature cannot be read, since then nothing can be checked.
     """
-    try:
-        parameters = list(inspect.signature(handler).parameters.values())
-    except (TypeError, ValueError) as exc:
-        raise HandlerContractError(
-            f"method handler {_handler_name(handler)}: its signature cannot be read ({exc})"
-        ) from exc
+    parameters = _signature_parameters(handler)
     namespace = _namespace(handler)
-    positional = [
-        p for p in parameters
-        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-    ]
-    takes_any = any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in parameters)
-    problems = []
-    if len(positional) < 2 and not takes_any:
-        problems.append("it must accept (manifest, obligation_id) positionally")
-    required = [p.name for p in positional if p.default is inspect.Parameter.empty]
-    if len(required) > 2:
-        problems.append(
-            f"it requires {len(required)} positional parameters ({', '.join(required)}); "
-            "the executor passes two"
-        )
+    problems = _positional_problems(parameters)
     declared = []
     for parameter in parameters:
-        expected = RUN_PARAMETERS.get(parameter.name)
-        if expected is not None:
-            if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
-                problems.append(f"`{parameter.name}` must be keyword-only (after `*`)")
-            elif _resolve(parameter.annotation, namespace) is not expected:
-                problems.append(
-                    f"`{parameter.name}` must be annotated `{expected.__name__}` "
-                    f"(`{expected.__module__}.{expected.__qualname__}`)"
-                )
-            else:
-                declared.append(parameter.name)
-            continue
-        misnamed = _names_a_run_type(
-            parameter.annotation, _resolve(parameter.annotation, namespace)
-        )
-        if misnamed:
-            problems.append(
-                f"`{parameter.name}` is annotated `{RUN_PARAMETERS[misnamed].__name__}`, "
-                f"but a run binds it only as `{misnamed}`"
-            )
-        elif (
-            parameter.kind is inspect.Parameter.KEYWORD_ONLY
-            and parameter.default is inspect.Parameter.empty
-        ):
-            problems.append(
-                f"`{parameter.name}` is a required keyword-only parameter that no run binds "
-                f"(a run binds {', '.join(f'`{name}`' for name in RUN_PARAMETERS)})"
-            )
+        name, problem = _classify_parameter(parameter, namespace)
+        if name is not None:
+            declared.append(name)
+        if problem is not None:
+            problems.append(problem)
     if problems:
         raise HandlerContractError(
             f"method handler {_handler_name(handler)}: " + "; ".join(problems)

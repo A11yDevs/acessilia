@@ -85,6 +85,121 @@ def _record_vision_failure(
         element.metadata.pop("vision_failure_detail", None)
 
 
+class _PictureEnrichment:
+    """The state ``_enrich_picture_descriptions`` shares across one document's pictures.
+
+    Descriptions are independent, so they run concurrently, bounded by
+    ``VisionConfig.concurrency`` to stay inside what the model provider accepts (a
+    rate-limited hosted API, or a local Ollama that queues beyond its own
+    parallelism). The progress callback is serialized separately: two
+    admitted tasks would otherwise interleave the state writes behind it
+    (the API's status persistence, the Telegram progress message), and even
+    serialized the emission order may vary with completion, so nothing here
+    promises FIFO delivery.
+    """
+
+    def __init__(
+        self,
+        *,
+        manifest: ProcessingManifest,
+        source_file: Path,
+        mode: str,
+        toolbox: ToolboxConfig,
+        agent: VisionAgent,
+        breaker: ProviderBreaker,
+        slots: asyncio.Semaphore,
+        total: int,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        on_progress: Callable[[], Awaitable[None]] | None,
+    ) -> None:
+        self.manifest = manifest
+        self.source_file = source_file
+        self.mode = mode
+        self.toolbox = toolbox
+        self.agent = agent
+        self.breaker = breaker
+        self.slots = slots
+        self.total = total
+        self.status_callback = status_callback
+        self.on_progress = on_progress
+        self.progress_lock = asyncio.Lock()
+
+    async def describe_one(self, position: int, element: ManifestElement) -> bool:
+        """Describe one picture, then let the caller persist its outcome.
+
+        The fold happens synchronously inside ``_describe``; the progress
+        callback is serialized on ``progress_lock`` so concurrent descriptions
+        never write the checkpoint at the same time (#407).
+        """
+        try:
+            return await self._describe(position, element)
+        finally:
+            if self.on_progress is not None:
+                async with self.progress_lock:
+                    await self.on_progress()
+
+    def _fallback_page_number(self, element: ManifestElement) -> int | None:
+        if element.page_number is None and len(self.manifest.pages) == 1:
+            return self.manifest.pages[0].page_number
+        return element.page_number
+
+    async def _report_progress(self, position: int, page_number: int | None) -> None:
+        if not self.status_callback:
+            return
+        async with self.progress_lock:
+            await self.status_callback(
+                t(STAGE_DESCRIBING_IMAGE).format(
+                    current=position,
+                    total=self.total,
+                    pages=_pages_label([page_number], len(self.manifest.pages)),
+                )
+            )
+
+    async def _describe(self, position: int, element: ManifestElement) -> bool:
+        """Describe one picture and fold the answer into it; True when enriched."""
+        fallback_page_number = self._fallback_page_number(element)
+
+        async with self.slots:
+            await self._report_progress(position, fallback_page_number)
+            if self.breaker.open:
+                _record_vision_failure(element, "model_failed", self.breaker.skip_detail())
+                return False
+            image_bytes, page_number = await run_blocking(
+                _extract_picture_bytes,
+                self.source_file,
+                element,
+                fallback_page_number,
+                _source_artifact_id(self.manifest),
+                self.manifest.source.media_type,
+                toolbox=self.toolbox,
+            )
+            if not image_bytes:
+                _record_vision_failure(
+                    element,
+                    "crop_unavailable" if page_number >= 1 else "image_unavailable",
+                )
+                return False
+
+            errors: list[str] = []
+            vision_output = await self.agent.describe_region(
+                image_bytes=image_bytes,
+                # A whole presentation slide gets the page prompt and budget.
+                classification=(
+                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
+                ),
+                page_num=page_number,
+                total_pages=len(self.manifest.pages),
+                mode=self.mode,
+                errors=errors,
+            )
+            self.breaker.record(isinstance(vision_output, VisionOutput))
+
+        if not isinstance(vision_output, VisionOutput):
+            _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
+            return False
+        return _fold_picture_description(self.manifest, element, vision_output, page_number)
+
+
 async def _enrich_picture_descriptions(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -105,88 +220,19 @@ async def _enrich_picture_descriptions(
     if not pictures:
         return
 
-    agent = VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox, models=models)
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
-    total_pages = len(manifest.pages)
-
-    # Descriptions are independent, so they run concurrently, bounded by
-    # ``VisionConfig.concurrency`` to stay inside what the model provider accepts (a
-    # rate-limited hosted API, or a local Ollama that queues beyond its own
-    # parallelism). The progress callback is serialized separately: two
-    # admitted tasks would otherwise interleave the state writes behind it
-    # (the API's status persistence, the Telegram progress message), and even
-    # serialized the emission order may vary with completion, so nothing here
-    # promises FIFO delivery.
-    slots = asyncio.Semaphore(max(1, vision.concurrency))
-    progress_lock = asyncio.Lock()
-
-    async def _describe_one(position: int, element: ManifestElement) -> bool:
-        """Describe one picture and fold the answer into it; True when enriched."""
-        fallback_page_number = element.page_number
-        if fallback_page_number is None and len(manifest.pages) == 1:
-            fallback_page_number = manifest.pages[0].page_number
-
-        async with slots:
-            if status_callback:
-                async with progress_lock:
-                    await status_callback(
-                        t(STAGE_DESCRIBING_IMAGE).format(
-                            current=position,
-                            total=len(pictures),
-                            pages=_pages_label([fallback_page_number], len(manifest.pages)),
-                        )
-                    )
-            if breaker.open:
-                _record_vision_failure(element, "model_failed", breaker.skip_detail())
-                return False
-            image_bytes, page_number = await run_blocking(
-                _extract_picture_bytes,
-                source_file,
-                element,
-                fallback_page_number,
-                _source_artifact_id(manifest),
-                manifest.source.media_type,
-                toolbox=toolbox,
-            )
-            if not image_bytes:
-                _record_vision_failure(
-                    element,
-                    "crop_unavailable" if page_number >= 1 else "image_unavailable",
-                )
-                return False
-
-            errors: list[str] = []
-            vision_output = await agent.describe_region(
-                image_bytes=image_bytes,
-                # A whole presentation slide gets the page prompt and budget.
-                classification=(
-                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
-                ),
-                page_num=page_number,
-                total_pages=total_pages,
-                mode=mode,
-                errors=errors,
-            )
-            breaker.record(isinstance(vision_output, VisionOutput))
-
-        if not isinstance(vision_output, VisionOutput):
-            _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
-            return False
-        return _fold_picture_description(manifest, element, vision_output, page_number)
-
-    async def describe_one(position: int, element: ManifestElement) -> bool:
-        """Describe one picture, then let the caller persist its outcome.
-
-        The fold happens synchronously inside ``_describe_one``; the progress
-        callback is serialized on ``progress_lock`` so concurrent descriptions
-        never write the checkpoint at the same time (#407).
-        """
-        try:
-            return await _describe_one(position, element)
-        finally:
-            if on_progress is not None:
-                async with progress_lock:
-                    await on_progress()
+    enrichment = _PictureEnrichment(
+        manifest=manifest,
+        source_file=source_file,
+        mode=mode,
+        toolbox=toolbox,
+        agent=VisionAgent(mode=mode, region_cache=region_cache, toolbox=toolbox, models=models),
+        breaker=breaker,
+        slots=asyncio.Semaphore(max(1, vision.concurrency)),
+        total=len(pictures),
+        status_callback=status_callback,
+        on_progress=on_progress,
+    )
 
     # The fold above touches only its own element and runs without awaits, so
     # concurrent folds cannot interleave. The TaskGroup cancels the sibling
@@ -195,7 +241,7 @@ async def _enrich_picture_descriptions(
     # the stage — without leaving tasks mutating the manifest after it failed.
     async with asyncio.TaskGroup() as group:
         tasks = [
-            group.create_task(describe_one(position, element))
+            group.create_task(enrichment.describe_one(position, element))
             for position, element in enumerate(pictures, start=1)
         ]
     enriched = sum(task.result() for task in tasks)
@@ -205,7 +251,7 @@ async def _enrich_picture_descriptions(
             for position, element in enumerate(pictures, start=1)
             if element.metadata.get("vision_failure_reason") in _RETRIED_VISION_FAILURES
         ],
-        describe_one,
+        enrichment.describe_one,
         kind="pictures",
         breaker=breaker,
         delay_seconds=vision.retry_pass_delay_seconds,

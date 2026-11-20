@@ -188,37 +188,10 @@ class ExecutorAgent:
         self._validate_binding(plan, manifest)
         if resume is not None and dry_run:
             raise ValueError("A dry run has no checkpoint to resume")
-        if resume is None:
-            working = deepcopy(manifest)
-            results: list[ExecutionStepResult] = []
-            replan_required = False
-        else:
-            working = resume.manifest
-            results = list(resume.results)
-            replan_required = resume.replan_required
-            indexes = [result.index for result in results]
-            if indexes != list(range(len(results))):
-                raise ValueError(
-                    f"A resumed plan expects consecutive step results, got {indexes}"
-                )
-            if len(results) > len(plan.steps):
-                raise ValueError(
-                    f"A resumed plan has {len(results)} recorded steps, "
-                    f"but the plan has {len(plan.steps)}"
-                )
-        # An obligation the plan's manifest does not have was added by a
-        # handler of this execution (#594). Its `selected` flag is the one the
-        # checkpoint recorded: set by a handler that succeeded
-        # (`_select_discovered`), left unset by one that failed. One still
-        # selected and open asks for a replan, as when it was found.
-        planned = {item.id for item in manifest.obligations}
-        selected = set(plan.selected_obligations)
-        for obligation in working.obligations:
-            if obligation.id not in planned:
-                if obligation.selected and obligation.status != "satisfied":
-                    replan_required = True
-                continue
-            obligation.selected = obligation.id in selected
+        working, results, replan_required = self._initial_working_state(
+            plan, manifest, resume
+        )
+        replan_required = self._sync_selection(plan, manifest, working) or replan_required
 
         started_at = datetime.now(timezone.utc)
         state = _ExecutionState(
@@ -245,26 +218,100 @@ class ExecutorAgent:
             )
         completed_at = datetime.now(timezone.utc)
 
-        if dry_run:
-            returned_manifest = deepcopy(manifest)
-            status = "failed" if state.failed_step_index is not None else "dry-run-completed"
-            revision_after = manifest.revision
-        else:
-            returned_manifest = state.manifest
-            if state.replan_required:
-                status = "replan-required"
-            elif state.failed_step_index is not None:
-                status = "failed"
-            else:
-                status = "completed"
-            returned_manifest.revision += 1
-            revision_after = returned_manifest.revision
+        returned_manifest, status, revision_after = self._conclude(
+            manifest, state, dry_run=dry_run
+        )
+        report = self._build_report(
+            plan,
+            manifest,
+            state,
+            status=status,
+            revision_after=revision_after,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        return returned_manifest, report
 
+    @staticmethod
+    def _initial_working_state(
+        plan: NominalPlan,
+        manifest: ProcessingManifest,
+        resume: ExecutionResume | None,
+    ) -> tuple[ProcessingManifest, list[ExecutionStepResult], bool]:
+        """The manifest, recorded results and replan flag a run starts from."""
+        if resume is None:
+            return deepcopy(manifest), [], False
+        results = list(resume.results)
+        indexes = [result.index for result in results]
+        if indexes != list(range(len(results))):
+            raise ValueError(
+                f"A resumed plan expects consecutive step results, got {indexes}"
+            )
+        if len(results) > len(plan.steps):
+            raise ValueError(
+                f"A resumed plan has {len(results)} recorded steps, "
+                f"but the plan has {len(plan.steps)}"
+            )
+        return resume.manifest, results, resume.replan_required
+
+    @staticmethod
+    def _sync_selection(
+        plan: NominalPlan, manifest: ProcessingManifest, working: ProcessingManifest
+    ) -> bool:
+        """Mark the plan's obligations selected on ``working``; True when one asks for a replan.
+
+        An obligation the plan's manifest does not have was added by a
+        handler of this execution (#594). Its `selected` flag is the one the
+        checkpoint recorded: set by a handler that succeeded
+        (`_select_discovered`), left unset by one that failed. One still
+        selected and open asks for a replan, as when it was found.
+        """
+        planned = {item.id for item in manifest.obligations}
+        selected = set(plan.selected_obligations)
+        replan_required = False
+        for obligation in working.obligations:
+            if obligation.id not in planned:
+                if obligation.selected and obligation.status != "satisfied":
+                    replan_required = True
+                continue
+            obligation.selected = obligation.id in selected
+        return replan_required
+
+    @staticmethod
+    def _conclude(
+        manifest: ProcessingManifest, state: _ExecutionState, *, dry_run: bool
+    ) -> tuple[ProcessingManifest, str, int]:
+        """The manifest to return, the report status and the revision after the run."""
+        if dry_run:
+            status = "failed" if state.failed_step_index is not None else "dry-run-completed"
+            return deepcopy(manifest), status, manifest.revision
+        returned_manifest = state.manifest
+        if state.replan_required:
+            status = "replan-required"
+        elif state.failed_step_index is not None:
+            status = "failed"
+        else:
+            status = "completed"
+        returned_manifest.revision += 1
+        return returned_manifest, status, returned_manifest.revision
+
+    @staticmethod
+    def _build_report(
+        plan: NominalPlan,
+        manifest: ProcessingManifest,
+        state: _ExecutionState,
+        *,
+        status: str,
+        revision_after: int,
+        started_at: datetime,
+        completed_at: datetime,
+    ) -> ExecutionReport:
+        mode = "dry-run" if state.dry_run else "live"
         execution_seed = (
             f"{plan.plan_id}:{manifest.manifest_id}:"
-            f"{started_at.isoformat()}:{'dry' if dry_run else 'live'}"
+            f"{started_at.isoformat()}:{'dry' if state.dry_run else 'live'}"
         )
-        report = ExecutionReport(
+        return ExecutionReport(
             execution_id=(
                 "execution-"
                 + hashlib.sha256(execution_seed.encode()).hexdigest()[:16]
@@ -275,13 +322,12 @@ class ExecutorAgent:
             manifest_revision_after=revision_after,
             started_at=started_at,
             completed_at=completed_at,
-            mode="dry-run" if dry_run else "live",
+            mode=mode,
             status=status,
             replan_required=state.replan_required,
             failed_step_index=state.failed_step_index,
             steps=state.results,
         )
-        return returned_manifest, report
 
     def _record_obligation_attempt(
         self,

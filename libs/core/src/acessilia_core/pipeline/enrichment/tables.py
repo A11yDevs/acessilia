@@ -62,6 +62,104 @@ from acessilia_core.i18n.stage_messages import (
 from acessilia_core.logger import logger
 
 
+class _TableReader:
+    """The state ``_enrich_table_structures`` shares across one document's tables."""
+
+    def __init__(
+        self,
+        *,
+        manifest: ProcessingManifest,
+        source_file: Path,
+        toolbox: ToolboxConfig,
+        data_agent: DataAgent,
+        breaker: ProviderBreaker,
+        garbled: dict[str, str],
+        total: int,
+        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+        on_progress: Callable[[], Awaitable[None]] | None,
+    ) -> None:
+        self.manifest = manifest
+        self.source_file = source_file
+        self.toolbox = toolbox
+        self.data_agent = data_agent
+        self.breaker = breaker
+        self.garbled = garbled
+        self.total = total
+        self.status_callback = status_callback
+        self.on_progress = on_progress
+
+    async def read_and_notify(self, position: int, element: ManifestElement) -> bool:
+        """Read one table, then let the caller persist its outcome (#407)."""
+        try:
+            return await self._read_one(position, element)
+        finally:
+            if self.on_progress is not None:
+                await self.on_progress()
+
+    async def _report_progress(self, position: int, page_number: int | None) -> None:
+        if self.status_callback:
+            await self.status_callback(
+                t(STAGE_RECOGNIZING_TABLE).format(
+                    current=position,
+                    total=self.total,
+                    pages=_pages_label([page_number], len(self.manifest.pages)),
+                )
+            )
+
+    async def _read_one(self, position: int, element: ManifestElement) -> bool:
+        """Read one table from its image, or keep it as it is; True when enriched."""
+        reason = self.garbled.get(element.id)
+        if reason is None and _backfill_table_from_existing_text(element):
+            return True
+
+        fallback_page_number = element.page_number
+        if fallback_page_number is None and len(self.manifest.pages) == 1:
+            fallback_page_number = self.manifest.pages[0].page_number
+
+        await self._report_progress(position, fallback_page_number)
+        # The breaker is consulted before the crop: a provider the pictures
+        # declared down must not cost one Toolbox render per remaining table.
+        # The second pass calls this anyway for its probe, because the probe
+        # is let through before any `_read_one` sees the breaker.
+        if self.breaker.open:
+            if reason is not None:
+                _keep_misread_table(
+                    element,
+                    fallback_page_number or 0,
+                    reason,
+                    self.breaker.skip_detail(),
+                    _table_review_attempts(element, 0),
+                )
+            _record_table_read_failure(element, "model_failed")
+            return False
+        image_bytes, page_number = await run_blocking(
+            _extract_picture_bytes,
+            self.source_file,
+            element,
+            fallback_page_number,
+            _source_artifact_id(self.manifest),
+            self.manifest.source.media_type,
+            toolbox=self.toolbox,
+        )
+        if not image_bytes:
+            _record_table_read_failure(element, "crop_unavailable")
+            if reason is not None:
+                _keep_misread_table(
+                    element, page_number, reason, "no image of the table",
+                    _table_review_attempts(element, 0),
+                )
+            return False
+
+        table_output, answered, why, attempt = await _read_table(
+            self.data_agent, self.breaker, element, image_bytes, page_number, reason
+        )
+        if table_output is None:
+            _record_unread_table(element, page_number, reason, answered, why, attempt)
+            return False
+        _fold_table_reading(element, table_output, page_number, reason, attempt)
+        return True
+
+
 async def _enrich_table_structures(
     manifest: ProcessingManifest,
     source_file: Path,
@@ -79,87 +177,29 @@ async def _enrich_table_structures(
     if not table_elements:
         return
 
-    data_agent = DataAgent(models=models, toolbox=toolbox)
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
-
-    async def read_one(position: int, element: ManifestElement) -> bool:
-        """Read one table from its image, or keep it as it is; True when enriched."""
-        reason = garbled.get(element.id)
-        if reason is None and _backfill_table_from_existing_text(element):
-            return True
-
-        fallback_page_number = element.page_number
-        if fallback_page_number is None and len(manifest.pages) == 1:
-            fallback_page_number = manifest.pages[0].page_number
-
-        if status_callback:
-            await status_callback(
-                t(STAGE_RECOGNIZING_TABLE).format(
-                    current=position,
-                    total=len(table_elements),
-                    pages=_pages_label([fallback_page_number], len(manifest.pages)),
-                )
-            )
-        # The breaker is consulted before the crop: a provider the pictures
-        # declared down must not cost one Toolbox render per remaining table.
-        # The second pass calls this anyway for its probe, because the probe
-        # is let through before any `read_one` sees the breaker.
-        if breaker.open:
-            if reason is not None:
-                _keep_misread_table(
-                    element,
-                    fallback_page_number or 0,
-                    reason,
-                    breaker.skip_detail(),
-                    _table_review_attempts(element, 0),
-                )
-            _record_table_read_failure(element, "model_failed")
-            return False
-        image_bytes, page_number = await run_blocking(
-            _extract_picture_bytes,
-            source_file,
-            element,
-            fallback_page_number,
-            _source_artifact_id(manifest),
-            manifest.source.media_type,
-            toolbox=toolbox,
-        )
-        if not image_bytes:
-            _record_table_read_failure(element, "crop_unavailable")
-            if reason is not None:
-                _keep_misread_table(
-                    element, page_number, reason, "no image of the table",
-                    _table_review_attempts(element, 0),
-                )
-            return False
-
-        table_output, answered, why, attempt = await _read_table(
-            data_agent, breaker, element, image_bytes, page_number, reason
-        )
-        if table_output is None:
-            _record_unread_table(element, page_number, reason, answered, why, attempt)
-            return False
-        _fold_table_reading(element, table_output, page_number, reason, attempt)
-        return True
-
-    async def read_and_notify(position: int, element: ManifestElement) -> bool:
-        """Read one table, then let the caller persist its outcome (#407)."""
-        try:
-            return await read_one(position, element)
-        finally:
-            if on_progress is not None:
-                await on_progress()
+    reader = _TableReader(
+        manifest=manifest,
+        source_file=source_file,
+        toolbox=toolbox,
+        data_agent=DataAgent(models=models, toolbox=toolbox),
+        breaker=breaker,
+        garbled=garbled,
+        total=len(table_elements),
+        status_callback=status_callback,
+        on_progress=on_progress,
+    )
 
     enriched = 0
     for position, element in enumerate(table_elements, start=1):
-        enriched += await read_and_notify(position, element)
+        enriched += await reader.read_and_notify(position, element)
     enriched += await _retry_failed(
         [
             (position, element)
             for position, element in enumerate(table_elements, start=1)
             if element.metadata.get("table_read_failure") == "model_failed"
         ],
-        read_and_notify,
+        reader.read_and_notify,
         kind="tables",
         breaker=breaker,
         delay_seconds=vision.retry_pass_delay_seconds,
