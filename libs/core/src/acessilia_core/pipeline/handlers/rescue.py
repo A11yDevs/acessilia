@@ -59,7 +59,6 @@ from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
 )
-from acessilia_core.pipeline.handlers.structure import unique_element_id
 from acessilia_core.pipeline.handlers.messages import (
     MSG_RESCUE_FUSED_PAGES,
     MSG_RESCUE_PRIMARY_KEPT,
@@ -67,6 +66,7 @@ from acessilia_core.pipeline.handlers.messages import (
     MSG_RESCUE_RESTORED,
     MSG_RESCUE_ROUTED_COMPLETE,
 )
+from acessilia_core.pipeline.handlers.structure import unique_element_id
 from acessilia_core.pipeline.secondary import (
     _MIN_BLOCK_IOU,
     _MIN_BLOCK_TEXT_RATIO,

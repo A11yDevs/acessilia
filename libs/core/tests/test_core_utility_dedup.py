@@ -30,6 +30,11 @@ from acessilia_core.pipeline.secondary import _SecondaryExtraction
 from pddl_support import build_element, build_manifest
 
 
+def _box(**overrides: object) -> dict[str, object]:
+    """A raw Toolbox bounding box, as the secondary extraction reads it."""
+    return {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 1.0, **overrides}
+
+
 def test_write_atomic_artifact_writes_content_addressed_file_and_cleans_up_on_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -53,6 +58,18 @@ def test_write_atomic_artifact_writes_content_addressed_file_and_cleans_up_on_er
     assert artifact.media_type == "image/png"
     assert artifact.sha256 == digest
     assert expected_path.read_bytes() == payload
+
+    # Content addressed: the same bytes and scope land on the same file and id.
+    again = handler_common.write_atomic_artifact(
+        payload,
+        category="regions",
+        scope=scope,
+        kind="region-crop",
+        suffix="png",
+        media_type="image/png",
+        data_dir=tmp_path,
+    )
+    assert (again.path, again.id) == (artifact.path, artifact.id)
 
     def fail_replace(_src: Path, _dst: Path) -> None:
         raise OSError("disk full")
@@ -209,8 +226,43 @@ def test_element_bbox_and_secondary_bbox_return_none_for_missing_or_invalid_inpu
     assert _element_bbox(element, other_page_manifest) is None
 
     secondary = _SecondaryExtraction(provider="mineru", pages={}, sizes={1: (500.0, 1000.0)})
-    assert secondary.bbox({"page_number": 2, "provenance": [{"bbox": {"left": 0, "top": 0, "right": 1, "bottom": 1}}]}) is None
-    assert secondary.bbox({"page_number": 1, "provenance": [{"bbox": {"left": "bad", "top": 0, "right": 1, "bottom": 1}}]}) is None
+    other_page = {"page_number": 2, "provenance": [{"bbox": _box()}]}
+    assert secondary.bbox(other_page) is None
+    assert secondary.bbox({"page_number": 1, "provenance": [{"bbox": _box(left="bad")}]}) is None
+
+    unpositioned = {"page_number": 1, "provenance": [{"bbox": _box()}]}
+    no_size = _SecondaryExtraction(provider="mineru", pages={}, sizes={})
+    zero_width = _SecondaryExtraction(provider="mineru", pages={}, sizes={1: (0.0, 1000.0)})
+    assert no_size.bbox(unpositioned) is None
+    assert zero_width.bbox(unpositioned) is None
+
+
+def test_element_bbox_uses_the_first_provenance_that_has_a_box() -> None:
+    """The loop, not ``detectors.oriented_bbox``, picks the box: that helper
+    reads ``provenance[0]`` alone and would answer ``None`` here."""
+    element = ManifestElement(
+        id="el-1",
+        type="paragraph",
+        raw_label="text",
+        reading_order=1,
+        hierarchy_level=0,
+        page_number=1,
+        text="Sample",
+        provenance=[
+            Provenance(page_number=1),
+            Provenance(
+                page_number=1,
+                bbox=BoundingBox(left=50.0, top=100.0, right=250.0, bottom=200.0),
+            ),
+        ],
+    )
+    manifest = SimpleNamespace(
+        pages=[PageDescriptor(page_number=1, width=500.0, height=1000.0, element_ids=["el-1"])]
+    )
+    unboxed = element.model_copy(update={"provenance": [Provenance(page_number=1)]})
+
+    assert _element_bbox(element, manifest) == pytest.approx((0.1, 0.1, 0.5, 0.2))
+    assert _element_bbox(unboxed, manifest) is None
 
 
 def test_rescue_page_uses_unique_element_id_on_id_collisions() -> None:

@@ -1,8 +1,10 @@
 """Helpers every deterministic method handler shares.
 
 A handler takes the manifest and an obligation id and returns a
-``MethodResult``. Moved verbatim from the PDDL orchestrator (#402, phase 3,
-step 6).
+``MethodResult``. The handler contract moved from the PDDL orchestrator (#402,
+phase 3, step 6); ``write_atomic_artifact`` is the writer the evidence handlers
+(fusion and region inspection) share for the files under the run's ``data_dir``
+(#612).
 """
 
 from __future__ import annotations
@@ -71,7 +73,15 @@ def write_atomic_artifact(
     data_dir: Path,
     id_prefix: str | None = None,
 ) -> Artifact:
-    """Write ``content`` atomically under ``data_dir/artifacts/<category>/<scope>/``."""
+    """Write ``content`` atomically and describe it as an ``Artifact``.
+
+    The file is content addressed, at
+    ``data_dir/artifacts/<category>/<scope>/<sha256>.<suffix>``, so equal
+    content reuses one file. The record's id is
+    ``artifact-<id_prefix>-<scope[:16]>-<sha256[:16]>``, with ``kind`` as the
+    default prefix. A failed write removes its temporary file beside the
+    target, leaving no partial artifact behind.
+    """
     digest = hashlib.sha256(content).hexdigest()
     output_path = data_dir / "artifacts" / category / scope / f"{digest}.{suffix}"
     output_path.parent.mkdir(parents=True, exist_ok=True)
