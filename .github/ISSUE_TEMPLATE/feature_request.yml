@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a new user-facing capability
+type: Feature
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write the proposal in English (constitution, principle 2.8). Use this form for a new user-facing capability (`Feature`); for internal improvements, refactoring, architectural plans, or open-ended discussions, open a blank issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What gap, friction, or user need motivates this new capability?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the desired capability and which component(s) it touches (`core`, `sdk`, `docstruct`, `Toolbox`).
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable conditions that define when this feature is done.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Related issues, ADRs, benchmarks, or alternatives considered.
+    validations:
+      required: false
