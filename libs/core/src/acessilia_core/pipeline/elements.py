@@ -239,6 +239,8 @@ def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:
 
 
 def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    # Stricter than the isinstance(span, int) rule it replaces: a rowspan or
+    # colspan carrying a JSON boolean is dropped (docstruct 0.5.7, #612).
     return normalize_strict_table_ast(metadata.get("table_ast"))
 
 

@@ -2,6 +2,22 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.2.4 — structural primitives from docstruct 0.5.7
+
+No behaviour change, except one stricter edge case. The core's duplicated
+implementations now call `acessilia-docstruct` directly (#612): the table
+checks and `DataOutput.table_ast` (`docstruct.tables.structured`), the
+heading-hierarchy gap detection and repair (`docstruct.sections`), the
+skeleton-order ranking (`docstruct.fusion.skeleton`, same 0.5 threshold), the
+slide box helpers (`docstruct.geometry.boxes`), the PNG/JPEG header inspection
+(`docstruct.imaging`) and `is_legitimate_text` (`docstruct.fusion.noise`).
+
+The stricter edge case: a `table_ast` whose `rowspan`/`colspan` carries a JSON
+boolean used to survive `isinstance(span, int)`; the strict normalizer drops
+it. Characterized in `libs/core/tests/test_docstruct_057_adoption.py`.
+
+The core now requires docstruct 0.5.7 or later (#612).
+
 ## 0.2.3 — the page judge through the SDK's operation
 
 The `vlm-pairwise-judge` method renders the page and asks the judge through
