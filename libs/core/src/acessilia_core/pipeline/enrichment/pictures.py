@@ -120,6 +120,7 @@ class _PictureEnrichment:
         self.breaker = breaker
         self.slots = slots
         self.total = total
+        self.total_pages = len(manifest.pages)
         self.status_callback = status_callback
         self.on_progress = on_progress
         self.progress_lock = asyncio.Lock()
@@ -151,7 +152,7 @@ class _PictureEnrichment:
                 t(STAGE_DESCRIBING_IMAGE).format(
                     current=position,
                     total=self.total,
-                    pages=_pages_label([page_number], len(self.manifest.pages)),
+                    pages=_pages_label([page_number], self.total_pages),
                 )
             )
 
@@ -188,7 +189,7 @@ class _PictureEnrichment:
                     "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
                 ),
                 page_num=page_number,
-                total_pages=len(self.manifest.pages),
+                total_pages=self.total_pages,
                 mode=self.mode,
                 errors=errors,
             )

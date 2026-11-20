@@ -213,10 +213,11 @@ request:
 1. ~~**Simplify the complex functions:** the five above first, starting with
    `_derive_v23_processing_needs` (complexity 71). This is the internal
    modularization #381 asked for, now on modules that have clear boundaries.~~
-   Top five done in #612 (`_derive_v23_processing_needs` → `manifest/detectors/`
-   plus `apply_page_routes`, `_execute_step`, `_absorb_near_pictures` and
-   `_extract_with`; functions over 15 in the core: 41 → 36; `manifest/builder.py`
-   below the 900-line limit).
+   Done in #612 (`_derive_v23_processing_needs` → `manifest/detectors/`
+   plus `apply_page_routes`, `_execute_step`, `_absorb_near_pictures`,
+   `_extract_with` and the remaining complex and long functions; functions over
+   15 in the core: 41 → 0; functions over 100 lines in the core: 21 → 0; every
+   module in `libs/core/src` below the 900-line limit).
 2. ~~**Move the core's tests to `libs/core/tests`** where they test the core
    alone, so the core's suite runs without the service.~~ Done in #613.
 3. **Give the operations users:** a `judge` command in the SDK's command line,

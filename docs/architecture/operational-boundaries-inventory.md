@@ -71,15 +71,25 @@ which is accepted:
 
 ## Structural algorithms: core and docstruct
 
-19 functions share a name between the core and docstruct. 15 are adapters
-that call docstruct, so nothing is duplicated there:
-- `pipeline/canonical_builder.py`, `pipeline/validators.py` and
-  `pipeline/table_ast.py`;
-- `refine_reading_order` and `is_unstructured_page_placeholder` in the
-  manifest builder;
-- the orchestrator's `_pair_block`, `_letterhead_groups`,
-  `_recover_empty_lettered_list_items` and `_implicit_product_variables`;
-- `wrap_latex`.
+At `8d7465e4`, 19 module-level functions (`ast.FunctionDef` /
+`ast.AsyncFunctionDef` in `tree.body`) shared a name between the core and
+docstruct, of which 15 were adapters that call docstruct. After #470 and #612
+(#621 removed the five thin wrappers `refine_reading_order`, `_pair_block`,
+`_letterhead_groups`, `_recover_empty_lettered_list_items` and
+`_implicit_product_variables` in favor of direct docstruct imports; #623/#631
+added the `apply_page_routes` and `fuse_extraction_payloads` adapters in
+`pipeline/fusion.py`), 14 module-level functions share a name between
+`libs/core/src` and `libs/docstruct/src`. 12 are adapters that call docstruct,
+so nothing is duplicated there:
+- `pipeline/canonical_builder.py` (`_enrich_math_blocks`,
+  `build_canonical_document`, `sanitize_canonical_document`),
+  `pipeline/validators.py` (`audit_canonical_document`,
+  `validate_canonical_document`, `validate_export_profile`,
+  `validate_output_text`) and `pipeline/table_ast.py`
+  (`linearize_table_for_text`);
+- `pipeline/fusion.py` (`apply_page_routes`, `fuse_extraction_payloads`);
+- `is_unstructured_page_placeholder` in the manifest builder;
+- `wrap_latex` in `formula_tools.py`.
 
 The rest, with the duplicates already on record:
 
@@ -90,6 +100,7 @@ The rest, with the duplicates already on record:
 | `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | The same computation, for a box that is present. **Resolved:** `slides.py` uses docstruct's (#470, phase 4). |
 | `_overlaps`, `_union_area` (`slides.py`) | none | Pure box geometry. **Moved** to `docstruct.geometry.boxes` as `boxes_overlap` and `union_area` (docstruct 0.5.6, #470, phase 4). (docstruct's `_overlaps` compares text spans, not boxes.) |
 | `decide` (`planning/toolbox_gate.py`) | `docstruct.fusion.adjudication.decide` | Same name only; unrelated. |
+| `_bbox` (`pipeline/elements.py`) | `docstruct.manifest_cases._bbox` | Same name only; `_bbox` in `manifest_cases` is a test-fixture constructor. |
 | callout clustering (Toolbox normalization builder) | `docstruct.regions.grouping` | Known deviation of ADR-0002 ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)). |
 
 ## Deterministic operations in the core

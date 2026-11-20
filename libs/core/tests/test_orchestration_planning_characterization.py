@@ -8,14 +8,23 @@ the functions that were above the complexity limit.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
+from dataclasses import replace
 
 import pytest
 from acessilia_core.config import CoreConfig
-from acessilia_core.execution.executor import ExecutionResume, ExecutorAgent
+from acessilia_core.execution.executor import (
+    ExecutionResume,
+    ExecutorAgent,
+    _ExecutionState,
+)
 from acessilia_core.execution.models import ExecutionStepResult
 from acessilia_core.manifest.models import ProcessingManifest
-from acessilia_core.pipeline.handlers.registry import _classify_parameter
+from acessilia_core.pipeline.handlers.registry import (
+    _classify_parameter,
+    _positional_problems,
+)
 from acessilia_core.planning.comparison import _compare_plans
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
@@ -96,6 +105,14 @@ class TestComparePlansCharacterization:
         assert different.cost_delta_fast_downward_minus_internal == 5
         assert different.notes == []
 
+        same_cost_different = _compare_plans(
+            _plan([a, b]), _plan([a, _execute(1, "o-2", "m3", cost=10)])
+        )
+        assert same_cost_different.verdict == "different"
+        assert same_cost_different.same_expected_total_cost is True
+        assert len(same_cost_different.notes) == 1
+        assert same_cost_different.notes != reordered.notes
+
 
 class TestExecutorHelpersCharacterization:
     def _manifest(self) -> ProcessingManifest:
@@ -134,6 +151,76 @@ class TestExecutorHelpersCharacterization:
             plan, manifest, None
         )
         assert working is not manifest and results == [] and replan is False
+
+        resumed = ExecutionResume(
+            manifest=manifest, results=[result(0)], replan_required=True
+        )
+        resumed_working, resumed_results, resumed_replan = (
+            ExecutorAgent._initial_working_state(plan, manifest, resumed)
+        )
+        assert resumed_working is manifest
+        assert resumed_results == [result(0)]
+        assert resumed_replan is True
+
+    def test_conclude_and_build_report_pin_status_revision_and_seed(self) -> None:
+        manifest = self._manifest()
+        plan = _plan([_execute(0, "o-1", "m1")])
+        dry_state = _ExecutionState(manifest=manifest, dry_run=True, results=[])
+        dry_manifest, dry_status, dry_rev = ExecutorAgent._conclude(
+            manifest, dry_state, dry_run=True
+        )
+        assert dry_manifest is not manifest
+        assert dry_status == "dry-run-completed"
+        assert dry_rev == manifest.revision
+
+        dry_failed = _ExecutionState(
+            manifest=manifest, dry_run=True, results=[], failed_step_index=0
+        )
+        _, dry_failed_status, _ = ExecutorAgent._conclude(
+            manifest, dry_failed, dry_run=True
+        )
+        assert dry_failed_status == "failed"
+
+        live_working = manifest.model_copy(deep=True)
+        replan_state = _ExecutionState(
+            manifest=live_working,
+            dry_run=False,
+            results=[],
+            replan_required=True,
+        )
+        _, replan_status, replan_rev = ExecutorAgent._conclude(
+            manifest, replan_state, dry_run=False
+        )
+        assert replan_status == "replan-required"
+        assert replan_rev == manifest.revision + 1
+
+        failed_state = _ExecutionState(
+            manifest=manifest.model_copy(deep=True),
+            dry_run=False,
+            results=[],
+            failed_step_index=0,
+        )
+        _, failed_status, _ = ExecutorAgent._conclude(
+            manifest, failed_state, dry_run=False
+        )
+        assert failed_status == "failed"
+
+        report = ExecutorAgent._build_report(
+            plan,
+            manifest,
+            replan_state,
+            status=replan_status,
+            revision_after=replan_rev,
+            started_at=NOW,
+            completed_at=NOW,
+        )
+        expected_seed = f"{plan.plan_id}:{manifest.manifest_id}:{NOW.isoformat()}:live"
+        assert report.execution_id == (
+            "execution-" + hashlib.sha256(expected_seed.encode()).hexdigest()[:16]
+        )
+        assert report.status == "replan-required"
+        assert report.replan_required is True
+        assert report.manifest_revision_after == replan_rev
 
     def test_selection_is_synced_and_discovered_open_obligations_request_a_replan(
         self,
@@ -193,10 +280,50 @@ class TestPddlActionSequenceCharacterization:
                 projection,
             )
         cost = projection.cost(obligation_id, "vision-description")
+        valid_step = _execute(1, obligation_id, "vision-description", cost=cost)
         _validate_action_sequence(
-            [start, _execute(1, obligation_id, "vision-description", cost=cost), complete],
+            [start, valid_step, complete],
             projection,
         )
+        with pytest.raises(ValueError, match=obligation_id):
+            _validate_action_sequence(
+                [
+                    start,
+                    valid_step,
+                    valid_step.model_copy(update={"index": 2}),
+                    PlanStep(index=3, action="complete-job"),
+                ],
+                projection,
+            )
+        with pytest.raises(ValueError, match="normalize-formula"):
+            _validate_action_sequence(
+                [
+                    start,
+                    valid_step.model_copy(
+                        update={"obligation_kind": "normalize-formula"}
+                    ),
+                    complete,
+                ],
+                projection,
+            )
+        without_method = replace(
+            projection, available_methods=frozenset({"human-review"})
+        )
+        with pytest.raises(ValueError, match="vision-description"):
+            _validate_action_sequence([start, valid_step, complete], without_method)
+        already_tried = replace(
+            projection, tried=frozenset({(obligation_id, "vision-description")})
+        )
+        with pytest.raises(ValueError, match=f"{obligation_id}/vision-description"):
+            _validate_action_sequence([start, valid_step, complete], already_tried)
+        dependent_obligation = projection.obligations[obligation_id].model_copy(
+            update={"dependencies": ["unmet-dep"]}
+        )
+        with_unmet_dep = replace(
+            projection, obligations={obligation_id: dependent_obligation}
+        )
+        with pytest.raises(ValueError, match=obligation_id):
+            _validate_action_sequence([start, valid_step, complete], with_unmet_dep)
 
 
 class TestHandlerParameterClassificationCharacterization:
@@ -206,15 +333,28 @@ class TestHandlerParameterClassificationCharacterization:
         return [_classify_parameter(p, {"CoreConfig": CoreConfig, "RunPorts": RunPorts}) for p in parameters]
 
     def test_declared_misnamed_and_unbound_parameters(self) -> None:
-        def declared(manifest, obligation_id, *, config: CoreConfig, ports: RunPorts): ...
+        def declared(manifest, obligation_id, *, config: CoreConfig, ports: RunPorts):
+            pass
 
-        def misnamed(manifest, obligation_id, *, cfg: CoreConfig): ...
+        def misnamed(manifest, obligation_id, *, cfg: CoreConfig):
+            pass
 
-        def positional_run_parameter(manifest, obligation_id, config: CoreConfig): ...
+        def positional_run_parameter(manifest, obligation_id, config: CoreConfig):
+            pass
 
-        def unbound(manifest, obligation_id, *, extra): ...
+        def wrong_annotation(manifest, obligation_id, *, config: RunPorts):
+            pass
+
+        def unbound(manifest, obligation_id, *, extra):
+            pass
+
+        def three_positionals(manifest, obligation_id, extra):
+            pass
 
         assert self._classify(declared) == [("config", None), ("ports", None)]
         assert "only as `config`" in self._classify(misnamed)[0][1]
         assert "keyword-only" in self._classify(positional_run_parameter)[0][1]
+        assert "annotated `CoreConfig`" in self._classify(wrong_annotation)[0][1]
         assert "no run binds" in self._classify(unbound)[0][1]
+        excess = list(inspect.signature(three_positionals).parameters.values())
+        assert "requires 3 positional parameters" in _positional_problems(excess)[0]

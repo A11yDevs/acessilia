@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from acessilia_core.hashing import json_sha256 as _json_sha256
 from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
 from acessilia_core.manifest.models import Obligation, ProcessingManifest
 from acessilia_core.planning.domain_bundle import DomainBundle
@@ -756,6 +757,3 @@ def _parenthesis_balance(text: str) -> int:
 
 def _text_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-from acessilia_core.hashing import json_sha256 as _json_sha256

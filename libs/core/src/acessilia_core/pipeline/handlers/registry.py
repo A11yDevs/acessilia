@@ -232,7 +232,7 @@ def _positional_problems(parameters: list[inspect.Parameter]) -> list[str]:
 
 
 def _classify_parameter(
-    parameter: inspect.Parameter, namespace: dict[str, object]
+    parameter: inspect.Parameter, namespace: Mapping[str, object]
 ) -> tuple[str | None, str | None]:
     """``(declared run parameter, problem)`` of one handler parameter."""
     expected = RUN_PARAMETERS.get(parameter.name)

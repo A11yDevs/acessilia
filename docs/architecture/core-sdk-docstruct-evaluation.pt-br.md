@@ -213,10 +213,11 @@ seu pull request:
 1. ~~**Simplificar as funções complexas:** as cinco acima primeiro, começando
    pelo `_derive_v23_processing_needs` (complexidade 71). É a modularização
    interna que a #381 pedia, agora sobre módulos com fronteiras claras.~~
-   Cinco funções do topo feitas no #612 (`_derive_v23_processing_needs` →
-   `manifest/detectors/`, mais `apply_page_routes`, `_execute_step`,
-   `_absorb_near_pictures` e `_extract_with`; funções acima de 15 no core:
-   41 → 36; `manifest/builder.py` abaixo do limite de 900 linhas).
+   Feito no #612 (`_derive_v23_processing_needs` → `manifest/detectors/`,
+   mais `apply_page_routes`, `_execute_step`, `_absorb_near_pictures`,
+   `_extract_with` e as demais funções complexas e longas; funções acima de 15
+   no core: 41 → 0; funções acima de 100 linhas no core: 21 → 0; todos os
+   módulos de `libs/core/src` abaixo do limite de 900 linhas).
 2. ~~**Levar para o `libs/core/tests` os testes do core** que testam só o core,
    para a suíte dele rodar sem o serviço.~~ Feito no #613.
 3. **Dar uso às operações:** um comando `judge` na linha de comando do SDK, e

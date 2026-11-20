@@ -1,3 +1,5 @@
+from typing import Any
+
 from acessilia_core.config import ModelConfig, ToolboxConfig
 
 
@@ -10,7 +12,7 @@ def _toolbox_model(
     max_tokens: int | None,
     timeout: int,
     max_retries: int | None,
-):
+) -> Any:
     from agno.models.openai.like import OpenAILike
 
     from acessilia_sdk.toolbox import vlm_gateway_base_url
@@ -41,7 +43,7 @@ def _openrouter_model(
     timeout: int,
     max_retries: int | None,
     reasoning_enabled: bool | None,
-):
+) -> Any:
     from agno.models.openrouter import OpenRouter
 
     base_url = models.openrouter_base_url.replace("/chat/completions", "").rstrip("/")
@@ -77,7 +79,7 @@ def _ollama_model(
     max_tokens: int | None,
     timeout: int,
     reasoning_enabled: bool | None,
-):
+) -> Any:
     from agno.models.ollama import Ollama
 
     host = models.ollama_base_url.replace("/api/chat", "").rstrip("/")
@@ -112,7 +114,7 @@ def get_agno_model(
     timeout_seconds: int | None = None,
     max_retries: int | None = None,
     reasoning_enabled: bool | None = None,
-):
+) -> Any:
     """Build the Agno model instance of the run's ``models`` (ADR-0016, step 3).
 
     The provider is chosen by ``models.ai_client``: the value ``"toolbox"`` sends the chats

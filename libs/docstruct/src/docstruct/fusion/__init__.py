@@ -1,7 +1,7 @@
 """docstruct.fusion — fusão multi-provider de documentos.
 
 Porta do Tree Differ v2 (PR #98, Dr.DocBench) como biblioteca pura.
-API principal: ``merge_blocks`` + ``blocks_from_provider``.
+API principal: ``merge_blocks`` + ``fuse_extraction_payloads``.
 """
 from docstruct.fusion.adjudication import (
     clean_transcription,
