@@ -125,6 +125,32 @@ def is_junk(text: str) -> bool:
     return quality(text) < 0.34 and len(text.split()) >= 3
 
 
+#: Default minimum share of word-like tokens for :func:`is_legitimate_text`.
+MIN_LEGITIMATE_QUALITY = 0.35
+
+
+def is_legitimate_text(
+    text: str | None,
+    *,
+    min_quality: float = MIN_LEGITIMATE_QUALITY,
+) -> bool:
+    """Whether ``text`` reads as real prose rather than OCR residue.
+
+    Rejects empty strings, junk (:func:`is_junk`), page numbers, strings with
+    fewer than three letters, strings below 40% alphanumeric characters, and
+    strings whose token quality (:func:`quality`) is below ``min_quality``.
+    """
+    stripped = (text or "").strip()
+    if not stripped or is_junk(stripped) or PAGENUM_RE.match(stripped):
+        return False
+    if sum(char.isalpha() for char in stripped) < 3:
+        return False
+    core = re.sub(r"\s+", "", stripped)
+    if sum(char.isalnum() for char in core) / len(core) < 0.4:
+        return False
+    return quality(stripped) >= min_quality
+
+
 def latex_to_text(md: str) -> str:
     t = LATEX_CMD_RE.sub(" ", md)
     return re.sub(r"\s+", " ", t).strip()

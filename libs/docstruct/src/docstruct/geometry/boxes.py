@@ -156,6 +156,38 @@ def union_area(boxes: Sequence[BBox]) -> float:
     return area
 
 
+def expand_box(box: BBox, margin: float) -> BBox:
+    """Return ``box`` expanded outwards by ``margin`` on all four sides."""
+    left, top, right, bottom = box
+    return (left - margin, top - margin, right + margin, bottom + margin)
+
+
+def spans_horizontally(first: BBox, second: BBox) -> bool:
+    """Whether ``first`` and ``second`` share a non-empty horizontal projection."""
+    return min(first[2], second[2]) > max(first[0], second[0])
+
+
+def boxes_side_by_side(boxes: Sequence[BBox]) -> bool:
+    """Whether all ``boxes`` share a common non-empty horizontal band."""
+    if not boxes:
+        return False
+    return min(box[3] for box in boxes) > max(box[1] for box in boxes)
+
+
+def box_distance(first: BBox, second: BBox) -> float:
+    """L1 (Manhattan) gap between two axis-aligned boxes; ``0.0`` if touching or overlapping."""
+    dx = max(0.0, max(first[0], second[0]) - min(first[2], second[2]))
+    dy = max(0.0, max(first[1], second[1]) - min(first[3], second[3]))
+    return dx + dy
+
+
+def box_contains_center(container: BBox, inner: BBox) -> bool:
+    """Whether the geometric centre of ``inner`` lies inside ``container``."""
+    cx = (inner[0] + inner[2]) / 2.0
+    cy = (inner[1] + inner[3]) / 2.0
+    return container[0] <= cx <= container[2] and container[1] <= cy <= container[3]
+
+
 def best_effort_clip(
     bbox: PageBox | None,
 ) -> tuple[BBox | None, Literal["TOPLEFT", "BOTTOMLEFT"]]:
@@ -187,10 +219,15 @@ __all__ = [
     "OrientedBox",
     "PageBox",
     "best_effort_clip",
+    "box_contains_center",
+    "box_distance",
     "boxes_overlap",
+    "boxes_side_by_side",
     "VerticalBox",
     "downward_edges",
+    "expand_box",
     "holds_point",
     "is_bottom_left",
+    "spans_horizontally",
     "union_area",
 ]

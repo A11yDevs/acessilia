@@ -18,7 +18,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
 | Legacy compatibility exports in `docstruct.types` and `docstruct` | `CanonicalDocument`, `CanonicalSection` — deprecated since 0.5.3; retained with unchanged behavior (see migration below) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
-| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point`, `boxes_overlap`, `union_area` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down and page-fraction conversions |
+| `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point`, `boxes_overlap`, `union_area`, `expand_box`, `spans_horizontally`, `boxes_side_by_side`, `box_distance`, `box_contains_center` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down, page-fraction and spatial helpers |
 | `docstruct.placeholders` | `is_unstructured_page_placeholder`, `UNSTRUCTURED_PAGE_LABEL`, `UNSTRUCTURED_PAGE_FLAG` — the placeholder element that stands for a page extracted without structure; `is_placeholder_text`, `is_ocr_noise`, `has_meaningful_text`, `is_placeholder_visual`, `is_mostly_visual` — which extracted text counts as content |
 | `docstruct.data_uri` | `decode_data_uri` — the bytes of an image inline as a base64 `data:` URI, for the media types and size the caller accepts; a remote URL is never fetched |
 | `docstruct.blocks.callouts` | `dedupe_callout_titles` — a callout split across blocks keeps its title on the first block only; `callout_titles` — each callout's title, read from its title element |
@@ -28,8 +28,9 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.manifest` | `StructuredDocument`, `DocumentElement`, `PageDescriptor`, `Provenance`, `BoundingBox`, `field_specs`, `validate_structured_document`, payload adapters — the processing manifest's document part: normative types and invariants that wire schemas are checked against |
 | `docstruct.manifest_cases` | `example_document`, `BROKEN`, `SUPPORTED`, `document_findings` — the shared contract cases of the manifest's document part: a valid example, changes that break one rule each, and changes that must stay valid, which the core and the SDK run against their own models (the Toolbox adopts them with its pin of 0.5.5) |
 | `docstruct.policy` | `FusionPolicy` (+ presets: `drbench_v12`, `drbench_v13`) |
-| `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk` |
-| `docstruct.fusion.noise` | `decor_role`, `split_decor` — page furniture of extraction blocks; `element_role` — a document element's role, from its metadata or its type; `is_decorated_page_number`, `is_bare_page_number`, `is_page_number_in_margin`, `select_page_numbers`, `PAGE_NUMBER_MARGIN`, `PAGE_NUMBER_MAX_LEN` — which numbers are page numbers, shared with the core's payload |
+| `docstruct.fusion` | `merge_blocks`, `block_to_diff`, `DiffBlock`, `ProviderBlocks`, `quality`, `is_junk`, `is_legitimate_text`, `skeleton_reading_order` |
+| `docstruct.fusion.noise` | `decor_role`, `split_decor` — page furniture of extraction blocks; `element_role` — a document element's role, from its metadata or its type; `is_legitimate_text`, `MIN_LEGITIMATE_QUALITY` — legitimate prose vs OCR residue; `is_decorated_page_number`, `is_bare_page_number`, `is_page_number_in_margin`, `select_page_numbers`, `PAGE_NUMBER_MARGIN`, `PAGE_NUMBER_MAX_LEN` — which numbers are page numbers, shared with the core's payload |
+| `docstruct.fusion.skeleton` | `skeleton_reading_order`, `DEFAULT_MIN_SKELETON_MATCH` — reading-order reconstruction from matched positions in a reference block skeleton |
 | `docstruct.fusion.xycut` | `xycut_order`, `count_columns`, `column_balance`, `reorder` — optional XY-cut reading order (`FusionPolicy.order_xycut`) |
 | `docstruct.fusion.verse` | `record_like`, `verse_lines`, `chunk_verse`, `split_box_rows`, `verse_blocks` |
 | `docstruct.fusion.line_numbers` | `line_number_chain`, `extract_line_numbers` |
@@ -51,8 +52,11 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.text.norm_fix` | `norm_fix` — post-normalization repairs |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — MinerU `middle_json` parsing, spacing, de-hyphenation, and formula/table formatting |
 | `docstruct.tables.ast` | `TABLE_SECTIONS`, `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `table_ast_column_count`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
+| `docstruct.tables.structured` | `StructuredTableCell`, `rows_look_like_placeholder`, `table_ast_has_structured_content`, `normalize_strict_table_ast`, `table_ast_from_structured_rows` — strict metadata table-AST validation, placeholder checks and canonical table-AST construction from structured rows |
 | `docstruct.tables.text_rows` | `rows_from_visual_table_text`, `rows_from_pipe_table`, `rows_from_delimited_lines`, `looks_like_markdown_separator`, `score_rows` — rows of a table read from its plain text (pipes, tabs, `;` or `,`) |
 | `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block`; `docstruct.text.paragraphs.PAGE_HEADING` — the page header `merge_broken_paragraphs` never joins across |
+| `docstruct.sections` | `HeadingGap`, `find_heading_gaps`, `repair_heading_levels`, `explicit_section_title`, `section_body_blocks`, `section_title_alias` — heading-hierarchy gap detection/repair and legacy section-title helpers |
+| `docstruct.imaging.headers` | `image_dimensions` — PNG/JPEG header dimensions from raw bytes (standard library `struct` only, no PIL/cv2) |
 | `docstruct.imaging.policy` | `upscale_factor`, `decide_orientation` (no PIL/cv2) |
 | `docstruct.evaluation.holdout` | `partition`, `score`, `evaluate_candidate` |
 | `docstruct.evaluation.metrics` | `text_ed`, `reading_order_score`, `teds_score`, `cdm_score`, `overall_score`, `PageScores` — local document-parsing metrics |

@@ -1,5 +1,52 @@
-"""Compatibility helpers for section titles also stored as legacy heading blocks."""
+"""Section compatibility and heading-hierarchy helpers."""
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass(frozen=True)
+class HeadingGap:
+    """A heading whose level violates the sequential hierarchy contract."""
+
+    index: int
+    previous_level: int
+    current_level: int
+
+
+def find_heading_gaps(levels: Sequence[int]) -> list[HeadingGap]:
+    """Return every position in ``levels`` that breaks the heading hierarchy.
+
+    The first heading must be level 1; each subsequent heading must sit in
+    ``[2, min(previous + 1, 6)]``.
+    """
+    gaps: list[HeadingGap] = []
+    previous = 0
+    for index, level in enumerate(levels):
+        invalid_first = previous == 0 and level != 1
+        invalid_successor = previous > 0 and (level < 2 or level > min(previous + 1, 6))
+        if invalid_first or invalid_successor:
+            gaps.append(
+                HeadingGap(index=index, previous_level=previous, current_level=level)
+            )
+        previous = level
+    return gaps
+
+
+def repair_heading_levels(levels: Sequence[int]) -> list[int]:
+    """Repair a heading-level sequence so every transition obeys the hierarchy.
+
+    The first heading becomes level 1; each subsequent heading is clamped to
+    ``[2, min(previous + 1, 6)]`` using the already-repaired predecessor level.
+    """
+    repaired: list[int] = []
+    previous = 0
+    for raw_level in levels:
+        level = 1 if previous == 0 else max(2, min(raw_level, previous + 1, 6))
+        repaired.append(level)
+        previous = level
+    return repaired
 
 
 def explicit_section_title(section: dict[str, Any]) -> dict[str, Any] | None:
@@ -26,3 +73,13 @@ def section_title_alias(section: dict[str, Any]) -> str:
     if first is not None and first.get("id") != section.get("id"):
         return first.get("id", "")
     return ""
+
+
+__all__ = [
+    "HeadingGap",
+    "explicit_section_title",
+    "find_heading_gaps",
+    "repair_heading_levels",
+    "section_body_blocks",
+    "section_title_alias",
+]

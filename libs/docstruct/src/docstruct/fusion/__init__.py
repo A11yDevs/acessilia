@@ -23,7 +23,7 @@ from docstruct.fusion.hf_end import (
     move_body_hf_to_tail,
     move_hf_to_end,
 )
-from docstruct.fusion.noise import is_junk, quality
+from docstruct.fusion.noise import is_junk, is_legitimate_text, quality
 from docstruct.fusion.oracle import (
     best_score,
     gt_text_blocks,
@@ -58,6 +58,10 @@ from docstruct.fusion.repetition import (
     max_run,
     strip_comment,
 )
+from docstruct.fusion.skeleton import (
+    DEFAULT_MIN_SKELETON_MATCH,
+    skeleton_reading_order,
+)
 from docstruct.fusion.tailjoin import (
     is_page_number,
     join_tail,
@@ -84,6 +88,7 @@ from docstruct.fusion.verse import (
 )
 
 __all__ = [
+    "DEFAULT_MIN_SKELETON_MATCH",
     "DiffBlock",
     "ProviderBlocks",
     "block_to_diff",
@@ -110,6 +115,7 @@ __all__ = [
     "hf_texts",
     "is_blank_page",
     "is_junk",
+    "is_legitimate_text",
     "is_page_number",
     "is_struct",
     "is_valid_table",
@@ -138,6 +144,7 @@ __all__ = [
     "select_greedy",
     "select_table",
     "should_judge",
+    "skeleton_reading_order",
     "split_box_rows",
     "strip_comment",
     "summarize",

@@ -118,6 +118,76 @@ def test_union_area_counts_negative_coordinates():
     assert union_area([(0, -20, 10, -10), (5, -15, 15, -5)]) == pytest.approx(175.0)
 
 
+# --- spatial box helpers (#612) ---
+
+from docstruct.geometry.boxes import (  # noqa: E402
+    box_contains_center,
+    box_distance,
+    boxes_side_by_side,
+    expand_box,
+    spans_horizontally,
+)
+
+
+def test_expand_box_grows_all_four_edges():
+    assert expand_box((1.0, 2.0, 3.0, 4.0), 0.5) == pytest.approx((0.5, 1.5, 3.5, 4.5))
+    assert expand_box((1.0, 2.0, 3.0, 4.0), 0.0) == pytest.approx((1.0, 2.0, 3.0, 4.0))
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        ((0.0, 0.0, 10.0, 5.0), (5.0, 20.0, 15.0, 25.0), True),
+        ((0.0, 0.0, 10.0, 5.0), (10.0, 0.0, 20.0, 5.0), False),  # touching edge
+        ((0.0, 0.0, 10.0, 5.0), (12.0, 0.0, 20.0, 5.0), False),
+    ],
+)
+def test_spans_horizontally(first, second, expected):
+    assert spans_horizontally(first, second) is expected
+    assert spans_horizontally(second, first) is expected
+
+
+@pytest.mark.parametrize(
+    ("boxes", "expected"),
+    [
+        ([], False),
+        ([(0.0, 10.0, 5.0, 20.0)], True),
+        ([(0.0, 10.0, 5.0, 20.0), (10.0, 15.0, 15.0, 25.0)], True),
+        ([(0.0, 10.0, 5.0, 20.0), (10.0, 20.0, 15.0, 30.0)], False),  # touching edge
+        ([(0.0, 10.0, 5.0, 20.0), (10.0, 25.0, 15.0, 35.0)], False),
+    ],
+)
+def test_boxes_side_by_side(boxes, expected):
+    assert boxes_side_by_side(boxes) is expected
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        ((0.0, 0.0, 10.0, 10.0), (5.0, 5.0, 15.0, 15.0), 0.0),
+        ((0.0, 0.0, 10.0, 10.0), (10.0, 0.0, 20.0, 10.0), 0.0),
+        ((0.0, 0.0, 10.0, 10.0), (13.0, 0.0, 20.0, 10.0), 3.0),
+        ((0.0, 0.0, 10.0, 10.0), (0.0, 14.0, 10.0, 20.0), 4.0),
+        ((0.0, 0.0, 10.0, 10.0), (13.0, 14.0, 20.0, 20.0), 7.0),
+    ],
+)
+def test_box_distance(first, second, expected):
+    assert box_distance(first, second) == pytest.approx(expected)
+    assert box_distance(second, first) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("container", "inner", "expected"),
+    [
+        ((0.0, 0.0, 10.0, 10.0), (2.0, 2.0, 4.0, 4.0), True),
+        ((0.0, 0.0, 10.0, 10.0), (8.0, 8.0, 12.0, 12.0), True),  # centre (10, 10) on edge
+        ((0.0, 0.0, 10.0, 10.0), (9.0, 9.0, 13.0, 13.0), False),  # centre (11, 11) outside
+    ],
+)
+def test_box_contains_center(container, inner, expected):
+    assert box_contains_center(container, inner) is expected
+
+
 def test_union_area_of_a_bottom_left_box_seen_top_down():
     """``top_down()`` mirrors a bottom-left box to negative y; its area holds."""
     box = OrientedBox(0, 700, 10, 690, "BOTTOMLEFT").top_down()
