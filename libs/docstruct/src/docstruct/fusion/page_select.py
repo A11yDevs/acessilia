@@ -73,7 +73,13 @@ def ratio(a: str, b: str) -> float:
         return 1.0
     if not a or not b:
         return 0.0
-    return 2 * _lcs_len(a, b) / (len(a) + len(b))
+    total = len(a) + len(b)
+    # Same arithmetic as ``rapidfuzz.fuzz.ratio``/100, bit for bit: the two
+    # forms are mathematically equal, but ``2 * lcs / total`` and
+    # ``100 * (1 - (total - 2 * lcs) / total) / 100`` round differently at
+    # 4-decimal half values, so a rounded similarity would depend on whether
+    # the optional accelerator is installed.
+    return 100.0 * (1.0 - (total - 2 * _lcs_len(a, b)) / total) / 100.0
 
 
 def page_agreement(a: str, b: str) -> float:
