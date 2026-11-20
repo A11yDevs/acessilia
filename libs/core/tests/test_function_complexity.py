@@ -26,6 +26,10 @@ CORE = ROOT / "libs" / "core" / "src" / "acessilia_core"
 MAX_LINES = 100
 MAX_COMPLEXITY = 15
 
+# Intentional stdlib-only copy of scripts/architecture_metrics.py's AST walk:
+# the `core alone` CI job runs pytest inside `libs/core` without `scripts/` on
+# sys.path. `tests/test_function_complexity.py` checks parity between this module
+# and `scripts.architecture_metrics` across every file in `libs/core/src`.
 _BRANCHES = (
     ast.If,
     ast.For,
