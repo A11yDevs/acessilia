@@ -1,0 +1,165 @@
+{
+  "_comment": "Legacy functions outside libs/core/src above the line limit (100) or McCabe cyclomatic complexity limit (15) when tests/test_function_complexity.py landed (#652). libs/core/src is permanently at 0 after #612. Only dimensions above their limit are recorded, and ceilings may only go down: lower a ceiling when a function shrinks, remove a dimension once it reaches the limit, and remove the function entry once both dimensions are within limits.",
+  "max_lines": 100,
+  "max_complexity": 15,
+  "functions": {
+    "backend/api/routes/jobs.py::submit_job": {
+      "complexity": 17
+    },
+    "backend/api/worker.py::JobExecutor.run": {
+      "lines": 325,
+      "complexity": 43
+    },
+    "backend/api/worker.py::recover_pending_jobs": {
+      "lines": 104,
+      "complexity": 19
+    },
+    "backend/service.py::process": {
+      "lines": 238,
+      "complexity": 43
+    },
+    "backend/services/model_calls.py::ModelCallExecutor._invoke": {
+      "complexity": 20
+    },
+    "frontend/telegram/handlers/document.py::_poll_job": {
+      "lines": 104,
+      "complexity": 19
+    },
+    "libs/docstruct/src/docstruct/adapters/mineru.py::extract_mineru_blocks": {
+      "complexity": 16
+    },
+    "libs/docstruct/src/docstruct/adapters/mineru.py::format_mineru_block_text": {
+      "complexity": 43
+    },
+    "libs/docstruct/src/docstruct/blocks/lists.py::recover_empty_lettered_list_items": {
+      "lines": 131,
+      "complexity": 53
+    },
+    "libs/docstruct/src/docstruct/canonical.py::_enrich_math_blocks": {
+      "complexity": 20
+    },
+    "libs/docstruct/src/docstruct/canonical.py::_sanitize_structured_blocks": {
+      "complexity": 23
+    },
+    "libs/docstruct/src/docstruct/canonical.py::_sanitize_table_ast": {
+      "complexity": 21
+    },
+    "libs/docstruct/src/docstruct/export/html.py::_render_html_table_row": {
+      "complexity": 21
+    },
+    "libs/docstruct/src/docstruct/export/html.py::_safe_mathml": {
+      "complexity": 16
+    },
+    "libs/docstruct/src/docstruct/export/page_text.py::blocks_text": {
+      "complexity": 16
+    },
+    "libs/docstruct/src/docstruct/export/pandoc_ast.py::_prose_inlines": {
+      "complexity": 16
+    },
+    "libs/docstruct/src/docstruct/fusion/_hungarian.py::linear_sum_assignment": {
+      "complexity": 21
+    },
+    "libs/docstruct/src/docstruct/fusion/adjudication.py::decide": {
+      "complexity": 16
+    },
+    "libs/docstruct/src/docstruct/fusion/differ.py::_pick": {
+      "complexity": 17
+    },
+    "libs/docstruct/src/docstruct/fusion/differ.py::merge_blocks": {
+      "lines": 198,
+      "complexity": 89
+    },
+    "libs/docstruct/src/docstruct/fusion/noise.py::fuse_line_runs": {
+      "complexity": 25
+    },
+    "libs/docstruct/src/docstruct/fusion/noise.py::group_split_blocks": {
+      "complexity": 30
+    },
+    "libs/docstruct/src/docstruct/fusion/noise.py::split_decor": {
+      "complexity": 17
+    },
+    "libs/docstruct/src/docstruct/fusion/noise.py::suppress_in_regions": {
+      "complexity": 38
+    },
+    "libs/docstruct/src/docstruct/fusion/page_select.py::fuse": {
+      "complexity": 19
+    },
+    "libs/docstruct/src/docstruct/fusion/xycut.py::_order": {
+      "complexity": 17
+    },
+    "libs/docstruct/src/docstruct/fusion/xycut.py::reorder": {
+      "complexity": 21
+    },
+    "libs/docstruct/src/docstruct/geometry/reading_order.py::_column_bounds": {
+      "complexity": 18
+    },
+    "libs/docstruct/src/docstruct/geometry/reading_order.py::_extract_bbox": {
+      "complexity": 17
+    },
+    "libs/docstruct/src/docstruct/geometry/reading_order.py::_order_body_columns": {
+      "complexity": 19
+    },
+    "libs/docstruct/src/docstruct/geometry/reading_order.py::_order_manifest_body": {
+      "lines": 114,
+      "complexity": 32
+    },
+    "libs/docstruct/src/docstruct/manifest.py::document_invariant_findings": {
+      "lines": 132,
+      "complexity": 32
+    },
+    "libs/docstruct/src/docstruct/regions/classify.py::classify_region": {
+      "complexity": 28
+    },
+    "libs/docstruct/src/docstruct/regions/grouping.py::_add_unknown_gaps": {
+      "complexity": 16
+    },
+    "libs/docstruct/src/docstruct/regions/grouping.py::_merge_callout_groups": {
+      "complexity": 30
+    },
+    "libs/docstruct/src/docstruct/tables/ast.py::_normalize_row": {
+      "complexity": 18
+    },
+    "libs/docstruct/src/docstruct/tables/ast.py::_project_section_rows": {
+      "complexity": 17
+    },
+    "libs/docstruct/src/docstruct/tables/ast.py::_project_text_rows": {
+      "complexity": 22
+    },
+    "libs/docstruct/src/docstruct/tables/ast.py::analyze_table_complexity": {
+      "complexity": 21
+    },
+    "libs/docstruct/src/docstruct/tables/ast.py::normalize_table_ast": {
+      "complexity": 29
+    },
+    "libs/docstruct/src/docstruct/tables/ast.py::table_ast_from_docling_grid": {
+      "lines": 147,
+      "complexity": 63
+    },
+    "libs/docstruct/src/docstruct/text/inline_math.py::_trimmed": {
+      "complexity": 24
+    },
+    "libs/docstruct/src/docstruct/text/inline_math.py::splice_inline_math": {
+      "complexity": 18
+    },
+    "libs/docstruct/src/docstruct/text/unicode_repair.py::repair_legacy_unicode": {
+      "complexity": 18
+    },
+    "libs/docstruct/src/docstruct/validation.py::_validate_table_block": {
+      "lines": 135,
+      "complexity": 31
+    },
+    "libs/docstruct/src/docstruct/validation.py::audit_canonical_document.check_accessibility": {
+      "complexity": 17
+    },
+    "libs/sdk/src/acessilia_sdk/cli.py::main": {
+      "complexity": 31
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/_model.py::decode": {
+      "lines": 109,
+      "complexity": 56
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/transport.py::execute_capability": {
+      "complexity": 17
+    }
+  }
+}

@@ -23,6 +23,7 @@ import statistics
 import subprocess
 import sys
 import warnings
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +42,7 @@ class Function:
     name: str
     lines: int
     complexity: int
+    qualname: str = ""
 
 
 def complexity(function: ast.AST) -> int:
@@ -56,6 +58,29 @@ def complexity(function: ast.AST) -> int:
         if not isinstance(node, _NESTED_SCOPES):
             nodes.extend(ast.iter_child_nodes(node))
     return total
+
+
+def iter_functions(
+    node: ast.AST,
+    path: str = "",
+    _prefix: tuple[str, ...] = (),
+) -> Iterator[Function]:
+    """Yield every function in ``node`` with its scope-qualified ``qualname``."""
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            scoped = (*_prefix, child.name)
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                assert child.end_lineno is not None
+                yield Function(
+                    path=path,
+                    name=child.name,
+                    lines=child.end_lineno - child.lineno + 1,
+                    complexity=complexity(child),
+                    qualname=".".join(scoped),
+                )
+            yield from iter_functions(child, path, scoped)
+        else:
+            yield from iter_functions(child, path, _prefix)
 
 
 def _git(*args: str) -> str:
@@ -91,11 +116,7 @@ def measure(rev: str, roots: list[str]) -> dict:
         tree = _parse(source)
         if tree is None:
             continue
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                functions.append(
-                    Function(path, node.name, node.end_lineno - node.lineno + 1, complexity(node))
-                )
+        functions.extend(iter_functions(tree, path))
     lengths = sorted(function.lines for function in functions)
     return {
         "rev": rev,
