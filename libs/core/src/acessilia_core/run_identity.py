@@ -84,6 +84,7 @@ NOT_PROCESSING_FIELDS: dict[str, str] = {
     "export.object_markers_enabled": "the exports run after the cache",
     "export.toolbox_docx_enabled": "the exports run after the cache",
     "export.toolbox_pdf_ua_enabled": "the exports run after the cache",
+    "export.toolbox_pdf_ua_math_bisect_budget": "the exports run after the cache",
     "paths.data_dir": "where files are written, not what they hold",
 }
 
