@@ -14,13 +14,17 @@ DURATIONS ?= 25
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test-file test-failed test-all
+.PHONY: help test-file test-failed test-all lint
 
 help:
 	@printf '%s\n' \
 		'make test-file F=tests/test_example.py  run one file or node id' \
 		'make test-failed                        rerun the tests that failed last time' \
-		'make test-all                           run the main suite (4 workers), docstruct, SDK and libs/core'
+		'make test-all                           run the main suite (4 workers), docstruct, SDK and libs/core' \
+		'make lint                               run Ruff against the shrinking baseline (scripts/check_ruff_baseline.py)'
+
+lint:
+	$(UV) run python scripts/check_ruff_baseline.py
 
 test-file:
 	@if [ -z "$(F)" ]; then \

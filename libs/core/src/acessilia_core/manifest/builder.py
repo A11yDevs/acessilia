@@ -31,7 +31,6 @@ from acessilia_core.manifest.detectors import (
 )
 from acessilia_core.manifest.models import (
     Artifact,
-    BoundingBox,
     ManifestElement,
     Obligation,
     Observation,

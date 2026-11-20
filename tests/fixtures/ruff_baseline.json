@@ -1,0 +1,1027 @@
+{
+  "_comment": "Pre-existing Ruff violations (rules F, I, E excluding E501; #366), counted per file and rule code. Counts may only go down: when you fix violations, run `uv run python scripts/check_ruff_baseline.py --update`.",
+  "files": {
+    "backend/api/app.py": {
+      "I001": 1
+    },
+    "backend/api/export_plan.py": {
+      "I001": 1
+    },
+    "backend/api/observability_auth.py": {
+      "I001": 1
+    },
+    "backend/api/operations_auth.py": {
+      "I001": 1
+    },
+    "backend/api/routes/download.py": {
+      "I001": 1
+    },
+    "backend/api/routes/health.py": {
+      "I001": 1
+    },
+    "backend/api/routes/history.py": {
+      "I001": 1
+    },
+    "backend/api/routes/jobs.py": {
+      "I001": 1
+    },
+    "backend/api/routes/logs.py": {
+      "I001": 1
+    },
+    "backend/api/routes/operations.py": {
+      "I001": 1
+    },
+    "backend/api/worker.py": {
+      "I001": 2
+    },
+    "backend/config/core_config.py": {
+      "I001": 1
+    },
+    "backend/service.py": {
+      "I001": 1
+    },
+    "backend/services/cache.py": {
+      "I001": 2
+    },
+    "backend/services/cleanup_service.py": {
+      "I001": 1
+    },
+    "backend/services/download_token_service.py": {
+      "I001": 1
+    },
+    "backend/services/email_service.py": {
+      "I001": 1
+    },
+    "backend/services/filenames.py": {
+      "I001": 1
+    },
+    "backend/services/history_service.py": {
+      "I001": 1
+    },
+    "backend/services/job_checkpoint.py": {
+      "I001": 1
+    },
+    "backend/services/model_calls.py": {
+      "I001": 1
+    },
+    "backend/services/operation_journal.py": {
+      "I001": 1
+    },
+    "backend/services/operation_registry.py": {
+      "I001": 1
+    },
+    "backend/services/queue_service.py": {
+      "I001": 1
+    },
+    "backend/services/remote_cancellation.py": {
+      "I001": 1
+    },
+    "backend/services/run_ports.py": {
+      "I001": 1
+    },
+    "backend/services/validators.py": {
+      "I001": 1
+    },
+    "frontend/agent_os.py": {
+      "I001": 1
+    },
+    "frontend/cli/run.py": {
+      "I001": 3
+    },
+    "frontend/run.py": {
+      "I001": 3
+    },
+    "frontend/telegram/adapters/file_service.py": {
+      "I001": 1
+    },
+    "frontend/telegram/adapters/status_tracker.py": {
+      "I001": 1
+    },
+    "frontend/telegram/bot.py": {
+      "I001": 1
+    },
+    "frontend/telegram/handlers/document.py": {
+      "I001": 1
+    },
+    "frontend/telegram/handlers/errors.py": {
+      "I001": 1
+    },
+    "frontend/telegram/handlers/start.py": {
+      "I001": 1
+    },
+    "frontend/telegram/middlewares/locale_middleware.py": {
+      "I001": 1
+    },
+    "frontend/telegram/middlewares/pause_middleware.py": {
+      "I001": 1
+    },
+    "frontend/web/app.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/agents/ai_client.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/agents/data_agent.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/agents/fusion_agent.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/agents/informational_structural.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/agents/output_schemas.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/agents/prompt_tools.py": {
+      "E701": 1
+    },
+    "libs/core/src/acessilia_core/agents/vision_agent.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/execution/executor.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/execution/models.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/export/catalog.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/export/exporters/audio_exporter.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/export/pandoc_exporter.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/export/renderers/html_renderer.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/formula_tools.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/logger.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/builder.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/detectors/fusion.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/detectors/layout.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/detectors/text.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/detectors/types.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/models.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/schema.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/slides.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/manifest/toolbox_extractor.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/canonical_builder.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/elements.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/enrichment/common.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/enrichment/tables.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/fusion.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/common.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/content.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/formula.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/fusion.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/inspection.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/order.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/rescue.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/review.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/handlers/text.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/judge.py": {
+      "I001": 3
+    },
+    "libs/core/src/acessilia_core/pipeline/obligations.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/payload.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/preflight.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/secondary.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/table_ast.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/pipeline/toolbox.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/pipeline/validators.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/planning/domain_bundle.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/planning/models.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/planning/pddl_processor.py": {
+      "E402": 1,
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/planning/planner_agent.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/planning/toolbox_gate.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/toolbox/media_inspect.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py": {
+      "I001": 2
+    },
+    "libs/core/src/acessilia_core/toolbox/toolbox_client.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py": {
+      "I001": 1
+    },
+    "libs/core/src/acessilia_core/toolbox/vision_payload.py": {
+      "I001": 1
+    },
+    "libs/core/tests/conftest.py": {
+      "I001": 1
+    },
+    "libs/core/tests/pddl_support.py": {
+      "I001": 2
+    },
+    "libs/core/tests/test_ai_client.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_audit_validation.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_blocking_cancellation.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_bottom_left_reading_order.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_canonical_pipeline.py": {
+      "I001": 2
+    },
+    "libs/core/tests/test_canonical_schema_contract.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_core_simplification_characterization.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_core_utility_dedup.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_data_agent_deadline.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_discovered_obligations.py": {
+      "I001": 2
+    },
+    "libs/core/tests/test_docstruct_057_adoption.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_event_loop_responsiveness.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_execute_flow.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_export_drbench_md.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_export_schema_gate.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_exporters.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_formula_classification.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_formula_tools_compat.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_fusion_adjudication_budget.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_heading_pipeline_contract.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_inline_math.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_inline_math_marking.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_legacy_section_export_contract.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_legacy_unicode_repair.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_letterhead_header.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_manifest_characterization.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_manifest_detectors.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_manifest_runtime_locale.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_media_inspect.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_model_config_reaches_the_agents.py": {
+      "I001": 2
+    },
+    "libs/core/tests/test_noncritical_obligations.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_page_judge_characterization.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_page_number_furniture.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pandoc_ast_builder.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_payload_elements_characterization.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_actionability.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_block_pairing.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_deterministic_transforms.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_element_role.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_execution_contract.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_messages_i18n.py": {
+      "F401": 1,
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_table_text.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pddl_visual_heuristics.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_picture_bytes_policy.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_picture_description_failures.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_picture_enrichment_flow.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pipeline_fusion.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_pipeline_validation.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_planner_sandbox.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_processing_manifest.py": {
+      "I001": 2
+    },
+    "libs/core/tests/test_region_concurrency.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_renderers.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_rescue_omitted_method.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_structural_containers.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_structural_extraction_failure.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_table_ast_from_rows_parity.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_table_enrichment_flow.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_table_inline_math_marking.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_table_visual_review.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_text_spans_fetch.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_toolbox_artifact_endpoint_affinity.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_toolbox_availability_gate.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_toolbox_config_reaches_the_factory.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_toolbox_config_reaches_the_stages.py": {
+      "I001": 3
+    },
+    "libs/core/tests/test_v23_obligation_emission.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_vision_config_stages.py": {
+      "I001": 1
+    },
+    "libs/core/tests/test_vision_provider_breaker.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/__init__.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/blocks/parser.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/canonical.py": {
+      "E402": 14,
+      "I001": 2
+    },
+    "libs/docstruct/src/docstruct/evaluation/metrics/__init__.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/export/filters.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/export/markdown.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/export/pandoc_ast.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/fusion/__init__.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/fusion/convert.py": {
+      "E741": 1,
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/fusion/differ.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/fusion/line_numbers.py": {
+      "E741": 1
+    },
+    "libs/docstruct/src/docstruct/fusion/oracle.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/fusion/verse.py": {
+      "E741": 7
+    },
+    "libs/docstruct/src/docstruct/profiles.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/regions/classify.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/schemas/__init__.py": {
+      "I001": 1
+    },
+    "libs/docstruct/src/docstruct/validation.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_code_controls.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_equation_numbers.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_export_characterization.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_export_walk.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_export_walk_parity.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_format_spec.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_fusion_payload.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_implicit_products.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_legacy_canonical_types.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_manifest_model.py": {
+      "E731": 3
+    },
+    "libs/docstruct/tests/test_manifest_reading_order.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_prose_tabs.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_region_grouping_regressions.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_regions.py": {
+      "I001": 1
+    },
+    "libs/docstruct/tests/test_table_specialist.py": {
+      "F401": 1
+    },
+    "libs/docstruct/tests/test_tables_validation_profiles.py": {
+      "F401": 1
+    },
+    "libs/docstruct/tests/test_text_migration.py": {
+      "I001": 2
+    },
+    "libs/docstruct/tests/test_xycut.py": {
+      "E731": 1
+    },
+    "libs/sdk/src/acessilia_sdk/cli.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/operations/formula.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/operations/fusion.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/catalog.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/clients/artifact.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/clients/media_inspect.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf_validate.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/reference.py": {
+      "F541": 3
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/__init__.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/_layout_generated.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/datasets.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/execute.py": {
+      "I001": 1
+    },
+    "libs/sdk/src/acessilia_sdk/toolbox/results/layout.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/clients/test_dataset.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/clients/test_pdf_render_media_types.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_catalog.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_dataset_readers.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_failover.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_layout_readers.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_operation.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_operations_fusion.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_result_readers.py": {
+      "I001": 1
+    },
+    "libs/sdk/tests/test_runtime.py": {
+      "I001": 1
+    },
+    "scripts/bench/__main__.py": {
+      "I001": 1
+    },
+    "scripts/bench/core.py": {
+      "I001": 1
+    },
+    "scripts/bench/math_case.py": {
+      "I001": 2
+    },
+    "scripts/bench/report.py": {
+      "I001": 1
+    },
+    "scripts/bench/toolbox.py": {
+      "I001": 1
+    },
+    "scripts/benchmark_formula_enrichment.py": {
+      "I001": 1
+    },
+    "scripts/benchmark_pipelines.py": {
+      "I001": 1
+    },
+    "scripts/capture_toolbox_contract.py": {
+      "I001": 1
+    },
+    "scripts/check_docstruct_pin.py": {
+      "E402": 1
+    },
+    "scripts/check_image_size.py": {
+      "I001": 1
+    },
+    "scripts/compare_pipelines.py": {
+      "E741": 2,
+      "F541": 5,
+      "F821": 1,
+      "I001": 1
+    },
+    "scripts/gen_locale_catalogs.py": {
+      "I001": 1
+    },
+    "scripts/generate_pddl_schemas.py": {
+      "E402": 3,
+      "I001": 1
+    },
+    "scripts/generate_processing_manifest_schema.py": {
+      "E402": 1,
+      "I001": 1
+    },
+    "scripts/generate_sdk_bindings.py": {
+      "I001": 1
+    },
+    "scripts/manifest.py": {
+      "I001": 1
+    },
+    "scripts/pddl_pipeline.py": {
+      "I001": 1
+    },
+    "scripts/production_deploy.py": {
+      "I001": 1
+    },
+    "tests/conftest.py": {
+      "I001": 1
+    },
+    "tests/core_config_support.py": {
+      "I001": 1
+    },
+    "tests/fixtures/export_snapshots/capture.py": {
+      "I001": 1
+    },
+    "tests/pddl_support.py": {
+      "I001": 2
+    },
+    "tests/test_agno_executor.py": {
+      "I001": 1
+    },
+    "tests/test_api.py": {
+      "I001": 2
+    },
+    "tests/test_audio_exporter_voice.py": {
+      "F401": 1,
+      "I001": 1
+    },
+    "tests/test_audit_export_regressions.py": {
+      "I001": 1
+    },
+    "tests/test_audit_fixes.py": {
+      "I001": 1
+    },
+    "tests/test_bench_toolbox.py": {
+      "I001": 1
+    },
+    "tests/test_cache_history.py": {
+      "I001": 1
+    },
+    "tests/test_cancellation_queue.py": {
+      "I001": 2
+    },
+    "tests/test_checkpoint_identity.py": {
+      "I001": 1
+    },
+    "tests/test_cleanup_service.py": {
+      "I001": 1
+    },
+    "tests/test_compare_pipelines_e2e.py": {
+      "I001": 1
+    },
+    "tests/test_compose_config.py": {
+      "I001": 1
+    },
+    "tests/test_core_config.py": {
+      "I001": 3
+    },
+    "tests/test_core_standalone_table_stage.py": {
+      "I001": 1
+    },
+    "tests/test_deprecated_configuration.py": {
+      "I001": 1
+    },
+    "tests/test_docx_export.py": {
+      "I001": 1
+    },
+    "tests/test_download_token_service.py": {
+      "I001": 1
+    },
+    "tests/test_dual_provider_fusion.py": {
+      "I001": 1
+    },
+    "tests/test_email_service.py": {
+      "I001": 2
+    },
+    "tests/test_export_catalog.py": {
+      "I001": 1
+    },
+    "tests/test_followup_regressions.py": {
+      "I001": 2
+    },
+    "tests/test_formula_crop.py": {
+      "F401": 1,
+      "I001": 1
+    },
+    "tests/test_formula_enrichment.py": {
+      "I001": 2
+    },
+    "tests/test_formula_recognition.py": {
+      "F401": 2,
+      "I001": 3
+    },
+    "tests/test_fusion_document_contract.py": {
+      "I001": 1
+    },
+    "tests/test_fusion_e2e.py": {
+      "I001": 1
+    },
+    "tests/test_fusion_transient_retry.py": {
+      "I001": 1
+    },
+    "tests/test_handler_contract.py": {
+      "I001": 1
+    },
+    "tests/test_i18n.py": {
+      "I001": 1
+    },
+    "tests/test_job_failure_e2e.py": {
+      "I001": 1
+    },
+    "tests/test_job_progress.py": {
+      "I001": 1
+    },
+    "tests/test_job_resume.py": {
+      "I001": 1
+    },
+    "tests/test_manifest_invariants.py": {
+      "I001": 1
+    },
+    "tests/test_manifest_semantic_contract.py": {
+      "I001": 1
+    },
+    "tests/test_math_case.py": {
+      "I001": 1
+    },
+    "tests/test_model_call_executor.py": {
+      "I001": 2
+    },
+    "tests/test_object_markers.py": {
+      "I001": 1
+    },
+    "tests/test_page_limit.py": {
+      "I001": 1
+    },
+    "tests/test_pandoc_filters.py": {
+      "I001": 1
+    },
+    "tests/test_pddl_audit_fixes.py": {
+      "I001": 1
+    },
+    "tests/test_pddl_cache_contract.py": {
+      "I001": 3
+    },
+    "tests/test_pddl_orchestrator.py": {
+      "I001": 2
+    },
+    "tests/test_pddl_payload_lists_and_callouts.py": {
+      "I001": 1
+    },
+    "tests/test_pddl_planning.py": {
+      "I001": 1
+    },
+    "tests/test_pdf_ua_audit.py": {
+      "I001": 1
+    },
+    "tests/test_pdf_ua_export.py": {
+      "I001": 1
+    },
+    "tests/test_pending_fixes.py": {
+      "I001": 2
+    },
+    "tests/test_picture_crop_render.py": {
+      "I001": 1
+    },
+    "tests/test_picture_without_page.py": {
+      "I001": 1
+    },
+    "tests/test_pipeline_disabled.py": {
+      "I001": 1
+    },
+    "tests/test_process_setup.py": {
+      "I001": 5
+    },
+    "tests/test_processing_options_cache.py": {
+      "I001": 4
+    },
+    "tests/test_production_deploy.py": {
+      "I001": 1
+    },
+    "tests/test_provider_choice_methods.py": {
+      "I001": 15
+    },
+    "tests/test_region_inspection.py": {
+      "I001": 1
+    },
+    "tests/test_renderable_media.py": {
+      "I001": 1
+    },
+    "tests/test_run_identity.py": {
+      "I001": 1
+    },
+    "tests/test_run_ports.py": {
+      "I001": 4
+    },
+    "tests/test_sdk_dataset_schema.py": {
+      "F401": 1,
+      "I001": 1
+    },
+    "tests/test_sdk_layout_schema.py": {
+      "I001": 1
+    },
+    "tests/test_sdk_result_schemas.py": {
+      "I001": 1
+    },
+    "tests/test_secondary_extraction_deadline.py": {
+      "I001": 2
+    },
+    "tests/test_service_engine.py": {
+      "I001": 2
+    },
+    "tests/test_settings_runtime_providers.py": {
+      "I001": 1
+    },
+    "tests/test_slide_geometry_parity.py": {
+      "I001": 1
+    },
+    "tests/test_slides.py": {
+      "F401": 1,
+      "I001": 5
+    },
+    "tests/test_staging_update.py": {
+      "I001": 1
+    },
+    "tests/test_structured_agent_outputs.py": {
+      "F401": 3,
+      "I001": 6
+    },
+    "tests/test_table_inline_math.py": {
+      "I001": 1
+    },
+    "tests/test_telegram_client.py": {
+      "I001": 1
+    },
+    "tests/test_toolbox_capability_registry.py": {
+      "I001": 1
+    },
+    "tests/test_toolbox_client_factory.py": {
+      "I001": 1
+    },
+    "tests/test_toolbox_e2e.py": {
+      "I001": 3
+    },
+    "tests/test_toolbox_gate_catalog_transport.py": {
+      "I001": 2
+    },
+    "tests/test_toolbox_manifest_extractor.py": {
+      "E731": 1,
+      "F401": 11,
+      "I001": 9
+    },
+    "tests/test_toolbox_math_tools.py": {
+      "I001": 1
+    },
+    "tests/test_toolbox_pr125_config.py": {
+      "I001": 1
+    },
+    "tests/test_toolbox_v2_contract.py": {
+      "I001": 1
+    },
+    "tests/test_trilha_a_regressions.py": {
+      "I001": 9
+    },
+    "tests/test_unstructured_pages.py": {
+      "I001": 1
+    },
+    "tests/test_untitled_document_name.py": {
+      "I001": 3
+    },
+    "tests/test_v2_security.py": {
+      "I001": 1
+    },
+    "tests/test_validators.py": {
+      "I001": 1
+    },
+    "tests/test_vision_payload.py": {
+      "I001": 1
+    },
+    "tests/test_web_panel.py": {
+      "I001": 2
+    }
+  }
+}
