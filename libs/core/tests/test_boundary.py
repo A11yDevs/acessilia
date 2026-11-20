@@ -40,7 +40,6 @@ ALLOWED_LIBRARIES = {
     "loguru": "the logger",
     "babel": "the translation catalogs",
     "jsonschema": "the manifest schema",
-    "rapidfuzz": "the fusion's text comparison",
 }
 
 #: Allowed only as a recorded deviation: it leaves when the audio export

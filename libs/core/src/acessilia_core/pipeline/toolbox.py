@@ -17,11 +17,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from acessilia_sdk.toolbox.clients.pdf import check_renderable
+
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
-from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 
 if TYPE_CHECKING:
     from acessilia_sdk.operations.formula import FormulaCrop
@@ -75,7 +76,7 @@ def _toolbox_render(
     """
     from acessilia_sdk.runtime import run_sync
 
-    _check_renderable(source, media_type)
+    check_renderable(source, media_type)
 
     async def render():
         client = _render_client(artifact_id, toolbox)
@@ -95,33 +96,14 @@ def _toolbox_render(
     return run_sync(render())
 
 
-def _check_renderable(source: Path, media_type: str | None) -> None:
-    """Refuse, before any request, a source ``pdf.render@2`` would not open.
-
-    The upload is labelled from the file extension; ``media_type`` (the
-    manifest's) must agree with that label, and the label must be one of the
-    SDK's ``RENDER_MEDIA_TYPES``. Raises ``ValueError`` saying which.
-    """
-    from acessilia_sdk.toolbox.transport import media_type_for
-
-    sent_as = media_type_for(source)
-    if media_type is not None and media_type != sent_as:
-        raise ValueError(
-            f"Source is {media_type} in the manifest but would be sent as {sent_as}"
-        )
-    if sent_as not in RENDER_MEDIA_TYPES:
-        raise ValueError(
-            f"pdf.render@2 renders PDF, PNG and JPEG inputs, not {sent_as}"
-        )
-
-
 def _render_client(artifact_id: str | None, toolbox: ToolboxConfig):
     """A ``ToolboxPdfClient`` from the run's ``toolbox``.
 
     With ``artifact_id``, a source the Toolbox no longer stores is sent again.
     """
-    from acessilia_core.toolbox.toolbox_client import make_toolbox_client
     from acessilia_sdk.toolbox.clients import ToolboxPdfClient
+
+    from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 
     return make_toolbox_client(
         ToolboxPdfClient, toolbox, resend_file_on_missing_artifact=artifact_id is not None
@@ -153,7 +135,7 @@ def _toolbox_formula_crop(
 
     if best_effort_clip(box)[0] is None:
         return FormulaCrop(None, page_number, reason="no usable box")
-    _check_renderable(source, media_type)
+    check_renderable(source, media_type)
 
     async def crop() -> FormulaCrop:
         client = _render_client(artifact_id, toolbox)

@@ -2,13 +2,16 @@
 
 Toolbox is mocked — no test requires a running service.
 """
+from collections import Counter
+from pathlib import Path
+
 import pytest
 from acessilia_core.pipeline.fusion import (
-    _group_by_page,
+    apply_page_routes,
     extract_fused,
 )
-
 from core_config_support import toolbox_config
+from docstruct.fusion.payload import group_payload_by_page as _group_by_page
 
 
 def _payload(elements: list[dict]) -> dict:
@@ -159,13 +162,13 @@ class TestExtractFused:
             return _payload([_el("observacao", 0)])
 
         def fake_merge_blocks(*args, **kwargs):
-            return [" ".join(["observacao"] * 6)], {}
+            return [" ".join(["observacao"] * 6)], Counter()
 
         monkeypatch.setattr(
             "acessilia_core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        monkeypatch.setattr("acessilia_core.pipeline.fusion.merge_blocks", fake_merge_blocks)
+        monkeypatch.setattr("docstruct.fusion.payload.merge_blocks", fake_merge_blocks)
 
         result = await extract_fused("arquivo.pdf", secondary_provider="mineru", toolbox=toolbox_config())
 
@@ -191,13 +194,13 @@ class TestExtractFused:
             return _payload([_el("observacao", 0)])
 
         def fake_merge_blocks(*args, **kwargs):
-            return list(blocks), {}
+            return list(blocks), Counter()
 
         monkeypatch.setattr(
             "acessilia_core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        monkeypatch.setattr("acessilia_core.pipeline.fusion.merge_blocks", fake_merge_blocks)
+        monkeypatch.setattr("docstruct.fusion.payload.merge_blocks", fake_merge_blocks)
 
         result = await extract_fused("arquivo.pdf", secondary_provider="mineru", toolbox=toolbox_config())
 
@@ -232,7 +235,7 @@ class TestExtractFused:
             "acessilia_core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        monkeypatch.setattr("acessilia_core.pipeline.fusion.merge_blocks", fake_merge_blocks)
+        monkeypatch.setattr("docstruct.fusion.payload.merge_blocks", fake_merge_blocks)
 
         result = await extract_fused("arquivo.pdf", secondary_provider="mineru", toolbox=toolbox_config())
         pages = result["fusion_evidence"]["pages"]
@@ -337,7 +340,7 @@ async def test_extract_fused_uploads_when_the_artifact_is_gone(monkeypatch):
     for provider in ("docling", "mineru"):
         assert [c for c in toolbox.calls if c[0] == provider] == [
             (provider, "art-1", None),
-            (provider, None, "doc.pdf"),
+            (provider, None, Path("doc.pdf")),
         ]
 
 
@@ -378,6 +381,7 @@ async def test_extract_fused_takes_the_primary_provider_from_the_run_config(monk
 
     class Client:
         def __init__(self, provider, _toolbox):
+            self.provider = provider
             providers.append(provider)
 
         async def extract_structure(self, *args, **kwargs):
@@ -394,3 +398,82 @@ async def test_extract_fused_takes_the_primary_provider_from_the_run_config(monk
     )
 
     assert sorted(providers) == ["mineru", "run-primary"]
+
+
+@pytest.mark.asyncio
+async def test_extract_fused_logs_both_failures_and_artifact_fallbacks_when_both_fail(
+    monkeypatch,
+):
+    from acessilia_core.logger import logger
+    from acessilia_core.toolbox.toolbox_client import (
+        ToolboxArtifactNotFound,
+        ToolboxProviderUnavailable,
+    )
+
+    class FailingClient:
+        def __init__(self, provider, _toolbox):
+            self.provider = provider
+            self.closed = False
+
+        async def extract_structure(self, file_path=None, *, artifact_id=None, **kwargs):
+            if artifact_id:
+                raise ToolboxArtifactNotFound("expired")
+            raise ToolboxProviderUnavailable(f"{self.provider} down")
+
+        async def close(self):
+            self.closed = True
+
+    clients: list[FailingClient] = []
+
+    def factory(provider, toolbox):
+        client = FailingClient(provider, toolbox)
+        clients.append(client)
+        return client
+
+    messages: list[str] = []
+    sink_id = logger.add(lambda message: messages.append(str(message)), level="INFO")
+    monkeypatch.setattr("acessilia_core.pipeline.fusion._structure_client", factory)
+    try:
+        with pytest.raises(ToolboxProviderUnavailable):
+            await extract_fused(
+                "doc.pdf",
+                primary_provider="docling",
+                secondary_provider="mineru",
+                artifact_id="art-9",
+                toolbox=toolbox_config(),
+            )
+    finally:
+        logger.remove(sink_id)
+
+    assert all(client.closed for client in clients)
+    joined = "\n".join(messages)
+    assert "artifact art-9 not in the Toolbox; uploading for docling" in joined
+    assert "artifact art-9 not in the Toolbox; uploading for mineru" in joined
+    assert "provider docling failed (ToolboxProviderUnavailable)" in joined
+    assert "provider mineru failed (ToolboxProviderUnavailable)" in joined
+
+
+def test_apply_page_routes_warns_when_secondary_misses_routed_page():
+    from acessilia_core.logger import logger
+
+    primary = {
+        "document": {
+            "pages": [{"page_number": 1, "width": 100.0, "height": 200.0, "element_ids": ["p1"]}],
+            "elements": [{"id": "p1", "type": "paragraph", "text": "p1", "page_number": 1, "reading_order": 1}],
+        }
+    }
+    secondary = {"document": {"pages": [], "elements": []}}
+    evidence = [{"page_number": 1, "stats": {"route": "mineru"}}]
+
+    warnings: list[str] = []
+    sink_id = logger.add(lambda message: warnings.append(str(message)), level="WARNING")
+    try:
+        payload, replaced = apply_page_routes(
+            primary, secondary, evidence, secondary_provider="mineru"
+        )
+    finally:
+        logger.remove(sink_id)
+
+    assert payload is primary
+    assert replaced == {}
+    assert any("has no elements on pages [1]" in msg for msg in warnings)

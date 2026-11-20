@@ -2,6 +2,29 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.2.5 — fusão dual, downscale, validação de render e bridge sync/async via SDK e docstruct
+
+Sem mudança de comportamento. O core passa a delegar a extração com dois
+provedores, a fusão/roteamento puro de payloads, a redução de escala de
+imagens, a pré-validação de mídia renderizável e os bridges síncrono/assíncrono
+ao `acessilia-sdk` e ao `acessilia-docstruct` (#612):
+
+- `pipeline/fusion.py`: `extract_fused` delega para
+  `acessilia_sdk.operations.fusion.extract_dual_fused` (preservando os logs de
+  falhas por provedor e fallback de artefato via `DualFusionUnavailable`),
+  enquanto `fuse_extraction_payloads` e `apply_page_routes` delegam para
+  `docstruct.fusion.payload.fuse_extraction_payloads` e `route_pages`
+  (preservando os logs de páginas roteadas e ausentes).
+- `toolbox/vision_payload.py`: `downscale_image` delega a renderização para
+  `acessilia_sdk.toolbox.clients.pdf.downscale_image`, mantendo no core o ciclo
+  de vida do cliente com `ToolboxConfig`, o log localizado e o retorno `None`.
+- `pipeline/toolbox.py` e `pipeline/judge.py`: substituem `_check_renderable`
+  por `acessilia_sdk.toolbox.clients.pdf.check_renderable`.
+- `pipeline/handlers/inspection.py` e `pipeline/handlers/fusion.py`: substituem
+  os bridges síncrono/assíncrono duplicados por `acessilia_sdk.runtime.run_sync`.
+
+O core passa a exigir `acessilia-docstruct>=0.5.8,<0.6` (#612).
+
 ## 0.2.4 — primitivas estruturais do docstruct 0.5.7
 
 Sem mudança de comportamento, exceto um caso-limite mais estrito. As

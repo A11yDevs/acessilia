@@ -1,13 +1,11 @@
-"""Differential parity between docstruct.fusion.payload and acessilia_core.pipeline.fusion (#612).
+"""Contract parity between docstruct.fusion.payload and acessilia_core.pipeline.fusion (#612).
 
-PR 4 of the #612 plan introduces pure multi-provider payload fusion and page
-routing in ``docstruct.fusion.payload`` while ``acessilia_core.pipeline.fusion``
-still keeps its copy until PR 6 delegates to docstruct. This suite pins exact
-parity across a seeded randomized corpus, policy presets, edge-case payloads,
-and the pure-Python similarity fallback without ``rapidfuzz``.
-
-Once PR 6 removes the legacy copy from the core, freeze the reference inputs or
-retire this comparison with a note.
+PR 4 introduced pure multi-provider payload fusion and page routing in
+``docstruct.fusion.payload`` while ``acessilia_core.pipeline.fusion`` still held
+its own copy; PR 6 delegated the core wrappers to ``docstruct.fusion.payload``.
+This suite stays as a regression guard ensuring the core logging/adapter layer
+introduces zero drift relative to ``docstruct.fusion.payload`` across policy
+presets, edge-case payloads, and the pure-Python fallback without ``rapidfuzz``.
 """
 
 from __future__ import annotations

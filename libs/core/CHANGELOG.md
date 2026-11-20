@@ -2,6 +2,28 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.2.5 — dual-provider fusion, downscale, render check and sync bridge via SDK and docstruct
+
+No behaviour change. The core now delegates its dual-provider extraction, pure
+payload fusion/page routing, image downscaling, renderable-media pre-check, and
+sync/async bridges to `acessilia-sdk` and `acessilia-docstruct` (#612):
+
+- `pipeline/fusion.py`: `extract_fused` delegates to
+  `acessilia_sdk.operations.fusion.extract_dual_fused` (preserving per-provider
+  failure and artifact-fallback logging via `DualFusionUnavailable`), while
+  `fuse_extraction_payloads` and `apply_page_routes` delegate to
+  `docstruct.fusion.payload.fuse_extraction_payloads` and `route_pages`
+  (preserving routed and missing-page logs).
+- `toolbox/vision_payload.py`: `downscale_image` delegates rendering to
+  `acessilia_sdk.toolbox.clients.pdf.downscale_image`, keeping `ToolboxConfig`
+  client lifecycle, localized warning log, and `None` recovery in the core.
+- `pipeline/toolbox.py` and `pipeline/judge.py`: replace `_check_renderable`
+  with `acessilia_sdk.toolbox.clients.pdf.check_renderable`.
+- `pipeline/handlers/inspection.py` and `pipeline/handlers/fusion.py`: replace
+  duplicated thread-pool sync/async bridges with `acessilia_sdk.runtime.run_sync`.
+
+The core now requires `acessilia-docstruct>=0.5.8,<0.6` (#612).
+
 ## 0.2.4 — structural primitives from docstruct 0.5.7
 
 No behaviour change, except one stricter edge case. The core's duplicated
