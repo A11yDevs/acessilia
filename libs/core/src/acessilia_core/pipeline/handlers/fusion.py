@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_sdk.runtime import run_sync
+from docstruct.tables.ast import analyze_table_complexity
 
 from acessilia_core.config import CoreConfig, ToolboxConfig
 from acessilia_core.execution.models import MethodResult
@@ -60,6 +61,7 @@ from acessilia_core.pipeline.secondary import (
     _page_markdown,
     _pair_block,
     _secondary_or_failure,
+    _SecondaryExtraction,
 )
 from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
@@ -75,7 +77,7 @@ def _match_secondary_table(
     element: ManifestElement,
     manifest: ProcessingManifest,
     candidates: list[dict[str, Any]],
-    secondary: Any,
+    secondary: _SecondaryExtraction,
     *,
     single_primary_on_page: bool,
 ) -> dict[str, Any] | None:
@@ -100,8 +102,6 @@ def _decide_table_source(
     candidates: list[dict[str, Any]],
     chosen: dict[str, Any] | None,
 ) -> tuple[str, str]:
-    from docstruct.tables.ast import analyze_table_complexity
-
     primary_name = _CALIBRATED_PAIR[0]
     chosen_meta = (chosen or {}).get("metadata") or {}
     if primary_ast and analyze_table_complexity(primary_ast).has_spans:

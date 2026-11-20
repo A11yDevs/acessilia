@@ -1,8 +1,9 @@
 """Legacy Unicode and detached negation-overlay repair handler.
 
 Extracted from ``acessilia_core.pipeline.handlers.text`` (#612) to keep each
-handler module focused and well below the module size limit. Re-exported from
-``handlers/text.py`` for backward compatibility.
+handler module focused and well below the module size limit. This module is
+the canonical owner of the Unicode repair handler and its internal helpers;
+``handlers/text.py`` re-exports the entry points for import compatibility.
 """
 
 from __future__ import annotations

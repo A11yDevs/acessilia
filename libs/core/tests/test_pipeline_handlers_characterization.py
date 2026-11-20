@@ -20,17 +20,20 @@ from acessilia_core.manifest.builder import (
 from acessilia_core.manifest.models import (
     Artifact,
     BoundingBox,
+    Observation,
     PageDescriptor,
     ProcessingManifest,
     Provenance,
 )
 from acessilia_core.pipeline.handlers.fusion import (
     _fused_text_elements,
+    _handle_dual_provider_fusion_method,
     _handle_table_smart_fusion_method,
 )
 from acessilia_core.pipeline.handlers.rescue import _handle_rescue_omitted_method
 from acessilia_core.pipeline.handlers.text import (
     _handle_tailjoin_method,
+    _handle_unicode_repair_method,
     _reattach_negation_overlays,
 )
 from acessilia_core.pipeline.secondary import _load_secondary_extraction
@@ -285,6 +288,55 @@ class TestFusionHandlersCharacterization:
                 },
             )
 
+    def test_dual_provider_fusion_replaces_elements_and_rejects_single_provider(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        p1 = build_element("e-1", "paragraph", text="Original", reading_order=1).model_copy(
+            update={"page_number": 1}
+        )
+        ob = build_obligation(
+            "fuse-providers", ["e-1"], ["dual-provider-fusion"]
+        ).model_copy(update={"id": "ob-fuse"})
+        manifest = build_manifest([p1], [ob])
+        manifest.pages = [
+            PageDescriptor(page_number=1, width=600.0, height=800.0, element_ids=["e-1"])
+        ]
+        cfg = core_config(paths={"data_dir": tmp_path})
+
+        monkeypatch.setattr(
+            "acessilia_core.pipeline.handlers.fusion._run_extract_fused",
+            lambda *_a, **_kw: {
+                "status": "succeeded",
+                "provider": "docling",
+                "document": {"elements": [{"type": "paragraph", "text": "Single"}]},
+            },
+        )
+        single_res = _handle_dual_provider_fusion_method(manifest, "ob-fuse", config=cfg)
+        assert single_res.success is False
+        assert manifest.elements[0].text == "Original"
+
+        monkeypatch.setattr(
+            "acessilia_core.pipeline.handlers.fusion._run_extract_fused",
+            lambda *_a, **_kw: {
+                "status": "succeeded",
+                "provider": "docling+mineru",
+                "document": {
+                    "elements": [
+                        {"type": "paragraph", "text": "Fused 1", "page_number": 1},
+                        {"type": "paragraph", "text": "Fused 2", "page_number": 1},
+                    ]
+                },
+            },
+        )
+        dual_res = _handle_dual_provider_fusion_method(manifest, "ob-fuse", config=cfg)
+        assert dual_res.success is True
+        assert len(dual_res.artifacts) == 1
+        assert [el.text for el in manifest.elements] == ["Fused 1", "Fused 2"]
+        assert manifest.pages[0].width == 600.0
+        assert manifest.pages[0].height == 800.0
+        assert manifest.summary.element_count == 2
+        assert manifest.summary.element_types == {"paragraph": 2}
+
 
 class TestTextAndRescueHandlersCharacterization:
     def test_reattach_negation_overlays_handles_composed_latex_ambiguous_and_retry(
@@ -361,6 +413,56 @@ class TestTextAndRescueHandlersCharacterization:
         }
         # Retry skips already-recorded overlays.
         assert _reattach_negation_overlays(manifest) == {}
+
+    def test_unicode_repair_handler_repairs_prose_and_table_and_handles_no_eligible(
+        self,
+    ) -> None:
+        prose = build_element(
+            "p-1", "paragraph", text="Bras\u0131\u0301lia", reading_order=1
+        ).model_copy(update={"page_number": 1})
+        table = build_element(
+            "t-1",
+            "table",
+            text="",
+            metadata={
+                "table_ast": {
+                    "caption": "Regia\u0303o",
+                    "body": [{"cells": [{"text": "Bras\u0131\u0301lia"}]}],
+                }
+            },
+            reading_order=2,
+        ).model_copy(update={"page_number": 1})
+        ob = build_obligation(
+            "repair-legacy-unicode", ["p-1", "t-1"], ["unicode-repair"]
+        ).model_copy(update={"id": "ob-uni"})
+        manifest = build_manifest([prose, table], [ob])
+        manifest.observations = [
+            Observation(
+                id="obs-uni",
+                kind="repair-legacy-unicode-detected",
+                severity="warning",
+                message="Legacy unicode",
+                target_ids=["p-1", "t-1"],
+                evidence={"spacing_word_internal": 0},
+            )
+        ]
+        manifest.summary.observation_count = 1
+
+        res = _handle_unicode_repair_method(manifest, "ob-uni")
+        assert res.success is True
+        assert prose.text == "Bras\u00edlia"
+        assert prose.metadata["unicode_repair"]["edited"] is True
+        assert table.metadata["table_ast"]["caption"] == "Regi\u00e3o"
+        assert table.metadata["table_ast"]["body"][0]["cells"][0]["text"] == "Bras\u00edlia"
+        assert table.metadata["unicode_repair"]["edited"] is True
+
+        pic = build_element("pic-1", "picture", text="alt", reading_order=1)
+        ob_none = build_obligation(
+            "repair-legacy-unicode", ["pic-1"], ["unicode-repair"]
+        ).model_copy(update={"id": "ob-uni-none"})
+        manifest_none = build_manifest([pic], [ob_none])
+        res_none = _handle_unicode_repair_method(manifest_none, "ob-uni-none")
+        assert res_none.success is False
 
     def test_tailjoin_validates_all_pages_before_mutating_earlier_page(
         self, monkeypatch: pytest.MonkeyPatch

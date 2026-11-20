@@ -70,6 +70,7 @@ from acessilia_core.pipeline.secondary import (
     _MIN_BLOCK_IOU,
     _MIN_BLOCK_TEXT_RATIO,
     _load_secondary_extraction,
+    _SecondaryExtraction,
 )
 
 #: Element types whose text the method rescues. Tables, formulas and pictures
@@ -112,7 +113,9 @@ def _fused_pages(manifest: ProcessingManifest, pages: list[int]) -> list[int]:
 
 
 def _classify_rescue_pages(
-    manifest: ProcessingManifest, pages: list[int], secondary: Any
+    manifest: ProcessingManifest,
+    pages: list[int],
+    secondary: _SecondaryExtraction,
 ) -> tuple[list[int], list[int], MethodResult | None]:
     # Every page is classified before any is changed: a failed method must
     # leave the manifest as it found it, since the executor does not roll back

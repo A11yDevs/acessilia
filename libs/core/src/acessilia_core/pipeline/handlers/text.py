@@ -57,14 +57,23 @@ from acessilia_core.pipeline.handlers.structure import (
     split_provenance,
     unique_element_id,
 )
-from acessilia_core.pipeline.handlers.unicode_repair import (  # noqa: F401
-    _UNICODE_REPAIR_BLOCK_TYPES,
-    _UNICODE_STANDALONE_SPACING_MIN,
-    _compose_in_host,
+from acessilia_core.pipeline.handlers.unicode_repair import (
     _handle_unicode_repair_method,
     _reattach_negation_overlays,
     _repair_table_cells,
 )
+
+__all__ = [
+    "_handle_chunk_verse_method",
+    "_handle_deterministic_heading_repair_method",
+    "_handle_extract_line_numbers_method",
+    "_handle_norm_fix_method",
+    "_handle_repetition_guard_method",
+    "_handle_tailjoin_method",
+    "_handle_unicode_repair_method",
+    "_reattach_negation_overlays",
+    "_repair_table_cells",
+]
 
 
 def _handle_norm_fix_method(
