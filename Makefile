@@ -35,7 +35,7 @@ typecheck:
 coverage:
 	@mkdir -p "$(COVERAGE_DIR)/app" "$(COVERAGE_DIR)/docstruct" "$(COVERAGE_DIR)/sdk" "$(COVERAGE_DIR)/core"; \
 	status=0; \
-	COVERAGE_FILE="$(CURDIR)/$(COVERAGE_DIR)/app/.coverage" $(PYTEST) $(PYTEST_FLAGS) $(CORE_PARALLEL) \
+	COVERAGE_FILE="$(CURDIR)/$(COVERAGE_DIR)/app/.coverage" $(UV) run --extra dev pytest $(PYTEST_FLAGS) $(CORE_PARALLEL) \
 		--cov=backend --cov=frontend --cov-branch --cov-config="$(CURDIR)/pyproject.toml" \
 		--cov-report=term-missing:skip-covered \
 		--cov-report=xml:"$(CURDIR)/$(COVERAGE_DIR)/app/coverage.xml" \

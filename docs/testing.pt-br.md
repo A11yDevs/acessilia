@@ -29,7 +29,7 @@ própria suíte completa mais rápida.
 | Mudei um arquivo ou um teste | `make test-file F=tests/test_example.py` | Roda apenas esse caminho, sem E2E |
 | Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches da suíte principal, do docstruct, do SDK e do `libs/core` |
 | Quero a confiança local completa | `make test-all` | Suíte principal com quatro workers, depois docstruct, SDK e `libs/core` |
-| Quero verificar o lint (baseline do Ruff) | `make lint` | Executa o Ruff (`F`, `I`, `E` sem `E501`) via `scripts/check_ruff_baseline.py` |
+| Quero verificar o lint (baseline do Ruff) | `make lint` | Executa o Ruff (`F`, `E` sem `E501`) via `scripts/check_ruff_baseline.py` |
 | Quero verificar tipos estáticos (Mypy) | `make typecheck` | Executa o Mypy no escopo configurado de `docstruct` e `acessilia_sdk` |
 | Quero relatórios de cobertura por componente | `make coverage` | Executa as quatro suítes com cobertura de desvios em `var/coverage/{app,core,sdk,docstruct}/` |
 | Quero só a suíte principal, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda a suíte principal non-E2E com quatro workers |

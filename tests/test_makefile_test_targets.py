@@ -111,3 +111,4 @@ def test_coverage_covers_all_four_components_with_branch_reports() -> None:
         "var/coverage/core/coverage.xml",
     ):
         assert expected in completed.stdout
+    assert completed.stdout.count("--extra dev") >= 4

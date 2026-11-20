@@ -97,9 +97,9 @@ make typecheck
 make test-all
 ```
 
-- `make lint` runs **Ruff** (rules `F`, `I` and `E` excluding `E501`) via `scripts/check_ruff_baseline.py` against the shrinking baseline in `tests/fixtures/ruff_baseline.json`. Any new violation fails the check; when you clean existing violations in a file, shrink the baseline with `uv run python scripts/check_ruff_baseline.py --update`.
+- `make lint` runs **Ruff** (rules `F` and `E` excluding `E501`) via `scripts/check_ruff_baseline.py` against the shrinking baseline in `tests/fixtures/ruff_baseline.json`. Any new violation fails the check; when you clean existing violations in a file, shrink the baseline with `uv run python scripts/check_ruff_baseline.py --update`. Import sorting (`uv run ruff check --select I`) is configured as advisory until a dedicated cleanup sweep lands.
 - `make typecheck` runs **Mypy** on the configured `docstruct` and `acessilia_sdk` scope in `pyproject.toml` (all modules except the explicitly listed legacy overrides, plus any newly added modules).
-- `make coverage` runs all four suites with branch coverage (`pytest-cov`) and writes separate XML, JSON and HTML reports under `var/coverage/{app,core,sdk,docstruct}/` without enforcing a minimum threshold yet.
+- Optional locally (runs automatically in CI): `make coverage` runs all four suites with branch coverage (`pytest-cov`) and writes separate XML, JSON and HTML reports under `var/coverage/{app,core,sdk,docstruct}/` without enforcing a minimum threshold yet.
 
 While iterating, `make test-file F=tests/test_example.py` runs one file or node
 id and `make test-failed` reruns the tests that failed last time.

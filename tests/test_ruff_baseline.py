@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from scripts import check_ruff_baseline
 
@@ -131,3 +134,84 @@ def test_update_shrinks_baseline_and_refuses_increases(tmp_path: Path, monkeypat
     )
     assert check_ruff_baseline.main(["--baseline", str(baseline), "--update"]) == 0
     assert check_ruff_baseline.load_baseline(baseline) == {"backend/a.py": {"I001": 1}}
+
+
+def test_run_ruff_raises_when_exit_1_produces_no_json(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0],
+            returncode=1,
+            stdout="",
+            stderr="No module named ruff",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="No module named ruff"):
+        check_ruff_baseline.run_ruff(root=tmp_path)
+
+
+def test_run_ruff_allows_empty_stdout_on_exit_0(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="", stderr=""
+        ),
+    )
+
+    assert check_ruff_baseline.run_ruff(root=tmp_path) == []
+
+
+def test_update_handles_relative_and_external_baseline_paths(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    outside = tmp_path / "outside" / "probe.json"
+    monkeypatch.setattr(check_ruff_baseline, "REPO_ROOT", repo)
+    monkeypatch.setattr(check_ruff_baseline, "run_ruff", lambda paths, *, root: [])
+
+    # External absolute path outside REPO_ROOT must not crash.
+    assert check_ruff_baseline.main(["--baseline", str(outside), "--update"]) == 0
+    assert outside.exists()
+    assert str(outside) in capsys.readouterr().out
+
+    # Relative path from cwd inside REPO_ROOT must not crash.
+    monkeypatch.chdir(repo)
+    rel = Path("tests/fixtures/probe.json")
+    assert check_ruff_baseline.main(["--baseline", str(rel), "--update"]) == 0
+    assert (repo / rel).exists()
+    assert "tests/fixtures/probe.json" in capsys.readouterr().out
+
+
+def test_update_refuses_positional_paths(tmp_path: Path, monkeypatch) -> None:
+    baseline = tmp_path / "ruff_baseline.json"
+    monkeypatch.setattr(check_ruff_baseline, "REPO_ROOT", tmp_path)
+
+    with pytest.raises(SystemExit) as exc_info:
+        check_ruff_baseline.main(["--baseline", str(baseline), "--update", "backend"])
+    assert exc_info.value.code == 2
+
+
+def test_check_with_positional_path_scopes_baseline(tmp_path: Path, monkeypatch, capsys) -> None:
+    baseline = tmp_path / "ruff_baseline.json"
+    check_ruff_baseline.write_baseline(
+        baseline,
+        {
+            "backend/a.py": {"F401": 1},
+            "tests/test_other.py": {"F401": 2},
+        },
+    )
+    monkeypatch.setattr(check_ruff_baseline, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        check_ruff_baseline,
+        "run_ruff",
+        lambda paths, *, root: [_diag(str(tmp_path / "backend" / "a.py"), "F401")],
+    )
+
+    code = check_ruff_baseline.main(["--baseline", str(baseline), "backend"])
+
+    assert code == 0
+    assert "0 new violations" in capsys.readouterr().out

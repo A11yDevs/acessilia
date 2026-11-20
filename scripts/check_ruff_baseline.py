@@ -75,7 +75,12 @@ def run_ruff(
         raise RuntimeError(f"ruff check failed (exit {completed.returncode}): {detail}")
     raw = completed.stdout.strip()
     if not raw:
-        return []
+        if completed.returncode == 0:
+            return []
+        detail = completed.stderr.strip() or "no output"
+        raise RuntimeError(
+            f"ruff check failed without JSON output (exit {completed.returncode}): {detail}"
+        )
     parsed = json.loads(raw)
     if not isinstance(parsed, list):
         raise RuntimeError(f"Unexpected ruff JSON output: {type(parsed).__name__}")
@@ -121,7 +126,7 @@ def write_baseline(path: Path, counts: Baseline) -> None:
     """Write a deterministic baseline JSON file."""
     payload = {
         "_comment": (
-            "Pre-existing Ruff violations (rules F, I, E excluding E501; #366), "
+            "Pre-existing Ruff violations (rules F, E excluding E501; #366), "
             "counted per file and rule code. Counts may only go down: when you "
             "fix violations, run `uv run python scripts/check_ruff_baseline.py --update`."
         ),
@@ -133,6 +138,37 @@ def write_baseline(path: Path, counts: Baseline) -> None:
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+
+
+def _filter_baseline_for_paths(
+    allowed: Baseline,
+    paths: Sequence[str],
+    *,
+    root: Path,
+) -> Baseline:
+    """Restrict ``allowed`` to entries matching any target in ``paths``."""
+    resolved_root = root.resolve()
+    targets: list[Path] = []
+    for raw in paths:
+        candidate = Path(raw)
+        if not candidate.is_absolute():
+            candidate = resolved_root / candidate
+        targets.append(candidate.resolve())
+
+    filtered: Baseline = {}
+    for rel, codes in allowed.items():
+        entry_path = (resolved_root / rel).resolve()
+        if any(entry_path == target or entry_path.is_relative_to(target) for target in targets):
+            filtered[rel] = codes
+    return filtered
+
+
+def _display_path(path: Path, *, root: Path) -> str:
+    """Format ``path`` relative to ``root`` when inside it, otherwise as given."""
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def compare_baselines(current: Baseline, allowed: Baseline) -> Comparison:
@@ -195,12 +231,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "paths",
         nargs="*",
-        default=list(DEFAULT_PATHS),
-        help="Directories or files to lint.",
+        default=None,
+        help="Directories or files to lint (default: all repository source/test trees).",
     )
     args = parser.parse_args(argv)
 
-    diagnostics = run_ruff(args.paths, root=REPO_ROOT)
+    custom_paths = args.paths is not None and len(args.paths) > 0
+    if args.update and custom_paths:
+        parser.error(
+            "--update rewrites the full baseline and cannot be combined with positional paths."
+        )
+    target_paths = list(args.paths) if custom_paths else list(DEFAULT_PATHS)
+
+    diagnostics = run_ruff(target_paths, root=REPO_ROOT)
     current = summarize_diagnostics(diagnostics, root=REPO_ROOT)
 
     if args.update:
@@ -214,7 +257,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 1
         write_baseline(args.baseline, current)
         total = sum(sum(codes.values()) for codes in current.values())
-        print(f"Updated {args.baseline.relative_to(REPO_ROOT)}: {total} violation(s) across {len(current)} file(s).")
+        shown = _display_path(args.baseline, root=REPO_ROOT)
+        print(f"Updated {shown}: {total} violation(s) across {len(current)} file(s).")
         return 0
 
     if not args.baseline.exists():
@@ -226,6 +270,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     allowed = load_baseline(args.baseline)
+    if custom_paths:
+        allowed = _filter_baseline_for_paths(allowed, target_paths, root=REPO_ROOT)
     comparison = compare_baselines(current, allowed)
 
     if comparison.regressions:

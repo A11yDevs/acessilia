@@ -29,7 +29,7 @@ make the full suite itself faster.
 | I changed one file or one test | `make test-file F=tests/test_example.py` | Runs only that path, non-E2E |
 | I fixed a failure and want to confirm it | `make test-failed` | Reruns the failures recorded in the main, docstruct, SDK and `libs/core` caches |
 | I want the full local confidence check | `make test-all` | Main suite with four workers, then docstruct, SDK and `libs/core` |
-| I want to check linting (Ruff baseline) | `make lint` | Runs Ruff (`F`, `I`, `E` without `E501`) via `scripts/check_ruff_baseline.py` |
+| I want to check linting (Ruff baseline) | `make lint` | Runs Ruff (`F`, `E` without `E501`) via `scripts/check_ruff_baseline.py` |
 | I want to check static types (Mypy) | `make typecheck` | Runs Mypy on the configured `docstruct` and `acessilia_sdk` scope |
 | I want per-component coverage reports | `make coverage` | Runs all four suites with branch coverage into `var/coverage/{app,core,sdk,docstruct}/` |
 | I want the main suite only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E main suite with four workers |
