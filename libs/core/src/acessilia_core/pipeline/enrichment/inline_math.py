@@ -111,6 +111,106 @@ def _boxed_pages(elements: Iterable[ManifestElement]) -> list[int]:
     )
 
 
+def _is_prose_inline_math_candidate(element: ManifestElement) -> bool:
+    return (
+        element.type in _INLINE_MATH_ELEMENT_TYPES
+        and bool((element.text or "").strip())
+        and "inline_math_detection" not in element.metadata
+        and any(provenance.bbox is not None for provenance in element.provenance)
+    )
+
+
+def _is_table_inline_math_candidate(element: ManifestElement) -> bool:
+    return (
+        element.type == "table"
+        and isinstance(element.metadata.get("table_ast"), dict)
+        and "inline_math_detection" not in element.metadata
+        and any(provenance.bbox is not None for provenance in element.provenance)
+    )
+
+
+def _claim_run_negations(
+    overlays: list[ManifestElement],
+    host: ManifestElement,
+    marked: Iterable[Any],
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+) -> None:
+    for run in marked:
+        for slash in run.negations:
+            _claim_negation_overlay(overlays, host, slash, run.page, spans, heights)
+
+
+def _splice_prose_element(
+    element: ManifestElement,
+    *,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+    overlays: list[ManifestElement],
+    counts: dict[str, int],
+) -> None:
+    detection = detect_inline_math_by_page(_placements(element), spans, heights)
+    if not detection.runs:
+        return
+    result = splice_inline_math(element.text or "", detection)
+    counts["elements"] += 1
+    counts["marked"] += len(result.marked)
+    counts["unmatched"] += len(result.unmatched)
+    element.metadata["inline_math_detection"] = {
+        "marked": len(result.marked),
+        "unmatched": len(result.unmatched),
+    }
+    if not result.marked:
+        return
+    element.text = result.text
+    _claim_run_negations(overlays, element, result.marked, spans, heights)
+
+
+def _table_text_cells(table: ManifestElement) -> list[dict[str, Any]]:
+    cells: list[dict[str, Any]] = []
+    for section in TABLE_SECTIONS:
+        for row in table.metadata["table_ast"].get(section) or []:
+            if not isinstance(row, dict):
+                continue
+            for cell in row.get("cells") or []:
+                if isinstance(cell, dict) and isinstance(cell.get("text"), str):
+                    cells.append(cell)
+    return cells
+
+
+def _splice_table_element(
+    table: ManifestElement,
+    *,
+    spans: dict[int, dict[str, Any]],
+    heights: dict[int, float | None],
+    overlays: list[ManifestElement],
+    counts: dict[str, int],
+) -> None:
+    detection = detect_inline_math_by_page(_placements(table), spans, heights)
+    if not detection.runs:
+        return
+    cells = _table_text_cells(table)
+    detections, left_out = assign_runs_to_cells(
+        detection, [cell["text"] for cell in cells]
+    )
+    marked, unmatched = [], list(left_out)
+    for cell, cell_detection in zip(cells, detections):
+        if not cell_detection.runs:
+            continue
+        result = splice_inline_math(cell["text"], cell_detection)
+        cell["text"] = result.text
+        marked.extend(result.marked)
+        unmatched.extend(result.unmatched)
+    counts["elements"] += 1
+    counts["marked"] += len(marked)
+    counts["unmatched"] += len(unmatched)
+    table.metadata["inline_math_detection"] = {
+        "marked": len(marked),
+        "unmatched": len(unmatched),
+    }
+    _claim_run_negations(overlays, table, marked, spans, heights)
+
+
 async def _mark_inline_math(
     manifest: ProcessingManifest,
     source_path: Path,
@@ -127,7 +227,7 @@ async def _mark_inline_math(
     text where both character sequences align. The canonical enrichment then
     converts each span (MathML, speech).
 
-    A negation slash the run composed into its relation (``h \neq 0``) is
+    A negation slash the run composed into its relation (``h \\neq 0``) is
     recorded on its detached-slash element (``negation_overlay`` outcome
     ``inline-math``), so the later reattachment does not compose another
     ``=`` of the paragraph. Returns ``{elements, marked, unmatched}``; the
@@ -140,10 +240,7 @@ async def _mark_inline_math(
     candidates = [
         element
         for element in manifest.elements
-        if element.type in _INLINE_MATH_ELEMENT_TYPES
-        and (element.text or "").strip()
-        and "inline_math_detection" not in element.metadata
-        and any(provenance.bbox is not None for provenance in element.provenance)
+        if _is_prose_inline_math_candidate(element)
     ]
     pages = _boxed_pages(candidates)
     if not pages:
@@ -153,25 +250,13 @@ async def _mark_inline_math(
         return counts
 
     heights = {page.page_number: page.height for page in manifest.pages}
-    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    overlays = [
+        element for element in manifest.elements if is_detached_overlay(element.text)
+    ]
     for element in candidates:
-        detection = detect_inline_math_by_page(_placements(element), spans, heights)
-        if not detection.runs:
-            continue
-        result = splice_inline_math(element.text or "", detection)
-        counts["elements"] += 1
-        counts["marked"] += len(result.marked)
-        counts["unmatched"] += len(result.unmatched)
-        element.metadata["inline_math_detection"] = {
-            "marked": len(result.marked),
-            "unmatched": len(result.unmatched),
-        }
-        if not result.marked:
-            continue
-        element.text = result.text
-        for run in result.marked:
-            for slash in run.negations:
-                _claim_negation_overlay(overlays, element, slash, run.page, spans, heights)
+        _splice_prose_element(
+            element, spans=spans, heights=heights, overlays=overlays, counts=counts
+        )
     manifest.extractor.configuration["inline_math_detection"] = "fonts"
     if counts["elements"]:
         logger.info("Inline math from the text layer's fonts: {}", counts)
@@ -199,10 +284,7 @@ async def _mark_table_inline_math(
     tables = [
         element
         for element in manifest.elements
-        if element.type == "table"
-        and isinstance(element.metadata.get("table_ast"), dict)
-        and "inline_math_detection" not in element.metadata
-        and any(provenance.bbox is not None for provenance in element.provenance)
+        if _is_table_inline_math_candidate(element)
     ]
     pages = _boxed_pages(tables)
     if not pages:
@@ -212,38 +294,13 @@ async def _mark_table_inline_math(
         return counts
 
     heights = {page.page_number: page.height for page in manifest.pages}
-    overlays = [element for element in manifest.elements if is_detached_overlay(element.text)]
+    overlays = [
+        element for element in manifest.elements if is_detached_overlay(element.text)
+    ]
     for table in tables:
-        detection = detect_inline_math_by_page(_placements(table), spans, heights)
-        if not detection.runs:
-            continue
-        cells = [
-            cell
-            for section in TABLE_SECTIONS
-            for row in table.metadata["table_ast"].get(section) or []
-            if isinstance(row, dict)
-            for cell in row.get("cells") or []
-            if isinstance(cell, dict) and isinstance(cell.get("text"), str)
-        ]
-        detections, left_out = assign_runs_to_cells(detection, [cell["text"] for cell in cells])
-        marked, unmatched = [], list(left_out)
-        for cell, cell_detection in zip(cells, detections):
-            if not cell_detection.runs:
-                continue
-            result = splice_inline_math(cell["text"], cell_detection)
-            cell["text"] = result.text
-            marked.extend(result.marked)
-            unmatched.extend(result.unmatched)
-        counts["elements"] += 1
-        counts["marked"] += len(marked)
-        counts["unmatched"] += len(unmatched)
-        table.metadata["inline_math_detection"] = {
-            "marked": len(marked),
-            "unmatched": len(unmatched),
-        }
-        for run in marked:
-            for slash in run.negations:
-                _claim_negation_overlay(overlays, table, slash, run.page, spans, heights)
+        _splice_table_element(
+            table, spans=spans, heights=heights, overlays=overlays, counts=counts
+        )
     if counts["elements"]:
         logger.info("Inline math of table cells from the text layer's fonts: {}", counts)
     return counts
