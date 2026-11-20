@@ -33,11 +33,10 @@ executor selects what a handler adds and replans for it.
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
-from docstruct.fusion.noise import is_junk, quality
-from docstruct.fusion.similarity import PAGENUM_RE, is_duplicate, pair_block
+from docstruct.fusion.noise import is_legitimate_text
+from docstruct.fusion.similarity import is_duplicate, pair_block
 from pydantic import ValidationError
 
 from acessilia_core.config import CoreConfig
@@ -87,9 +86,6 @@ _STRUCTURE_PARENTS = frozenset({"picture", "table", "group", "form"})
 #: Least text a block needs for its presence in the page text to count.
 _MIN_CONTAINED_TEXT = 8
 
-#: Lowest share of word-like tokens of a legitimate block (``is_legitimate_text``).
-_MIN_QUALITY = 0.35
-
 #: v2.3 needs that a block has on its own. The others (reading order, verse,
 #: line numbers, tail join) describe a whole page: derived over the restored
 #: blocks alone they would judge a page made only of them.
@@ -101,23 +97,6 @@ _ELEMENT_V23_KINDS = frozenset(
 #: heading changes, rather than on one element.
 _SEQUENCE_KINDS = frozenset({"repair-heading-hierarchy"})
 _SEQUENCE_OBSERVATION_KINDS = frozenset({"heading-hierarchy-gap"})
-
-
-def is_legitimate_text(text: str) -> bool:
-    """Whether ``text`` reads as real text rather than OCR residue.
-
-    Dr.DocBench's ``is_legitimate_text``: not junk, not a page number, at least
-    three letters, mostly alphanumeric and mostly word-like tokens.
-    """
-    stripped = (text or "").strip()
-    if not stripped or is_junk(stripped) or PAGENUM_RE.match(stripped):
-        return False
-    if sum(char.isalpha() for char in stripped) < 3:
-        return False
-    core = re.sub(r"\s+", "", stripped)
-    if sum(char.isalnum() for char in core) / len(core) < 0.4:
-        return False
-    return quality(stripped) >= _MIN_QUALITY
 
 
 def _handle_rescue_omitted_method(

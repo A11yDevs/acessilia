@@ -2,6 +2,23 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.2.4 — primitivas estruturais do docstruct 0.5.7
+
+Sem mudança de comportamento, exceto um caso-limite mais estrito. As
+implementações duplicadas do core passam a chamar o `acessilia-docstruct`
+diretamente (#612): as verificações de tabela e o `DataOutput.table_ast`
+(`docstruct.tables.structured`), a detecção e o reparo da hierarquia de
+títulos (`docstruct.sections`), a ordenação pelo esqueleto
+(`docstruct.fusion.skeleton`, mesmo limiar de 0.5), os helpers de caixa dos
+slides (`docstruct.geometry.boxes`), a inspeção de cabeçalhos PNG/JPEG
+(`docstruct.imaging`) e o `is_legitimate_text` (`docstruct.fusion.noise`).
+
+O caso-limite mais estrito: um `table_ast` cujo `rowspan`/`colspan` traz um
+booleano JSON sobrevivia ao `isinstance(span, int)`; o normalizador estrito o
+descarta. Caracterizado em `libs/core/tests/test_docstruct_057_adoption.py`.
+
+O core passa a exigir o docstruct 0.5.7 ou mais novo (#612).
+
 ## 0.2.3 — o juiz de página pela operação do SDK
 
 O método `vlm-pairwise-judge` renderiza a página e consulta o juiz pela

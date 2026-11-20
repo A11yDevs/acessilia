@@ -17,6 +17,7 @@ from docstruct.fusion.noise import (
 )
 from docstruct.fusion.tailjoin import page_number_position
 from docstruct.geometry.boxes import downward_edges
+from docstruct.sections import repair_heading_levels
 from docstruct.tables.ast import (
     TABLE_SECTIONS,
 )
@@ -776,13 +777,17 @@ def _handle_deterministic_heading_repair_method(
             validated=False,
             message=t(MSG_HEADING_NONE),
         )
-    previous = 0
+    headings = [
+        element
+        for element in sorted(manifest.elements, key=lambda item: item.reading_order)
+        if element.type in {"title", "heading"}
+    ]
+    repaired_levels = repair_heading_levels(
+        [element.hierarchy_level for element in headings]
+    )
     repaired = 0
-    for element in sorted(manifest.elements, key=lambda item: item.reading_order):
-        if element.type not in {"title", "heading"}:
-            continue
-        level = 1 if not previous else max(2, min(element.hierarchy_level, previous + 1, 6))
-        if previous and element.type == "title":
+    for index, (element, level) in enumerate(zip(headings, repaired_levels, strict=True)):
+        if index > 0 and element.type == "title":
             element.metadata["original_type"] = "title"
             element.type = "heading"
         if level != element.hierarchy_level:
@@ -790,7 +795,6 @@ def _handle_deterministic_heading_repair_method(
             element.hierarchy_level = level
             element.metadata["heading_repaired"] = True
             repaired += 1
-        previous = level
     manifest.summary.element_types = dict(Counter(element.type for element in manifest.elements))
     return MethodResult(
         success=True,

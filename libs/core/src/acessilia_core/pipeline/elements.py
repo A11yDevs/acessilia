@@ -3,11 +3,9 @@
 Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6). The payload,
 the handlers, the furniture checks and the enrichment stages read them.
 
-``_table_element_has_structured_content`` and ``_rows_look_like_placeholder``
-tell a real table AST from the placeholder one; the table handler and the table
-enrichment both use them. They live here for now: finding S of the orchestrator
-inventory sends the row rule (``_rows_look_like_placeholder``) to
-``docstruct.tables``.
+``_table_ast_from_metadata`` and ``_table_element_has_structured_content``
+delegate their structural rules to ``docstruct.tables.structured`` (#612),
+passing the core's localized placeholder label explicitly.
 """
 
 from __future__ import annotations
@@ -21,6 +19,10 @@ from docstruct.geometry import OrientedBox
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
     table_ast_from_rows,
+)
+from docstruct.tables.structured import (
+    normalize_strict_table_ast,
+    table_ast_has_structured_content,
 )
 from docstruct.text.code_reflow import normalize_code_text
 
@@ -65,7 +67,7 @@ def _element_bbox(
 
 
 #: The single cell of a table that reached the payload with no text. It is
-#: written by _element_to_block and recognized by _rows_look_like_placeholder,
+#: written by _element_to_block and passed to ``table_ast_has_structured_content``,
 #: which must keep agreeing; the reader sees it, in Portuguese (#410).
 _TABLE_PLACEHOLDER_TEXT = "Tabela detectada"
 
@@ -237,58 +239,9 @@ def _normalize_metadata_links(metadata: dict[str, Any]) -> dict[str, Any]:
 
 
 def _table_ast_from_metadata(metadata: dict[str, Any]) -> dict[str, Any] | None:
-    raw = metadata.get("table_ast")
-    if not isinstance(raw, dict):
-        return None
-
-    table_ast: dict[str, Any] = {}
-    caption = raw.get("caption")
-    if isinstance(caption, str) and caption.strip():
-        table_ast["caption"] = caption.strip()
-
-    for section_name in ("header", "body", "footer"):
-        section = raw.get(section_name)
-        if not isinstance(section, list):
-            continue
-        normalized_rows: list[dict[str, Any]] = []
-        for row in section:
-            if not isinstance(row, dict):
-                continue
-            cells = row.get("cells")
-            if not isinstance(cells, list):
-                continue
-            normalized_cells: list[dict[str, Any]] = []
-            for cell in cells:
-                if not isinstance(cell, dict) or "text" not in cell:
-                    continue
-                text = str(cell.get("text", "")).strip()
-                normalized_cell: dict[str, Any] = {"text": text}
-                if isinstance(cell.get("header"), bool):
-                    normalized_cell["header"] = cell["header"]
-                scope = cell.get("scope")
-                if isinstance(scope, str) and scope in {
-                    "none",
-                    "row",
-                    "col",
-                    "rowgroup",
-                    "colgroup",
-                }:
-                    normalized_cell["scope"] = scope
-                for span_key in ("rowspan", "colspan"):
-                    span = cell.get(span_key)
-                    if isinstance(span, int) and span >= 1:
-                        normalized_cell[span_key] = span
-                normalized_cells.append(normalized_cell)
-            if normalized_cells:
-                normalized_rows.append({"cells": normalized_cells})
-        if normalized_rows:
-            table_ast[section_name] = normalized_rows
-
-    metadata_obj = raw.get("metadata")
-    if isinstance(metadata_obj, dict):
-        table_ast["metadata"] = metadata_obj
-
-    return table_ast if table_ast.get("body") else None
+    # Stricter than the isinstance(span, int) rule it replaces: a rowspan or
+    # colspan carrying a JSON boolean is dropped (docstruct 0.5.7, #612).
+    return normalize_strict_table_ast(metadata.get("table_ast"))
 
 
 #: Slack, in PDF points, when finding the element a negation slash lies in.
@@ -309,22 +262,6 @@ def _bbox(element: ManifestElement, page: int | None = None) -> tuple[int, Any] 
 
 def _table_element_has_structured_content(element: ManifestElement) -> bool:
     metadata = element.metadata or {}
-    table_ast = metadata.get("table_ast")
-    if not isinstance(table_ast, dict):
-        return False
-
-    rows = _rows_from_table_ast(table_ast)
-    if not rows:
-        return False
-
-    width = max((len(row) for row in rows), default=0)
-    if len(rows) >= 2 and width >= 2:
-        return True
-
-    return not _rows_look_like_placeholder(rows)
-
-
-def _rows_look_like_placeholder(rows: list[list[str]]) -> bool:
-    if len(rows) != 1 or len(rows[0]) != 1:
-        return False
-    return rows[0][0].strip().lower() == _TABLE_PLACEHOLDER_TEXT.lower()
+    return table_ast_has_structured_content(
+        metadata.get("table_ast"), placeholder=_TABLE_PLACEHOLDER_TEXT
+    )
