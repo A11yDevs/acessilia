@@ -124,3 +124,39 @@ exclude_also = [
     "if __name__ == .__main__.:",
     "raise NotImplementedError",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = ["libs/docstruct/src", "libs/sdk/src"]
+files = [
+    "libs/docstruct/src/docstruct",
+    "libs/sdk/src/acessilia_sdk",
+]
+explicit_package_bases = true
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+
+# Pre-existing modules in docstruct and sdk deferred to incremental follow-up (#366).
+# Every other module — and every newly added module in either package — is checked.
+[[tool.mypy.overrides]]
+module = [
+    "docstruct.canonical",
+    "docstruct.evaluation.metrics.text_ed",
+    "docstruct.export.html",
+    "docstruct.export.pandoc_ast",
+    "docstruct.fusion.differ",
+    "docstruct.fusion.noise",
+    "docstruct.fusion.payload",
+    "docstruct.fusion.table_specialist",
+    "docstruct.manifest",
+    "docstruct.regions.grouping",
+    "docstruct.validation",
+    "acessilia_sdk.cli",
+    "acessilia_sdk.toolbox.clients.pdf",
+    "acessilia_sdk.toolbox.results.layout",
+    "acessilia_sdk.toolbox.transport",
+]
+ignore_errors = true

@@ -15,7 +15,7 @@ COVERAGE_DIR ?= var/coverage
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test-file test-failed test-all lint coverage
+.PHONY: help test-file test-failed test-all lint typecheck coverage
 
 help:
 	@printf '%s\n' \
@@ -23,10 +23,14 @@ help:
 		'make test-failed                        rerun the tests that failed last time' \
 		'make test-all                           run the main suite (4 workers), docstruct, SDK and libs/core' \
 		'make lint                               run Ruff against the shrinking baseline (scripts/check_ruff_baseline.py)' \
+		'make typecheck                          run Mypy on the configured docstruct and SDK scope' \
 		'make coverage                           run tests with branch coverage per component (var/coverage/)'
 
 lint:
 	$(UV) run python scripts/check_ruff_baseline.py
+
+typecheck:
+	$(UV) run mypy
 
 coverage:
 	@mkdir -p "$(COVERAGE_DIR)/app" "$(COVERAGE_DIR)/docstruct" "$(COVERAGE_DIR)/sdk" "$(COVERAGE_DIR)/core"; \
