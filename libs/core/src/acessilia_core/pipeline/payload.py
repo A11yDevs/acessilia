@@ -36,6 +36,7 @@ from docstruct.visual_text import (
     collect_picture_context,
     deduplicate_picture_description,
     is_confirmed_logo_description,
+    is_document_artifact,
     is_scene_text_covered,
 )
 
@@ -599,7 +600,9 @@ def _resolve_manifest_ownership(
         if (box := _element_bbox(element, manifest)) is not None
     }
     standalone = any(
-        el.type == "picture" and bool(el.metadata.get("injected_picture"))
+        el.type == "picture"
+        and bool(el.metadata.get("injected_picture"))
+        and not is_document_artifact(el.metadata.get("media_inspection"))
         for el in manifest.elements
     )
     ownership = analyze_visual_text_ownership(

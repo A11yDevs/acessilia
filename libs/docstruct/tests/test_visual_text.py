@@ -15,7 +15,9 @@ from docstruct.visual_text import (
     deduplicate_picture_description,
     is_caption_text,
     is_confirmed_logo_description,
+    is_document_artifact,
     is_prose_sentence,
+    is_scene_artifact,
     is_scene_ocr_collection,
     is_scene_text_covered,
     is_scene_text_fragment,
@@ -327,3 +329,42 @@ def test_is_confirmed_logo_description(
         is_confirmed_logo_description(description, mentioned, described=described)
         is expected
     )
+
+
+@pytest.mark.parametrize(
+    ("inspection", "document", "scene"),
+    [
+        ({"is_image": True, "artifact_nature": "standalone_image"}, False, True),
+        ({"is_image": True}, False, True),
+        ({"is_image": True, "artifact_nature": "scanned_page"}, True, False),
+        ({"is_image": False, "artifact_nature": "paginated_document"}, True, False),
+        ({"is_image": False}, False, False),
+        (None, False, False),
+    ],
+)
+def test_artifact_nature_separates_scene_images_from_document_pages(
+    inspection: dict | None, document: bool, scene: bool
+) -> None:
+    """A photographed or scanned page is a document; only a standalone image holds scene text."""
+    assert is_document_artifact(inspection) is document
+    assert is_scene_artifact(inspection) is scene
+
+
+def test_injected_picture_of_a_scanned_page_owns_no_scene_text() -> None:
+    """Short uppercase lines of a photographed form are document text, not scene text."""
+    elements = [
+        _element("lbl-1", "paragraph", "NAME", order=1),
+        _element("lbl-2", "paragraph", "ADDRESS", order=2),
+        _element(
+            "pic-1",
+            "picture",
+            "",
+            order=3,
+            metadata={
+                "injected_picture": True,
+                "media_inspection": {"is_image": True, "artifact_nature": "scanned_page"},
+            },
+        ),
+    ]
+    ownership = analyze_visual_text_ownership(elements)
+    assert {decision.role for decision in ownership.values()} == {"document_text"}

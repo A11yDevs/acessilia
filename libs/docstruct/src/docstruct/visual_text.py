@@ -55,6 +55,10 @@ MAX_CONTEXT_ITEM_CHARS = 160
 MAX_CONTEXT_TOTAL_CHARS = 480
 MAX_CONTEXT_ITEMS = 6
 
+#: Media-inspection natures whose pages are documents, not scenes: their short
+#: text lines (form labels, headings) are document text even on a photo.
+_DOCUMENT_ARTIFACT_NATURES = frozenset({"scanned_page", "paginated_document"})
+
 _SENTENCE_END_RE = re.compile(r"[.!?;\u2026]$")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -273,6 +277,22 @@ def is_scene_ocr_collection(elements: Iterable[ExtractedElement]) -> bool:
     return len(text_items) >= 2
 
 
+def is_document_artifact(media_inspection: Mapping[str, Any] | None) -> bool:
+    """Whether a media inspection classifies the input as a document page, not a scene."""
+    if not isinstance(media_inspection, Mapping):
+        return False
+    return media_inspection.get("artifact_nature") in _DOCUMENT_ARTIFACT_NATURES
+
+
+def is_scene_artifact(media_inspection: Mapping[str, Any] | None) -> bool:
+    """Whether a media inspection describes a standalone image whose text is scene text."""
+    return (
+        isinstance(media_inspection, Mapping)
+        and bool(media_inspection.get("is_image"))
+        and not is_document_artifact(media_inspection)
+    )
+
+
 def is_scene_text_covered(
     fragment: str | None,
     description: str | None,
@@ -418,8 +438,15 @@ def _full_page_picture_id(
     *,
     standalone_image: bool,
 ) -> str | None:
-    """A picture owns unboxed page-level scene OCR only on an explicit standalone/injected image."""
+    """A picture owns unboxed page-level scene OCR only on an explicit standalone/injected image.
+
+    An injected picture whose recorded media inspection marks the input as a
+    document page (a photographed or scanned form) owns no scene text: its
+    short lines are document text.
+    """
     for pic in pictures:
+        if is_document_artifact(pic.metadata.get("media_inspection")):
+            continue
         if pic.metadata.get("injected_picture") or standalone_image:
             return str(getattr(pic, "id", ""))
     return None
@@ -698,7 +725,9 @@ __all__ = [
     "deduplicate_picture_description",
     "is_caption_text",
     "is_confirmed_logo_description",
+    "is_document_artifact",
     "is_prose_sentence",
+    "is_scene_artifact",
     "is_scene_ocr_collection",
     "is_scene_text_covered",
     "is_scene_text_fragment",

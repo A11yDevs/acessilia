@@ -29,6 +29,7 @@ from docstruct.visual_text import (
     analyze_visual_text_ownership,
     collect_picture_context,
     deduplicate_picture_description,
+    is_scene_artifact,
 )
 
 from acessilia_core.agents.output_schemas import VisionOutput
@@ -403,10 +404,12 @@ def _annotate_visual_text_ownership(
     manifest: ProcessingManifest,
     media_inspection: dict[str, Any] | None = None,
 ) -> None:
-    """Assign semantic visual-text ownership and picture surrounding context (#653)."""
-    standalone = bool(
-        isinstance(media_inspection, dict) and media_inspection.get("is_image")
-    )
+    """Assign semantic visual-text ownership and picture surrounding context (#653).
+
+    Only a standalone image (a photo, not a photographed or scanned document
+    page, per ``artifact_nature``) makes its page-level OCR lines scene text.
+    """
+    standalone = is_scene_artifact(media_inspection)
     boxes = {
         element.id: box
         for element in manifest.elements
