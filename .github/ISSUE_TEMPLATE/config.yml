@@ -1,3 +1,7 @@
-# Keep blank issues enabled so architectural plans, RFCs and discussions can
-# still be opened freely (#323).
+# Keep blank issues enabled so internal improvements, architectural plans,
+# RFCs and discussions can still be opened freely (#323).
 blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (private report)
+    url: https://github.com/A11yDevs/acessilia/security/advisories/new
+    about: Report a security vulnerability privately instead of opening a public issue (see SECURITY.md).

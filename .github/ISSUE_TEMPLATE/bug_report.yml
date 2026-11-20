@@ -36,7 +36,7 @@ body:
       description: Deployment target (staging / local / production) and relevant environment flags (`FUSION_MODE`, `INLINE_MATH_DETECTION`, `LEGACY_UNICODE_REPAIR`, etc.).
       placeholder: |
         - Target: local / staging / production
-        - Flags: `FUSION_MODE=dual`, `INLINE_MATH_DETECTION=fonts`, `LEGACY_UNICODE_REPAIR=auto`
+        - Flags: `FUSION_MODE=dual`, `INLINE_MATH_DETECTION=fonts`, `LEGACY_UNICODE_REPAIR=repair`
     validations:
       required: true
 

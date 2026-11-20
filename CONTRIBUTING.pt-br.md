@@ -404,7 +404,7 @@ request, senão o CI falha; `uv lock` o atualiza.
 
 ## Triagem de issues
 
-Ao reportar um defeito, use o [formulário de relato de bug](.github/ISSUE_TEMPLATE/bug_report.yml) para incluir os campos mínimos de reprodução (versões, flags de ambiente, entrada, comando e tecnologia assistiva quando aplicável); melhorias podem usar o [formulário de melhoria/funcionalidade](.github/ISSUE_TEMPLATE/feature_request.yml), e issues em branco continuam habilitadas para planos arquiteturais e discussões.
+Ao reportar um defeito, use o [formulário de relato de bug](https://github.com/A11yDevs/acessilia/issues/new?template=bug_report.yml) para incluir os campos mínimos de reprodução (versões, flags de ambiente, entrada, comando e tecnologia assistiva quando aplicável); novas funcionalidades para usuários podem usar o [formulário de solicitação de funcionalidade](https://github.com/A11yDevs/acessilia/issues/new?template=feature_request.yml), e issues em branco continuam disponíveis no [seletor de issues](https://github.com/A11yDevs/acessilia/issues/new/choose) para melhorias internas, planos arquiteturais e discussões.
 
 Toda issue aberta tem um **tipo** de issue e exatamente um rótulo de **categoria** e um de **urgência**. O tipo diz que espécie de issue ela é; os dois rótulos dizem o que ela melhora e em quanto tempo importa.
 
