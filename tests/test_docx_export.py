@@ -194,7 +194,7 @@ def test_sync_wrapper_downloads_the_stored_docx(respx_mock, monkeypatch, tmp_pat
 
 
 def test_the_math_guard_reaches_the_docx_too(monkeypatch, tmp_path):
-    """build_pandoc_ast is shared with PDF/UA: a math macro the renderers must
+    r"""build_pandoc_ast is shared with PDF/UA: a math macro the renderers must
     not compile (\write18, \input, ...) goes as text in every Pandoc-rendered
     format, not only where LaTeX runs."""
     captured = []

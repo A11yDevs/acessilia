@@ -9,6 +9,11 @@ description = "Núcleo puro de processamento estrutural de documentos: tipos can
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = []
 
 [project.optional-dependencies]

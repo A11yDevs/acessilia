@@ -49,25 +49,25 @@ make the full suite itself faster.
 Every pull request and push to `develop`, `main` or a release branch runs the
 GitHub Actions workflow `CI`:
 
-- **`tests (Python 3.11)`** installs the project, runs Ruff against the
+- **`tests (Python 3.11)` / `tests (Python 3.12)`** installs the project, runs Ruff against the
   shrinking baseline and Mypy on the configured `docstruct`/SDK scope (#366),
   checks the Toolbox capability contract, reports whether the Toolbox's
   docstruct pin follows the core (warnings only; see below), runs the non-E2E
   main suite with **four workers**, runs the docstruct, SDK and core library
   suites with branch coverage, summarizes per-component coverage in the job
-  summary, rejects unexpected skipped tests and uploads JUnit (`test-reports`)
-  and coverage (`coverage-reports`) artifacts.
-- **`SDK alone (Python 3.11)`** installs only the SDK, docstruct (its one
+  summary, rejects unexpected skipped tests and uploads JUnit (`test-reports-py*`)
+  and coverage (`coverage-reports-py*`) artifacts.
+- **`SDK alone (Python 3.11)` / `SDK alone (Python 3.12)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,
   pytest-asyncio, respx), and proves that it works without the core.
-- **`docstruct alone (Python 3.11)`** installs only docstruct, from its wheel,
+- **`docstruct alone (Python 3.11)` / `docstruct alone (Python 3.12)`** installs only docstruct, from its wheel,
   and pytest, and runs its suite on the standard library alone: no core, SDK, Toolbox or
   optional accelerator (`rapidfuzz`) is importable, and no test may be skipped
   (#470).
-- `tests` and `SDK alone` are required checks in the live rulesets for `main`
+- `tests (Python 3.11)` and `SDK alone (Python 3.11)` are required checks in the live rulesets for `main`
   and `develop`. `docstruct alone` is not required yet: making it required is a
   ruleset change, a maintainer decision (CONTRIBUTING.md).
-- **`core alone (Python 3.11)`** installs only the core, as a wheel from its
+- **`core alone (Python 3.11)` / `core alone (Python 3.12)`** installs only the core, as a wheel from its
   own lock (`libs/core/uv.lock`): neither the service, the front ends, FastAPI
   nor the Toolbox package is importable. It runs the full core library suite
   from the wheel, the smoke test from a folder outside the checkout, and the
@@ -76,8 +76,11 @@ GitHub Actions workflow `CI`:
 - Image delivery waits for all four jobs.
 
 The main suite check does not have a separate collection step: the test run collects
-the suite itself. The job name is intentionally kept as `tests (Python 3.11)` so
-branch protection and existing links keep working.
+the suite itself. The job name template `tests (Python ${{ matrix.python-version }})`
+intentionally keeps the 3.11 leg as `tests (Python 3.11)` (while running
+`tests (Python 3.12)` alongside it, with `UV_PYTHON` pinned to each leg's
+matrix version) so branch protection and existing links keep working during the
+transition.
 
 ### Locally
 
@@ -390,9 +393,10 @@ The test run collects the suite itself, so the separate `--collect-only` step
 was redundant.
 
 **Where are the slow-test reports?**
-`make` and CI pass `--durations=25`. CI also uploads JUnit reports as
-`test-reports`, `sdk-isolated-report` and `docstruct-isolated-report`, with
-7-day retention.
+`make` and CI pass `--durations=25`. CI also uploads JUnit and coverage reports
+per matrix leg as `test-reports-py*`, `coverage-reports-py*`,
+`sdk-isolated-report-py*` and `docstruct-isolated-report-py*`, with 7-day
+retention.
 
 **Where do I see the scheduled comparison?**
 After the workflow reaches the default branch, open Actions →
@@ -407,11 +411,12 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 
 ## Where to see the results
 
-- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` → step
-  `Run main test suite`. The log shows `created: 4/4 workers` and
-  `--durations=25`.
-- **Artifacts:** `test-reports` (main, docstruct, SDK and core library),
-  `sdk-isolated-report` and `docstruct-isolated-report`.
+- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` /
+  `tests (Python 3.12)` → step `Run main test suite`. The log shows
+  `created: 4/4 workers` and `--durations=25`.
+- **Artifacts:** `test-reports-py*` (main, docstruct, SDK and core library),
+  `coverage-reports-py*`, `sdk-isolated-report-py*` and
+  `docstruct-isolated-report-py*`.
 - **Scheduled:** workflow `Scheduled test monitoring`, with artifacts retained
   for 30 days and a tracking issue on scheduled failures.
 - **Rulesets:** both `main` and `develop` require `tests (Python 3.11)` and

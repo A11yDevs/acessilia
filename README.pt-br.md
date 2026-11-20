@@ -63,7 +63,7 @@ Principais endpoints (`/api/v1`):
 
 ### Usando uv (recomendado)
 
-O repositório fixa o Python 3.11 em `.python-version`, a mesma versão usada pelo CI e pela imagem Docker. O `uv` lê esse arquivo e baixa o interpretador se for preciso.
+O repositório fixa o Python 3.12 em `.python-version`, a mesma versão usada pela imagem Docker. O `uv` lê esse arquivo e baixa o interpretador se for preciso.
 
 ```bash
 uv lock --check
@@ -124,7 +124,7 @@ Execute as suítes do core sem E2E, da docstruct e do SDK:
 make test-all
 ```
 
-O GitHub Actions repete essa validação em Python 3.11 para todo pull request direcionado à `main`, à `develop` ou a `release/**`. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
+O GitHub Actions repete essa validação em Python 3.11 e 3.12 para todo pull request direcionado à `main`, à `develop` ou a `release/**`. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
 
 ## Notebooks Interativos
 

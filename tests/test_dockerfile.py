@@ -32,7 +32,7 @@ def test_uv_is_pinned_by_release_and_digest() -> None:
 
 
 def test_the_base_image_is_pinned_by_digest() -> None:
-    assert _text().count("python:3.11-slim@sha256:") == 2
+    assert _text().count("python:3.12-slim@sha256:") == 2
 
 
 def test_the_runtime_runs_from_the_locked_environment() -> None:

@@ -19,7 +19,7 @@ Deliver document and image conversion to accessible formats through:
 4. Configurable operation: behavior must be driven by environment variables and local folders. Configuration selects where capabilities run (for example the Toolbox endpoint); it does not imply local execution (P4).
 5. Deterministic-first extraction: text-based PDFs should prefer deterministic extraction before invoking AI. Deterministic extraction runs as a Toolbox capability or a docstruct algorithm, not as a local operational executor in the core (P4).
 6. Hybrid determinism and intelligence: the system combines deterministic planning (PDDL processing, manifesto generation) with AI-driven execution to ensure reliability and flexibility. Deterministic functions are the source of truth; LLMs provide interpretation and description.
-7. Reproducible CI validation: before merge, the automated CI gate must pass the applicable test suites on Python 3.11 with dependencies installed from the committed lockfiles (section 3.7). Before publication, the production image must build, start and pass the API health smoke test. The production image does not need to include test dependencies or the full test suite.
+7. Reproducible CI validation: before merge, the automated CI gate must pass the applicable test suites on Python 3.11 and 3.12 with dependencies installed from the committed lockfiles (section 3.7). Before publication, the production image must build, start and pass the API health smoke test. The production image does not need to include test dependencies or the full test suite.
 8. **English-first documentation with Brazilian Portuguese as official secondary language**: all source code (identifiers, comments, docstrings, log messages), Markdown documentation, issues, pull requests, and commit messages must be written in English — the mandatory, authoritative language. Brazilian Portuguese is the official secondary language: desirable for all documentation, and every `*.pt-br.md` mirror must be updated in the same PR whenever its English source changes. The English version is authoritative in case of divergence. Translation and support for other languages is an important secondary goal (internationalization/i18n) aimed at a broad, inclusive audience; localized content for other languages is welcome but never blocks a merge. User-facing content (Telegram messages, rendered output, prompts for the AI models) must be localized according to the user's locale — including English and Brazilian Portuguese, and extended to other languages as the i18n effort grows. Educational materials are a priority domain for internationalization: they should be produced in the audience's language whenever possible, with English and Brazilian Portuguese as the primary supported languages.
 
 ## 3. Architectural quality rules
@@ -59,7 +59,7 @@ Deliver document and image conversion to accessible formats through:
      opening a pull request. See the [testing workflow](testing.md).
    - **CI gate:** before merge, the applicable unit, regression, contract and
      integration tests must pass in [.github/workflows/ci.yml](../.github/workflows/ci.yml).
-     CI uses Python 3.11, checks the root `uv.lock` with `uv lock --check` and
+     CI uses Python 3.11 and 3.12, checks the root `uv.lock` with `uv lock --check` and
      installs the environment from it with `uv sync --locked --extra dev`.
      It runs the non-E2E main and core library, docstruct and SDK suites in that root environment
      and rejects unexpected skipped tests. Additional isolation jobs install

@@ -20,7 +20,7 @@ EVAL=$WS/repos/DrDocBench
 
 VENV=$EVAL/.venv
 if [[ ! -x $VENV/bin/python ]]; then
-  uv venv --python 3.11 "$VENV"
+  uv venv --python 3.12 "$VENV"
   uv pip install --python "$VENV/bin/python" \
     "apted==1.0.3" "beautifulsoup4==4.11.1" "evaluate==0.4.3" "func-timeout==4.3.5" \
     "Levenshtein==0.25.1" "loguru==0.7.2" "lxml" "matplotlib" "nltk==3.9.1" \

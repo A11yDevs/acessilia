@@ -388,7 +388,7 @@ rm .github/rulesets/main.json
 git clone git@github.com:A11yDevs/acessilia.git
 cd acessilia
 uv lock --check                    # fails when pyproject.toml needs a new lock
-uv sync --locked --extra dev       # uses the Python 3.11 pinned in .python-version
+uv sync --locked --extra dev       # uses the Python 3.12 pinned in .python-version
 
 # Configure environment variables
 cp .env.example .env
@@ -453,7 +453,7 @@ During a refactoring cycle, `is:open -type:Feature` shows the cycle's backlog, a
 
 The CI/CD pipeline is defined by three workflows:
 
-- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the Ruff baseline check and Mypy on the configured `docstruct`/SDK scope, executes the main, docstruct, SDK and core test suites on Python 3.11 with per-component branch coverage reports uploaded as the `coverage-reports` artifact, and rejects unexpected skipped tests.
+- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the Ruff baseline check and Mypy on the configured `docstruct`/SDK scope, executes the main, docstruct, SDK and core test suites on Python 3.11 and 3.12 with per-component branch coverage reports uploaded as the `coverage-reports-py*` artifacts, and rejects unexpected skipped tests.
 - **`.github/workflows/delivery.yml`** — after CI passes on a push, builds the image, runs a health smoke test and a size guardrail, and publishes it to GHCR.
 - **`.github/workflows/release.yml`** — when a maintainer creates a `v*` tag, builds, publishes and creates the GitHub Release.
 

@@ -9,6 +9,11 @@ description = "Acessilia's core: the PDDL pipeline that plans and executes a doc
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 # The libraries ADR-0016 allows the core (tests/test_boundary.py checks
 # the imports). openai and ollama are what Agno's model classes load; rapidfuzz
 # accelerates docstruct.fusion.payload.page_similarity; edge-tts is the audio

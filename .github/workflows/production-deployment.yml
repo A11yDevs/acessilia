@@ -67,7 +67,7 @@ jobs:
               # into the venv. pip 24 requires --python before the subcommand.
               BASE_PYTHON=/usr/local/bin/python3
               [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python
-              [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python3.11
+              [ -x "$BASE_PYTHON" ] || BASE_PYTHON=/usr/local/bin/python3.12
               "$BASE_PYTHON" -m pip --python /app/.venv/bin/python install --no-cache-dir ".[dev]" PyYAML
               groupadd --gid "$CHECK_GID" checks
               useradd --uid "$CHECK_UID" --gid "$CHECK_GID" --create-home checks
