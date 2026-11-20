@@ -33,15 +33,8 @@ import copy
 import re
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import dataclass
 
-from acessilia_core.manifest.models import (
-    BoundingBox,
-    ManifestElement,
-    ProcessingManifest,
-    Provenance,
-)
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 from docstruct.fusion.similarity import area
 from docstruct.geometry import is_bottom_left, union
 from docstruct.geometry.boxes import (
@@ -52,6 +45,18 @@ from docstruct.geometry.boxes import (
     expand_box,
     spans_horizontally,
     union_area,
+)
+
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    MSG_SLIDE_HEADING,
+    MSG_SLIDE_HEADING_WITH_TITLE,
+)
+from acessilia_core.manifest.models import (
+    BoundingBox,
+    ManifestElement,
+    ProcessingManifest,
+    Provenance,
 )
 
 #: Default share of the slide its pictures must cover for the slide to be
@@ -116,6 +121,99 @@ _URL = re.compile(r"^(https?://|www\.)", re.IGNORECASE)
 PageFractions = Callable[[ManifestElement], "tuple[float, float, float, float] | None"]
 
 
+def _partition_slide_elements(
+    manifest: ProcessingManifest, numbers: list[int]
+) -> tuple[dict[int, list[ManifestElement]], list[ManifestElement]]:
+    by_page: dict[int, list[ManifestElement]] = {number: [] for number in numbers}
+    loose: list[ManifestElement] = []
+    for element in sorted(manifest.elements, key=lambda item: item.reading_order):
+        if element.page_number in by_page:
+            by_page[element.page_number].append(element)
+        else:
+            # Groups and other nodes without a page are not exported; they keep
+            # their place at the end.
+            loose.append(element)
+    return by_page, loose
+
+
+def _demote_inner_headings(body: list[ManifestElement]) -> None:
+    for element in body:
+        if element.type in {"title", "heading"}:
+            if element.type == "title":
+                element.metadata["original_type"] = "title"
+                element.type = "heading"
+            element.hierarchy_level = max(element.hierarchy_level, INNER_LEVEL)
+
+
+@dataclass(frozen=True)
+class _SlideStructureOptions:
+    visual_coverage: float
+    fold_figure_labels: bool
+    page_fractions: PageFractions
+
+
+def _structure_single_slide(
+    slide: list[ManifestElement],
+    *,
+    number: int,
+    position: int,
+    total: int,
+    options: _SlideStructureOptions,
+) -> tuple[ManifestElement, list[ManifestElement], str | None]:
+    title = _slide_title(slide)
+    title_text = (title.text or "").strip() if title is not None else ""
+    heading = _slide_heading(slide, title, number, position, total)
+    body = [element for element in slide if element is not heading]
+    _demote_inner_headings(body)
+    if (
+        not slide
+        or _only_text_split_in(body)
+        or _is_visual(body, options.visual_coverage, options.page_fractions)
+    ):
+        # A slide nothing was extracted from may be a scan or a photo; the
+        # heading would hide it from the unstructured-page inspection. A
+        # slide whose only text was split off another slide's element was
+        # read no better: the vision model reads it whole, and the split
+        # text stays in replaced_text for when it cannot.
+        body = [_whole_slide_picture(number, body)]
+    elif options.fold_figure_labels:
+        body = _fold_figure_labels(body, options.page_fractions)
+        body = _absorb_near_pictures(body, options.page_fractions)
+    return heading, body, title_text or None
+
+
+def _finalize_slide_manifest(
+    manifest: ProcessingManifest,
+    *,
+    deck_title: str | None,
+    first_page: int,
+    ordered: list[ManifestElement],
+    loose: list[ManifestElement],
+) -> None:
+    deck = ManifestElement(
+        id="element-slide-deck-title",
+        type="title",
+        raw_label="title",
+        reading_order=1,
+        hierarchy_level=DECK_LEVEL,
+        text=deck_title or manifest.source.filename.rsplit(".", 1)[0],
+        page_number=first_page,
+        metadata={"slide_role": "deck_title"},
+    )
+    elements = [deck, *ordered, *loose]
+    for order, element in enumerate(elements, start=1):
+        element.reading_order = order
+    manifest.elements = elements
+    for page in manifest.pages:
+        page.element_ids = [
+            element.id
+            for element in elements
+            if element.page_number == page.page_number
+        ]
+    manifest.summary.element_count = len(elements)
+    manifest.summary.element_types = dict(Counter(element.type for element in elements))
+
+
 def structure_as_slides(
     manifest: ProcessingManifest,
     *,
@@ -135,68 +233,35 @@ def structure_as_slides(
     if not numbers:
         return
     total = len(numbers)
-    by_page: dict[int, list[ManifestElement]] = {number: [] for number in numbers}
-    loose: list[ManifestElement] = []
-    for element in sorted(manifest.elements, key=lambda item: item.reading_order):
-        if element.page_number in by_page:
-            by_page[element.page_number].append(element)
-        else:
-            # Groups and other nodes without a page are not exported; they keep
-            # their place at the end.
-            loose.append(element)
+    by_page, loose = _partition_slide_elements(manifest, numbers)
 
+    options = _SlideStructureOptions(
+        visual_coverage=visual_coverage,
+        fold_figure_labels=fold_figure_labels,
+        page_fractions=page_fractions,
+    )
     deck_title: str | None = None
     ordered: list[ManifestElement] = []
     for position, number in enumerate(numbers, start=1):
-        slide = by_page[number]
-        title = _slide_title(slide)
-        if position == 1 and title is not None and (title.text or "").strip():
-            deck_title = title.text.strip()
-        heading = _slide_heading(slide, title, number, position, total)
-        body = [element for element in slide if element is not heading]
-        for element in body:
-            if element.type in {"title", "heading"}:
-                if element.type == "title":
-                    element.metadata["original_type"] = "title"
-                    element.type = "heading"
-                element.hierarchy_level = max(element.hierarchy_level, INNER_LEVEL)
-        if (
-            not slide
-            or _only_text_split_in(body)
-            or _is_visual(body, visual_coverage, page_fractions)
-        ):
-            # A slide nothing was extracted from may be a scan or a photo; the
-            # heading would hide it from the unstructured-page inspection. A
-            # slide whose only text was split off another slide's element was
-            # read no better: the vision model reads it whole, and the split
-            # text stays in replaced_text for when it cannot.
-            body = [_whole_slide_picture(number, body)]
-        elif fold_figure_labels:
-            body = _fold_figure_labels(body, page_fractions)
-            body = _absorb_near_pictures(body, page_fractions)
+        heading, body, title_text = _structure_single_slide(
+            by_page[number],
+            number=number,
+            position=position,
+            total=total,
+            options=options,
+        )
+        if position == 1 and title_text is not None:
+            deck_title = title_text
         ordered.append(heading)
         ordered.extend(body)
 
-    deck = ManifestElement(
-        id="element-slide-deck-title",
-        type="title",
-        raw_label="title",
-        reading_order=1,
-        hierarchy_level=DECK_LEVEL,
-        text=deck_title or manifest.source.filename.rsplit(".", 1)[0],
-        page_number=numbers[0],
-        metadata={"slide_role": "deck_title"},
+    _finalize_slide_manifest(
+        manifest,
+        deck_title=deck_title,
+        first_page=numbers[0],
+        ordered=ordered,
+        loose=loose,
     )
-    elements = [deck, *ordered, *loose]
-    for order, element in enumerate(elements, start=1):
-        element.reading_order = order
-    manifest.elements = elements
-    for page in manifest.pages:
-        page.element_ids = [
-            element.id for element in elements if element.page_number == page.page_number
-        ]
-    manifest.summary.element_count = len(elements)
-    manifest.summary.element_types = dict(Counter(element.type for element in elements))
 
 
 #: The types whose exported content is their text alone: a table is exported
@@ -228,6 +293,68 @@ def split_across_slides(manifest: ProcessingManifest) -> None:
         ]
 
 
+def _provenance_page_runs(
+    provenance: list[Provenance],
+) -> list[list[Provenance]] | None:
+    if any(entry.char_start is None or entry.char_end is None for entry in provenance):
+        return None
+    # Consecutive entries on one page (the lines of one slide) make one part.
+    runs: list[list[Provenance]] = []
+    for entry in sorted(provenance, key=lambda item: item.char_start):
+        if runs and runs[-1][0].page_number == entry.page_number:
+            runs[-1].append(entry)
+        else:
+            runs.append([entry])
+    return runs
+
+
+def _contiguous_run_spans(
+    text: str, runs: list[list[Provenance]]
+) -> list[tuple[int, int]] | None:
+    spans: list[tuple[int, int]] = []
+    previous_end = 0
+    for run in runs:
+        start, end = run[0].char_start, max(entry.char_end for entry in run)
+        if start < previous_end or end <= start or text[previous_end:start].strip():
+            return None
+        spans.append((start, end))
+        previous_end = end
+    if text[previous_end:].strip():
+        return None
+    return spans
+
+
+def _build_split_parts(
+    element: ManifestElement,
+    text: str,
+    runs: list[list[Provenance]],
+    spans: list[tuple[int, int]],
+) -> list[ManifestElement] | None:
+    parts: list[ManifestElement] = []
+    for index, (run, (start, end)) in enumerate(
+        zip(runs, spans, strict=True), start=1
+    ):
+        piece = text[start:end].strip()
+        if not piece:
+            return None
+        parts.append(
+            element.model_copy(
+                update={
+                    "id": f"{element.id}-part-{index}",
+                    "text": piece,
+                    "page_number": run[0].page_number,
+                    "provenance": [entry.model_copy(deep=True) for entry in run],
+                    "metadata": {
+                        **copy.deepcopy(element.metadata),
+                        "split_from": element.id,
+                    },
+                },
+                deep=True,
+            )
+        )
+    return parts
+
+
 def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
     """``element`` as one element per slide its text was read on.
 
@@ -244,43 +371,14 @@ def _split_across_slides(element: ManifestElement) -> list[ManifestElement]:
     pages = {entry.page_number for entry in element.provenance}
     if len(pages) < 2 or element.type not in _SPLITTABLE or not text.strip():
         return [element]
-    if any(entry.char_start is None or entry.char_end is None for entry in element.provenance):
+    runs = _provenance_page_runs(element.provenance)
+    if runs is None:
         return [element]
-    # Consecutive entries on one page (the lines of one slide) make one part.
-    runs: list[list[Provenance]] = []
-    for entry in sorted(element.provenance, key=lambda entry: entry.char_start):
-        if runs and runs[-1][0].page_number == entry.page_number:
-            runs[-1].append(entry)
-        else:
-            runs.append([entry])
-    spans: list[tuple[int, int]] = []
-    previous_end = 0
-    for run in runs:
-        start, end = run[0].char_start, max(entry.char_end for entry in run)
-        if start < previous_end or end <= start or text[previous_end:start].strip():
-            return [element]
-        spans.append((start, end))
-        previous_end = end
-    if text[previous_end:].strip():
+    spans = _contiguous_run_spans(text, runs)
+    if spans is None:
         return [element]
-    parts: list[ManifestElement] = []
-    for index, (run, (start, end)) in enumerate(zip(runs, spans, strict=True), start=1):
-        piece = text[start:end].strip()
-        if not piece:
-            return [element]
-        parts.append(
-            element.model_copy(
-                update={
-                    "id": f"{element.id}-part-{index}",
-                    "text": piece,
-                    "page_number": run[0].page_number,
-                    "provenance": [entry.model_copy(deep=True) for entry in run],
-                    "metadata": {**copy.deepcopy(element.metadata), "split_from": element.id},
-                },
-                deep=True,
-            )
-        )
-    return parts
+    parts = _build_split_parts(element, text, runs, spans)
+    return parts if parts is not None else [element]
 
 
 def _only_text_split_in(body: list[ManifestElement]) -> bool:
