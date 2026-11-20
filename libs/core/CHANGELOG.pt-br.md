@@ -4,10 +4,11 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 
 ## 0.2.5 — fusão dual, downscale, validação de render e bridge sync/async via SDK e docstruct
 
-Sem mudança de comportamento. O core passa a delegar a extração com dois
-provedores, a fusão/roteamento puro de payloads, a redução de escala de
-imagens, a pré-validação de mídia renderizável e os bridges síncrono/assíncrono
-ao `acessilia-sdk` e ao `acessilia-docstruct` (#612):
+Sem mudança de comportamento, exceto dois casos-limite menores descritos
+abaixo. O core passa a delegar a extração com dois provedores, a
+fusão/roteamento puro de payloads, a redução de escala de imagens, a
+pré-validação de mídia renderizável e os bridges síncrono/assíncrono ao
+`acessilia-sdk` e ao `acessilia-docstruct` (#612):
 
 - `pipeline/fusion.py`: `extract_fused` delega para
   `acessilia_sdk.operations.fusion.extract_dual_fused` (preservando os logs de
@@ -22,6 +23,15 @@ ao `acessilia-sdk` e ao `acessilia-docstruct` (#612):
   por `acessilia_sdk.toolbox.clients.pdf.check_renderable`.
 - `pipeline/handlers/inspection.py` e `pipeline/handlers/fusion.py`: substituem
   os bridges síncrono/assíncrono duplicados por `acessilia_sdk.runtime.run_sync`.
+
+Casos-limite menores:
+
+- O `ValueError` de divergência de tipo de mídia em `check_renderable` passa a
+  dizer `Source is <declared> but would be sent as <extension>` (sem o trecho
+  `"in the manifest"`).
+- `vision_payload.downscale_image` com `scale` não positivo ou não finito passa
+  a devolver `None` sem construir cliente da Toolbox, em vez de renderizar uma
+  imagem de 1 px.
 
 O core passa a exigir `acessilia-docstruct>=0.5.8,<0.6` (#612).
 

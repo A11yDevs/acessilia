@@ -113,6 +113,32 @@ class TestPageSimilarity:
             assert fast == pure
             assert round(fast, 4) == round(pure, 4)
 
+    def test_fuse_extraction_payloads_matches_bit_for_bit_without_rapidfuzz(self, monkeypatch) -> None:
+        primary = {
+            "document": {
+                "elements": [
+                    {"type": "paragraph", "text": "a" * 3 + "b" * 157, "page_number": 1},
+                    {"type": "paragraph", "text": PROSE, "page_number": 2},
+                ]
+            }
+        }
+        secondary = {
+            "document": {
+                "elements": [
+                    {"type": "paragraph", "text": "a" * 3 + "c" * 157, "page_number": 1},
+                    {"type": "paragraph", "text": PROSE[:-1] + "!", "page_number": 2},
+                ]
+            }
+        }
+        with_accel = fuse_extraction_payloads(
+            primary, secondary, primary_provider="docling", secondary_provider="mineru"
+        )
+        monkeypatch.setattr(fusion_payload, "_rapidfuzz_fuzz", None)
+        without_accel = fuse_extraction_payloads(
+            primary, secondary, primary_provider="docling", secondary_provider="mineru"
+        )
+        assert without_accel == with_accel
+
 
 class TestBlockConversionAndSignatures:
     def test_element_to_canonical_block_reads_dict_bbox_from_provenance(self) -> None:

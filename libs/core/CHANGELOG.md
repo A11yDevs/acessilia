@@ -4,9 +4,10 @@ Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
 ## 0.2.5 — dual-provider fusion, downscale, render check and sync bridge via SDK and docstruct
 
-No behaviour change. The core now delegates its dual-provider extraction, pure
-payload fusion/page routing, image downscaling, renderable-media pre-check, and
-sync/async bridges to `acessilia-sdk` and `acessilia-docstruct` (#612):
+No behaviour change, except two minor edge cases noted below. The core now
+delegates its dual-provider extraction, pure payload fusion/page routing, image
+downscaling, renderable-media pre-check, and sync/async bridges to
+`acessilia-sdk` and `acessilia-docstruct` (#612):
 
 - `pipeline/fusion.py`: `extract_fused` delegates to
   `acessilia_sdk.operations.fusion.extract_dual_fused` (preserving per-provider
@@ -21,6 +22,15 @@ sync/async bridges to `acessilia-sdk` and `acessilia-docstruct` (#612):
   with `acessilia_sdk.toolbox.clients.pdf.check_renderable`.
 - `pipeline/handlers/inspection.py` and `pipeline/handlers/fusion.py`: replace
   duplicated thread-pool sync/async bridges with `acessilia_sdk.runtime.run_sync`.
+
+Minor edge-case changes:
+
+- The media-type mismatch `ValueError` raised by `check_renderable` now says
+  `Source is <declared> but would be sent as <extension>` (dropping
+  `"in the manifest"`).
+- `vision_payload.downscale_image` with a non-positive or non-finite `scale`
+  now returns `None` without constructing a Toolbox client instead of rendering
+  a 1 px image.
 
 The core now requires `acessilia-docstruct>=0.5.8,<0.6` (#612).
 

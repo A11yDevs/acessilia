@@ -477,3 +477,27 @@ def test_apply_page_routes_warns_when_secondary_misses_routed_page():
     assert payload is primary
     assert replaced == {}
     assert any("has no elements on pages [1]" in msg for msg in warnings)
+
+
+@pytest.mark.asyncio
+async def test_extract_fused_closes_both_clients_even_if_one_close_raises(monkeypatch):
+    closed: list[str] = []
+
+    class CloseErrorClient:
+        def __init__(self, provider, _toolbox):
+            self.provider = provider
+
+        async def extract_structure(self, *args, **kwargs):
+            return _payload([_el(f"texto {self.provider}", 0)])
+
+        async def close(self):
+            closed.append(self.provider)
+            if self.provider == "mineru":
+                raise RuntimeError("close failed")
+
+    monkeypatch.setattr("acessilia_core.pipeline.fusion._structure_client", CloseErrorClient)
+
+    with pytest.raises(RuntimeError, match="close failed"):
+        await extract_fused("arquivo.pdf", secondary_provider="mineru", toolbox=toolbox_config())
+
+    assert set(closed) == {"docling", "mineru"}

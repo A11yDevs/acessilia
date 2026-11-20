@@ -9,6 +9,7 @@ logging.
 
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
 from typing import Any
 
 from acessilia_sdk.operations.fusion import DualFusionUnavailable, extract_dual_fused
@@ -70,10 +71,11 @@ async def extract_fused(
     primary = primary_provider or toolbox.providers["toolbox_provider"]
     secondary = secondary_provider
 
-    primary_client = _structure_client(primary, toolbox)
-    secondary_client = None
-    try:
+    async with AsyncExitStack() as stack:
+        primary_client = _structure_client(primary, toolbox)
+        stack.push_async_callback(primary_client.close)
         secondary_client = _structure_client(secondary, toolbox)
+        stack.push_async_callback(secondary_client.close)
         try:
             result = await extract_dual_fused(
                 primary_client,
@@ -91,10 +93,6 @@ async def extract_fused(
                 failures=exc.failures,
             )
             raise
-    finally:
-        await primary_client.close()
-        if secondary_client is not None:
-            await secondary_client.close()
 
     _log_fusion_events(
         artifact_id=artifact_id,

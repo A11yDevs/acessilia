@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from acessilia_sdk.toolbox import ToolboxError
 from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 from acessilia_sdk.toolbox.clients.pdf import downscale_image as _sdk_downscale_image
@@ -24,6 +26,13 @@ async def downscale_image(
     ``ToolboxConfig`` client lifecycle, localized logging, and best-effort
     ``None`` recovery in the core.
     """
+    if (
+        isinstance(scale, bool)
+        or not isinstance(scale, (int, float))
+        or not math.isfinite(scale)
+        or scale <= 0
+    ):
+        return None
     size = image_dimensions(payload)
     if size is None:
         return None

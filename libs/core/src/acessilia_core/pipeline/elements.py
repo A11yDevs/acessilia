@@ -10,7 +10,7 @@ passing the core's localized placeholder label explicitly.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from docstruct.blocks.lists import (
     marker_numbering,
@@ -31,10 +31,6 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
 from acessilia_core.i18n import t
-
-if TYPE_CHECKING:
-    pass
-
 
 #: Canonical English msgid for the alt text of a picture the vision model left
 #: undescribed; why it was left so goes to the operator, not the reader.

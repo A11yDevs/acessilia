@@ -296,7 +296,14 @@ def _run_extract_fused(
     artifact_id: str | None = None,
     policy=None,
 ) -> dict:
-    """Run ``extract_fused`` synchronously via ``acessilia_sdk.runtime.run_sync``."""
+    """Run ``extract_fused`` synchronously via ``acessilia_sdk.runtime.run_sync``.
+
+    Architecture note: when called from a thread with a running event loop
+    (Agno Workflow, API), ``run_sync`` executes the coroutine in a worker
+    thread and blocks the calling loop until fusion finishes. The handlers'
+    contract stays synchronous; async callers must run the whole executor with
+    ``await run_blocking(...)`` so as not to block the main event loop.
+    """
     from acessilia_core.pipeline.fusion import extract_fused
 
     return run_sync(

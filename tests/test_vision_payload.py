@@ -33,6 +33,24 @@ async def test_invalid_or_unshrinkable_images_do_not_call_the_toolbox(fake_toolb
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("bad_scale", [0, -0.5, float("nan"), float("inf"), True])
+async def test_non_positive_or_invalid_scale_returns_none_without_building_client(
+    monkeypatch, bad_scale
+):
+    from acessilia_core.toolbox import vision_payload
+
+    built = []
+    monkeypatch.setattr(
+        vision_payload, "make_toolbox_client", lambda *_a, **_kw: built.append(True)
+    )
+    source = BytesIO()
+    Image.new("RGB", (400, 240), "white").save(source, format="PNG")
+
+    assert await downscale_image(source.getvalue(), scale=bad_scale, toolbox=toolbox_config()) is None
+    assert built == []
+
+
+@pytest.mark.asyncio
 async def test_a_toolbox_failure_returns_none_and_closes_the_client(monkeypatch):
     from acessilia_core.toolbox import vision_payload
     from acessilia_sdk.toolbox import ToolboxProviderUnavailable
