@@ -1,4 +1,5 @@
 """Prompt-loading utilities that assemble the system and region prompts for the vision model."""
+from collections.abc import Sequence
 from pathlib import Path
 
 from acessilia_core.i18n import t
@@ -19,6 +20,7 @@ MODE_MAP = {
 #: (a picture, a whole page): a drawn molecule is described, not transcribed
 #: as a formula. Kept apart so both kinds of prompt share one wording.
 CHEMISTRY_PROMPT = "quimica.md"
+SURROUNDING_TEXT_PROMPT = "contexto_pagina.md"
 
 REGION_PROMPT_MAP = {
     "formula_candidate": "formula_candidate.md",
@@ -51,7 +53,8 @@ def load_system_prompt(mode: str = "medio") -> str:
 
 def load_region_prompt(region_type: str) -> str:
     filename = REGION_PROMPT_MAP.get(region_type)
-    if not filename: return ""
+    if not filename:
+        return ""
     prompt_path = PROMPTS_DIR / filename
     if prompt_path.exists():
         return prompt_path.read_text(encoding="utf-8")
@@ -64,6 +67,21 @@ def load_chemistry_prompt() -> str:
         return prompt_path.read_text(encoding="utf-8")
     logger.warning(t(LOG_PROMPT_FILE_NOT_FOUND).format(path=str(prompt_path)))
     return ""
+
+
+def build_surrounding_text_prompt(surrounding_text: Sequence[str]) -> str:
+    """Build the page-context instruction listing text already present near an image (#263, #653)."""
+    items = [text.strip() for text in surrounding_text if text and text.strip()]
+    if not items:
+        return ""
+    prompt_path = PROMPTS_DIR / SURROUNDING_TEXT_PROMPT
+    header = (
+        prompt_path.read_text(encoding="utf-8").strip()
+        if prompt_path.exists()
+        else ""
+    )
+    bullets = "\n".join(f"- {item}" for item in items[:6])
+    return f"{header}\n{bullets}" if header else bullets
 
 
 def build_page_prompt(system_prompt: str, total_pages: int, page_num: int, is_pdf: bool) -> str:

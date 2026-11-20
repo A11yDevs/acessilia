@@ -94,7 +94,11 @@ def _text_kept_by_picture(element: ManifestElement) -> list[ManifestElement]:
     texts = (
         [line for line in replaced.splitlines() if line.strip()]
         if isinstance(replaced, str) and replaced.strip()
-        else list(element.metadata.get("figure_labels") or [])
+        else list(
+            element.metadata.get("figure_labels")
+            or element.metadata.get("scene_text")
+            or []
+        )
     )
     return [
         ManifestElement(

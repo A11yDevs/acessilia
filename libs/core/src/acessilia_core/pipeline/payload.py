@@ -28,7 +28,14 @@ from docstruct.fusion.noise import (
     select_page_numbers,
 )
 from docstruct.geometry import reading_role
+from docstruct.placeholders import has_meaningful_text
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
+from docstruct.visual_text import (
+    analyze_visual_text_ownership,
+    collect_picture_context,
+    deduplicate_picture_description,
+    is_confirmed_logo_description,
+)
 
 from acessilia_core.execution.models import ExecutionReport
 from acessilia_core.i18n import (
@@ -466,6 +473,12 @@ def _letterhead_groups(
             continue
         item = PlacedItem(element.id, element.page_number or 1, element.reading_order, bbox)
         if element.type == "picture":
+            if not is_confirmed_logo_description(
+                element.text,
+                element.metadata.get("vision_elements") or (),
+                described=bool(element.metadata.get("vision_description_complete")),
+            ):
+                continue
             pictures.append(item)
         elif _is_page_header_line(element, bbox):
             lines.append(item)
@@ -566,13 +579,83 @@ def _grouped_pages(
     return [(page_number, grouped[page_number]) for page_number in sorted(grouped)]
 
 
+def _picture_has_usable_description(element: ManifestElement) -> bool:
+    if element.type != "picture" or element.metadata.get("vision_failure_reason"):
+        return False
+    if element.metadata.get("vision_description_complete"):
+        return bool((element.text or "").strip())
+    return has_meaningful_text(element)
+
+
+def _scene_text_excluded_ids(manifest: ProcessingManifest) -> set[str]:
+    """Scene-OCR elements whose owner picture has a usable visual description (#398, #653)."""
+    by_id = {element.id: element for element in manifest.elements}
+    boxes = {
+        element.id: box
+        for element in manifest.elements
+        if (box := _element_bbox(element, manifest)) is not None
+    }
+    standalone = any(
+        el.type == "picture" and bool(el.metadata.get("injected_picture"))
+        for el in manifest.elements
+    )
+    computed = analyze_visual_text_ownership(
+        manifest.elements, page_boxes=boxes, standalone_image=standalone
+    )
+    excluded: set[str] = set()
+    for element in manifest.elements:
+        if element.type == "picture":
+            continue
+        recorded = element.metadata.get("visual_text_ownership")
+        if isinstance(recorded, dict):
+            role = recorded.get("role")
+            owner_id = recorded.get("owner_id")
+        else:
+            decision = computed.get(element.id)
+            role = decision.role if decision is not None else None
+            owner_id = decision.owner_id if decision is not None else None
+        if role != "scene_text" or not isinstance(owner_id, str):
+            continue
+        owner = by_id.get(owner_id)
+        if owner is not None and _picture_has_usable_description(owner):
+            excluded.add(element.id)
+    return excluded
+
+
+def _deduplicate_page_pictures(
+    page_elements: list[ManifestElement],
+    letterhead_ids: set[str],
+) -> list[ManifestElement]:
+    """Deduplicate picture descriptions against adjacent independent page text (#263, #653)."""
+    if not any(el.type == "picture" for el in page_elements):
+        return page_elements
+    ownership = analyze_visual_text_ownership(page_elements)
+    updated: list[ManifestElement] = []
+    for element in page_elements:
+        if (
+            element.type == "picture"
+            and element.id not in letterhead_ids
+            and (element.text or "").strip()
+        ):
+            context = collect_picture_context(element.id, page_elements, ownership)
+            if context.surrounding_text:
+                deduped = deduplicate_picture_description(
+                    element.text or "", context.surrounding_text
+                )
+                if deduped != element.text:
+                    element = element.model_copy(update={"text": deduped})
+        updated.append(element)
+    return updated
+
+
 def _build_page_payload(
     page_number: int,
     page_elements: list[ManifestElement],
     letterhead_blocks: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     ordered = sorted(page_elements, key=lambda item: item.reading_order)
-    blocks = _elements_to_blocks(ordered, letterhead_blocks)
+    deduped = _deduplicate_page_pictures(ordered, set(letterhead_blocks))
+    blocks = _elements_to_blocks(deduped, letterhead_blocks)
     _dedupe_callout_titles(blocks)
     return {
         "page_number": page_number,
@@ -594,7 +677,8 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
         key: _letterhead_block(members, manifest.language)
         for key, members in letterheads.items()
     }
-    excluded_ids = page_numbers | merged
+    scene_text_ids = _scene_text_excluded_ids(manifest)
+    excluded_ids = page_numbers | merged | scene_text_ids
     page_groups = (
         _explicit_pages(manifest, excluded_ids=excluded_ids)
         if manifest.pages

@@ -25,6 +25,11 @@ from docstruct.placeholders import (
     is_mostly_visual,
     is_placeholder_visual,
 )
+from docstruct.visual_text import (
+    analyze_visual_text_ownership,
+    collect_picture_context,
+    deduplicate_picture_description,
+)
 
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
@@ -43,6 +48,9 @@ from acessilia_core.pipeline.enrichment.common import (
     _RETRIED_VISION_FAILURES,
     _extract_picture_bytes,
     _retry_failed,
+)
+from acessilia_core.pipeline.elements import (
+    _element_bbox,
 )
 from acessilia_core.pipeline.obligations import (
     _pages_label,
@@ -182,6 +190,10 @@ class _PictureEnrichment:
                 return False
 
             errors: list[str] = []
+            surrounding = element.metadata.get("surrounding_text")
+            extra_kwargs = (
+                {"surrounding_text": surrounding} if surrounding else {}
+            )
             vision_output = await self.agent.describe_region(
                 image_bytes=image_bytes,
                 # A whole presentation slide gets the page prompt and budget.
@@ -192,6 +204,7 @@ class _PictureEnrichment:
                 total_pages=self.total_pages,
                 mode=self.mode,
                 errors=errors,
+                **extra_kwargs,
             )
             self.breaker.record(isinstance(vision_output, VisionOutput))
 
@@ -216,6 +229,7 @@ async def _enrich_picture_descriptions(
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     _inject_full_page_picture(manifest, media_inspection)
+    _annotate_visual_text_ownership(manifest, media_inspection)
 
     pictures = _pictures_to_describe(manifest)
     if not pictures:
@@ -257,6 +271,7 @@ async def _enrich_picture_descriptions(
         breaker=breaker,
         delay_seconds=vision.retry_pass_delay_seconds,
     )
+    _annotate_visual_text_ownership(manifest, media_inspection)
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
@@ -333,7 +348,12 @@ def _fold_picture_description(
         # that text is worth keeping is decided below.
         answered = bool(vision_output.description.strip())
         if answered:
-            element.text = vision_output.description
+            surrounding = element.metadata.get("surrounding_text") or ()
+            element.text = (
+                deduplicate_picture_description(vision_output.description, surrounding)
+                if surrounding
+                else vision_output.description
+            )
         _retype_element(manifest, element, "picture")
     if element.page_number is None and page_number >= 1:
         element.page_number = page_number
@@ -377,6 +397,40 @@ def _retype_element(
         element,
         previous_type=previous_type,
     )
+
+
+def _annotate_visual_text_ownership(
+    manifest: ProcessingManifest,
+    media_inspection: dict[str, Any] | None = None,
+) -> None:
+    """Assign semantic visual-text ownership and picture surrounding context (#653)."""
+    standalone = bool(
+        isinstance(media_inspection, dict) and media_inspection.get("is_image")
+    )
+    boxes = {
+        element.id: box
+        for element in manifest.elements
+        if (box := _element_bbox(element, manifest)) is not None
+    }
+    ownership = analyze_visual_text_ownership(
+        manifest.elements, page_boxes=boxes, standalone_image=standalone
+    )
+    for element in manifest.elements:
+        decision = ownership.get(element.id)
+        if decision is not None and decision.role != "document_text":
+            element.metadata["visual_text_ownership"] = decision.to_metadata()
+    for element in manifest.elements:
+        if element.type != "picture":
+            continue
+        context = collect_picture_context(element.id, manifest.elements, ownership)
+        if context.scene_text:
+            element.metadata["scene_text"] = list(context.scene_text)
+        if (
+            context.surrounding_text
+            and not element.metadata.get("slide_visual")
+            and not element.metadata.get("injected_picture")
+        ):
+            element.metadata["surrounding_text"] = list(context.surrounding_text)
 
 
 def _inject_full_page_picture(

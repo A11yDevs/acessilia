@@ -113,12 +113,18 @@ def is_placeholder_visual(element: ExtractedElement) -> bool:
 
 
 def is_mostly_visual(elements: Iterable[ExtractedElement]) -> bool:
-    """Whether no text element (``TEXT_ELEMENT_TYPES``) holds content.
+    """Whether no text element (``TEXT_ELEMENT_TYPES``) holds independent document content.
 
-    Content is text that is neither a placeholder nor OCR noise; an empty
-    document is mostly visual.
+    Content is text that is neither a placeholder, OCR noise, nor a pure
+    collection of scene-OCR signage fragments (#398, #653); an empty document
+    is mostly visual.
     """
-    for element in elements:
+    from docstruct.visual_text import is_scene_ocr_collection
+
+    items = list(elements)
+    if is_scene_ocr_collection(items):
+        return True
+    for element in items:
         if element.type in TEXT_ELEMENT_TYPES:
             text = (element.text or "").strip()
             if text and not is_placeholder_text(text) and not is_ocr_noise(text):
