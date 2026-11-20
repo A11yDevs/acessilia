@@ -55,7 +55,13 @@ from typing import Any, Iterator
 
 from docstruct.evaluation.metrics import cdm_score
 from docstruct.evaluation.metrics.cdm import _tokens
-from docstruct.text.latex import bare_latex
+from docstruct.text.equations import _SPACED, split_equation_number
+from docstruct.text.latex import (
+    _FUNCTION_ALIASES,
+    _FUNCTION_NAMES,
+    _OPERATORNAME_RE,
+    bare_latex,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 CASE_DIR = Path("input") / "math-reference"
@@ -66,19 +72,47 @@ CASE_PDF = "velocidade-instantanea.pdf"
 #: different expression sharing a few letters.
 MATCH_CDM = 80.0
 
+#: Standard LaTeX named operators, built from ``docstruct.text.latex._FUNCTION_NAMES``
+#: so the scorer stays in step with the library (#266).
+_NAMED_OPERATORS = frozenset(_FUNCTION_NAMES)
+
 #: Tokens that carry 2-D or symbolic structure. Text-layer extraction keeps
 #: the letters and digits of a formula but drops these, so their recall is
 #: what separates real LaTeX from a flattened formula.
 STRUCTURE_TOKENS = frozenset({
-    "^", "_", "\\frac", "\\dfrac", "\\tfrac", "\\lim", "\\to", "\\mathbb", "\\neq", "\\ne",
+    "^", "_", "\\frac", "\\dfrac", "\\tfrac", "\\to", "\\mathbb", "\\neq", "\\ne",
     "\\geq", "\\ge", "\\leq", "\\le", "\\in", "\\cup", "\\infty", "\\cdot", "\\cdots",
     "\\tag", "\\mathrm", "\\text", "\\quad", "\\lbrace", "\\rbrace",
+    *(f"\\{name}" for name in _NAMED_OPERATORS),
 })
 
 #: Set braces as commands. The CDM tokenizer turns every brace, escaped ones
 #: included, into a token boundary, so ``\{``/``\}`` would never reach the
 #: recall; their command spellings survive it.
 _SET_BRACES = (("\\{", "\\lbrace "), ("\\}", "\\rbrace "))
+
+#: Equivalent LaTeX macro spellings folded to a canonical structural token
+#: before counting structure recall (#266): commands that render and speak the
+#: same (e.g. ``\rightarrow``/``\to``, ``\ldots``/``\dots``/``\cdots``,
+#: ``\dfrac``/``\tfrac``/``\frac``, ``\ne``/``\neq``, ``\ge``/``\geq``, ``\le``/``\leq``).
+_EQUIVALENT_COMMANDS: dict[str, str] = {
+    r"\rightarrow": r"\to",
+    r"\ldots": r"\cdots",
+    r"\dots": r"\cdots",
+    r"\dfrac": r"\frac",
+    r"\tfrac": r"\frac",
+    r"\ne": r"\neq",
+    r"\ge": r"\geq",
+    r"\le": r"\leq",
+}
+
+#: Whole LaTeX control words, so macro folding never rewrites a prefix like
+#: ``\left`` via ``\le`` or ``\rightarrowtail`` via ``\rightarrow``.
+_COMMAND_RE = re.compile(r"\\[A-Za-z]+")
+
+#: Spaces and LaTeX spacing commands stripped inside ``\operatorname{...}``
+#: before matching against ``_NAMED_OPERATORS`` and ``_FUNCTION_ALIASES``.
+_OPERATOR_SPACE_RE = re.compile(r"(?:\\[,;:! ]|\s)+")
 
 #: A math span in a text: ``$$...$$``, ``\[...\]``, ``$...$`` or ``\(...\)``.
 #: Display delimiters count too, because a cell or a paragraph that carries
@@ -268,13 +302,57 @@ def _inline_spans(text: str) -> list[str]:
 # ── Scoring ─────────────────────────────────────────────────────────
 
 
+def _normalize_structure_latex(latex: str) -> str:
+    """Normalize equivalent LaTeX spellings before counting structural tokens (#266).
+
+    - trailing spaced equation labels recognized by ``docstruct.text.equations``
+      (``\\quad(n)``, ``\\qquad(n)``, ``\\qquad\\text{(n)}``) -> ``\\tag{n}``;
+    - ``\\operatorname*?{l i m}`` (spaces / thin spaces ignored, including
+      pt-BR aliases from ``docstruct.text.latex._FUNCTION_ALIASES`` such as
+      ``sen`` -> ``sin`` and ``tg`` -> ``tan``) -> ``\\lim`` (and likewise for
+      the other standard ``_NAMED_OPERATORS``);
+    - any other ``\\operatorname*?{X}`` -> ``\\mathrm{X}``;
+    - equivalent macro spellings in ``_EQUIVALENT_COMMANDS`` (``\\rightarrow``
+      -> ``\\to``, ``\\ldots``/``\\dots`` -> ``\\cdots``, ``\\dfrac``/``\\tfrac``
+      -> ``\\frac``, ``\\ne`` -> ``\\neq``, ``\\ge`` -> ``\\geq``, ``\\le`` ->
+      ``\\leq``);
+    - escaped set braces ``\\{`` / ``\\}`` -> ``\\lbrace`` / ``\\rbrace``.
+
+    Applied to ``structure_recall`` only; CDM keeps the raw tokens so bench
+    scores remain comparable across runs.
+    """
+    latex = bare_latex(latex)
+
+    if _SPACED.search(latex):
+        expression, number = split_equation_number(latex)
+        if number is not None:
+            latex = f"{expression} \\tag{{{number}}}"
+
+    def replace_operatorname(match: re.Match[str]) -> str:
+        body = match.group(1)
+        stripped = _OPERATOR_SPACE_RE.sub("", body)
+        name = _FUNCTION_ALIASES.get(stripped, stripped)
+        if name in _NAMED_OPERATORS:
+            return f"\\{name} "
+        return f"\\mathrm{{{body}}}"
+
+    latex = _OPERATORNAME_RE.sub(replace_operatorname, latex)
+    latex = _COMMAND_RE.sub(
+        lambda m: f"{_EQUIVALENT_COMMANDS[m.group(0)]} "
+        if m.group(0) in _EQUIVALENT_COMMANDS
+        else m.group(0),
+        latex,
+    )
+    for brace, command in _SET_BRACES:
+        latex = latex.replace(brace, command)
+    return latex
+
+
 def structure_recall(predicted: str, expected: str) -> float | None:
     """Share of the expected structural tokens the prediction keeps (0-100)."""
 
     def structural(latex: str) -> Counter[str]:
-        for brace, command in _SET_BRACES:
-            latex = latex.replace(brace, command)
-        return Counter(t for t in _tokens(latex) if t in STRUCTURE_TOKENS)
+        return Counter(t for t in _tokens(_normalize_structure_latex(latex)) if t in STRUCTURE_TOKENS)
 
     wanted = structural(expected)
     if not wanted:
