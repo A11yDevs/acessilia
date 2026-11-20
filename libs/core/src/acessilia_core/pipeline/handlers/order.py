@@ -8,6 +8,11 @@ XY-cut to the elements' boxes. Moved verbatim from the PDDL orchestrator
 
 from __future__ import annotations
 
+from docstruct.fusion.skeleton import (
+    DEFAULT_MIN_SKELETON_MATCH as _MIN_SKELETON_MATCH,
+    skeleton_reading_order,
+)
+
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.manifest.models import (
     ManifestElement,
@@ -33,10 +38,6 @@ from acessilia_core.pipeline.secondary import (
     _secondary_or_failure,
 )
 from acessilia_core.i18n import t
-
-
-#: Share of a page's elements that must be paired to follow the skeleton order.
-_MIN_SKELETON_MATCH = 0.5
 
 
 def _handle_skeleton_order_method(
@@ -73,17 +74,11 @@ def _handle_skeleton_order_method(
             if match is not None:
                 used.add(match)
                 keys[index] = match
-        if len(current) < 2 or len(keys) < _MIN_SKELETON_MATCH * len(current):
+        order = skeleton_reading_order(
+            len(current), keys, min_match_ratio=_MIN_SKELETON_MATCH
+        )
+        if order is None:
             continue
-        ranked: list[tuple[float, int, int]] = []
-        last = -1.0
-        for index in range(len(current)):
-            if index in keys:
-                last = float(keys[index])
-                ranked.append((last, 0, index))
-            else:
-                ranked.append((last, 1, index))
-        order = [index for _, _, index in sorted(ranked)]
         if _apply_page_order(current, order):
             reordered.add(page_number)
         else:

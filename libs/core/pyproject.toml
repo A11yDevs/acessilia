@@ -15,7 +15,7 @@ license = { text = "MIT" }
 # docstruct and the SDK are not on an index: install ./libs/docstruct and
 # ./libs/sdk first; uv resolves them from the paths below.
 dependencies = [
-    "acessilia-docstruct>=0.5.6,<0.6",
+    "acessilia-docstruct>=0.5.7,<0.6",
     "acessilia-sdk>=0.3,<0.4",
     "agno==3.0.5",
     "openai>=2.45.0,<3",

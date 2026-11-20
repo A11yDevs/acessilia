@@ -44,7 +44,15 @@ from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
 from docstruct.fusion.similarity import area
 from docstruct.geometry import is_bottom_left, union
-from docstruct.geometry.boxes import boxes_overlap, union_area
+from docstruct.geometry.boxes import (
+    box_contains_center,
+    box_distance,
+    boxes_overlap,
+    boxes_side_by_side,
+    expand_box,
+    spans_horizontally,
+    union_area,
+)
 
 #: Default share of the slide its pictures must cover for the slide to be
 #: described as an image rather than read as text (SLIDE_VISUAL_COVERAGE).
@@ -379,7 +387,7 @@ def _is_visual(
         box = page_fractions(element)
         if box is None:
             return False
-        if not any(_contains(picture, box) for picture in pictures):
+        if not any(box_contains_center(picture, box) for picture in pictures):
             outside.append(box)
     return union_area(outside) <= _MAX_TEXT_OUTSIDE
 
@@ -438,7 +446,7 @@ def _fold_figure_labels(
         hosts = [
             (picture, picture_box)
             for picture, picture_box in pictures
-            if box is not None and _contains(picture_box, box)
+            if box is not None and box_contains_center(picture_box, box)
         ]
         if (
             not text
@@ -522,7 +530,7 @@ def _pictures_near(
     return [
         picture_id
         for picture_id, picture_box in boxes.items()
-        if boxes_overlap(_expanded(picture_box, _NEAR_MARGIN), box)
+        if boxes_overlap(expand_box(picture_box, _NEAR_MARGIN), box)
     ]
 
 
@@ -537,19 +545,19 @@ def _select_picture_host(
     removed: set[str],
 ) -> ManifestElement | None:
     near = _pictures_near(pictures, box)
-    spanned = [p for p in near if _spans_across(box, pictures[p])]
+    spanned = [p for p in near if spans_horizontally(box, pictures[p])]
     if (
         len(spanned) >= 2
         and (label or caption)
-        and _side_by_side([pictures[p] for p in spanned])
+        and boxes_side_by_side([pictures[p] for p in spanned])
     ):
         return _merge_pictures([by_id[p] for p in spanned], pictures, reach, removed)
     near_merged = [p for p in spanned if by_id[p].metadata.get("merged_picture_ids")]
     if near_merged and (label or caption):
-        return by_id[min(near_merged, key=lambda p: _distance(pictures[p], box))]
+        return by_id[min(near_merged, key=lambda p: box_distance(pictures[p], box))]
     near_own = _pictures_near(reach, box)
     if near_own and label and not caption:
-        return by_id[min(near_own, key=lambda p: _distance(reach[p], box))]
+        return by_id[min(near_own, key=lambda p: box_distance(reach[p], box))]
     return None
 
 
@@ -648,43 +656,9 @@ def _grow(host: ManifestElement, other: ManifestElement) -> bool:
     return True
 
 
-def _expanded(
-    box: tuple[float, float, float, float], margin: float
-) -> tuple[float, float, float, float]:
-    return (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)
-
-
-def _spans_across(
-    box: tuple[float, float, float, float], picture: tuple[float, float, float, float]
-) -> bool:
-    """Whether ``box`` shares part of ``picture``'s width."""
-    return min(box[2], picture[2]) > max(box[0], picture[0])
-
-
-def _side_by_side(boxes: list[tuple[float, float, float, float]]) -> bool:
-    """Whether ``boxes`` share a horizontal band, so text spans them across."""
-    return min(box[3] for box in boxes) > max(box[1] for box in boxes)
-
-
-def _distance(
-    first: tuple[float, float, float, float], second: tuple[float, float, float, float]
-) -> float:
-    across = max(0.0, max(first[0], second[0]) - min(first[2], second[2]))
-    down = max(0.0, max(first[1], second[1]) - min(first[3], second[3]))
-    return across + down
-
-
 def _reads_as_label(text: str) -> bool:
     words = sum(1 for word in text.split() if sum(char.isalpha() for char in word) >= 3)
     return words <= _LABEL_MAX_WORDS and not (words and _SENTENCE.search(text))
-
-
-def _contains(
-    picture: tuple[float, float, float, float], box: tuple[float, float, float, float]
-) -> bool:
-    """Whether the center of ``box`` lies within ``picture``."""
-    x, y = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
-    return picture[0] <= x <= picture[2] and picture[1] <= y <= picture[3]
 
 
 def _whole_slide_picture(number: int, replaced: list[ManifestElement]) -> ManifestElement:

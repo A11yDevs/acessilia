@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import struct
 import tempfile
 from pathlib import Path
+
+from docstruct.imaging import image_dimensions
 
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.i18n import t
@@ -13,36 +14,6 @@ from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.toolbox import ToolboxError
 from acessilia_sdk.toolbox.clients import ToolboxPdfClient
-
-
-def _image_size(payload: bytes) -> tuple[int, int, str] | None:
-    """Read PNG/JPEG header dimensions without decoding or transforming pixels."""
-    if payload.startswith(b"\x89PNG\r\n\x1a\n") and len(payload) >= 24 and payload[12:16] == b"IHDR":
-        width, height = struct.unpack(">II", payload[16:24])
-        return (width, height, ".png") if width and height else None
-    if payload.startswith(b"\xff\xd8"):
-        position = 2
-        while position + 4 <= len(payload):
-            if payload[position] != 0xFF:
-                return None
-            while position < len(payload) and payload[position] == 0xFF:
-                position += 1
-            if position >= len(payload):
-                return None
-            marker = payload[position]
-            position += 1
-            if marker in {0xD9, 0xDA}:
-                return None
-            length = int.from_bytes(payload[position:position + 2], "big")
-            if length < 2 or position + length > len(payload):
-                return None
-            if marker in {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}:
-                if length < 7:
-                    return None
-                height, width = struct.unpack(">HH", payload[position + 3:position + 7])
-                return (width, height, ".jpg") if width and height else None
-            position += length
-    return None
 
 
 async def downscale_image(
@@ -54,7 +25,7 @@ async def downscale_image(
     would not get smaller, or when the Toolbox cannot render it: the caller
     then lets the original context error stand.
     """
-    size = _image_size(payload)
+    size = image_dimensions(payload)
     if size is None:
         return None
     width, height, suffix = size

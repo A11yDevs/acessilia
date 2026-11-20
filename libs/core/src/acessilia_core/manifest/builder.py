@@ -6,6 +6,7 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from docstruct.sections import find_heading_gaps
 from docstruct.text.equations import preserve_equation_number
 from docstruct.text.latex import has_latex_markup
 
@@ -572,39 +573,40 @@ def _derive_processing_needs(
         for element in sorted(elements, key=lambda item: item.reading_order)
         if element.type in {"title", "heading"}
     ]
-    previous = 0
-    for element_id, level in heading_levels:
-        invalid_first = not previous and level != 1
-        invalid_successor = previous and (level < 2 or level > min(previous + 1, 6))
-        if invalid_first or invalid_successor:
-            suffix = element_id.removeprefix("element-")
-            message = t(MSG_HEADING_GAP).format(previous=previous, level=level)
-            observations.append(
-                Observation(
-                    id=f"observation-heading-gap-{suffix}",
-                    kind="heading-hierarchy-gap",
-                    severity="error",
-                    message=message,
-                    target_ids=[element_id],
-                    evidence={"previous_level": previous, "current_level": level},
-                )
+    for gap in find_heading_gaps([level for _, level in heading_levels]):
+        element_id = heading_levels[gap.index][0]
+        suffix = element_id.removeprefix("element-")
+        message = t(MSG_HEADING_GAP).format(
+            previous=gap.previous_level, level=gap.current_level
+        )
+        observations.append(
+            Observation(
+                id=f"observation-heading-gap-{suffix}",
+                kind="heading-hierarchy-gap",
+                severity="error",
+                message=message,
+                target_ids=[element_id],
+                evidence={
+                    "previous_level": gap.previous_level,
+                    "current_level": gap.current_level,
+                },
             )
-            obligations.append(
-                Obligation(
-                    id=f"obligation-repair-heading-{suffix}",
-                    kind="repair-heading-hierarchy",
-                    target_ids=[element_id],
-                    admissible_methods=["deterministic-heading-repair", "human-review"],
-                    method_costs={
-                        "deterministic-heading-repair": DEFAULT_METHOD_COSTS[
-                            "deterministic-heading-repair"
-                        ],
-                        "human-review": DEFAULT_METHOD_COSTS["human-review"],
-                    },
-                    rationale=message,
-                )
+        )
+        obligations.append(
+            Obligation(
+                id=f"obligation-repair-heading-{suffix}",
+                kind="repair-heading-hierarchy",
+                target_ids=[element_id],
+                admissible_methods=["deterministic-heading-repair", "human-review"],
+                method_costs={
+                    "deterministic-heading-repair": DEFAULT_METHOD_COSTS[
+                        "deterministic-heading-repair"
+                    ],
+                    "human-review": DEFAULT_METHOD_COSTS["human-review"],
+                },
+                rationale=message,
             )
-        previous = level
+        )
     return observations, obligations
 
 
