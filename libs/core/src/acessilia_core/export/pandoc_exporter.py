@@ -15,14 +15,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from jsonschema import ValidationError, validate
-from docstruct.validation import validate_against_schema
-
+from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
 from docstruct.export.filters import strip_internal_audit_blocks
-from docstruct.export.pandoc_ast import build_pandoc_ast
-from docstruct.export.pandoc_ast import count_math_nodes
-from docstruct.export.pandoc_ast import degrade_math_to_text
-from docstruct.export.pandoc_ast import unconverted_math_indices
+from docstruct.export.pandoc_ast import (
+    build_pandoc_ast,
+    count_math_nodes,
+    degrade_math_to_text,
+    unconverted_math_indices,
+)
+from docstruct.validation import validate_against_schema
+from jsonschema import ValidationError, validate
 
 from acessilia_core.config import ExportConfig, ToolboxConfig
 from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
@@ -179,7 +181,6 @@ def _render_pdf_ua(
     """
     if not enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
-    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
     output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         toolbox_export_pdf_ua(ast, output_path, lang=lang, toolbox=toolbox)
@@ -195,6 +196,160 @@ def _render_pdf_ua(
         )
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
+
+
+class _PdfUaMathBisector:
+    """Bounded largest-chunk-first bisector isolating rejected PDF/UA math nodes."""
+
+    def __init__(
+        self,
+        ast: dict[str, Any],
+        output_path: Path,
+        *,
+        lang: str,
+        toolbox: ToolboxConfig,
+        initial_error: Exception,
+        budget: int,
+        total: int,
+        check_cancelled: Callable[[], None] | None,
+    ) -> None:
+        self.ast = ast
+        self.output_path = output_path
+        self.lang = lang
+        self.toolbox = toolbox
+        self.initial_error = initial_error
+        self.budget = budget
+        self.total = total
+        self.check_cancelled = check_cancelled
+        self.all_indices = frozenset(range(total))
+        self.attempts = 0
+        self.last_error: Exception = initial_error
+        self.proven_bad: set[int] = set()
+        self.pending: list[list[int]] = []
+
+    def try_render(self, degraded: frozenset[int]) -> bool:
+        if self.check_cancelled is not None:
+            self.check_cancelled()
+        self.attempts += 1
+        candidate_ast = degrade_math_to_text(self.ast, indices=degraded)
+        try:
+            toolbox_export_pdf_ua(
+                candidate_ast, self.output_path, lang=self.lang, toolbox=self.toolbox
+            )
+        except ToolboxInvalidInput as exc:
+            self.last_error = exc
+            return False
+        return True
+
+    def _enqueue(self, chunk: list[int]) -> None:
+        if len(chunk) == 1:
+            self.proven_bad.add(chunk[0])
+        elif chunk:
+            self.pending.append(chunk)
+
+    def _initial_partition(self) -> tuple[list[int], list[int]]:
+        # Re-walks source_document once per rejected PDF/UA export to build the
+        # suspect ordering hint. Only used when at most half the formulas lack
+        # MathML, so a transient math.convert outage falls back to a balanced split.
+        suspects = unconverted_math_indices(self.ast, target_format=PDF_UA.spec.id)
+        if 0 < len(suspects) <= self.total // 2:
+            right = sorted(suspects)
+            left = [idx for idx in range(self.total) if idx not in suspects]
+            return left, right
+        mid = self.total // 2
+        return list(range(mid)), list(range(mid, self.total))
+
+    def _establish_verified_pdf(self, left: list[int], right: list[int]) -> None:
+        # Establish a verified working PDF on disk before refining chunks.
+        if self.try_render(frozenset(right)):
+            self._enqueue(right)
+        elif self.budget - self.attempts >= 2 and self.try_render(frozenset(left)):
+            self._enqueue(left)
+        else:
+            both_halves_probed = self.attempts >= 2
+            if not self.try_render(self.all_indices):
+                raise self.last_error
+            if both_halves_probed:
+                self._enqueue(left)
+                self._enqueue(right)
+            else:
+                self.pending.append(list(range(self.total)))
+
+    def _refine_pending_chunks(self) -> None:
+        # Refine the largest unresolved chunk first so each successful probe rescues
+        # the biggest possible block of valid formulas within the retry budget.
+        # Invariant: output_path always holds the verified PDF for
+        # ``proven_bad | union(pending)``.
+        while self.pending and self.attempts < self.budget:
+            chunk_pos = max(
+                range(len(self.pending)),
+                key=lambda i: (len(self.pending[i]), -self.pending[i][0]),
+            )
+            chunk = self.pending.pop(chunk_pos)
+            mid = len(chunk) // 2
+            left, right = chunk[:mid], chunk[mid:]
+            other = frozenset(
+                self.proven_bad | {idx for rest in self.pending for idx in rest}
+            )
+            if self.try_render(other | frozenset(right)):
+                self._enqueue(right)
+                continue
+            if self.attempts >= self.budget:
+                self.pending.append(chunk)
+                break
+            if self.try_render(other | frozenset(left)):
+                self._enqueue(left)
+                continue
+            self._enqueue(left)
+            self._enqueue(right)
+
+    def _log_outcome(self) -> None:
+        degraded_indices = frozenset(
+            self.proven_bad | {idx for rest in self.pending for idx in rest}
+        )
+        if self.pending:
+            logger.warning(
+                t(LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED).format(
+                    attempts=self.attempts,
+                    degraded=len(degraded_indices),
+                    total=self.total,
+                    error=self.initial_error,
+                )
+            )
+        elif len(degraded_indices) == self.total:
+            logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=self.initial_error))
+        else:
+            logger.warning(
+                t(LOG_PDF_UA_MATH_PARTIALLY_DEGRADED).format(
+                    degraded=len(degraded_indices),
+                    total=self.total,
+                    error=self.initial_error,
+                )
+            )
+
+    def run(self) -> None:
+        if self.total == 1 or self.budget == 1:
+            if not self.try_render(self.all_indices):
+                raise self.last_error
+            if self.total == 1:
+                logger.warning(
+                    t(LOG_PDF_UA_MATH_DEGRADED).format(error=self.initial_error)
+                )
+            else:
+                logger.warning(
+                    t(LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED).format(
+                        attempts=self.attempts,
+                        degraded=self.total,
+                        total=self.total,
+                        error=self.initial_error,
+                    )
+                )
+            return
+
+        left, right = self._initial_partition()
+        self._establish_verified_pdf(left, right)
+        self._refine_pending_chunks()
+        self._log_outcome()
 
 
 def _recover_pdf_ua_math(
@@ -229,121 +384,25 @@ def _recover_pdf_ua_math(
        smallest verified PDF on disk and logs a distinct budget-exhausted
        warning instead of overstating rejected formulas.
     """
-    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
-
-    budget = _MAX_MATH_BISECT_ATTEMPTS if max_bisect_attempts is None else max(0, max_bisect_attempts)
+    budget = (
+        _MAX_MATH_BISECT_ATTEMPTS
+        if max_bisect_attempts is None
+        else max(0, max_bisect_attempts)
+    )
     total = count_math_nodes(ast)
     if total == 0 or budget == 0:
         raise initial_error
 
-    all_indices = frozenset(range(total))
-    attempts = 0
-    last_error: Exception = initial_error
-
-    def try_render(degraded: frozenset[int]) -> bool:
-        nonlocal attempts, last_error
-        if check_cancelled is not None:
-            check_cancelled()
-        attempts += 1
-        candidate_ast = degrade_math_to_text(ast, indices=degraded)
-        try:
-            toolbox_export_pdf_ua(candidate_ast, output_path, lang=lang, toolbox=toolbox)
-        except ToolboxInvalidInput as exc:
-            last_error = exc
-            return False
-        return True
-
-    if total == 1 or budget == 1:
-        if not try_render(all_indices):
-            raise last_error
-        if total == 1:
-            logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=initial_error))
-        else:
-            logger.warning(
-                t(LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED).format(
-                    attempts=attempts, degraded=total, total=total, error=initial_error
-                )
-            )
-        return
-
-    proven_bad: set[int] = set()
-    pending: list[list[int]] = []
-
-    def enqueue(chunk: list[int]) -> None:
-        if len(chunk) == 1:
-            proven_bad.add(chunk[0])
-        elif chunk:
-            pending.append(chunk)
-
-    # Re-walks source_document once per rejected PDF/UA export to build the
-    # suspect ordering hint. Only used when at most half the formulas lack
-    # MathML, so a transient math.convert outage falls back to a balanced split.
-    suspects = unconverted_math_indices(ast, target_format=PDF_UA.spec.id)
-    if 0 < len(suspects) <= total // 2:
-        right = sorted(suspects)
-        left = [idx for idx in range(total) if idx not in suspects]
-    else:
-        mid = total // 2
-        left = list(range(mid))
-        right = list(range(mid, total))
-
-    # Establish a verified working PDF on disk before refining chunks.
-    if try_render(frozenset(right)):
-        enqueue(right)
-    elif budget - attempts >= 2 and try_render(frozenset(left)):
-        enqueue(left)
-    else:
-        both_halves_probed = attempts >= 2
-        if not try_render(all_indices):
-            raise last_error
-        if both_halves_probed:
-            enqueue(left)
-            enqueue(right)
-        else:
-            pending.append(list(range(total)))
-
-    # Refine the largest unresolved chunk first so each successful probe rescues
-    # the biggest possible block of valid formulas within the retry budget.
-    # Invariant: output_path always holds the verified PDF for
-    # ``proven_bad | union(pending)``.
-    while pending and attempts < budget:
-        chunk_pos = max(range(len(pending)), key=lambda i: (len(pending[i]), -pending[i][0]))
-        chunk = pending.pop(chunk_pos)
-        mid = len(chunk) // 2
-        left = chunk[:mid]
-        right = chunk[mid:]
-        other = frozenset(proven_bad | {idx for rest in pending for idx in rest})
-
-        if try_render(other | frozenset(right)):
-            enqueue(right)
-            continue
-        if attempts >= budget:
-            pending.append(chunk)
-            break
-        if try_render(other | frozenset(left)):
-            enqueue(left)
-            continue
-        enqueue(left)
-        enqueue(right)
-
-    degraded_indices = frozenset(proven_bad | {idx for rest in pending for idx in rest})
-    if pending:
-        logger.warning(
-            t(LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED).format(
-                attempts=attempts,
-                degraded=len(degraded_indices),
-                total=total,
-                error=initial_error,
-            )
-        )
-    elif len(degraded_indices) == total:
-        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=initial_error))
-    else:
-        logger.warning(
-            t(LOG_PDF_UA_MATH_PARTIALLY_DEGRADED).format(
-                degraded=len(degraded_indices), total=total, error=initial_error
-            )
-        )
+    _PdfUaMathBisector(
+        ast,
+        output_path,
+        lang=lang,
+        toolbox=toolbox,
+        initial_error=initial_error,
+        budget=budget,
+        total=total,
+        check_cancelled=check_cancelled,
+    ).run()
 
 
 def _validate_export_schema(document: dict[str, Any]) -> None:

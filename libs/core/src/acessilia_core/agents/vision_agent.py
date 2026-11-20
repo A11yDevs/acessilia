@@ -5,6 +5,8 @@ import functools
 import hashlib
 import json
 import re
+import traceback
+from typing import Any, Generic
 
 from docstruct.fusion.repetition import collapse
 from pydantic import ValidationError
@@ -96,6 +98,91 @@ RETRY_INSTRUCTION = (
 )
 
 
+def _build_region_prompt(
+    system_prompt: str,
+    classification: str,
+    *,
+    effective_mode: str,
+    page_num: int,
+    total_pages: int,
+    custom_prompt: str | None,
+) -> str:
+    if custom_prompt:
+        prompt = custom_prompt
+    elif classification == "formula_candidate":
+        # A missing prompt file loads as "": fall back like the region
+        # prompts do, so the request keeps its instructions.
+        prompt = load_region_prompt("formula_candidate") or system_prompt
+    elif classification in {"full_page_fallback", "full_page_image"}:
+        base = load_system_prompt(effective_mode)
+        prompt = build_page_prompt(
+            base, total_pages, page_num, is_pdf=classification == "full_page_fallback"
+        )
+    else:
+        region_prompt = load_region_prompt(region_prompt_key(classification))
+        prompt = region_prompt if region_prompt else system_prompt
+
+    if not custom_prompt and classification in _CHEMISTRY_CLASSIFICATIONS:
+        prompt = f"{prompt}\n{load_chemistry_prompt()}"
+    return f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
+
+
+async def _get_cached_vision_output(
+    region_cache: RegionCache | None, image_bytes: bytes, cache_extra: str
+) -> VisionOutput | None:
+    if region_cache is None:
+        return None
+    cached = await region_cache.get(
+        image_bytes, cache_extra, ttl_seconds=VISION_CACHE_TTL_SECONDS
+    )
+    if cached is None:
+        return None
+    try:
+        return VisionOutput.model_validate(cached)
+    except ValidationError:
+        return None  # stale or incompatible stored payload: describe again
+
+
+def _handle_describe_region_error(
+    error: Exception,
+    *,
+    classification: str,
+    page_num: int,
+    max_tokens: int | None,
+    errors: list[str] | None,
+) -> VisionOutput | None:
+    salvaged = (
+        _salvage_truncated_description(error)
+        if isinstance(error, ValidationError)
+        else None
+    )
+    if salvaged is not None:
+        if max_tokens is not None:
+            salvaged, _ = _truncate_description(
+                salvaged,
+                page_num=page_num,
+                region_type=classification,
+                limit_tokens=max_tokens,
+            )
+        logger.warning(
+            t(LOG_VISION_AGENT_REGION_SALVAGED).format(
+                page_num=page_num, type=classification, chars=len(salvaged.description)
+            )
+        )
+        return salvaged
+    if errors is not None:
+        errors.append(_failure_summary(error))
+    logger.critical(
+        t(LOG_VISION_AGENT_REGION_ERROR).format(
+            page_num=page_num,
+            type=classification,
+            error=error,
+            tb=traceback.format_exc(),
+        )
+    )
+    return None
+
+
 class VisionAgent:
     """Processes visual regions and produces accessible audio descriptions."""
 
@@ -142,44 +229,19 @@ class VisionAgent:
     ) -> VisionOutput | None:
         """Describe a single visual region of a page with the vision model.
 
-        Args:
-            image_bytes (bytes): PNG/encoded image payload of the region to describe.
-            classification (str): Region classification key (e.g. "full_page_fallback", "full_page_image", or a region type) driving prompt selection.
-            page_num (int): 1-based page number the region belongs to, used in log lines and page prompts (default 0).
-            total_pages (int): Total page count of the source document for page prompts (default 0).
-            mode (str | None): Prompting mode override for this call; falls back to the instance default when None (default None).
-            custom_prompt (str | None): Fully custom prompt that, when given, replaces all selection logic (default None).
-            full_budget (bool): Use the general token budget instead of VISION_REGION_MAX_TOKENS, for a region that may need transcribing (default False).
-            errors (list[str] | None): When given, receives a one-line summary of the error that made the call return None, for a caller that records why (default None).
-
-        Returns:
-            A validated visual result, or None when inference or validation fails. A
-            description longer than the region token budget is truncated with a
-            recorded warning; regions on the general budget (``full_budget``) are
-            never truncated, because a cut there would lose document content.
+        Returns a validated visual result, or ``None`` when inference or
+        validation fails. Descriptions above the region token budget are
+        truncated with a warning; ``full_budget`` regions are never truncated.
         """
         effective_mode = mode or self.mode
-
-        if custom_prompt:
-            prompt = custom_prompt
-        elif classification == "formula_candidate":
-            # A missing prompt file loads as "": fall back like the region
-            # prompts do, so the request keeps its instructions.
-            prompt = load_region_prompt("formula_candidate") or self.system_prompt
-        elif classification == "full_page_fallback":
-            base = load_system_prompt(effective_mode)
-            prompt = build_page_prompt(base, total_pages, page_num, is_pdf=True)
-        elif classification == "full_page_image":
-            base = load_system_prompt(effective_mode)
-            prompt = build_page_prompt(base, total_pages, page_num, is_pdf=False)
-        else:
-            prompt_key = region_prompt_key(classification)
-            region_prompt = load_region_prompt(prompt_key)
-            prompt = region_prompt if region_prompt else self.system_prompt
-
-        if not custom_prompt and classification in _CHEMISTRY_CLASSIFICATIONS:
-            prompt = f"{prompt}\n{load_chemistry_prompt()}"
-        prompt = f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
+        prompt = _build_region_prompt(
+            self.system_prompt,
+            classification,
+            effective_mode=effective_mode,
+            page_num=page_num,
+            total_pages=total_pages,
+            custom_prompt=custom_prompt,
+        )
         # A whole page, or a region inspected for review-structure (scanned text,
         # a table), may need the general budget to be transcribed; a picture
         # gets the smaller one, which also bounds what a degenerate try costs.
@@ -188,7 +250,6 @@ class VisionAgent:
             if full_budget or classification.startswith("full_page")
             else self.models.vision_region_max_tokens
         )
-
         context_retry_max_tokens = _context_retry_max_tokens(
             classification, max_tokens, self.models.vision_region_max_tokens
         )
@@ -199,57 +260,30 @@ class VisionAgent:
             self.models,
             context_retry_max_tokens=context_retry_max_tokens,
         )
-        if self.region_cache is not None:
-            cached = await self.region_cache.get(
-                image_bytes, cache_extra, ttl_seconds=VISION_CACHE_TTL_SECONDS
-            )
-            if cached is not None:
-                try:
-                    return VisionOutput.model_validate(cached)
-                except ValidationError:
-                    pass  # stale or incompatible stored payload: describe again
+        cached = await _get_cached_vision_output(self.region_cache, image_bytes, cache_extra)
+        if cached is not None:
+            return cached
 
         try:
             output = await _run_with_retry(
-                prompt, image_bytes, VisionOutput, page_num=page_num, label=classification,
-                toolbox=self.toolbox, models=self.models, max_tokens=max_tokens,
+                prompt,
+                image_bytes,
+                VisionOutput,
+                page_num=page_num,
+                label=classification,
+                toolbox=self.toolbox,
+                models=self.models,
+                max_tokens=max_tokens,
                 model_calls=self.model_calls,
             )
         except Exception as error:
-            salvaged = (
-                _salvage_truncated_description(error)
-                if isinstance(error, ValidationError)
-                else None
+            return _handle_describe_region_error(
+                error,
+                classification=classification,
+                page_num=page_num,
+                max_tokens=max_tokens,
+                errors=errors,
             )
-            if salvaged is not None:
-                if max_tokens is not None:
-                    salvaged, _ = _truncate_description(
-                        salvaged,
-                        page_num=page_num,
-                        region_type=classification,
-                        limit_tokens=max_tokens,
-                    )
-                logger.warning(
-                    t(LOG_VISION_AGENT_REGION_SALVAGED).format(
-                        page_num=page_num,
-                        type=classification,
-                        chars=len(salvaged.description),
-                    )
-                )
-                return salvaged
-            if errors is not None:
-                errors.append(_failure_summary(error))
-            import traceback
-            tb = traceback.format_exc()
-            logger.critical(
-                t(LOG_VISION_AGENT_REGION_ERROR).format(
-                    page_num=page_num,
-                    type=classification,
-                    error=error,
-                    tb=tb,
-                )
-            )
-            return None
         truncated = False
         if max_tokens is not None:
             output, truncated = _truncate_description(
@@ -259,7 +293,9 @@ class VisionAgent:
                 limit_tokens=max_tokens,
             )
         if self.region_cache is not None and _cacheable(output, truncated):
-            await self.region_cache.put(image_bytes, cache_extra, output.model_dump(mode="json"))
+            await self.region_cache.put(
+                image_bytes, cache_extra, output.model_dump(mode="json")
+            )
         return output
 
     async def inspect_page(
@@ -285,6 +321,182 @@ class VisionAgent:
         )
 
 
+class _VisionRetryRunner(Generic[OutputModel]):
+    """Stateful retry loop for structured vision model calls."""
+
+    def __init__(
+        self,
+        prompt: str,
+        image_bytes: bytes,
+        schema: type[OutputModel],
+        *,
+        page_num: int,
+        label: str,
+        toolbox: ToolboxConfig,
+        model_calls: ModelCallRunner,
+        models: ModelConfig,
+        max_tokens: int | None,
+    ) -> None:
+        self.prompt = prompt
+        self.image_bytes = image_bytes
+        self.schema = schema
+        self.page_num = page_num
+        self.label = label
+        self.toolbox = toolbox
+        self.model_calls = model_calls
+        self.models = models
+        self.max_tokens = max_tokens
+        self.attempt = 0
+        self.rate_limit_retries = 0
+        self.timeout_retries = 0
+        self.context_retries = 0
+
+    async def _retry_after_context_overflow(self, error: BaseException) -> bool:
+        if (
+            self.context_retries >= _CONTEXT_OVERFLOW_RETRIES
+            or not _is_context_overflow(error)
+        ):
+            return False
+        smaller_image = await _downscale_image(self.image_bytes, self.toolbox)
+        if smaller_image is None:
+            return False
+
+        size_before = len(self.image_bytes)
+        self.image_bytes = smaller_image
+        fallback_max_tokens = _context_retry_max_tokens(
+            self.label, self.max_tokens, self.models.vision_region_max_tokens
+        )
+        if fallback_max_tokens is not None:
+            self.max_tokens = fallback_max_tokens
+        self.context_retries += 1
+        self.attempt -= 1  # a context rejection says nothing about the answer
+        logger.warning(
+            t(LOG_VISION_AGENT_CONTEXT_RETRY).format(
+                page_num=self.page_num,
+                type=self.label,
+                size_before=size_before,
+                size_after=len(self.image_bytes),
+                max_tokens=(
+                    self.max_tokens if self.max_tokens is not None else "provider default"
+                ),
+                error=_failure_summary(error),
+            )
+        )
+        return True
+
+    async def _retry_after_rate_limit(self, error: BaseException) -> bool:
+        if not _is_rate_limited(error) or self.rate_limit_retries >= _RATE_LIMIT_RETRIES:
+            return False
+        self.rate_limit_retries += 1
+        self.attempt -= 1  # a rate limit says nothing about the answer
+        await _wait_out_rate_limit(
+            self.page_num, self.label, error, self.rate_limit_retries
+        )
+        return True
+
+    async def _invoke_model(self, attempt_prompt: str) -> tuple[Any, bool]:
+        model_options: dict[str, Any] = {"max_tokens": self.max_tokens, "max_retries": 0}
+        if self.context_retries and _is_whole_page(self.label):
+            # A small recovery cap must leave tokens for the actual answer.
+            model_options["reasoning_enabled"] = False
+        agent = Agent(
+            name="VisionAgent",
+            model=get_agno_model(self.models, self.toolbox, **model_options),
+            output_schema=self.schema,
+            telemetry=False,
+        )
+        run = functools.partial(
+            agent.run, input=attempt_prompt, images=[Image(content=self.image_bytes)]
+        )
+        try:
+            response = await self.model_calls.run(
+                run,
+                timeout=model_call_deadline(self.models.model_call_timeout_seconds),
+                label=f"VisionAgent/{self.label}/page-{self.page_num}",
+            )
+            return response, False
+        except TimeoutError as error:
+            if self.timeout_retries < _TIMEOUT_RETRIES:
+                self.timeout_retries += 1
+                self.attempt -= 1  # a stalled provider says nothing about the answer
+                logger.warning(
+                    t(LOG_VISION_AGENT_TIMEOUT_RETRY).format(
+                        page_num=self.page_num,
+                        type=self.label,
+                        retry=self.timeout_retries,
+                        retries=_TIMEOUT_RETRIES,
+                        error=error,
+                    )
+                )
+                return None, True
+            raise
+        except Exception as error:
+            if await self._retry_after_context_overflow(error) or await self._retry_after_rate_limit(error):
+                return None, True
+            raise
+
+    async def _validate_response(
+        self, response: Any
+    ) -> tuple[OutputModel | None, bool]:
+        try:
+            return validate_structured_run(response, self.schema), False
+        except ValidationError as error:
+            if self.attempt == REGION_ATTEMPTS:
+                raise
+            logger.warning(
+                t(LOG_VISION_AGENT_REGION_RETRY).format(
+                    page_num=self.page_num,
+                    type=self.label,
+                    attempt=self.attempt + 1,
+                    attempts=REGION_ATTEMPTS,
+                    error=_short_error(error),
+                )
+            )
+            return None, True
+        except RunIncompleteError as error:
+            if await self._retry_after_context_overflow(error) or await self._retry_after_rate_limit(error):
+                return None, True
+            raise
+        except Exception as error:
+            if await self._retry_after_context_overflow(error):
+                return None, True
+            raise
+
+    async def run(self) -> OutputModel:
+        while self.attempt < REGION_ATTEMPTS:
+            self.attempt += 1
+            attempt_prompt = (
+                self.prompt
+                if self.attempt == 1
+                else f"{self.prompt}\n\n{RETRY_INSTRUCTION}"
+            )
+            logger.debug(
+                t(LOG_VISION_AGENT_SENDING_REGION).format(
+                    page_num=self.page_num,
+                    size=len(self.image_bytes),
+                    type=self.label,
+                )
+            )
+            response, should_retry = await self._invoke_model(attempt_prompt)
+            if should_retry:
+                continue
+            output, should_retry = await self._validate_response(response)
+            if should_retry:
+                continue
+            assert output is not None
+            if self.attempt > 1:
+                logger.info(
+                    t(LOG_VISION_AGENT_REGION_RECOVERED).format(
+                        page_num=self.page_num,
+                        type=self.label,
+                        attempt=self.attempt,
+                        attempts=REGION_ATTEMPTS,
+                    )
+                )
+            return output
+        raise AssertionError("REGION_ATTEMPTS must be at least 1")
+
+
 async def _run_with_retry(
     prompt: str,
     image_bytes: bytes,
@@ -300,148 +512,21 @@ async def _run_with_retry(
     """Ask the vision model for ``schema``, retrying answers that fail validation.
 
     A region gets ``REGION_ATTEMPTS`` answer tries; a context overflow gets one
-    smaller-image retry without consuming an answer try. A rate-limit rejection
-    does not consume one of them — it says the provider is busy, nothing about the
-    answer — and gets its own smaller budget of backed-off retries instead. A
-    call that runs out of time gets ``_TIMEOUT_RETRIES`` more, on the same
-    grounds: a stalled provider says nothing about the image. Any other error
-    (provider failure, incomplete run) fails at once.
-    Each call also has a hard wall-clock deadline, because the client's HTTP
-    timeout is applied per read and a provider that trickles bytes can outlive
-    it.
+    smaller-image retry without consuming an answer try. Rate-limit rejections
+    and timeouts get their own separate retry budgets. Any other error fails at
+    once, and each call has a hard wall-clock deadline.
     """
-    attempt = 0
-    rate_limit_retries = 0
-    timeout_retries = 0
-    context_retries = 0
-
-    async def retry_after_context_overflow(error: BaseException) -> bool:
-        nonlocal attempt, context_retries, image_bytes, max_tokens
-        if (
-            context_retries >= _CONTEXT_OVERFLOW_RETRIES
-            or not _is_context_overflow(error)
-        ):
-            return False
-        smaller_image = await _downscale_image(image_bytes, toolbox)
-        if smaller_image is None:
-            return False
-
-        size_before = len(image_bytes)
-        image_bytes = smaller_image
-        fallback_max_tokens = _context_retry_max_tokens(
-            label, max_tokens, models.vision_region_max_tokens
-        )
-        if fallback_max_tokens is not None:
-            max_tokens = fallback_max_tokens
-        context_retries += 1
-        attempt -= 1  # a context rejection says nothing about the answer
-        logger.warning(
-            t(LOG_VISION_AGENT_CONTEXT_RETRY).format(
-                page_num=page_num,
-                type=label,
-                size_before=size_before,
-                size_after=len(image_bytes),
-                max_tokens=(
-                    max_tokens if max_tokens is not None else "provider default"
-                ),
-                error=_failure_summary(error),
-            )
-        )
-        return True
-
-    while attempt < REGION_ATTEMPTS:
-        attempt += 1
-        attempt_prompt = prompt if attempt == 1 else f"{prompt}\n\n{RETRY_INSTRUCTION}"
-        logger.debug(
-            t(LOG_VISION_AGENT_SENDING_REGION).format(
-                page_num=page_num,
-                size=len(image_bytes),
-                type=label,
-            )
-        )
-        model_options = {"max_tokens": max_tokens, "max_retries": 0}
-        if context_retries and _is_whole_page(label):
-            # A small recovery cap must leave tokens for the actual answer.
-            model_options["reasoning_enabled"] = False
-        agent = Agent(
-            name="VisionAgent",
-            model=get_agno_model(models, toolbox, **model_options),
-            output_schema=schema,
-            telemetry=False,
-        )
-        run = functools.partial(
-            agent.run, input=attempt_prompt, images=[Image(content=image_bytes)]
-        )
-        try:
-            response = await model_calls.run(
-                run, timeout=model_call_deadline(models.model_call_timeout_seconds),
-                label=f"VisionAgent/{label}/page-{page_num}",
-            )
-        except TimeoutError as error:
-            # The runner distinguishes its deadline from a provider's own
-            # TimeoutError; both retain the existing retry budget here.
-            if timeout_retries < _TIMEOUT_RETRIES:
-                timeout_retries += 1
-                attempt -= 1  # a stalled provider says nothing about the answer
-                logger.warning(
-                    t(LOG_VISION_AGENT_TIMEOUT_RETRY).format(
-                        page_num=page_num,
-                        type=label,
-                        retry=timeout_retries,
-                        retries=_TIMEOUT_RETRIES,
-                        error=error,
-                    )
-                )
-                continue
-            raise
-        except Exception as error:
-            if await retry_after_context_overflow(error):
-                continue
-            if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
-                rate_limit_retries += 1
-                attempt -= 1  # a rate limit says nothing about the answer
-                await _wait_out_rate_limit(page_num, label, error, rate_limit_retries)
-                continue
-            raise
-        try:
-            output = validate_structured_run(response, schema)
-        except ValidationError as error:
-            if attempt == REGION_ATTEMPTS:
-                raise
-            logger.warning(
-                t(LOG_VISION_AGENT_REGION_RETRY).format(
-                    page_num=page_num,
-                    type=label,
-                    attempt=attempt + 1,
-                    attempts=REGION_ATTEMPTS,
-                    error=_short_error(error),
-                )
-            )
-            continue
-        except RunIncompleteError as error:
-            if await retry_after_context_overflow(error):
-                continue
-            if _is_rate_limited(error) and rate_limit_retries < _RATE_LIMIT_RETRIES:
-                rate_limit_retries += 1
-                attempt -= 1  # a rate limit says nothing about the answer
-                await _wait_out_rate_limit(page_num, label, error, rate_limit_retries)
-                continue
-            raise
-        except Exception as error:
-            if await retry_after_context_overflow(error):
-                continue
-            raise
-        if attempt > 1:
-            logger.info(
-                t(LOG_VISION_AGENT_REGION_RECOVERED).format(
-                    page_num=page_num,
-                    type=label,
-                    attempt=attempt,
-                    attempts=REGION_ATTEMPTS,
-                )
-            )
-        return output
-    raise AssertionError("REGION_ATTEMPTS must be at least 1")
+    return await _VisionRetryRunner(
+        prompt,
+        image_bytes,
+        schema,
+        page_num=page_num,
+        label=label,
+        toolbox=toolbox,
+        model_calls=model_calls,
+        models=models,
+        max_tokens=max_tokens,
+    ).run()
 
 
 #: Pattern identifying a provider rate-limit rejection (HTTP 429) in the error
