@@ -1,4 +1,8 @@
-# Trivy ignore file read by .github/workflows/security.yml (container-scan).
-# No active CVE exceptions are required on the pinned python:3.12-slim base
-# image; the former CVE-2025-47273 exception for python:3.11-slim's preinstalled
-# setuptools 70.3.0 was retired with the Python 3.12 image migration (#170).
+# Verified on python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+# (CI run 44812795445 / job 136553357549): even though the runtime stage upgrades
+# /usr/local/lib/python3.12/site-packages to setuptools >= 84 (0 findings on its
+# dist-info METADATA), Trivy v0.69.3 still reports CVE-2025-47273 (setuptools
+# 70.3.0) under the aggregated "Python (python-pkg)" target from pip's vendored
+# inventory metadata (pip/_vendor/vendor.txt). Remove this exception once the
+# upstream inventory / base image no longer records setuptools < 78.1.1.
+CVE-2025-47273
