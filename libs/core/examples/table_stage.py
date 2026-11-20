@@ -127,6 +127,7 @@ def explicit_config(*, toolbox_url: str, data_dir: Path) -> CoreConfig:
             object_markers_enabled=False,
             toolbox_docx_enabled=True,
             toolbox_pdf_ua_enabled=True,
+            toolbox_pdf_ua_math_bisect_budget=8,
         ),
         paths=PathsConfig(data_dir=data_dir),
     )

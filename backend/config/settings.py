@@ -323,6 +323,16 @@ class Settings:
     toolbox_pdf_ua_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("TOOLBOX_PDF_UA_TIMEOUT_SECONDS", "300"))
     )
+    # Max remote retry renders spent isolating failing PDF/UA formulas on
+    # ToolboxInvalidInput (#258). Worst-case wall time is
+    # (1 + budget) * TOOLBOX_PDF_UA_TIMEOUT_SECONDS; 8 isolates a single bad
+    # formula in 16-32 formulas while keeping retries bounded. Set to 1 for a
+    # single all-degraded retry or 0 to disable retries.
+    toolbox_pdf_ua_math_bisect_budget: int = field(
+        default_factory=lambda: max(
+            0, int(os.getenv("TOOLBOX_PDF_UA_MATH_BISECT_BUDGET", "8"))
+        )
+    )
     toolbox_pdf_validate_provider: str = field(
         default_factory=lambda: os.getenv(
             "TOOLBOX_PDF_VALIDATE_PROVIDER",

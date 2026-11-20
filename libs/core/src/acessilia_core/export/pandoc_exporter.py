@@ -11,6 +11,7 @@ for catalog generation.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -19,13 +20,17 @@ from docstruct.validation import validate_against_schema
 
 from docstruct.export.filters import strip_internal_audit_blocks
 from docstruct.export.pandoc_ast import build_pandoc_ast
+from docstruct.export.pandoc_ast import count_math_nodes
 from docstruct.export.pandoc_ast import degrade_math_to_text
+from docstruct.export.pandoc_ast import unconverted_math_indices
 
 from acessilia_core.config import ExportConfig, ToolboxConfig
 from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
+from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED
+from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_PARTIALLY_DEGRADED
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from acessilia_core.export.messages import (
     MSG_AUDIT_FAILED,
@@ -44,6 +49,13 @@ from acessilia_core.logger import logger
 
 #: BCP 47 language for the document metadata when the document declares none.
 DEFAULT_EXPORT_LANG = "pt-BR"
+#: Default upper bound on Toolbox retry renders spent isolating failing PDF/UA
+#: formulas (#258). Each retry is a full remote PDF/UA render, so worst-case
+#: wall time is ``(1 + budget) * TOOLBOX_PDF_UA_TIMEOUT_SECONDS`` (~45 min at
+#: budget=8 and 300s timeout, though rejected LaTeX renders typically fail fast
+#: and a timeout immediately aborts without retrying). Deployments tune this via
+#: ``ExportConfig.toolbox_pdf_ua_math_bisect_budget`` (``TOOLBOX_PDF_UA_MATH_BISECT_BUDGET``).
+_MAX_MATH_BISECT_ATTEMPTS = 8
 
 
 def _toolbox_export(
@@ -136,6 +148,8 @@ def _render_pdf_ua(
     enabled: bool,
     toolbox: ToolboxConfig,
     lang: str = DEFAULT_EXPORT_LANG,
+    max_bisect_attempts: int | None = None,
+    check_cancelled: Callable[[], None] | None = None,
 ) -> Path:
     """Renders PDF/UA on the Toolbox, which pins Pandoc and TeX Live in its image.
 
@@ -147,6 +161,10 @@ def _render_pdf_ua(
         ast (dict): Pandoc JSON AST mapping for the canonical document.
         output_path (Path): Destination PDF file path.
         lang (str): BCP 47 tag written to the PDF metadata.
+        max_bisect_attempts (int | None): Cap on retry renders for per-formula math
+            isolation; ``None`` reads ``_MAX_MATH_BISECT_ATTEMPTS``.
+        check_cancelled (Callable[[], None] | None): Optional callback checked before
+            each retry render; raising aborts isolation immediately.
 
     Returns:
         Path: The output_path where the PDF/UA file was written.
@@ -154,8 +172,10 @@ def _render_pdf_ua(
     Raises:
         RuntimeError: When TOOLBOX_PDF_UA_ENABLED is false.
         acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF. An input
-            rejection (``ToolboxInvalidInput``) gets one retry with the math exported as literal text, so a
-            formula the LaTeX compiler rejects cannot lose the whole document; a second rejection propagates.
+            rejection (``ToolboxInvalidInput``) degrades only the offending math formulas to literal text
+            (trying formulas ``math.convert`` did not convert first when focused, then bounded
+            largest-chunk-first bisection, falling back to a verified degraded subset when the budget
+            runs out); a rejection not caused by math propagates.
     """
     if not enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
@@ -164,23 +184,166 @@ def _render_pdf_ua(
     try:
         toolbox_export_pdf_ua(ast, output_path, lang=lang, toolbox=toolbox)
     except ToolboxInvalidInput as exc:
-        # ToolboxInvalidInput means the request reached a healthy renderer and
-        # the AST itself is the problem — but not every rejection is about
-        # math. When the AST carries no Math inline left (the builder guard
-        # already exports the dangerous ones as text), the degradation changes
-        # nothing and a retry would resend the identical request, so the
-        # rejection propagates instead.
-        degraded = degrade_math_to_text(ast)
-        if degraded == ast:
-            raise
-        # Math the renderer's LaTeX compiler rejects, e.g. \chemfig from a
-        # chemical structure a vision model classified as a formula. The retry
-        # is a deterministic degradation, not a failover — the formulas go as
-        # literal text, the way the HTML and TXT renderers already show them.
-        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=exc))
-        toolbox_export_pdf_ua(degraded, output_path, lang=lang, toolbox=toolbox)
+        _recover_pdf_ua_math(
+            ast,
+            output_path,
+            lang=lang,
+            toolbox=toolbox,
+            initial_error=exc,
+            max_bisect_attempts=max_bisect_attempts,
+            check_cancelled=check_cancelled,
+        )
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
+
+
+def _recover_pdf_ua_math(
+    ast: dict[str, Any],
+    output_path: Path,
+    *,
+    lang: str,
+    toolbox: ToolboxConfig,
+    initial_error: Exception,
+    max_bisect_attempts: int | None = None,
+    check_cancelled: Callable[[], None] | None = None,
+) -> None:
+    """Retry PDF/UA rendering by degrading only the formulas the renderer rejects (#258).
+
+    ``ToolboxInvalidInput`` means the request reached a healthy renderer and
+    the AST itself is the problem — often a single formula with a macro the
+    template does not load (e.g. ``\\chemfig``). Rather than degrading every
+    formula in the document:
+
+    1. When the AST has no ``Math`` inline or the retry budget is 0, re-raise
+       ``initial_error`` without retrying.
+    2. With a single formula (or a retry budget of 1), degrade all math and
+       retry once; a second rejection propagates.
+    3. With several formulas, isolate the offending ones iteratively
+       (largest-chunk-first) within ``budget`` total recovery renders — every
+       retry, including the all-degraded fallback, counts against the budget
+       and checks ``check_cancelled`` before starting. A focused unconverted
+       subset from ``unconverted_math_indices`` (<= half the formulas) is used
+       as the first partition so a known-bad formula recovers in one retry.
+       Every successful probe writes a render-verified PDF to ``output_path``
+       and shrinks the degraded set, so exhausting the budget always leaves the
+       smallest verified PDF on disk and logs a distinct budget-exhausted
+       warning instead of overstating rejected formulas.
+    """
+    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
+
+    budget = _MAX_MATH_BISECT_ATTEMPTS if max_bisect_attempts is None else max(0, max_bisect_attempts)
+    total = count_math_nodes(ast)
+    if total == 0 or budget == 0:
+        raise initial_error
+
+    all_indices = frozenset(range(total))
+    attempts = 0
+    last_error: Exception = initial_error
+
+    def try_render(degraded: frozenset[int]) -> bool:
+        nonlocal attempts, last_error
+        if check_cancelled is not None:
+            check_cancelled()
+        attempts += 1
+        candidate_ast = degrade_math_to_text(ast, indices=degraded)
+        try:
+            toolbox_export_pdf_ua(candidate_ast, output_path, lang=lang, toolbox=toolbox)
+        except ToolboxInvalidInput as exc:
+            last_error = exc
+            return False
+        return True
+
+    if total == 1 or budget == 1:
+        if not try_render(all_indices):
+            raise last_error
+        if total == 1:
+            logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=initial_error))
+        else:
+            logger.warning(
+                t(LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED).format(
+                    attempts=attempts, degraded=total, total=total, error=initial_error
+                )
+            )
+        return
+
+    proven_bad: set[int] = set()
+    pending: list[list[int]] = []
+
+    def enqueue(chunk: list[int]) -> None:
+        if len(chunk) == 1:
+            proven_bad.add(chunk[0])
+        elif chunk:
+            pending.append(chunk)
+
+    # Re-walks source_document once per rejected PDF/UA export to build the
+    # suspect ordering hint. Only used when at most half the formulas lack
+    # MathML, so a transient math.convert outage falls back to a balanced split.
+    suspects = unconverted_math_indices(ast, target_format=PDF_UA.spec.id)
+    if 0 < len(suspects) <= total // 2:
+        right = sorted(suspects)
+        left = [idx for idx in range(total) if idx not in suspects]
+    else:
+        mid = total // 2
+        left = list(range(mid))
+        right = list(range(mid, total))
+
+    # Establish a verified working PDF on disk before refining chunks.
+    if try_render(frozenset(right)):
+        enqueue(right)
+    elif budget - attempts >= 2 and try_render(frozenset(left)):
+        enqueue(left)
+    else:
+        both_halves_probed = attempts >= 2
+        if not try_render(all_indices):
+            raise last_error
+        if both_halves_probed:
+            enqueue(left)
+            enqueue(right)
+        else:
+            pending.append(list(range(total)))
+
+    # Refine the largest unresolved chunk first so each successful probe rescues
+    # the biggest possible block of valid formulas within the retry budget.
+    # Invariant: output_path always holds the verified PDF for
+    # ``proven_bad | union(pending)``.
+    while pending and attempts < budget:
+        chunk_pos = max(range(len(pending)), key=lambda i: (len(pending[i]), -pending[i][0]))
+        chunk = pending.pop(chunk_pos)
+        mid = len(chunk) // 2
+        left = chunk[:mid]
+        right = chunk[mid:]
+        other = frozenset(proven_bad | {idx for rest in pending for idx in rest})
+
+        if try_render(other | frozenset(right)):
+            enqueue(right)
+            continue
+        if attempts >= budget:
+            pending.append(chunk)
+            break
+        if try_render(other | frozenset(left)):
+            enqueue(left)
+            continue
+        enqueue(left)
+        enqueue(right)
+
+    degraded_indices = frozenset(proven_bad | {idx for rest in pending for idx in rest})
+    if pending:
+        logger.warning(
+            t(LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED).format(
+                attempts=attempts,
+                degraded=len(degraded_indices),
+                total=total,
+                error=initial_error,
+            )
+        )
+    elif len(degraded_indices) == total:
+        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=initial_error))
+    else:
+        logger.warning(
+            t(LOG_PDF_UA_MATH_PARTIALLY_DEGRADED).format(
+                degraded=len(degraded_indices), total=total, error=initial_error
+            )
+        )
 
 
 def _validate_export_schema(document: dict[str, Any]) -> None:
@@ -210,6 +373,7 @@ def export_accessible_document(
     profile_name: str | None = None,
     export: ExportConfig | None = None,
     toolbox: ToolboxConfig | None = None,
+    check_cancelled: Callable[[], None] | None = None,
 ) -> Path:
     """Exports a canonical document (or raw markdown/text) to the named format.
 
@@ -264,8 +428,15 @@ def export_accessible_document(
             toolbox=_toolbox_config(toolbox, format_name), lang=lang,
         ),
         PDF_UA.spec.id: lambda: _render_pdf_ua(
-            ast, output_path, enabled=_export_config(export, format_name).toolbox_pdf_ua_enabled,
-            toolbox=_toolbox_config(toolbox, format_name), lang=lang,
+            ast,
+            output_path,
+            enabled=_export_config(export, format_name).toolbox_pdf_ua_enabled,
+            toolbox=_toolbox_config(toolbox, format_name),
+            lang=lang,
+            max_bisect_attempts=_export_config(
+                export, format_name
+            ).toolbox_pdf_ua_math_bisect_budget,
+            check_cancelled=check_cancelled,
         ),
     }
     render = renderers.get(format_name)

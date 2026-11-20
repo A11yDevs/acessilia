@@ -300,6 +300,9 @@ class JobExecutor:
         state_manager.atualizar(task_id, etapa=t(stage), progresso=progress)
         try:
             await self._run_in_executor(export_fn, canonical, path, filename)
+        except TaskCancelledError:
+            _remove_partial_output(path)
+            raise
         except Exception as exc:
             if not optional:
                 raise
@@ -472,10 +475,15 @@ class JobExecutor:
                 path = out_dir / delivery.output_filename(base)
                 if delivery.spec.execution == "remote":
                     exporter, failed_log, skipped_log = remote_exports[step.format_id]
+                    export_kwargs: dict[str, Any] = {"export": export, "toolbox": toolbox}
+                    if step.format_id == PDF_UA.spec.id:
+                        export_kwargs["check_cancelled"] = functools.partial(
+                            state_manager.verificar_cancelamento, task_id
+                        )
                     paths[step.format_id] = await self._optional_toolbox_export(
                         task_id, enabled=getattr(export, step.requires_flag),
                         stage=step.stage_msgid, progress=step.progress,
-                        export_fn=functools.partial(exporter, export=export, toolbox=toolbox),
+                        export_fn=functools.partial(exporter, **export_kwargs),
                         canonical=delivered, path=path, filename=job.filename,
                         format_name=step.format_id, failed_log=failed_log, skipped_log=skipped_log,
                         completed_formats=completed_formats, optional_errors=optional_errors,

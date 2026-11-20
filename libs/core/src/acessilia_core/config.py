@@ -135,6 +135,7 @@ class ExportConfig:
     object_markers_enabled: bool
     toolbox_docx_enabled: bool
     toolbox_pdf_ua_enabled: bool
+    toolbox_pdf_ua_math_bisect_budget: int
 
 
 @dataclass(frozen=True)

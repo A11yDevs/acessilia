@@ -199,6 +199,8 @@ from acessilia_core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
+    LOG_PDF_UA_MATH_PARTIALLY_DEGRADED,
+    LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -897,6 +899,8 @@ MESSAGES: tuple[str, ...] = (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
+    LOG_PDF_UA_MATH_PARTIALLY_DEGRADED,
+    LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -1894,9 +1898,20 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_PDF_UA_EXPORTED: "PDF/UA exportado: {output_path}",
         # Toolbox-first PDF/UA rendering; {output_path} the destination file path.
         LOG_PDF_UA_TOOLBOX_EXPORTED: "PDF/UA renderizado pela Toolbox: {output_path}",
-        # The Toolbox rejected the AST's math and the export retries with the formulas as text; {error} the cause.
+        # The Toolbox rejected the AST's math and the export succeeded with all formulas as literal text.
         LOG_PDF_UA_MATH_DEGRADED: (
-            "A Toolbox rejeitou a matemática do PDF/UA; tentando de novo com as fórmulas como texto: {error}"
+            "A Toolbox rejeitou a matemática do PDF/UA; exportado com as fórmulas como texto literal: {error}"
+        ),
+        # The Toolbox rejected part of the AST's math and only the offending formulas were degraded.
+        LOG_PDF_UA_MATH_PARTIALLY_DEGRADED: (
+            "A Toolbox rejeitou parte da matemática do PDF/UA; exportado com {degraded} de {total} "
+            "fórmula(s) como texto literal: {error}"
+        ),
+        # Per-formula math isolation hit the retry budget before isolating every remaining chunk.
+        LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED: (
+            "O isolamento de matemática do PDF/UA atingiu o limite de {attempts} renderização(ões); "
+            "exportado com {degraded} de {total} fórmula(s) como texto literal "
+            "(algumas não foram isoladas individualmente): {error}"
         ),
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",

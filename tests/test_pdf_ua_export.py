@@ -364,9 +364,11 @@ def test_only_an_input_rejection_retries(monkeypatch, tmp_path, error):
 
 
 def test_a_second_rejection_propagates(monkeypatch, tmp_path):
-    """One retry is the whole contract: if the degraded AST is rejected too,
-    that is a real failure, not another degradation to attempt."""
+    """One retry is the whole contract for a single formula (multi-formula
+    documents use bounded bisection): if the degraded AST is rejected too,
+    that is a real failure and propagates without logging a false recovery."""
     calls = []
+    warnings: list[str] = []
 
     def failing_toolbox(ast, output_path, *, lang, toolbox):
         calls.append(ast)
@@ -375,6 +377,7 @@ def test_a_second_rejection_propagates(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", failing_toolbox
     )
+    monkeypatch.setattr(pandoc_exporter.logger, "warning", lambda msg, *a, **kw: warnings.append(str(msg)))
 
     with pytest.raises(
         ToolboxInvalidInput, match=re.escape("pandoc failed (attempt 2)")
@@ -382,6 +385,7 @@ def test_a_second_rejection_propagates(monkeypatch, tmp_path):
         _export_math_document(tmp_path)
 
     assert len(calls) == 2
+    assert not warnings
 
 
 def test_an_ast_without_math_does_not_retry(monkeypatch, tmp_path):
@@ -434,3 +438,467 @@ def test_the_format_needs_the_run_toolbox_config(tmp_path):
         pandoc_exporter.export_accessible_document(
             "# Report\n", tmp_path / "doc.pdf_ua.pdf", format_name="pdf_ua", export=export_config(),
         )
+
+
+# ── Per-formula PDF/UA degradation (#258) ───────────────────────────────
+
+
+def _all_math_nodes(node: object) -> list[dict]:
+    if isinstance(node, list):
+        return [found for item in node for found in _all_math_nodes(item)]
+    if isinstance(node, dict):
+        if node.get("t") == "Math":
+            return [node]
+        if "c" in node:
+            return _all_math_nodes(node["c"])
+        if "blocks" in node:
+            return _all_math_nodes(node["blocks"])
+    return []
+
+
+def _all_math_latex(ast_doc: dict) -> list[str]:
+    return [str(math["c"][1]) for math in _all_math_nodes(ast_doc["blocks"])]
+
+
+def _all_formula_span_alts(node: object) -> list[str]:
+    if isinstance(node, list):
+        return [alt for item in node for alt in _all_formula_span_alts(item)]
+    if isinstance(node, dict):
+        if node.get("t") == "Span":
+            attrs = node["c"][0]
+            if len(attrs) > 1 and "accessilia-formula" in (attrs[1] or []):
+                return [dict(attrs[2]).get("alt", "")]
+        if "c" in node:
+            return _all_formula_span_alts(node["c"])
+        if "blocks" in node:
+            return _all_formula_span_alts(node["blocks"])
+    return []
+
+
+def _multi_formula_doc(
+    formulas: list[str],
+    *,
+    mathml_indices: set[int] | None = None,
+    with_alt: bool = False,
+) -> dict:
+    mathml = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>'
+    blocks = []
+    for idx, latex in enumerate(formulas):
+        block: dict = {"id": f"m-{idx}", "type": "math", "text": latex}
+        if with_alt:
+            block["alt_text"] = f"Formula {idx}"
+        if mathml_indices is not None and idx in mathml_indices:
+            block["metadata"] = {"mathml": mathml}
+        blocks.append(block)
+    return {
+        "id": "doc-multi",
+        "schema_version": "1.0.0",
+        "title": "Report",
+        "language": "en-US",
+        "sections": [
+            {
+                "id": "sec-1",
+                "level": 1,
+                "title": "Formulas",
+                "blocks": blocks,
+                "children": [],
+            }
+        ],
+    }
+
+
+def _export_document(
+    document: dict,
+    tmp_path: Path,
+    *,
+    bisect_budget: int | None = None,
+    check_cancelled=None,
+) -> Path:
+    export_kwargs = {}
+    if bisect_budget is not None:
+        export_kwargs["toolbox_pdf_ua_math_bisect_budget"] = bisect_budget
+    return pandoc_exporter.export_accessible_document(
+        document,
+        tmp_path / "doc.pdf_ua.pdf",
+        format_name="pdf_ua",
+        title="Report",
+        export=export_config(**export_kwargs),
+        toolbox=toolbox_config(),
+        check_cancelled=check_cancelled,
+    )
+
+
+def test_one_bad_formula_keeps_every_other_formula_typeset(monkeypatch, tmp_path):
+    """#258 acceptance: a document with one unrenderable formula keeps every
+    other formula typeset in the PDF/UA, even without MathML metadata."""
+    formulas = [f"x_{i} = {i}" for i in range(6)]
+    formulas[4] = r"\chemfig{H-O-H}"
+    doc = _multi_formula_doc(formulas, with_alt=True)
+    succeeded: list[dict] = []
+
+    def fake_toolbox(ast_doc, output_path, *, lang, toolbox):
+        if any(r"\chemfig" in latex for latex in _all_math_latex(ast_doc)):
+            raise ToolboxInvalidInput("pandoc failed: Undefined control sequence \\chemfig")
+        succeeded.append(ast_doc)
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_document(doc, tmp_path)
+
+    assert output.read_bytes() == PDF
+    final_ast = succeeded[-1]
+    assert _all_math_latex(final_ast) == [f"x_{i} = {i}" for i in range(6) if i != 4]
+    # Every surviving formula keeps its Formula alternate text; the degraded one does not.
+    assert _all_formula_span_alts(final_ast) == [f"Formula {i}" for i in range(6) if i != 4]
+    assert "chemfig" in json.dumps(final_ast["blocks"])
+
+
+def test_one_bad_inline_formula_keeps_display_and_other_inline_math(monkeypatch, tmp_path):
+    """Per-formula degradation also isolates a bad inline formula inside prose
+    or a table cell without degrading surrounding display or inline math."""
+    doc = {
+        "id": "doc-inline",
+        "schema_version": "1.0.0",
+        "title": "Report",
+        "language": "en-US",
+        "sections": [
+            {
+                "id": "sec-1",
+                "level": 1,
+                "title": "Section",
+                "blocks": [
+                    {
+                        "id": "m-1",
+                        "type": "math",
+                        "text": "E = mc^2",
+                        "alt_text": "Formula: E equals m c squared",
+                    },
+                    {
+                        "id": "p-1",
+                        "type": "paragraph",
+                        "text": r"Here $a+b$ works and $\chemfig{H-O-H}$ fails.",
+                    },
+                    {
+                        "id": "t-1",
+                        "type": "table",
+                        "table_ast": {
+                            "caption": "Values of $x^2$",
+                            "body": [{"cells": [{"text": "Result $y = 2x$"}]}],
+                        },
+                    },
+                ],
+                "children": [],
+            }
+        ],
+    }
+    succeeded: list[dict] = []
+
+    def fake_toolbox(ast_doc, output_path, *, lang, toolbox):
+        if any(r"\chemfig" in latex for latex in _all_math_latex(ast_doc)):
+            raise ToolboxInvalidInput("Undefined control sequence \\chemfig")
+        succeeded.append(ast_doc)
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_document(doc, tmp_path)
+
+    assert output.read_bytes() == PDF
+    final_ast = succeeded[-1]
+    assert _all_math_latex(final_ast) == ["E = mc^2", "a+b", "x^2", "y = 2x"]
+    assert _all_formula_span_alts(final_ast) == ["Formula: E equals m c squared"]
+    assert "chemfig" in json.dumps(final_ast["blocks"])
+
+
+def test_unconverted_math_suspect_degrades_in_one_retry(monkeypatch, tmp_path):
+    """Option 1 (#258): when math.convert converted every formula except the
+    offending one, degrading that single suspect succeeds in two total calls."""
+    formulas = [f"x_{i} = {i}" for i in range(16)]
+    formulas[11] = r"\chemfig{C-C}"
+    doc = _multi_formula_doc(formulas, mathml_indices=set(range(16)) - {11})
+    rendered: list[dict] = []
+
+    def fake_toolbox(ast_doc, output_path, *, lang, toolbox):
+        rendered.append(ast_doc)
+        if any(r"\chemfig" in latex for latex in _all_math_latex(ast_doc)):
+            raise ToolboxInvalidInput("Undefined control sequence \\chemfig")
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_document(doc, tmp_path)
+
+    assert output.read_bytes() == PDF
+    assert len(rendered) == 2
+    assert _all_math_latex(rendered[-1]) == [f"x_{i} = {i}" for i in range(16) if i != 11]
+
+
+def test_false_mathml_suspect_falls_back_to_bisect_and_keeps_good_formulas(monkeypatch, tmp_path):
+    """If the unconverted formula actually compiles and a converted one is what
+    LuaLaTeX rejects, bisection still isolates only the real offender."""
+    formulas = ["a=1", "b=2", r"\ce{H2O}", "d=4"]
+    # Formula 0 lacks MathML (false suspect), while formula 2 is what LuaLaTeX rejects.
+    doc = _multi_formula_doc(formulas, mathml_indices={1, 2, 3})
+    rendered: list[dict] = []
+
+    def fake_toolbox(ast_doc, output_path, *, lang, toolbox):
+        rendered.append(ast_doc)
+        if any(r"\ce" in latex for latex in _all_math_latex(ast_doc)):
+            raise ToolboxInvalidInput("Undefined control sequence \\ce")
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_document(doc, tmp_path)
+
+    assert output.read_bytes() == PDF
+    assert _all_math_latex(rendered[-1]) == ["a=1", "b=2", "d=4"]
+
+
+def test_multiple_bad_formulas_in_both_halves_are_isolated(monkeypatch, tmp_path):
+    """When offending formulas appear in both halves of the document, bisection
+    finds all of them while keeping every good formula typeset."""
+    formulas = [r"\chemfig{A}", "x=1", "y=2", r"\ce{B}", "z=3", "w=4"]
+    doc = _multi_formula_doc(formulas)
+    rendered: list[dict] = []
+
+    def fake_toolbox(ast_doc, output_path, *, lang, toolbox):
+        rendered.append(ast_doc)
+        latexes = _all_math_latex(ast_doc)
+        if any(r"\chemfig" in item or r"\ce" in item for item in latexes):
+            raise ToolboxInvalidInput("Undefined control sequence")
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_document(doc, tmp_path)
+
+    assert output.read_bytes() == PDF
+    assert _all_math_latex(rendered[-1]) == ["x=1", "y=2", "z=3", "w=4"]
+
+
+def test_non_math_rejection_on_multi_formula_document_fails_fast(monkeypatch, tmp_path):
+    """When degrading all math still fails, the rejection is not about math:
+    bisection stops immediately after verifying all-degraded fails."""
+    doc = _multi_formula_doc([f"x_{i} = {i}" for i in range(16)])
+    calls: list[dict] = []
+
+    def always_reject(ast_doc, output_path, *, lang, toolbox):
+        calls.append(ast_doc)
+        raise ToolboxInvalidInput("broken document metadata")
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", always_reject
+    )
+
+    with pytest.raises(ToolboxInvalidInput, match="broken document metadata"):
+        _export_document(doc, tmp_path)
+
+    # Initial + left half + right half + all degraded = 4 calls regardless of formula count.
+    assert len(calls) == 4
+
+
+def test_bisection_render_count_is_strictly_bounded(monkeypatch, tmp_path):
+    """Even when every formula in a large document fails, retries stay strictly
+    within ``1 + budget`` total calls (including the all-degraded fallback)."""
+    budget = 6
+    doc = _multi_formula_doc([rf"\badmacro{{{i}}}" for i in range(20)])
+    calls: list[dict] = []
+    succeeded: list[dict] = []
+
+    def reject_any_math(ast_doc, output_path, *, lang, toolbox):
+        calls.append(ast_doc)
+        if _all_math_latex(ast_doc):
+            raise ToolboxInvalidInput("Undefined control sequence \\badmacro")
+        succeeded.append(ast_doc)
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", reject_any_math
+    )
+
+    output = _export_document(doc, tmp_path, bisect_budget=budget)
+
+    assert output.read_bytes() == PDF
+    assert len(calls) <= 1 + budget
+    assert succeeded and not _all_math_latex(succeeded[-1])
+
+
+def test_budget_exhaustion_keeps_rescued_formulas_and_logs_distinct_warning(monkeypatch, tmp_path):
+    """When the retry budget runs out before isolating every chunk, the final
+    PDF comes from the smallest render-verified AST (preserving already-rescued
+    good formulas) and logs a budget-exhausted warning rather than claiming
+    every degraded formula was individually rejected (#258)."""
+    bad_indices = {5, 7, 16, 51}
+    formulas = [
+        rf"\bad{{{i}}}" if i in bad_indices else f"x_{i} = {i}"
+        for i in range(60)
+    ]
+    doc = _multi_formula_doc(formulas)
+    calls: list[dict] = []
+    succeeded: list[dict] = []
+    warnings: list[str] = []
+
+    def reject_bad(ast_doc, output_path, *, lang, toolbox):
+        calls.append(ast_doc)
+        if any(r"\bad{" in latex for latex in _all_math_latex(ast_doc)):
+            raise ToolboxInvalidInput("Undefined control sequence \\bad")
+        succeeded.append(ast_doc)
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", reject_bad
+    )
+    monkeypatch.setattr(pandoc_exporter.logger, "warning", lambda msg, *a, **kw: warnings.append(str(msg)))
+
+    output = _export_document(doc, tmp_path, bisect_budget=8)
+
+    assert output.read_bytes() == PDF
+    assert len(calls) <= 1 + 8
+    # The final file on disk was written by a render-verified AST that rescued clean blocks.
+    kept = _all_math_latex(succeeded[-1])
+    assert len(kept) >= 15
+    assert all(r"\bad{" not in latex for latex in kept)
+    # Warning clearly reports budget exhaustion instead of overstating rejections.
+    assert len(warnings) == 1
+    assert "8-render budget" in warnings[0]
+    assert "not individually isolated" in warnings[0]
+
+
+def test_default_bisect_cap_reads_module_constant_dynamically(monkeypatch, tmp_path):
+    """Calling ``_render_pdf_ua`` without an explicit cap reads
+    ``_MAX_MATH_BISECT_ATTEMPTS`` at call time (not import time)."""
+    from docstruct.export.pandoc_ast import build_pandoc_ast
+
+    doc = _multi_formula_doc([rf"\bad{{{i}}}" for i in range(8)])
+    ast_doc = build_pandoc_ast(doc, target_format="pdf_ua")
+    calls: list[dict] = []
+
+    def reject_any_math(candidate, output_path, *, lang, toolbox):
+        calls.append(candidate)
+        if _all_math_latex(candidate):
+            raise ToolboxInvalidInput("Undefined control sequence \\bad")
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", reject_any_math
+    )
+    monkeypatch.setattr(pandoc_exporter, "_MAX_MATH_BISECT_ATTEMPTS", 2)
+
+    output = pandoc_exporter._render_pdf_ua(
+        ast_doc, tmp_path / "doc.pdf_ua.pdf", enabled=True, toolbox=toolbox_config()
+    )
+
+    assert output.read_bytes() == PDF
+    assert len(calls) <= 1 + 2
+
+
+def test_cancellation_aborts_bisection_before_next_retry(monkeypatch, tmp_path):
+    """A user cancellation checked between retry renders stops bisection
+    immediately instead of holding the worker across the remaining budget."""
+    class _Cancelled(Exception):
+        pass
+
+    doc = _multi_formula_doc([f"x_{i} = {i}" for i in range(8)])
+    calls: list[dict] = []
+
+    def reject_all(ast_doc, output_path, *, lang, toolbox):
+        calls.append(ast_doc)
+        raise ToolboxInvalidInput("Undefined control sequence")
+
+    def check_cancelled() -> None:
+        if len(calls) >= 2:
+            raise _Cancelled("job cancelled")
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", reject_all
+    )
+
+    with pytest.raises(_Cancelled, match="job cancelled"):
+        _export_document(doc, tmp_path, check_cancelled=check_cancelled)
+
+    # Initial attempt + 1 retry before cancellation stopped the second retry.
+    assert len(calls) == 2
+
+
+def test_transient_math_convert_outage_falls_back_to_balanced_split(monkeypatch, tmp_path):
+    """When most formulas lack MathML (> half, e.g. transient math.convert outage),
+    bisection uses a balanced 50/50 split rather than a skewed suspect probe."""
+    formulas = [f"x_{i} = {i}" for i in range(8)]
+    formulas[7] = r"\chemfig{A}"
+    # Only formula 0 has MathML (7 of 8 unconverted -> > half).
+    doc = _multi_formula_doc(formulas, mathml_indices={0})
+    calls: list[dict] = []
+    succeeded: list[dict] = []
+
+    def fake_toolbox(ast_doc, output_path, *, lang, toolbox):
+        calls.append(ast_doc)
+        if any(r"\chemfig" in latex for latex in _all_math_latex(ast_doc)):
+            raise ToolboxInvalidInput("Undefined control sequence \\chemfig")
+        succeeded.append(ast_doc)
+        output_path.write_bytes(PDF)
+        return {"artifact_id": PDF_ID}
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", fake_toolbox
+    )
+
+    output = _export_document(doc, tmp_path)
+
+    assert output.read_bytes() == PDF
+    # First retry probed the balanced half (4 kept), not only formula 0 (1 kept).
+    assert len(_all_math_latex(calls[1])) == 4
+    assert _all_math_latex(succeeded[-1]) == [f"x_{i} = {i}" for i in range(7)]
+
+
+@pytest.mark.parametrize(("raw", "expected"), [(None, 8), ("4", 4), ("0", 0), ("-3", 0)])
+def test_toolbox_pdf_ua_math_bisect_budget_is_parsed_from_env(monkeypatch, raw, expected):
+    from backend.config.settings import Settings
+
+    if raw is None:
+        monkeypatch.delenv("TOOLBOX_PDF_UA_MATH_BISECT_BUDGET", raising=False)
+    else:
+        monkeypatch.setenv("TOOLBOX_PDF_UA_MATH_BISECT_BUDGET", raw)
+    assert Settings().toolbox_pdf_ua_math_bisect_budget == expected
+
+
+def test_non_input_error_during_bisection_propagates_immediately(monkeypatch, tmp_path):
+    """An outage or timeout during a bisection retry must propagate instead of
+    being treated as another formula rejection."""
+    doc = _multi_formula_doc(["a=1", r"\chemfig{A}", "b=2", "c=3"])
+    calls: list[dict] = []
+
+    def flaky_toolbox(ast_doc, output_path, *, lang, toolbox):
+        calls.append(ast_doc)
+        if len(calls) == 1:
+            raise ToolboxInvalidInput("Undefined control sequence \\chemfig")
+        raise ToolboxTimeout("renderer timed out during retry")
+
+    monkeypatch.setattr(
+        "acessilia_core.export.pandoc_exporter.toolbox_export_pdf_ua", flaky_toolbox
+    )
+
+    with pytest.raises(ToolboxTimeout, match="renderer timed out during retry"):
+        _export_document(doc, tmp_path)
+
+    assert len(calls) == 2
+
