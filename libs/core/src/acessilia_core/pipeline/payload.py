@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from docstruct.blocks.callouts import callout_titles
 from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
@@ -30,6 +30,18 @@ from docstruct.geometry import reading_role
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
 
 from acessilia_core.execution.models import ExecutionReport
+from acessilia_core.i18n import (
+    locale_for_user,
+    n,
+    reset_request_locale,
+    set_request_locale,
+    t,
+)
+from acessilia_core.i18n.log_messages import (
+    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
+    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
+)
+from acessilia_core.logger import logger
 from acessilia_core.manifest.builder import (
     is_unstructured_page_placeholder,
 )
@@ -37,26 +49,16 @@ from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
 )
-from acessilia_core.planning.models import NominalPlan, PlanningComparison
-from acessilia_core.i18n import locale_for_user, n, reset_request_locale, set_request_locale, t
-from acessilia_core.i18n.log_messages import (
-    LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
-    MSG_STRUCTURAL_EXTRACTION_DEGRADED,
-)
-from acessilia_core.logger import logger
-from acessilia_core.pipeline.obligations import (
-    _unsatisfied_obligations,
-    _unsatisfied_summary,
-)
 from acessilia_core.pipeline.elements import (
     _element_bbox,
     _element_to_block,
     _text_kept_by_picture,
 )
-
-if TYPE_CHECKING:
-    pass
-
+from acessilia_core.pipeline.obligations import (
+    _unsatisfied_obligations,
+    _unsatisfied_summary,
+)
+from acessilia_core.planning.models import NominalPlan, PlanningComparison
 
 #: Canonical English msgid for an institutional header read as one paragraph:
 #: the logo, then its header lines; {lines} is substituted by callers after lookup.
@@ -77,6 +79,148 @@ MSG_TABLES_NOT_READ: tuple[str, str] = (
 )
 
 
+def _has_unrepaired_legacy_unicode(manifest: ProcessingManifest) -> bool:
+    observations = getattr(manifest, "observations", [])
+    obligations = getattr(manifest, "obligations", [])
+    return any(
+        observation.kind == "repair-legacy-unicode-detected"
+        for observation in observations
+    ) and not any(
+        obligation.kind == "repair-legacy-unicode"
+        for obligation in obligations
+    )
+
+
+def _collect_technical_warnings(
+    *,
+    manifest: ProcessingManifest,
+    execution_report: ExecutionReport | None,
+    comparison: PlanningComparison | None,
+    unsatisfied_obligations: list[dict[str, Any]],
+    visual_failures: dict[str, dict[str, int]] | None,
+    extraction_degraded: bool,
+    configuration: dict[str, Any],
+) -> list[str]:
+    technical_warnings: list[str] = []
+    if execution_report is None:
+        technical_warnings.append(
+            "Executor nao foi executado; somente manifesto e plano foram gerados."
+        )
+    elif execution_report.status in {"failed", "replan-required"} or unsatisfied_obligations:
+        # A replan that leaves an exhausted refinement out can still report
+        # `completed`; the open obligation must reach the document anyway. The
+        # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
+        technical_warnings.append(_unsatisfied_summary(manifest))
+
+    if comparison is not None:
+        technical_warnings.append(
+            f"Comparacao de planners: {comparison.comparison.verdict}."
+        )
+
+    for kind, msgids in (
+        ("pictures", MSG_PICTURES_NOT_DESCRIBED),
+        ("tables", MSG_TABLES_NOT_READ),
+    ):
+        if count := sum((visual_failures or {}).get(kind, {}).values()):
+            technical_warnings.append(n(*msgids, count).format(count=count))
+
+    if _has_unrepaired_legacy_unicode(manifest):
+        # Only the observation exists: LEGACY_UNICODE_REPAIR=detect. The
+        # warning names the switch because the job delivers the text as
+        # extracted, NFD and dotless-i included.
+        technical_warnings.append(
+            "Texto com sinais de Unicode legado (NFD, i sem ponto ou acento espaçador); "
+            "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
+        )
+
+    if extraction_degraded:
+        technical_warnings.append(
+            t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
+                provider=configuration.get("toolbox_provider", manifest.extractor.name)
+            )
+        )
+    return technical_warnings
+
+
+def _build_canonical_metadata(
+    *,
+    manifest: ProcessingManifest,
+    plan: NominalPlan,
+    execution_report: ExecutionReport | None,
+    comparison: PlanningComparison | None,
+    unsatisfied_obligations: list[dict[str, Any]],
+    toolbox_availability: dict[str, Any] | None,
+    fusion_status: dict[str, Any],
+    extraction_degraded: bool,
+    visual_failures: dict[str, dict[str, int]] | None,
+    media_inspection_status: Any,
+    configuration: dict[str, Any],
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "pipeline_engine": "pddl",
+        "pddl_validation_only": True,
+        "accessibility_verified": False,
+        "pddl_manifest_id": manifest.manifest_id,
+        "pddl_manifest_revision": manifest.revision,
+        "pddl_plan_id": plan.plan_id,
+        "pddl_planner": plan.planner,
+        "pddl_expected_total_cost": plan.expected_total_cost,
+        "pddl_execution_id": execution_report.execution_id if execution_report else None,
+        "pddl_execution_status": execution_report.status if execution_report else None,
+        "pddl_comparison_verdict": comparison.comparison.verdict if comparison else None,
+        "pddl_unsatisfied_obligations": unsatisfied_obligations,
+        # The open obligations a delivered document still has, for the
+        # result e-mail: the job page and e-mail show no technical warning.
+        "pddl_unsatisfied_summary": (
+            _unsatisfied_summary(manifest) if unsatisfied_obligations else None
+        ),
+        "pddl_toolbox_availability": toolbox_availability,
+        "pddl_fusion": fusion_status or None,
+    }
+    if extraction_degraded:
+        metadata["pddl_extraction_degraded"] = True
+        metadata["pddl_extraction_failures"] = configuration.get("extraction_failures", {})
+    # Pictures and tables left undescribed or unread, by reason; a rerun
+    # once the model provider or the Toolbox is back may deliver them.
+    metadata["pddl_visual_failures"] = visual_failures
+    metadata["pddl_media_inspection"] = (
+        {
+            "status": media_inspection_status,
+            "error": configuration.get("media_inspection_error"),
+            # Why a deck was structured slide by slide (or not).
+            "document_genre": configuration.get("document_genre"),
+            "genre_signals": configuration.get("genre_signals", []),
+        }
+        if media_inspection_status is not None
+        else None
+    )
+    return metadata
+
+
+def _is_payload_cacheable(
+    *,
+    media_inspection_status: Any,
+    fusion_status: dict[str, Any],
+    execution_report: ExecutionReport | None,
+    unsatisfied_obligations: list[dict[str, Any]],
+    visual_failures: dict[str, dict[str, int]] | None,
+    extraction_degraded: bool,
+) -> bool:
+    # A step degraded by a Toolbox or model failure must not be replayed
+    # from the cache once the service is back.
+    return (
+        media_inspection_status != "failed"
+        and fusion_status.get("status") != "degraded"
+        and execution_report is not None
+        and execution_report.status in {"completed", "dry-run-completed"}
+        and not any(
+            item["recovery"] != "human-review" for item in unsatisfied_obligations
+        )
+        and not records_visual_failures(visual_failures)
+        and not extraction_degraded
+    )
+
+
 def build_pddl_structured_payload(
     *,
     file_path: Path,
@@ -93,122 +237,48 @@ def build_pddl_structured_payload(
     media_inspection_status = configuration.get("media_inspection")
     fusion_status = configuration.get("fusion") or {}
     unsatisfied_obligations = _unsatisfied_obligations(manifest)
-
-    technical_warnings: list[str] = []
-    if execution_report is None:
-        technical_warnings.append(
-            "Executor nao foi executado; somente manifesto e plano foram gerados."
-        )
-    elif execution_report.status in {
-        "failed", "replan-required",
-    } or unsatisfied_obligations:
-        # A replan that leaves an exhausted refinement out can still report
-        # `completed`; the open obligation must reach the document anyway. The
-        # ids are in `pddl_unsatisfied_obligations`, so the warning stays short.
-        technical_warnings.append(_unsatisfied_summary(manifest))
-
-    if comparison is not None:
-        technical_warnings.append(
-            f"Comparacao de planners: {comparison.comparison.verdict}."
-        )
-
     visual_failures = _visual_failures(manifest)
-    for kind, msgids in (("pictures", MSG_PICTURES_NOT_DESCRIBED), ("tables", MSG_TABLES_NOT_READ)):
-        if count := sum((visual_failures or {}).get(kind, {}).values()):
-            technical_warnings.append(n(*msgids, count).format(count=count))
-
-    observations = getattr(manifest, "observations", [])
-    obligations = getattr(manifest, "obligations", [])
-    if any(
-        observation.kind == "repair-legacy-unicode-detected"
-        for observation in observations
-    ) and not any(
-        obligation.kind == "repair-legacy-unicode"
-        for obligation in obligations
-    ):
-        # Only the observation exists: LEGACY_UNICODE_REPAIR=detect. The
-        # warning names the switch because the job delivers the text as
-        # extracted, NFD and dotless-i included.
-        technical_warnings.append(
-            "Texto com sinais de Unicode legado (NFD, i sem ponto ou acento espaçador); "
-            "reparo desabilitado (LEGACY_UNICODE_REPAIR=detect)."
-        )
-
     extraction_degraded = records_extraction_degradation(
         configuration.get("extraction_degraded")
     )
-    if extraction_degraded:
-        technical_warnings.append(
-            t(MSG_STRUCTURAL_EXTRACTION_DEGRADED).format(
-                provider=configuration.get("toolbox_provider", manifest.extractor.name)
-            )
-        )
 
+    technical_warnings = _collect_technical_warnings(
+        manifest=manifest,
+        execution_report=execution_report,
+        comparison=comparison,
+        unsatisfied_obligations=unsatisfied_obligations,
+        visual_failures=visual_failures,
+        extraction_degraded=extraction_degraded,
+        configuration=configuration,
+    )
+    canonical_metadata = _build_canonical_metadata(
+        manifest=manifest,
+        plan=plan,
+        execution_report=execution_report,
+        comparison=comparison,
+        unsatisfied_obligations=unsatisfied_obligations,
+        toolbox_availability=toolbox_availability,
+        fusion_status=fusion_status,
+        extraction_degraded=extraction_degraded,
+        visual_failures=visual_failures,
+        media_inspection_status=media_inspection_status,
+        configuration=configuration,
+    )
     return {
         "text": text_output,
         "pages": pages_payload,
         "page_count": len(pages_payload),
         "mode": f"pddl-{planner_backend}",
         "source_path": str(file_path),
-        "canonical_metadata": {
-            "pipeline_engine": "pddl",
-            "pddl_validation_only": True,
-            "accessibility_verified": False,
-            "pddl_manifest_id": manifest.manifest_id,
-            "pddl_manifest_revision": manifest.revision,
-            "pddl_plan_id": plan.plan_id,
-            "pddl_planner": plan.planner,
-            "pddl_expected_total_cost": plan.expected_total_cost,
-            "pddl_execution_id": execution_report.execution_id
-            if execution_report
-            else None,
-            "pddl_execution_status": execution_report.status
-            if execution_report
-            else None,
-            "pddl_comparison_verdict": comparison.comparison.verdict
-            if comparison
-            else None,
-            "pddl_unsatisfied_obligations": unsatisfied_obligations,
-            # The open obligations a delivered document still has, for the
-            # result e-mail: the job page and e-mail show no technical warning.
-            "pddl_unsatisfied_summary": _unsatisfied_summary(manifest)
-            if unsatisfied_obligations
-            else None,
-            "pddl_toolbox_availability": toolbox_availability,
-            "pddl_fusion": fusion_status or None,
-            **(
-                {
-                    "pddl_extraction_degraded": True,
-                    "pddl_extraction_failures": configuration.get("extraction_failures", {}),
-                }
-                if extraction_degraded else {}
-            ),
-            # Pictures and tables left undescribed or unread, by reason; a rerun
-            # once the model provider or the Toolbox is back may deliver them.
-            "pddl_visual_failures": visual_failures,
-            "pddl_media_inspection": {
-                "status": media_inspection_status,
-                "error": configuration.get("media_inspection_error"),
-                # Why a deck was structured slide by slide (or not).
-                "document_genre": configuration.get("document_genre"),
-                "genre_signals": configuration.get("genre_signals", []),
-            }
-            if media_inspection_status is not None
-            else None,
-        },
+        "canonical_metadata": canonical_metadata,
         "technical_warnings": technical_warnings,
-        # A step degraded by a Toolbox or model failure must not be replayed
-        # from the cache once the service is back.
-        "cacheable": (
-            media_inspection_status != "failed"
-            and fusion_status.get("status") != "degraded"
-            and execution_report is not None
-            and execution_report.status in {"completed", "dry-run-completed"}
-            and not any(
-                item["recovery"] != "human-review" for item in unsatisfied_obligations
-            )
-            and not records_visual_failures(visual_failures)
-            and not extraction_degraded
+        "cacheable": _is_payload_cacheable(
+            media_inspection_status=media_inspection_status,
+            fusion_status=fusion_status,
+            execution_report=execution_report,
+            unsatisfied_obligations=unsatisfied_obligations,
+            visual_failures=visual_failures,
+            extraction_degraded=extraction_degraded,
         ),
     }
 
@@ -441,8 +511,72 @@ def _letterhead_block(
     return block
 
 
+def _elements_for_page_descriptor(
+    page_number: int,
+    element_ids: list[str],
+    manifest: ProcessingManifest,
+    elements_by_id: dict[str, ManifestElement],
+) -> list[ManifestElement]:
+    block_elements = [
+        elements_by_id[element_id]
+        for element_id in element_ids
+        if element_id in elements_by_id
+    ]
+    if block_elements:
+        return block_elements
+    # Some extractors can fill in pages without element_ids; in that
+    # case we fall back to page_number so no content is lost.
+    return [
+        element
+        for element in manifest.elements
+        if (element.page_number or 1) == page_number
+    ]
+
+
+def _group_elements_by_page(
+    manifest: ProcessingManifest,
+    *,
+    excluded_ids: set[str],
+) -> list[tuple[int, list[ManifestElement]]]:
+    if manifest.pages:
+        elements_by_id = {element.id: element for element in manifest.elements}
+        pages: list[tuple[int, list[ManifestElement]]] = []
+        for page in sorted(manifest.pages, key=lambda item: item.page_number):
+            raw_elements = _elements_for_page_descriptor(
+                page.page_number, page.element_ids, manifest, elements_by_id
+            )
+            kept = [
+                item
+                for item in raw_elements
+                if not _is_left_out_of_payload(item) and item.id not in excluded_ids
+            ]
+            pages.append((page.page_number, kept))
+        return pages
+
+    grouped: dict[int, list[ManifestElement]] = {}
+    for element in manifest.elements:
+        if _is_left_out_of_payload(element) or element.id in excluded_ids:
+            continue
+        grouped.setdefault(element.page_number or 1, []).append(element)
+    return [(page_number, grouped[page_number]) for page_number in sorted(grouped)]
+
+
+def _build_page_payload(
+    page_number: int,
+    page_elements: list[ManifestElement],
+    letterhead_blocks: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    ordered = sorted(page_elements, key=lambda item: item.reading_order)
+    blocks = _elements_to_blocks(ordered, letterhead_blocks)
+    _dedupe_callout_titles(blocks)
+    return {
+        "page_number": page_number,
+        "text": _render_text_from_blocks(blocks),
+        "blocks": blocks,
+    }
+
+
 def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, Any]]:
-    elements_by_id = {element.id: element for element in manifest.elements}
     page_numbers = _page_number_ids(manifest)
     letterheads = _letterhead_groups(manifest, page_numbers)
     #: Letterhead members other than the first, which carries the whole group.
@@ -455,70 +589,13 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
         key: _letterhead_block(members, manifest.language)
         for key, members in letterheads.items()
     }
-    pages: list[dict[str, Any]] = []
-
-    if manifest.pages:
-        sorted_pages = sorted(manifest.pages, key=lambda page: page.page_number)
-        for page in sorted_pages:
-            block_elements = [
-                elements_by_id[element_id]
-                for element_id in page.element_ids
-                if element_id in elements_by_id
-            ]
-            if not block_elements:
-                # Some extractors can fill in pages without element_ids; in that
-                # case we fall back to page_number so no content is lost.
-                block_elements = [
-                    element
-                    for element in manifest.elements
-                    if (element.page_number or 1) == page.page_number
-                ]
-            block_elements = [
-                item
-                for item in block_elements
-                if not _is_left_out_of_payload(item)
-                and item.id not in page_numbers
-                and item.id not in merged
-            ]
-            block_elements.sort(key=lambda item: item.reading_order)
-            blocks = _elements_to_blocks(block_elements, letterhead_blocks)
-            _dedupe_callout_titles(blocks)
-            pages.append(
-                {
-                    "page_number": page.page_number,
-                    "text": _render_text_from_blocks(blocks),
-                    "blocks": blocks,
-                }
-            )
-        return pages
-
-    grouped: dict[int, list[ManifestElement]] = {}
-    for element in manifest.elements:
-        if (
-            _is_left_out_of_payload(element)
-            or element.id in page_numbers
-            or element.id in merged
-        ):
-            continue
-        page_number = element.page_number or 1
-        grouped.setdefault(page_number, []).append(element)
-
-    for page_number in sorted(grouped):
-        page_elements = sorted(
-            grouped[page_number],
-            key=lambda item: item.reading_order,
-        )
-        blocks = _elements_to_blocks(page_elements, letterhead_blocks)
-        _dedupe_callout_titles(blocks)
-        pages.append(
-            {
-                "page_number": page_number,
-                "text": _render_text_from_blocks(blocks),
-                "blocks": blocks,
-            }
-        )
-
-    return pages
+    grouped_pages = _group_elements_by_page(
+        manifest, excluded_ids=page_numbers | merged
+    )
+    return [
+        _build_page_payload(page_number, page_elements, letterhead_blocks)
+        for page_number, page_elements in grouped_pages
+    ]
 
 
 def _elements_to_blocks(
