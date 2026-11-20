@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -106,6 +107,31 @@ from acessilia_core.toolbox.toolbox_client import ToolboxError
 
 class StructuralExtractionError(RuntimeError):
     """The Toolbox could not extract the document structure (job-level failure)."""
+
+
+@dataclass(frozen=True)
+class _RunContext:
+    """What every phase of one ``execute`` call shares."""
+
+    file_path: Path
+    source_path: Path
+    effective_mode: str
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None
+    config: CoreConfig
+    ports: RunPorts
+    checkpoints: RunCheckpoints
+
+
+@dataclass(frozen=True)
+class _PlanningState:
+    """The plan of a run and the planning inputs a replan reuses."""
+
+    plan: NominalPlan
+    comparison: PlanningComparison | None
+    planning_manifest: ProcessingManifest
+    availability: toolbox_gate.AvailabilityDecision
+    gated: list[str]
+    replans: int
 
 
 class PddlAccessibilityOrchestrator:
@@ -238,104 +264,37 @@ class PddlAccessibilityOrchestrator:
         config: CoreConfig,
         ports: RunPorts,
     ) -> str | dict[str, Any]:
-        effective_mode = mode or "medio"
-
         if custom_prompt or thinking_mode:
             raise ValueError("Custom instructions and thinking mode are unavailable for this pipeline")
 
         executor = self._run_executor(config, ports)
-        source_path = file_path.resolve()
         # Inside a job the service gives the run its checkpoints; a benchmark
         # or the CLI runs without one and keeps the old behaviour.
-        checkpoints = RunCheckpoints(ports.checkpoints, config, options=self._checkpoint_options())
+        ctx = _RunContext(
+            file_path=file_path,
+            source_path=file_path.resolve(),
+            effective_mode=mode or "medio",
+            status_callback=status_callback,
+            config=config,
+            ports=ports,
+            checkpoints=RunCheckpoints(
+                ports.checkpoints, config, options=self._checkpoint_options()
+            ),
+        )
 
-        media_state = checkpoints.load(PHASE_MEDIA)
-        if media_state is not None:
-            media_inspection = media_state.get("inspection")
-            media_configuration = dict(media_state.get("configuration") or {})
-        else:
-            # media.inspect runs first: a slide deck is extracted and structured
-            # slide by slide, which has to be decided before extraction.
-            media_inspection, media_configuration = await _inspect_media(
-                source_path, config.toolbox
-            )
-            await checkpoints.save(
-                PHASE_MEDIA,
-                lambda: {"inspection": media_inspection, "configuration": media_configuration},
-            )
+        media_inspection, media_configuration = await self._load_or_inspect_media(ctx)
         _check_page_limit_before_extraction(media_inspection, config.document)
-        presentation = _is_presentation(media_inspection)
+        manifest = await self._load_or_extract_manifest(
+            ctx,
+            presentation=_is_presentation(media_inspection),
+            media_configuration=media_configuration,
+        )
+        manifest = await self._load_or_enrich_manifest(
+            ctx, manifest, media_inspection, media_configuration
+        )
+        planning = await self._load_or_build_plan(ctx, manifest)
 
-        manifest_state = checkpoints.load(PHASE_MANIFEST)
-        resumed_manifest = manifest_state is not None
-        if manifest_state is not None:
-            manifest = ProcessingManifest.model_validate(manifest_state["manifest"])
-        else:
-            if status_callback:
-                await status_callback(t(STAGE_ANALYZING_STRUCTURAL))
-            manifest = await self._extract_structure(
-                source_path, presentation, config.document, config.fusion, config.toolbox,
-                config.paths, ports.operations,
-            )
-        _check_page_limit(manifest, config.document)
-        manifest.extractor.configuration["region_inspection_mode"] = effective_mode
-        manifest.extractor.configuration.update(media_configuration)
-        if not resumed_manifest:
-            # Saved after the page limit and the media configuration: an
-            # oversized document must not leave a checkpoint to resume from.
-            await checkpoints.save_manifest(manifest, enriching=False)
-
-        enriched_state = checkpoints.load(PHASE_ENRICHED)
-        if enriched_state is not None:
-            manifest = ProcessingManifest.model_validate(enriched_state["manifest"])
-            # An enrichment checkpoint is complete for the mode it ran in; the
-            # configuration is re-applied so a changed default is still visible.
-            manifest.extractor.configuration["region_inspection_mode"] = effective_mode
-            manifest.extractor.configuration.update(media_configuration)
-        else:
-            await self._enrich_before_planning(
-                manifest, file_path, source_path, effective_mode, media_inspection, status_callback,
-                config, ports, checkpoints,
-            )
-            await checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
-
-        plan_state = checkpoints.load(PHASE_PLAN)
-        if plan_state is not None:
-            plan = NominalPlan.model_validate(plan_state["plan"])
-            comparison = (
-                PlanningComparison.model_validate(plan_state["comparison"])
-                if plan_state.get("comparison")
-                else None
-            )
-            planning_manifest = ProcessingManifest.model_validate(plan_state["manifest"])
-            availability = _availability_from(
-                plan_state.get("availability") or {}, config.toolbox
-            )
-            gated = list(plan_state.get("gated") or [])
-            replans = int(plan_state.get("replans") or 0)
-        else:
-            if status_callback:
-                await status_callback(t(STAGE_GENERATING_PDDL_PLAN))
-            # One catalogue snapshot per document, so the first plan and every
-            # replan see the same Toolbox.
-            availability = await toolbox_gate.decide(manifest, config)
-            _log_availability(availability)
-            gated = availability.unavailable_methods
-            plan, comparison = await run_blocking(
-                self._build_plan, manifest, extra_unavailable=gated
-            )
-            planning_manifest = manifest
-            replans = 0
-            await checkpoints.save_plan(
-                plan, comparison, planning_manifest, availability, gated, replans
-            )
-
-        execution_state = checkpoints.load(PHASE_EXECUTION)
-        if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
-            # The plan checkpoint was replaced after this execution checkpoint
-            # was written (a replan that crashed before it started). The old
-            # progress does not apply to the new plan.
-            execution_state = None
+        execution_state = self._load_execution_state(ctx.checkpoints, planning.plan)
         if status_callback and execution_state is None:
             await status_callback(
                 t(STAGE_VALIDATING_PLAN_DRY_RUN)
@@ -348,10 +307,10 @@ class PddlAccessibilityOrchestrator:
         # other branch instead of silence.
         loop = asyncio.get_running_loop()
         manifest, execution_report = await self._run_plan(
-            plan,
-            planning_manifest,
+            planning.plan,
+            planning.planning_manifest,
             execution_state,
-            checkpoints,
+            ctx.checkpoints,
             status_callback,
             loop,
             executor=executor,
@@ -359,15 +318,15 @@ class PddlAccessibilityOrchestrator:
         manifest, execution_report, plan, comparison = await self._replan_until_done(
             manifest,
             execution_report,
-            plan,
-            comparison,
-            gated,
+            planning.plan,
+            planning.comparison,
+            planning.gated,
             status_callback,
             loop,
-            checkpoints=checkpoints,
-            planning_manifest=planning_manifest,
-            availability=availability,
-            replans=replans,
+            checkpoints=ctx.checkpoints,
+            planning_manifest=planning.planning_manifest,
+            availability=planning.availability,
+            replans=planning.replans,
             executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
@@ -379,12 +338,134 @@ class PddlAccessibilityOrchestrator:
             planner_backend=self.planner_backend,
             execution_report=execution_report,
             comparison=comparison,
-            toolbox_availability=availability.to_metadata(),
+            toolbox_availability=planning.availability.to_metadata(),
         )
 
         if structured_output:
             return payload
         return payload["text"]
+
+    async def _load_or_inspect_media(
+        self, ctx: _RunContext
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+        """The media inspection and configuration, from the checkpoint or a new run."""
+        media_state = ctx.checkpoints.load(PHASE_MEDIA)
+        if media_state is not None:
+            return media_state.get("inspection"), dict(media_state.get("configuration") or {})
+        # media.inspect runs first: a slide deck is extracted and structured
+        # slide by slide, which has to be decided before extraction.
+        media_inspection, media_configuration = await _inspect_media(
+            ctx.source_path, ctx.config.toolbox
+        )
+        await ctx.checkpoints.save(
+            PHASE_MEDIA,
+            lambda: {"inspection": media_inspection, "configuration": media_configuration},
+        )
+        return media_inspection, media_configuration
+
+    async def _load_or_extract_manifest(
+        self,
+        ctx: _RunContext,
+        *,
+        presentation: bool,
+        media_configuration: dict[str, Any],
+    ) -> ProcessingManifest:
+        """The extracted manifest, from the checkpoint or the Toolbox."""
+        manifest_state = ctx.checkpoints.load(PHASE_MANIFEST)
+        resumed_manifest = manifest_state is not None
+        if manifest_state is not None:
+            manifest = ProcessingManifest.model_validate(manifest_state["manifest"])
+        else:
+            if ctx.status_callback:
+                await ctx.status_callback(t(STAGE_ANALYZING_STRUCTURAL))
+            manifest = await self._extract_structure(
+                ctx.source_path, presentation, ctx.config.document, ctx.config.fusion,
+                ctx.config.toolbox, ctx.config.paths, ctx.ports.operations,
+            )
+        _check_page_limit(manifest, ctx.config.document)
+        manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
+        manifest.extractor.configuration.update(media_configuration)
+        if not resumed_manifest:
+            # Saved after the page limit and the media configuration: an
+            # oversized document must not leave a checkpoint to resume from.
+            await ctx.checkpoints.save_manifest(manifest, enriching=False)
+        return manifest
+
+    async def _load_or_enrich_manifest(
+        self,
+        ctx: _RunContext,
+        manifest: ProcessingManifest,
+        media_inspection: dict[str, Any] | None,
+        media_configuration: dict[str, Any],
+    ) -> ProcessingManifest:
+        """The enriched manifest, from the checkpoint or the enrichment stages."""
+        enriched_state = ctx.checkpoints.load(PHASE_ENRICHED)
+        if enriched_state is not None:
+            manifest = ProcessingManifest.model_validate(enriched_state["manifest"])
+            # An enrichment checkpoint is complete for the mode it ran in; the
+            # configuration is re-applied so a changed default is still visible.
+            manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
+            manifest.extractor.configuration.update(media_configuration)
+            return manifest
+        await self._enrich_before_planning(
+            manifest, ctx.file_path, ctx.source_path, ctx.effective_mode, media_inspection,
+            ctx.status_callback, ctx.config, ctx.ports, ctx.checkpoints,
+        )
+        await ctx.checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
+        return manifest
+
+    async def _load_or_build_plan(
+        self, ctx: _RunContext, manifest: ProcessingManifest
+    ) -> _PlanningState:
+        """The nominal plan and what it was built under, from the checkpoint or a new plan."""
+        plan_state = ctx.checkpoints.load(PHASE_PLAN)
+        if plan_state is not None:
+            return _PlanningState(
+                plan=NominalPlan.model_validate(plan_state["plan"]),
+                comparison=(
+                    PlanningComparison.model_validate(plan_state["comparison"])
+                    if plan_state.get("comparison")
+                    else None
+                ),
+                planning_manifest=ProcessingManifest.model_validate(plan_state["manifest"]),
+                availability=_availability_from(
+                    plan_state.get("availability") or {}, ctx.config.toolbox
+                ),
+                gated=list(plan_state.get("gated") or []),
+                replans=int(plan_state.get("replans") or 0),
+            )
+        if ctx.status_callback:
+            await ctx.status_callback(t(STAGE_GENERATING_PDDL_PLAN))
+        # One catalogue snapshot per document, so the first plan and every
+        # replan see the same Toolbox.
+        availability = await toolbox_gate.decide(manifest, ctx.config)
+        _log_availability(availability)
+        gated = availability.unavailable_methods
+        plan, comparison = await run_blocking(
+            self._build_plan, manifest, extra_unavailable=gated
+        )
+        await ctx.checkpoints.save_plan(plan, comparison, manifest, availability, gated, 0)
+        return _PlanningState(
+            plan=plan,
+            comparison=comparison,
+            planning_manifest=manifest,
+            availability=availability,
+            gated=gated,
+            replans=0,
+        )
+
+    @staticmethod
+    def _load_execution_state(
+        checkpoints: RunCheckpoints, plan: NominalPlan
+    ) -> dict[str, Any] | None:
+        """The execution checkpoint of ``plan``, ``None`` when it belongs to another plan."""
+        execution_state = checkpoints.load(PHASE_EXECUTION)
+        if execution_state is not None and execution_state.get("plan_id") != plan.plan_id:
+            # The plan checkpoint was replaced after this execution checkpoint
+            # was written (a replan that crashed before it started). The old
+            # progress does not apply to the new plan.
+            return None
+        return execution_state
 
     async def _run_plan(
         self,

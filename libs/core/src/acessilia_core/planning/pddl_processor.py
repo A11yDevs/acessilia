@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from acessilia_core.hashing import json_sha256 as _json_sha256
 from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
 from acessilia_core.manifest.models import Obligation, ProcessingManifest
 from acessilia_core.planning.domain_bundle import DomainBundle
@@ -82,31 +83,12 @@ class PddlProblemCompiler:
         )
         kind_symbols = _symbol_table(kinds)
         method_symbols = _symbol_table(methods)
-        unavailable = set(unavailable_methods)
-        known_manifest_methods = {
-            method
-            for item in obligations.values()
-            for method in item.admissible_methods
-        }
-        unknown_unavailable = unavailable - known_manifest_methods
-        if unknown_unavailable:
-            raise ValueError(
-                f"Métodos indisponíveis desconhecidos: {sorted(unknown_unavailable)}"
-            )
-        available_methods = frozenset(set(methods) - unavailable)
-
-        tried = frozenset(
-            (item.id, attempt.method)
-            for item in selected_obligations.values()
-            for attempt in item.attempts
-            if attempt.status in {"failed", "rejected"}
+        available_methods = self._available_methods(
+            obligations, methods, unavailable_methods
         )
-        initially_satisfied = frozenset(
-            item.id
-            for item in selected_obligations.values()
-            if item.status == "satisfied"
+        tried, initially_satisfied, initially_pending = self._initial_status(
+            selected, selected_obligations
         )
-        initially_pending = frozenset(selected) - initially_satisfied
         self._validate_causal_state(selected_obligations, initially_satisfied)
         self._validate_kinds(selected_obligations)
         self._validate_methods(
@@ -149,6 +131,44 @@ class PddlProblemCompiler:
             manifest_sha256=_json_sha256(manifest_payload),
             projection=projection,
         )
+
+    @staticmethod
+    def _available_methods(
+        obligations: dict[str, Obligation],
+        methods: list[str],
+        unavailable_methods: Iterable[str],
+    ) -> frozenset[str]:
+        unavailable = set(unavailable_methods)
+        known_manifest_methods = {
+            method
+            for item in obligations.values()
+            for method in item.admissible_methods
+        }
+        unknown_unavailable = unavailable - known_manifest_methods
+        if unknown_unavailable:
+            raise ValueError(
+                f"Métodos indisponíveis desconhecidos: {sorted(unknown_unavailable)}"
+            )
+        return frozenset(set(methods) - unavailable)
+
+    @staticmethod
+    def _initial_status(
+        selected: list[str],
+        selected_obligations: dict[str, Obligation],
+    ) -> tuple[frozenset[tuple[str, str]], frozenset[str], frozenset[str]]:
+        tried = frozenset(
+            (item.id, attempt.method)
+            for item in selected_obligations.values()
+            for attempt in item.attempts
+            if attempt.status in {"failed", "rejected"}
+        )
+        initially_satisfied = frozenset(
+            item.id
+            for item in selected_obligations.values()
+            if item.status == "satisfied"
+        )
+        initially_pending = frozenset(selected) - initially_satisfied
+        return tried, initially_satisfied, initially_pending
 
     @staticmethod
     def _resolve_roots(
@@ -550,6 +570,49 @@ def _parse_fast_downward_plan(
     return steps
 
 
+def _validate_execute_obligation_step(
+    step: PlanStep,
+    projection: PlanningProjection,
+    *,
+    processing: bool,
+    satisfied: set[str],
+) -> None:
+    assert step.obligation_id is not None
+    assert step.method is not None
+    if step.obligation_id not in projection.obligations:
+        raise ValueError(
+            f"Obrigação não selecionada: {step.obligation_id}"
+        )
+    item = projection.obligations[step.obligation_id]
+    if step.obligation_id in satisfied:
+        raise ValueError(
+            f"Obrigação executada mais de uma vez: {step.obligation_id}"
+        )
+    if not processing or not set(item.dependencies).issubset(satisfied):
+        raise ValueError(
+            f"Precondições não satisfeitas para {step.obligation_id}"
+        )
+    if step.obligation_kind != item.kind:
+        raise ValueError(
+            f"Tipo incorreto para {step.obligation_id}: "
+            f"{step.obligation_kind}"
+        )
+    if step.method not in item.admissible_methods:
+        raise ValueError(f"Método não admissível: {step.method}")
+    if step.method not in projection.available_methods:
+        raise ValueError(f"Método indisponível: {step.method}")
+    if (step.obligation_id, step.method) in projection.tried:
+        raise ValueError(
+            f"Método já tentado: {step.obligation_id}/{step.method}"
+        )
+    expected_cost = projection.cost(step.obligation_id, step.method)
+    if step.expected_cost != expected_cost:
+        raise ValueError(
+            f"Custo incorreto para {step.obligation_id}: "
+            f"{step.expected_cost}; esperado {expected_cost}"
+        )
+
+
 def _validate_action_sequence(
     steps: list[PlanStep],
     projection: PlanningProjection,
@@ -565,44 +628,10 @@ def _validate_action_sequence(
                 raise ValueError("start-job aplicado fora do estado queued")
             processing = True
         elif step.action == "execute-obligation":
-            assert step.obligation_id is not None
-            assert step.method is not None
-            if step.obligation_id not in projection.obligations:
-                raise ValueError(
-                    f"Obrigação não selecionada: {step.obligation_id}"
-                )
-            item = projection.obligations[step.obligation_id]
-            if step.obligation_id in satisfied:
-                raise ValueError(
-                    f"Obrigação executada mais de uma vez: {step.obligation_id}"
-                )
-            if not processing or not set(item.dependencies).issubset(
-                satisfied
-            ):
-                raise ValueError(
-                    f"Precondições não satisfeitas para {step.obligation_id}"
-                )
-            if step.obligation_kind != item.kind:
-                raise ValueError(
-                    f"Tipo incorreto para {step.obligation_id}: "
-                    f"{step.obligation_kind}"
-                )
-            if step.method not in item.admissible_methods:
-                raise ValueError(f"Método não admissível: {step.method}")
-            if step.method not in projection.available_methods:
-                raise ValueError(f"Método indisponível: {step.method}")
-            if (step.obligation_id, step.method) in projection.tried:
-                raise ValueError(
-                    f"Método já tentado: {step.obligation_id}/{step.method}"
-                )
-            expected_cost = projection.cost(
-                step.obligation_id, step.method
+            _validate_execute_obligation_step(
+                step, projection, processing=processing, satisfied=satisfied
             )
-            if step.expected_cost != expected_cost:
-                raise ValueError(
-                    f"Custo incorreto para {step.obligation_id}: "
-                    f"{step.expected_cost}; esperado {expected_cost}"
-                )
+            assert step.obligation_id is not None
             satisfied.add(step.obligation_id)
         elif step.action == "complete-job":
             if not processing:
@@ -728,6 +757,3 @@ def _parenthesis_balance(text: str) -> int:
 
 def _text_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-from acessilia_core.hashing import json_sha256 as _json_sha256

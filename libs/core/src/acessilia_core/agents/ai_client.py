@@ -1,6 +1,109 @@
+from typing import Any
+
 from acessilia_core.config import ModelConfig, ToolboxConfig
 
 
+
+
+def _toolbox_model(
+    models: ModelConfig,
+    toolbox: ToolboxConfig,
+    *,
+    max_tokens: int | None,
+    timeout: int,
+    max_retries: int | None,
+) -> Any:
+    from agno.models.openai.like import OpenAILike
+
+    from acessilia_sdk.toolbox import vlm_gateway_base_url
+    from acessilia_core.toolbox.toolbox_client import toolbox_vlm_endpoint
+
+    # The model id is the Toolbox provider id and the key the Toolbox's own:
+    # the VLM server's key stays with the Toolbox. The timeout also covers
+    # the wait for one of the provider's slots.
+    endpoint = toolbox_vlm_endpoint(toolbox)
+    return OpenAILike(
+        id=models.toolbox_vlm_provider,
+        api_key=endpoint.api_key or toolbox.api_key or "not-needed",
+        base_url=vlm_gateway_base_url(endpoint),
+        max_tokens=(
+            max_tokens
+            if max_tokens is not None
+            else models.openrouter_max_tokens
+        ),
+        timeout=float(timeout),
+        max_retries=max_retries,
+    )
+
+
+def _openrouter_model(
+    models: ModelConfig,
+    *,
+    max_tokens: int | None,
+    timeout: int,
+    max_retries: int | None,
+    reasoning_enabled: bool | None,
+) -> Any:
+    from agno.models.openrouter import OpenRouter
+
+    base_url = models.openrouter_base_url.replace("/chat/completions", "").rstrip("/")
+    extra_headers = {}
+    if models.openrouter_site_url:
+        extra_headers["HTTP-Referer"] = models.openrouter_site_url
+    if models.openrouter_app_name:
+        extra_headers["X-Title"] = models.openrouter_app_name
+
+    reasoning_options = (
+        {"extra_body": {"reasoning": {"enabled": reasoning_enabled}}}
+        if reasoning_enabled is not None else {}
+    )
+    return OpenRouter(
+        id=models.openrouter_model,
+        api_key=models.openrouter_api_key,
+        base_url=base_url,
+        max_tokens=(
+            max_tokens
+            if max_tokens is not None
+            else models.openrouter_max_tokens
+        ),
+        extra_headers=extra_headers if extra_headers else None,
+        timeout=float(timeout),
+        max_retries=max_retries,
+        **reasoning_options,
+    )
+
+
+def _ollama_model(
+    models: ModelConfig,
+    *,
+    max_tokens: int | None,
+    timeout: int,
+    reasoning_enabled: bool | None,
+) -> Any:
+    from agno.models.ollama import Ollama
+
+    host = models.ollama_base_url.replace("/api/chat", "").rstrip("/")
+    options = {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 64,
+        "seed": 42,
+    }
+    if max_tokens is not None:
+        options["num_predict"] = max_tokens
+
+    reasoning_options = (
+        {"request_params": {"think": reasoning_enabled}}
+        if reasoning_enabled is not None else {}
+    )
+    return Ollama(
+        id=models.ollama_model,
+        host=host,
+        options=options,
+        api_key=models.ollama_api_key or "not-needed",
+        timeout=float(timeout),
+        **reasoning_options,
+    )
 
 
 def get_agno_model(
@@ -11,7 +114,7 @@ def get_agno_model(
     timeout_seconds: int | None = None,
     max_retries: int | None = None,
     reasoning_enabled: bool | None = None,
-):
+) -> Any:
     """Build the Agno model instance of the run's ``models`` (ADR-0016, step 3).
 
     The provider is chosen by ``models.ai_client``: the value ``"toolbox"`` sends the chats
@@ -39,80 +142,20 @@ def get_agno_model(
         else models.model_call_timeout_seconds
     )
     if models.ai_client == "toolbox":
-        from agno.models.openai.like import OpenAILike
-
-        from acessilia_sdk.toolbox import vlm_gateway_base_url
-        from acessilia_core.toolbox.toolbox_client import toolbox_vlm_endpoint
-
-        # The model id is the Toolbox provider id and the key the Toolbox's own:
-        # the VLM server's key stays with the Toolbox. The timeout also covers
-        # the wait for one of the provider's slots.
-        endpoint = toolbox_vlm_endpoint(toolbox)
-        return OpenAILike(
-            id=models.toolbox_vlm_provider,
-            api_key=endpoint.api_key or toolbox.api_key or "not-needed",
-            base_url=vlm_gateway_base_url(endpoint),
-            max_tokens=(
-                max_tokens
-                if max_tokens is not None
-                else models.openrouter_max_tokens
-            ),
-            timeout=float(timeout),
-            max_retries=max_retries,
+        return _toolbox_model(
+            models, toolbox, max_tokens=max_tokens, timeout=timeout, max_retries=max_retries
         )
     if models.ai_client == "openrouter":
-        from agno.models.openrouter import OpenRouter
-
-        base_url = models.openrouter_base_url.replace("/chat/completions", "").rstrip("/")
-        extra_headers = {}
-        if models.openrouter_site_url:
-            extra_headers["HTTP-Referer"] = models.openrouter_site_url
-        if models.openrouter_app_name:
-            extra_headers["X-Title"] = models.openrouter_app_name
-
-        reasoning_options = (
-            {"extra_body": {"reasoning": {"enabled": reasoning_enabled}}}
-            if reasoning_enabled is not None else {}
-        )
-        return OpenRouter(
-            id=models.openrouter_model,
-            api_key=models.openrouter_api_key,
-            base_url=base_url,
-            max_tokens=(
-                max_tokens
-                if max_tokens is not None
-                else models.openrouter_max_tokens
-            ),
-            extra_headers=extra_headers if extra_headers else None,
-            timeout=float(timeout),
+        return _openrouter_model(
+            models,
+            max_tokens=max_tokens,
+            timeout=timeout,
             max_retries=max_retries,
-            **reasoning_options,
+            reasoning_enabled=reasoning_enabled,
         )
-    else:
-        from agno.models.ollama import Ollama
-
-        host = models.ollama_base_url.replace("/api/chat", "").rstrip("/")
-        options = {
-            "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 64,
-            "seed": 42,
-        }
-        if max_tokens is not None:
-            options["num_predict"] = max_tokens
-
-        reasoning_options = (
-            {"request_params": {"think": reasoning_enabled}}
-            if reasoning_enabled is not None else {}
-        )
-        return Ollama(
-            id=models.ollama_model,
-            host=host,
-            options=options,
-            api_key=models.ollama_api_key or "not-needed",
-            timeout=float(timeout),
-            **reasoning_options,
-        )
+    return _ollama_model(
+        models, max_tokens=max_tokens, timeout=timeout, reasoning_enabled=reasoning_enabled
+    )
 
 
 def active_model_name(models: ModelConfig) -> str:

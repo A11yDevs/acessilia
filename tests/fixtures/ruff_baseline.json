@@ -4,9 +4,6 @@
     "libs/core/src/acessilia_core/agents/prompt_tools.py": {
       "E701": 1
     },
-    "libs/core/src/acessilia_core/planning/pddl_processor.py": {
-      "E402": 1
-    },
     "libs/core/tests/test_pddl_messages_i18n.py": {
       "F401": 1
     },

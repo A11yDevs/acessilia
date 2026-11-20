@@ -72,15 +72,25 @@ que já foi aceita:
 
 ## Algoritmos estruturais: core e docstruct
 
-19 funções têm o mesmo nome no core e no docstruct. 15 são adaptadores que
-chamam o docstruct, então não há duplicação nelas:
-- `pipeline/canonical_builder.py`, `pipeline/validators.py` e
-  `pipeline/table_ast.py`;
-- `refine_reading_order` e `is_unstructured_page_placeholder` no builder do
-  manifesto;
-- `_pair_block`, `_letterhead_groups`, `_recover_empty_lettered_list_items` e
-  `_implicit_product_variables` do orquestrador;
-- `wrap_latex`.
+Em `8d7465e4`, 19 funções de nível de módulo (`ast.FunctionDef` /
+`ast.AsyncFunctionDef` em `tree.body`) tinham o mesmo nome no core e no
+docstruct, das quais 15 eram adaptadores que chamam o docstruct. Depois da #470
+e da #612 (a #621 removeu os cinco wrappers finos `refine_reading_order`,
+`_pair_block`, `_letterhead_groups`, `_recover_empty_lettered_list_items` e
+`_implicit_product_variables` em favor de imports diretos do docstruct; a
+#623/#631 adicionou os adaptadores `apply_page_routes` e
+`fuse_extraction_payloads` em `pipeline/fusion.py`), 14 funções de nível de
+módulo têm o mesmo nome em `libs/core/src` e `libs/docstruct/src`. 12 são
+adaptadores que chamam o docstruct, então não há duplicação nelas:
+- `pipeline/canonical_builder.py` (`_enrich_math_blocks`,
+  `build_canonical_document`, `sanitize_canonical_document`),
+  `pipeline/validators.py` (`audit_canonical_document`,
+  `validate_canonical_document`, `validate_export_profile`,
+  `validate_output_text`) e `pipeline/table_ast.py`
+  (`linearize_table_for_text`);
+- `pipeline/fusion.py` (`apply_page_routes`, `fuse_extraction_payloads`);
+- `is_unstructured_page_placeholder` no builder do manifesto;
+- `wrap_latex` em `formula_tools.py`.
 
 O resto, com as duplicações já registradas:
 
@@ -91,6 +101,7 @@ O resto, com as duplicações já registradas:
 | `_area` (`libs/core/src/acessilia_core/manifest/slides.py`) | `docstruct.fusion.similarity.area` | O mesmo cálculo, para uma caixa presente. **Resolvido:** o `slides.py` usa o do docstruct (#470, fase 4). |
 | `_overlaps`, `_union_area` (`slides.py`) | nenhuma | Geometria pura de caixas. **Movidas** para `docstruct.geometry.boxes` como `boxes_overlap` e `union_area` (docstruct 0.5.6, #470, fase 4). (O `_overlaps` do docstruct compara trechos de texto, não caixas.) |
 | `decide` (`planning/toolbox_gate.py`) | `docstruct.fusion.adjudication.decide` | Só o nome é igual; não têm relação. |
+| `_bbox` (`pipeline/elements.py`) | `docstruct.manifest_cases._bbox` | Só o nome é igual; o `_bbox` de `manifest_cases` constrói casos de teste. |
 | agrupamento de callouts (builder de normalização da Toolbox) | `docstruct.regions.grouping` | Desvio conhecido da ADR-0002 ([acessilia-toolbox#72](https://github.com/A11yDevs/acessilia-toolbox/issues/72)). |
 
 ## Operações determinísticas no core

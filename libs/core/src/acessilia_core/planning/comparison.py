@@ -26,92 +26,7 @@ def build_planning_comparison(
     preferred_backend: str,
 ) -> PlanningComparison:
     """Compares planner outputs without conflating equivalently valid causal orderings."""
-    internal = plans.get("internal")
-    fast_downward = plans.get("fast-downward")
-    both_solved = internal is not None and fast_downward is not None
-
-    if not both_solved:
-        details = ComparisonDetails(
-            verdict="inconclusive",
-            both_solved=False,
-            notes=[
-                "A equivalência não pode ser determinada porque ao menos um "
-                "backend não produziu plano válido."
-            ],
-        )
-    else:
-        assert internal is not None
-        assert fast_downward is not None
-        internal_signatures = [_step_signature(step) for step in internal.steps]
-        fd_signatures = [_step_signature(step) for step in fast_downward.steps]
-        internal_counter = Counter(internal_signatures)
-        fd_counter = Counter(fd_signatures)
-        same_cost = (
-            internal.expected_total_cost
-            == fast_downward.expected_total_cost
-        )
-        same_selected = (
-            set(internal.selected_obligations)
-            == set(fast_downward.selected_obligations)
-        )
-        same_executed = (
-            _executed_obligations(internal)
-            == _executed_obligations(fast_downward)
-        )
-        same_methods = (
-            _method_selection(internal)
-            == _method_selection(fast_downward)
-        )
-        same_multiset = internal_counter == fd_counter
-        same_sequence = internal_signatures == fd_signatures
-        semantic_equivalence = all(
-            (
-                same_cost,
-                same_selected,
-                same_executed,
-                same_methods,
-                same_multiset,
-            )
-        )
-        verdict = (
-            "identical"
-            if semantic_equivalence and same_sequence
-            else "equivalent"
-            if semantic_equivalence
-            else "different"
-        )
-        notes: list[str] = []
-        if verdict == "equivalent":
-            notes.append(
-                "Os planos diferem apenas na ordem de ações independentes; "
-                "ambos passaram pela validação causal."
-            )
-        elif verdict == "different" and same_cost:
-            notes.append(
-                "O custo total coincide, mas isso não basta para estabelecer "
-                "equivalência semântica."
-            )
-        details = ComparisonDetails(
-            verdict=verdict,
-            both_solved=True,
-            same_expected_total_cost=same_cost,
-            cost_delta_fast_downward_minus_internal=(
-                fast_downward.expected_total_cost
-                - internal.expected_total_cost
-            ),
-            same_selected_obligations=same_selected,
-            same_executed_obligations=same_executed,
-            same_method_selection=same_methods,
-            same_action_multiset=same_multiset,
-            same_action_sequence=same_sequence,
-            internal_only_steps=_counter_difference(
-                internal_counter, fd_counter
-            ),
-            fast_downward_only_steps=_counter_difference(
-                fd_counter, internal_counter
-            ),
-            notes=notes,
-        )
+    details = _compare_plans(plans.get("internal"), plans.get("fast-downward"))
 
     seed = (
         f"{manifest.manifest_id}:{manifest.revision}:{compiled.sha256}:"
@@ -137,6 +52,90 @@ def build_planning_comparison(
         problem_sha256=compiled.sha256,
         outcomes=outcomes,
         comparison=details,
+    )
+
+
+def _compare_plans(
+    internal: NominalPlan | None, fast_downward: NominalPlan | None
+) -> ComparisonDetails:
+    if internal is None or fast_downward is None:
+        return ComparisonDetails(
+            verdict="inconclusive",
+            both_solved=False,
+            notes=[
+                "A equivalência não pode ser determinada porque ao menos um "
+                "backend não produziu plano válido."
+            ],
+        )
+    internal_signatures = [_step_signature(step) for step in internal.steps]
+    fd_signatures = [_step_signature(step) for step in fast_downward.steps]
+    internal_counter = Counter(internal_signatures)
+    fd_counter = Counter(fd_signatures)
+    same_cost = (
+        internal.expected_total_cost
+        == fast_downward.expected_total_cost
+    )
+    same_selected = (
+        set(internal.selected_obligations)
+        == set(fast_downward.selected_obligations)
+    )
+    same_executed = (
+        _executed_obligations(internal)
+        == _executed_obligations(fast_downward)
+    )
+    same_methods = (
+        _method_selection(internal)
+        == _method_selection(fast_downward)
+    )
+    same_multiset = internal_counter == fd_counter
+    same_sequence = internal_signatures == fd_signatures
+    semantic_equivalence = all(
+        (
+            same_cost,
+            same_selected,
+            same_executed,
+            same_methods,
+            same_multiset,
+        )
+    )
+    verdict = (
+        "identical"
+        if semantic_equivalence and same_sequence
+        else "equivalent"
+        if semantic_equivalence
+        else "different"
+    )
+    notes: list[str] = []
+    if verdict == "equivalent":
+        notes.append(
+            "Os planos diferem apenas na ordem de ações independentes; "
+            "ambos passaram pela validação causal."
+        )
+    elif verdict == "different" and same_cost:
+        notes.append(
+            "O custo total coincide, mas isso não basta para estabelecer "
+            "equivalência semântica."
+        )
+    return ComparisonDetails(
+        verdict=verdict,
+        both_solved=True,
+        same_expected_total_cost=same_cost,
+        cost_delta_fast_downward_minus_internal=(
+            fast_downward.expected_total_cost
+            - internal.expected_total_cost
+        ),
+        same_selected_obligations=same_selected,
+        same_executed_obligations=same_executed,
+        same_method_selection=same_methods,
+        same_action_multiset=same_multiset,
+        same_action_sequence=same_sequence,
+        internal_only_steps=_counter_difference(
+            internal_counter, fd_counter
+        ),
+        fast_downward_only_steps=_counter_difference(
+            fd_counter, internal_counter
+        ),
+        notes=notes,
     )
 
 
