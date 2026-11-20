@@ -4,18 +4,19 @@ build-backend = "hatchling.build"
 
 [project]
 name = "acessilia-core"
-version = "0.2.4"
+version = "0.2.5"
 description = "Acessilia's core: the PDDL pipeline that plans and executes a document's accessibility, with its agents, enrichment stages and exporters (ADR-0016)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 # The libraries ADR-0016 allows the core (tests/test_boundary.py checks
-# the imports). openai and ollama are what Agno's model classes load; edge-tts
-# is the audio export's recorded deviation (ADR-0003, acessilia-toolbox#73).
+# the imports). openai and ollama are what Agno's model classes load; rapidfuzz
+# accelerates docstruct.fusion.payload.page_similarity; edge-tts is the audio
+# export's recorded deviation (ADR-0003, acessilia-toolbox#73).
 # docstruct and the SDK are not on an index: install ./libs/docstruct and
 # ./libs/sdk first; uv resolves them from the paths below.
 dependencies = [
-    "acessilia-docstruct>=0.5.7,<0.6",
+    "acessilia-docstruct>=0.5.8,<0.6",
     "acessilia-sdk>=0.3,<0.4",
     "agno==3.0.5",
     "openai>=2.45.0,<3",

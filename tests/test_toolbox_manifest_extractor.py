@@ -249,7 +249,7 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
     from backend.config.settings import settings
 
     monkeypatch.setattr(
-        "acessilia_core.pipeline.fusion.decide_v1",
+        "docstruct.fusion.payload.decide_v1",
         lambda primary, secondary: ("mineru", "both_formula->mineru"),
     )
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)

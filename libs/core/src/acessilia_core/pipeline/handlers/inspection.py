@@ -12,9 +12,7 @@ The agents it asks (the vision or the data agent) live in the core, in
 
 from __future__ import annotations
 
-import asyncio
 import base64
-import contextvars
 import hashlib
 import json
 import math
@@ -22,11 +20,13 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from acessilia_sdk.runtime import run_sync
+
 from acessilia_core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from acessilia_core.agents.vision_agent import VisionAgent
 from acessilia_core.config import CoreConfig, ModelConfig, ToolboxConfig
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.ports import RegionCache, RunPorts, region_cache_for
+from acessilia_core.formula_tools import normalize_latex
 from acessilia_core.manifest.builder import (
     is_unstructured_page_placeholder,
 )
@@ -44,7 +44,7 @@ from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
     _toolbox_render,
 )
-from acessilia_core.formula_tools import normalize_latex
+from acessilia_core.ports import RegionCache, RunPorts, region_cache_for
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin
@@ -112,20 +112,7 @@ def _inspect_region(
             total_pages=total_pages, mode=mode, full_budget=True,
         )
 
-    return _run_inspection(inspect())
-
-
-def _run_inspection(coro):
-    """Preserve the request context across a synchronous handler's bridge."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    import concurrent.futures
-
-    context = contextvars.copy_context()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(context.run, asyncio.run, coro).result()
+    return run_sync(inspect())
 
 
 def _save_region_artifact(
@@ -261,7 +248,7 @@ def _inspect_page(
     toolbox: ToolboxConfig,
     models: ModelConfig,
 ) -> PageInspectionOutput:
-    return _run_inspection(
+    return run_sync(
         VisionAgent(
             mode=mode, region_cache=region_cache, toolbox=toolbox, models=models
         ).inspect_page(

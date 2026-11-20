@@ -16,8 +16,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from acessilia_sdk.toolbox.clients.pdf import check_renderable
+
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.execution.models import MethodResult
+from acessilia_core.i18n import t
+from acessilia_core.logger import logger
 from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -25,16 +29,13 @@ from acessilia_core.manifest.models import (
 from acessilia_core.pipeline.handlers import messages as step_messages
 from acessilia_core.pipeline.secondary import (
     _CALIBRATED_PAIR,
-    _SecondaryExtraction,
     _page_markdown,
+    _SecondaryExtraction,
 )
 from acessilia_core.pipeline.toolbox import (
-    _check_renderable,
     _render_client,
     _source_artifact_id,
 )
-from acessilia_core.i18n import t
-from acessilia_core.logger import logger
 
 if TYPE_CHECKING:
     from acessilia_sdk.operations.page_judge import PageJudgement
@@ -58,7 +59,7 @@ def _render_page_png(
     from acessilia_sdk.operations.page_judge import render_judge_page
     from acessilia_sdk.runtime import run_sync
 
-    _check_renderable(source_path, media_type)
+    check_renderable(source_path, media_type)
 
     async def render() -> bytes:
         client = _render_client(artifact_id, toolbox)

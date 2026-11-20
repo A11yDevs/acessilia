@@ -12,11 +12,16 @@ from pathlib import Path
 
 import fitz
 import pytest
-
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
-from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+
+from tests.core_config_support import (
+    document_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
 
@@ -41,6 +46,15 @@ def test_other_rasters_are_refused_before_any_request(fake_toolbox_render, tmp_p
 
     with pytest.raises(ValueError, match=f"renders PDF, PNG and JPEG inputs, not {media_type}"):
         inspection_handlers._render_source_page(image, media_type, 1, dpi=160, toolbox=toolbox_config())
+    assert not fake_toolbox_render.requests
+
+
+def test_mismatched_media_type_uses_sdk_check_renderable_message(fake_toolbox_render, tmp_path) -> None:
+    source = tmp_path / "doc.pdf"
+    source.write_bytes(b"%PDF-1.4")
+
+    with pytest.raises(ValueError, match=r"^Source is image/png but would be sent as application/pdf$"):
+        inspection_handlers._render_source_page(source, "image/png", 1, dpi=160, toolbox=toolbox_config())
     assert not fake_toolbox_render.requests
 
 

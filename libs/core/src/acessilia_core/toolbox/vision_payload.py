@@ -1,10 +1,12 @@
-"""Reduce a vision payload through the Toolbox rendering capability."""
+"""Reduce a vision payload through the SDK's downscale helper and the run's ToolboxConfig."""
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
+import math
 
+from acessilia_sdk.toolbox import ToolboxError
+from acessilia_sdk.toolbox.clients import ToolboxPdfClient
+from acessilia_sdk.toolbox.clients.pdf import downscale_image as _sdk_downscale_image
 from docstruct.imaging import image_dimensions
 
 from acessilia_core.config import ToolboxConfig
@@ -12,8 +14,6 @@ from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
 from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_client import make_toolbox_client
-from acessilia_sdk.toolbox import ToolboxError
-from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
 
 async def downscale_image(
@@ -21,25 +21,28 @@ async def downscale_image(
 ) -> bytes | None:
     """``payload`` rendered by the Toolbox with its longest side times ``scale``.
 
-    ``None`` when the image is not a PNG/JPEG whose size can be read, when it
-    would not get smaller, or when the Toolbox cannot render it: the caller
-    then lets the original context error stand.
+    Delegates dimension parsing and ``pdf.render@2`` invocation to
+    :func:`acessilia_sdk.toolbox.clients.pdf.downscale_image`, keeping
+    ``ToolboxConfig`` client lifecycle, localized logging, and best-effort
+    ``None`` recovery in the core.
     """
+    if (
+        isinstance(scale, bool)
+        or not isinstance(scale, (int, float))
+        or not math.isfinite(scale)
+        or scale <= 0
+    ):
+        return None
     size = image_dimensions(payload)
     if size is None:
         return None
-    width, height, suffix = size
-    max_side = max(1, int(max(width, height) * scale))
-    if max_side >= max(width, height):
+    width, height, _ = size
+    if max(1, int(max(width, height) * scale)) >= max(width, height):
         return None
     client = None
     try:
         client = make_toolbox_client(ToolboxPdfClient, toolbox)
-        with tempfile.TemporaryDirectory(prefix="vision-context-") as directory:
-            source = Path(directory) / f"region{suffix}"
-            source.write_bytes(payload)
-            rendered = await client.render(file_path=source, max_side=max_side)
-        return rendered.image
+        return await _sdk_downscale_image(client, payload, scale)
     except (ToolboxError, OSError, ValueError) as error:
         logger.warning(t(LOG_VISION_CONTEXT_DOWNSCALE_FAILED).format(error=error))
         return None

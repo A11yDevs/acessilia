@@ -19,16 +19,17 @@ with the two docstrings of the dual-provider fusion translated from Portuguese.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from acessilia_core.run_identity import fusion_reuse_identity
+from acessilia_sdk.runtime import run_sync
+
 from acessilia_core.config import CoreConfig, ToolboxConfig
 from acessilia_core.execution.models import MethodResult
+from acessilia_core.i18n import t
 from acessilia_core.manifest.models import (
     Artifact,
     ManifestElement,
@@ -63,8 +64,7 @@ from acessilia_core.pipeline.secondary import (
 from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
 )
-from acessilia_core.i18n import t
-
+from acessilia_core.run_identity import fusion_reuse_identity
 
 #: Accepted Dr.DocBench table preference (TEDS): MinerU's table, unless Docling's
 #: has spans or is the only one.
@@ -296,45 +296,25 @@ def _run_extract_fused(
     artifact_id: str | None = None,
     policy=None,
 ) -> dict:
-    """Run ``extract_fused`` in a way that suits the current event loop.
-
-    Checks for a running event loop **before** creating the coroutine, so no
-    coroutine object is left without an ``await`` (which would raise
-    ``RuntimeWarning: coroutine ... was never awaited``).
+    """Run ``extract_fused`` synchronously via ``acessilia_sdk.runtime.run_sync``.
 
     Architecture note: when called from a thread with a running event loop
-    (Agno Workflow, API), ``.result()`` still blocks the calling loop until the
-    fusion ends. The handlers' contract stays synchronous; code that calls the
-    executor from async code must run the whole executor with
+    (Agno Workflow, API), ``run_sync`` executes the coroutine in a worker
+    thread and blocks the calling loop until fusion finishes. The handlers'
+    contract stays synchronous; async callers must run the whole executor with
     ``await run_blocking(...)`` so as not to block the main event loop.
     """
-    import concurrent.futures
-
     from acessilia_core.pipeline.fusion import extract_fused
 
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        # Synchronous context (deterministic executor, CLI, tests): no event
-        # loop is running in this thread.
-        return asyncio.run(
-            extract_fused(
-                source_path, artifact_id=artifact_id, policy=policy,
-                secondary_provider=secondary_provider, toolbox=toolbox,
-            )
+    return run_sync(
+        extract_fused(
+            source_path,
+            artifact_id=artifact_id,
+            policy=policy,
+            secondary_provider=secondary_provider,
+            toolbox=toolbox,
         )
-
-    # An event loop is already running in this thread; since the handler is
-    # synchronous, the coroutine runs in a dedicated thread with its own loop.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(
-            lambda: asyncio.run(
-                extract_fused(
-                    source_path, artifact_id=artifact_id, policy=policy,
-                    secondary_provider=secondary_provider, toolbox=toolbox,
-                )
-            )
-        ).result()
+    )
 
 
 def _reusable_fusion_payload(manifest: ProcessingManifest, config: CoreConfig) -> dict | None:

@@ -78,7 +78,8 @@ async def test_concurrent_downloads_have_independent_temporary_files(tmp_path):
 
 @pytest.mark.parametrize("kind", ["table", "picture", "formula"])
 def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
-    from acessilia_core.pipeline.fusion import _group_by_page, fuse_extraction_payloads
+    from docstruct.fusion.payload import group_payload_by_page as _group_by_page
+    from acessilia_core.pipeline.fusion import fuse_extraction_payloads
 
     primary = {"document": {"elements": []}}
     secondary = {

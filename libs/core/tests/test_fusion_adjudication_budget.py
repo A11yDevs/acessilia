@@ -12,10 +12,6 @@ test_noncritical_obligations.py).
 from __future__ import annotations
 
 import pytest
-
-from docstruct.fusion.judge import should_judge
-from docstruct.fusion.page_select import page_norm, ratio
-
 from acessilia_core.manifest.builder import inspect_document_needs
 from acessilia_core.manifest.detectors import (
     MAX_ID_SUFFIX,
@@ -23,10 +19,12 @@ from acessilia_core.manifest.detectors import (
 )
 from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.pipeline.fusion import (
-    _similarity,
     apply_page_routes,
     fuse_extraction_payloads,
 )
+from docstruct.fusion.judge import should_judge
+from docstruct.fusion.page_select import page_norm, ratio
+from docstruct.fusion.payload import page_similarity as _similarity
 
 PROSE = (
     "The reaction rate depends on the concentration of the reactants and on the "
