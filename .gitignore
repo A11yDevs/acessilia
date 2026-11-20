@@ -59,3 +59,4 @@ scripts/drbench/builds
 tests/dataset/
 .mypy_cache/
 .ruff_cache/
+.claude/
