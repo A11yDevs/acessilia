@@ -375,16 +375,22 @@ def _count_math_nodes(node: Any) -> int:
 
 
 def unconverted_math_indices(
-    document_ast: dict[str, Any], *, target_format: str = "latex"
+    document_ast: dict[str, Any], *, target_format: str
 ) -> frozenset[int]:
     """0-based ``Math`` indices whose source formula lacks converted MathML.
 
-    Only returns indices when at least one formula in the document *does* carry
-    MathML (so ``math.convert`` ran and succeeded elsewhere, making missing
-    MathML a signal that its LaTeX was rejected rather than that enrichment was
-    absent or unavailable) and when the source walk matches the AST's ``Math``
-    node count. Callers use this as the cheapest first suspect set before
-    bisecting (#258).
+    Precondition: ``document_ast`` must have been built by
+    :func:`build_pandoc_ast` with the same ``target_format``; the mapping comes
+    from re-walking ``document_ast["source_document"]``, and a mismatch is
+    caught only indirectly if the resulting ``Math`` count differs.
+
+    The returned set is only a cheap ordering hint, never proof of rejection: a
+    formula can also lack MathML because it was never enriched (for example an
+    inline span without ``metadata["inline_math"]``) or because
+    ``math.convert`` failed transiently. When no formula carries MathML (or
+    every formula does), returns an empty set; callers should also ignore the
+    hint when most of the document lacks MathML, where probing the whole
+    unconverted set first would spend an extra render before bisecting (#258).
     """
     source = document_ast.get("source_document")
     if not isinstance(source, dict):

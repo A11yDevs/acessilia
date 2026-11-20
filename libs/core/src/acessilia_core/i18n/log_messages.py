@@ -525,10 +525,10 @@ LOG_PDDL_SELECTED_CLOSURE_MISMATCH: str = (
 LOG_PDF_UA_EXPORTED: str = "PDF/UA exported: {output_path}"
 #: Info logged when the Toolbox rendered the PDF/UA; {output_path} the destination file path.
 LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path}"
-#: Warning logged when the Toolbox rejected the PDF/UA AST's math and the export retries with the
-#: formulas as literal text; {error} is the Toolbox's rejection cause.
+#: Warning logged when the Toolbox rejected the PDF/UA AST's math and the export succeeded with
+#: all formulas exported as literal text; {error} is the Toolbox's initial rejection cause.
 LOG_PDF_UA_MATH_DEGRADED: str = (
-    "The Toolbox rejected the PDF/UA math; retrying with formulas as literal text: {error}"
+    "The Toolbox rejected the PDF/UA math; exported with formulas as literal text: {error}"
 )
 #: Warning logged when the Toolbox rejected part of the PDF/UA AST's math and the export succeeded
 #: by degrading only the offending formulas to literal text; {degraded} of {total} formulas degraded
@@ -536,6 +536,13 @@ LOG_PDF_UA_MATH_DEGRADED: str = (
 LOG_PDF_UA_MATH_PARTIALLY_DEGRADED: str = (
     "The Toolbox rejected part of the PDF/UA math; exported with {degraded} of {total} "
     "formula(s) as literal text: {error}"
+)
+#: Warning logged when per-formula PDF/UA math isolation reached its retry budget before isolating
+#: every remaining chunk; {attempts} is the retry count, {degraded} of {total} formulas were
+#: exported as literal text (some not individually proven rejected), and {error} is the initial cause.
+LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED: str = (
+    "PDF/UA math isolation reached its {attempts}-render budget; exported with {degraded} of "
+    "{total} formula(s) as literal text (some were not individually isolated): {error}"
 )
 #: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
 LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"

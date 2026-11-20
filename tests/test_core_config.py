@@ -87,6 +87,7 @@ FIELD_SETTINGS: dict[str, str] = {
     "export.object_markers_enabled": "object_markers_enabled",
     "export.toolbox_docx_enabled": "toolbox_docx_enabled",
     "export.toolbox_pdf_ua_enabled": "toolbox_pdf_ua_enabled",
+    "export.toolbox_pdf_ua_math_bisect_budget": "toolbox_pdf_ua_math_bisect_budget",
     "paths.data_dir": "data_dir",
     **{f"toolbox.providers[{key}]": key for key in PROVIDER_DEFAULTS},
     **{f"toolbox.timeouts[{key}]": key for key in TIMEOUT_KEYS},

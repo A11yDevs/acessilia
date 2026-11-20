@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 
+import pytest
+
 from docstruct.export.pandoc_ast import (
     FORMULA_ALT_CLASS,
     build_pandoc_ast,
@@ -51,6 +53,7 @@ def _collect_formula_spans(node: object) -> list[dict]:
 
 
 def _multi_formula_document() -> dict:
+    """Document exercising every block visitor that emits Math inlines."""
     return {
         "title": "Physics",
         "language": "en-US",
@@ -88,6 +91,57 @@ def _multi_formula_document() -> dict:
                         },
                     },
                     {
+                        "id": "l-1",
+                        "type": "list",
+                        "items": [r"Item $k + 1$", r"Bad $\badlist{1}$"],
+                        "metadata": {
+                            "inline_math": [
+                                {"source": "k + 1", "latex": "k + 1", "mathml": MATHML},
+                                {"source": r"\badlist{1}", "latex": r"\badlist{1}"},
+                            ]
+                        },
+                    },
+                    {
+                        "id": "q-1",
+                        "type": "quote",
+                        "text": r"Quoted $\badquote{q}$",
+                        "metadata": {
+                            "inline_math": [
+                                {"source": r"\badquote{q}", "latex": r"\badquote{q}"},
+                            ]
+                        },
+                    },
+                    {
+                        "id": "d-1",
+                        "type": "details",
+                        "text": "Details $d_1$",
+                        "metadata": {
+                            "inline_math": [
+                                {"source": "d_1", "latex": "d_1", "mathml": MATHML},
+                            ]
+                        },
+                    },
+                    {
+                        "id": "n-1",
+                        "type": "note",
+                        "text": r"Note $\badnote{n}$",
+                        "metadata": {
+                            "inline_math": [
+                                {"source": r"\badnote{n}", "latex": r"\badnote{n}"},
+                            ]
+                        },
+                    },
+                    {
+                        "id": "w-1",
+                        "type": "warning",
+                        "text": "Warning $w_1$",
+                        "metadata": {
+                            "inline_math": [
+                                {"source": "w_1", "latex": "w_1", "mathml": MATHML},
+                            ]
+                        },
+                    },
+                    {
                         "id": "t-1",
                         "type": "table",
                         "table_ast": {
@@ -117,14 +171,20 @@ def _multi_formula_document() -> dict:
     }
 
 
-def test_count_math_nodes_covers_display_inline_and_tables():
-    ast = build_pandoc_ast(_multi_formula_document())
+def test_count_math_nodes_covers_all_block_types():
+    ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
 
-    assert count_math_nodes(ast) == 7
+    assert count_math_nodes(ast) == 13
     assert _collect_math_latex(ast) == [
         "E = mc^2",
         "a + b",
         r"\chemfig{H-O-H}",
+        "k + 1",
+        r"\badlist{1}",
+        r"\badquote{q}",
+        "d_1",
+        r"\badnote{n}",
+        "w_1",
         "x^2",
         "y",
         r"\ce{H2O}",
@@ -133,17 +193,20 @@ def test_count_math_nodes_covers_display_inline_and_tables():
 
 
 def test_degrade_math_to_text_selective_preserves_other_formulas_and_alt_spans():
-    ast = build_pandoc_ast(_multi_formula_document())
+    ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
     snapshot = deepcopy(ast)
 
-    degraded = degrade_math_to_text(ast, indices={2, 5})
+    degraded = degrade_math_to_text(ast, indices={2, 4, 5, 7, 11})
 
     # Original AST is untouched.
     assert ast == snapshot
-    # Only indices 2 (\chemfig) and 5 (\ce) were degraded.
+    # Only the targeted indices were degraded across prose, list, callouts, and table.
     assert _collect_math_latex(degraded) == [
         "E = mc^2",
         "a + b",
+        "k + 1",
+        "d_1",
+        "w_1",
         "x^2",
         "y",
         r"\frac{1}{2}",
@@ -159,26 +222,36 @@ def test_degrade_math_to_text_selective_preserves_other_formulas_and_alt_spans()
     blocks_json = json.dumps(degraded["blocks"])
     assert "chemfig" in blocks_json
     assert "water" not in blocks_json
+    assert "badlist" in blocks_json
+    assert "badquote" in blocks_json
+    assert "badnote" in blocks_json
     assert "H2O" in blocks_json
 
 
 def test_degrade_math_to_text_empty_indices_keeps_ast_equal():
-    ast = build_pandoc_ast(_multi_formula_document())
+    ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
 
     assert degrade_math_to_text(ast, indices=set()) == ast
 
 
 def test_degrade_math_to_text_all_indices_matches_full_degradation():
-    ast = build_pandoc_ast(_multi_formula_document())
+    ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
     total = count_math_nodes(ast)
 
     assert degrade_math_to_text(ast, indices=range(total)) == degrade_math_to_text(ast)
 
 
-def test_unconverted_math_indices_identifies_formulas_without_mathml():
+def test_unconverted_math_indices_tracks_every_block_visitor():
     ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
 
-    assert unconverted_math_indices(ast, target_format="pdf_ua") == frozenset({2, 5})
+    assert unconverted_math_indices(ast, target_format="pdf_ua") == frozenset({2, 4, 5, 7, 11})
+
+
+def test_unconverted_math_indices_requires_target_format():
+    ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
+
+    with pytest.raises(TypeError):
+        unconverted_math_indices(ast)  # type: ignore[call-arg]
 
 
 def test_unconverted_math_indices_empty_when_no_formula_has_mathml():
@@ -198,9 +271,9 @@ def test_unconverted_math_indices_empty_when_no_formula_has_mathml():
             }
         ],
     }
-    ast = build_pandoc_ast(doc)
+    ast = build_pandoc_ast(doc, target_format="pdf_ua")
 
-    assert unconverted_math_indices(ast) == frozenset()
+    assert unconverted_math_indices(ast, target_format="pdf_ua") == frozenset()
 
 
 def test_unconverted_math_indices_empty_when_all_formulas_have_mathml():
@@ -220,13 +293,13 @@ def test_unconverted_math_indices_empty_when_all_formulas_have_mathml():
             }
         ],
     }
-    ast = build_pandoc_ast(doc)
+    ast = build_pandoc_ast(doc, target_format="pdf_ua")
 
-    assert unconverted_math_indices(ast) == frozenset()
+    assert unconverted_math_indices(ast, target_format="pdf_ua") == frozenset()
 
 
 def test_unconverted_math_indices_empty_when_ast_drifted_from_source():
-    ast = build_pandoc_ast(_multi_formula_document())
+    ast = build_pandoc_ast(_multi_formula_document(), target_format="pdf_ua")
     tampered = {**ast, "blocks": ast["blocks"][:1]}
 
-    assert unconverted_math_indices(tampered) == frozenset()
+    assert unconverted_math_indices(tampered, target_format="pdf_ua") == frozenset()

@@ -1587,11 +1587,11 @@ msgstr "PDF/UA renderizado pela Toolbox: {output_path}"
 
 #, python-brace-format
 msgid ""
-"The Toolbox rejected the PDF/UA math; retrying with formulas as literal "
+"The Toolbox rejected the PDF/UA math; exported with formulas as literal "
 "text: {error}"
 msgstr ""
-"A Toolbox rejeitou a matemática do PDF/UA; tentando de novo com as "
-"fórmulas como texto: {error}"
+"A Toolbox rejeitou a matemática do PDF/UA; exportado com as fórmulas como"
+" texto literal: {error}"
 
 #, python-brace-format
 msgid ""
@@ -1600,6 +1600,16 @@ msgid ""
 msgstr ""
 "A Toolbox rejeitou parte da matemática do PDF/UA; exportado com "
 "{degraded} de {total} fórmula(s) como texto literal: {error}"
+
+#, python-brace-format
+msgid ""
+"PDF/UA math isolation reached its {attempts}-render budget; exported with"
+" {degraded} of {total} formula(s) as literal text (some were not "
+"individually isolated): {error}"
+msgstr ""
+"O isolamento de matemática do PDF/UA atingiu o limite de {attempts} "
+"renderização(ões); exportado com {degraded} de {total} fórmula(s) como "
+"texto literal (algumas não foram isoladas individualmente): {error}"
 
 #, python-brace-format
 msgid "TXT exported: {output_path}"

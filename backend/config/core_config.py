@@ -88,6 +88,7 @@ def core_config_from_settings(settings: Settings | None = None) -> CoreConfig:
             object_markers_enabled=s.object_markers_enabled,
             toolbox_docx_enabled=s.toolbox_docx_enabled,
             toolbox_pdf_ua_enabled=s.toolbox_pdf_ua_enabled,
+            toolbox_pdf_ua_math_bisect_budget=s.toolbox_pdf_ua_math_bisect_budget,
         ),
         paths=PathsConfig(data_dir=s.data_dir),
     )

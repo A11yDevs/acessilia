@@ -1,5 +1,6 @@
 """PDF/UA export wrapper around the shared pandoc export entry point."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ def export_pdf_ua(
     *,
     export: ExportConfig,
     toolbox: ToolboxConfig,
+    check_cancelled: Callable[[], None] | None = None,
 ) -> Path:
     """Export a canonical document (or raw markdown/text) to an accessible PDF/UA document.
 
@@ -27,6 +29,8 @@ def export_pdf_ua(
         title (str | None): Document title override; when None the localized default title is used.
         export (ExportConfig): The run's export configuration, which enables the Toolbox rendering.
         toolbox (ToolboxConfig): The run's Toolbox configuration, which renders it.
+        check_cancelled (Callable[[], None] | None): Optional cancellation probe checked before
+            each PDF/UA math-isolation retry render.
 
     Returns:
         Path: The output_path where the PDF/UA was written.
@@ -39,6 +43,7 @@ def export_pdf_ua(
         profile_name="pdf_ua",
         export=export,
         toolbox=toolbox,
+        check_cancelled=check_cancelled,
     )
     logger.debug(t(LOG_PDF_UA_EXPORTED).format(output_path=output_path))
     return result
