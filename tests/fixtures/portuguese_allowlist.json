@@ -79,7 +79,6 @@
     "libs/docstruct/src/docstruct/fusion/tailjoin.py": 24,
     "libs/docstruct/src/docstruct/fusion/types.py": 6,
     "libs/docstruct/src/docstruct/fusion/verse.py": 28,
-    "libs/docstruct/src/docstruct/imaging/__init__.py": 1,
     "libs/docstruct/src/docstruct/imaging/policy.py": 27,
     "libs/docstruct/src/docstruct/policy.py": 63,
     "libs/docstruct/src/docstruct/regions/classify.py": 1,
