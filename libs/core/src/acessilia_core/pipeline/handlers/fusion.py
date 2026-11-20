@@ -22,8 +22,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
-import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -43,6 +41,7 @@ from acessilia_core.pipeline.elements import (
 from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
+    write_atomic_artifact,
 )
 from acessilia_core.pipeline.handlers.messages import (
     MSG_DUAL_FUSION_DONE,
@@ -549,26 +548,17 @@ def _persist_fusion_payload(
     under the run's ``data_dir``."""
 
     content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    digest = hashlib.sha256(content).hexdigest()
     scope = hashlib.sha256(json.dumps([
         manifest.manifest_id, manifest.source.document_id, manifest.source.sha256,
         manifest.revision, obligation_id,
     ]).encode()).hexdigest()
-    output_path = data_dir / "artifacts" / "fusion" / scope / f"{digest}.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(dir=output_path.parent, delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(content)
-        os.replace(temporary, output_path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    return Artifact(
-        id=f"artifact-{kind.removesuffix('-payload')}-{scope[:16]}-{digest[:16]}",
+    return write_atomic_artifact(
+        content,
+        category="fusion",
+        scope=scope,
         kind=kind,
-        path=str(output_path),
+        suffix="json",
         media_type="application/json",
-        sha256=digest,
+        data_dir=data_dir,
+        id_prefix=kind.removesuffix("-payload"),
     )

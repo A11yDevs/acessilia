@@ -596,6 +596,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
         ("acessilia_core.manifest.toolbox_extractor:_persist_secondary_extraction", "data_dir"),
         ("acessilia_core.pipeline.handlers.fusion:_persist_fusion_payload", "data_dir"),
         ("acessilia_core.pipeline.handlers.inspection:_save_region_artifact", "data_dir"),
+        ("acessilia_core.pipeline.handlers.common:write_atomic_artifact", "data_dir"),
         ("acessilia_core.agents.vision_agent:VisionAgent.__init__", "models"),
         ("acessilia_core.agents.data_agent:DataAgent.__init__", "models"),
         ("acessilia_core.agents.data_agent:DataAgent.__init__", "toolbox"),
