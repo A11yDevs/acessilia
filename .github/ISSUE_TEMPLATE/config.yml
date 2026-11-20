@@ -1,0 +1,3 @@
+# Keep blank issues enabled so architectural plans, RFCs and discussions can
+# still be opened freely (#323).
+blank_issues_enabled: true

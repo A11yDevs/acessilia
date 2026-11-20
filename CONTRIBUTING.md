@@ -400,6 +400,8 @@ CI fails; `uv lock` updates it.
 
 ## Issue triage
 
+When reporting a defect, use the [bug report issue form](.github/ISSUE_TEMPLATE/bug_report.yml) so the report carries the minimum reproduction details (versions, environment flags, input, command, and assistive technology when relevant); improvements can use the [feature/enhancement form](.github/ISSUE_TEMPLATE/feature_request.yml), and blank issues remain enabled for architectural plans and discussions.
+
 Every open issue has an issue **type** and carries exactly one **category** label and one **urgency** label. The type says what kind of issue it is; the two labels say what it improves and how soon it matters.
 
 | Type | Use it for | Matching label |

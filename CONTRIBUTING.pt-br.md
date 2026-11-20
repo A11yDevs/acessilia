@@ -404,6 +404,8 @@ request, senão o CI falha; `uv lock` o atualiza.
 
 ## Triagem de issues
 
+Ao reportar um defeito, use o [formulário de relato de bug](.github/ISSUE_TEMPLATE/bug_report.yml) para incluir os campos mínimos de reprodução (versões, flags de ambiente, entrada, comando e tecnologia assistiva quando aplicável); melhorias podem usar o [formulário de melhoria/funcionalidade](.github/ISSUE_TEMPLATE/feature_request.yml), e issues em branco continuam habilitadas para planos arquiteturais e discussões.
+
 Toda issue aberta tem um **tipo** de issue e exatamente um rótulo de **categoria** e um de **urgência**. O tipo diz que espécie de issue ela é; os dois rótulos dizem o que ela melhora e em quanto tempo importa.
 
 | Tipo | Use para | Rótulo correspondente |

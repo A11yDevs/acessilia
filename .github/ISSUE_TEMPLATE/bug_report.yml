@@ -1,0 +1,116 @@
+name: Bug report
+description: Report unexpected behaviour or an accessibility defect with minimum reproduction details
+type: Bug
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write the report in English (constitution, principle 2.8) and fill in the reproduction fields below so the defect can be reproduced and verified after a fix.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence stating what is wrong and who it affects.
+      placeholder: "e.g. PDF/UA export drops typeset math for all formulas when a single macro is rejected"
+    validations:
+      required: true
+
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: Core commit/branch (`git rev-parse --short HEAD`, or the image tag) and the Toolbox version or image tag that produced the output.
+      placeholder: |
+        - Core: `develop` (`abc1234`) or `ghcr.io/a11ydevs/acessilia:develop`
+        - Toolbox: `v0.2.0` or `ghcr.io/a11ydevs/acessilia-toolbox:develop`
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Deployment target (staging / local / production) and relevant environment flags (`FUSION_MODE`, `INLINE_MATH_DETECTION`, `LEGACY_UNICODE_REPAIR`, etc.).
+      placeholder: |
+        - Target: local / staging / production
+        - Flags: `FUSION_MODE=dual`, `INLINE_MATH_DETECTION=fonts`, `LEGACY_UNICODE_REPAIR=auto`
+    validations:
+      required: true
+
+  - type: textarea
+    id: providers_and_models
+    attributes:
+      label: Providers and models
+      description: Extraction provider(s), vision model and served context size, and `math.recognize` provider (if applicable).
+      placeholder: |
+        - Extraction: `docling` / `mineru`
+        - Vision model: `qwen3-vl-8b` (context size: 32768)
+        - Formula recognition: `pp-formulanet`
+    validations:
+      required: false
+
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      description: Dataset case ID or attached file, and the exact pages or slides processed.
+      placeholder: "e.g. dataset case `math-ref-01`, pages 1-4 (or attach a minimal file)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps / command
+      description: Exact command (e.g. `python -m scripts.bench.math_case run`) or API/web/Telegram flow to reproduce.
+      placeholder: |
+        1. Run `python -m scripts.bench.math_case run ...`
+        2. Inspect the generated output / logs
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What should happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What actually happened, including an output excerpt (HTML, canonical payload, PDF tag tree) or relevant log lines.
+    validations:
+      required: true
+
+  - type: textarea
+    id: assistive_technology
+    attributes:
+      label: Assistive technology
+      description: Needed for accessibility, speech, or reading defects — screen reader + version, synthesizer/voice, and browser or PDF viewer + version.
+      placeholder: "e.g. NVDA 2025.1 + eSpeak NG (pt-BR), Firefox 136 / Adobe Acrobat Reader"
+    validations:
+      required: false
+
+  - type: input
+    id: reproducibility
+    attributes:
+      label: Reproducibility
+      description: How often this occurs — always, sometimes (n of m runs), or once.
+      placeholder: "always / sometimes (3 of 5 runs) / once"
+    validations:
+      required: true
+
+  - type: textarea
+    id: suspected_cause
+    attributes:
+      label: Suspected cause
+      description: Relevant file path and line number, or initial hypothesis, if known.
+      placeholder: "e.g. `libs/core/src/acessilia_core/export/pandoc_exporter.py:173`"
+    validations:
+      required: false

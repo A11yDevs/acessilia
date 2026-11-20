@@ -1,0 +1,41 @@
+name: Feature or enhancement request
+description: Propose an improvement to existing behaviour or a new capability
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write the proposal in English (constitution, principle 2.8). For architectural plans or open-ended discussions, you may also open a blank issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What gap, friction, or user need motivates this change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the desired behaviour or change and which component(s) it touches (`core`, `sdk`, `docstruct`, `Toolbox`).
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable conditions that define when this request is done.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Related issues, ADRs, benchmarks, or alternatives considered.
+    validations:
+      required: false
