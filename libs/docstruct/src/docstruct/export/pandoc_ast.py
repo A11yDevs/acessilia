@@ -5,6 +5,7 @@ document dict -> Pandoc JSON AST (in-memory dict), no I/O.
 """
 from __future__ import annotations
 
+from collections.abc import Collection
 import re
 from typing import Any
 from docstruct.blocks.lists import list_numbering, list_start
@@ -99,9 +100,33 @@ def _section_to_blocks(section: dict[str, Any], *, target_format: str = "latex")
     return _document_blocks({"sections": [section]}, target_format)
 
 
-def _document_blocks(document: dict[str, Any], target_format: str) -> list[dict[str, Any]]:
+class _MathStatusTracker:
+    """Tracks emitted Math inlines and whether each carried converted MathML."""
+
+    def __init__(self) -> None:
+        self.total = 0
+        self.with_mathml = 0
+        self.without_mathml: list[int] = []
+
+    def record(self, has_mathml: bool) -> None:
+        index = self.total
+        self.total += 1
+        if has_mathml:
+            self.with_mathml += 1
+        else:
+            self.without_mathml.append(index)
+
+
+def _document_blocks(
+    document: dict[str, Any],
+    target_format: str,
+    *,
+    tracker: _MathStatusTracker | None = None,
+) -> list[dict[str, Any]]:
     return [block for group in walk(
-        document, _visitor(target_format), select=lambda block, ctx: not ctx.is_legacy_title,
+        document,
+        _visitor(target_format, tracker=tracker),
+        select=lambda block, ctx: not ctx.is_legacy_title,
     ) for block in group]
 
 
@@ -129,20 +154,22 @@ def _section_title(ctx: SectionContext) -> list[dict[str, Any]]:
     return blocks
 
 
-def _visitor(target_format: str) -> Visitor[list[dict[str, Any]]]:
+def _visitor(
+    target_format: str, *, tracker: _MathStatusTracker | None = None
+) -> Visitor[list[dict[str, Any]]]:
     return Visitor(
         default=lambda block, ctx: _text(block),
         heading=lambda block, ctx: _heading(block),
-        paragraph=lambda block, ctx: _paragraph(block),
-        list=lambda block, ctx: _list(block),
-        table=lambda block, ctx: _table(block),
+        paragraph=lambda block, ctx: _paragraph(block, tracker=tracker),
+        list=lambda block, ctx: _list(block, tracker=tracker),
+        table=lambda block, ctx: _table(block, tracker=tracker),
         image=lambda block, ctx: _image(block),
         code=lambda block, ctx: _code(block),
-        math=lambda block, ctx: _math(block, target_format),
-        quote=lambda block, ctx: _quote(block),
-        details=lambda block, ctx: _quote(block),
-        note=lambda block, ctx: _quote(block),
-        warning=lambda block, ctx: _quote(block),
+        math=lambda block, ctx: _math(block, target_format, tracker=tracker),
+        quote=lambda block, ctx: _quote(block, tracker=tracker),
+        details=lambda block, ctx: _quote(block, tracker=tracker),
+        note=lambda block, ctx: _quote(block, tracker=tracker),
+        warning=lambda block, ctx: _quote(block, tracker=tracker),
         enter_section=_section_title,
     )
 
@@ -167,8 +194,10 @@ def _heading(block: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _paragraph(block: dict[str, Any]) -> list[dict[str, Any]]:
-    return [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}]
+def _paragraph(
+    block: dict[str, Any], *, tracker: _MathStatusTracker | None = None
+) -> list[dict[str, Any]]:
+    return [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block, tracker=tracker)}]
 
 
 def _code(block: dict[str, Any]) -> list[dict[str, Any]]:
@@ -183,9 +212,11 @@ def _code(block: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _list(block: dict[str, Any]) -> list[dict[str, Any]]:
+def _list(
+    block: dict[str, Any], *, tracker: _MathStatusTracker | None = None
+) -> list[dict[str, Any]]:
     items = [
-        [{"t": "Para", "c": _prose_inlines(str(item), block)}]
+        [{"t": "Para", "c": _prose_inlines(str(item), block, tracker=tracker)}]
         for item in block.get("items", [])
     ]
     if block.get("ordered"):
@@ -195,11 +226,13 @@ def _list(block: dict[str, Any]) -> list[dict[str, Any]]:
     return [{"t": "BulletList", "c": items}]
 
 
-def _table(block: dict[str, Any]) -> list[dict[str, Any]]:
+def _table(
+    block: dict[str, Any], *, tracker: _MathStatusTracker | None = None
+) -> list[dict[str, Any]]:
     table_ast = table_ast_from_block(block)
     if table_ast is None:
         return []
-    return [_table_to_pandoc_ast(table_ast, block)]
+    return [_table_to_pandoc_ast(table_ast, block, tracker=tracker)]
 
 
 def _image(block: dict[str, Any]) -> list[dict[str, Any]]:
@@ -211,11 +244,18 @@ def _image(block: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _math(block: dict[str, Any], target_format: str) -> list[dict[str, Any]]:
+def _math(
+    block: dict[str, Any],
+    target_format: str,
+    *,
+    tracker: _MathStatusTracker | None = None,
+) -> list[dict[str, Any]]:
     metadata = block.get("metadata") or {}
     latex = numbered_latex(str(block.get("text", "")), metadata, use_tag=target_format != "docx")
     if _has_unsafe_latex_macro(latex):
         return [{"t": "Para", "c": _meta_inlines(_math_as_text(latex))}]
+    if tracker is not None:
+        tracker.record(bool(metadata.get("mathml")))
     # A math block is a formula of its own, so it is display math. This
     # reaches every Pandoc writer: DOCX typesets it as a display equation
     # (oMathPara) where it used to be inline. (The HTML export does not go
@@ -237,11 +277,13 @@ def _math(block: dict[str, Any], target_format: str) -> list[dict[str, Any]]:
     return [{"t": "Para", "c": [math]}]
 
 
-def _quote(block: dict[str, Any]) -> list[dict[str, Any]]:
+def _quote(
+    block: dict[str, Any], *, tracker: _MathStatusTracker | None = None
+) -> list[dict[str, Any]]:
     return [
         {
             "t": "BlockQuote",
-            "c": [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block)}],
+            "c": [{"t": "Para", "c": _prose_inlines(block.get("text", ""), block, tracker=tracker)}],
         }
     ]
 
@@ -263,7 +305,12 @@ def _meta_inlines(text: str) -> list[dict[str, Any]]:
     return inlines
 
 
-def _prose_inlines(text: str, block: dict[str, Any]) -> list[dict[str, Any]]:
+def _prose_inlines(
+    text: str,
+    block: dict[str, Any],
+    *,
+    tracker: _MathStatusTracker | None = None,
+) -> list[dict[str, Any]]:
     """Inlines of a prose text whose ``$…$`` spans become ``InlineMath``.
 
     A span the canonical enrichment converted takes its normalized LaTeX and,
@@ -286,6 +333,8 @@ def _prose_inlines(text: str, block: dict[str, Any]) -> list[dict[str, Any]]:
         if _has_unsafe_latex_macro(latex):
             inlines.extend(_meta_inlines(latex))
             continue
+        if tracker is not None:
+            tracker.record(bool(entry.get("mathml")))
         math: dict[str, Any] = {"t": "Math", "c": [{"t": "InlineMath"}, latex]}
         speech = str(entry.get("speech") or "").strip()
         if speech:
@@ -309,52 +358,125 @@ _ORDERED_LIST_STYLES = {
 }
 
 
-def degrade_math_to_text(document_ast: dict[str, Any]) -> dict[str, Any]:
-    """A copy of the Pandoc AST whose Math inlines carry the formula as text.
+def count_math_nodes(document_ast: dict[str, Any]) -> int:
+    """Count every ``Math`` inline in ``document_ast`` in pre-order walk order."""
+    return _count_math_nodes(document_ast.get("blocks", []))
+
+
+def _count_math_nodes(node: Any) -> int:
+    if isinstance(node, list):
+        return sum(_count_math_nodes(item) for item in node)
+    if isinstance(node, dict):
+        if node.get("t") == "Math":
+            return 1
+        if "c" in node:
+            return _count_math_nodes(node["c"])
+    return 0
+
+
+def unconverted_math_indices(
+    document_ast: dict[str, Any], *, target_format: str = "latex"
+) -> frozenset[int]:
+    """0-based ``Math`` indices whose source formula lacks converted MathML.
+
+    Only returns indices when at least one formula in the document *does* carry
+    MathML (so ``math.convert`` ran and succeeded elsewhere, making missing
+    MathML a signal that its LaTeX was rejected rather than that enrichment was
+    absent or unavailable) and when the source walk matches the AST's ``Math``
+    node count. Callers use this as the cheapest first suspect set before
+    bisecting (#258).
+    """
+    source = document_ast.get("source_document")
+    if not isinstance(source, dict):
+        return frozenset()
+    tracker = _MathStatusTracker()
+    _document_blocks(source, target_format, tracker=tracker)
+    if tracker.total != count_math_nodes(document_ast):
+        return frozenset()
+    if tracker.with_mathml == 0 or not tracker.without_mathml:
+        return frozenset()
+    return frozenset(tracker.without_mathml)
+
+
+def degrade_math_to_text(
+    document_ast: dict[str, Any], *, indices: Collection[int] | None = None
+) -> dict[str, Any]:
+    """A copy of the Pandoc AST with selected (or all) ``Math`` inlines as text.
 
     The Toolbox compiles the PDF/UA AST with LaTeX, and math its compiler
     rejects (a macro the template does not load, e.g. ``\\chemfig`` from a
     chemical structure a vision model classified as a formula) fails the
-    whole document. The fallback exports the formula source as literal text
-    — the same representation the HTML and TXT renderers already show — so
-    one block cannot lose the PDF. The walk covers the whole payload (a
-    ``Math`` inside a quote, a ``Div`` or a table cell degrades too), and the
-    input AST is left untouched. With no ``Math`` inline the copy equals the
-    input, which callers use to skip a pointless retry.
+    whole document. The fallback exports the failing formula source as literal
+    text — the same representation the HTML and TXT renderers already show — so
+    one block cannot lose the PDF.
+
+    When ``indices`` is ``None`` (the default), every ``Math`` inline is
+    degraded. When ``indices`` is given, only the 0-based ``Math`` inlines at
+    those pre-order positions are degraded; all other ``Math`` inlines and
+    their ``FORMULA_ALT_CLASS`` spans survive untouched (#258). The walk covers
+    the whole payload (a ``Math`` inside a quote, a ``Div`` or a table cell
+    degrades too), and the input AST is left untouched. With no ``Math`` inline
+    degraded, the copy equals the input.
     """
+    target = None if indices is None else frozenset(indices)
+    cursor = [0]
     return {
         **document_ast,
         "blocks": [
-            _degrade_node(block) for block in document_ast.get("blocks", [])
+            _degrade_node(block, target, cursor) for block in document_ast.get("blocks", [])
         ],
     }
 
 
-def _degrade_node(node: Any) -> Any:
-    """Rebuild ``node`` with every ``Math`` inline replaced by its text.
+def _contains_math(node: Any) -> bool:
+    if isinstance(node, list):
+        return any(_contains_math(item) for item in node)
+    if isinstance(node, dict):
+        if node.get("t") == "Math":
+            return True
+        if "c" in node:
+            return _contains_math(node["c"])
+    return False
 
-    Lists and dicts come back with the same shape: a ``Math`` inline expands
-    into the text inlines that replace it in place, everything else is
+
+def _degrade_node(
+    node: Any, target: frozenset[int] | None = None, cursor: list[int] | None = None
+) -> Any:
+    """Rebuild ``node`` with targeted ``Math`` inlines replaced by their text.
+
+    Lists and dicts come back with the same shape: a degraded ``Math`` inline
+    expands into the text inlines that replace it in place, everything else is
     walked through ``c`` and rebuilt. A formula span (``FORMULA_ALT_CLASS``)
-    is unwrapped too: once its formula is text there is no Formula element
-    for the alternate text, and an ``alt`` left on plain text would be
-    behaviour nobody asked for.
+    is unwrapped when its formula is degraded — once its formula is text there
+    is no Formula element for the alternate text — and preserved when its
+    ``Math`` inline survives.
     """
+    if cursor is None:
+        cursor = [0]
     if isinstance(node, list):
         rebuilt: list[Any] = []
         for item in node:
             if isinstance(item, dict) and item.get("t") == "Math":
-                latex = ""
-                if isinstance(item.get("c"), list) and len(item["c"]) > 1:
-                    latex = str(item["c"][1])
-                rebuilt.extend(_meta_inlines(_math_as_text(latex)))
+                index = cursor[0]
+                cursor[0] += 1
+                if target is None or index in target:
+                    latex = ""
+                    if isinstance(item.get("c"), list) and len(item["c"]) > 1:
+                        latex = str(item["c"][1])
+                    rebuilt.extend(_meta_inlines(_math_as_text(latex)))
+                else:
+                    rebuilt.append(item)
             elif _is_formula_span(item):
-                rebuilt.extend(_degrade_node(item["c"][1]))
+                children = _degrade_node(item["c"][1], target, cursor)
+                if _contains_math(children):
+                    rebuilt.append({**item, "c": [item["c"][0], children]})
+                else:
+                    rebuilt.extend(children)
             else:
-                rebuilt.append(_degrade_node(item))
+                rebuilt.append(_degrade_node(item, target, cursor))
         return rebuilt
     if isinstance(node, dict) and "c" in node:
-        return {**node, "c": _degrade_node(node["c"])}
+        return {**node, "c": _degrade_node(node["c"], target, cursor)}
     return node
 
 
@@ -379,7 +501,10 @@ def _is_formula_span(node: Any) -> bool:
 
 
 def _table_to_pandoc_ast(
-    table_ast: dict[str, Any], block: dict[str, Any] | None = None
+    table_ast: dict[str, Any],
+    block: dict[str, Any] | None = None,
+    *,
+    tracker: _MathStatusTracker | None = None,
 ) -> dict[str, Any]:
     """A Pandoc ``Table``; ``block``'s converted inline math renders the ``$…$``
     of the caption and cells as ``InlineMath`` (#260)."""
@@ -400,22 +525,28 @@ def _table_to_pandoc_ast(
 
     caption_text = table_ast.get("caption")
     short_caption = (
-        _prose_inlines(caption_text, block)
+        _prose_inlines(caption_text, block, tracker=tracker)
         if isinstance(caption_text, str) and caption_text.strip()
         else None
     )
     caption = [short_caption, []]
 
-    head = [["", [], []], [_pandoc_row(row, header=True, block=block) for row in header_rows]]
+    head = [
+        ["", [], []],
+        [_pandoc_row(row, header=True, block=block, tracker=tracker) for row in header_rows],
+    ]
     bodies = [
         [
             ["", [], []],
             row_head_columns,
             [],
-            [_pandoc_row(row, header=False, block=block) for row in body_rows],
+            [_pandoc_row(row, header=False, block=block, tracker=tracker) for row in body_rows],
         ]
     ]
-    foot = [["", [], []], [_pandoc_row(row, header=False, block=block) for row in footer_rows]]
+    foot = [
+        ["", [], []],
+        [_pandoc_row(row, header=False, block=block, tracker=tracker) for row in footer_rows],
+    ]
 
     return {
         "t": "Table",
@@ -430,12 +561,23 @@ def _table_to_pandoc_ast(
     }
 
 
-def _pandoc_row(row: dict[str, Any], *, header: bool, block: dict[str, Any]) -> list[Any]:
+def _pandoc_row(
+    row: dict[str, Any],
+    *,
+    header: bool,
+    block: dict[str, Any],
+    tracker: _MathStatusTracker | None = None,
+) -> list[Any]:
     cells = row.get("cells", []) if isinstance(row, dict) else []
     return [
         ["", [], []],
         [
-            _pandoc_cell(cell, header=header or _cell_is_header(cell), block=block)
+            _pandoc_cell(
+                cell,
+                header=header or _cell_is_header(cell),
+                block=block,
+                tracker=tracker,
+            )
             for cell in cells
             if isinstance(cell, dict)
         ],
@@ -452,7 +594,13 @@ def _cell_is_header(cell: dict[str, Any]) -> bool:
     }
 
 
-def _pandoc_cell(cell: dict[str, Any], *, header: bool, block: dict[str, Any]) -> list[Any]:
+def _pandoc_cell(
+    cell: dict[str, Any],
+    *,
+    header: bool,
+    block: dict[str, Any],
+    tracker: _MathStatusTracker | None = None,
+) -> list[Any]:
     text = str(cell.get("text", "")).strip()
     rowspan = cell.get("rowspan") if isinstance(cell.get("rowspan"), int) else 1
     colspan = cell.get("colspan") if isinstance(cell.get("colspan"), int) else 1
@@ -471,5 +619,5 @@ def _pandoc_cell(cell: dict[str, Any], *, header: bool, block: dict[str, Any]) -
         alignment,
         max(1, int(rowspan)),
         max(1, int(colspan)),
-        [{"t": block_kind, "c": _prose_inlines(text, block)}],
+        [{"t": block_kind, "c": _prose_inlines(text, block, tracker=tracker)}],
     ]

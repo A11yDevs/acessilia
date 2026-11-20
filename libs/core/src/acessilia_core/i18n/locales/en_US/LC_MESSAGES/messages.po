@@ -1575,6 +1575,14 @@ msgstr ""
 "text: {error}"
 
 #, python-brace-format
+msgid ""
+"The Toolbox rejected part of the PDF/UA math; exported with {degraded} of"
+" {total} formula(s) as literal text: {error}"
+msgstr ""
+"The Toolbox rejected part of the PDF/UA math; exported with {degraded} of"
+" {total} formula(s) as literal text: {error}"
+
+#, python-brace-format
 msgid "TXT exported: {output_path}"
 msgstr "TXT exported: {output_path}"
 

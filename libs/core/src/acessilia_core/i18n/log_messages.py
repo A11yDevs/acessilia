@@ -530,6 +530,13 @@ LOG_PDF_UA_TOOLBOX_EXPORTED: str = "PDF/UA rendered by the Toolbox: {output_path
 LOG_PDF_UA_MATH_DEGRADED: str = (
     "The Toolbox rejected the PDF/UA math; retrying with formulas as literal text: {error}"
 )
+#: Warning logged when the Toolbox rejected part of the PDF/UA AST's math and the export succeeded
+#: by degrading only the offending formulas to literal text; {degraded} of {total} formulas degraded
+#: and {error} is the initial rejection cause.
+LOG_PDF_UA_MATH_PARTIALLY_DEGRADED: str = (
+    "The Toolbox rejected part of the PDF/UA math; exported with {degraded} of {total} "
+    "formula(s) as literal text: {error}"
+)
 #: Info logged when the worker skips PDF/UA because TOOLBOX_PDF_UA_ENABLED is false.
 LOG_PDF_UA_SKIPPED_DISABLED: str = "PDF/UA skipped: TOOLBOX_PDF_UA_ENABLED is false"
 #: Info logged when the PDF/UA audit is skipped because TOOLBOX_PDF_VALIDATE_ENABLED is false.

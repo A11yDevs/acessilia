@@ -19,13 +19,16 @@ from docstruct.validation import validate_against_schema
 
 from docstruct.export.filters import strip_internal_audit_blocks
 from docstruct.export.pandoc_ast import build_pandoc_ast
+from docstruct.export.pandoc_ast import count_math_nodes
 from docstruct.export.pandoc_ast import degrade_math_to_text
+from docstruct.export.pandoc_ast import unconverted_math_indices
 
 from acessilia_core.config import ExportConfig, ToolboxConfig
 from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
+from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_PARTIALLY_DEGRADED
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
 from acessilia_core.export.messages import (
     MSG_AUDIT_FAILED,
@@ -44,6 +47,8 @@ from acessilia_core.logger import logger
 
 #: BCP 47 language for the document metadata when the document declares none.
 DEFAULT_EXPORT_LANG = "pt-BR"
+#: Upper bound on Toolbox retry renders spent bisecting failing PDF/UA formulas (#258).
+_MAX_MATH_BISECT_ATTEMPTS = 16
 
 
 def _toolbox_export(
@@ -154,8 +159,9 @@ def _render_pdf_ua(
     Raises:
         RuntimeError: When TOOLBOX_PDF_UA_ENABLED is false.
         acessilia_sdk.toolbox.errors.ToolboxError: When the Toolbox cannot render or deliver the PDF. An input
-            rejection (``ToolboxInvalidInput``) gets one retry with the math exported as literal text, so a
-            formula the LaTeX compiler rejects cannot lose the whole document; a second rejection propagates.
+            rejection (``ToolboxInvalidInput``) degrades only the offending math formulas to literal text
+            (trying formulas ``math.convert`` did not convert first, then bounded bisection, falling back to
+            degrading all math only when needed); a rejection not caused by math propagates.
     """
     if not enabled:
         raise RuntimeError(t(MSG_PDF_UA_DISABLED))
@@ -164,23 +170,152 @@ def _render_pdf_ua(
     try:
         toolbox_export_pdf_ua(ast, output_path, lang=lang, toolbox=toolbox)
     except ToolboxInvalidInput as exc:
-        # ToolboxInvalidInput means the request reached a healthy renderer and
-        # the AST itself is the problem — but not every rejection is about
-        # math. When the AST carries no Math inline left (the builder guard
-        # already exports the dangerous ones as text), the degradation changes
-        # nothing and a retry would resend the identical request, so the
-        # rejection propagates instead.
-        degraded = degrade_math_to_text(ast)
-        if degraded == ast:
-            raise
-        # Math the renderer's LaTeX compiler rejects, e.g. \chemfig from a
-        # chemical structure a vision model classified as a formula. The retry
-        # is a deterministic degradation, not a failover — the formulas go as
-        # literal text, the way the HTML and TXT renderers already show them.
-        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=exc))
-        toolbox_export_pdf_ua(degraded, output_path, lang=lang, toolbox=toolbox)
+        _recover_pdf_ua_math(
+            ast, output_path, lang=lang, toolbox=toolbox, initial_error=exc,
+        )
     logger.info(t(LOG_PDF_UA_TOOLBOX_EXPORTED).format(output_path=output_path))
     return output_path
+
+
+def _recover_pdf_ua_math(
+    ast: dict[str, Any],
+    output_path: Path,
+    *,
+    lang: str,
+    toolbox: ToolboxConfig,
+    initial_error: Exception,
+    max_bisect_attempts: int = _MAX_MATH_BISECT_ATTEMPTS,
+) -> None:
+    """Retry PDF/UA rendering by degrading only the formulas the renderer rejects (#258).
+
+    ``ToolboxInvalidInput`` means the request reached a healthy renderer and
+    the AST itself is the problem — often a single formula with a macro the
+    template does not load (e.g. ``\\chemfig``). Rather than degrading every
+    formula in the document:
+
+    1. When the AST has no ``Math`` inline, re-raise ``initial_error`` without retrying.
+    2. With a single formula, degrade it and retry once (a second rejection propagates).
+    3. With several formulas, isolate the offending ones with bounded bisection,
+       using formulas that ``math.convert`` did not convert (when others did) as
+       the first partition so a known-bad formula costs a single retry. Non-math
+       rejections fail when all math is degraded and propagate immediately.
+    """
+    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
+
+    total = count_math_nodes(ast)
+    if total == 0:
+        raise initial_error
+
+    if total == 1:
+        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=initial_error))
+        toolbox_export_pdf_ua(degrade_math_to_text(ast), output_path, lang=lang, toolbox=toolbox)
+        return
+
+    all_indices = frozenset(range(total))
+    attempts = 0
+    best_degraded: frozenset[int] | None = None
+    last_succeeded: frozenset[int] | None = None
+    last_error: Exception = initial_error
+
+    def try_render(degraded: frozenset[int], *, count_against_budget: bool = True) -> bool:
+        nonlocal attempts, best_degraded, last_succeeded, last_error
+        if count_against_budget:
+            attempts += 1
+        candidate_ast = degrade_math_to_text(ast, indices=degraded)
+        try:
+            toolbox_export_pdf_ua(candidate_ast, output_path, lang=lang, toolbox=toolbox)
+        except ToolboxInvalidInput as exc:
+            last_error = exc
+            return False
+        last_succeeded = degraded
+        if best_degraded is None or len(degraded) < len(best_degraded):
+            best_degraded = degraded
+        return True
+
+    def isolate(
+        candidates: list[int],
+        fixed_degraded: frozenset[int],
+        *,
+        all_degraded_verified: bool,
+        first_right: list[int] | None = None,
+    ) -> frozenset[int]:
+        if len(candidates) == 1:
+            single = frozenset(candidates)
+            if all_degraded_verified:
+                return single
+            if try_render(fixed_degraded | single):
+                return single
+            raise last_error
+
+        if attempts >= max_bisect_attempts:
+            return frozenset(candidates)
+
+        if first_right:
+            right = first_right
+            right_set = frozenset(right)
+            left = [idx for idx in candidates if idx not in right_set]
+        else:
+            mid = len(candidates) // 2
+            left = candidates[:mid]
+            right = candidates[mid:]
+
+        left_set = frozenset(left)
+        right_set = frozenset(right)
+
+        # Probe 1: degrade right (keep left active).
+        if try_render(fixed_degraded | right_set):
+            return isolate(right, fixed_degraded, all_degraded_verified=True)
+
+        if attempts >= max_bisect_attempts:
+            return frozenset(candidates)
+
+        # Probe 2: degrade left (keep right active).
+        if try_render(fixed_degraded | left_set):
+            return isolate(left, fixed_degraded, all_degraded_verified=True)
+
+        # Both halves failed: verify degrading every remaining candidate succeeds
+        # before spending more renders (a non-math rejection fails here too).
+        if not all_degraded_verified:
+            if not try_render(fixed_degraded | left_set | right_set):
+                raise last_error
+            all_degraded_verified = True
+
+        left_bad = isolate(left, fixed_degraded | right_set, all_degraded_verified=True)
+        right_bad = isolate(right, fixed_degraded | left_bad, all_degraded_verified=True)
+        return left_bad | right_bad
+
+    suspects = unconverted_math_indices(ast, target_format="pdf_ua")
+    first_right = sorted(suspects) if 0 < len(suspects) < total else None
+
+    degraded_indices = isolate(
+        list(range(total)),
+        frozenset(),
+        all_degraded_verified=False,
+        first_right=first_right,
+    )
+
+    if best_degraded is None:
+        if not try_render(all_indices, count_against_budget=False):
+            raise last_error
+        degraded_indices = all_indices
+    elif len(best_degraded) < len(degraded_indices):
+        degraded_indices = best_degraded
+
+    if last_succeeded != degraded_indices:
+        if not try_render(degraded_indices, count_against_budget=False):
+            degraded_indices = best_degraded
+            if last_succeeded != degraded_indices:
+                if not try_render(degraded_indices, count_against_budget=False):
+                    raise last_error
+
+    if len(degraded_indices) == total:
+        logger.warning(t(LOG_PDF_UA_MATH_DEGRADED).format(error=initial_error))
+    else:
+        logger.warning(
+            t(LOG_PDF_UA_MATH_PARTIALLY_DEGRADED).format(
+                degraded=len(degraded_indices), total=total, error=initial_error
+            )
+        )
 
 
 def _validate_export_schema(document: dict[str, Any]) -> None:

@@ -199,6 +199,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
+    LOG_PDF_UA_MATH_PARTIALLY_DEGRADED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -897,6 +898,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_MEDIA_INSPECT_FAILED,
     LOG_PDF_UA_TOOLBOX_EXPORTED,
     LOG_PDF_UA_MATH_DEGRADED,
+    LOG_PDF_UA_MATH_PARTIALLY_DEGRADED,
     LOG_TXT_EXPORTED,
     LOG_DOCX_EXPORTED,
     LOG_DOCX_GENERATION_FAILED,
@@ -1897,6 +1899,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # The Toolbox rejected the AST's math and the export retries with the formulas as text; {error} the cause.
         LOG_PDF_UA_MATH_DEGRADED: (
             "A Toolbox rejeitou a matemática do PDF/UA; tentando de novo com as fórmulas como texto: {error}"
+        ),
+        # The Toolbox rejected part of the AST's math and only the offending formulas were degraded.
+        LOG_PDF_UA_MATH_PARTIALLY_DEGRADED: (
+            "A Toolbox rejeitou parte da matemática do PDF/UA; exportado com {degraded} de {total} "
+            "fórmula(s) como texto literal: {error}"
         ),
         # Worker skips PDF/UA because the Toolbox capability is switched off.
         LOG_PDF_UA_SKIPPED_DISABLED: "PDF/UA ignorado: TOOLBOX_PDF_UA_ENABLED está desativado",
