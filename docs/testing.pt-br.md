@@ -49,25 +49,25 @@ própria suíte completa mais rápida.
 Todo pull request e push para `develop`, `main` ou uma branch de release executa
 o workflow `CI` do GitHub Actions:
 
-- **`tests (Python 3.11)`** instala o projeto, executa o Ruff contra a baseline
+- **`tests (Python 3.11)` / `tests (Python 3.12)`** instala o projeto, executa o Ruff contra a baseline
   que só diminui e o Mypy no escopo configurado de `docstruct`/SDK (#366),
   confere o contrato de capacidades da Toolbox, informa se a versão do
   docstruct fixada pela Toolbox acompanha o core (só avisos; veja abaixo), roda
   a suíte principal non-E2E com **quatro workers**, roda as suítes do
   docstruct, do SDK e da biblioteca do core com cobertura de desvios, resume a
   cobertura por componente no resumo do job, recusa skips inesperados e publica
-  os artefatos JUnit (`test-reports`) e de cobertura (`coverage-reports`).
-- **`SDK alone (Python 3.11)`** instala apenas o SDK, o docstruct (a única
+  os artefatos JUnit (`test-reports-py*`) e de cobertura (`coverage-reports-py*`).
+- **`SDK alone (Python 3.11)` / `SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
   (pytest, pytest-asyncio, respx), e prova que ele funciona sem o core.
-- **`docstruct alone (Python 3.11)`** instala apenas o docstruct, a partir do
+- **`docstruct alone (Python 3.11)` / `docstruct alone (Python 3.12)`** instala apenas o docstruct, a partir do
   wheel dele, e o pytest, e roda a suíte só com a biblioteca padrão: o core, o SDK, a
   Toolbox e o acelerador opcional (`rapidfuzz`) não podem estar importáveis, e
   nenhum teste pode ser pulado (#470).
-- `tests` e `SDK alone` são checks obrigatórios nos rulesets vivos de `main` e
+- `tests (Python 3.11)` e `SDK alone (Python 3.11)` são checks obrigatórios nos rulesets vivos de `main` e
   `develop`. O `docstruct alone` ainda não é: torná-lo obrigatório é uma mudança
   de ruleset, decisão de quem mantém o repositório (CONTRIBUTING.pt-br.md).
-- **`core alone (Python 3.11)`** instala só o core, como wheel, a partir do
+- **`core alone (Python 3.11)` / `core alone (Python 3.12)`** instala só o core, como wheel, a partir do
   seu próprio lock (`libs/core/uv.lock`): nem o serviço, nem os front-ends, nem
   o FastAPI, nem o pacote da Toolbox podem ser importados. Ele roda a suíte
   completa do core a partir do wheel, o teste de fumaça a partir de uma pasta

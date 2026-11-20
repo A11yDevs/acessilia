@@ -34,10 +34,31 @@ def _apply_bypass(payload: dict) -> dict:
     return json.loads(completed.stdout)
 
 
+def _rendered_job_names(job: dict) -> set[str]:
+    template = job["name"]
+    versions = (
+        job.get("strategy", {}).get("matrix", {}).get("python-version") or []
+    )
+    if not versions:
+        return {template}
+    return {
+        template.replace("${{ matrix.python-version }}", str(v))
+        for v in versions
+    }
+
+
 def test_required_check_names_are_unchanged() -> None:
     jobs = _workflow()["jobs"]
-    assert jobs["tests"]["name"] == "tests (Python 3.11)"
-    assert jobs["sdk-isolated"]["name"] == "SDK alone (Python 3.11)"
+    for job_id in ("tests", "sdk-isolated", "core-isolated", "docstruct-isolated"):
+        assert jobs[job_id]["strategy"]["matrix"]["python-version"] == ["3.11", "3.12"]
+    assert _rendered_job_names(jobs["tests"]) == {
+        "tests (Python 3.11)",
+        "tests (Python 3.12)",
+    }
+    assert _rendered_job_names(jobs["sdk-isolated"]) == {
+        "SDK alone (Python 3.11)",
+        "SDK alone (Python 3.12)",
+    }
 
 
 def test_core_suite_runs_with_bounded_parallelism() -> None:
@@ -68,7 +89,10 @@ def test_docstruct_runs_alone_from_its_wheel() -> None:
     job = _workflow()["jobs"]["docstruct-isolated"]
     steps = {step.get("name"): step for step in job["steps"]}
 
-    assert job["name"] == "docstruct alone (Python 3.11)"
+    assert _rendered_job_names(job) == {
+        "docstruct alone (Python 3.11)",
+        "docstruct alone (Python 3.12)",
+    }
     install = steps["Install docstruct alone from its lock"]["run"]
     assert "uv lock --check --project libs/docstruct" in install
     assert (
@@ -184,7 +208,11 @@ def test_production_container_installs_dev_deps_into_the_uv_venv() -> None:
 
 def test_ruleset_templates_require_the_full_gate() -> None:
     jobs = _workflow()["jobs"]
-    expected = {jobs["tests"]["name"], jobs["sdk-isolated"]["name"]}
+    rendered = _rendered_job_names(jobs["tests"]) | _rendered_job_names(
+        jobs["sdk-isolated"]
+    )
+    expected = {"tests (Python 3.11)", "SDK alone (Python 3.11)"}
+    assert expected <= rendered
     for template in ("main.json.example", "develop.json.example"):
         ruleset = json.loads((RULESETS / template).read_text(encoding="utf-8"))
         checks = next(

@@ -3,7 +3,7 @@
 # The image and CI install the same runtime versions from the committed lock
 # (#405). uv is pinned by release tag and by digest: the tag names the version,
 # the digest fixes the artifact that runs.
-FROM python:3.11-slim@sha256:94c50be2dc994b873b55bc123e95e6dbade08095b3dfd790f51c34de3f08cbb7 AS builder
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -42,7 +42,7 @@ print("docstruct and the SDK are installed from wheels.")
 PY
 
 # The runtime carries the locked environment, not the builder's uv or cache.
-FROM python:3.11-slim@sha256:94c50be2dc994b873b55bc123e95e6dbade08095b3dfd790f51c34de3f08cbb7 AS runtime
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

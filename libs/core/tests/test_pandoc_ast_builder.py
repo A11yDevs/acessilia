@@ -221,7 +221,7 @@ def test_a_math_macro_the_compiler_must_not_run_becomes_text(latex):
 
 
 def test_an_unknown_but_benign_math_macro_stays_math():
-    """\chemfig is not in the guard: rejecting every unknown macro would
+    r"""\chemfig is not in the guard: rejecting every unknown macro would
     degrade legitimate math. What the LaTeX compiler still rejects is the
     PDF/UA retry's job (degrade_math_to_text)."""
     latex = r"\chemfig{*6((-SO_2O^-Na^+)-=-=)=-=(-N=N-C(=O-O^-Na^+)-N(-C(-OH)=N)=-=)}"

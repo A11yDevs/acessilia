@@ -17,7 +17,7 @@ node; `DOCLING_SERVE_URL`, `MINERU_SERVE_URL` and `TOOLBOX_BASE_URL` are exporte
 accordingly. Health: `GET /health` (docling), `GET /openapi.json` (mineru), `GET /v1/health`
 (toolbox). Service logs: `runs/slurm/logs/<job>_<id>_{docling,mineru,toolbox}.log`.
 
-Virtualenvs (Python 3.11, uv): `repos/acessilia-toolbox/{.venv,.venv-docling,.venv-mineru}`,
+Virtualenvs (Python 3.12, uv): `repos/acessilia-toolbox/{.venv,.venv-docling,.venv-mineru}`,
 `repos/acessilia/.venv`. Models: `$CACHE_ROOT/docling/models`,
 `$CACHE_ROOT/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0`. Environment:
 `runs/slurm/env.sh` (parameterised — see [CODE.md](CODE.md)).

@@ -62,7 +62,7 @@ Main endpoints (`/api/v1`):
 
 ### Using uv (recommended)
 
-The repository pins Python 3.11 in `.python-version`, the same version CI and the Docker image use. `uv` reads that file, and downloads the interpreter if needed.
+The repository pins Python 3.12 in `.python-version`, the same version the Docker image uses. `uv` reads that file, and downloads the interpreter if needed.
 
 ```bash
 uv lock --check
@@ -123,7 +123,7 @@ Run the non-E2E core, docstruct and SDK suites:
 make test-all
 ```
 
-GitHub Actions repeats this validation on Python 3.11 for every pull request targeting `main`, `develop`, or `release/**`. Failures, errors, and skipped tests are all rejected. See the [contribution guide](CONTRIBUTING.md) to set up the environment and learn the review flow.
+GitHub Actions repeats this validation on Python 3.11 and 3.12 for every pull request targeting `main`, `develop`, or `release/**`. Failures, errors, and skipped tests are all rejected. See the [contribution guide](CONTRIBUTING.md) to set up the environment and learn the review flow.
 
 ## Interactive Notebooks
 

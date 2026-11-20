@@ -85,14 +85,14 @@ Fonte obrigatória: [Orientacoes_cluster_dgx_SLURM.pdf](Orientacoes_cluster_dgx_
 - Checkpoint: pipeline reentrante (pula páginas já geradas), `#SBATCH --signal=B:SIGUSR1@300`. Scripts em `runs/slurm/*.sbatch`, logs em `runs/slurm/logs/`, registro em `runs/slurm/JOBS.md`.
 - Serviços (docling-serve :5001, mineru-api :5002, toolbox :8002) sobem **dentro** do job sbatch que roda a pipeline (mesmo nó/GPU).
 - Disponível: `uv`, `tectonic`, python3.12, `module`. **Sem** docker (usar apptainer se precisar de container), conda, gh, pdflatex.
-- `acessilia` exige Python `>=3.11,<3.12` → `uv venv --python 3.11`.
+- `acessilia` exige Python `>=3.11,<3.14` → `uv venv --python 3.12`.
 - Fallback sem GPU: **Docling em CPU** (job CPU-only, 32 cores) — viável para dev subset (~100 págs) e para as 509 de teste. MinerU em CPU é lento; usar só no subset.
 
 ## 5. Passo a passo
 
 ### Fase A — Infra (subagente `infra`) — bloqueia tudo — **tudo via Slurm**
 0. `mkdir -p /raid/user_marcospaulo/cache/{huggingface,uv,pip,torch} runs/slurm/logs`; `runs/slurm/env.sh` exporta caches + URLs.
-1. Job CPU `srun -p h100n2 -c 16 --mem 64G --time 01:00:00`: venvs — `repos/acessilia-toolbox/.venv` (`uv pip install -e ".[api]"`), `.venv-docling` (`docling-serve`), `.venv-mineru` (`mineru[core]`), `repos/acessilia/.venv` (py3.11, `-e .`); download de modelos Docling/MinerU para o HF cache em /raid; download `dev/**` do HF → `data/hf/dev`.
+1. Job CPU `srun -p h100n2 -c 16 --mem 64G --time 01:00:00`: venvs — `repos/acessilia-toolbox/.venv` (`uv pip install -e ".[api]"`), `.venv-docling` (`docling-serve`), `.venv-mineru` (`mineru[core]`), `repos/acessilia/.venv` (py3.12, `-e .`); download de modelos Docling/MinerU para o HF cache em /raid; download `dev/**` do HF → `data/hf/dev`.
 2. `runs/slurm/pipeline.sbatch` (parametrizado por PROVIDER, IMAGES_ROOT, OUT_DIR, DEVICE=gpu|cpu): sobe docling-serve/mineru-api + toolbox em background dentro do job, espera health, roda `run_pipeline.py` reentrante, trata SIGUSR1, encerra serviços.
 3. Smoke: `sbatch --gres=gpu:1 --time=00:30:00 pipeline.sbatch` com `--sample 3` (ou CPU-only se a fila não liberar).
 

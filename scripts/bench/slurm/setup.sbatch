@@ -17,7 +17,7 @@ DL_PID=
 if [[ -n "${HF_DATASET:-}" ]]; then
   step "dataset snapshot $HF_DATASET (background)"
   mkdir -p "$WS/${DATASET_DIR:?}"
-  uv run --python 3.11 --with huggingface_hub python - "$HF_DATASET" "${HF_PATTERN:-*}" "$WS/$DATASET_DIR" \
+  uv run --python 3.12 --with huggingface_hub python - "$HF_DATASET" "${HF_PATTERN:-*}" "$WS/$DATASET_DIR" \
       > "$WS/logs/slurm/dataset_$SLURM_JOB_ID.log" 2>&1 <<'PY' &
 import sys
 from huggingface_hub import snapshot_download
@@ -30,16 +30,16 @@ fi
 
 step "toolbox venv"
 cd "$WS/repos/acessilia-toolbox"
-[[ -d .venv ]] || uv venv --python 3.11 .venv
+[[ -d .venv ]] || uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -e ".[api]" && echo "TOOLBOX_OK"
 
 step "docling-serve venv"
-[[ -d .venv-docling ]] || uv venv --python 3.11 .venv-docling
+[[ -d .venv-docling ]] || uv venv --python 3.12 .venv-docling
 uv pip install --python .venv-docling/bin/python docling-serve && echo "DOCLING_OK"
 .venv-docling/bin/docling-tools models download 2>&1 | tail -5 || echo "docling models download FAILED"
 
 step "mineru venv"
-[[ -d .venv-mineru ]] || uv venv --python 3.11 .venv-mineru
+[[ -d .venv-mineru ]] || uv venv --python 3.12 .venv-mineru
 uv pip install --python .venv-mineru/bin/python "mineru[core]" && echo "MINERU_OK"
 .venv-mineru/bin/mineru-models-download -s huggingface -m pipeline 2>&1 | tail -20 || echo "mineru models download FAILED"
 
