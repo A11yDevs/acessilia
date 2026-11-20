@@ -99,6 +99,67 @@ _SEQUENCE_KINDS = frozenset({"repair-heading-hierarchy"})
 _SEQUENCE_OBSERVATION_KINDS = frozenset({"heading-hierarchy-gap"})
 
 
+def _fused_pages(manifest: ProcessingManifest, pages: list[int]) -> list[int]:
+    return [
+        page
+        for page in pages
+        if any(
+            element.metadata.get("fusion_provider")
+            for element in manifest.elements
+            if element.page_number == page
+        )
+    ]
+
+
+def _classify_rescue_pages(
+    manifest: ProcessingManifest, pages: list[int], secondary: Any
+) -> tuple[list[int], list[int], MethodResult | None]:
+    # Every page is classified before any is changed: a failed method must
+    # leave the manifest as it found it, since the executor does not roll back
+    # a failed attempt.
+    routed = [page for page in pages if page in secondary.replaced_primary]
+    unknown = [
+        page
+        for page in pages
+        if page not in secondary.replaced_primary
+        and any(
+            element.metadata.get("provider") == secondary.provider
+            for element in _page_elements(manifest, page)
+        )
+    ]
+    if unknown:
+        return (
+            [],
+            [],
+            MethodResult(
+                success=False,
+                validated=False,
+                message=t(MSG_RESCUE_REPLACED_UNKNOWN).format(
+                    pages=_pages(unknown), provider=secondary.provider or "?"
+                ),
+            ),
+        )
+    kept = [page for page in pages if page not in routed]
+    return routed, kept, None
+
+
+def _format_rescue_summary(
+    *, restored: dict[int, int], complete: list[int], kept: list[int]
+) -> str:
+    parts = []
+    if restored:
+        parts.append(
+            t(MSG_RESCUE_RESTORED).format(
+                count=sum(restored.values()), pages=_pages(restored)
+            )
+        )
+    if complete:
+        parts.append(t(MSG_RESCUE_ROUTED_COMPLETE).format(pages=_pages(complete)))
+    if kept:
+        parts.append(t(MSG_RESCUE_PRIMARY_KEPT).format(pages=_pages(kept)))
+    return "; ".join(parts)
+
+
 def _handle_rescue_omitted_method(
     manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
@@ -108,14 +169,7 @@ def _handle_rescue_omitted_method(
     if not pages:
         return _missing_obligation(obligation_id)
 
-    fused = [
-        page for page in pages
-        if any(
-            element.metadata.get("fusion_provider")
-            for element in manifest.elements
-            if element.page_number == page
-        )
-    ]
+    fused = _fused_pages(manifest, pages)
     if fused:
         return MethodResult(
             success=False,
@@ -127,27 +181,9 @@ def _handle_rescue_omitted_method(
     if secondary is None:
         return MethodResult(success=False, validated=False, message=problem)
 
-    # Every page is classified before any is changed: a failed method must
-    # leave the manifest as it found it, since the executor does not roll back
-    # a failed attempt.
-    routed = [page for page in pages if page in secondary.replaced_primary]
-    unknown = [
-        page for page in pages
-        if page not in secondary.replaced_primary
-        and any(
-            element.metadata.get("provider") == secondary.provider
-            for element in _page_elements(manifest, page)
-        )
-    ]
-    if unknown:
-        return MethodResult(
-            success=False,
-            validated=False,
-            message=t(MSG_RESCUE_REPLACED_UNKNOWN).format(
-                pages=_pages(unknown), provider=secondary.provider or "?"
-            ),
-        )
-    kept = [page for page in pages if page not in routed]
+    routed, kept, failure = _classify_rescue_pages(manifest, pages, secondary)
+    if failure is not None:
+        return failure
 
     present = {element.id for element in manifest.elements}
     complete: list[int] = []
@@ -171,18 +207,13 @@ def _handle_rescue_omitted_method(
             legacy_unicode_repair=config.document.legacy_unicode_repair,
         )
 
-    parts = []
-    if restored:
-        parts.append(
-            t(MSG_RESCUE_RESTORED).format(
-                count=sum(restored.values()), pages=_pages(restored)
-            )
-        )
-    if complete:
-        parts.append(t(MSG_RESCUE_ROUTED_COMPLETE).format(pages=_pages(complete)))
-    if kept:
-        parts.append(t(MSG_RESCUE_PRIMARY_KEPT).format(pages=_pages(kept)))
-    return MethodResult(success=True, validated=True, message="; ".join(parts))
+    return MethodResult(
+        success=True,
+        validated=True,
+        message=_format_rescue_summary(
+            restored=restored, complete=complete, kept=kept
+        ),
+    )
 
 
 def _add_restored_needs(
@@ -263,13 +294,31 @@ def _primary_elements(
     return parsed
 
 
-def _rescue_page(
+def _build_rescued_element(
+    element: ManifestElement,
+    *,
+    page: int,
+    existing_ids: set[str],
+    provider: str,
+) -> ManifestElement:
+    rescued = element.model_copy(deep=True)
+    rescued.id = unique_element_id(f"element-rescued-p{page}-{element.id}", existing_ids)
+    rescued.parent_id = None
+    rescued.parent_ref = None
+    rescued.metadata = {
+        **rescued.metadata,
+        "provider": provider or rescued.metadata.get("provider"),
+        "rescued_by": "rescue-omitted",
+    }
+    return rescued
+
+
+def _collect_page_rescues(
     manifest: ProcessingManifest,
     page: int,
     current: list[ManifestElement],
     rows: list[dict[str, Any]],
-) -> int:
-    """Insert the omitted primary blocks of ``page``; returns how many."""
+) -> dict[int, list[ManifestElement]]:
     primary = _primary_elements(rows, page)
     parent_types = {element.id: element.type for element in primary}
     boxes = [_element_bbox(element, manifest) for element in current]
@@ -299,19 +348,18 @@ def _rescue_page(
             continue
         if not _omitted(element, page_text, parent_types):
             continue
-        rescued = element.model_copy(deep=True)
-        rescued.id = unique_element_id(f"element-rescued-p{page}-{element.id}", existing)
-        rescued.parent_id = None
-        rescued.parent_ref = None
-        rescued.metadata = {
-            **rescued.metadata,
-            "provider": provider or rescued.metadata.get("provider"),
-            "rescued_by": "rescue-omitted",
-        }
+        rescued = _build_rescued_element(
+            element, page=page, existing_ids=existing, provider=provider
+        )
         inserts.setdefault(anchor, []).append(rescued)
+    return inserts
 
-    if not inserts:
-        return 0
+
+def _splice_rescued_elements(
+    manifest: ProcessingManifest,
+    current: list[ManifestElement],
+    inserts: dict[int, list[ManifestElement]],
+) -> int:
     before = {current[0].id: inserts.pop(-1)} if -1 in inserts else {}
     after = {current[index].id: rescued for index, rescued in inserts.items()}
     ordered: list[ManifestElement] = []
@@ -322,6 +370,19 @@ def _rescue_page(
     added = len(ordered) - len(manifest.elements)
     manifest.elements = ordered
     return added
+
+
+def _rescue_page(
+    manifest: ProcessingManifest,
+    page: int,
+    current: list[ManifestElement],
+    rows: list[dict[str, Any]],
+) -> int:
+    """Insert the omitted primary blocks of ``page``; returns how many."""
+    inserts = _collect_page_rescues(manifest, page, current, rows)
+    if not inserts:
+        return 0
+    return _splice_rescued_elements(manifest, current, inserts)
 
 
 def _omitted(

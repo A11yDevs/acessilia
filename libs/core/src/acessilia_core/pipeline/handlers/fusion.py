@@ -71,6 +71,66 @@ from acessilia_core.run_identity import fusion_reuse_identity
 _TABLE_PREFERENCE = "mineru"
 
 
+def _match_secondary_table(
+    element: ManifestElement,
+    manifest: ProcessingManifest,
+    candidates: list[dict[str, Any]],
+    secondary: Any,
+    *,
+    single_primary_on_page: bool,
+) -> dict[str, Any] | None:
+    match = _pair_block(element, manifest, candidates, secondary, set())
+    if (
+        match is None
+        and len(candidates) == 1
+        and single_primary_on_page
+        and (
+            _element_bbox(element, manifest) is None
+            or secondary.bbox(candidates[0]) is None
+        )
+    ):
+        # One table on each side and no position to compare them by: the
+        # same table. With both positions known and no overlap, they are not.
+        match = 0
+    return candidates[match] if match is not None else None
+
+
+def _decide_table_source(
+    primary_ast: Any,
+    candidates: list[dict[str, Any]],
+    chosen: dict[str, Any] | None,
+) -> tuple[str, str]:
+    from docstruct.tables.ast import analyze_table_complexity
+
+    primary_name = _CALIBRATED_PAIR[0]
+    chosen_meta = (chosen or {}).get("metadata") or {}
+    if primary_ast and analyze_table_complexity(primary_ast).has_spans:
+        return primary_name, "primary-has-spans"
+    if not candidates:
+        return primary_name, "no-secondary-table"
+    if chosen is None:
+        return primary_name, "no-secondary-match"
+    if not (chosen.get("text") or chosen_meta.get("table_ast")):
+        return primary_name, "secondary-table-empty"
+    return _TABLE_PREFERENCE, f"preference-{_TABLE_PREFERENCE}"
+
+
+def _adopt_secondary_table(
+    element: ManifestElement, chosen: dict[str, Any]
+) -> None:
+    # Docling's table_* keys (AST, row/column counts, header) describe
+    # the table being replaced; the output prefers table_ast over the
+    # text, so a stale AST would hide the adopted MinerU text.
+    for key in [k for k in element.metadata if k.startswith("table_")]:
+        del element.metadata[key]
+    if chosen.get("text"):
+        element.text = chosen["text"]
+    chosen_meta = chosen.get("metadata") or {}
+    for key, value in chosen_meta.items():
+        if key.startswith("table_"):
+            element.metadata[key] = value
+
+
 def _handle_table_smart_fusion_method(
     manifest: ProcessingManifest, obligation_id: str
 ) -> MethodResult:
@@ -82,8 +142,6 @@ def _handle_table_smart_fusion_method(
     when there is no position to compare. The choice and its reason are recorded
     in ``table_source`` / ``table_source_reason``.
     """
-    from docstruct.tables.ast import analyze_table_complexity
-
     tables = [
         element
         for element in _target_elements(manifest, obligation_id)
@@ -95,58 +153,31 @@ def _handle_table_smart_fusion_method(
     if failure is not None:
         return failure
 
-    primary_name, secondary_name = _CALIBRATED_PAIR
+    secondary_name = _CALIBRATED_PAIR[1]
     primary_tables_by_page = Counter(
         element.page_number
         for element in manifest.elements
         if element.type == "table"
     )
-    reasons: Counter = Counter()
+    reasons: Counter[str] = Counter()
     for element in tables:
-        primary_ast = (element.metadata or {}).get("table_ast")
         candidates = [
             block
             for block in secondary.pages.get(element.page_number or 0, [])
             if block.get("type") == "table"
         ]
-        match = _pair_block(element, manifest, candidates, secondary, set())
-        if (
-            match is None
-            and len(candidates) == 1
-            and primary_tables_by_page[element.page_number] == 1
-            and (
-                _element_bbox(element, manifest) is None
-                or secondary.bbox(candidates[0]) is None
-            )
-        ):
-            # One table on each side and no position to compare them by: the
-            # same table. With both positions known and no overlap, they are not.
-            match = 0
-        chosen = candidates[match] if match is not None else None
-        chosen_meta = (chosen or {}).get("metadata") or {}
-
-        if primary_ast and analyze_table_complexity(primary_ast).has_spans:
-            source, reason = primary_name, "primary-has-spans"
-        elif not candidates:
-            source, reason = primary_name, "no-secondary-table"
-        elif chosen is None:
-            source, reason = primary_name, "no-secondary-match"
-        elif not (chosen.get("text") or chosen_meta.get("table_ast")):
-            source, reason = primary_name, "secondary-table-empty"
-        else:
-            source, reason = _TABLE_PREFERENCE, f"preference-{_TABLE_PREFERENCE}"
-
+        chosen = _match_secondary_table(
+            element,
+            manifest,
+            candidates,
+            secondary,
+            single_primary_on_page=primary_tables_by_page[element.page_number] == 1,
+        )
+        source, reason = _decide_table_source(
+            (element.metadata or {}).get("table_ast"), candidates, chosen
+        )
         if source == secondary_name and chosen is not None:
-            # Docling's table_* keys (AST, row/column counts, header) describe
-            # the table being replaced; the output prefers table_ast over the
-            # text, so a stale AST would hide the adopted MinerU text.
-            for key in [k for k in element.metadata if k.startswith("table_")]:
-                del element.metadata[key]
-            if chosen.get("text"):
-                element.text = chosen["text"]
-            for key, value in chosen_meta.items():
-                if key.startswith("table_"):
-                    element.metadata[key] = value
+            _adopt_secondary_table(element, chosen)
         element.metadata["table_source"] = source
         element.metadata["table_source_reason"] = reason
         reasons[reason] += 1
@@ -350,6 +381,63 @@ def _reusable_fusion_payload(manifest: ProcessingManifest, config: CoreConfig) -
         return None
 
 
+def _obtain_fusion_payload(
+    manifest: ProcessingManifest,
+    config: CoreConfig,
+    *,
+    source_path: Path,
+    artifact_id: str | None,
+) -> dict[str, Any]:
+    payload = _reusable_fusion_payload(manifest, config)
+    if payload is not None:
+        return payload
+    from docstruct.policy import FusionPolicy
+
+    policy_config = manifest.extractor.configuration.get("fusion_policy")
+    policy = FusionPolicy.from_dict(policy_config) if policy_config else None
+    secondary = config.fusion.secondary_provider
+    if policy is None:
+        return _run_extract_fused(
+            source_path,
+            artifact_id=artifact_id,
+            secondary_provider=secondary,
+            toolbox=config.toolbox,
+        )
+    return _run_extract_fused(
+        source_path,
+        artifact_id=artifact_id,
+        policy=policy,
+        secondary_provider=secondary,
+        toolbox=config.toolbox,
+    )
+
+
+def _replace_manifest_with_fused_elements(
+    manifest: ProcessingManifest, elements: list[ManifestElement]
+) -> None:
+    manifest.elements = elements
+    page_ids = {element.page_number or 1 for element in elements}
+    existing_pages = {page.page_number: page for page in manifest.pages}
+    manifest.pages = [
+        PageDescriptor(
+            page_number=number,
+            width=existing_pages[number].width if number in existing_pages else None,
+            height=existing_pages[number].height if number in existing_pages else None,
+            element_ids=[
+                element.id
+                for element in elements
+                if (element.page_number or 1) == number
+            ],
+        )
+        for number in sorted(page_ids)
+    ]
+    manifest.summary.page_count = len(manifest.pages)
+    manifest.summary.element_count = len(elements)
+    manifest.summary.element_types = dict(
+        Counter(element.type for element in elements)
+    )
+
+
 def _handle_dual_provider_fusion_method(
     manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig
 ) -> MethodResult:
@@ -377,23 +465,9 @@ def _handle_dual_provider_fusion_method(
     # Reuse the document the structure extractor already stored in the Toolbox.
     artifact_id = _source_artifact_id(manifest)
     try:
-        payload = _reusable_fusion_payload(manifest, config)
-        if payload is None:
-            from docstruct.policy import FusionPolicy
-
-            policy_config = manifest.extractor.configuration.get("fusion_policy")
-            policy = FusionPolicy.from_dict(policy_config) if policy_config else None
-            secondary = config.fusion.secondary_provider
-            if policy is None:
-                payload = _run_extract_fused(
-                    source_path, artifact_id=artifact_id, secondary_provider=secondary,
-                    toolbox=config.toolbox,
-                )
-            else:
-                payload = _run_extract_fused(
-                    source_path, artifact_id=artifact_id, policy=policy,
-                    secondary_provider=secondary, toolbox=config.toolbox,
-                )
+        payload = _obtain_fusion_payload(
+            manifest, config, source_path=source_path, artifact_id=artifact_id
+        )
     except Exception as exc:  # noqa: BLE001
         return MethodResult(
             success=False,
@@ -434,22 +508,7 @@ def _handle_dual_provider_fusion_method(
         kind="fusion-payload",
         data_dir=config.paths.data_dir,
     )
-
-    manifest.elements = elements
-    page_ids = {element.page_number or 1 for element in elements}
-    existing_pages = {page.page_number: page for page in manifest.pages}
-    manifest.pages = [
-        PageDescriptor(
-            page_number=number,
-            width=existing_pages[number].width if number in existing_pages else None,
-            height=existing_pages[number].height if number in existing_pages else None,
-            element_ids=[element.id for element in elements if (element.page_number or 1) == number],
-        )
-        for number in sorted(page_ids)
-    ]
-    manifest.summary.page_count = len(manifest.pages)
-    manifest.summary.element_count = len(elements)
-    manifest.summary.element_types = dict(Counter(element.type for element in elements))
+    _replace_manifest_with_fused_elements(manifest, elements)
     return MethodResult(
         success=True,
         validated=True,
@@ -458,19 +517,25 @@ def _handle_dual_provider_fusion_method(
     )
 
 
-def _fused_text_elements(
-    manifest: ProcessingManifest, target_ids: list[str], payload: dict[str, Any]
-) -> list[ManifestElement]:
-    # The fusion adapter currently emits text-only blocks. It cannot safely
-    # replace a structured document or a subset with a whole-document result.
-    if any(element.type != "paragraph" for element in manifest.elements) or set(target_ids) != {
-        element.id for element in manifest.elements
-    }:
-        raise ValueError("Text fusion requires all paragraphs of a text-only manifest")
+def _parse_fused_page_number(
+    raw: dict[str, Any], manifest: ProcessingManifest
+) -> int:
+    page = raw.get("page_number", raw.get("page"))
+    if page is None:
+        if len(manifest.pages) > 1:
+            raise ValueError("Fusion omitted page identity for a multipage document")
+        page = manifest.pages[0].page_number if manifest.pages else 1
+    if type(page) is not int or page < 1:
+        raise ValueError("Fusion returned an invalid page number")
+    return page
+
+
+def _group_fused_raw_elements(
+    manifest: ProcessingManifest, payload: dict[str, Any]
+) -> dict[int, list[dict[str, Any]]]:
     raw_elements = payload.get("document", {}).get("elements")
     if not isinstance(raw_elements, list) or not raw_elements:
         raise ValueError("Fusion returned no usable document elements")
-    originals = sorted(manifest.elements, key=lambda element: element.reading_order)
     by_page: dict[int, list[dict[str, Any]]] = {}
     for raw in raw_elements:
         if not isinstance(raw, dict) or raw.get("type") != "paragraph":
@@ -478,41 +543,81 @@ def _fused_text_elements(
         text = raw.get("text")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Fusion returned an empty text block")
-        page = raw.get("page_number", raw.get("page"))
-        if page is None:
-            if len(manifest.pages) > 1:
-                raise ValueError("Fusion omitted page identity for a multipage document")
-            page = manifest.pages[0].page_number if manifest.pages else 1
-        if type(page) is not int or page < 1:
-            raise ValueError("Fusion returned an invalid page number")
+        page = _parse_fused_page_number(raw, manifest)
         by_page.setdefault(page, []).append(raw)
+    return by_page
+
+
+def _build_fused_page_elements(
+    manifest: ProcessingManifest,
+    *,
+    page_number: int,
+    rows: list[dict[str, Any]],
+    originals: list[ManifestElement],
+    start_order: int,
+    provider: str,
+) -> list[ManifestElement]:
+    # Keep every existing ID and reference; ambiguous mappings fail closed.
+    if len(rows) < len(originals):
+        raise ValueError(
+            "Fusion cannot safely map fewer blocks to existing element references"
+        )
+    page_result: list[ManifestElement] = []
+    for index, raw in enumerate(rows):
+        reading_order = start_order + len(page_result)
+        if index < len(originals):
+            element = originals[index].model_copy(deep=True)
+            element.text = raw["text"]
+            element.page_number = page_number
+        else:
+            identifier = hashlib.sha256(
+                json.dumps([manifest.manifest_id, page_number, index, raw["text"]]).encode()
+            ).hexdigest()[:24]
+            element = ManifestElement(
+                id=f"element-fusion-{identifier}",
+                type="paragraph",
+                raw_label="paragraph",
+                reading_order=reading_order,
+                hierarchy_level=0,
+                page_number=page_number,
+                text=raw["text"],
+            )
+        element.metadata["fusion_provider"] = provider
+        element.reading_order = reading_order
+        page_result.append(element)
+    return page_result
+
+
+def _fused_text_elements(
+    manifest: ProcessingManifest, target_ids: list[str], payload: dict[str, Any]
+) -> list[ManifestElement]:
+    # The fusion adapter currently emits text-only blocks. It cannot safely
+    # replace a structured document or a subset with a whole-document result.
+    if any(element.type != "paragraph" for element in manifest.elements) or set(
+        target_ids
+    ) != {element.id for element in manifest.elements}:
+        raise ValueError("Text fusion requires all paragraphs of a text-only manifest")
+    originals = sorted(manifest.elements, key=lambda element: element.reading_order)
+    by_page = _group_fused_raw_elements(manifest, payload)
     original_pages = {element.page_number or 1 for element in originals}
     if not original_pages.issubset(by_page):
         raise ValueError("Fusion omitted a source page")
 
-    result = []
+    result: list[ManifestElement] = []
     for number, rows in sorted(by_page.items()):
-        old = [element for element in originals if (element.page_number or 1) == number]
-        # Keep every existing ID and reference; ambiguous mappings fail closed.
-        if len(rows) < len(old):
-            raise ValueError("Fusion cannot safely map fewer blocks to existing element references")
-        for index, raw in enumerate(rows):
-            if index < len(old):
-                element = old[index].model_copy(deep=True)
-                element.text = raw["text"]
-                element.page_number = number
-            else:
-                identifier = hashlib.sha256(json.dumps([
-                    manifest.manifest_id, number, index, raw["text"],
-                ]).encode()).hexdigest()[:24]
-                element = ManifestElement(
-                    id=f"element-fusion-{identifier}", type="paragraph", raw_label="paragraph",
-                    reading_order=len(result) + 1, hierarchy_level=0,
-                    page_number=number, text=raw["text"],
-                )
-            element.metadata["fusion_provider"] = payload["provider"]
-            element.reading_order = len(result) + 1
-            result.append(element)
+        old = [
+            element for element in originals if (element.page_number or 1) == number
+        ]
+        result.extend(
+            _build_fused_page_elements(
+                manifest,
+                page_number=number,
+                rows=rows,
+                originals=old,
+                start_order=len(result) + 1,
+                provider=payload["provider"],
+            )
+        )
     return result
 
 
