@@ -256,3 +256,147 @@ class TestFormulaEnrichmentAndVisionRetryCharacterization:
         assert result is not None
         assert result.description == "A clear chart showing steady growth."
         assert calls == 3
+
+    @pytest.mark.asyncio
+    async def test_vision_retry_runner_retries_run_incomplete_from_validate_structured_run(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = 0
+
+        class FakeAgent:
+            def __init__(self, **_kw) -> None:
+                pass
+
+            def run(self, **_kw):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    # Non-completed, non-error status makes validate_structured_run raise RunIncompleteError.
+                    return SimpleNamespace(
+                        status="cancelled", content="HTTP 429 rate limit exceeded"
+                    )
+                return SimpleNamespace(
+                    content=VisionOutput(
+                        kind="description",
+                        description="Recovered chart description after 429.",
+                        language="en",
+                        confidence=0.88,
+                    )
+                )
+
+        async def no_sleep(_delay: float) -> None:
+            pass
+
+        monkeypatch.setattr(vision_agent, "Agent", FakeAgent)
+        monkeypatch.setattr(vision_agent, "get_agno_model", lambda *_a, **_kw: object())
+        monkeypatch.setattr(vision_agent.asyncio, "sleep", no_sleep)
+
+        class InlineRunner:
+            async def run(self, fn, **_kw):
+                return fn()
+
+        agent = VisionAgent(
+            mode="medio",
+            region_cache=None,
+            toolbox=toolbox_config(),
+            models=model_config(),
+            model_calls=InlineRunner(),
+        )
+        result = await agent.describe_region(
+            image_bytes=b"img", classification="embedded_image", page_num=1, total_pages=1
+        )
+        assert result is not None
+        assert result.description == "Recovered chart description after 429."
+        assert calls == 2
+
+    @pytest.mark.asyncio
+    async def test_formula_recognition_records_unavailable_empty_and_vision_failures(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import asyncio
+
+        from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+
+        f1 = build_element("element-f1", "formula", text="").model_copy(
+            update={"page_number": 1}
+        )
+        f2 = build_element("element-f2", "formula", text="").model_copy(
+            update={"page_number": 1}
+        )
+        manifest = build_manifest([f1, f2], [])
+
+        class FailingVision:
+            async def describe_region(self, **_kw):
+                return None
+
+        breaker = ProviderBreaker(1)
+        enrichment = formula_enrichment._FormulaEnrichment(
+            manifest=manifest,
+            source_file=tmp_path / "doc.pdf",
+            mode="medio",
+            status_callback=None,
+            vision=FailingVision(),
+            breaker=breaker,
+            slots=asyncio.Semaphore(1),
+            total=2,
+            recognize_provider="pp-formulanet",
+            toolbox=toolbox_config(),
+            agreement_min=0.5,
+        )
+        gate = formula_enrichment._TextLayerGate("", 0.5)
+
+        # Empty answer while recognizer available increments empty_answers.
+        monkeypatch.setattr(
+            formula_enrichment, "toolbox_recognize_formula", lambda *_a, **_kw: []
+        )
+        empty_reading = await enrichment._recognize_by_math(f1, b"img", 1, gate)
+        assert empty_reading.latex == ""
+        assert enrichment.empty_answers == 1
+
+        # Vision returning None records model_failed and trips breaker (threshold=1).
+        vision_fail = await enrichment._fallback_to_vision(f1, b"img", 1, gate)
+        assert vision_fail.reclassified is False
+        assert f1.metadata["formula_recognition_failure"] == "model_failed"
+
+        # Subsequent fallback with open breaker records provider_blocked.
+        vision_blocked = await enrichment._fallback_to_vision(f2, b"img", 1, gate)
+        assert vision_blocked.reclassified is False
+        assert f2.metadata["formula_recognition_failure"] == "provider_blocked"
+
+        # Recognizer outage marks recognizer_unavailable and turns recognizer off.
+        def raise_unavailable(*_a, **_kw):
+            raise MathCapabilityUnavailable("math.recognize", RuntimeError("down"))
+
+        enrichment.recognizer = formula_enrichment._MathRecognizer(toolbox_config())
+        monkeypatch.setattr(
+            formula_enrichment, "toolbox_recognize_formula", raise_unavailable
+        )
+        unavail_reading = await enrichment._recognize_by_math(f1, b"img", 1, gate)
+        assert unavail_reading.latex == ""
+        assert enrichment.recognizer.available is False
+        assert f1.metadata["formula_recognition_failure"] == "recognizer_unavailable"
+
+    @pytest.mark.asyncio
+    async def test_enrich_formula_latex_separates_equation_numbers_on_non_renderable_media(
+        self, tmp_path: Path
+    ) -> None:
+        f_el = build_element("element-f1", "formula", text=r"x = y \tag{3}").model_copy(
+            update={"page_number": 1}
+        )
+        manifest = build_manifest([f_el], [])
+        manifest.source.media_type = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+        await formula_enrichment._enrich_formula_latex(
+            manifest,
+            tmp_path / "doc.docx",
+            mode="medio",
+            document=document_config(),
+            vision=vision_config(),
+            toolbox=toolbox_config(),
+            models=model_config(),
+            region_cache=None,
+        )
+        assert f_el.text == "x = y"
+        assert f_el.metadata["equation_number"] == "3"

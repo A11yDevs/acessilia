@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import base64
 from collections.abc import Awaitable, Callable, Coroutine
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -270,9 +271,14 @@ async def _classify_formula_regions(
             group.create_task(classify_and_notify(element))
 
 
-def _formulas_needing_latex(manifest: ProcessingManifest) -> list[ManifestElement]:
+def _separate_equation_numbers(manifest: ProcessingManifest) -> None:
+    """Move trailing equation labels into ``metadata.equation_number`` in place."""
     for element in manifest.elements:
         separate_equation_number(element)
+
+
+def _formulas_needing_latex(manifest: ProcessingManifest) -> list[ManifestElement]:
+    """Return formulas without LaTeX markup that are not already marked unresolved."""
     return [
         element
         for element in manifest.elements
@@ -282,6 +288,20 @@ def _formulas_needing_latex(manifest: ProcessingManifest) -> list[ManifestElemen
         and element.metadata.get("formula_classification", {}).get("status")
         != "unresolved"
     ]
+
+
+@dataclass(frozen=True)
+class _MathReading:
+    latex: str
+    confidence: Any
+    rank: int
+
+
+@dataclass(frozen=True)
+class _VisionReading:
+    latex: str
+    confidence: Any
+    reclassified: bool
 
 
 async def _enrich_formula_latex(
@@ -300,15 +320,14 @@ async def _enrich_formula_latex(
 ) -> None:
     """Give LaTeX to formulas the extractor delivered without it.
 
-    Covers empty formulas and PDF text-layer formulas (where ``has_latex_markup``
-    is false). ``math.recognize`` runs first and each ranked candidate is gated
-    by ``latex_text_agreement >= FORMULA_TEXT_AGREEMENT_MIN``; the vision model
-    serves as fallback while sharing the document's provider breaker, and a
-    ``math.recognize`` outage is paid once per document. Outcomes and refused
-    candidates are recorded in ``metadata["formula_recognition"]``.
+    Runs ``_separate_equation_numbers`` across the manifest first, then
+    delegates recognition of renderable candidates to :class:`_FormulaEnrichment`
+    (which documents the ``metadata["formula_recognition"]`` contract and the
+    text-layer gating, outage, breaker, and concurrency semantics).
     """
     from acessilia_sdk.toolbox.capabilities import provider_default
 
+    _separate_equation_numbers(manifest)
     formulas = _formulas_needing_latex(manifest)
     # Without a page to render there is no crop to recognize. DOCX/PPTX
     # formulas stay as the extractor delivered them instead of paying one
@@ -318,6 +337,8 @@ async def _enrich_formula_latex(
     if status_callback:
         await status_callback(t(STAGE_ENRICHING_FORMULAS))
 
+    # Resolved like ``ToolboxCapabilityClient``: an empty setting means the
+    # registry default, which is the provider the request actually asked.
     recognize_provider = toolbox.providers[
         "toolbox_math_recognize_provider"
     ] or provider_default("toolbox_math_recognize_provider")
@@ -341,7 +362,40 @@ async def _enrich_formula_latex(
 
 
 class _FormulaEnrichment:
-    """The state ``_enrich_formula_latex`` shares across one document's formulas."""
+    """The state ``_enrich_formula_latex`` shares across one document's formulas.
+
+    Covers formulas with no text and, in born-digital PDFs, formulas whose text
+    is the PDF text layer (``s(t) = s0 + v0t + 1 2 at2``): ``has_latex_markup``
+    tells them apart. ``math.recognize`` (PP-FormulaNet) runs first; the vision
+    model is the fallback, so a Toolbox outage degrades gracefully instead of
+    leaving formulas without content. Recognition runs before planning, like the
+    picture descriptions, so ``mathml`` and ``latex-verbalizer`` work on real
+    LaTeX.
+
+    When a formula has text-layer text, a recognition must agree with it
+    (``latex_text_agreement`` >= ``FORMULA_TEXT_AGREEMENT_MIN``): PP-FormulaNet
+    reports no confidence, and the text layer is the only independent reading of
+    the same formula. A recognition below threshold is tried against the next
+    ranked candidate; when none agrees the formula keeps its text-layer version
+    and leaves ``formula_text_layer`` and ``rejected`` on record. During a
+    ``math.recognize`` outage, text-layer formulas also go to vision. A provider
+    answering without LaTeX (e.g. a page-level ``docling-math`` provider on a
+    chip) is not an outage: each fallback logs at DEBUG and one INFO summary
+    counts them per document.
+
+    The vision fallback shares the job's provider breaker with the picture and
+    table stages: once open, each formula degrades to its text-layer text at
+    once. Crops run concurrently bounded by ``VisionConfig.concurrency``, while
+    the first ``math.recognize`` probe is serialized so an outage is paid once
+    per document. Two formulas on the same page still pay two renders (ADR-0003).
+
+    Each recognized formula records ``metadata["formula_recognition"]``:
+    ``method`` (``math.recognize``, ``vision``, or ``text-layer`` when nothing
+    agreed), ``confidence``, ``text_agreement`` when there was text-layer text,
+    ``rank`` when a lower-ranked ``math.recognize`` candidate was used, and
+    ``rejected`` (refused readings keyed by ``method`` or ``method#rank``,
+    valued by their agreement score or ``None`` for no evidence).
+    """
 
     def __init__(
         self,
@@ -427,7 +481,7 @@ class _FormulaEnrichment:
         image_bytes: bytes,
         page_number: int,
         gate: _TextLayerGate,
-    ) -> tuple[str, Any, int]:
+    ) -> _MathReading:
         candidates = await self.recognizer.recognize(image_bytes)
         if not candidates and not self.recognizer.available:
             # No reading from math.recognize because it was down, not
@@ -444,7 +498,10 @@ class _FormulaEnrichment:
                     provider=self.recognize_provider,
                 )
             )
-        return _first_agreeing_candidate(candidates, gate, "math.recognize")
+        latex, confidence, rank = _first_agreeing_candidate(
+            candidates, gate, "math.recognize"
+        )
+        return _MathReading(latex=latex, confidence=confidence, rank=rank)
 
     async def _fallback_to_vision(
         self,
@@ -452,7 +509,7 @@ class _FormulaEnrichment:
         image_bytes: bytes,
         page_number: int,
         gate: _TextLayerGate,
-    ) -> tuple[str, Any, bool]:
+    ) -> _VisionReading:
         blocked = self.breaker.open
         output = await _formula_by_vision(
             self.vision, self.breaker, image_bytes, page_number, self.total_pages, self.mode
@@ -461,7 +518,7 @@ class _FormulaEnrichment:
             element.metadata["formula_recognition_failure"] = (
                 "provider_blocked" if blocked else "model_failed"
             )
-            return "", None, False
+            return _VisionReading(latex="", confidence=None, reclassified=False)
         if (
             output.kind == "description"
             and output.description.strip()
@@ -471,11 +528,13 @@ class _FormulaEnrichment:
             _reclassify_formula_picture(
                 self.manifest, element, output, image_bytes, source="recognition_fallback"
             )
-            return "", None, True
+            return _VisionReading(latex="", confidence=None, reclassified=True)
         if output.kind == "formula":
             latex = gate.accept("vision", normalize_latex(output.formula_latex or ""))
-            return latex, output.confidence, False
-        return "", None, False
+            return _VisionReading(
+                latex=latex, confidence=output.confidence, reclassified=False
+            )
+        return _VisionReading(latex="", confidence=None, reclassified=False)
 
     async def enrich_one(self, position: int, element: ManifestElement) -> bool:
         """Recognize one formula and fold the answer into it; True when filled.
@@ -503,16 +562,22 @@ class _FormulaEnrichment:
             original_text = element.text or ""
             gate = _TextLayerGate(normalize_latex(original_text), self.agreement_min)
             method = "math.recognize"
-            latex, confidence, accepted_rank = await self._recognize_by_math(
+            reading = await self._recognize_by_math(
                 element, image_bytes, page_number, gate
+            )
+            latex, confidence, accepted_rank = (
+                reading.latex,
+                reading.confidence,
+                reading.rank,
             )
             if not latex:
                 method = "vision"
-                latex, confidence, reclassified = await self._fallback_to_vision(
+                vision_reading = await self._fallback_to_vision(
                     element, image_bytes, page_number, gate
                 )
-                if reclassified:
+                if vision_reading.reclassified:
                     return False
+                latex, confidence = vision_reading.latex, vision_reading.confidence
 
         return _record_formula_recognition(
             element,
@@ -664,7 +729,7 @@ def _record_formula_recognition(
 ) -> bool:
     """Fold a formula's recognition into it, or record why there is none; True when filled.
 
-    ``_enrich_formula_latex`` documents ``metadata["formula_recognition"]``.
+    :class:`_FormulaEnrichment` documents ``metadata["formula_recognition"]``.
     """
     if gate.rejected:
         logger.info(

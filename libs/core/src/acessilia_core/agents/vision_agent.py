@@ -177,7 +177,7 @@ def _handle_describe_region_error(
             page_num=page_num,
             type=classification,
             error=error,
-            tb=traceback.format_exc(),
+            tb="".join(traceback.format_exception(error)),
         )
     )
     return None
@@ -229,9 +229,20 @@ class VisionAgent:
     ) -> VisionOutput | None:
         """Describe a single visual region of a page with the vision model.
 
-        Returns a validated visual result, or ``None`` when inference or
-        validation fails. Descriptions above the region token budget are
-        truncated with a warning; ``full_budget`` regions are never truncated.
+        Args:
+            image_bytes (bytes): PNG/encoded image payload of the region to describe.
+            classification (str): Region classification key driving prompt selection.
+            page_num (int): 1-based page number for logs and page prompts (default 0).
+            total_pages (int): Total page count of the source document (default 0).
+            mode (str | None): Prompting mode override; falls back to instance default.
+            custom_prompt (str | None): Replaces all prompt selection logic when given.
+            full_budget (bool): Use the general token budget instead of the region cap.
+            errors (list[str] | None): Receives a one-line error summary on failure.
+
+        Returns:
+            A validated visual result, or None when inference or validation fails.
+            Descriptions above the region token budget are truncated with a warning;
+            ``full_budget`` regions are never truncated.
         """
         effective_mode = mode or self.mode
         prompt = _build_region_prompt(
@@ -394,6 +405,11 @@ class _VisionRetryRunner(Generic[OutputModel]):
         )
         return True
 
+    async def _retry_provider_failure(self, error: BaseException) -> bool:
+        return await self._retry_after_context_overflow(
+            error
+        ) or await self._retry_after_rate_limit(error)
+
     async def _invoke_model(self, attempt_prompt: str) -> tuple[Any, bool]:
         model_options: dict[str, Any] = {"max_tokens": self.max_tokens, "max_retries": 0}
         if self.context_retries and _is_whole_page(self.label):
@@ -431,7 +447,7 @@ class _VisionRetryRunner(Generic[OutputModel]):
                 return None, True
             raise
         except Exception as error:
-            if await self._retry_after_context_overflow(error) or await self._retry_after_rate_limit(error):
+            if await self._retry_provider_failure(error):
                 return None, True
             raise
 
@@ -454,7 +470,7 @@ class _VisionRetryRunner(Generic[OutputModel]):
             )
             return None, True
         except RunIncompleteError as error:
-            if await self._retry_after_context_overflow(error) or await self._retry_after_rate_limit(error):
+            if await self._retry_provider_failure(error):
                 return None, True
             raise
         except Exception as error:
@@ -483,7 +499,8 @@ class _VisionRetryRunner(Generic[OutputModel]):
             output, should_retry = await self._validate_response(response)
             if should_retry:
                 continue
-            assert output is not None
+            if output is None:
+                raise RuntimeError("Vision validation returned no output")
             if self.attempt > 1:
                 logger.info(
                     t(LOG_VISION_AGENT_REGION_RECOVERED).format(
