@@ -3,9 +3,24 @@ from __future__ import annotations
 import hashlib
 import mimetypes
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from docstruct.geometry import (
+    ReadingItem,
+    order_reading_items,
+    reading_role,
+)
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_FLAG,
+)
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,
+)
+from docstruct.placeholders import (
+    is_unstructured_page_placeholder as _is_placeholder,
+)
 from docstruct.sections import find_heading_gaps
 from docstruct.text.equations import preserve_equation_number
 from docstruct.text.latex import has_latex_markup
@@ -23,35 +38,32 @@ from acessilia_core.i18n.log_messages import (
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
 )
 from acessilia_core.logger import logger
-
 from acessilia_core.manifest.detectors import (
     inspect_document_needs as _inspect_document_needs,
+)
+from acessilia_core.manifest.detectors import (
     normalized_element_bbox as _normalized_element_bbox,
+)
+from acessilia_core.manifest.detectors import (
     oriented_bbox as _oriented_bbox,
 )
 from acessilia_core.manifest.models import (
     Artifact,
-    BoundingBox,
     ManifestElement,
     Obligation,
     Observation,
     ProcessingManifest,
+)
+from acessilia_core.manifest.reconciliation import (
+    build_element_obligation,
+    build_element_observation,
+    reconcile_reclassified_element,
 )
 from acessilia_core.manifest.slides import (
     DEFAULT_FOLD_FIGURE_LABELS,
     DEFAULT_VISUAL_COVERAGE,
     split_across_slides,
     structure_as_slides,
-)
-from docstruct.placeholders import (
-    UNSTRUCTURED_PAGE_FLAG,
-    UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,
-    is_unstructured_page_placeholder as _is_placeholder,
-)
-from docstruct.geometry import (
-    ReadingItem,
-    order_reading_items,
-    reading_role,
 )
 
 if TYPE_CHECKING:
@@ -261,6 +273,113 @@ def separate_equation_number(element: ManifestElement) -> None:
         element.metadata["latex_markup"] = True
 
 
+@dataclass(frozen=True)
+class _SecondaryExtractionInfo:
+    path: str
+    sha256: str | None
+    present: bool
+    readable: bool
+
+
+def _prepare_manifest_data(
+    source_path: Path,
+    extraction: ToolboxExtraction,
+    *,
+    digest: str,
+    language: str,
+) -> dict[str, Any]:
+    data: dict[str, Any] = dict(extraction.document["document"])
+    data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
+    data["source"] = {
+        "document_id": f"doc-{digest[:16]}",
+        "filename": source_path.name,
+        "path": str(source_path.resolve()),
+        "media_type": mimetypes.guess_type(source_path.name)[0]
+        or "application/octet-stream",
+        "byte_size": source_path.stat().st_size,
+        "sha256": digest,
+    }
+    data["extractor"] = {
+        "name": data.get("extractor", {}).get(
+            "name", extraction.configuration.get("toolbox_provider") or "toolbox"
+        ),
+        "version": extraction.version,
+        "started_at": extraction.started_at.isoformat(),
+        "completed_at": extraction.completed_at.isoformat(),
+        "duration_ms": extraction.duration_ms,
+        "configuration": extraction.configuration,
+    }
+    data.setdefault("language", language)
+    data.setdefault("created_at", extraction.completed_at.isoformat())
+    # The Toolbox is a capability layer: deciding what a document needs and which
+    # methods may satisfy it is this core's planning policy. Whatever processing
+    # needs the payload carries (older Toolbox images derive their own, with
+    # methods the core does not implement) are discarded and derived below.
+    data["observations"] = []
+    data["obligations"] = []
+    if isinstance(data.get("summary"), dict):
+        data["summary"] = {
+            **data["summary"],
+            "observation_count": 0,
+            "obligation_count": 0,
+        }
+    return data
+
+
+def _extract_secondary_info(extraction: ToolboxExtraction) -> _SecondaryExtractionInfo:
+    secondary = extraction.document.get("secondary_extraction")
+    secondary_path = (
+        str(secondary["path"])
+        if isinstance(secondary, dict) and secondary.get("path")
+        else ""
+    )
+    present = bool(secondary_path.strip())
+    # skeleton-order reads the file, so it is planned only while the file the
+    # extractor wrote is still there; a recorded path alone would plan a
+    # method that fails and forces a replan (#298).
+    readable = present and Path(secondary_path).is_file()
+    sha256 = secondary.get("sha256") if isinstance(secondary, dict) else None
+    return _SecondaryExtractionInfo(
+        path=secondary_path, sha256=sha256, present=present, readable=readable
+    )
+
+
+def _sync_page_element_ids(manifest: ProcessingManifest) -> None:
+    by_page: dict[int, list[str]] = {}
+    for elem in manifest.elements:
+        if elem.page_number is not None:
+            by_page.setdefault(elem.page_number, []).append(elem.id)
+    for page in manifest.pages:
+        page.element_ids = by_page.get(page.page_number, [])
+
+
+def _apply_layout_passes(
+    manifest: ProcessingManifest,
+    *,
+    presentation: bool,
+    refine_reading_order: bool,
+    slide_visual_coverage: float,
+    slide_fold_figure_labels: bool,
+) -> None:
+    if presentation:
+        split_across_slides(manifest)
+    if refine_reading_order:
+        manifest.elements = _refine_reading_order(manifest.elements)
+        _sync_page_element_ids(manifest)
+    if presentation:
+        page_sizes = {
+            page.page_number: (page.width, page.height) for page in manifest.pages
+        }
+        structure_as_slides(
+            manifest,
+            visual_coverage=slide_visual_coverage,
+            fold_figure_labels=slide_fold_figure_labels,
+            page_fractions=lambda element: _normalized_element_bbox(
+                element, page_sizes
+            ),
+        )
+
+
 def _build_from_toolbox_json(
     source_path: Path,
     extraction: ToolboxExtraction,
@@ -279,83 +398,20 @@ def _build_from_toolbox_json(
     The Toolbox already returns a complete ProcessingManifest-compatible JSON
     payload inside ``extraction.document["document"]``, so we parse it directly.
     """
-    data: dict[str, Any] = dict(extraction.document["document"])
-
-    data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
-
-    # Override source with local file info
-    data["source"] = {
-        "document_id": f"doc-{digest[:16]}",
-        "filename": source_path.name,
-        "path": str(source_path.resolve()),
-        "media_type": mimetypes.guess_type(source_path.name)[0]
-        or "application/octet-stream",
-        "byte_size": source_path.stat().st_size,
-        "sha256": digest,
-    }
-
-    # Override extractor metadata with this run
-    data["extractor"] = {
-        "name": data.get("extractor", {}).get(
-            "name", extraction.configuration.get("toolbox_provider") or "toolbox"
-        ),
-        "version": extraction.version,
-        "started_at": extraction.started_at.isoformat(),
-        "completed_at": extraction.completed_at.isoformat(),
-        "duration_ms": extraction.duration_ms,
-        "configuration": extraction.configuration,
-    }
-
-    data.setdefault("language", language)
-    data.setdefault("created_at", extraction.completed_at.isoformat())
-
-    # The Toolbox is a capability layer: deciding what a document needs and which
-    # methods may satisfy it is this core's planning policy. Whatever processing
-    # needs the payload carries (older Toolbox images derive their own, with
-    # methods the core does not implement) are discarded and derived below.
-    data["observations"] = []
-    data["obligations"] = []
-    if isinstance(data.get("summary"), dict):
-        data["summary"] = {
-            **data["summary"],
-            "observation_count": 0,
-            "obligation_count": 0,
-        }
-
+    data = _prepare_manifest_data(
+        source_path, extraction, digest=digest, language=language
+    )
     manifest = ProcessingManifest.model_validate(data)
     for element in manifest.elements:
         separate_equation_number(element)
-    secondary = extraction.document.get("secondary_extraction")
-    secondary_path = (
-        str(secondary["path"])
-        if isinstance(secondary, dict) and secondary.get("path")
-        else ""
+    secondary = _extract_secondary_info(extraction)
+    _apply_layout_passes(
+        manifest,
+        presentation=presentation,
+        refine_reading_order=refine_reading_order,
+        slide_visual_coverage=slide_visual_coverage,
+        slide_fold_figure_labels=slide_fold_figure_labels,
     )
-    has_secondary_extraction = bool(secondary_path.strip())
-    # skeleton-order reads the file, so it is planned only while the file the
-    # extractor wrote is still there; a recorded path alone would plan a
-    # method that fails and forces a replan (#298).
-    secondary_extraction_readable = (
-        has_secondary_extraction and Path(secondary_path).is_file()
-    )
-    if presentation:
-        split_across_slides(manifest)
-    if refine_reading_order:
-        manifest.elements = _refine_reading_order(manifest.elements)
-        by_page: dict[int, list[str]] = {}
-        for elem in manifest.elements:
-            if elem.page_number is not None:
-                by_page.setdefault(elem.page_number, []).append(elem.id)
-        for page in manifest.pages:
-            page.element_ids = by_page.get(page.page_number, [])
-    if presentation:
-        page_sizes = {page.page_number: (page.width, page.height) for page in manifest.pages}
-        structure_as_slides(
-            manifest,
-            visual_coverage=slide_visual_coverage,
-            fold_figure_labels=slide_fold_figure_labels,
-            page_fractions=lambda element: _normalized_element_bbox(element, page_sizes),
-        )
     observations, obligations = _derive_processing_needs(manifest.elements)
     document_observations, document_obligations = inspect_document_needs(
         manifest.elements,
@@ -366,20 +422,20 @@ def _build_from_toolbox_json(
         fusion_stats=extraction.document.get("fusion_stats"),
         legacy_unicode_repair=legacy_unicode_repair,
         fusion_judge_max_pages=fusion_judge_max_pages,
-        secondary_extraction_available=secondary_extraction_readable,
+        secondary_extraction_available=secondary.readable,
     )
     observations.extend(document_observations)
     obligations.extend(document_obligations)
     _append_processing_needs(manifest, observations, obligations)
     append_unstructured_page_needs(manifest)
-    if has_secondary_extraction:
+    if secondary.present:
         manifest.artifacts.append(
             Artifact(
                 id=SECONDARY_EXTRACTION_ARTIFACT_ID,
                 kind=SECONDARY_EXTRACTION_KIND,
-                path=secondary_path,
+                path=secondary.path,
                 media_type="application/json",
-                sha256=secondary.get("sha256"),
+                sha256=secondary.sha256,
             )
         )
     return manifest
@@ -515,59 +571,11 @@ def _is_structural_container(
     )
 
 
-def _derive_processing_needs(
+def _derive_heading_gap_needs(
     elements: list[ManifestElement],
 ) -> tuple[list[Observation], list[Obligation]]:
     observations: list[Observation] = []
     obligations: list[Obligation] = []
-    parent_ids: set[str] = {
-        element.parent_id for element in elements if element.parent_id
-    }
-
-    for element in elements:
-        if is_unstructured_page_placeholder(element):
-            # Planned by append_unstructured_page_needs, not as an unknown region.
-            continue
-        if _is_structural_container(element, parent_ids):
-            logger.debug(
-                t(LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED).format(
-                    element_id=element.id, raw_label=element.raw_label
-                )
-            )
-            continue
-        spec = OBLIGATION_BY_TYPE.get(element.type)
-        if spec is None:
-            continue
-        kind, msgid, methods = spec
-        rationale = t(msgid)
-        suffix = element.id.removeprefix("element-")
-        observations.append(
-            Observation(
-                id=f"observation-{kind}-{suffix}",
-                kind=f"{element.type}-requires-processing",
-                severity="warning" if element.type != "code" else "info",
-                message=rationale,
-                target_ids=[element.id],
-                evidence={
-                    "raw_label": element.raw_label,
-                    "page_number": element.page_number,
-                },
-            )
-        )
-        obligations.append(
-            Obligation(
-                id=f"obligation-{kind}-{suffix}",
-                kind=kind,
-                target_ids=[element.id],
-                admissible_methods=methods,
-                method_costs={
-                    method: DEFAULT_METHOD_COSTS.get(method, 50)
-                    for method in methods
-                },
-                rationale=rationale,
-            )
-        )
-
     heading_levels = [
         (element.id, 1 if element.type == "title" else element.hierarchy_level)
         for element in sorted(elements, key=lambda item: item.reading_order)
@@ -607,6 +615,50 @@ def _derive_processing_needs(
                 rationale=message,
             )
         )
+    return observations, obligations
+
+
+def _derive_processing_needs(
+    elements: list[ManifestElement],
+) -> tuple[list[Observation], list[Obligation]]:
+    observations: list[Observation] = []
+    obligations: list[Obligation] = []
+    parent_ids: set[str] = {
+        element.parent_id for element in elements if element.parent_id
+    }
+
+    for element in elements:
+        if is_unstructured_page_placeholder(element):
+            # Planned by append_unstructured_page_needs, not as an unknown region.
+            continue
+        if _is_structural_container(element, parent_ids):
+            logger.debug(
+                t(LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED).format(
+                    element_id=element.id, raw_label=element.raw_label
+                )
+            )
+            continue
+        spec = OBLIGATION_BY_TYPE.get(element.type)
+        if spec is None:
+            continue
+        kind, msgid, methods = spec
+        rationale = t(msgid)
+        observations.append(
+            build_element_observation(element, kind=kind, rationale=rationale)
+        )
+        obligations.append(
+            build_element_obligation(
+                element,
+                kind=kind,
+                methods=methods,
+                method_costs=DEFAULT_METHOD_COSTS,
+                rationale=rationale,
+            )
+        )
+
+    heading_observations, heading_obligations = _derive_heading_gap_needs(elements)
+    observations.extend(heading_observations)
+    obligations.extend(heading_obligations)
     return observations, obligations
 
 
@@ -679,109 +731,13 @@ def reconcile_reclassified_element_processing_needs(
     dual-provider fusion evidence) is kept untouched instead of rebuilding the
     complete list.
     """
-    if previous_type == element.type:
-        return
-
-    previous_spec = OBLIGATION_BY_TYPE.get(previous_type)
-    current_spec = OBLIGATION_BY_TYPE.get(element.type)
-    if current_spec is None:
-        return
-
-    current_kind, msgid, methods = current_spec
-    rationale = t(msgid)
-    previous_kind = previous_spec[0] if previous_spec is not None else None
-    previous_observation_kind = (
-        f"{previous_type}-requires-processing" if previous_spec is not None else None
-    )
-    current_observation_kind = f"{element.type}-requires-processing"
-    bound_kinds = TYPE_BOUND_V23_KINDS.get(previous_type, frozenset())
-    bound_observation_kinds = {f"{kind}-detected" for kind in bound_kinds}
-    suffix = element.id.removeprefix("element-")
-    current_obligation_id = f"obligation-{current_kind}-{suffix}"
-    current_observation_id = f"observation-{current_kind}-{suffix}"
-
-    removed_obligation_ids: set[str] = set()
-    retained_obligations: list[Obligation] = []
-    has_current_obligation = False
-    for obligation in manifest.obligations:
-        targets_only_element = obligation.target_ids == [element.id]
-        if targets_only_element and obligation.kind == current_kind:
-            has_current_obligation = True
-        if targets_only_element and (
-            (previous_kind is not None and obligation.kind == previous_kind)
-            or obligation.kind in bound_kinds
-        ):
-            removed_obligation_ids.add(obligation.id)
-            continue
-        retained_obligations.append(obligation)
-
-    if not has_current_obligation:
-        retained_obligations.append(
-            Obligation(
-                id=current_obligation_id,
-                kind=current_kind,
-                target_ids=[element.id],
-                admissible_methods=list(methods),
-                method_costs={
-                    method: DEFAULT_METHOD_COSTS.get(method, 50)
-                    for method in methods
-                },
-                rationale=rationale,
-            )
-        )
-
-    replacement_id = next(
-        (
-            obligation.id
-            for obligation in retained_obligations
-            if obligation.target_ids == [element.id]
-            and obligation.kind == current_kind
-        ),
-        current_obligation_id,
-    )
-    for obligation in retained_obligations:
-        obligation.dependencies = [
-            replacement_id if dependency in removed_obligation_ids else dependency
-            for dependency in obligation.dependencies
-        ]
-    manifest.obligations = retained_obligations
-
-    retained_observations: list[Observation] = []
-    has_current_observation = False
-    for observation in manifest.observations:
-        targets_only_element = observation.target_ids == [element.id]
-        if targets_only_element and observation.kind == current_observation_kind:
-            has_current_observation = True
-        if targets_only_element and (
-            (
-                previous_observation_kind is not None
-                and observation.kind == previous_observation_kind
-            )
-            or observation.kind in bound_observation_kinds
-        ):
-            continue
-        retained_observations.append(observation)
-
-    if not has_current_observation:
-        retained_observations.append(
-            Observation(
-                id=current_observation_id,
-                kind=current_observation_kind,
-                severity="warning" if element.type != "code" else "info",
-                message=rationale,
-                target_ids=[element.id],
-                evidence={
-                    "raw_label": element.raw_label,
-                    "page_number": element.page_number,
-                },
-            )
-        )
-    manifest.observations = retained_observations
-
-    manifest.summary.observation_count = len(manifest.observations)
-    manifest.summary.obligation_count = len(manifest.obligations)
-    manifest.summary.element_types = dict(
-        sorted(Counter(item.type for item in manifest.elements).items())
+    reconcile_reclassified_element(
+        manifest,
+        element,
+        previous_type=previous_type,
+        obligation_by_type=OBLIGATION_BY_TYPE,
+        type_bound_v23_kinds=TYPE_BOUND_V23_KINDS,
+        method_costs=DEFAULT_METHOD_COSTS,
     )
 
 

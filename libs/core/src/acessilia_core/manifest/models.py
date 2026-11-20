@@ -1,12 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import MSG_PLANNER_NOT_STARTED, MSG_TIMESTAMPS_MIXED_TIMEZONES
 from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
@@ -14,14 +11,20 @@ from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the cata
     MSG_ELEMENT_UNKNOWN_PAGE,
     MSG_PAGE_DUPLICATE_ELEMENT_IDS,
     MSG_PAGE_UNKNOWN_ELEMENTS,
+    MSG_PARENT_CYCLE,
     MSG_PARENT_REF_MISMATCH,
     MSG_PROVENANCE_UNKNOWN_PAGE,
-    MSG_PARENT_CYCLE,
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
     document_invariant_findings,
 )
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    MSG_PLANNER_NOT_STARTED,
+    MSG_TIMESTAMPS_MIXED_TIMEZONES,
+)
 
 SCHEMA_VERSION = "1.1.0"
 SCHEMA_ID = "urn:a11y-devs:schema:processing-manifest:1.1.0"
@@ -97,7 +100,7 @@ class ExtractorRun(StrictModel):
     configuration: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_interval(self) -> "ExtractorRun":
+    def validate_interval(self) -> ExtractorRun:
         _check_comparable(self.started_at, self.completed_at)
         return self
 
@@ -143,7 +146,7 @@ class ObligationAttempt(StrictModel):
     artifact_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_interval(self) -> "ObligationAttempt":
+    def validate_interval(self) -> ObligationAttempt:
         _check_comparable(self.started_at, self.completed_at)
         if self.completed_at < self.started_at:
             raise ValueError(t(MSG_PLANNER_NOT_STARTED))
@@ -163,7 +166,7 @@ class Obligation(StrictModel):
     rationale: str = Field(min_length=1)
 
     @model_validator(mode="after")
-    def validate_methods(self) -> "Obligation":
+    def validate_methods(self) -> Obligation:
         methods = set(self.admissible_methods)
         unknown = set(self.method_costs) - methods
         if unknown:
@@ -192,6 +195,121 @@ class ManifestSummary(StrictModel):
     element_types: dict[str, int] = Field(default_factory=dict)
 
 
+def _ensure_unique_ids(items: Sequence[Any], message: str) -> set[str]:
+    ids = [item.id for item in items]
+    known = set(ids)
+    if len(ids) != len(known):
+        raise ValueError(message)
+    return known
+
+
+def _validate_observation_targets(
+    observations: list[Observation], known_elements: set[str]
+) -> None:
+    for observation in observations:
+        unknown = set(observation.target_ids) - known_elements
+        if unknown:
+            raise ValueError(
+                f"Observação {observation.id} referencia alvos inexistentes: "
+                f"{sorted(unknown)}"
+            )
+
+
+def _validate_obligation_attempts(
+    obligation: Obligation, known_artifacts: set[str]
+) -> None:
+    for attempt in obligation.attempts:
+        if attempt.method not in obligation.admissible_methods:
+            raise ValueError(
+                f"Tentativa de método não admissível em {obligation.id}: "
+                f"{attempt.method}"
+            )
+        unknown_artifacts = set(attempt.artifact_ids) - known_artifacts
+        if unknown_artifacts:
+            raise ValueError(
+                f"Tentativa em {obligation.id} referencia artefatos "
+                f"inexistentes: {sorted(unknown_artifacts)}"
+            )
+
+
+def _validate_obligation_references(
+    obligations: list[Obligation],
+    *,
+    known_elements: set[str],
+    known_obligations: set[str],
+    known_artifacts: set[str],
+) -> None:
+    for obligation in obligations:
+        unknown_targets = set(obligation.target_ids) - known_elements
+        if unknown_targets:
+            raise ValueError(
+                f"Obrigação {obligation.id} referencia alvos inexistentes: "
+                f"{sorted(unknown_targets)}"
+            )
+        unknown_dependencies = set(obligation.dependencies) - known_obligations
+        if unknown_dependencies:
+            raise ValueError(
+                f"Obrigação {obligation.id} referencia dependências inexistentes: "
+                f"{sorted(unknown_dependencies)}"
+            )
+        if obligation.id in obligation.dependencies:
+            raise ValueError(f"Obrigação {obligation.id} depende de si mesma")
+        _validate_obligation_attempts(obligation, known_artifacts)
+
+
+def _validate_obligation_dag(obligations: list[Obligation]) -> None:
+    dependency_graph = {
+        obligation.id: obligation.dependencies for obligation in obligations
+    }
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(obligation_id: str) -> None:
+        if obligation_id in visiting:
+            raise ValueError("Ciclo detectado nas dependências de obrigações")
+        if obligation_id in visited:
+            return
+        visiting.add(obligation_id)
+        for dependency in dependency_graph.get(obligation_id, []):
+            visit(dependency)
+        visiting.remove(obligation_id)
+        visited.add(obligation_id)
+
+    for obligation_id in dependency_graph:
+        visit(obligation_id)
+
+
+def _validate_satisfied_predecessors(obligations: list[Obligation]) -> None:
+    obligation_by_id = {obligation.id: obligation for obligation in obligations}
+    for obligation in obligations:
+        if obligation.status != "satisfied":
+            continue
+        unsatisfied = [
+            dependency
+            for dependency in obligation.dependencies
+            if obligation_by_id[dependency].status != "satisfied"
+        ]
+        if unsatisfied:
+            raise ValueError(
+                f"Obrigação satisfeita {obligation.id} possui predecessoras "
+                f"insatisfeitas: {unsatisfied}"
+            )
+
+
+def _validate_summary_counts(manifest: ProcessingManifest) -> None:
+    expected_counts = {
+        "page_count": len(manifest.pages),
+        "element_count": len(manifest.elements),
+        "observation_count": len(manifest.observations),
+        "obligation_count": len(manifest.obligations),
+    }
+    for field, expected in expected_counts.items():
+        if getattr(manifest.summary, field) != expected:
+            raise ValueError(
+                f"summary.{field}={getattr(manifest.summary, field)}; esperado {expected}"
+            )
+
+
 class ProcessingManifest(StrictModel):
     schema_ref: str = Field(default=SCHEMA_ID, alias="$schema")
     schema_version: Literal["1.1.0"] = SCHEMA_VERSION
@@ -213,7 +331,7 @@ class ProcessingManifest(StrictModel):
     summary: ManifestSummary
 
     @model_validator(mode="after")
-    def validate_references(self) -> "ProcessingManifest":
+    def validate_references(self) -> ProcessingManifest:
         if self.extractor.completed_at < self.extractor.started_at:
             raise ValueError("A extração terminou antes de começar")
 
@@ -226,103 +344,25 @@ class ProcessingManifest(StrictModel):
             msgid, kwargs = findings[0]
             raise ValueError(t(msgid).format(**kwargs))
 
-        observation_ids = [observation.id for observation in self.observations]
-        if len(observation_ids) != len(set(observation_ids)):
-            raise ValueError("IDs de observações duplicados")
-
-        obligation_ids = [obligation.id for obligation in self.obligations]
-        if len(obligation_ids) != len(set(obligation_ids)):
-            raise ValueError("IDs de obrigações duplicados")
-
-        artifact_ids = [artifact.id for artifact in self.artifacts]
-        if len(artifact_ids) != len(set(artifact_ids)):
-            raise ValueError("IDs de artefatos duplicados")
+        _ensure_unique_ids(self.observations, "IDs de observações duplicados")
+        known_obligations = _ensure_unique_ids(
+            self.obligations, "IDs de obrigações duplicados"
+        )
+        known_artifacts = _ensure_unique_ids(
+            self.artifacts, "IDs de artefatos duplicados"
+        )
 
         known_elements = {element.id for element in self.elements}
-        for observation in self.observations:
-            unknown = set(observation.target_ids) - known_elements
-            if unknown:
-                raise ValueError(
-                    f"Observação {observation.id} referencia alvos inexistentes: "
-                    f"{sorted(unknown)}"
-                )
-        known_obligations = set(obligation_ids)
-        for obligation in self.obligations:
-            unknown_targets = set(obligation.target_ids) - known_elements
-            if unknown_targets:
-                raise ValueError(
-                    f"Obrigação {obligation.id} referencia alvos inexistentes: "
-                    f"{sorted(unknown_targets)}"
-                )
-            unknown_dependencies = set(obligation.dependencies) - known_obligations
-            if unknown_dependencies:
-                raise ValueError(
-                    f"Obrigação {obligation.id} referencia dependências inexistentes: "
-                    f"{sorted(unknown_dependencies)}"
-                )
-            if obligation.id in obligation.dependencies:
-                raise ValueError(f"Obrigação {obligation.id} depende de si mesma")
-            for attempt in obligation.attempts:
-                if attempt.method not in obligation.admissible_methods:
-                    raise ValueError(
-                        f"Tentativa de método não admissível em {obligation.id}: "
-                        f"{attempt.method}"
-                    )
-                unknown_artifacts = set(attempt.artifact_ids) - set(artifact_ids)
-                if unknown_artifacts:
-                    raise ValueError(
-                        f"Tentativa em {obligation.id} referencia artefatos "
-                        f"inexistentes: {sorted(unknown_artifacts)}"
-                    )
-
-        dependency_graph = {
-            obligation.id: obligation.dependencies for obligation in self.obligations
-        }
-        visiting: set[str] = set()
-        visited: set[str] = set()
-
-        def visit(obligation_id: str) -> None:
-            if obligation_id in visiting:
-                raise ValueError("Ciclo detectado nas dependências de obrigações")
-            if obligation_id in visited:
-                return
-            visiting.add(obligation_id)
-            for dependency in dependency_graph.get(obligation_id, []):
-                visit(dependency)
-            visiting.remove(obligation_id)
-            visited.add(obligation_id)
-
-        for obligation_id in dependency_graph:
-            visit(obligation_id)
-
-        obligation_by_id = {
-            obligation.id: obligation for obligation in self.obligations
-        }
-        for obligation in self.obligations:
-            if obligation.status != "satisfied":
-                continue
-            unsatisfied = [
-                dependency
-                for dependency in obligation.dependencies
-                if obligation_by_id[dependency].status != "satisfied"
-            ]
-            if unsatisfied:
-                raise ValueError(
-                    f"Obrigação satisfeita {obligation.id} possui predecessoras "
-                    f"insatisfeitas: {unsatisfied}"
-                )
-
-        expected_counts = {
-            "page_count": len(self.pages),
-            "element_count": len(self.elements),
-            "observation_count": len(self.observations),
-            "obligation_count": len(self.obligations),
-        }
-        for field, expected in expected_counts.items():
-            if getattr(self.summary, field) != expected:
-                raise ValueError(
-                    f"summary.{field}={getattr(self.summary, field)}; esperado {expected}"
-                )
+        _validate_observation_targets(self.observations, known_elements)
+        _validate_obligation_references(
+            self.obligations,
+            known_elements=known_elements,
+            known_obligations=known_obligations,
+            known_artifacts=known_artifacts,
+        )
+        _validate_obligation_dag(self.obligations)
+        _validate_satisfied_predecessors(self.obligations)
+        _validate_summary_counts(self)
         return self
 
     model_config = ConfigDict(
