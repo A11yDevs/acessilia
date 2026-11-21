@@ -2,7 +2,8 @@
 
 Characterization written on develop before ``_enrich_table_structures`` was
 split. The crop and the data agent are replaced. tests/test_table_visual_review.py
-covers the re-reading of misread tables; this file covers the other paths.
+covers the shape checks of the re-reading of misread tables; this file covers
+the other paths and the metadata a fold leaves behind, including a replacement.
 """
 
 from __future__ import annotations
@@ -78,19 +79,46 @@ def test_a_table_without_structure_is_read_and_its_metadata_written(run) -> None
     assert "table_read_failure" not in md
 
 
-def test_a_replacement_reading_without_warnings_clears_the_previous_ones() -> None:
-    """A later accepted reading replaces the warnings along with the AST (#682)."""
-    table = build_element("t", "table")
-    first = _reading([["Nome", "Nota"], ["Ana", "9"]], warnings=["borrado"])
-    replacement = _reading([["Nome", "Nota"], ["Ana", "10"], ["Beto", "8"]])
+def test_a_re_read_replacement_without_warnings_clears_the_previous_ones(run) -> None:
+    """A second pass over the same misread table replaces the warnings too (#682)."""
+    table = build_element("t", "table", text="")
+    collapsed = _reading(
+        [
+            ["Prefix", "symbol", "power"],
+            [
+                "yota zeta exa peta tera giga mega kilo hecto deca",
+                "Y Z E P T G M k h da",
+                "10^24 10^21 10^18 10^15 10^12 10^9 10^6 10^3 10^2 10^1",
+            ],
+        ],
+        warnings=["borrado"],
+    )
+    cleaned = _reading(
+        [
+            ["Prefix", "symbol", "power"],
+            ["yota", "Y", "10^24"],
+            ["zeta", "Z", "10^21"],
+            ["exa", "E", "10^18"],
+            ["peta", "P", "10^15"],
+            ["tera", "T", "10^12"],
+            ["giga", "G", "10^9"],
+            ["mega", "M", "10^6"],
+            ["kilo", "k", "10^3"],
+            ["hecto", "h", "10^2"],
+            ["deca", "da", "10^1"],
+        ]
+    )
 
-    table_stage._fold_table_reading(table, first, 1, None, 0)
+    _, calls = run([table], {"all": [collapsed]})
+    assert calls == [""]
     assert table.metadata["data_warnings"] == ["borrado"]
+    assert table.metadata["table_ast"]["metadata"]["warnings"] == ["borrado"]
 
-    table_stage._fold_table_reading(table, replacement, 1, "collapsed_rows", 1)
-
+    # The next pass reads the persisted collapsed AST as misread and replaces it.
+    _, calls = run([table], {"all": [cleaned]})
+    assert calls == [""]
     assert table.metadata["data_warnings"] == []
-    assert table.metadata["table_ast"] == replacement.table_ast()
+    assert table.metadata["table_ast"] == cleaned.table_ast()
     assert table.metadata["table_review"]["outcome"] == "replaced"
 
 
