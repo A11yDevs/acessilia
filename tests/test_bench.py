@@ -180,6 +180,41 @@ def test_score_covers_only_the_pages_of_the_run(tmp_path, monkeypatch):
     assert json.loads((run / "report.json").read_text())["pages"] == 1
 
 
+@pytest.mark.parametrize(
+    ("command", "option"), [("run", "--sample"), ("download", "--limit")]
+)
+def test_negative_counts_fail_at_argument_parsing(
+    command: str, option: str, monkeypatch
+) -> None:
+    """A negative count must fail at parsing, not slice or fail mid-run (#704)."""
+    monkeypatch.setattr(
+        cli.toolbox,
+        "list_items",
+        lambda *_args, **_kwargs: pytest.fail(
+            "parsing must reject before the dataset download"
+        ),
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        cli.main([command, "--dataset", "drdocbench", option, "-1"])
+
+    assert caught.value.code == 2
+
+
+def test_zero_sample_keeps_every_page(tmp_path, monkeypatch):
+    """Zero keeps the current no-limit semantics for --sample (#704)."""
+    _tree(tmp_path / "data", pages=(1, 2))
+    run = _stub_toolbox(tmp_path, monkeypatch)
+    data = ["--dataset", "drdocbench", "--root", str(tmp_path / "data")]
+
+    assert cli.main(["run", *data, "--sample", "0"]) == 0
+
+    assert sorted(path.name for path in (run / "predictions").glob("*.md")) == [
+        f"{DOC}_p1.md",
+        f"{DOC}_p2.md",
+    ]
+
+
 def test_score_without_ground_truth_fails(tmp_path, monkeypatch):
     _tree(tmp_path / "data", pages=(1,), gt=False)
     _stub_toolbox(tmp_path, monkeypatch)

@@ -526,7 +526,11 @@ def _relative_input(file_path: Path, input_root: Path) -> Path:
 
 
 def _non_negative_int(value: str) -> int:
-    """argparse type for counts where a negative value would silently slice."""
+    """argparse type for counts where a negative value would silently slice.
+
+    Mirrors ``scripts.bench.__main__._non_negative_int`` (#704); keep the two
+    copies in sync.
+    """
     try:
         number = int(value)
     except ValueError as exc:

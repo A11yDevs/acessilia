@@ -34,6 +34,21 @@ from scripts.bench.report import MANIFEST_FILE, compare_runs, score_run
 VAR = Path(os.environ.get("BENCH_VAR") or Path(__file__).resolve().parents[2] / "var" / "bench")
 
 
+def _non_negative_int(value: str) -> int:
+    """argparse type for counts where a negative value would slice or fail mid-run.
+
+    Mirrors ``scripts/compare_pipelines._non_negative_int`` (#695/#702); keep
+    the two copies in sync.
+    """
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an integer") from exc
+    if number < 0:
+        raise argparse.ArgumentTypeError("must be 0 or greater")
+    return number
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m scripts.bench", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -48,9 +63,17 @@ def main(argv: list[str] | None = None) -> int:
         return p
 
     p = dataset_command("download", "materialize a split as a local tree")
-    p.add_argument("--limit", type=int)
+    p.add_argument(
+        "--limit",
+        type=_non_negative_int,
+        help="first N items only (0 = none)",
+    )
     p = dataset_command("run", "run the core on the pages and write predictions")
-    p.add_argument("--sample", type=int, help="first N pages only")
+    p.add_argument(
+        "--sample",
+        type=_non_negative_int,
+        help="first N pages only (0 = all)",
+    )
     p.add_argument("--item", help="a single item id")
     p.add_argument("--provider", help="Toolbox structure provider override")
     p.add_argument("--save-raw", action="store_true", help="also keep the Toolbox payload")
