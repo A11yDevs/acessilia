@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from docstruct.fusion.adjudication import decide_v1
@@ -43,12 +43,17 @@ class PageRouteResult:
     secondary elements. ``replaced`` maps each routed 1-based page number to the
     primary elements it replaced. ``routed_pages`` and ``missing_pages`` let
     callers log routing decisions without coupling docstruct to a logger.
+    ``page_evidence`` is an annotated copy of the caller's evidence; the caller's
+    list is never mutated.
     """
 
     payload: dict[str, Any]
     replaced: dict[int, list[dict[str, Any]]]
     routed_pages: tuple[int, ...]
     missing_pages: tuple[Any, ...]
+    #: Copy of the caller's routing evidence with ``stats["applied"]`` set on
+    #: routed entries. The input list is never mutated (#633).
+    page_evidence: list[dict[str, Any]] = field(default_factory=list)
 
 
 def page_similarity(a: str, b: str) -> float:
@@ -531,8 +536,9 @@ def _rebuild_routed_pages(
     ids_by_page: dict[int, list[Any]] = {}
     for element in elements:
         page_number = _element_page_number(element)
-        if page_number is not None:
-            ids_by_page.setdefault(page_number, []).append(element["id"])
+        element_id = element.get("id")
+        if page_number is not None and element_id is not None:
+            ids_by_page.setdefault(page_number, []).append(element_id)
     for number, descriptor in page_descriptors.items():
         descriptor["element_ids"] = ids_by_page.get(number, [])
     return [page_descriptors[number] for number in sorted(page_descriptors)]
@@ -555,6 +561,25 @@ def _updated_document_summary(
     }
 
 
+def _applied_evidence(
+    page_evidence: list[dict[str, Any]],
+    routed: AbstractSet[Any],
+    secondary_provider: str,
+) -> list[dict[str, Any]]:
+    """Copy ``page_evidence`` and mark the routed entries without touching the input."""
+    updated: list[dict[str, Any]] = []
+    for entry in page_evidence:
+        copied = dict(entry)
+        if entry.get("page_number") in routed:
+            stats = entry.get("stats")
+            copied["stats"] = {
+                **(stats if isinstance(stats, dict) else {}),
+                "applied": secondary_provider,
+            }
+        updated.append(copied)
+    return updated
+
+
 def route_pages(
     primary_res: dict[str, Any],
     secondary_res: dict[str, Any],
@@ -564,11 +589,11 @@ def route_pages(
 ) -> PageRouteResult:
     """Replace pages routed to ``"mineru"`` with adopted secondary elements.
 
-    Marks routed entries in ``page_evidence`` in place with
-    ``stats["applied"] = secondary_provider``. Returns a :class:`PageRouteResult`
-    carrying the resulting payload (identical to ``primary_res`` when no page
-    was routed), replaced primary elements by page, and the sorted routed and
-    missing page numbers.
+    Returns a :class:`PageRouteResult` carrying the resulting payload (identical
+    to ``primary_res`` when no page was routed), replaced primary elements by
+    page, the sorted routed and missing page numbers, and a copy of
+    ``page_evidence`` with ``stats["applied"] = secondary_provider`` on routed
+    entries. ``page_evidence`` itself is never mutated (#633).
     """
     primary_doc = primary_res.get("document") or {}
     secondary_doc = secondary_res.get("document") or {}
@@ -580,6 +605,7 @@ def route_pages(
             replaced={},
             routed_pages=(),
             missing_pages=missing,
+            page_evidence=_applied_evidence(page_evidence, routed, secondary_provider),
         )
 
     primary_elements = primary_doc.get("elements") or []
@@ -600,9 +626,6 @@ def route_pages(
     elements, replaced = _merge_routed_elements(
         primary_by_page, unpaged, adopted, routed
     )
-    for entry in page_evidence:
-        if entry.get("page_number") in routed:
-            entry.setdefault("stats", {})["applied"] = secondary_provider
     rebuilt_pages = _rebuild_routed_pages(primary_doc, secondary_doc, elements, routed)
 
     document: dict[str, Any] = {
@@ -619,6 +642,7 @@ def route_pages(
         replaced=replaced,
         routed_pages=tuple(sorted(routed)),
         missing_pages=missing,
+        page_evidence=_applied_evidence(page_evidence, routed, secondary_provider),
     )
 
 
@@ -629,7 +653,11 @@ def apply_page_routes(
     *,
     secondary_provider: str,
 ) -> tuple[dict[str, Any], dict[int, list[dict[str, Any]]]]:
-    """Convenience wrapper around :func:`route_pages` returning ``(payload, replaced)``."""
+    """Convenience wrapper around :func:`route_pages` returning ``(payload, replaced)``.
+
+    Use :func:`route_pages` directly when the annotated copy of ``page_evidence``
+    is needed; this wrapper keeps the historical two-value return (#633).
+    """
     result = route_pages(
         primary_res,
         secondary_res,

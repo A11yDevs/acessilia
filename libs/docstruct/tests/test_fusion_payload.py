@@ -460,8 +460,11 @@ class TestRoutePagesAndApplyPageRoutes:
         assert document["pages"][1]["element_ids"] == ["mineru-s2", "mineru-s3"]
         assert document["summary"]["element_count"] == 5
         assert document["summary"]["element_types"] == {"paragraph": 4, "table": 1}
-        assert evidence[1]["stats"]["applied"] == "mineru"
-        assert "applied" not in evidence[2]["stats"]
+        assert result.page_evidence[1]["stats"]["applied"] == "mineru"
+        assert "applied" not in result.page_evidence[2]["stats"]
+        # #633: the caller's evidence is pure input; the result carries the copy.
+        assert "applied" not in evidence[1]["stats"]
+        assert evidence is not result.page_evidence
 
     def test_without_routed_pages_primary_payload_identity_is_preserved(self) -> None:
         payload, replaced = apply_page_routes(
@@ -515,4 +518,30 @@ class TestRoutePagesAndApplyPageRoutes:
         assert result.routed_pages == (2.0,)
         assert result.missing_pages == ()
         assert [e["id"] for e in result.replaced[2]] == ["p2"]
-        assert evidence[1]["stats"]["applied"] == "mineru"
+        assert result.page_evidence[1]["stats"]["applied"] == "mineru"
+        assert "applied" not in evidence[1]["stats"]
+
+    def test_primary_elements_without_id_do_not_break_page_rebuild(self) -> None:
+        """#633: an unrouted primary element without id is skipped in element_ids."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+                {
+                    "id": None,
+                    "type": "paragraph",
+                    "text": "primary without id",
+                    "page_number": 3,
+                    "reading_order": 3,
+                },
+            ],
+            pages=3,
+        )
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert result.payload["document"]["pages"][2]["element_ids"] == []
