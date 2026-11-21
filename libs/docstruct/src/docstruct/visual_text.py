@@ -758,8 +758,17 @@ def is_confirmed_logo_description(
     mentioned_elements: Iterable[str] = (),
     *,
     described: bool = False,
+    classified_as_logo: bool | None = None,
 ) -> bool:
     """Whether a header-adjacent picture is confirmed as an institutional logo (#325).
+
+    ``classified_as_logo`` is the vision model's own answer for the picture
+    (``VisionOutput.institutional_logo``). ``False`` keeps the picture even if
+    its description uses logo words; ``True`` confirms the logo unless the
+    description also names a non-logo subject, because a logo shown next to a
+    photograph is still one picture and folding it into ``Logo.`` would drop
+    the photograph; ``None`` falls back to the description, for answers stored
+    before the field existed.
 
     When ``described=True`` (the VLM ran on the picture), an explicit positive
     logo/emblem/crest marker is required, and no non-logo marker may appear,
@@ -773,6 +782,11 @@ def is_confirmed_logo_description(
     ).strip()
     has_logo = bool(_LOGO_MARKER_RE.search(combined))
     has_non_logo = bool(_NON_LOGO_MARKER_RE.search(combined))
+    if classified_as_logo is False:
+        # An explicit non-logo answer outweighs any word in the description.
+        return False
+    if classified_as_logo is True:
+        return not has_non_logo
     if described:
         # Both cues ("logo next to the author's photograph") is not a confirmed
         # logo: keeping the description loses nothing, folding it would.

@@ -56,6 +56,34 @@ def test_logo_and_header_lines_become_one_paragraph():
     assert "logo" not in [block["id"] for block in blocks]
 
 
+def test_case_036_real_logo_description_still_becomes_one_header_paragraph():
+    """The described logo of acessilia-dataset 036, confirmed by the VLM, merges."""
+    line_1, logo, line_2 = _letterhead()
+    logo.text = (
+        "Logotipo da Universidade de Brasília composto por duas formas geométricas: "
+        "uma em azul escuro na parte superior e outra em verde na parte inferior. "
+        "À direita do logotipo, está o texto 'Universidade de Brasília' em fonte "
+        "serifada, seguido abaixo por 'Departamento de Matemática'."
+    )
+    logo.metadata.update(
+        {
+            "vision_description_complete": True,
+            "vision_elements": ["logotipo", "Universidade de Brasília"],
+            "vision_institutional_logo": True,
+        }
+    )
+
+    blocks = _blocks(line_1, logo, line_2, BODY)
+
+    assert [block["type"] for block in blocks] == ["paragraph", "paragraph"]
+    assert blocks[0]["metadata"]["role"] == "header"
+    assert blocks[0]["metadata"]["letterhead_members"] == ["line-1", "logo", "line-2"]
+    assert blocks[0]["text"].endswith(
+        " University of Brasilia, Department of Mathematics."
+    )
+    assert "Logotipo" in blocks[0]["text"]
+
+
 def test_page_header_without_a_picture_is_unchanged():
     line_1, _, line_2 = _letterhead()
 

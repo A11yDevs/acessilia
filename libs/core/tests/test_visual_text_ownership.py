@@ -595,6 +595,121 @@ def test_case_325_non_logo_picture_beside_page_header_keeps_its_description(
     assert all("Logo." not in (b.get("text") or "") for b in blocks)
 
 
+@pytest.mark.asyncio
+async def test_case_325_vision_logo_answer_confirms_the_merge_with_one_call() -> None:
+    """Option A of #325: the model's own logo answer confirms the merge, with no extra call."""
+    line_1 = _placed(
+        "line-1",
+        "page_header",
+        "University of Brasilia",
+        LINE_1_BOX,
+        metadata=FURNITURE,
+        reading_order=1,
+    )
+    picture = _placed("logo-1", "picture", "", LOGO_BOX, reading_order=2)
+    line_2 = _placed(
+        "line-2",
+        "page_header",
+        "Department of Mathematics",
+        LINE_2_BOX,
+        metadata=FURNITURE,
+        reading_order=3,
+    )
+    body = _placed(
+        "body",
+        "paragraph",
+        "Lecture notes on calculus.",
+        (72, 650, 540, 600),
+        reading_order=4,
+    )
+    manifest = build_manifest(
+        [line_1, picture, line_2, body],
+        [build_obligation("describe-image", ["logo-1"], ["vision-description"])],
+    )
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+    RecordingVision.answers = {
+        # No logo word at all: only the classification confirms it.
+        "logo-1": _vision_answer(
+            "A red shield with a green triangle and three stars.",
+            institutional_logo=True,
+        )
+    }
+
+    await picture_stage._enrich_picture_descriptions(
+        manifest,
+        Path("velocidade-instantanea.pdf"),
+        mode="medio",
+        vision=vision_config(retry_pass_delay_seconds=0),
+        toolbox=toolbox_config(),
+        models=model_config(),
+        region_cache=None,
+    )
+
+    assert len(RecordingVision.calls) == 1
+    [page] = _manifest_pages_to_payload(manifest)
+    blocks = page["blocks"]
+
+    assert [b["type"] for b in blocks] == ["paragraph", "paragraph"]
+    assert blocks[0]["metadata"]["letterhead_members"] == ["line-1", "logo-1", "line-2"]
+    assert blocks[1]["text"] == "Lecture notes on calculus."
+
+
+@pytest.mark.asyncio
+async def test_case_325_vision_non_logo_answer_keeps_a_logo_sounding_description() -> None:
+    """An explicit non-logo answer outweighs logo words in the description."""
+    line_1 = _placed(
+        "line-1",
+        "page_header",
+        "University of Brasilia",
+        LINE_1_BOX,
+        metadata=FURNITURE,
+        reading_order=1,
+    )
+    picture = _placed("pic-header", "picture", "", LOGO_BOX, reading_order=2)
+    line_2 = _placed(
+        "line-2",
+        "page_header",
+        "Department of Mathematics",
+        LINE_2_BOX,
+        metadata=FURNITURE,
+        reading_order=3,
+    )
+    body = _placed(
+        "body",
+        "paragraph",
+        "Lecture notes on calculus.",
+        (72, 650, 540, 600),
+        reading_order=4,
+    )
+    manifest = build_manifest(
+        [line_1, picture, line_2, body],
+        [build_obligation("describe-image", ["pic-header"], ["vision-description"])],
+    )
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+    description = "Logotipo da UFG ao lado da fotografia do autor."
+    RecordingVision.answers = {
+        "pic-header": _vision_answer(description, institutional_logo=False)
+    }
+
+    await picture_stage._enrich_picture_descriptions(
+        manifest,
+        Path("velocidade-instantanea.pdf"),
+        mode="medio",
+        vision=vision_config(retry_pass_delay_seconds=0),
+        toolbox=toolbox_config(),
+        models=model_config(),
+        region_cache=None,
+    )
+
+    assert len(RecordingVision.calls) == 1
+    [page] = _manifest_pages_to_payload(manifest)
+    blocks = page["blocks"]
+
+    assert [b["type"] for b in blocks] == ["paragraph", "image", "paragraph", "paragraph"]
+    assert blocks[1]["alt_text"] == description
+    assert all("Logo." not in (b.get("text") or "") for b in blocks)
+
+
 def test_surrounding_text_prompt_bounds_item_and_total_char_overhead() -> None:
     """Note 6: Prompt context formatting caps per-item and total character overhead."""
     huge_items = ["palavra " * 100 for _ in range(10)]

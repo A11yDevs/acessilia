@@ -88,6 +88,8 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("libs/core/src/acessilia_core/agents/output_schemas.py", "descreva os elementos visuais"),
     ("libs/core/src/acessilia_core/agents/output_schemas.py", "para tabelas, incluindo caption"),
     ("libs/core/src/acessilia_core/agents/output_schemas.py", "latex para fórmulas"),
+    ("libs/core/src/acessilia_core/agents/output_schemas.py", "somente quando ela for um logotipo"),
+    ("libs/core/src/acessilia_core/agents/output_schemas.py", "false para fotografia, retrato"),
     # Page prompt and its fallback — AI prompts, moved with prompt_tools.py out
     # of the allowlist (ADR-0016, step 2)
     ("libs/core/src/acessilia_core/agents/prompt_tools.py", "Você é um sistema de acessibilidade digital"),
@@ -215,6 +217,11 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("libs/docstruct/src/docstruct/text/unicode_repair.py", "à"),
     ("libs/docstruct/tests/test_unicode_repair.py", "à"),
     ("libs/core/tests/test_legacy_unicode_repair.py", "à medida"),
+    # Real VLM answer from acessilia-dataset 036, used as document content.
+    ("libs/core/tests/test_letterhead_header.py", "Logotipo da Universidade de Brasília composto"),
+    ("libs/core/tests/test_letterhead_header.py", "À direita do logotipo"),
+    ("libs/core/tests/test_letterhead_header.py", "serifada, seguido abaixo por"),
+    ("libs/core/tests/test_letterhead_header.py", "vision_elements"),
     ("docs/docstruct_algorithms.md", "→ `à`"),
 ]
 

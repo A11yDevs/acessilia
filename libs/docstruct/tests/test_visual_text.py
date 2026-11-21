@@ -310,35 +310,49 @@ def test_deduplicate_picture_description_never_empties_description_or_cuts_visua
 
 
 @pytest.mark.parametrize(
-    ("description", "mentioned", "described", "expected"),
+    ("description", "mentioned", "described", "classified", "expected"),
     [
-        ("A long description of the logo.", (), False, True),
-        ("Institution crest", (), False, True),
-        ("QR code for the course page", (), False, False),
-        ("A small blue icon.", (), False, False),
-        ("Logotipo institucional da UnB.", ("brasao",), True, True),
-        ("University coat of arms in green and yellow.", (), True, True),
-        ("Fotografia do rosto do autor sorrindo.", ("pessoa",), True, False),
-        ("Portrait photo of the author.", (), True, False),
-        ("A photo.", (), True, False),
-        ("A small blue icon.", (), True, False),
-        ("A map of the region.", (), True, False),
-        ("A red circle.", (), True, False),
-        ("Codigo QR apontando para o site da disciplina.", (), True, False),
-        ("Grafico de barras com tres series.", (), True, False),
-        ("Logo of UFG next to the author's photograph.", (), True, False),
-        ("Logotipo da UFG ao lado da fotografia do autor.", (), True, False),
-        ("UFG coat of arms.", ("portrait",), True, False),
+        ("A long description of the logo.", (), False, None, True),
+        ("Institution crest", (), False, None, True),
+        ("QR code for the course page", (), False, None, False),
+        ("A small blue icon.", (), False, None, False),
+        ("A long description of the logo.", (), False, False, False),
+        ("Logotipo institucional da UnB.", ("brasao",), True, None, True),
+        ("University coat of arms in green and yellow.", (), True, None, True),
+        ("Fotografia do rosto do autor sorrindo.", ("pessoa",), True, None, False),
+        ("Portrait photo of the author.", (), True, None, False),
+        ("A photo.", (), True, None, False),
+        ("A small blue icon.", (), True, None, False),
+        ("A map of the region.", (), True, None, False),
+        ("A red circle.", (), True, None, False),
+        ("Codigo QR apontando para o site da disciplina.", (), True, None, False),
+        ("Grafico de barras com tres series.", (), True, None, False),
+        ("Logo of UFG next to the author's photograph.", (), True, None, False),
+        ("Logotipo da UFG ao lado da fotografia do autor.", (), True, None, False),
+        ("UFG coat of arms.", ("portrait",), True, None, False),
+        # The model's own answer decides when the description is neutral (#325).
+        ("A red shield with a green triangle.", (), True, True, True),
+        ("Logo of UFG next to the author's photograph.", (), True, True, False),
+        ("Logotipo da UFG ao lado da fotografia do autor.", (), True, True, False),
+        # An explicit non-logo answer outweighs logo words in the description.
+        ("Logotipo da Universidade de Brasilia.", (), True, False, False),
+        ("Institution crest", (), False, False, False),
     ],
 )
 def test_is_confirmed_logo_description(
     description: str,
     mentioned: tuple[str, ...],
     described: bool,
+    classified: bool | None,
     expected: bool,
 ) -> None:
     assert (
-        is_confirmed_logo_description(description, mentioned, described=described)
+        is_confirmed_logo_description(
+            description,
+            mentioned,
+            described=described,
+            classified_as_logo=classified,
+        )
         is expected
     )
 

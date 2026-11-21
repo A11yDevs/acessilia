@@ -14,8 +14,11 @@ VISION_SCHEMA_INSTRUCTION = (
     "description para conteúdo visual/textual, ou kind='formula' e formula_latex "
     "quando a região for predominantemente uma fórmula matemática (um desenho de "
     "molécula é kind='description'). Não preencha formula_latex "
-    "quando kind='description'. Sempre informe language, confidence, "
-    "mentioned_elements e warnings."
+    "quando kind='description'. Em uma imagem, informe institutional_logo=true "
+    "somente quando ela for um logotipo, brasão, emblema ou selo institucional, e "
+    "false para fotografia, retrato, ícone, mapa, código QR, gráfico, diagrama ou "
+    "outra imagem. Sempre informe language, confidence, mentioned_elements e "
+    "warnings."
 )
 
 PAGE_INSPECTION_INSTRUCTION = (
@@ -74,6 +77,15 @@ class VisionOutput(AgentOutput):
     mentioned_elements: list[str] = Field(
         default_factory=list,
         description="Concrete visual elements explicitly mentioned in the description.",
+    )
+    institutional_logo: bool | None = Field(
+        default=None,
+        description=(
+            "For a picture: true only when the region is an institutional logo, coat "
+            "of arms, emblem or seal; false for a photograph, portrait, icon, map, QR "
+            "code, chart, diagram or other image; null when the region is not a "
+            "picture or this cannot be told."
+        ),
     )
     formula_latex: str | None = Field(
         default=None,
