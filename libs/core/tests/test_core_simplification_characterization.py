@@ -68,11 +68,31 @@ class _FakeStructureClient:
 
 def _structure_payload(provider: str, text: str) -> dict[str, Any]:
     return {
-        "provenance": {"provider_version": f"{provider}-1.0", "cache_key": f"ck-{provider}"},
-        "pages": [{"page_number": 1, "width": 600.0, "height": 800.0, "element_ids": ["e-1"]}],
-        "elements": [
-            {"id": "e-1", "type": "paragraph", "text": text, "page_number": 1, "reading_order": 1}
-        ],
+        "status": "succeeded",
+        "provider": provider,
+        "document": {
+            "pages": [
+                {
+                    "page_number": 1,
+                    "width": 600.0,
+                    "height": 800.0,
+                    "element_ids": ["e-1"],
+                }
+            ],
+            "elements": [
+                {
+                    "id": "e-1",
+                    "type": "paragraph",
+                    "text": text,
+                    "page_number": 1,
+                    "reading_order": 1,
+                }
+            ],
+        },
+        "provenance": {
+            "provider_version": f"{provider}-1.0",
+            "cache_key": f"ck-{provider}",
+        },
     }
 
 
@@ -116,7 +136,7 @@ async def test_extract_with_primary_ok_and_secondary_failure_degrades_to_primary
         "failed_providers": ["mineru"],
         "reason": "ToolboxTimeout",
     }
-    assert extraction.document["elements"][0]["text"] == "Primary text"
+    assert extraction.document["document"]["elements"][0]["text"] == "Primary text"
     assert extraction.configuration["toolbox_provider"] == "docling"
     assert extraction.configuration["toolbox_base_url"] == "http://primary.test"
     assert extraction.configuration["extraction_degraded"] is True
@@ -163,7 +183,7 @@ async def test_extract_with_primary_failure_and_secondary_ok_degrades_to_seconda
         "failed_providers": ["docling"],
         "reason": "ToolboxProviderUnavailable",
     }
-    assert extraction.document["elements"][0]["text"] == "Secondary text"
+    assert extraction.document["document"]["elements"][0]["text"] == "Secondary text"
     assert extraction.configuration["toolbox_provider"] == "mineru"
     assert extraction.configuration["toolbox_base_url"] == "http://secondary.test"
     assert extraction.configuration["extraction_degraded"] is True

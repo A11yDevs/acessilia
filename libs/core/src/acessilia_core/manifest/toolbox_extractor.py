@@ -30,6 +30,7 @@ from acessilia_core.i18n.log_messages import (
 )
 from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_client import (
+    ToolboxContractViolation,
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -56,6 +57,38 @@ class ToolboxExtraction:
     configuration: dict[str, Any]
     artifact_id: str | None = None
     cache_key: str | None = None
+
+
+def _validated_structure_result(result: Any, *, provider: str) -> dict[str, Any]:
+    """The extraction envelope, refusing a non-object or one without a document.
+
+    The shipped client already rejects a non-object HTTP body, but an injected
+    or duck-typed client can still answer ``None``. Treating that as a payload
+    would let a silent ``None`` reach the manifest (or a bare assert stand in
+    for a typed failure) instead of the recordable provider error (#673).
+    """
+    if not isinstance(result, dict):
+        raise ToolboxContractViolation(
+            f"{provider} returned {type(result).__name__}, not an extraction envelope"
+        )
+    document = result.get("document")
+    if not isinstance(document, dict):
+        raise ToolboxContractViolation(
+            f"{provider} answered without a document object: {type(document).__name__}"
+        )
+    return result
+
+
+def _record_provider_failure(
+    provider: str, exc: ToolboxError, extraction_failures: dict[str, str]
+) -> None:
+    """Record and log one provider's failure so the run is marked degraded."""
+    extraction_failures[provider] = type(exc).__name__
+    logger.warning(
+        t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
+            provider=provider, error=type(exc).__name__
+        )
+    )
 
 
 class ToolboxManifestExtractor:
@@ -255,7 +288,10 @@ class ToolboxManifestExtractor:
                 extraction_failures=extraction_failures,
             )
 
-        assert result is not None
+        if result is None:
+            raise primary_error or ToolboxContractViolation(
+                "The structure extraction produced no document"
+            )
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(UTC)
         provenance = result.get("provenance", {})
@@ -320,6 +356,7 @@ class ToolboxManifestExtractor:
         dual_enabled: bool,
         extraction_failures: dict[str, str],
     ) -> tuple[dict[str, Any] | None, ToolboxError | None]:
+        provider = structure.provider or "primary"
         try:
             with self._remote_operation("primary", operations):
                 result = await structure.extract_structure(
@@ -331,14 +368,15 @@ class ToolboxManifestExtractor:
         except ToolboxError as exc:
             if not dual_enabled or not _provider_failure(exc):
                 raise
-            extraction_failures[structure.provider] = type(exc).__name__
-            logger.warning(
-                t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
-                    provider=structure.provider, error=type(exc).__name__
-                )
-            )
+            _record_provider_failure(provider, exc, extraction_failures)
             return None, exc
-        return result, None
+        try:
+            return _validated_structure_result(result, provider=provider), None
+        except ToolboxContractViolation as exc:
+            if not dual_enabled:
+                raise
+            _record_provider_failure(provider, exc, extraction_failures)
+            return None, exc
 
     async def _apply_dual_extraction(
         self,
@@ -358,7 +396,10 @@ class ToolboxManifestExtractor:
     ) -> tuple[dict[str, Any], str, str]:
         secondary_provider = fusion_config.secondary_provider
         if secondary_provider == structure.provider:
-            assert primary_result is not None
+            if primary_result is None:
+                raise ToolboxContractViolation(
+                    "Identical providers reported no primary extraction"
+                )
             skipped = {
                 **primary_result,
                 "fusion": {
@@ -458,7 +499,7 @@ class ToolboxManifestExtractor:
             _secondary_budget(toolbox_config, started_clock) if has_primary else None
         )
         with self._remote_operation("secondary", operations):
-            return await _within(
+            result = await _within(
                 budget,
                 secondary_client.extract_structure(
                     file_path=None if secondary_artifact_id else source_path,
@@ -468,6 +509,7 @@ class ToolboxManifestExtractor:
                 ),
                 provider=secondary_provider,
             )
+        return _validated_structure_result(result, provider=secondary_provider)
 
     @staticmethod
     def _handle_secondary_failure(
@@ -491,13 +533,11 @@ class ToolboxManifestExtractor:
                     (f"{secondary_client.base_url} ({secondary_provider})", exc),
                 ]
             ) from exc
-        assert primary_result is not None
-        extraction_failures[secondary_provider] = type(exc).__name__
-        logger.warning(
-            t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
-                provider=secondary_provider, error=type(exc).__name__
+        if primary_result is None:
+            raise ToolboxContractViolation(
+                "The structure extraction produced no primary document"
             )
-        )
+        _record_provider_failure(secondary_provider, exc, extraction_failures)
         return {
             **primary_result,
             "fusion": {
