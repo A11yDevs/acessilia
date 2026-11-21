@@ -5,6 +5,14 @@ and are covered by E2E tests (pytest -m e2e).
 """
 from __future__ import annotations
 
+import asyncio
+import ast
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts import compare_pipelines
 from scripts.compare_pipelines import (
     _compare_documents,
     _compute_verdict,
@@ -16,6 +24,7 @@ from scripts.compare_pipelines import (
     _jaccard_similarity,
     _summarize_document,
     _tokenize,
+    run_comparison,
 )
 
 
@@ -229,3 +238,70 @@ class TestComputeVerdict:
         )
         verdict = _compute_verdict(comp)
         assert "DIVERGENTE" in verdict
+
+
+class TestPipelineRunnerWiring:
+    """The comparison must not hide bugs in its own runner wiring (#646).
+
+    ``run_comparison`` catches pipeline failures so the report can record
+    them, but a ``NameError`` means this script calls a helper that does not
+    exist -- a programming mistake that must surface instead of becoming an
+    ``"error_type": "NameError"`` entry in an otherwise valid report.
+    """
+
+    @staticmethod
+    def _write_reference(tmp_path: Path) -> Path:
+        reference = tmp_path / "reference.json"
+        reference.write_text(json.dumps({"sections": []}), encoding="utf-8")
+        return reference
+
+    def test_runner_name_error_is_not_swallowed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def runner_using_missing_helper(*_args: object, **_kwargs: object) -> dict:
+            raise NameError("name '_run_pddl_toolbox' is not defined")
+
+        monkeypatch.setattr(compare_pipelines, "_run_toolbox", runner_using_missing_helper)
+
+        with pytest.raises(NameError, match="_run_pddl_toolbox"):
+            asyncio.run(
+                run_comparison(
+                    file_path=tmp_path / "input.pdf",
+                    reference_path=self._write_reference(tmp_path),
+                    output_dir=tmp_path / "out",
+                )
+            )
+
+    def test_pipeline_failure_is_still_recorded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def failing_runner(*_args: object, **_kwargs: object) -> dict:
+            raise RuntimeError("toolbox offline")
+
+        monkeypatch.setattr(compare_pipelines, "_run_toolbox", failing_runner)
+
+        report_path = asyncio.run(
+            run_comparison(
+                file_path=tmp_path / "input.pdf",
+                reference_path=self._write_reference(tmp_path),
+                output_dir=tmp_path / "out",
+            )
+        )
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["engines"]["toolbox"]["status"] == "error"
+        assert report["engines"]["toolbox"]["error_type"] == "RuntimeError"
+        assert "toolbox offline" in report["verdict"]
+
+    def test_retired_reference_entry_point_stays_removed(self) -> None:
+        """The duplicate reference runner deleted in #646 must not return."""
+        assert not hasattr(compare_pipelines, "run_comparison_with_reference")
+
+    def test_runner_is_defined_once(self) -> None:
+        source = Path(compare_pipelines.__file__).read_text(encoding="utf-8")
+        names = [
+            node.name
+            for node in ast.parse(source).body
+            if isinstance(node, ast.AsyncFunctionDef)
+        ]
+        assert names.count("_run_toolbox") == 1
