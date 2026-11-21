@@ -200,9 +200,10 @@ ISSUE_398_DESCRIPTION = ISSUE_398_LINES[-1]
 async def test_case_398_real_ocr_and_description_emit_only_the_image() -> None:
     """#398 golden case: the real 42 OCR fragments and description yield only the image description.
 
-    The three fragments the description does not mention (``WUNIDADES``,
-    ``TINHO DAVILA``, ``OPORQUE PREFERE``) are OCR misreads of inscriptions it
-    already transcribes; they are neither paragraphs nor appended to the alt.
+    The description transcribes the scene, so its OCR misreads (``WUNIDADES``,
+    ``TINHO DAVILA``, ``OPORQUE PREFERE``) are not carried. ``ARLINDO`` and
+    ``GABI`` are: the description spells them ``'Arland'`` and ``'GABO'``, and
+    the OCR reading is the correct one (#658).
     """
     assert len(ISSUE_398_FRAGMENTS) == 42
     manifest, picture_id = _photo_manifest(ISSUE_398_FRAGMENTS, language="pt-BR")
@@ -212,7 +213,14 @@ async def test_case_398_real_ocr_and_description_emit_only_the_image() -> None:
 
     [page] = _manifest_pages_to_payload(manifest)
     assert [b["type"] for b in page["blocks"]] == ["image"]
-    assert page["blocks"][0]["alt_text"] == ISSUE_398_DESCRIPTION
+    alt = page["blocks"][0]["alt_text"]
+    tail = alt.removeprefix(f"{ISSUE_398_DESCRIPTION} ")
+    assert tail != alt  # the scene-text sentence follows the description
+    assert tail == tail.strip() and tail.endswith(".")
+    assert "GABI; ARLINDO" in tail
+    assert "ARLINDO" in alt and "GABI" in alt
+    for misread in ("WUNIDADES", "TINHO DAVILA", "OPORQUE PREFERE", "ISEJA"):
+        assert misread not in alt
     _assert_no_scene_text_block(manifest, page)
 
 

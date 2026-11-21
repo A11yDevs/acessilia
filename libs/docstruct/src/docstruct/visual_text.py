@@ -25,6 +25,7 @@ visual regions on a page (#263, #325, #398):
 
 from __future__ import annotations
 
+import difflib
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
@@ -57,8 +58,16 @@ MAX_CONTEXT_ITEMS = 6
 #: Share of an owner picture's meaningful scene-text fragments that its
 #: description must cover for the description to count as a transcription of
 #: the scene; the uncovered remainder is then OCR misreading, not content
-#: (#398: 39 of 42 real fragments covered, the rest garbled).
+#: (#398: 39 of 42 real fragments covered, the rest garbled except the
+#: near-miss spellings kept as competing readings, #658).
 SCENE_TEXT_TRANSCRIBED_SHARE = 0.6
+
+#: Minimum similarity for an uncovered scene fragment to count as the same
+#: inscription the description spelled differently (``ARLINDO`` / ``'Arland'``,
+#: ``GABI`` / ``'GABO'``); the OCR reading is then kept (#658). Conservative:
+#: only a single word that keeps the initial and differs by a letter or two
+#: qualifies, so OCR segmentation noise (``ISEJA`` for ``SEJA``) does not.
+_SCENE_TEXT_COMPETING_READING_RATIO = 0.75
 
 #: Media-inspection natures whose pages are documents, not scenes: their short
 #: text lines (form labels, headings) are document text even on a photo.
@@ -340,6 +349,36 @@ def is_scene_text_covered(
     return matched * 2 >= len(frag_tokens)
 
 
+def _is_competing_reading(fragment: str, description: str | None) -> bool:
+    """Whether ``fragment`` is the OCR spelling of a word the description misread (#658).
+
+    A description that transcribes the scene can still misspell an inscription
+    (``'Arland'`` for ``ARLINDO``). Dropping the fragment then loses the
+    correct reading, so it stays with the image as a competing spelling.
+    Fragments that merely glue a spurious character onto a word the
+    description read correctly (``ISEJA``/``SEJA``, ``AVIDA``/``VIDA``) are
+    OCR segmentation artifacts, not a different reading, and do not qualify.
+    """
+    frag_tokens = _tokens(fragment)
+    if len(frag_tokens) != 1:
+        return False
+    word = frag_tokens[0]
+    if len(word) < 4:
+        return False
+    for candidate in set(_tokens(description or "")):
+        if (
+            len(candidate) < 4
+            or candidate == word
+            or candidate[0] != word[0]
+            or abs(len(candidate) - len(word)) > 2
+        ):
+            continue
+        ratio = difflib.SequenceMatcher(None, word, candidate).ratio()
+        if ratio >= _SCENE_TEXT_COMPETING_READING_RATIO:
+            return True
+    return False
+
+
 def scene_text_residue(
     fragments: Iterable[str | None],
     description: str | None,
@@ -359,7 +398,10 @@ def scene_text_residue(
     - fragments the description covers are dropped;
     - when the description covers at least ``SCENE_TEXT_TRANSCRIBED_SHARE`` of
       the meaningful fragments, it transcribes the scene and the uncovered
-      remainder is OCR misreading (``WUNIDADES``, ``TINHO DAVILA``): dropped;
+      remainder is OCR misreading (``WUNIDADES``, ``TINHO DAVILA``): dropped.
+      The exception is a single-word fragment that is the same inscription
+      under another spelling (``ARLINDO`` vs ``'Arland'``): the OCR reading is
+      kept, since the description misread it (#658);
     - otherwise (a generic description) the uncovered fragments are kept.
     """
     meaningful: list[str] = []
@@ -377,7 +419,11 @@ def scene_text_residue(
     ]
     covered_share = 1 - len(uncovered) / len(meaningful)
     if covered_share >= SCENE_TEXT_TRANSCRIBED_SHARE:
-        return ()
+        return tuple(
+            fragment
+            for fragment in uncovered
+            if _is_competing_reading(fragment, description)
+        )
     return tuple(uncovered)
 
 

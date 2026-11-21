@@ -424,6 +424,49 @@ def test_scene_text_residue_uses_mentioned_elements_as_coverage() -> None:
     assert residue == ()
 
 
+def test_scene_text_residue_keeps_the_ocr_reading_the_description_misspells() -> None:
+    """A correct OCR name survives when the description spells it differently (#658).
+
+    ``ARLINDO``/``'Arland'`` and ``GABI``/``'GABO'`` are the same inscription
+    read two ways. The uncovered fragment is a competing reading, not an OCR
+    misread, so it stays in the image's residue; the garbled fragments and the
+    multi-word ones do not qualify.
+    """
+    description = (
+        "Painted bricks with 'Favela Vive', 'Minha Gente', 'Vila Isabel', "
+        "'Zeca Pagodinho', 'Paz no Mundo', 'Meu Lugar', 'Sambas', 'Sorte', "
+        "'Serra', 'Mocinho', 'Morro', 'Arland' and 'GABO'."
+    )
+    fragments = [
+        "FAVELA VIVE",
+        "MINHA GENTE",
+        "VILA ISABEL",
+        "ZECA PAGODINHO",
+        "PAZ NO MUNDO",
+        "MEU LUGAR",
+        "SAMBA",
+        "SORTE",
+        "SERRA",
+        "MOCINHO",
+        "MORRO",
+        "ARLINDO",
+        "GABI",
+        "ISEJA",
+        "WUNIDADES",
+        "TINHO DAVILA",
+        "OPORQUE PREFERE",
+    ]
+    residue = scene_text_residue(fragments, description, described=True)
+    assert residue == ("ARLINDO", "GABI")
+
+
+def test_scene_text_residue_drops_ocr_noise_glued_to_a_correctly_read_word() -> None:
+    """``ISEJA``/``AVIDA``/``EHOJE`` are OCR segmentation artifacts of words the description reads."""
+    description = "Bricks reading 'Seja a Vida' and 'E Hoje'."
+    fragments = ["ISEJA", "AVIDA", "EHOJE"]
+    assert scene_text_residue(fragments, description, described=True) == ()
+
+
 @pytest.mark.parametrize(
     ("inspection", "document", "scene"),
     [
