@@ -237,6 +237,37 @@ def test_a_page_with_content_becomes_a_described_picture(
     assert [block["type"] for block in page_two["blocks"]] == ["image"]
 
 
+def test_a_successful_page_inspection_replaces_the_failed_description_metadata(
+    tmp_path,
+) -> None:
+    element = build_element("el-1", "unknown", text="Page without structure")
+    element.metadata["vision_failure_reason"] = "model_failed"
+    element.metadata["vision_failure_detail"] = "timeout"
+    manifest = build_manifest([element], [])
+    output = PageInspectionOutput(
+        kind="content",
+        description="A described page",
+        language="en",
+        confidence=0.9,
+        warnings=["blurred"],
+    )
+    item = inspection_handlers._InspectedPage(
+        element=element, page_number=1, image=PNG, output=output
+    )
+
+    replacement, _, is_blank = inspection_handlers._persist_page_inspection(
+        manifest, "o-1", item, data_dir=tmp_path
+    )
+
+    assert is_blank is False
+    assert replacement.metadata["vision_description_complete"] is True
+    assert replacement.metadata["vision_warnings"] == ["blurred"]
+    # #680: the manifest must not share the model output's list object.
+    assert replacement.metadata["vision_warnings"] is not output.warnings
+    assert "vision_failure_reason" not in replacement.metadata
+    assert "vision_failure_detail" not in replacement.metadata
+
+
 @pytest.mark.parametrize("enabled", [True, False])
 def test_the_page_is_rendered_and_inspected_as_the_run_config_says(
     monkeypatch, source_pdf, isolated_artifacts, enabled
