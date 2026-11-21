@@ -57,7 +57,14 @@ def test_logo_and_header_lines_become_one_paragraph():
 
 
 def test_case_036_real_logo_description_still_becomes_one_header_paragraph():
-    """The described logo of acessilia-dataset 036, confirmed by the VLM, merges."""
+    """Regression for acessilia-dataset 036: its real description still merges.
+
+    Compatibility case, not proof that the VLM answer is what confirms the
+    merge: this description names the logo ("Logotipo"), so the legacy marker
+    fallback would confirm it too. A neutral description that only the model's
+    ``institutional_logo`` answer confirms is covered by
+    ``test_case_325_vision_logo_answer_confirms_the_merge_with_one_call``.
+    """
     line_1, logo, line_2 = _letterhead()
     logo.text = (
         "Logotipo da Universidade de Brasília composto por duas formas geométricas: "
