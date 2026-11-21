@@ -308,11 +308,13 @@ class TestPipelineRunnerWiring:
         assert names.count("_run_toolbox") == 1
 
 
-@pytest.mark.parametrize("input_arg", ["input", "input/001.pdf"])
-def test_batch_mode_accepts_a_relative_input(
-    tmp_path, monkeypatch, input_arg: str
+@pytest.mark.parametrize(
+    "input_kind", ["relative-directory", "relative-file", "absolute-directory"]
+)
+def test_batch_mode_accepts_a_relative_or_absolute_input(
+    tmp_path, monkeypatch, input_kind: str
 ) -> None:
-    """A relative --batch input must resolve against the same base (#671)."""
+    """A relative or absolute --batch input must resolve against the same base (#671)."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "input").mkdir()
     (tmp_path / "input" / "001.pdf").write_bytes(b"%PDF-1.4\n")
@@ -320,6 +322,11 @@ def test_batch_mode_accepts_a_relative_input(
     (tmp_path / "refs" / "001.json").write_text(
         json.dumps({"sections": []}), encoding="utf-8"
     )
+    input_arg = {
+        "relative-directory": "input",
+        "relative-file": "input/001.pdf",
+        "absolute-directory": str(tmp_path / "input"),
+    }[input_kind]
 
     async def fake_run_comparison(
         *, file_path: Path, reference_path: Path, output_dir: Path, **_kwargs
@@ -352,10 +359,70 @@ def test_batch_mode_accepts_a_relative_input(
     )
     assert summary == [
         {
-            "file": "input/001.pdf",
+            "file": str(tmp_path / "input" / "001.pdf"),
             "status": "ok",
             "report_path": str(
                 tmp_path / "out" / "001" / "comparison_report.json"
             ),
         }
+    ]
+
+
+@pytest.mark.parametrize("target_kind", ["inside", "outside"])
+def test_batch_mode_keeps_a_symlinked_file_name(
+    tmp_path, monkeypatch, target_kind: str
+) -> None:
+    """A symlinked file keeps its stem and cannot escape the input root (#671)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "input").mkdir()
+    source = tmp_path / "input" / "001.pdf"
+    source.write_bytes(b"%PDF-1.4\n")
+    if target_kind == "inside":
+        target = source
+    else:
+        target = tmp_path / "outside.pdf"
+        target.write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "input" / "alias.pdf").symlink_to(target)
+    (tmp_path / "refs").mkdir()
+    for stem in ("001", "alias"):
+        (tmp_path / "refs" / f"{stem}.json").write_text(
+            json.dumps({"sections": []}), encoding="utf-8"
+        )
+
+    output_dirs: list[Path] = []
+
+    async def fake_run_comparison(
+        *, file_path: Path, reference_path: Path, output_dir: Path, **_kwargs
+    ) -> Path:
+        output_dirs.append(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report = output_dir / "comparison_report.json"
+        report.write_text(json.dumps({"verdict": "ok"}), encoding="utf-8")
+        return report
+
+    monkeypatch.setattr(compare_pipelines, "run_comparison", fake_run_comparison)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare-pipelines",
+            "input",
+            "--batch",
+            "--reference-dir",
+            "refs",
+            "--output-dir",
+            "out",
+            "--max-files",
+            "2",
+        ],
+    )
+
+    assert compare_pipelines.main() == 0
+    assert [directory.name for directory in output_dirs] == ["001", "alias"]
+    summary = json.loads(
+        (tmp_path / "out" / "batch_summary.json").read_text(encoding="utf-8")
+    )
+    assert [row["file"] for row in summary] == [
+        str(tmp_path / "input" / "001.pdf"),
+        str(tmp_path / "input" / "alias.pdf"),
     ]
