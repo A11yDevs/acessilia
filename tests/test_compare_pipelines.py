@@ -426,3 +426,84 @@ def test_batch_mode_keeps_a_symlinked_file_name(
         str(tmp_path / "input" / "001.pdf"),
         str(tmp_path / "input" / "alias.pdf"),
     ]
+
+
+def test_batch_mode_keeps_the_nested_stem_with_recursive(tmp_path, monkeypatch) -> None:
+    """A recursive input keeps its subdirectory in the output stem (#671)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "input" / "sub").mkdir(parents=True)
+    (tmp_path / "input" / "sub" / "002.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "refs").mkdir()
+    (tmp_path / "refs" / "sub_002.json").write_text(
+        json.dumps({"sections": []}), encoding="utf-8"
+    )
+
+    async def fake_run_comparison(
+        *, file_path: Path, reference_path: Path, output_dir: Path, **_kwargs
+    ) -> Path:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report = output_dir / "comparison_report.json"
+        report.write_text(json.dumps({"verdict": "ok"}), encoding="utf-8")
+        return report
+
+    monkeypatch.setattr(compare_pipelines, "run_comparison", fake_run_comparison)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare-pipelines",
+            "input",
+            "--batch",
+            "--recursive",
+            "--reference-dir",
+            "refs",
+            "--output-dir",
+            "out",
+            "--max-files",
+            "1",
+        ],
+    )
+
+    assert compare_pipelines.main() == 0
+    summary = json.loads(
+        (tmp_path / "out" / "batch_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary == [
+        {
+            "file": str(tmp_path / "input" / "sub" / "002.pdf"),
+            "status": "ok",
+            "report_path": str(
+                tmp_path / "out" / "sub_002" / "comparison_report.json"
+            ),
+        }
+    ]
+
+
+def test_batch_mode_without_a_reference_reports_a_row(tmp_path, monkeypatch) -> None:
+    """A batch input without --reference records the error row and fails (#671)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "input").mkdir()
+    (tmp_path / "input" / "001.pdf").write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare-pipelines",
+            "input",
+            "--batch",
+            "--output-dir",
+            "out",
+        ],
+    )
+
+    assert compare_pipelines.main() == 1
+    summary = json.loads(
+        (tmp_path / "out" / "batch_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary == [
+        {
+            "file": str(tmp_path / "input" / "001.pdf"),
+            "status": "ERRO: sem referencia",
+            "report_path": "",
+        }
+    ]
