@@ -12,7 +12,11 @@ from acessilia_core.manifest.models import BoundingBox, ManifestElement, PageDes
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline.payload import _manifest_pages_to_payload
 from core_config_support import model_config, toolbox_config, vision_config
-from docstruct.visual_text import MAX_CONTEXT_ITEM_CHARS, MAX_CONTEXT_TOTAL_CHARS
+from docstruct.visual_text import (
+    MAX_CONTEXT_ITEM_CHARS,
+    MAX_CONTEXT_TOTAL_CHARS,
+    bound_surrounding_items,
+)
 from pddl_support import build_element, build_manifest, build_obligation
 from test_page_number_furniture import HEIGHT, WIDTH, _placed
 
@@ -603,6 +607,8 @@ def test_surrounding_text_prompt_bounds_item_and_total_char_overhead() -> None:
     assert 1 <= len(bullet_lines) <= 6
     assert all(len(line) <= MAX_CONTEXT_ITEM_CHARS for line in bullet_lines)
     assert sum(len(line) for line in bullet_lines) <= MAX_CONTEXT_TOTAL_CHARS
+    # The prompt and collect_picture_context share one public bound.
+    assert tuple(bullet_lines) == bound_surrounding_items(huge_items)
 
 
 def test_scanned_document_ocr_paragraphs_are_preserved_in_payload() -> None:

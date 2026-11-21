@@ -605,8 +605,13 @@ def _page_items_for_picture(
     return page_items, target_idx
 
 
-def _bound_surrounding_items(items: Sequence[str]) -> tuple[str, ...]:
-    """Cap surrounding context items by count, per-item length, and total length."""
+def bound_surrounding_items(items: Sequence[str]) -> tuple[str, ...]:
+    """Cap surrounding context items by count, per-item length, and total length.
+
+    The single bound shared by :func:`collect_picture_context` and the vision
+    prompt that lists the context: ``MAX_CONTEXT_ITEMS`` items of at most
+    ``MAX_CONTEXT_ITEM_CHARS`` characters, ``MAX_CONTEXT_TOTAL_CHARS`` in all.
+    """
     bounded: list[str] = []
     total_chars = 0
     for raw in items:
@@ -692,7 +697,7 @@ def collect_picture_context(
     ordered_candidates = [*headers, *captions, *nearby]
     return PictureTextContext(
         picture_id=picture_id,
-        surrounding_text=_bound_surrounding_items(ordered_candidates),
+        surrounding_text=bound_surrounding_items(ordered_candidates),
         header_text=tuple(headers),
         caption_text=tuple(captions),
         scene_text=tuple(scene),
@@ -786,6 +791,7 @@ __all__ = [
     "TextOwnership",
     "VisualTextRole",
     "analyze_visual_text_ownership",
+    "bound_surrounding_items",
     "collect_picture_context",
     "deduplicate_picture_description",
     "is_caption_text",

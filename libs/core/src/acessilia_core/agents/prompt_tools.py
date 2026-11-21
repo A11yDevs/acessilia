@@ -2,6 +2,8 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from docstruct.visual_text import bound_surrounding_items
+
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_PROMPT_FILE_NOT_FOUND
 from acessilia_core.logger import logger
@@ -71,9 +73,7 @@ def load_chemistry_prompt() -> str:
 
 def build_surrounding_text_prompt(surrounding_text: Sequence[str]) -> str:
     """Build the bounded page-context instruction listing text near an image (#263, #653)."""
-    from docstruct.visual_text import _bound_surrounding_items
-
-    items = _bound_surrounding_items(
+    items = bound_surrounding_items(
         [text.strip() for text in surrounding_text if text and text.strip()]
     )
     if not items:
