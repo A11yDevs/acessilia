@@ -91,6 +91,29 @@ def test_case_036_real_logo_description_still_becomes_one_header_paragraph():
     assert "Logotipo" in blocks[0]["text"]
 
 
+def test_region_inspection_vision_elements_confirm_the_letterhead():
+    """#688: a region-inspected picture's mentioned elements reach the logo check.
+
+    The description is neutral and there is no ``vision_institutional_logo``
+    answer -- exactly the metadata ``_persist_region_inspection`` writes -- so
+    only the recorded ``vision_elements`` can confirm the merge.
+    """
+    line_1, logo, line_2 = _letterhead()
+    logo.text = "A red shield with a green triangle and three stars."
+    logo.metadata.update(
+        {
+            "vision_description_complete": True,
+            "vision_elements": ["logotipo", "Universidade de Brasília"],
+        }
+    )
+
+    blocks = _blocks(line_1, logo, line_2, BODY)
+
+    assert [block["type"] for block in blocks] == ["paragraph", "paragraph"]
+    assert blocks[0]["metadata"]["role"] == "header"
+    assert blocks[0]["metadata"]["letterhead_members"] == ["line-1", "logo", "line-2"]
+
+
 def test_page_header_without_a_picture_is_unchanged():
     line_1, _, line_2 = _letterhead()
 
