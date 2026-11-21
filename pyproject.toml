@@ -146,7 +146,6 @@ show_error_codes = true
 # Every other module — and every newly added module in either package — is checked.
 [[tool.mypy.overrides]]
 module = [
-    "docstruct.canonical",
     "docstruct.evaluation.metrics.text_ed",
     "docstruct.export.html",
     "docstruct.export.pandoc_ast",
