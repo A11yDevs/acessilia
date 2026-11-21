@@ -343,8 +343,10 @@ def _fold_picture_description(
         element.metadata.pop("vision_institutional_logo", None)
     else:
         element.metadata["vision_institutional_logo"] = vision_output.institutional_logo
-    if vision_output.warnings:
-        element.metadata["vision_warnings"] = list(vision_output.warnings)
+    # Always overwrite the previous answer's warnings (#667): a later fold,
+    # such as a re-description of a restored manifest, must clear the list
+    # instead of keeping warnings the current description does not report.
+    element.metadata["vision_warnings"] = list(vision_output.warnings)
 
     if vision_output.kind == "formula":
         element.text = vision_output.formula_latex or ""
