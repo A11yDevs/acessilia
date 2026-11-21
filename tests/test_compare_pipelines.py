@@ -15,6 +15,7 @@ import pytest
 
 from scripts import compare_pipelines
 from scripts.compare_pipelines import (
+    _collect_inputs,
     _compare_documents,
     _compute_verdict,
     _count_by_type,
@@ -507,3 +508,56 @@ def test_batch_mode_without_a_reference_reports_a_row(tmp_path, monkeypatch) -> 
             "report_path": "",
         }
     ]
+
+
+def test_collect_inputs_accepts_supported_suffixes(tmp_path: Path) -> None:
+    """Batch input collection accepts .pdf/.jpg/.jpeg/.png and ignores the rest (#695)."""
+    for name in (
+        "001.pdf",
+        "002.PDF",
+        "003.jpg",
+        "004.jpeg",
+        "005.JPEG",
+        "006.png",
+        "007.PNG",
+        "008.ppg",
+        "009.jng",
+        "010.txt",
+    ):
+        (tmp_path / name).write_bytes(b"")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "011.jpeg").write_bytes(b"")
+
+    assert [path.name for path in _collect_inputs(tmp_path, recursive=False)] == [
+        "001.pdf",
+        "002.PDF",
+        "003.jpg",
+        "004.jpeg",
+        "005.JPEG",
+        "006.png",
+        "007.PNG",
+    ]
+    assert [path.name for path in _collect_inputs(tmp_path, recursive=True)] == [
+        "001.pdf",
+        "002.PDF",
+        "003.jpg",
+        "004.jpeg",
+        "005.JPEG",
+        "006.png",
+        "007.PNG",
+        "011.jpeg",
+    ]
+
+
+def test_max_files_rejects_a_negative_value(monkeypatch) -> None:
+    """A negative --max-files must fail instead of slicing off the last file (#695)."""
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["compare-pipelines", "input", "--batch", "--max-files", "-1"],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        compare_pipelines.parse_args()
+
+    assert caught.value.code == 2
