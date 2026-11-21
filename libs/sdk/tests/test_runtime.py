@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import gc
 import inspect
 import threading
+import warnings
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import NoReturn
@@ -51,6 +53,100 @@ def test_outside_an_event_loop() -> None:
         return 42
 
     assert run_sync(value()) == 42
+
+
+def test_a_failed_event_loop_creation_closes_the_coroutine() -> None:
+    """The no-loop path must not leak ``coro`` when ``asyncio.run`` cannot start (#668)."""
+
+    async def value() -> int:
+        return 1
+
+    class BrokenPolicy(asyncio.DefaultEventLoopPolicy):
+        def new_event_loop(self) -> asyncio.AbstractEventLoop:
+            raise OSError("cannot create event loop")
+
+    previous = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(BrokenPolicy())
+    try:
+        coro = value()
+        with pytest.raises(OSError, match="cannot create event loop"):
+            run_sync(coro)
+
+        # Closing is what prevents ``coroutine ... was never awaited`` when
+        # the object is collected, so the state assertion subsumes the warning.
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            del coro
+            gc.collect()
+        assert not any(
+            "was never awaited" in str(item.message) for item in caught
+        )
+    finally:
+        asyncio.set_event_loop_policy(previous)
+
+
+def test_a_loop_that_cannot_schedule_closes_the_coroutine() -> None:
+    """The ownership window also covers a loop that exists but cannot start the task."""
+
+    async def value() -> int:
+        return 1
+
+    class BrokenPolicy(asyncio.DefaultEventLoopPolicy):
+        def new_event_loop(self) -> asyncio.AbstractEventLoop:
+            loop = super().new_event_loop()
+
+            def fail(*args: object, **kwargs: object) -> NoReturn:
+                raise RuntimeError("cannot schedule")
+
+            loop.create_task = fail  # type: ignore[method-assign]
+            return loop
+
+    previous = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(BrokenPolicy())
+    try:
+        coro = value()
+        with pytest.raises(RuntimeError, match="cannot schedule"):
+            run_sync(coro)
+
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+    finally:
+        asyncio.set_event_loop_policy(previous)
+
+
+def test_a_keyboard_interrupt_during_loop_creation_closes_the_coroutine() -> None:
+    """``except BaseException`` must close and re-raise, not swallow the interrupt."""
+
+    async def value() -> int:
+        return 1
+
+    class InterruptingPolicy(asyncio.DefaultEventLoopPolicy):
+        def new_event_loop(self) -> asyncio.AbstractEventLoop:
+            raise KeyboardInterrupt
+
+    previous = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(InterruptingPolicy())
+    try:
+        coro = value()
+        with pytest.raises(KeyboardInterrupt):
+            run_sync(coro)
+
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+    finally:
+        asyncio.set_event_loop_policy(previous)
+
+
+def test_a_coroutine_that_raises_is_closed_by_asyncio_run_once() -> None:
+    """The helper must leave a coroutine the loop already closed untouched."""
+
+    async def boom() -> int:
+        raise ValueError("boom")
+
+    coro = boom()
+    with pytest.raises(ValueError, match="boom"):
+        run_sync(coro)
+
+    assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
 
 
 def test_preserves_contextvars_outside_an_event_loop() -> None:

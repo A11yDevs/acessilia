@@ -7,6 +7,12 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** `acessilia_sdk.runtime.run_sync` also closes the coroutine when
+  `asyncio.run` fails before an event loop takes ownership -- for example a
+  custom event loop policy whose `new_event_loop` raises, or resource
+  exhaustion -- so the no-loop path no longer leaks it into a later
+  `RuntimeWarning: coroutine ... was never awaited` (#668). The docstring now
+  covers both paths.
 - **Fixed** `extract_dual_fused` treats a `document.structure.extract` answer
   outside the envelope (not a JSON object, or without its `document` object) as
   a `ToolboxContractViolation` recorded in `failures`, without emitting a
