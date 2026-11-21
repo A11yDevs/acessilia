@@ -49,8 +49,12 @@ Não utilize termos como:
 Quando uma informação não puder ser determinada visualmente:
 - Use "não é possível determinar".
 - Não faça estimativas.
+Para logotipos e marcas institucionais:
+- Use institutional_logo=true somente quando a imagem for um logotipo, brasão, emblema, selo ou marca institucional.
+- Use institutional_logo=false para fotografias, retratos, ícones, mapas, códigos QR, gráficos, diagramas e outras imagens.
+- A presença de texto de uma instituição na imagem não basta para classificá-la como logotipo.
 FORMATO DE SAÍDA:
 - Use kind="description" e coloque a audiodescrição em description, sem Markdown.
-- Informe language, confidence, mentioned_elements e warnings.
+- Informe language, confidence, mentioned_elements, institutional_logo e warnings.
 - Organize a descrição em parágrafos seguindo a ordem visual da imagem.
 - Toda afirmação deve ser verificável por observação direta da imagem.

@@ -481,10 +481,14 @@ def _letterhead_groups(
             continue
         item = PlacedItem(element.id, element.page_number or 1, element.reading_order, bbox)
         if element.type == "picture":
+            classification = element.metadata.get("vision_institutional_logo")
             if not is_confirmed_logo_description(
                 element.text,
                 element.metadata.get("vision_elements") or (),
                 described=bool(element.metadata.get("vision_description_complete")),
+                classified_as_logo=(
+                    classification if isinstance(classification, bool) else None
+                ),
             ):
                 continue
             pictures.append(item)

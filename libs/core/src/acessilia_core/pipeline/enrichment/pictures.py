@@ -339,6 +339,10 @@ def _fold_picture_description(
     element.metadata["vision_language"] = vision_output.language
     element.metadata["vision_confidence"] = vision_output.confidence
     element.metadata["vision_elements"] = list(vision_output.mentioned_elements)
+    if vision_output.institutional_logo is None:
+        element.metadata.pop("vision_institutional_logo", None)
+    else:
+        element.metadata["vision_institutional_logo"] = vision_output.institutional_logo
     if vision_output.warnings:
         element.metadata["vision_warnings"] = list(vision_output.warnings)
 
