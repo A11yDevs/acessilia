@@ -14,6 +14,12 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   payload inválido; no caminho de artefato, a violação não dispara nova
   tentativa de upload. Assim, `DualFusionUnavailable` deixa de ser levantada com
   `failures` vazio (#635).
+- **Corrigido** `acessilia_sdk.runtime.run_sync` agora fecha a corrotina quando
+  o preparo do worker falha -- cópia do contexto, criação do executor ou envio
+  do trabalho -- em vez de deixá-la sem `await` e emitir depois
+  `RuntimeWarning: coroutine ... was never awaited` (#634). A docstring agora
+  documenta que, dentro de um event loop em execução, a chamada bloqueia esse
+  loop até a worker thread terminar.
 - **Alterado** `acessilia_sdk.runtime.run_sync` agora copia o contexto
   `contextvars` do chamador para a worker thread quando chamado dentro de um
   event loop em execução, propagando `operation_context` e variáveis de escopo

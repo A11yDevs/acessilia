@@ -34,11 +34,6 @@
     "scripts/check_docstruct_pin.py": {
       "E402": 1
     },
-    "scripts/compare_pipelines.py": {
-      "E741": 2,
-      "F541": 5,
-      "F821": 1
-    },
     "scripts/generate_pddl_schemas.py": {
       "E402": 3
     },
