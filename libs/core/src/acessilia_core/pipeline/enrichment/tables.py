@@ -347,8 +347,9 @@ def _fold_table_reading(
     )
     element.metadata["data_language"] = table_output.language
     element.metadata["data_confidence"] = table_output.confidence
-    if table_output.warnings:
-        element.metadata["data_warnings"] = list(table_output.warnings)
+    # Always overwrite the previous reading's warnings (#682): a replacement
+    # reading with none must clear the list, not keep the replaced AST's.
+    element.metadata["data_warnings"] = list(table_output.warnings)
     element.text = ""
     if element.page_number is None and page_number >= 1:
         element.page_number = page_number
