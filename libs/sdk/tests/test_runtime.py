@@ -77,6 +77,69 @@ def test_a_failed_event_loop_creation_closes_the_coroutine() -> None:
         asyncio.set_event_loop_policy(previous)
 
 
+def test_a_loop_that_cannot_schedule_closes_the_coroutine() -> None:
+    """The ownership window also covers a loop that exists but cannot start the task."""
+
+    async def value() -> int:
+        return 1
+
+    class BrokenPolicy(asyncio.DefaultEventLoopPolicy):
+        def new_event_loop(self) -> asyncio.AbstractEventLoop:
+            loop = super().new_event_loop()
+
+            def fail(*args: object, **kwargs: object) -> NoReturn:
+                raise RuntimeError("cannot schedule")
+
+            loop.create_task = fail  # type: ignore[method-assign]
+            return loop
+
+    previous = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(BrokenPolicy())
+    try:
+        coro = value()
+        with pytest.raises(RuntimeError, match="cannot schedule"):
+            run_sync(coro)
+
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+    finally:
+        asyncio.set_event_loop_policy(previous)
+
+
+def test_a_keyboard_interrupt_during_loop_creation_closes_the_coroutine() -> None:
+    """``except BaseException`` must close and re-raise, not swallow the interrupt."""
+
+    async def value() -> int:
+        return 1
+
+    class InterruptingPolicy(asyncio.DefaultEventLoopPolicy):
+        def new_event_loop(self) -> asyncio.AbstractEventLoop:
+            raise KeyboardInterrupt
+
+    previous = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(InterruptingPolicy())
+    try:
+        coro = value()
+        with pytest.raises(KeyboardInterrupt):
+            run_sync(coro)
+
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+    finally:
+        asyncio.set_event_loop_policy(previous)
+
+
+def test_a_coroutine_that_raises_is_closed_by_asyncio_run_once() -> None:
+    """The helper must leave a coroutine the loop already closed untouched."""
+
+    async def boom() -> int:
+        raise ValueError("boom")
+
+    coro = boom()
+    with pytest.raises(ValueError, match="boom"):
+        run_sync(coro)
+
+    assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+
+
 def test_preserves_contextvars_outside_an_event_loop() -> None:
     token = _REQUEST_TAG.set("outer-sync")
     try:
