@@ -140,7 +140,7 @@ These are the functions #365 asked to split, at their current size. All stay in 
 - `extractor.configuration["…"]`;
 - assignments to element and obligation fields.
 
-It finds 63 keys, 18 of them written or read by more than one group.
+It finds 64 keys, 19 of them written or read by more than one group.
 
 | Key | Written by | Read by | What the current order guarantees |
 |---|---|---|---|

@@ -140,7 +140,7 @@ São as funções que a #365 pediu para dividir, no tamanho atual. Todas ficam n
 - o `extractor.configuration["…"]`;
 - atribuições a campos de elementos e de obrigações.
 
-Ele encontra 63 chaves, 18 delas gravadas ou lidas por mais de um grupo.
+Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 
 | Chave | Gravada por | Lida por | O que a ordem atual garante |
 |---|---|---|---|
