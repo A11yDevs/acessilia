@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-import scripts.compare_pipelines as compare_pipelines
+from scripts import compare_pipelines
 from scripts.compare_pipelines import (
     _compare_documents,
     _compute_verdict,
