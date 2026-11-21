@@ -15,6 +15,7 @@ import pytest
 
 from scripts import compare_pipelines
 from scripts.compare_pipelines import (
+    _collect_inputs,
     _compare_documents,
     _compute_verdict,
     _count_by_type,
@@ -507,3 +508,132 @@ def test_batch_mode_without_a_reference_reports_a_row(tmp_path, monkeypatch) -> 
             "report_path": "",
         }
     ]
+
+
+def test_collect_inputs_accepts_supported_suffixes(tmp_path: Path) -> None:
+    """Batch input collection accepts .pdf/.jpg/.jpeg/.png and ignores the rest (#695)."""
+    for name in (
+        "001.pdf",
+        "002.PDF",
+        "003.jpg",
+        "004.jpeg",
+        "005.JPEG",
+        "006.png",
+        "007.PNG",
+        "008.ppg",
+        "009.jng",
+        "010.txt",
+    ):
+        (tmp_path / name).write_bytes(b"")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "011.jpeg").write_bytes(b"")
+    (tmp_path / "dir.pdf").mkdir()
+    (tmp_path / "broken.pdf").symlink_to(tmp_path / "missing.pdf")
+
+    assert [path.name for path in _collect_inputs(tmp_path, recursive=False)] == [
+        "001.pdf",
+        "002.PDF",
+        "003.jpg",
+        "004.jpeg",
+        "005.JPEG",
+        "006.png",
+        "007.PNG",
+    ]
+    assert [path.name for path in _collect_inputs(tmp_path, recursive=True)] == [
+        "001.pdf",
+        "002.PDF",
+        "003.jpg",
+        "004.jpeg",
+        "005.JPEG",
+        "006.png",
+        "007.PNG",
+        "011.jpeg",
+    ]
+
+
+@pytest.mark.parametrize("recursive", [False, True])
+def test_collect_inputs_missing_path_returns_empty(tmp_path: Path, recursive: bool) -> None:
+    """A missing input path is reported as no files, not a traceback (#695)."""
+    assert _collect_inputs(tmp_path / "missing", recursive=recursive) == []
+
+
+def test_collect_inputs_returns_empty_when_listing_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """An unreadable directory is an empty collection, not a traceback (#695)."""
+
+    def fail(_path: Path):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "iterdir", fail)
+
+    assert _collect_inputs(tmp_path, recursive=False) == []
+
+
+def test_main_reports_a_missing_input_without_a_traceback(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    """The CLI keeps its clean 'no files found' contract for a typo'd path (#695)."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["compare-pipelines", "missing", "--batch"])
+
+    assert compare_pipelines.main() == 1
+    assert "nenhum arquivo encontrado" in capsys.readouterr().out
+
+
+def test_max_files_rejects_a_negative_value(monkeypatch) -> None:
+    """A negative --max-files must fail instead of slicing off the last file (#695)."""
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["compare-pipelines", "input", "--batch", "--max-files", "-1"],
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        compare_pipelines.parse_args()
+
+    assert caught.value.code == 2
+
+
+def test_max_files_zero_processes_every_file(tmp_path, monkeypatch) -> None:
+    """Zero keeps the documented unlimited semantics (#695)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "input").mkdir()
+    for name in ("001.pdf", "002.pdf"):
+        (tmp_path / "input" / name).write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "refs").mkdir()
+    for name in ("001.json", "002.json"):
+        (tmp_path / "refs" / name).write_text(
+            json.dumps({"sections": []}), encoding="utf-8"
+        )
+
+    seen: list[str] = []
+
+    async def fake_run_comparison(
+        *, file_path: Path, reference_path: Path, output_dir: Path, **_kwargs
+    ) -> Path:
+        seen.append(file_path.name)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report = output_dir / "comparison_report.json"
+        report.write_text(json.dumps({"verdict": "ok"}), encoding="utf-8")
+        return report
+
+    monkeypatch.setattr(compare_pipelines, "run_comparison", fake_run_comparison)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare-pipelines",
+            "input",
+            "--batch",
+            "--reference-dir",
+            "refs",
+            "--output-dir",
+            "out",
+            "--max-files",
+            "0",
+        ],
+    )
+
+    assert compare_pipelines.main() == 0
+    assert seen == ["001.pdf", "002.pdf"]

@@ -485,14 +485,28 @@ def _write_artifacts(
 # ---------------------------------------------------------------------------
 
 
+#: File suffixes accepted from a batch input directory. An explicit set avoids
+#: the ``*.[pj][np]g`` glob, which missed ``.jpeg`` and matched ``.jng``/``.ppg``.
+_INPUT_SUFFIXES = frozenset({".pdf", ".jpg", ".jpeg", ".png"})
+
+
 def _collect_inputs(file_or_dir: Path, recursive: bool) -> list[Path]:
-    """Collect input files from a path (single file or directory)."""
+    """Collect supported inputs from a path (an explicit file or a directory)."""
     if file_or_dir.is_file():
         return [file_or_dir]
-    pdfs = sorted(file_or_dir.rglob("*.pdf") if recursive else file_or_dir.glob("*.pdf"))
-    images = sorted(
-        file_or_dir.rglob("*.[pj][np]g") if recursive else file_or_dir.glob("*.[pj][np]g")
-    )
+    if not file_or_dir.is_dir():
+        return []
+    try:
+        paths = list(file_or_dir.rglob("*") if recursive else file_or_dir.iterdir())
+    except OSError:
+        return []
+    inputs = [
+        path
+        for path in paths
+        if path.is_file() and path.suffix.lower() in _INPUT_SUFFIXES
+    ]
+    pdfs = sorted(path for path in inputs if path.suffix.lower() == ".pdf")
+    images = sorted(path for path in inputs if path.suffix.lower() != ".pdf")
     return pdfs + images
 
 
@@ -511,6 +525,17 @@ def _relative_input(file_path: Path, input_root: Path) -> Path:
     return Path(os.path.abspath(file_path)).relative_to(input_root)
 
 
+def _non_negative_int(value: str) -> int:
+    """argparse type for counts where a negative value would silently slice."""
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an integer") from exc
+    if number < 0:
+        raise argparse.ArgumentTypeError("must be 0 or greater")
+    return number
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="compare-pipelines",
@@ -519,7 +544,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "input",
         type=Path,
-        help="Input file or directory with input files.",
+        help=(
+            "Input file, or a directory scanned for .pdf/.jpg/.jpeg/.png "
+            "(case-insensitive)."
+        ),
     )
     parser.add_argument(
         "-o",
@@ -558,7 +586,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-files",
-        type=int,
+        type=_non_negative_int,
         default=0,
         help="Maximum number of files to process in batch mode (0 = unlimited).",
     )
