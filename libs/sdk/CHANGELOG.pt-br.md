@@ -20,6 +20,12 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   `RuntimeWarning: coroutine ... was never awaited` (#634). A docstring agora
   documenta que, dentro de um event loop em execução, a chamada bloqueia esse
   loop até a worker thread terminar.
+- **Corrigido** `acessilia_sdk.runtime.run_sync` também fecha a corrotina quando
+  `asyncio.run` falha antes de um event loop assumir a posse -- por exemplo uma
+  política de event loop cujo `new_event_loop` levanta erro, ou esgotamento de
+  recursos -- para que o caminho sem loop não a deixe vazar para um
+  `RuntimeWarning: coroutine ... was never awaited` posterior (#668). A
+  docstring agora cobre os dois caminhos.
 - **Alterado** `acessilia_sdk.runtime.run_sync` agora copia o contexto
   `contextvars` do chamador para a worker thread quando chamado dentro de um
   event loop em execução, propagando `operation_context` e variáveis de escopo

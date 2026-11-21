@@ -53,6 +53,30 @@ def test_outside_an_event_loop() -> None:
     assert run_sync(value()) == 42
 
 
+def test_a_failed_event_loop_creation_closes_the_coroutine() -> None:
+    """The no-loop path must not leak ``coro`` when ``asyncio.run`` cannot start (#668)."""
+
+    async def value() -> int:
+        return 1
+
+    class BrokenPolicy(asyncio.DefaultEventLoopPolicy):
+        def new_event_loop(self) -> asyncio.AbstractEventLoop:
+            raise OSError("cannot create event loop")
+
+    previous = asyncio.get_event_loop_policy()
+    asyncio.set_event_loop_policy(BrokenPolicy())
+    try:
+        coro = value()
+        with pytest.raises(OSError, match="cannot create event loop"):
+            run_sync(coro)
+
+        # Closing is what prevents ``coroutine ... was never awaited`` when
+        # the object is collected, so the state assertion subsumes the warning.
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+    finally:
+        asyncio.set_event_loop_policy(previous)
+
+
 def test_preserves_contextvars_outside_an_event_loop() -> None:
     token = _REQUEST_TAG.set("outer-sync")
     try:

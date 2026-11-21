@@ -19,6 +19,11 @@ can see are recorded here, newest first.
   `RuntimeWarning: coroutine ... was never awaited` (#634). Its docstring now
   documents that, inside a running event loop, it blocks that loop until the
   worker thread finishes.
+- **Fixed** `acessilia_sdk.runtime.run_sync` also closes the coroutine when
+  `asyncio.run` fails before an event loop takes ownership -- for example a
+  custom event loop policy whose `new_event_loop` raises, or resource exhaustion --
+  so the no-loop path no longer leaks it into a later `RuntimeWarning:
+  coroutine ... was never awaited` (#668). The docstring now covers both paths.
 - **Changed** `acessilia_sdk.runtime.run_sync` now copies the caller's
   `contextvars` context into its worker thread when called inside a running
   event loop, so `operation_context` and request-scoped variables propagate

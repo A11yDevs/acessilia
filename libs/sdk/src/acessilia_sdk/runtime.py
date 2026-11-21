@@ -5,10 +5,25 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import contextvars
+import inspect
 from collections.abc import Coroutine
 from typing import Any, TypeVar
 
 T = TypeVar("T")
+
+
+def _close_if_never_started(coro: Coroutine[Any, Any, T]) -> None:
+    """Close ``coro`` if no event loop took ownership, so it cannot warn at GC.
+
+    ``asyncio.run`` closes a coroutine it started, but it may fail before its
+    loop exists (a broken event loop policy, resource exhaustion).  Only a
+    coroutine still in ``CORO_CREATED`` is ours to close; anything else was
+    already consumed, and the original failure must not be masked.
+    """
+    if inspect.iscoroutine(coro) and (
+        inspect.getcoroutinestate(coro) is inspect.CORO_CREATED
+    ):
+        coro.close()
 
 
 def run_sync(coro: Coroutine[Any, Any, T]) -> T:
@@ -31,16 +46,20 @@ def run_sync(coro: Coroutine[Any, Any, T]) -> T:
         instead.
 
     Coroutine ownership:
-        ``run_sync`` consumes the coroutine object.  If the worker setup fails
-        before an event loop takes ownership -- while copying the context,
-        creating the executor, or submitting the work -- the coroutine is
-        closed before the error propagates, so the failure cannot surface later
-        as ``RuntimeWarning: coroutine ... was never awaited``.
+        ``run_sync`` consumes the coroutine object.  If the coroutine cannot
+        be started -- ``asyncio.run`` fails before creating its event loop, or
+        the worker setup fails before the loop takes ownership -- the coroutine
+        is closed before the error propagates, so the failure cannot surface
+        later as ``RuntimeWarning: coroutine ... was never awaited``.
     """
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(coro)
+        try:
+            return asyncio.run(coro)
+        except BaseException:
+            _close_if_never_started(coro)
+            raise
 
     submitted = False
     try:
@@ -53,7 +72,7 @@ def run_sync(coro: Coroutine[Any, Any, T]) -> T:
             return future.result()
     finally:
         if not submitted:
-            coro.close()
+            _close_if_never_started(coro)
 
 
 __all__ = ["run_sync"]
