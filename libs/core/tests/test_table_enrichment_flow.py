@@ -78,6 +78,22 @@ def test_a_table_without_structure_is_read_and_its_metadata_written(run) -> None
     assert "table_read_failure" not in md
 
 
+def test_a_replacement_reading_without_warnings_clears_the_previous_ones() -> None:
+    """A later accepted reading replaces the warnings along with the AST (#682)."""
+    table = build_element("t", "table")
+    first = _reading([["Nome", "Nota"], ["Ana", "9"]], warnings=["borrado"])
+    replacement = _reading([["Nome", "Nota"], ["Ana", "10"], ["Beto", "8"]])
+
+    table_stage._fold_table_reading(table, first, 1, None, 0)
+    assert table.metadata["data_warnings"] == ["borrado"]
+
+    table_stage._fold_table_reading(table, replacement, 1, "collapsed_rows", 1)
+
+    assert table.metadata["data_warnings"] == []
+    assert table.metadata["table_ast"] == replacement.table_ast()
+    assert table.metadata["table_review"]["outcome"] == "replaced"
+
+
 def test_a_table_with_rows_in_its_own_text_needs_no_reading(run) -> None:
     table = build_element("t", "table", text="Nome;Nota\nAna;9\nBeto;8")
 
