@@ -1,9 +1,6 @@
 {
   "_comment": "Pre-existing Ruff violations (rules F, E excluding E501; #366), counted per file and rule code. Counts may only go down: when you fix violations, run `uv run python scripts/check_ruff_baseline.py --update`.",
   "files": {
-    "libs/core/src/acessilia_core/agents/prompt_tools.py": {
-      "E701": 1
-    },
     "libs/core/tests/test_pddl_messages_i18n.py": {
       "F401": 1
     },

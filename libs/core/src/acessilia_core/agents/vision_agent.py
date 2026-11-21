@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import traceback
+from collections.abc import Sequence
 from typing import Any, Generic
 
 from docstruct.fusion.repetition import collapse
@@ -31,6 +32,7 @@ from acessilia_core.logger import logger
 
 from acessilia_core.agents.prompt_tools import (
     build_page_prompt,
+    build_surrounding_text_prompt,
     load_chemistry_prompt,
     load_region_prompt,
     load_system_prompt,
@@ -106,6 +108,7 @@ def _build_region_prompt(
     page_num: int,
     total_pages: int,
     custom_prompt: str | None,
+    surrounding_text: Sequence[str] | None = None,
 ) -> str:
     if custom_prompt:
         prompt = custom_prompt
@@ -124,6 +127,10 @@ def _build_region_prompt(
 
     if not custom_prompt and classification in _CHEMISTRY_CLASSIFICATIONS:
         prompt = f"{prompt}\n{load_chemistry_prompt()}"
+    if not custom_prompt and classification == "embedded_image" and surrounding_text:
+        context_block = build_surrounding_text_prompt(surrounding_text)
+        if context_block:
+            prompt = f"{prompt}\n\n{context_block}"
     return f"{prompt}\n\n{VISION_SCHEMA_INSTRUCTION}"
 
 
@@ -226,6 +233,7 @@ class VisionAgent:
         custom_prompt: str | None = None,
         full_budget: bool = False,
         errors: list[str] | None = None,
+        surrounding_text: Sequence[str] | None = None,
     ) -> VisionOutput | None:
         """Describe a single visual region of a page with the vision model.
 
@@ -238,6 +246,7 @@ class VisionAgent:
             custom_prompt (str | None): Replaces all prompt selection logic when given.
             full_budget (bool): Use the general token budget instead of the region cap.
             errors (list[str] | None): Receives a one-line error summary on failure.
+            surrounding_text (Sequence[str] | None): Independent text already present on the page near the image (#263, #653).
 
         Returns:
             A validated visual result, or None when inference or validation fails.
@@ -252,6 +261,7 @@ class VisionAgent:
             page_num=page_num,
             total_pages=total_pages,
             custom_prompt=custom_prompt,
+            surrounding_text=surrounding_text,
         )
         # A whole page, or a region inspected for review-structure (scanned text,
         # a table), may need the general budget to be transcribed; a picture

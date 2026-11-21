@@ -28,7 +28,17 @@ from docstruct.fusion.noise import (
     select_page_numbers,
 )
 from docstruct.geometry import reading_role
+from docstruct.placeholders import has_meaningful_text
 from docstruct.regions.letterhead import PlacedItem, letterhead_groups
+from docstruct.visual_text import (
+    TextOwnership,
+    analyze_visual_text_ownership,
+    collect_picture_context,
+    deduplicate_picture_description,
+    is_confirmed_logo_description,
+    is_document_artifact,
+    scene_text_residue,
+)
 
 from acessilia_core.execution.models import ExecutionReport
 from acessilia_core.i18n import (
@@ -51,6 +61,7 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
 from acessilia_core.pipeline.elements import (
+    MSG_UNDESCRIBED_PICTURE_ALT,
     _element_bbox,
     _element_to_block,
     _text_kept_by_picture,
@@ -64,6 +75,10 @@ from acessilia_core.planning.models import NominalPlan, PlanningComparison
 #: Canonical English msgid for an institutional header read as one paragraph:
 #: the logo, then its header lines; {lines} is substituted by callers after lookup.
 MSG_LETTERHEAD_TEXT: str = "Logo. {lines}."
+
+#: Canonical English msgid for the scene text an image carries beyond its own
+#: description (#398, #653); {fragments} is substituted by callers after lookup.
+MSG_SCENE_TEXT_IN_PICTURE: str = "Text visible in the image: {fragments}."
 
 
 #: Canonical English singular/plural msgids for the document's warning on the
@@ -466,6 +481,12 @@ def _letterhead_groups(
             continue
         item = PlacedItem(element.id, element.page_number or 1, element.reading_order, bbox)
         if element.type == "picture":
+            if not is_confirmed_logo_description(
+                element.text,
+                element.metadata.get("vision_elements") or (),
+                described=bool(element.metadata.get("vision_description_complete")),
+            ):
+                continue
             pictures.append(item)
         elif _is_page_header_line(element, bbox):
             lines.append(item)
@@ -566,13 +587,184 @@ def _grouped_pages(
     return [(page_number, grouped[page_number]) for page_number in sorted(grouped)]
 
 
+def _picture_has_usable_description(element: ManifestElement) -> bool:
+    if element.type != "picture" or element.metadata.get("vision_failure_reason"):
+        return False
+    if element.metadata.get("vision_description_complete"):
+        return bool((element.text or "").strip())
+    return has_meaningful_text(element)
+
+
+def _resolve_manifest_ownership(
+    manifest: ProcessingManifest,
+) -> dict[str, TextOwnership]:
+    """Compute visual-text ownership across ``manifest`` using boxes and recorded annotations."""
+    boxes = {
+        element.id: box
+        for element in manifest.elements
+        if (box := _element_bbox(element, manifest)) is not None
+    }
+    standalone = any(
+        el.type == "picture"
+        and bool(el.metadata.get("injected_picture"))
+        and not is_document_artifact(el.metadata.get("media_inspection"))
+        for el in manifest.elements
+    )
+    ownership = analyze_visual_text_ownership(
+        manifest.elements, page_boxes=boxes, standalone_image=standalone
+    )
+    for element in manifest.elements:
+        recorded = element.metadata.get("visual_text_ownership")
+        if isinstance(recorded, dict) and isinstance(recorded.get("role"), str):
+            ownership[element.id] = TextOwnership(
+                element_id=element.id,
+                role=recorded["role"],
+                owner_id=recorded.get("owner_id"),
+                confidence=float(recorded.get("confidence", 1.0)),
+                reason=str(recorded.get("reason", "")),
+            )
+    return ownership
+
+
+def _scene_text_by_owner(
+    manifest: ProcessingManifest,
+    ownership: dict[str, TextOwnership],
+    letterhead_ids: set[str],
+) -> dict[str, list[ManifestElement]]:
+    """Scene-OCR elements, in reading order, grouped by the picture that owns them (#398, #653).
+
+    Text inside an image belongs to the image: every element returned here is
+    left out of the page flow, whether or not the picture was described. What
+    the description does not convey is carried by the picture itself
+    (:func:`_scene_text_residues`), never as a document-level block. A picture
+    merged into a letterhead is not rendered as an image, so it cannot carry
+    text: the text it would own stays in the flow.
+    """
+    picture_ids = {
+        element.id
+        for element in manifest.elements
+        if element.type == "picture" and element.id not in letterhead_ids
+    }
+    grouped: dict[str, list[ManifestElement]] = {}
+    for element in sorted(manifest.elements, key=lambda item: item.reading_order):
+        if element.type == "picture":
+            continue
+        decision = ownership.get(element.id)
+        if (
+            decision is None
+            or decision.role != "scene_text"
+            or decision.owner_id not in picture_ids
+        ):
+            continue
+        grouped.setdefault(decision.owner_id, []).append(element)
+    return grouped
+
+
+def _scene_text_residues(
+    manifest: ProcessingManifest,
+    scene_text: dict[str, list[ManifestElement]],
+) -> dict[str, tuple[str, ...]]:
+    """Per owner picture, the scene text its description does not already carry (#398)."""
+    by_id = {element.id: element for element in manifest.elements}
+    residues: dict[str, tuple[str, ...]] = {}
+    for owner_id, members in scene_text.items():
+        owner = by_id[owner_id]
+        residue = scene_text_residue(
+            (member.text for member in members),
+            owner.text,
+            owner.metadata.get("vision_elements") or (),
+            described=_picture_has_usable_description(owner),
+        )
+        if residue:
+            residues[owner_id] = residue
+    return residues
+
+
+def _attach_scene_text(
+    page_elements: list[ManifestElement],
+    residues: dict[str, tuple[str, ...]],
+    language: str | None,
+) -> list[ManifestElement]:
+    """Append each picture's remaining scene text to its own alt text, once (#398, #653).
+
+    An undescribed picture keeps its fallback alt text and gains the text read
+    off it, so a failed vision call neither loses the inscriptions nor turns
+    them into paragraphs. The wording is in the document's language.
+    """
+    if not any(element.id in residues for element in page_elements):
+        return page_elements
+    token = set_request_locale(locale_for_user(language))
+    try:
+        template = t(MSG_SCENE_TEXT_IN_PICTURE)
+        undescribed = t(MSG_UNDESCRIBED_PICTURE_ALT)
+    finally:
+        reset_request_locale(token)
+    updated: list[ManifestElement] = []
+    for element in page_elements:
+        residue = residues.get(element.id) if element.type == "picture" else None
+        if residue:
+            base = (element.text or "").strip() or undescribed
+            if not base.endswith((".", "!", "?", "\u2026")):
+                base = f"{base}."
+            scene_line = template.format(fragments="; ".join(residue))
+            element = element.model_copy(update={"text": f"{base} {scene_line}"})
+        updated.append(element)
+    return updated
+
+
+def _deduplicate_page_pictures(
+    page_elements: list[ManifestElement],
+    letterhead_ids: set[str],
+    ownership: dict[str, TextOwnership],
+) -> list[ManifestElement]:
+    """Deduplicate picture descriptions against adjacent independent page text (#263, #653)."""
+    if not any(el.type == "picture" for el in page_elements):
+        return page_elements
+    updated: list[ManifestElement] = []
+    for element in page_elements:
+        if (
+            element.type == "picture"
+            and element.id not in letterhead_ids
+            and (element.text or "").strip()
+        ):
+            recorded_context = element.metadata.get("surrounding_text")
+            if isinstance(recorded_context, list) and recorded_context:
+                surrounding: tuple[str, ...] = tuple(str(x) for x in recorded_context)
+            else:
+                surrounding = collect_picture_context(
+                    element.id, page_elements, ownership
+                ).surrounding_text
+            if surrounding:
+                deduped = deduplicate_picture_description(
+                    element.text or "", surrounding
+                )
+                if deduped != element.text:
+                    element = element.model_copy(update={"text": deduped})
+        updated.append(element)
+    return updated
+
+
 def _build_page_payload(
     page_number: int,
     page_elements: list[ManifestElement],
     letterhead_blocks: dict[str, dict[str, Any]],
+    ownership: dict[str, TextOwnership] | None = None,
+    scene_text_residues: dict[str, tuple[str, ...]] | None = None,
+    language: str | None = None,
 ) -> dict[str, Any]:
     ordered = sorted(page_elements, key=lambda item: item.reading_order)
-    blocks = _elements_to_blocks(ordered, letterhead_blocks)
+    resolved_ownership = (
+        ownership
+        if ownership is not None
+        else analyze_visual_text_ownership(ordered)
+    )
+    deduped = _deduplicate_page_pictures(
+        ordered, set(letterhead_blocks), resolved_ownership
+    )
+    with_scene_text = _attach_scene_text(
+        deduped, scene_text_residues or {}, language
+    )
+    blocks = _elements_to_blocks(with_scene_text, letterhead_blocks)
     _dedupe_callout_titles(blocks)
     return {
         "page_number": page_number,
@@ -594,14 +786,30 @@ def _manifest_pages_to_payload(manifest: ProcessingManifest) -> list[dict[str, A
         key: _letterhead_block(members, manifest.language)
         for key, members in letterheads.items()
     }
-    excluded_ids = page_numbers | merged
+    ownership = _resolve_manifest_ownership(manifest)
+    letterhead_ids = {
+        member.id for members in letterheads.values() for member in members
+    }
+    scene_text = _scene_text_by_owner(manifest, ownership, letterhead_ids)
+    residues = _scene_text_residues(manifest, scene_text)
+    scene_text_ids = {
+        member.id for members in scene_text.values() for member in members
+    }
+    excluded_ids = page_numbers | merged | scene_text_ids
     page_groups = (
         _explicit_pages(manifest, excluded_ids=excluded_ids)
         if manifest.pages
         else _grouped_pages(manifest, excluded_ids=excluded_ids)
     )
     return [
-        _build_page_payload(page_number, page_elements, letterhead_blocks)
+        _build_page_payload(
+            page_number,
+            page_elements,
+            letterhead_blocks,
+            ownership,
+            residues,
+            manifest.language,
+        )
         for page_number, page_elements in page_groups
     ]
 

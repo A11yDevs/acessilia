@@ -25,6 +25,14 @@ from docstruct.placeholders import (
     is_mostly_visual,
     is_placeholder_visual,
 )
+from docstruct.visual_text import (
+    TextOwnership,
+    analyze_visual_text_ownership,
+    collect_picture_context,
+    deduplicate_picture_description,
+    is_document_artifact,
+    is_scene_artifact,
+)
 
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
@@ -43,6 +51,9 @@ from acessilia_core.pipeline.enrichment.common import (
     _RETRIED_VISION_FAILURES,
     _extract_picture_bytes,
     _retry_failed,
+)
+from acessilia_core.pipeline.elements import (
+    _element_bbox,
 )
 from acessilia_core.pipeline.obligations import (
     _pages_label,
@@ -182,6 +193,10 @@ class _PictureEnrichment:
                 return False
 
             errors: list[str] = []
+            surrounding = element.metadata.get("surrounding_text")
+            extra_kwargs = (
+                {"surrounding_text": surrounding} if surrounding else {}
+            )
             vision_output = await self.agent.describe_region(
                 image_bytes=image_bytes,
                 # A whole presentation slide gets the page prompt and budget.
@@ -192,6 +207,7 @@ class _PictureEnrichment:
                 total_pages=self.total_pages,
                 mode=self.mode,
                 errors=errors,
+                **extra_kwargs,
             )
             self.breaker.record(isinstance(vision_output, VisionOutput))
 
@@ -216,6 +232,7 @@ async def _enrich_picture_descriptions(
     on_progress: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     _inject_full_page_picture(manifest, media_inspection)
+    _annotate_visual_text_ownership(manifest, media_inspection)
 
     pictures = _pictures_to_describe(manifest)
     if not pictures:
@@ -257,6 +274,7 @@ async def _enrich_picture_descriptions(
         breaker=breaker,
         delay_seconds=vision.retry_pass_delay_seconds,
     )
+    _annotate_visual_text_ownership(manifest, media_inspection)
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
@@ -333,7 +351,12 @@ def _fold_picture_description(
         # that text is worth keeping is decided below.
         answered = bool(vision_output.description.strip())
         if answered:
-            element.text = vision_output.description
+            surrounding = element.metadata.get("surrounding_text") or ()
+            element.text = (
+                deduplicate_picture_description(vision_output.description, surrounding)
+                if surrounding
+                else vision_output.description
+            )
         _retype_element(manifest, element, "picture")
     if element.page_number is None and page_number >= 1:
         element.page_number = page_number
@@ -377,6 +400,70 @@ def _retype_element(
         element,
         previous_type=previous_type,
     )
+
+
+def _annotate_visual_text_ownership(
+    manifest: ProcessingManifest,
+    media_inspection: dict[str, Any] | None = None,
+) -> None:
+    """Assign semantic visual-text ownership and picture surrounding context (#653).
+
+    Only a standalone image (a photo, not a photographed or scanned document
+    page, per ``artifact_nature``) makes its page-level OCR lines scene text.
+    On a document page every picture records that nature, so no picture, and
+    no later recomputation in the payload, takes the page's text as its own.
+    """
+    if isinstance(media_inspection, dict) and is_document_artifact(media_inspection):
+        nature = media_inspection["artifact_nature"]
+        for element in manifest.elements:
+            if element.type == "picture":
+                element.metadata.setdefault("artifact_nature", nature)
+    standalone = is_scene_artifact(media_inspection)
+    boxes = {
+        element.id: box
+        for element in manifest.elements
+        if (box := _element_bbox(element, manifest)) is not None
+    }
+    ownership = analyze_visual_text_ownership(
+        manifest.elements, page_boxes=boxes, standalone_image=standalone
+    )
+    # The stage annotates twice (before and after the descriptions are folded,
+    # which may retype elements): each pass replaces what the previous one
+    # recorded, so a stale decision never overrides the payload's fresh one.
+    for element in manifest.elements:
+        decision = ownership.get(element.id)
+        if decision is not None and decision.role != "document_text":
+            element.metadata["visual_text_ownership"] = decision.to_metadata()
+        else:
+            element.metadata.pop("visual_text_ownership", None)
+    for element in manifest.elements:
+        if element.type == "picture":
+            _record_picture_context(element, manifest, ownership)
+
+
+def _record_picture_context(
+    picture: ManifestElement,
+    manifest: ProcessingManifest,
+    ownership: dict[str, TextOwnership],
+) -> None:
+    """Record (or clear) the scene text a picture owns and the page text around it."""
+    context = collect_picture_context(picture.id, manifest.elements, ownership)
+    _set_or_clear(picture.metadata, "scene_text", context.scene_text)
+    keeps_context = not picture.metadata.get("slide_visual") and not picture.metadata.get(
+        "injected_picture"
+    )
+    _set_or_clear(
+        picture.metadata,
+        "surrounding_text",
+        context.surrounding_text if keeps_context else (),
+    )
+
+
+def _set_or_clear(metadata: dict[str, Any], key: str, values: tuple[str, ...]) -> None:
+    if values:
+        metadata[key] = list(values)
+    else:
+        metadata.pop(key, None)
 
 
 def _inject_full_page_picture(
