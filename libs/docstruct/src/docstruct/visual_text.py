@@ -33,11 +33,9 @@ from typing import Any, Literal
 
 from docstruct.geometry.boxes import box_contains_center
 from docstruct.placeholders import (
-    TEXT_ELEMENT_TYPES,
     ExtractedElement,
     is_ocr_noise,
     is_placeholder_text,
-    is_unstructured_page_placeholder,
 )
 
 VisualTextRole = Literal[
@@ -263,25 +261,6 @@ def is_scene_text_fragment(text: str | None) -> bool:
         return True
     words = normalized.split()
     return len(words) <= 4 and len(normalized) <= 32 and _is_all_upper(normalized)
-
-
-def is_scene_ocr_collection(elements: Iterable[ExtractedElement]) -> bool:
-    """Whether ``elements`` consist of scene-OCR signage fragments with no prose structure."""
-    items = list(elements)
-    text_items: list[str] = []
-    for element in items:
-        if is_unstructured_page_placeholder(element.raw_label, element.metadata):
-            continue
-        text = (element.text or "").strip()
-        if element.type in {"formula", "table", "code"} and text:
-            return False
-        if is_caption_text(text, element.raw_label, element.type):
-            return False
-        if element.type in TEXT_ELEMENT_TYPES and text:
-            if not is_scene_text_fragment(text):
-                return False
-            text_items.append(text)
-    return len(text_items) >= 2
 
 
 def is_scene_text_garbage(text: str | None) -> bool:
@@ -815,7 +794,6 @@ __all__ = [
     "is_document_page_picture",
     "is_prose_sentence",
     "is_scene_artifact",
-    "is_scene_ocr_collection",
     "is_scene_text_covered",
     "is_scene_text_fragment",
     "is_scene_text_garbage",

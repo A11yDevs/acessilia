@@ -20,7 +20,6 @@ from docstruct.visual_text import (
     is_document_page_picture,
     is_prose_sentence,
     is_scene_artifact,
-    is_scene_ocr_collection,
     is_scene_text_covered,
     is_scene_text_fragment,
     is_scene_text_garbage,
@@ -102,12 +101,16 @@ def test_every_case_398_fragment_is_recognized_as_scene_text(fragment: str) -> N
     assert not is_prose_sentence(fragment)
 
 
-def test_case_398_collection_is_scene_ocr_but_uppercase_headings_are_not_mostly_visual() -> None:
+def test_case_398_fragments_on_a_standalone_image_are_scene_text_but_uppercase_headings_are_not_visual() -> None:
     elements = [
         _element(f"el-{idx}", "paragraph", text, order=idx)
         for idx, text in enumerate(CASE_398_FRAGMENTS, start=1)
     ]
-    assert is_scene_ocr_collection(elements)
+    elements.append(
+        _element("pic", "picture", "", order=99, metadata={"injected_picture": True})
+    )
+    ownership = analyze_visual_text_ownership(elements, standalone_image=True)
+    assert {ownership[el.id].role for el in elements[:-1]} == {"scene_text"}
 
     # A text document with uppercase headings and no visual region is NOT mostly visual (Note 1).
     uppercase_headings = [
@@ -128,7 +131,6 @@ def test_scanned_document_prose_is_never_classified_as_scene_ocr() -> None:
         ),
         _element("pic", "picture", "Scanned page diagram", order=3, metadata={"injected_picture": True}),
     ]
-    assert not is_scene_ocr_collection(scanned)
     assert not is_mostly_visual(scanned)
     ownership = analyze_visual_text_ownership(scanned, standalone_image=True)
     assert ownership["h1"].role == "document_text"
