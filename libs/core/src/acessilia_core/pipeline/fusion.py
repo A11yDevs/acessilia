@@ -144,7 +144,11 @@ def apply_page_routes(
     """Put the secondary provider's page where the deterministic router prefers it.
 
     Delegates pure routing to :func:`docstruct.fusion.payload.route_pages` and
-    logs routed and missing secondary pages in the core.
+    logs routed and missing secondary pages in the core. ``docstruct`` never
+    mutates ``page_evidence``; this core wrapper adopts the returned annotated
+    copy so the caller's fusion evidence stays in sync (#633). The entries
+    themselves are replaced by copies, so an entry reference captured before
+    this call will not observe the annotation.
     """
     result = _docstruct_route_pages(
         primary_res,
@@ -152,6 +156,9 @@ def apply_page_routes(
         page_evidence,
         secondary_provider=secondary_provider,
     )
+    # docstruct is pure and returns the annotated copy; the core adopts it for
+    # the caller, which keeps ``fusion["fusion_evidence"]["pages"]`` in sync.
+    page_evidence[:] = result.page_evidence
     if result.missing_pages:
         logger.warning(
             "Fusion: {} has no elements on pages {} the router sent to it; "

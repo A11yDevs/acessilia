@@ -460,8 +460,14 @@ class TestRoutePagesAndApplyPageRoutes:
         assert document["pages"][1]["element_ids"] == ["mineru-s2", "mineru-s3"]
         assert document["summary"]["element_count"] == 5
         assert document["summary"]["element_types"] == {"paragraph": 4, "table": 1}
-        assert evidence[1]["stats"]["applied"] == "mineru"
-        assert "applied" not in evidence[2]["stats"]
+        assert result.page_evidence[1]["stats"]["applied"] == "mineru"
+        assert "applied" not in result.page_evidence[2]["stats"]
+        # #633: the caller's evidence is pure input; the result carries the copy.
+        assert "applied" not in evidence[1]["stats"]
+        assert evidence is not result.page_evidence
+        assert result.page_evidence[0]["stats"] is not evidence[0]["stats"]
+        result.page_evidence[0]["stats"]["sentinel"] = "copy-only"
+        assert "sentinel" not in evidence[0]["stats"]
 
     def test_without_routed_pages_primary_payload_identity_is_preserved(self) -> None:
         payload, replaced = apply_page_routes(
@@ -515,4 +521,79 @@ class TestRoutePagesAndApplyPageRoutes:
         assert result.routed_pages == (2.0,)
         assert result.missing_pages == ()
         assert [e["id"] for e in result.replaced[2]] == ["p2"]
-        assert evidence[1]["stats"]["applied"] == "mineru"
+        assert result.page_evidence[1]["stats"]["applied"] == "mineru"
+        assert "applied" not in evidence[1]["stats"]
+
+    def test_primary_elements_without_id_do_not_break_page_rebuild(self) -> None:
+        """#633: an unrouted primary element without id is skipped in element_ids."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+                {
+                    "id": None,
+                    "type": "paragraph",
+                    "text": "primary without id",
+                    "page_number": 3,
+                    "reading_order": 3,
+                },
+            ],
+            pages=3,
+        )
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert result.payload["document"]["pages"][2]["element_ids"] == []
+        assert any(
+            element.get("text") == "primary without id"
+            for element in result.payload["document"]["elements"]
+        )
+        assert result.payload["document"]["summary"]["element_count"] == 4
+
+    @pytest.mark.parametrize("missing_id", ["absent", ""])
+    def test_primary_elements_without_a_usable_id_do_not_break_page_rebuild(
+        self, missing_id: str
+    ) -> None:
+        """#633: a missing/empty primary id is skipped in element_ids, not a KeyError."""
+        element = {
+            "type": "paragraph",
+            "text": "primary without usable id",
+            "page_number": 3,
+            "reading_order": 3,
+        }
+        if missing_id != "absent":
+            element["id"] = missing_id
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+                element,
+            ],
+            pages=3,
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert result.payload["document"]["pages"][2]["element_ids"] == []
+        assert any(
+            item.get("text") == "primary without usable id"
+            for item in result.payload["document"]["elements"]
+        )
+        assert result.payload["document"]["summary"]["element_count"] == 4
+
+    def test_apply_page_routes_wrapper_keeps_its_two_value_contract(self) -> None:
+        """#633: the historical wrapper does not expose the annotated evidence copy."""
+        evidence = _routes("docling", "mineru", "docling")
+        apply_page_routes(
+            self.PRIMARY, self.SECONDARY, evidence, secondary_provider="mineru"
+        )
+        assert "applied" not in evidence[1]["stats"]
