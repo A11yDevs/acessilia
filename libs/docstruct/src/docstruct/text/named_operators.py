@@ -8,11 +8,13 @@ d o m, multiplicado por" for the domain of a function (#546).
 
 This module gives the few operators whose meaning the document makes
 unambiguous a canonical spelling before MathML and speech are produced:
-``\operatorname{D o m}``, ``\operatorname{Dom}`` and ``\operatorname{dom}``
-all become ``\operatorname{Dom}``, a single ``<mi>`` that MathCAT applies as a
-function ("Dom de"), never a product. For the pt-BR speech, the same operator
-is written as ``\mathop{\text{domínio}}``, which MathCAT reads as "domínio de";
-the engine still produces every word, so there is no second verbalizer.
+``\operatorname{D o m}``, ``\operatorname{D\,o\,m}`` and
+``\operatorname{Dom}`` all become ``\operatorname{Dom}``, a single ``<mi>``
+that MathCAT applies as a function ("Dom de"), never a product. Spaces and the
+LaTeX spacing commands a recognizer may print between the letters are ignored
+for the name lookup. For the pt-BR speech, the same operator is written as
+``\mathop{\text{domínio}}``, which MathCAT reads as "domínio de"; the engine
+still produces every word, so there is no second verbalizer.
 
 The rule is conservative and only covers names in ``_NAMED_OPERATORS``.
 Anything else keeps the LaTeX as the source had it: an unknown name is not
@@ -49,10 +51,15 @@ _NAMED_OPERATORS: dict[str, tuple[str, str]] = {
 #: ``\operatorname{…}`` and its starred form; the argument is not nested.
 _OPERATORNAME = re.compile(r"\\operatorname(\*?)\s*\{([^{}]*)\}")
 
+#: Spaces and LaTeX spacing commands a recognizer may put between the letters
+#: of a printed name: ``D o m``, ``D\,o\,m``, ``D\;o\;m``. Same set the math
+#: benchmark strips from ``\operatorname{l\,i\,m}``.
+_OPERATOR_SPACE = re.compile(r"(?:\\[,;:! ]|\s)+")
+
 
 def _operator(content: str) -> tuple[str, str] | None:
     r"""Canonical spelling and pt-BR speech form of an ``\operatorname`` argument."""
-    name = "".join(content.split())
+    name = _OPERATOR_SPACE.sub("", content)
     return _NAMED_OPERATORS.get(unicodedata.normalize("NFC", name).casefold())
 
 

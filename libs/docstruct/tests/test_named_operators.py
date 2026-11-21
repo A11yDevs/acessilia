@@ -19,7 +19,12 @@ from docstruct.text.named_operators import (
         r"\operatorname{domínio}(v m_{2})",
         r"\operatorname{Domínio}(v m_{2})",
         "\\operatorname{domi\u0301nio}(v m_{2})",
-        r"\operatorname*{D o m}(v m_{2})",
+        r"\operatorname{D\,o\,m}(v m_{2})",
+        r"\operatorname{D\;o\;m}(v m_{2})",
+        r"\operatorname{D\:o\:m}(v m_{2})",
+        r"\operatorname{D\!o\!m}(v m_{2})",
+        r"\operatorname{D\ o\ m}(v m_{2})",
+        r"\operatorname*{D\,o\,m}(v m_{2})",
     ],
 )
 def test_the_domain_operator_gets_one_canonical_spelling(latex):
@@ -35,7 +40,9 @@ def test_the_domain_operator_gets_one_canonical_spelling(latex):
     [
         # No known name: the source keeps its spelling.
         r"\operatorname{D o g}(x)",
+        r"\operatorname{D\,o\,g}(x)",
         r"\operatorname{sen} x",
+        r"\operatorname{l\,i\,m} x",
         # Other commands that take a name are not operator names.
         r"\mathrm{D o m}(x)",
         r"\text{D o m}(x)",
@@ -70,6 +77,7 @@ def test_normalization_is_idempotent():
     [
         r"\operatorname{Dom}(v m_{2})",
         r"\operatorname{D o m}(v m_{2})",
+        r"\operatorname{D\,o\,m}(v m_{2})",
         r"\operatorname{domínio}(v m_{2})",
         r"\operatorname*{D o m}(v m_{2})",
     ],
