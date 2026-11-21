@@ -720,7 +720,7 @@ async def test_case_325_vision_non_logo_answer_keeps_a_logo_sounding_description
 
 @pytest.mark.asyncio
 async def test_case_325_a_later_answer_without_a_classification_clears_the_old_one() -> None:
-    """A reprocessing answer with ``institutional_logo=None`` must not reuse the old True."""
+    """A later fold with ``institutional_logo=None`` must not reuse the old True."""
     line_1 = _placed(
         "line-1",
         "page_header",
@@ -750,13 +750,13 @@ async def test_case_325_a_later_answer_without_a_classification_clears_the_old_o
         [build_obligation("describe-image", ["pic-header"], ["vision-description"])],
     )
     manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+    # Neutral on purpose: only the classification can fold this picture into
+    # the letterhead, so the cleanup below is what keeps it an image.
+    neutral_description = "A red shield with a green triangle and three stars."
     RecordingVision.answer_sequences = {
         "pic-header": [
-            _vision_answer(
-                "A red shield with a green triangle and three stars.",
-                institutional_logo=True,
-            ),
-            _vision_answer("Portrait photo of the author.", institutional_logo=None),
+            _vision_answer(neutral_description, institutional_logo=True),
+            _vision_answer(neutral_description, institutional_logo=None),
         ]
     }
 
@@ -771,8 +771,18 @@ async def test_case_325_a_later_answer_without_a_classification_clears_the_old_o
     )
 
     assert picture.metadata["vision_institutional_logo"] is True
+    [first_page] = _manifest_pages_to_payload(manifest)
+    first_blocks = first_page["blocks"]
+    assert [b["type"] for b in first_blocks] == ["paragraph", "paragraph"]
+    assert first_blocks[0]["metadata"]["letterhead_members"] == [
+        "line-1",
+        "pic-header",
+        "line-2",
+    ]
 
-    # Reprocessing asks again; the fresh answer omits the classification.
+    # A second fold for the same element. The pipeline describes a picture
+    # once per run; this pins the invariant that a later fold cannot reuse
+    # the previous answer's classification.
     picture.metadata.pop("vision_description_complete")
     await picture_stage._enrich_picture_descriptions(
         manifest,
@@ -790,8 +800,9 @@ async def test_case_325_a_later_answer_without_a_classification_clears_the_old_o
     blocks = page["blocks"]
 
     assert [b["type"] for b in blocks] == ["paragraph", "image", "paragraph", "paragraph"]
-    assert blocks[1]["alt_text"] == "Portrait photo of the author."
-    assert all("Logo." not in (b.get("text") or "") for b in blocks)
+    assert blocks[1]["alt_text"] == neutral_description
+    # Language-independent: no block stands for a merged letterhead.
+    assert all("letterhead_members" not in b.get("metadata", {}) for b in blocks)
 
 
 def test_surrounding_text_prompt_bounds_item_and_total_char_overhead() -> None:
