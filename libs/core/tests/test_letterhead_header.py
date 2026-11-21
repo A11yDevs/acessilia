@@ -114,6 +114,45 @@ def test_region_inspection_vision_elements_confirm_the_letterhead():
     assert blocks[0]["metadata"]["letterhead_members"] == ["line-1", "logo", "line-2"]
 
 
+def test_region_inspection_logo_answer_confirms_the_letterhead():
+    """#692: the model's explicit ``institutional_logo`` answer confirms the merge.
+
+    The description is neutral and there are no mentioned elements, exactly the
+    metadata ``_persist_region_inspection`` writes for a logo it recognised; only
+    the recorded answer can confirm the merge.
+    """
+    line_1, logo, line_2 = _letterhead()
+    logo.text = "A red shield with a green triangle and three stars."
+    logo.metadata.update(
+        {
+            "vision_description_complete": True,
+            "vision_institutional_logo": True,
+        }
+    )
+
+    blocks = _blocks(line_1, logo, line_2, BODY)
+
+    assert [block["type"] for block in blocks] == ["paragraph", "paragraph"]
+    assert blocks[0]["metadata"]["role"] == "header"
+    assert blocks[0]["metadata"]["letterhead_members"] == ["line-1", "logo", "line-2"]
+
+
+def test_region_inspection_without_a_logo_answer_stays_an_image():
+    """#692: the same neutral description without the answer is not merged."""
+    line_1, logo, line_2 = _letterhead()
+    logo.text = "A red shield with a green triangle and three stars."
+    logo.metadata.update({"vision_description_complete": True})
+
+    blocks = _blocks(line_1, logo, line_2, BODY)
+
+    assert [block["type"] for block in blocks] == [
+        "paragraph",
+        "image",
+        "paragraph",
+        "paragraph",
+    ]
+
+
 def test_page_header_without_a_picture_is_unchanged():
     line_1, _, line_2 = _letterhead()
 

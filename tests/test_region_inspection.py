@@ -139,6 +139,7 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
         confidence=0.9,
         mentioned_elements=["logo"],
         warnings=["blurred"],
+        institutional_logo=True,
     )
     item = inspection_handlers._InspectedRegion(
         element=element,
@@ -160,8 +161,40 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
     # #688: the region writer records the model's mentioned elements too.
     assert replacement.metadata["vision_elements"] == ["logo"]
     assert replacement.metadata["vision_elements"] is not output.mentioned_elements
+    # #692: the region writer records the model's explicit logo answer.
+    assert replacement.metadata["vision_institutional_logo"] is True
     assert "vision_failure_reason" not in replacement.metadata
     assert "vision_failure_detail" not in replacement.metadata
+
+
+def test_a_region_inspection_without_a_logo_answer_clears_the_stale_value(
+    inspection, tmp_path
+):
+    """#692: ``institutional_logo=None`` removes a previous answer."""
+    manifest, _, _ = inspection
+    element = manifest.elements[0]
+    element.metadata["vision_institutional_logo"] = True
+    output = VisionOutput(
+        kind="description",
+        description="A map",
+        language="en",
+        confidence=0.9,
+    )
+    item = inspection_handlers._InspectedRegion(
+        element=element,
+        image=b"png",
+        page_number=1,
+        rectangle=[10.0, 20.0, 90.0, 70.0],
+        output=output,
+        text="A map",
+    )
+
+    replacement, _ = inspection_handlers._persist_region_inspection(
+        manifest, "o-1", item, data_dir=tmp_path
+    )
+
+    assert replacement.type == "picture"
+    assert "vision_institutional_logo" not in replacement.metadata
 
 
 @pytest.mark.parametrize("kind", ["description", "formula"])
