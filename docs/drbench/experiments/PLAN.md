@@ -85,7 +85,7 @@ Fonte obrigatória: [Orientacoes_cluster_dgx_SLURM.pdf](Orientacoes_cluster_dgx_
 - Checkpoint: pipeline reentrante (pula páginas já geradas), `#SBATCH --signal=B:SIGUSR1@300`. Scripts em `runs/slurm/*.sbatch`, logs em `runs/slurm/logs/`, registro em `runs/slurm/JOBS.md`.
 - Serviços (docling-serve :5001, mineru-api :5002, toolbox :8002) sobem **dentro** do job sbatch que roda a pipeline (mesmo nó/GPU).
 - Disponível: `uv`, `tectonic`, python3.12, `module`. **Sem** docker (usar apptainer se precisar de container), conda, gh, pdflatex.
-- `acessilia` exige Python `>=3.11,<3.14` → `uv venv --python 3.12`.
+- `acessilia` exige Python `>=3.12,<3.14` → `uv venv --python 3.12`.
 - Fallback sem GPU: **Docling em CPU** (job CPU-only, 32 cores) — viável para dev subset (~100 págs) e para as 509 de teste. MinerU em CPU é lento; usar só no subset.
 
 ## 5. Passo a passo

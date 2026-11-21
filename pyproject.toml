@@ -9,7 +9,7 @@ description = "Extração, classificação e conversão de documentos (PDF, DOCX
 authors = [{name = "Jhonata"}]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "loguru>=0.7.3,<0.8",
     "aiosmtplib>=5.1.2,<6",

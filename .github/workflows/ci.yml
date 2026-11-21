@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     env:
       UV_PYTHON: ${{ matrix.python-version }}
 
@@ -156,7 +156,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     env:
       UV_PYTHON: ${{ matrix.python-version }}
 
@@ -270,7 +270,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     env:
       UV_PYTHON: ${{ matrix.python-version }}
 
@@ -397,7 +397,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     env:
       UV_PYTHON: ${{ matrix.python-version }}
 
