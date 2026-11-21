@@ -152,6 +152,18 @@ def test_a_dual_payload_where_nothing_is_routed_is_normalized_too(tmp_path: Path
     assert any(item.id == "element-p1-4" for item in manifest.elements)
 
 
+def test_a_malformed_pages_value_still_fails_validation(tmp_path: Path) -> None:
+    """#679: preserving a malformed envelope keeps rejection in the model."""
+    from pydantic import ValidationError
+
+    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
+    response["document"]["pages"] = None
+    response["document"]["elements"][3].pop("id")
+
+    with pytest.raises(ValidationError):
+        _build_from_response(tmp_path, response)
+
+
 @pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
 def test_formula_number_is_preserved_before_planning(tmp_path, suffix):
     from acessilia_core.pipeline.elements import _element_to_block

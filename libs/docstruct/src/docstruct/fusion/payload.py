@@ -564,6 +564,8 @@ def _normalize_missing_ids(elements: list[dict[str, Any]]) -> None:
         element["id"] = candidate
         used.add(candidate)
         if previous_id:
+            # The input is already invalid when the id repeats; the last
+            # occurrence wins so a child still points at some regenerated id.
             try:
                 replacements[previous_id] = candidate
             except TypeError:  # an unhashable id cannot be referenced either
@@ -621,29 +623,31 @@ def normalize_element_ids(document: dict[str, Any]) -> dict[str, Any]:
     page descriptors when normalization is needed, so a caller can hand it to
     the manifest model while keeping the raw extraction intact. Payloads whose
     elements all carry a usable id get a shallow copy only, leaving their page
-    membership exactly as the extractor wrote it. Non-object elements and page
-    descriptors are kept for the model to reject.
+    membership exactly as the extractor wrote it. Malformed containers and
+    non-object elements or page descriptors are kept for the model to reject.
     """
-    elements = [item for item in document.get("elements") or [] if isinstance(item, dict)]
+    raw_elements = document.get("elements")
+    if not isinstance(raw_elements, list):
+        return {**document}
+    elements = [item for item in raw_elements if isinstance(item, dict)]
     if all(_has_usable_id(element) for element in elements):
         return {**document}
     copied: list[Any] = [
-        dict(item) if isinstance(item, dict) else item
-        for item in document.get("elements") or []
+        dict(item) if isinstance(item, dict) else item for item in raw_elements
     ]
     objects: list[dict[str, Any]] = [
         item for item in copied if isinstance(item, dict)
     ]
     _normalize_missing_ids(objects)
     normalized: dict[str, Any] = {**document, "elements": copied}
-    if "pages" in document:
+    if isinstance(document.get("pages"), list):
         ids_by_page = _page_element_ids(objects)
         normalized["pages"] = [
             {**descriptor, "element_ids": ids_by_page.get(descriptor["page_number"], [])}
             if isinstance(descriptor, dict)
             and isinstance(descriptor.get("page_number"), int)
             else descriptor
-            for descriptor in document.get("pages") or []
+            for descriptor in document["pages"]
         ]
     return normalized
 

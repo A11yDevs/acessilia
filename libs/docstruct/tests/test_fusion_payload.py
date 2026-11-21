@@ -94,10 +94,12 @@ def _routes(*providers: str) -> list[dict]:
 
 
 def _manifest_element(
-    element_id: str | None,
+    element_id: str | int | None,
     page_number: int,
     reading_order: int,
     text: str,
+    *,
+    parent_id: str | int | None = None,
 ) -> dict:
     """A ``DocumentElement`` shaped for ``structured_document_from_payload``."""
     element: dict = {
@@ -108,7 +110,7 @@ def _manifest_element(
         "text": text,
         "source_ref": None,
         "parent_ref": None,
-        "parent_id": None,
+        "parent_id": parent_id,
         "page_number": page_number,
         "confidence": None,
         "provenance": [],
@@ -538,6 +540,123 @@ class TestNormalizeElementIds:
         assert normalized["pages"] == ["not-an-object"]
         assert normalized["elements"][0]["id"] == "element-p1-1"
 
+    def test_the_normalized_document_is_valid_for_the_manifest_model(self) -> None:
+        """#679: the helper's output passes the manifest's own validation path."""
+        document = {
+            "title": "Doc",
+            "language": "pt-BR",
+            "pages": [
+                {
+                    "page_number": 1,
+                    "width": 100.0,
+                    "height": 200.0,
+                    "element_ids": ["stale"],
+                }
+            ],
+            "elements": [
+                _manifest_element(123, 1, 1, "parent"),
+                _manifest_element(None, 1, 2, "child", parent_id=123),
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        parsed = structured_document_from_payload(normalized)
+        assert validate_structured_document(parsed) == []
+        assert [element.id for element in parsed.elements] == [
+            "element-p1-1",
+            "element-p1-2",
+        ]
+        assert parsed.elements[1].parent_id == "element-p1-1"
+        assert normalized["pages"][0]["element_ids"] == [
+            "element-p1-1",
+            "element-p1-2",
+        ]
+
+    @pytest.mark.parametrize("pages", [None, "not-a-list", {"a": 1}])
+    def test_malformed_pages_are_kept_for_the_model_to_reject(self, pages: object) -> None:
+        document = {
+            "pages": pages,
+            "elements": [{"type": "paragraph", "text": "one", "page_number": 1}],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["pages"] is pages
+        assert normalized["elements"][0]["id"] == "element-p1-1"
+
+    def test_malformed_elements_are_kept_for_the_model_to_reject(self) -> None:
+        document = {"pages": [], "elements": 5}
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["elements"] == 5
+
+    def test_the_fast_path_leaves_stale_page_membership_untouched(self) -> None:
+        document = {
+            "pages": [{"page_number": 1, "element_ids": ["p1", "stale"]}],
+            "elements": [
+                {"id": "p1", "type": "paragraph", "text": "one", "page_number": 1}
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["pages"][0]["element_ids"] == ["p1", "stale"]
+
+    def test_non_object_elements_are_kept_for_the_model_to_reject(self) -> None:
+        document = {
+            "pages": [],
+            "elements": [
+                "not-an-element",
+                {"type": "paragraph", "text": "one", "page_number": 1},
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["elements"][0] == "not-an-element"
+        assert normalized["elements"][1]["id"] == "element-p1-1"
+
+    def test_normalization_is_idempotent(self) -> None:
+        document = {
+            "pages": [{"page_number": 1, "element_ids": []}],
+            "elements": [{"type": "paragraph", "text": "one", "page_number": 1}],
+        }
+
+        once = normalize_element_ids(document)
+        twice = normalize_element_ids(once)
+
+        assert twice == once
+
+    def test_a_zero_based_page_is_scoped_to_the_one_based_page(self) -> None:
+        document = {"elements": [{"type": "paragraph", "text": "one", "page": 2}]}
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["elements"][0]["id"] == "element-p3-1"
+
+    def test_with_duplicate_non_string_ids_children_follow_the_last_one(self) -> None:
+        """#679: a duplicate id is already invalid; the last occurrence wins."""
+        document = {
+            "elements": [
+                {"id": 123, "type": "paragraph", "text": "first", "page_number": 1},
+                {"id": 123, "type": "paragraph", "text": "second", "page_number": 1},
+                {
+                    "type": "paragraph",
+                    "text": "child",
+                    "page_number": 1,
+                    "parent_id": 123,
+                },
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["elements"][0]["id"] == "element-p1-1"
+        assert normalized["elements"][1]["id"] == "element-p1-2"
+        assert normalized["elements"][2]["parent_id"] == "element-p1-2"
+
 
 class TestRoutePagesAndApplyPageRoutes:
     PRIMARY = _doc(
@@ -904,6 +1023,45 @@ class TestRoutePagesAndApplyPageRoutes:
         )
         assert normalized["id"] == "element-p3-1"
         assert document["pages"][2]["element_ids"] == ["element-p3-1"]
+
+    def test_a_routed_payload_remaps_parent_ids_for_a_replaced_non_string_id(
+        self,
+    ) -> None:
+        """#679: the routed path shares the parent-id normalization too."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                {
+                    "id": 123,
+                    "type": "paragraph",
+                    "text": "parent",
+                    "page_number": 3,
+                    "reading_order": 2,
+                },
+                {
+                    "type": "paragraph",
+                    "text": "child",
+                    "page_number": 3,
+                    "reading_order": 3,
+                    "parent_id": 123,
+                },
+            ],
+            pages=3,
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        elements = result.payload["document"]["elements"]
+        parent = next(element for element in elements if element.get("text") == "parent")
+        child = next(element for element in elements if element.get("text") == "child")
+        assert parent["id"] == "element-p3-1"
+        assert child["id"] == "element-p3-2"
+        assert child["parent_id"] == "element-p3-1"
 
     def test_the_routed_payload_is_a_valid_structured_document(self) -> None:
         """#664: normalization keeps the routed payload valid as a manifest document."""
