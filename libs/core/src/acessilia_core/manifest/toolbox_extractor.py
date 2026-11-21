@@ -60,12 +60,15 @@ class ToolboxExtraction:
 
 
 def _validated_structure_result(result: Any, *, provider: str) -> dict[str, Any]:
-    """The extraction envelope, refusing a non-object or one without a document.
+    """The extraction envelope, refusing a non-object, a missing or non-object
+    document, or a non-object provenance.
 
     The shipped client already rejects a non-object HTTP body, but an injected
     or duck-typed client can still answer ``None``. Treating that as a payload
     would let a silent ``None`` reach the manifest (or a bare assert stand in
-    for a typed failure) instead of the recordable provider error (#673).
+    for a typed failure) instead of the recordable provider error (#673). The
+    provenance check also keeps ``_extract_with`` from reading ``cache_key`` and
+    ``provider_version`` off a non-mapping.
     """
     if not isinstance(result, dict):
         raise ToolboxContractViolation(
@@ -76,13 +79,25 @@ def _validated_structure_result(result: Any, *, provider: str) -> dict[str, Any]
         raise ToolboxContractViolation(
             f"{provider} answered without a document object: {type(document).__name__}"
         )
+    provenance = result.get("provenance", {})
+    if not isinstance(provenance, dict):
+        raise ToolboxContractViolation(
+            f"{provider} answered with a non-object provenance: "
+            f"{type(provenance).__name__}"
+        )
     return result
 
 
 def _record_provider_failure(
     provider: str, exc: ToolboxError, extraction_failures: dict[str, str]
 ) -> None:
-    """Record and log one provider's failure so the run is marked degraded."""
+    """Record and log one provider's failure so the run is marked degraded.
+
+    ``exc`` may be a transport error classified by ``_provider_failure``, a
+    ``ToolboxContractViolation`` raised by ``_validated_structure_result`` for a
+    malformed answer, or any secondary failure once the primary result is in
+    hand; all are per-provider failures for this record.
+    """
     extraction_failures[provider] = type(exc).__name__
     logger.warning(
         t(LOG_STRUCTURAL_PROVIDER_DEGRADED).format(
@@ -256,12 +271,13 @@ class ToolboxManifestExtractor:
         )
 
         extraction_failures: dict[str, str] = {}
-        final_provider = structure.provider or "primary"
+        primary_provider = structure.provider or "primary"
+        final_provider = primary_provider
         final_base_url = structure.base_url
         dual_enabled = (
             fusion_config.mode == "dual"
             and dual_fusion
-            and fusion_config.secondary_provider != structure.provider
+            and fusion_config.secondary_provider != primary_provider
         )
         result, primary_error = await self._extract_primary(
             structure,
@@ -271,12 +287,14 @@ class ToolboxManifestExtractor:
             operations=operations,
             dual_enabled=dual_enabled,
             extraction_failures=extraction_failures,
+            primary_provider=primary_provider,
         )
         if fusion_config.mode == "dual" and dual_fusion:
             result, final_provider, final_base_url = await self._apply_dual_extraction(
                 result,
                 primary_error=primary_error,
                 structure=structure,
+                primary_provider=primary_provider,
                 artifacts=artifacts,
                 source_path=source_path,
                 artifact_id=artifact_id,
@@ -359,8 +377,8 @@ class ToolboxManifestExtractor:
         operations: RemoteOperations | None,
         dual_enabled: bool,
         extraction_failures: dict[str, str],
+        primary_provider: str,
     ) -> tuple[dict[str, Any] | None, ToolboxError | None]:
-        provider = structure.provider or "primary"
         try:
             with self._remote_operation("primary", operations):
                 result = await structure.extract_structure(
@@ -372,17 +390,19 @@ class ToolboxManifestExtractor:
         except ToolboxError as exc:
             if not dual_enabled or not _provider_failure(exc):
                 raise
-            _record_provider_failure(provider, exc, extraction_failures)
+            _record_provider_failure(primary_provider, exc, extraction_failures)
             return None, exc
         # Validate outside the client `except`: a contract violation raised by
         # the transport stays permanent, while a provider's malformed answer can
         # differ by provider and degrades to the secondary (#673).
         try:
-            return _validated_structure_result(result, provider=provider), None
+            return _validated_structure_result(
+                result, provider=primary_provider
+            ), None
         except ToolboxContractViolation as exc:
             if not dual_enabled:
                 raise
-            _record_provider_failure(provider, exc, extraction_failures)
+            _record_provider_failure(primary_provider, exc, extraction_failures)
             return None, exc
 
     async def _apply_dual_extraction(
@@ -391,6 +411,7 @@ class ToolboxManifestExtractor:
         *,
         primary_error: ToolboxError | None,
         structure: ToolboxStructureClient,
+        primary_provider: str,
         artifacts: ToolboxArtifactClient | None,
         source_path: Path,
         artifact_id: str | None,
@@ -402,8 +423,7 @@ class ToolboxManifestExtractor:
         extraction_failures: dict[str, str],
     ) -> tuple[dict[str, Any], str, str]:
         secondary_provider = fusion_config.secondary_provider
-        primary_provider = structure.provider or "primary"
-        if secondary_provider == structure.provider:
+        if secondary_provider == primary_provider:
             if primary_result is None:
                 raise ToolboxContractViolation(
                     "Identical providers reported no primary extraction"
@@ -446,6 +466,7 @@ class ToolboxManifestExtractor:
                 primary_error=primary_error,
                 primary_result=primary_result,
                 structure=structure,
+                primary_provider=primary_provider,
                 secondary_client=secondary_client,
                 secondary_provider=secondary_provider,
                 extraction_failures=extraction_failures,
@@ -526,13 +547,13 @@ class ToolboxManifestExtractor:
         primary_error: ToolboxError | None,
         primary_result: dict[str, Any] | None,
         structure: ToolboxStructureClient,
+        primary_provider: str,
         secondary_client: ToolboxStructureClient,
         secondary_provider: str,
         extraction_failures: dict[str, str],
     ) -> dict[str, Any]:
         # With the primary's result in hand the comparison is only a gain, so
         # any secondary failure degrades instead of discarding a complete extraction.
-        primary_provider = structure.provider or "primary"
         if primary_error is not None:
             if not _provider_failure(exc):
                 raise exc from primary_error
