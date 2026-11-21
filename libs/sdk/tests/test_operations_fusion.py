@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+from typing import Any
 from urllib.parse import parse_qs
 
 import httpx
@@ -15,6 +16,7 @@ from acessilia_sdk.operations.fusion import (
 )
 from acessilia_sdk.toolbox import (
     ToolboxArtifactNotFound,
+    ToolboxContractViolation,
     ToolboxError,
     ToolboxProviderUnavailable,
 )
@@ -71,6 +73,28 @@ def _clients() -> tuple[ToolboxStructureClient, ToolboxStructureClient]:
     primary = ToolboxStructureClient(base_url=BASE, provider="docling", timeout_seconds=5)
     secondary = ToolboxStructureClient(base_url=BASE, provider="mineru", timeout_seconds=5)
     return primary, secondary
+
+
+def _envelope(elements: list[dict]) -> dict:
+    return {"status": "succeeded", "document": {"elements": elements}}
+
+
+class _FakeStructureClient:
+    """A structure client that answers with ``answer`` (or raises it)."""
+
+    def __init__(self, provider: str, answer: Any) -> None:
+        self.provider = provider
+        self.calls: list[dict[str, Any]] = []
+        self._answer = answer
+
+    async def extract_structure(self, file_path: object = None, **kwargs: Any) -> Any:
+        self.calls.append({"file_path": file_path, **kwargs})
+        if isinstance(self._answer, BaseException):
+            raise self._answer
+        return self._answer
+
+    async def close(self) -> None:
+        pass
 
 
 @pytest.mark.asyncio
@@ -291,6 +315,57 @@ async def test_missing_artifact_without_file_path_records_failure_instead_of_upl
     assert result.fused is False
     assert result.artifact_fallbacks == ()
     assert isinstance(result.failures["mineru"], ToolboxArtifactNotFound)
+
+
+@pytest.mark.parametrize("invalid", [None, [], "envelope", 7])
+@pytest.mark.asyncio
+async def test_a_payload_that_is_not_an_object_is_a_recorded_contract_violation(
+    invalid: Any,
+) -> None:
+    primary = _FakeStructureClient("docling", invalid)
+    secondary = _FakeStructureClient(
+        "mineru",
+        _envelope([{"type": "paragraph", "text": "Secondary survives", "page_number": 1}]),
+    )
+
+    result = await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert result.fused is False
+    assert isinstance(result.failures["docling"], ToolboxContractViolation)
+    assert set(result.failures) == {"docling"}
+    assert result.payload["document"]["elements"][0]["text"] == "Secondary survives"
+    # No step for the provider whose answer violated the contract.
+    assert result.steps == (
+        Step("document.structure.extract", "mineru", {"language": "pt-BR", "source": "file"}),
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_invalid_artifact_payload_is_not_retried_as_an_upload() -> None:
+    primary = _FakeStructureClient("docling", None)
+    secondary = _FakeStructureClient("mineru", _envelope([]))
+
+    result = await extract_dual_fused(primary, secondary, "doc.pdf", artifact_id=SOURCE_ID)
+
+    assert isinstance(result.failures["docling"], ToolboxContractViolation)
+    assert result.artifact_fallbacks == ()
+    assert len(primary.calls) == 1
+    assert "artifact_id" in primary.calls[0]
+
+
+@pytest.mark.asyncio
+async def test_both_providers_answering_none_record_each_contract_violation() -> None:
+    primary = _FakeStructureClient("docling", None)
+    secondary = _FakeStructureClient("mineru", None)
+
+    with pytest.raises(DualFusionUnavailable) as caught:
+        await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert set(caught.value.failures) == {"docling", "mineru"}
+    assert all(
+        isinstance(exc, ToolboxContractViolation)
+        for exc in caught.value.failures.values()
+    )
 
 
 @pytest.mark.asyncio

@@ -30,6 +30,7 @@ from acessilia_sdk.toolbox.clients.structure import (
 )
 from acessilia_sdk.toolbox.errors import (
     ToolboxArtifactNotFound,
+    ToolboxContractViolation,
     ToolboxError,
     ToolboxProviderUnavailable,
 )
@@ -61,6 +62,23 @@ class DualFusionUnavailable(ToolboxProviderUnavailable):
         )
 
 
+def _validated_payload(payload: Any) -> dict[str, Any]:
+    """The extraction envelope, refusing an answer that is not a JSON object.
+
+    ``extract_structure`` is typed to return a ``dict``, but a fake client or a
+    caller's implementation may still answer ``None``. Recording that as a
+    successful step would hide the provider's failure: ``_collect_outcomes``
+    would see no payload and no error, and ``DualFusionUnavailable`` would
+    raise with an empty ``failures`` map. A contract violation keeps the
+    provider's error.
+    """
+    if not isinstance(payload, dict):
+        raise ToolboxContractViolation(
+            f"{STRUCTURE_CAPABILITY} returned {type(payload).__name__}, not an object"
+        )
+    return payload
+
+
 @dataclass(frozen=True)
 class DualFusionResult:
     """Outcome of :func:`extract_dual_fused` across two structure providers.
@@ -68,7 +86,10 @@ class DualFusionResult:
     ``payload`` is the fused payload when both providers succeeded (``fused=True``)
     or the surviving provider's payload when one failed with a
     :class:`~acessilia_sdk.toolbox.errors.ToolboxError` (``fused=False``).
-    ``failures`` maps each failed provider name to its ``ToolboxError``;
+    ``failures`` maps each failed provider name to its ``ToolboxError``; an
+    answer that is not a JSON object counts as a
+    :class:`~acessilia_sdk.toolbox.errors.ToolboxContractViolation` and never
+    produces a ``Step``;
     ``artifact_fallbacks`` lists providers where ``artifact_id`` was missing in
     the Toolbox and ``file_path`` was uploaded instead; ``steps`` records each
     successful ``document.structure.extract`` step.
@@ -95,10 +116,12 @@ async def _extract_with_fallback(
     try:
         if artifact_id:
             try:
-                payload = await client.extract_structure(
-                    artifact_id=artifact_id,
-                    language=language,
-                    use_remote_cache=use_remote_cache,
+                payload = _validated_payload(
+                    await client.extract_structure(
+                        artifact_id=artifact_id,
+                        language=language,
+                        use_remote_cache=use_remote_cache,
+                    )
                 )
                 step = Step(
                     STRUCTURE_CAPABILITY,
@@ -110,10 +133,12 @@ async def _extract_with_fallback(
                 if source is None:
                     raise
                 fell_back = True
-        payload = await client.extract_structure(
-            source,
-            language=language,
-            use_remote_cache=use_remote_cache,
+        payload = _validated_payload(
+            await client.extract_structure(
+                source,
+                language=language,
+                use_remote_cache=use_remote_cache,
+            )
         )
         step = Step(
             STRUCTURE_CAPABILITY,
@@ -202,8 +227,12 @@ async def extract_dual_fused(
 
     If one provider raises a :class:`~acessilia_sdk.toolbox.errors.ToolboxError`,
     returns the other provider's payload with ``fused=False`` and records the
-    error in :attr:`DualFusionResult.failures`. If both fail with
-    ``ToolboxError``, raises :class:`DualFusionUnavailable` (a subclass of
+    error in :attr:`DualFusionResult.failures`. An answer that is not a JSON
+    object counts as a
+    :class:`~acessilia_sdk.toolbox.errors.ToolboxContractViolation`, so its
+    error is recorded too instead of passing for a successful step. If both
+    fail with ``ToolboxError``, raises :class:`DualFusionUnavailable` (a
+    subclass of
     :class:`~acessilia_sdk.toolbox.errors.ToolboxProviderUnavailable`) carrying
     ``failures`` and ``artifact_fallbacks``. Unexpected (non-``ToolboxError``)
     exceptions propagate unchanged.
