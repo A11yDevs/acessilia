@@ -7,6 +7,12 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** `acessilia_sdk.runtime.run_sync` now closes the coroutine when the
+  worker setup fails -- copying the context, creating the executor or
+  submitting the work -- instead of leaving it unawaited and later emitting
+  `RuntimeWarning: coroutine ... was never awaited` (#634). Its docstring now
+  documents that, inside a running event loop, it blocks that loop until the
+  worker thread finishes.
 - **Changed** `acessilia_sdk.runtime.run_sync` now copies the caller's
   `contextvars` context into its worker thread when called inside a running
   event loop, so `operation_context` and request-scoped variables propagate

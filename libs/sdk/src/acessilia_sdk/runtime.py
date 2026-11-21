@@ -20,16 +20,17 @@ def run_sync(coro: Coroutine[Any, Any, T]) -> T:
     context so operation identifiers and other request-scoped variables
     propagate across the thread boundary.
 
-    Blocking contract
+    Blocking contract:
         When this thread already has a running loop, ``run_sync`` blocks that
         loop until the worker thread finishes: it is a synchronous bridge, not
         a non-blocking offload.  Every task on the calling loop stays stalled
         for the whole duration of the coroutine, so an async caller must not
         invoke a synchronous entrypoint that reaches ``run_sync`` directly.
-        Wrap that entrypoint in :func:`acessilia_core.blocking.run_blocking`
-        (or ``asyncio.to_thread``) and ``await`` the result instead.
+        Wrap that entrypoint in ``asyncio.to_thread`` (in this service,
+        :func:`acessilia_core.blocking.run_blocking`) and ``await`` the result
+        instead.
 
-    Coroutine ownership
+    Coroutine ownership:
         ``run_sync`` consumes the coroutine object.  If the worker setup fails
         before an event loop takes ownership -- while copying the context,
         creating the executor, or submitting the work -- the coroutine is
