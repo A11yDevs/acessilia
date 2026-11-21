@@ -579,10 +579,12 @@ def main() -> int:
         results: list[dict[str, Any]] = []
         max_files = args.max_files or len(files)
         ref_dir = args.reference_dir
+        input_root = args.input.resolve()
+        if not input_root.is_dir():
+            input_root = input_root.parent
 
         for i, file_path in enumerate(files[:max_files]):
-            rel = file_path.relative_to(args.input.resolve() if args.input.is_dir()
-                                         else args.input.parent)
+            rel = file_path.resolve().relative_to(input_root)
             stem = "_".join(rel.with_suffix("").parts)
             out_dir = output_base / stem
 
