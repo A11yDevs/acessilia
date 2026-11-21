@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from acessilia_core.agents.output_schemas import DataOutput
-from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures, _fold_table_reading
 from pddl_support import build_element as _element
 from pddl_support import build_manifest as _manifest
 from acessilia_core.pipeline.enrichment import tables as table_stage
@@ -103,6 +103,42 @@ def test_a_collapsed_table_is_replaced_by_its_reading_from_the_image(monkeypatch
     assert table.metadata["table_review"] == {
         "reason": "collapsed_rows", "outcome": "replaced", "attempts": 1,
     }
+    assert table.metadata["table_ast_replaced"] == _ast(COLLAPSED)
+
+
+def test_a_second_replacement_keeps_the_first_replaced_ast_as_evidence():
+    """The original misread AST survives a later accepted replacement (#685).
+
+    Two reason-folds need a restored or external manifest today: an accepted
+    replacement cannot be garbled, so the core does not re-flag it. This pins
+    the keep-first invariant for that case, even when the reasons differ.
+    """
+    table = _element("t-1", "table", metadata={"table_ast": _ast(COLLAPSED)})
+    first = _reading([["Prefix", "symbol", "power"], *map(list, PREFIXES)])
+    second = _reading([["Prefix", "symbol", "power"], ["yotta", "Y", "10^24"]])
+
+    _fold_table_reading(table, first, 1, "collapsed_rows", 1)
+    _fold_table_reading(table, second, 1, "duplicated_cells", 1)
+
+    assert table.metadata["table_ast_replaced"] == _ast(COLLAPSED)
+    assert table.metadata["table_ast"] == second.table_ast()
+    assert table.metadata["table_review"]["reason"] == "duplicated_cells"
+    assert table.metadata["table_review"]["attempts"] == 2
+
+
+def test_a_corrupt_replaced_ast_is_replaced_by_the_real_evidence():
+    """A non-AST value in a restored manifest does not become permanent evidence."""
+    table = _element(
+        "t-1",
+        "table",
+        metadata={"table_ast": _ast(COLLAPSED), "table_ast_replaced": "not an AST"},
+    )
+
+    _fold_table_reading(
+        table, _reading([["Prefix", "symbol", "power"], ["yota", "Y", "10^24"]]),
+        1, "collapsed_rows", 1,
+    )
+
     assert table.metadata["table_ast_replaced"] == _ast(COLLAPSED)
 
 

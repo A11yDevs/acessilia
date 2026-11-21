@@ -152,6 +152,7 @@ It finds 63 keys, 17 of them written or read by more than one group.
 | `metadata["src"]` | G, P | O | Region and page inspection and the formula crop record the image source; picture enrichment reads it. |
 | `metadata["table_ast"]` | S | E, F, I, Q, S | S writes it before planning. Q's table pass runs after S, because S can replace a table's cells. E, F and I read it during execution. |
 | `metadata["table_read_failure"]` | S | S, V | S records why a table was not read, and V reports it as a degradation. |
+| `metadata["table_review" / "table_ast_replaced"]` | S | — | S records the latest review verdict (`reason`, `outcome`, accumulated `attempts`) and keeps the first AST a review replaced as evidence; smart-fusion adoption deletes every `table_*` key, discarding both. |
 | `metadata["mathml"]`, `metadata["verbalization"]`, `metadata["latex_normalized"]` | B, B, E | T | T counts a formula as readable from these (`_formula_has_readable_content`), so its delivery check depends on the handlers having run first. |
 | `metadata["blank_page"]` | G | W | Page inspection marks blank pages, and the page payload uses the mark. |
 | `configuration["region_inspection_mode"]` | N | G | The pipeline chooses the inspection mode, and the region and page handlers read it. |

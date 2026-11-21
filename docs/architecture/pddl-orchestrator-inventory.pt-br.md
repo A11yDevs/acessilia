@@ -152,6 +152,7 @@ Ele encontra 63 chaves, 17 delas gravadas ou lidas por mais de um grupo.
 | `metadata["src"]` | G, P | O | A inspeção de região e de página e o recorte de fórmula registram a origem da imagem; o enriquecimento de figuras a lê. |
 | `metadata["table_ast"]` | S | E, F, I, Q, S | S a grava antes do planejamento. A passada de tabelas de Q roda depois de S, porque S pode substituir as células de uma tabela. E, F e I a leem na execução. |
 | `metadata["table_read_failure"]` | S | S, V | S registra por que uma tabela não foi lida, e V a informa como degradação. |
+| `metadata["table_review" / "table_ast_replaced"]` | S | — | S registra o veredito da revisão mais recente (`reason`, `outcome`, `attempts` acumulados) e mantém o primeiro AST que uma revisão substituiu como evidência; a adoção por smart fusion apaga todas as chaves `table_*`, descartando os dois. |
 | `metadata["mathml"]`, `metadata["verbalization"]`, `metadata["latex_normalized"]` | B, B, E | T | T considera uma fórmula legível a partir dessas chaves (`_formula_has_readable_content`), então a sua checagem de entrega depende de os handlers terem rodado antes. |
 | `metadata["blank_page"]` | G | W | A inspeção de página marca páginas em branco, e o payload de página usa a marca. |
 | `configuration["region_inspection_mode"]` | N | G | O pipeline escolhe o modo de inspeção, e os handlers de região e de página o leem. |
