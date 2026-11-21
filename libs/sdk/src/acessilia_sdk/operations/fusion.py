@@ -100,8 +100,8 @@ class DualFusionResult:
     or the surviving provider's payload when one failed with a
     :class:`~acessilia_sdk.toolbox.errors.ToolboxError` (``fused=False``).
     ``failures`` maps each failed provider name to its ``ToolboxError``; an
-    answer outside the envelope (not a JSON object, or without its ``document``
-    object) counts as a
+    answer outside the envelope (not a JSON object, one whose ``status`` is not
+    ``succeeded``, or without its ``document`` object) counts as a
     :class:`~acessilia_sdk.toolbox.errors.ToolboxContractViolation` and never
     produces a ``Step``;
     ``artifact_fallbacks`` lists providers where ``artifact_id`` was missing in
@@ -242,7 +242,8 @@ async def extract_dual_fused(
     If one provider raises a :class:`~acessilia_sdk.toolbox.errors.ToolboxError`,
     returns the other provider's payload with ``fused=False`` and records the
     error in :attr:`DualFusionResult.failures`. An answer outside the envelope
-    (not a JSON object, or without its ``document`` object) counts as a
+    (not a JSON object, one whose ``status`` is not ``succeeded``, or without
+    its ``document`` object) counts as a
     :class:`~acessilia_sdk.toolbox.errors.ToolboxContractViolation`, so its
     error is recorded too instead of passing for a successful step. If both
     fail with ``ToolboxError``, raises :class:`DualFusionUnavailable` (a

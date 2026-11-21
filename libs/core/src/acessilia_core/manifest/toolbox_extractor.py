@@ -67,8 +67,8 @@ def _validated_structure_result(result: Any, *, provider: str) -> dict[str, Any]
     or duck-typed client can still answer ``None``. Treating that as a payload
     would let a silent ``None`` reach the manifest (or a bare assert stand in
     for a typed failure) instead of the recordable provider error (#673). The
-    status and provenance checks also keep a failed or non-mapping envelope
-    from reaching the manifest (#698).
+    status check keeps a failed envelope out of the manifest, and the provenance
+    check keeps a non-mapping provenance out (#698).
     """
     if not isinstance(result, dict):
         raise ToolboxContractViolation(

@@ -491,8 +491,10 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 > objeto `document` ou com `provenance` que não seja objeto é uma falha por
 > provider, então no modo dual o primário inválido passa para o secundário e um
 > secundário inválido mantém o primário completo; se ambos estiverem
-> malformados, o erro tipado propaga. A recusa de transporte acima mantém sua
-> permanência quando vem do primário.
+> malformados, o erro tipado propaga. O caso de `status` é o que um cliente
+> injetado pode produzir; o transporte real rejeita uma resposta com status
+> diferente de `succeeded` antes deste guard. A recusa de transporte acima
+> mantém sua permanência quando vem do primário.
 
 ---
 
