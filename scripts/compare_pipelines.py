@@ -207,53 +207,6 @@ async def _run_toolbox(
     return {"structured": structured, "canonical": canonical}
 
 
-async def _run_toolbox(
-    file_path: Path,
-    tmpdir: Path,
-    mode: str = "normal",
-    *,
-    planner_backend: str = "internal",
-    execute_plan: bool = False,
-    enable_ocr: bool = False,
-) -> dict[str, Any]:
-    """Run the PDDL pipeline with ToolboxManifestExtractor."""
-    orchestrator = PddlAccessibilityOrchestrator(
-        planner_backend=planner_backend,
-        preferred_plan=planner_backend,
-        execute_dry_run=not execute_plan,
-        enable_ocr=enable_ocr,
-        extractor_backend="toolbox",
-    )
-    structured = await orchestrator.execute(
-        file_path=file_path,
-        tmpdir=tmpdir,
-        structured_output=True,
-        config=core_config_from_settings(),
-        model_calls=get_model_calls(),
-        ports=service_run_ports(),
-    )
-    canonical_metadata = structured.get("canonical_metadata")
-    technical_warnings = structured.get("technical_warnings")
-
-    canonical = build_canonical_document(
-        structured,
-        toolbox=core_config_from_settings().toolbox,
-        title=file_path.stem,
-        language="pt-BR",
-        verbosity=verbosity_for_mode(mode),
-        source_name=file_path.name,
-        source_path=str(file_path),
-        audience=["reader"],
-        metadata=canonical_metadata if isinstance(canonical_metadata, dict) else None,
-        technical_warnings=(
-            [str(item) for item in technical_warnings]
-            if isinstance(technical_warnings, list)
-            else None
-        ),
-    )
-    return {"structured": structured, "canonical": canonical}
-
-
 # ---------------------------------------------------------------------------
 # Comparison logic
 # ---------------------------------------------------------------------------
@@ -276,10 +229,10 @@ def _compare_documents(
     all_types = sorted(set(ref_by_type) | set(tb_by_type))
     type_deltas: dict[str, dict[str, int]] = {}
     for t in all_types:
-        l = ref_by_type.get(t, 0)
-        p = tb_by_type.get(t, 0)
-        if l != p:
-            type_deltas[t] = {"reference": l, "toolbox": p}
+        ref_count = ref_by_type.get(t, 0)
+        tb_count = tb_by_type.get(t, 0)
+        if ref_count != tb_count:
+            type_deltas[t] = {"reference": ref_count, "toolbox": tb_count}
 
     # Text similarity
     similarity = _jaccard_similarity(ref_text, tb_text)
@@ -344,14 +297,14 @@ def _format_comparison_summary(
     if type_deltas:
         lines.append("  Block type deltas (reference \u2192 toolbox):")
         for bt, vals in type_deltas.items():
-            l = vals.get("reference", 0)
-            p = vals.get("toolbox", 0)
-            delta = p - l
+            ref_count = vals.get("reference", 0)
+            tb_count = vals.get("toolbox", 0)
+            delta = tb_count - ref_count
             sign = "+" if delta > 0 else ""
-            lines.append(f"    {bt}: {l} \u2192 {p} ({sign}{delta})")
+            lines.append(f"    {bt}: {ref_count} \u2192 {tb_count} ({sign}{delta})")
 
     t = comparison.get("text", {})
-    lines.append(f"\n[Text]")
+    lines.append("\n[Text]")
     lines.append(f"  Length:       reference={t.get('reference_length', '?')}, "
                   f"toolbox={t.get('toolbox_length', '?')}")
     sim = t.get("jaccard_similarity", 0)
@@ -361,21 +314,21 @@ def _format_comparison_summary(
     lines.append(f"  Jaccard sim:  {sim:.1%}  [{bar}]")
 
     f = comparison.get("formulas", {})
-    lines.append(f"\n[Formulas]")
+    lines.append("\n[Formulas]")
     lines.append(f"  Count: reference={f.get('reference_count', '?')}, "
                   f"toolbox={f.get('toolbox_count', '?')}")
     lines.append(f"  Common: {f.get('common_formulas', '?')}")
 
     tbl = comparison.get("tables", {})
-    lines.append(f"\n[Tables]")
+    lines.append("\n[Tables]")
     lines.append(f"  Count: reference={tbl.get('reference_count', '?')}, "
                   f"toolbox={tbl.get('toolbox_count', '?')}")
 
-    lines.append(f"\n[Performance]")
+    lines.append("\n[Performance]")
     lines.append(f"  Toolbox:     {toolbox_elapsed:.1f}s")
 
     verdict = _compute_verdict(comparison)
-    lines.append(f"\n[Verdict]")
+    lines.append("\n[Verdict]")
     lines.append(f"  {verdict}")
 
     return "\n".join(lines)
@@ -463,6 +416,11 @@ async def run_comparison(
             "elapsed_s": round(toolbox_elapsed, 2),
             "summary": _summarize_document(toolbox["canonical"]),
         }
+    except NameError:
+        # A missing helper or constant is a bug in this script, not a pipeline
+        # failure: let it fail loudly instead of recording it as an engine
+        # error in the report (#646).
+        raise
     except Exception as exc:
         toolbox_elapsed = time.perf_counter() - toolbox_start
         report["engines"]["toolbox"] = {
@@ -521,103 +479,7 @@ def _write_artifacts(
     )
 
 
-async def run_comparison_with_reference(
-    file_path: Path,
-    reference_path: Path,
-    output_dir: Path,
-    mode: str = "normal",
-    *,
-    planner_backend: str = "internal",
-    execute_plan: bool = False,
-    enable_ocr: bool = False,
-) -> Path:
-    """Run PDDL+Toolbox and compare against a reference canonical document.
-
-    This is the fastest E2E validation: it loads a pre-computed reference
-    canonical document (from tests/dataset/intermediate/canonical-document/)
-    and compares it against the toolbox output, without running any local
-    pipeline.
-
-    Args:
-        file_path: Input file to process with Toolbox.
-        reference_path: Path to the reference canonical JSON.
-        output_dir: Output directory for artifacts and report.
-        mode: Verbosity mode.
-        planner_backend: PDDL planner backend.
-        execute_plan: Whether to execute the plan.
-        enable_ocr: Whether to enable OCR.
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    tmpdir = output_dir / "tmp"
-    tmpdir.mkdir(parents=True, exist_ok=True)
-
-    # Load reference
-    reference = json.loads(reference_path.read_text(encoding="utf-8"))
-
-    report: dict[str, Any] = {
-        "source_file": str(file_path.resolve()),
-        "reference_file": str(reference_path.resolve()),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "mode": mode,
-        "engines": {},
-        "comparison": {},
-    }
-
-    # --- PDDL + Toolbox pipeline ---
-    toolbox_start = time.perf_counter()
-    try:
-        toolbox = await _run_pddl_toolbox(
-            file_path, tmpdir, mode=mode,
-            planner_backend=planner_backend,
-            execute_plan=execute_plan,
-            enable_ocr=enable_ocr,
-        )
-        toolbox_elapsed = time.perf_counter() - toolbox_start
-        _write_artifacts(toolbox, output_dir, "pddl_toolbox")
-        report["engines"]["pddl_toolbox"] = {
-            "status": "ok",
-            "elapsed_s": round(toolbox_elapsed, 2),
-            "summary": _summarize_document(toolbox["canonical"]),
-        }
-    except Exception as exc:
-        toolbox_elapsed = time.perf_counter() - toolbox_start
-        report["engines"]["pddl_toolbox"] = {
-            "status": "error",
-            "elapsed_s": round(toolbox_elapsed, 2),
-            "error_type": type(exc).__name__,
-            "error": str(exc),
-        }
-
-    # --- Comparison ---
-    toolbox_ok = report["engines"].get("pddl_toolbox", {}).get("status") == "ok"
-    if toolbox_ok:
-        comparison = _compare_documents(reference, toolbox["canonical"])
-        report["comparison"] = comparison
-        report["reference_summary"] = _summarize_document(reference)
-        verdict = _compute_verdict(comparison)
-        report["verdict"] = verdict
-    else:
-        tb_error = report["engines"]["pddl_toolbox"].get("error", "unknown error")
-        report["verdict"] = f"\u26a0\ufe0f  Toolbox falhou: {tb_error}"
-
-    # --- Cleanup and save ---
-    import shutil
-    shutil.rmtree(tmpdir, ignore_errors=True)
-
-    report_path = output_dir / "comparison_report.json"
-    report_path.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-    # Console summary
-    print(_format_comparison_summary(
-        report.get("comparison", {}),
-        0,
-        report["engines"].get("pddl_toolbox", {}).get("elapsed_s", 0),
-    ))
-
-    return report_path
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
