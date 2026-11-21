@@ -26,6 +26,7 @@ from docstruct.placeholders import (
     is_placeholder_visual,
 )
 from docstruct.visual_text import (
+    TextOwnership,
     analyze_visual_text_ownership,
     collect_picture_context,
     deduplicate_picture_description,
@@ -426,22 +427,43 @@ def _annotate_visual_text_ownership(
     ownership = analyze_visual_text_ownership(
         manifest.elements, page_boxes=boxes, standalone_image=standalone
     )
+    # The stage annotates twice (before and after the descriptions are folded,
+    # which may retype elements): each pass replaces what the previous one
+    # recorded, so a stale decision never overrides the payload's fresh one.
     for element in manifest.elements:
         decision = ownership.get(element.id)
         if decision is not None and decision.role != "document_text":
             element.metadata["visual_text_ownership"] = decision.to_metadata()
+        else:
+            element.metadata.pop("visual_text_ownership", None)
     for element in manifest.elements:
-        if element.type != "picture":
-            continue
-        context = collect_picture_context(element.id, manifest.elements, ownership)
-        if context.scene_text:
-            element.metadata["scene_text"] = list(context.scene_text)
-        if (
-            context.surrounding_text
-            and not element.metadata.get("slide_visual")
-            and not element.metadata.get("injected_picture")
-        ):
-            element.metadata["surrounding_text"] = list(context.surrounding_text)
+        if element.type == "picture":
+            _record_picture_context(element, manifest, ownership)
+
+
+def _record_picture_context(
+    picture: ManifestElement,
+    manifest: ProcessingManifest,
+    ownership: dict[str, TextOwnership],
+) -> None:
+    """Record (or clear) the scene text a picture owns and the page text around it."""
+    context = collect_picture_context(picture.id, manifest.elements, ownership)
+    _set_or_clear(picture.metadata, "scene_text", context.scene_text)
+    keeps_context = not picture.metadata.get("slide_visual") and not picture.metadata.get(
+        "injected_picture"
+    )
+    _set_or_clear(
+        picture.metadata,
+        "surrounding_text",
+        context.surrounding_text if keeps_context else (),
+    )
+
+
+def _set_or_clear(metadata: dict[str, Any], key: str, values: tuple[str, ...]) -> None:
+    if values:
+        metadata[key] = list(values)
+    else:
+        metadata.pop(key, None)
 
 
 def _inject_full_page_picture(

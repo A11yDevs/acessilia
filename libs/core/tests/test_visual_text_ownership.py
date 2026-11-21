@@ -784,3 +784,33 @@ async def test_enrichment_records_the_document_nature_so_the_payload_keeps_form_
     )
     [page] = _manifest_pages_to_payload(manifest)
     assert _block_texts(page)[1:4] == ["NOME COMPLETO", "DATE OF BIRTH", "CPF"]
+
+
+def test_a_second_annotation_pass_clears_decisions_that_no_longer_hold() -> None:
+    """Annotations are replaced, not accumulated: a stale scene_text never overrides a fresh decision."""
+    manifest, _picture_id = _photo_manifest(["FAVELA VIVE", "PAZ NO MUNDO"])
+    standalone = {"is_image": True, "requires_visual_inspection": True}
+    picture_stage._inject_full_page_picture(manifest, standalone)
+    picture_stage._annotate_visual_text_ownership(manifest, standalone)
+    picture = manifest.elements[-1]
+    assert picture.metadata["scene_text"] == ["FAVELA VIVE", "PAZ NO MUNDO"]
+    assert manifest.elements[0].metadata["visual_text_ownership"]["role"] == "scene_text"
+
+    # Between passes the page gains document prose, so the fragments are no longer scene text.
+    prose = build_element(
+        "el-prose",
+        "paragraph",
+        text="This photograph documents a community art installation in Rio de Janeiro.",
+    )
+    prose.reading_order = 0
+    manifest.elements.insert(0, prose)
+    manifest.pages[0].element_ids.insert(0, prose.id)
+    picture.text = "A colorful art installation photographed at night."
+    picture.metadata["vision_description_complete"] = True
+    picture_stage._annotate_visual_text_ownership(manifest, standalone)
+
+    assert all("visual_text_ownership" not in el.metadata for el in manifest.elements)
+    assert "scene_text" not in picture.metadata
+    [page] = _manifest_pages_to_payload(manifest)
+    assert "FAVELA VIVE" in _block_texts(page)
+    assert "PAZ NO MUNDO" in _block_texts(page)
