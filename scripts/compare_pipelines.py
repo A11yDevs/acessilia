@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -495,6 +496,21 @@ def _collect_inputs(file_or_dir: Path, recursive: bool) -> list[Path]:
     return pdfs + images
 
 
+def _batch_input_root(input_path: Path) -> Path:
+    """The absolute base of a batch input: its directory, or a file's parent.
+
+    ``abspath`` normalises ``.``/``..`` without resolving symlinks, so a
+    symlinked entry keeps its name and stays under the input root (#671).
+    """
+    root = Path(os.path.abspath(input_path))
+    return root if root.is_dir() else root.parent
+
+
+def _relative_input(file_path: Path, input_root: Path) -> Path:
+    """``file_path`` relative to ``input_root``, without following its symlink."""
+    return Path(os.path.abspath(file_path)).relative_to(input_root)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="compare-pipelines",
@@ -579,10 +595,11 @@ def main() -> int:
         results: list[dict[str, Any]] = []
         max_files = args.max_files or len(files)
         ref_dir = args.reference_dir
+        input_root = _batch_input_root(args.input)
 
         for i, file_path in enumerate(files[:max_files]):
-            rel = file_path.relative_to(args.input.resolve() if args.input.is_dir()
-                                         else args.input.parent)
+            rel = _relative_input(file_path, input_root)
+            absolute_file = input_root / rel
             stem = "_".join(rel.with_suffix("").parts)
             out_dir = output_base / stem
 
@@ -593,14 +610,14 @@ def main() -> int:
                 ref_path = args.reference
             else:
                 print(f"  [{i + 1}/{min(max_files, len(files))}] {rel} -- ERRO: --reference ou --reference-dir necessario")
-                results.append({"file": str(file_path), "status": "ERRO: sem referencia", "report_path": ""})
+                results.append({"file": str(absolute_file), "status": "ERRO: sem referencia", "report_path": ""})
                 continue
 
             print(f"\n[{i + 1}/{min(max_files, len(files))}] {rel}")
 
             report_path = asyncio.run(
                 run_comparison(
-                    file_path=file_path,
+                    file_path=absolute_file,
                     reference_path=ref_path,
                     output_dir=out_dir,
                     mode=args.mode,
@@ -611,7 +628,7 @@ def main() -> int:
             )
             report = json.loads(report_path.read_text(encoding="utf-8"))
             results.append({
-                "file": str(file_path),
+                "file": str(absolute_file),
                 "status": report.get("verdict", "?"),
                 "report_path": str(report_path),
             })
