@@ -140,7 +140,7 @@ São as funções que a #365 pediu para dividir, no tamanho atual. Todas ficam n
 - o `extractor.configuration["…"]`;
 - atribuições a campos de elementos e de obrigações.
 
-Ele encontra 63 chaves, 18 delas gravadas ou lidas por mais de um grupo.
+Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 
 | Chave | Gravada por | Lida por | O que a ordem atual garante |
 |---|---|---|---|
@@ -149,6 +149,7 @@ Ele encontra 63 chaves, 18 delas gravadas ou lidas por mais de um grupo.
 | `metadata["vision_failure_reason" / "vision_failure_detail"]` | G, O | E, O, V | O registra a causa e a nova tentativa dele a lê. G apaga as duas chaves quando uma inspeção de região ou página descreve o elemento. O handler de E lê a razão. V a informa como degradação visível (`records_visual_failures`). |
 | `metadata["vision_confidence" / "vision_language" / "vision_warnings"]` | G, O, P | — | Três gravadores dos mesmos campos de descrição: G para inspeção de região e página, O para figuras, P para o fallback de visão das fórmulas. Eles precisam manter um só formato. |
 | `metadata["vision_elements"]` | G (região), O, P | V | A inspeção de região, o enriquecimento de figuras e o fallback de fórmulas registram os elementos mencionados pelo modelo; a inspeção de página não tem esse campo. V os usa para classificação de letterhead e scene text. |
+| `metadata["vision_institutional_logo"]` | G (região), O | V | A inspeção de região e o enriquecimento de figuras registram a resposta explícita do modelo sobre o logotipo e a apagam quando a resposta está ausente; a inspeção de página não tem esse campo. V a usa para confirmar a fusão do letterhead. |
 | `metadata["original_type"]` | G, K, O, P | — | Atribuída, e não definida uma vez só. Quando um elemento é reclassificado duas vezes, o último a gravar decide qual tipo original sobrevive, então a ordem faz parte do comportamento. |
 | `metadata["src"]` | G, P | O | A inspeção de região e de página e o recorte de fórmula registram a origem da imagem; o enriquecimento de figuras a lê. |
 | `metadata["table_ast"]` | S | E, F, I, Q, S | S a grava antes do planejamento. A passada de tabelas de Q roda depois de S, porque S pode substituir as células de uma tabela. E, F e I a leem na execução. |

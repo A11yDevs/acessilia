@@ -125,8 +125,9 @@ def test_real_region_inspection_updates_output_and_records_evidence(inspection, 
     assert ("x^2" if kind == "formula" else "A map") in payload["text"]
 
 
+@pytest.mark.parametrize("logo_answer", [True, False])
 def test_a_successful_region_inspection_replaces_the_failed_description_metadata(
-    inspection, tmp_path
+    inspection, tmp_path, logo_answer
 ):
     manifest, _, _ = inspection
     element = manifest.elements[0]
@@ -139,6 +140,7 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
         confidence=0.9,
         mentioned_elements=["logo"],
         warnings=["blurred"],
+        institutional_logo=logo_answer,
     )
     item = inspection_handlers._InspectedRegion(
         element=element,
@@ -160,8 +162,60 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
     # #688: the region writer records the model's mentioned elements too.
     assert replacement.metadata["vision_elements"] == ["logo"]
     assert replacement.metadata["vision_elements"] is not output.mentioned_elements
+    # #692: the region writer records the model's explicit logo answer.
+    assert replacement.metadata["vision_institutional_logo"] is logo_answer
     assert "vision_failure_reason" not in replacement.metadata
     assert "vision_failure_detail" not in replacement.metadata
+
+
+def test_a_region_inspection_without_a_logo_answer_clears_the_stale_value(
+    inspection, tmp_path
+):
+    """#692: ``institutional_logo=None`` removes a previous answer."""
+    manifest, _, _ = inspection
+    element = manifest.elements[0]
+    element.metadata["vision_institutional_logo"] = True
+    output = VisionOutput(
+        kind="description",
+        description="A map",
+        language="en",
+        confidence=0.9,
+    )
+    item = inspection_handlers._InspectedRegion(
+        element=element,
+        image=b"png",
+        page_number=1,
+        rectangle=[10.0, 20.0, 90.0, 70.0],
+        output=output,
+        text="A map",
+    )
+
+    replacement, _ = inspection_handlers._persist_region_inspection(
+        manifest, "o-1", item, data_dir=tmp_path
+    )
+
+    assert replacement.type == "picture"
+    assert "vision_institutional_logo" not in replacement.metadata
+
+
+def test_the_region_handler_records_the_logo_answer(inspection):
+    """#692: the live handler carries the model's logo answer into the manifest."""
+    manifest, _, vision = inspection
+    vision.response = VisionOutput(
+        kind="description",
+        description="A map",
+        language="en",
+        confidence=0.9,
+        institutional_logo=True,
+    )
+
+    result = inspection_handlers._handle_pymupdf_region_method(
+        manifest, "o-1", config=core_config(), ports=RunPorts.none()
+    )
+
+    assert result.success and result.validated, result.message
+    updated = next(item for item in manifest.elements if item.id == "unknown")
+    assert updated.metadata["vision_institutional_logo"] is True
 
 
 @pytest.mark.parametrize("kind", ["description", "formula"])

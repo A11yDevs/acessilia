@@ -140,7 +140,7 @@ These are the functions #365 asked to split, at their current size. All stay in 
 - `extractor.configuration["…"]`;
 - assignments to element and obligation fields.
 
-It finds 63 keys, 18 of them written or read by more than one group.
+It finds 64 keys, 19 of them written or read by more than one group.
 
 | Key | Written by | Read by | What the current order guarantees |
 |---|---|---|---|
@@ -149,6 +149,7 @@ It finds 63 keys, 18 of them written or read by more than one group.
 | `metadata["vision_failure_reason" / "vision_failure_detail"]` | G, O | E, O, V | O records the cause and its retry reads it. G clears both keys when a region or page inspection describes the element. E's handler reads the reason. V reports it as a visible degradation (`records_visual_failures`). |
 | `metadata["vision_confidence" / "vision_language" / "vision_warnings"]` | G, O, P | — | Three writers of the same description fields: G for region and page inspection, O for pictures, P for the vision fallback of formulas. They must keep one shape. |
 | `metadata["vision_elements"]` | G (region), O, P | V | Region inspection, picture enrichment and the formula fallback record the model's mentioned elements; page inspection has no such field. V uses them for letterhead and scene-text classification. |
+| `metadata["vision_institutional_logo"]` | G (region), O | V | Region inspection and picture enrichment record the model's explicit logo answer, and clear it when the answer is absent; page inspection has no such field. V uses it to confirm the letterhead merge. |
 | `metadata["original_type"]` | G, K, O, P | — | Assigned, not set once. When an element is reclassified twice, the last writer decides which original type survives, so the order is part of the behaviour. |
 | `metadata["src"]` | G, P | O | Region and page inspection and the formula crop record the image source; picture enrichment reads it. |
 | `metadata["table_ast"]` | S | E, F, I, Q, S | S writes it before planning. Q's table pass runs after S, because S can replace a table's cells. E, F and I read it during execution. |

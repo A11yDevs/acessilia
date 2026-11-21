@@ -284,6 +284,12 @@ def _persist_region_inspection(
         region_crop=crop.path,
         region_inspection=record.id,
     )
+    if item.output.institutional_logo is None:
+        replacement.metadata.pop("vision_institutional_logo", None)
+    else:
+        replacement.metadata["vision_institutional_logo"] = (
+            item.output.institutional_logo
+        )
     # A successful inspection replaces the failed description (#680): the
     # failure keys would otherwise keep the element counted as undescribed.
     replacement.metadata.pop("vision_failure_reason", None)
