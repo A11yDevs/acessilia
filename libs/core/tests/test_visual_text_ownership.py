@@ -821,10 +821,13 @@ async def test_case_667_a_later_answer_without_warnings_clears_the_old_ones() ->
     assert picture.text == "Old description."
     assert picture.metadata["vision_warnings"] == ["blurred"]
 
-    # The pipeline describes a picture once per run; a later fold (a retry or
-    # a re-run) replaces the previous answer, so its warnings must not survive.
+    # The pipeline describes a picture once per run; a later fold of the same
+    # element (e.g. a re-description of a restored manifest) replaces the
+    # previous answer, so its warnings must not survive.
     picture.metadata.pop("vision_description_complete")
     await _enrich_photo(manifest)
+    assert len(RecordingVision.calls) == 2
+    assert picture.metadata["vision_description_complete"] is True
     assert picture.text == "New description."
     assert picture.metadata["vision_warnings"] == []
 
