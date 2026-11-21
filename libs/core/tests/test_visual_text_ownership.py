@@ -805,6 +805,30 @@ async def test_case_325_a_later_answer_without_a_classification_clears_the_old_o
     assert all("letterhead_members" not in b.get("metadata", {}) for b in blocks)
 
 
+@pytest.mark.asyncio
+async def test_case_667_a_later_answer_without_warnings_clears_the_old_ones() -> None:
+    """A re-description must not inherit warnings from the previous answer."""
+    manifest, picture_id = _photo_manifest(["FAVELA VIVE"])
+    RecordingVision.answer_sequences = {
+        picture_id: [
+            _vision_answer("Old description.", warnings=["blurred"]),
+            _vision_answer("New description."),
+        ]
+    }
+
+    await _enrich_photo(manifest)
+    picture = next(el for el in manifest.elements if el.id == picture_id)
+    assert picture.text == "Old description."
+    assert picture.metadata["vision_warnings"] == ["blurred"]
+
+    # The pipeline describes a picture once per run; a later fold (a retry or
+    # a re-run) replaces the previous answer, so its warnings must not survive.
+    picture.metadata.pop("vision_description_complete")
+    await _enrich_photo(manifest)
+    assert picture.text == "New description."
+    assert picture.metadata["vision_warnings"] == []
+
+
 def test_surrounding_text_prompt_bounds_item_and_total_char_overhead() -> None:
     """Note 6: Prompt context formatting caps per-item and total character overhead."""
     huge_items = ["palavra " * 100 for _ in range(10)]
