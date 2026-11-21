@@ -543,15 +543,18 @@ def _normalize_missing_ids(elements: list[dict[str, Any]]) -> None:
     payload fail manifest validation later (#664). The generated id is
     page-scoped, so it stays stable when elements before that page change, and
     a numeric suffix keeps it unique when the provider already used the same
-    shape.
+    shape. ``parent_id`` references to a replaced non-string id follow the new
+    id.
     """
     used = {str(element.get("id")) for element in elements if _has_id(element)}
+    replacements: dict[Any, str] = {}
     positions: Counter[int | None] = Counter()
     for element in elements:
         page_number = _element_page_number(element)
         positions[page_number] += 1
         if _has_usable_id(element):
             continue
+        previous_id = element.get("id")
         scope = f"p{page_number}" if page_number is not None else "unpaged"
         candidate = f"element-{scope}-{positions[page_number]}"
         suffix = 2
@@ -560,6 +563,28 @@ def _normalize_missing_ids(elements: list[dict[str, Any]]) -> None:
             suffix += 1
         element["id"] = candidate
         used.add(candidate)
+        if previous_id:
+            try:
+                replacements[previous_id] = candidate
+            except TypeError:  # an unhashable id cannot be referenced either
+                pass
+    for element in elements:
+        try:
+            replacement = replacements.get(element.get("parent_id"))
+        except TypeError:
+            continue
+        if replacement is not None:
+            element["parent_id"] = replacement
+
+
+def _page_element_ids(elements: list[dict[str, Any]]) -> dict[int, list[Any]]:
+    """The usable ids of the elements on each page, in elements order."""
+    ids_by_page: dict[int, list[Any]] = {}
+    for element in elements:
+        page_number = _element_page_number(element)
+        if page_number is not None and _has_usable_id(element):
+            ids_by_page.setdefault(page_number, []).append(element["id"])
+    return ids_by_page
 
 
 def _rebuild_routed_pages(
@@ -577,14 +602,50 @@ def _rebuild_routed_pages(
         if isinstance(descriptor, dict) and descriptor.get("page_number") in routed:
             page_descriptors.setdefault(descriptor["page_number"], dict(descriptor))
 
-    ids_by_page: dict[int, list[Any]] = {}
-    for element in elements:
-        page_number = _element_page_number(element)
-        if page_number is not None and _has_usable_id(element):
-            ids_by_page.setdefault(page_number, []).append(element["id"])
+    ids_by_page = _page_element_ids(elements)
     for number, descriptor in page_descriptors.items():
         descriptor["element_ids"] = ids_by_page.get(number, [])
     return [page_descriptors[number] for number in sorted(page_descriptors)]
+
+
+def normalize_element_ids(document: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of ``document`` with usable element ids and consistent pages.
+
+    This is the normalization :func:`route_pages` applies to the payload it
+    returns, exposed for callers that build a manifest from an extraction the
+    routing never touches (#679). Every element without a usable ``id``
+    (missing, empty or not a string) receives the deterministic page-scoped id,
+    and each page's ``element_ids`` is rebuilt from the final elements.
+
+    The input is never mutated: the returned document has copied elements and
+    page descriptors when normalization is needed, so a caller can hand it to
+    the manifest model while keeping the raw extraction intact. Payloads whose
+    elements all carry a usable id get a shallow copy only, leaving their page
+    membership exactly as the extractor wrote it. Non-object elements and page
+    descriptors are kept for the model to reject.
+    """
+    elements = [item for item in document.get("elements") or [] if isinstance(item, dict)]
+    if all(_has_usable_id(element) for element in elements):
+        return {**document}
+    copied: list[Any] = [
+        dict(item) if isinstance(item, dict) else item
+        for item in document.get("elements") or []
+    ]
+    objects: list[dict[str, Any]] = [
+        item for item in copied if isinstance(item, dict)
+    ]
+    _normalize_missing_ids(objects)
+    normalized: dict[str, Any] = {**document, "elements": copied}
+    if "pages" in document:
+        ids_by_page = _page_element_ids(objects)
+        normalized["pages"] = [
+            {**descriptor, "element_ids": ids_by_page.get(descriptor["page_number"], [])}
+            if isinstance(descriptor, dict)
+            and isinstance(descriptor.get("page_number"), int)
+            else descriptor
+            for descriptor in document.get("pages") or []
+        ]
+    return normalized
 
 
 def _updated_document_summary(
@@ -732,6 +793,7 @@ __all__ = [
     "element_to_canonical_block",
     "fuse_extraction_payloads",
     "group_payload_by_page",
+    "normalize_element_ids",
     "page_content_signature",
     "page_scales",
     "page_similarity",

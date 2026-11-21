@@ -101,6 +101,57 @@ def test_obligations_come_from_the_core_policy_not_the_payload(tmp_path: Path):
     assert all(o.kind != "toolbox-only" for o in manifest.obligations)
 
 
+@pytest.mark.parametrize("unusable_id", ["absent", "", 123])
+def test_an_element_without_a_usable_id_is_normalized_before_validation(
+    tmp_path: Path, unusable_id: object
+) -> None:
+    """#679: single-provider payloads get the routed payload's id normalization."""
+    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
+    element = response["document"]["elements"][3]  # "After picture", a leaf
+    if unusable_id == "absent":
+        element.pop("id")
+    else:
+        element["id"] = unusable_id
+
+    manifest = _build_from_response(tmp_path, response)
+
+    normalized = next(
+        item for item in manifest.elements if item.text == "After picture"
+    )
+    assert normalized.id == "element-p1-4"
+    page = next(item for item in manifest.pages if item.page_number == 1)
+    assert page.element_ids == [
+        "element-000001",
+        "element-000002",
+        "element-000003",
+        "element-p1-4",
+        "element-000005",
+    ]
+    assert validate_manifest(manifest.model_dump(mode="json", by_alias=True)) == []
+    # The Toolbox response is input; normalization works on a copy.
+    assert element.get("id") == (None if unusable_id == "absent" else unusable_id)
+    assert response["document"]["pages"][0]["element_ids"][3] == "element-000004"
+
+
+def test_a_dual_payload_where_nothing_is_routed_is_normalized_too(tmp_path: Path) -> None:
+    """#679: the no-route identity return still reaches a validating manifest."""
+    from acessilia_core.pipeline.fusion import apply_page_routes
+
+    response = json.loads(TOOLBOX_RESPONSE.read_text(encoding="utf-8"))
+    response["document"]["elements"][3].pop("id")
+    secondary = {"status": "succeeded", "document": {"pages": [], "elements": []}}
+    evidence = [{"page_number": 1, "stats": {"route": "docling"}}]
+
+    unrouted, replaced = apply_page_routes(
+        response, secondary, evidence, secondary_provider="mineru"
+    )
+
+    assert unrouted is response
+    assert replaced == {}
+    manifest = _build_from_response(tmp_path, unrouted)
+    assert any(item.id == "element-p1-4" for item in manifest.elements)
+
+
 @pytest.mark.parametrize("suffix", [r"\tag{1}", r"\quad(1)", " (1)"])
 def test_formula_number_is_preserved_before_planning(tmp_path, suffix):
     from acessilia_core.pipeline.elements import _element_to_block

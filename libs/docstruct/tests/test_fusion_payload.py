@@ -15,6 +15,7 @@ from docstruct.fusion.payload import (
     element_to_canonical_block,
     fuse_extraction_payloads,
     group_payload_by_page,
+    normalize_element_ids,
     page_content_signature,
     page_scales,
     page_similarity,
@@ -448,6 +449,94 @@ class TestScalingAndAdoption:
         assert adopted[2][0]["provenance"][0]["bbox"] == [5.0, 10.0, 15.0, 20.0]
         assert adopted[2][1]["id"] == "mineru-p2-2"
         assert adopted[2][1]["parent_id"] is None
+
+
+class TestNormalizeElementIds:
+    def test_it_normalizes_ids_and_rebuilds_membership_on_a_copy(self) -> None:
+        """#679: raw extraction payloads get the routed payload's normalization."""
+        document = {
+            "title": "Doc",
+            "language": "pt-BR",
+            "pages": [{"page_number": 1, "element_ids": ["p1", "stale"]}],
+            "elements": [
+                {"id": "p1", "type": "paragraph", "text": "one", "page_number": 1},
+                {"id": "", "type": "paragraph", "text": "two", "page_number": 1},
+                {"type": "paragraph", "text": "three", "page_number": 1},
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert [element.get("id") for element in normalized["elements"]] == [
+            "p1",
+            "element-p1-2",
+            "element-p1-3",
+        ]
+        assert normalized["pages"][0]["element_ids"] == [
+            "p1",
+            "element-p1-2",
+            "element-p1-3",
+        ]
+        assert normalized["title"] == "Doc"
+        # Input purity: the raw extraction is untouched.
+        assert [element.get("id") for element in document["elements"]] == [
+            "p1",
+            "",
+            None,
+        ]
+        assert document["pages"][0]["element_ids"] == ["p1", "stale"]
+
+    def test_a_payload_with_usable_ids_keeps_its_page_membership(self) -> None:
+        document = {
+            "pages": [{"page_number": 1, "element_ids": ["p1"]}],
+            "elements": [
+                {"id": "p1", "type": "paragraph", "text": "one", "page_number": 1}
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized == document
+        assert normalized is not document
+
+    def test_pages_are_not_added_when_the_document_has_none(self) -> None:
+        document = {"elements": [{"type": "paragraph", "text": "one"}]}
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["elements"][0]["id"] == "element-unpaged-1"
+        assert "pages" not in normalized
+
+    def test_parent_references_follow_a_replaced_non_string_id(self) -> None:
+        document = {
+            "elements": [
+                {"id": 123, "type": "paragraph", "text": "parent", "page_number": 1},
+                {
+                    "type": "paragraph",
+                    "text": "child",
+                    "page_number": 1,
+                    "parent_id": 123,
+                },
+            ],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["elements"][0]["id"] == "element-p1-1"
+        assert normalized["elements"][1]["parent_id"] == "element-p1-1"
+        assert document["elements"][0]["id"] == 123
+        assert document["elements"][1]["parent_id"] == 123
+
+    def test_non_object_page_descriptors_are_kept_for_the_model_to_reject(self) -> None:
+        document = {
+            "pages": ["not-an-object"],
+            "elements": [{"type": "paragraph", "text": "one", "page_number": 1}],
+        }
+
+        normalized = normalize_element_ids(document)
+
+        assert normalized["pages"] == ["not-an-object"]
+        assert normalized["elements"][0]["id"] == "element-p1-1"
 
 
 class TestRoutePagesAndApplyPageRoutes:
