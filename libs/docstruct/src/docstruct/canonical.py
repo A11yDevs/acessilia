@@ -60,11 +60,11 @@ from docstruct.tables.ast import raw_rows_from_table_ast
 from docstruct.text.math_spans import block_prose
 from docstruct.text.math_spans import inline_math_entries
 from docstruct.text.math_spans import inline_math_sources
-from docstruct.text.equations import equation_number
-from docstruct.text.equations import numbered_speech
+from docstruct.text.equations import equation_number, numbered_speech
 from docstruct.text.equations import preserve_equation_number
 from docstruct.text.implicit_products import implicit_product_variables
 from docstruct.text.implicit_products import mark_implicit_products
+from docstruct.text.named_operators import normalize_named_operators, speak_named_operators
 from docstruct.text.math_spans import whole_inline_math
 
 
@@ -200,7 +200,10 @@ def _enrich_math_blocks(
     The LaTeX sent for MathML and speech marks the implicit products of the
     document's variables (``mark_implicit_products``), so ``h(12 + h)`` is
     spoken "h vezes", not "h de"; the block keeps its text unmarked.
-    ``variables`` are read once from every formula of the document.
+    ``variables`` are read once from every formula of the document. Recognized
+    named operators are normalized before that (``normalize_named_operators``),
+    and written for pt-BR speech (``speak_named_operators``), so
+    ``\\operatorname{D o m}`` is not read as a product of letters (#546).
     """
     if not sections:
         return
@@ -229,14 +232,14 @@ def _enrich_math_blocks(
                 latex = math_enricher.normalize(latex)
                 block["text"] = latex
                 metadata = block.get("metadata") or {}
-                marked = mark_implicit_products(latex, variables)
+                marked = mark_implicit_products(normalize_named_operators(latex), variables)
                 if not metadata.get("mathml"):
                     mathml = math_enricher.to_mathml(marked)
                     if mathml:
                         block.setdefault("metadata", {})["mathml"] = mathml
                 if not block.get("alt_text"):
-                    block["alt_text"] = (
-                        metadata.get("verbalization") or math_enricher.verbalize(marked)
+                    block["alt_text"] = metadata.get("verbalization") or math_enricher.verbalize(
+                        speak_named_operators(marked)
                     )
             if equation_number(metadata):
                 block["alt_text"] = numbered_speech(str(block.get("alt_text") or latex), metadata)
@@ -281,12 +284,12 @@ def _enrich_inline_math(
         if source not in cache:
             latex = math_enricher.normalize(source)
             entry = {"source": source, "latex": latex}
-            marked = mark_implicit_products(latex, variables)
+            marked = mark_implicit_products(normalize_named_operators(latex), variables)
             mathml = math_enricher.to_mathml(marked)
             if mathml:
                 entry["mathml"] = mathml
             verbalize_inline = getattr(math_enricher, "verbalize_inline", None)
-            speech = verbalize_inline(marked) if verbalize_inline else ""
+            speech = verbalize_inline(speak_named_operators(marked)) if verbalize_inline else ""
             if speech:
                 entry["speech"] = speech
             cache[source] = entry

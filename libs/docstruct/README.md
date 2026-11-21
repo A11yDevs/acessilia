@@ -48,6 +48,7 @@ Pure document-structure processing core for Acessilia.
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
 | `docstruct.text.negation_overlay` | `negates`, `is_detached_overlay`, `compose_negation`, `locate_in_text`, `locate_in_grid`, `table_grid`, `compose_in_text`, `compose_in_grid` — give a detached negation slash (U+0338) back to the relation it negates, only when the choice is unambiguous |
 | `docstruct.text.inline_math` | `detect_inline_math`, `detect_inline_math_by_page`, `span_lines_on_page`, `top_left_box`, `assign_runs_to_cells`, `splice_inline_math` — inline math found in a PDF text layer from its fonts and baselines (ADR 0011), placed on an element's boxes page by page and written into its text as `$…$` |
+| `docstruct.text.named_operators` | `normalize_named_operators`, `speak_named_operators` — a recognized named operator keeps one identifier for MathML (`\operatorname{D o m}` → `\operatorname{Dom}`) and its pt-BR speech form (`\mathop{\text{domínio}}`), so it is applied, not read as a product of letters (#546) |
 | `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — canonical LaTeX formula normalization and standardization; `ranked_latex_candidates` — a recognizer's candidates, delimiters stripped, by decreasing confidence |
 | `docstruct.text.equations` | `split_equation_number`, `preserve_equation_number`, `equation_number`, `numbered_latex`, `numbered_speech` — display equation labels kept in `metadata.equation_number` and restored by each exporter |
 | `docstruct.text.normalize` | `norm` — deterministic text cleanups |
@@ -198,6 +199,14 @@ Canonical routines for standardizing and cleaning mathematical formulas:
 - `ensure_math_delimiters(text)`: Wraps text in `$...$` unless it is already delimited by `$` or `\[...\]`.
 - `has_latex_markup(text)`: Whether a formula's text is LaTeX (math delimiters, a command, or `^`/`_` applied to a group such as `x^{2}`) or only math characters, as a PDF text layer gives them (`s(t) = s0 + v0t + 1 2 at2`). Bare scripts (`2^8`, `v_0`) and braces alone are not markup: text layers and set notation carry them too.
 - `latex_text_agreement(latex, text)`: F1 (0–1) between the letters, digits and math symbols of a LaTeX formula (commands rendered as their glyphs, `\alpha` → α) and of text-layer text, ignoring structure. Unicode scripts and ligatures are folded (`x²` reads as `x2`, like `x^2`), and Portuguese function names match their LaTeX command (`sen x` ↔ `\sin x`, `tg` ↔ `\tan`). It tells a recognition of the same formula from a misread; a single changed symbol barely moves it. `None` means no evidence either way.
+
+### Named Operators (`docstruct.text.named_operators`)
+
+A recognizer may print an operator's name with spaces between its letters (`\operatorname{D o m}`). MathJax keeps the spaces and writes one `<mi>` per letter, so MathCAT reads a product of letters and treats the parenthesis after the last one as multiplication (#546). The module covers the names whose meaning is unambiguous:
+- `normalize_named_operators(latex)`: Rewrites a recognized name in its canonical spelling (`\operatorname{D o m}`, `\operatorname{dom}` → `\operatorname{Dom}`), so MathML carries one identifier and speech applies the operator ("Dom de"). Unknown names are left untouched.
+- `speak_named_operators(latex)`: Writes a recognized name in its pt-BR speech form (`\mathop{\text{domínio}}`), so MathCAT says "domínio de". The engine still produces all the speech; this is not a second verbalizer.
+
+The document's text is never rewritten: only the LaTeX sent for MathML and speech goes through these functions. The operator list is conservative (`Dom` only); a name outside it is never given an invented meaning. A bare `Dom(...)`, without `\operatorname`, is also left alone: the letters may be a product. The pt-BR speech form relies on MathCAT applying an `<mtext>` head to its argument, as the pinned engine does; the `math.verbalize` golden file catches an upgrade that changes it.
 
 ### MinerU Adapter (`docstruct.adapters.mineru`)
 

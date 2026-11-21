@@ -5,8 +5,11 @@ through the Toolbox (``toolbox_convert_latex`` and ``toolbox_verbalize_latex``,
 which call the SDK's formula steps, ADR-0017); an unavailable capability fails
 the method explicitly so the executor can try another one or replan. Both mark
 implicit products with the variables the whole document uses, as the canonical
-build does. ``latex-normalizer`` normalizes the LaTeX in place. Moved verbatim
-from the PDDL orchestrator once ADR-0017 was accepted (#402, phase 3, step 6).
+build does, and normalize the few named operators whose printed name a
+recognizer may space out (``\\operatorname{D o m}``), so the speech applies the
+operator instead of reading a product of letters (#546). ``latex-normalizer``
+normalizes the LaTeX in place. Moved verbatim from the PDDL orchestrator once
+ADR-0017 was accepted (#402, phase 3, step 6).
 """
 
 from __future__ import annotations
@@ -16,6 +19,10 @@ from docstruct.text.implicit_products import (
     mark_implicit_products,
 )
 from docstruct.text.math_spans import block_prose, inline_math_sources
+from docstruct.text.named_operators import (
+    normalize_named_operators,
+    speak_named_operators,
+)
 
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
@@ -80,7 +87,9 @@ def _handle_mathml_method(
     converted = 0
     variables = _implicit_product_variables(manifest)
     for element in elements:
-        latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
+        latex = mark_implicit_products(
+            normalize_named_operators(normalize_latex(element.text or "")), variables
+        )
         try:
             mathml = toolbox_convert_latex(latex, toolbox=config.toolbox) if latex else ""
         except MathCapabilityUnavailable as exc:
@@ -122,10 +131,14 @@ def _handle_latex_verbalizer_method(
     verbalized = 0
     variables = _implicit_product_variables(manifest)
     for element in elements:
-        latex = mark_implicit_products(normalize_latex(element.text or ""), variables)
+        latex = mark_implicit_products(
+            normalize_named_operators(normalize_latex(element.text or "")), variables
+        )
         try:
             spoken = (
-                label_spoken_formula(toolbox_verbalize_latex(latex, toolbox=config.toolbox))
+                label_spoken_formula(
+                    toolbox_verbalize_latex(speak_named_operators(latex), toolbox=config.toolbox)
+                )
                 if latex
                 else ""
             )

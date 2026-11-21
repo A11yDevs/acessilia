@@ -528,6 +528,89 @@ def test_canonical_build_marks_products_in_blocks_and_inline_spans(toolbox_math)
     assert all(IT not in str(block.get("text")) for block in blocks)
 
 
+# ── named operators (#546) ──
+
+DOMAIN = r"\operatorname{D o m}(v m_{2})=[-2,0)\cup(0,+\infty)"
+DOMAIN_CANONICAL = r"\operatorname{Dom}(v m_{2})=[-2,0)\cup(0,+\infty)"
+DOMAIN_SPOKEN = r"\mathop{\text{domínio}}(v m_{2})=[-2,0)\cup(0,+\infty)"
+
+
+def _domain_speech(latex: str) -> str:
+    """What MathCAT answers for the speech LaTeX, read from the real engine."""
+    if r"\mathop{\text{domínio}}" in latex:
+        return "domínio de, abre parênteses, v m subscrito 2, fecha parênteses"
+    return "Dom de, abre parênteses, v m subscrito 2, fecha parênteses"
+
+
+@pytest.mark.parametrize(
+    ("handler", "capability", "expected"),
+    [
+        ("_handle_mathml_method", "convert", DOMAIN_CANONICAL),
+        ("_handle_latex_verbalizer_method", "verbalize", DOMAIN_SPOKEN),
+    ],
+)
+def test_pddl_handlers_send_the_domain_operator_as_one_name(
+    toolbox_math, handler, capability, expected
+):
+    """A recognizer's spaced operator name is not read as a product of letters:
+    the MathML gets one identifier, the speech its pt-BR name (#546)."""
+    manifest = _manifest_with_formulas(DOMAIN)
+
+    assert getattr(formula_handlers, handler)(manifest, "o-f", config=core_config()).success
+
+    assert toolbox_math[capability] == [expected]
+    # The document keeps the source's LaTeX.
+    assert manifest.elements[0].text == DOMAIN
+
+
+def test_pddl_verbalizer_names_the_domain_operator_in_portuguese(
+    toolbox_math, monkeypatch
+):
+    monkeypatch.setattr(
+        formula_handlers,
+        "toolbox_verbalize_latex",
+        lambda latex, **_kwargs: _domain_speech(latex),
+    )
+    manifest = _manifest_with_formulas(DOMAIN)
+
+    assert formula_handlers._handle_latex_verbalizer_method(
+        manifest, "o-f", config=core_config()
+    ).success
+
+    speech = manifest.elements[0].metadata["verbalization"]
+    assert speech.startswith("Fórmula: domínio de")
+    assert "vezes" not in speech and "multiplicado" not in speech
+
+
+def test_canonical_build_names_the_domain_operator(toolbox_math, monkeypatch):
+    from acessilia_core.pipeline.canonical_builder import build_canonical_document
+
+    monkeypatch.setattr(
+        "acessilia_core.pipeline.canonical_builder.toolbox_verbalize_latex",
+        lambda latex, **_kwargs: _domain_speech(latex),
+    )
+    payload = {
+        "pages": [
+            {
+                "blocks": [
+                    {"type": "math", "text": DOMAIN},
+                    {"type": "paragraph", "text": r"O domínio é $\operatorname{D o m}(v m_2)$."},
+                ]
+            }
+        ]
+    }
+
+    document = build_canonical_document(payload, title="t", toolbox=toolbox_config())
+
+    assert toolbox_math["convert"] == [DOMAIN_CANONICAL, r"\operatorname{Dom}(v m_2)"]
+    block, paragraph = document["sections"][0]["blocks"]
+    assert block["alt_text"].startswith("Fórmula: domínio de")
+    assert paragraph["metadata"]["inline_math"][0]["speech"].startswith("domínio de")
+    # Only the LaTeX sent for MathML and speech changes.
+    assert block["text"] == DOMAIN
+    assert r"$\operatorname{D o m}(v m_2)$" in paragraph["text"]
+
+
 @pytest.mark.parametrize('kind', ['cell', 'caption', 'replaced_text', 'figure_labels', 'described_picture', 'code'])
 @pytest.mark.parametrize(('handler', 'capability'), [
     ('_handle_mathml_method', 'convert'),

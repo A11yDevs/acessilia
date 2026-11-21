@@ -210,6 +210,15 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     # pt-BR material prints, matched as a detection pattern
     ("libs/docstruct/src/docstruct/text/latex.py", "máx"),
     ("libs/docstruct/tests/test_latex.py", "máx"),
+    # Named operators (#546) — the pt-BR spoken name of Dom is user-facing
+    # accessible text; the other side is the engine's own speech the tests read.
+    ("libs/docstruct/src/docstruct/text/named_operators.py", "domínio"),
+    ("libs/docstruct/src/docstruct/text/named_operators.py", "maiúscula"),
+    ("libs/docstruct/tests/test_named_operators.py", "domínio"),
+    ("libs/docstruct/tests/test_named_operators.py", "Domínio"),
+    ("libs/docstruct/README.md", "domínio"),
+    ("tests/test_formula_enrichment.py", "domínio"),
+    ("tests/test_formula_enrichment.py", "v m subscrito"),
     # Legacy TeX repair — the Portuguese crase (à) is what the grave-crase
     # rule produces, so its code, docs and tests carry it
     ("libs/docstruct/src/docstruct/text/unicode_repair.py", "à"),

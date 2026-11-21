@@ -48,6 +48,7 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.fusion.table_specialist` | `extract_table`, `norm_table`, `select_table`, `select_greedy` |
 | `docstruct.text.negation_overlay` | `negates`, `is_detached_overlay`, `compose_negation`, `locate_in_text`, `locate_in_grid`, `table_grid`, `compose_in_text`, `compose_in_grid` — devolve uma barra de negação solta (U+0338) à relação que ela nega, só quando a escolha não é ambígua |
 | `docstruct.text.inline_math` | `detect_inline_math`, `detect_inline_math_by_page`, `span_lines_on_page`, `top_left_box`, `assign_runs_to_cells`, `splice_inline_math` — matemática inline encontrada na camada de texto de um PDF pelas fontes e linhas de base (ADR 0011), localizada nas caixas de um elemento página a página e escrita no seu texto como `$…$` |
+| `docstruct.text.named_operators` | `normalize_named_operators`, `speak_named_operators` — um operador nomeado reconhecido mantém um único identificador no MathML (`\operatorname{D o m}` → `\operatorname{Dom}`) e a sua forma falada em pt-BR (`\mathop{\text{domínio}}`), para ser aplicado, não lido como produto de letras (#546) |
 | `docstruct.text.latex` | `bare_latex`, `ensure_math_delimiters`, `has_latex_markup`, `latex_text_agreement`, `strip_latex_delimiters`, `normalize_latex`, `wrap_latex` — normalização canônica e padronização de fórmulas LaTeX; `ranked_latex_candidates` — os candidatos de um reconhecedor, sem delimitadores, por confiança decrescente |
 | `docstruct.text.equations` | `split_equation_number`, `preserve_equation_number`, `equation_number`, `numbered_latex`, `numbered_speech` — rótulos de equações em destaque guardados em `metadata.equation_number` e restaurados por cada exportador |
 | `docstruct.text.normalize` | `norm` — limpezas determinísticas de texto |
@@ -201,6 +202,14 @@ Rotinas canônicas para padronização e higienização de fórmulas matemática
 - `ensure_math_delimiters(text)`: Envolve o texto em `$...$`, a menos que ele já esteja delimitado por `$` ou `\[...\]`.
 - `has_latex_markup(text)`: Diz se o texto de uma fórmula é LaTeX (delimitadores matemáticos, um comando, ou `^`/`_` aplicado a um grupo, como `x^{2}`) ou só caracteres matemáticos, como a camada de texto de um PDF os entrega (`s(t) = s0 + v0t + 1 2 at2`). Índices soltos (`2^8`, `v_0`) e chaves sozinhas não contam: camadas de texto e notação de conjunto também os trazem.
 - `latex_text_agreement(latex, text)`: F1 (0–1) entre as letras, dígitos e símbolos matemáticos de uma fórmula LaTeX (comandos lidos como seus glifos, `\alpha` → α) e os de um texto da camada de texto, ignorando a estrutura. Índices e expoentes Unicode e ligaduras são normalizados (`x²` vira `x2`, como `x^2`), e os nomes de função em português casam com o comando LaTeX (`sen x` ↔ `\sin x`, `tg` ↔ `\tan`). Distingue um reconhecimento da mesma fórmula de uma leitura errada; a troca de um único símbolo quase não o altera. `None` significa que não há evidência para nenhum lado.
+
+### Operadores nomeados (`docstruct.text.named_operators`)
+
+Um reconhecedor pode imprimir o nome de um operador com espaços entre as letras (`\operatorname{D o m}`). O MathJax preserva os espaços e escreve um `<mi>` por letra, então o MathCAT lê um produto de letras e trata o parêntese depois da última como multiplicação (#546). O módulo cobre os nomes cujo significado é inequívoco:
+- `normalize_named_operators(latex)`: Reescreve um nome reconhecido na grafia canônica (`\operatorname{D o m}`, `\operatorname{dom}` → `\operatorname{Dom}`), para o MathML levar um único identificador e a fala aplicar o operador ("Dom de"). Nomes desconhecidos ficam como estão.
+- `speak_named_operators(latex)`: Escreve um nome reconhecido na forma falada em pt-BR (`\mathop{\text{domínio}}`), para o MathCAT dizer "domínio de". O motor continua produzindo toda a fala; não é um segundo verbalizador.
+
+O texto do documento nunca é reescrito: só o LaTeX enviado para o MathML e para a fala passa por essas funções. A lista de operadores é conservadora (só `Dom`); um nome fora dela nunca recebe um significado inventado. Um `Dom(...)` solto, sem `\operatorname`, também fica como está: as letras podem ser um produto. A forma falada em pt-BR depende de o MathCAT aplicar um cabeçalho `<mtext>` ao argumento, como o motor fixado faz; o arquivo golden de `math.verbalize` detecta uma atualização que mude isso.
 
 ### Adaptador MinerU (`docstruct.adapters.mineru`)
 
