@@ -216,6 +216,12 @@ def test_the_region_handler_records_the_logo_answer(inspection):
     assert result.success and result.validated, result.message
     updated = next(item for item in manifest.elements if item.id == "unknown")
     assert updated.metadata["vision_institutional_logo"] is True
+    [page] = [
+        page
+        for page in pipeline_payload._manifest_pages_to_payload(manifest)
+        if page["blocks"]
+    ]
+    assert page["blocks"][0]["metadata"]["vision_institutional_logo"] is True
 
 
 @pytest.mark.parametrize("kind", ["description", "formula"])
