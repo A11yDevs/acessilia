@@ -137,6 +137,7 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
         description="A map",
         language="en",
         confidence=0.9,
+        mentioned_elements=["logo"],
         warnings=["blurred"],
     )
     item = inspection_handlers._InspectedRegion(
@@ -156,6 +157,9 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
     assert replacement.metadata["vision_warnings"] == ["blurred"]
     # #680: the manifest must not share the model output's list object.
     assert replacement.metadata["vision_warnings"] is not output.warnings
+    # #688: the region writer records the model's mentioned elements too.
+    assert replacement.metadata["vision_elements"] == ["logo"]
+    assert replacement.metadata["vision_elements"] is not output.mentioned_elements
     assert "vision_failure_reason" not in replacement.metadata
     assert "vision_failure_detail" not in replacement.metadata
 
