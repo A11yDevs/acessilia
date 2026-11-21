@@ -588,6 +588,8 @@ def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_cli
     {"status": "succeeded"},
     {"status": "succeeded", "document": "not-an-object"},
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
+    {"document": {"elements": []}},
 ])
 def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
     mock_client, answer
@@ -609,6 +611,7 @@ def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
     None,
     {"status": "succeeded", "document": "not-an-object"},
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
 ])
 def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -655,6 +658,7 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     None,
     {"status": "succeeded", "document": "not-an-object"},
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
 ])
 def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -692,6 +696,7 @@ def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_co
 @pytest.mark.parametrize("answer", [
     None,
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
 ])
 def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -720,11 +725,15 @@ def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
     secondary.close.assert_awaited_once()
 
 
+@pytest.mark.parametrize("answer", [
+    None,
+    {"status": "failed", "document": {"elements": []}},
+])
 def test_identical_providers_with_an_invalid_primary_answer_raise(
-    mock_client, monkeypatch
+    mock_client, monkeypatch, answer
 ):
     """#673: without a distinct secondary the validation error is permanent."""
-    mock_client.extract_structure.return_value = None
+    mock_client.extract_structure.return_value = answer
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: pytest.fail("secondary must not be built"),
@@ -740,11 +749,15 @@ def test_identical_providers_with_an_invalid_primary_answer_raise(
         )
 
 
+@pytest.mark.parametrize("answer", [
+    None,
+    {"status": "failed", "document": {"elements": []}},
+])
 def test_presentation_mode_with_an_invalid_answer_does_not_try_a_secondary(
-    mock_client, monkeypatch
+    mock_client, monkeypatch, answer
 ):
     """#673: dual_fusion=False keeps the single-provider failure permanent."""
-    mock_client.extract_structure.return_value = None
+    mock_client.extract_structure.return_value = answer
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: pytest.fail("secondary must not be built"),

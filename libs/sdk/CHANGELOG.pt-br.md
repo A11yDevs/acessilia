@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido** `extract_dual_fused` rejeita uma resposta de
+  `document.structure.extract` cujo `status` não seja `succeeded`, mesmo que
+  traga um objeto `document`; ela é registrada como
+  `ToolboxContractViolation`, sem `Step`, alinhada ao contrato do transporte
+  (#698).
 - **Corrigido** `acessilia_sdk.runtime.run_sync` também fecha a corrotina quando
   `asyncio.run` falha antes de um event loop assumir a posse -- por exemplo uma
   política de event loop personalizada cujo `new_event_loop` levanta erro, ou

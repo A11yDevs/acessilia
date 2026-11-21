@@ -328,6 +328,8 @@ async def test_missing_artifact_without_file_path_records_failure_instead_of_upl
         {"status": "succeeded"},
         {"status": "succeeded", "document": None},
         {"status": "succeeded", "document": "nope"},
+        {"status": "failed", "document": {"elements": []}},
+        {"document": {"elements": []}},
     ],
 )
 @pytest.mark.asyncio
@@ -423,6 +425,43 @@ async def test_the_real_client_records_a_non_object_answer_without_reuploading(
 async def test_both_providers_answering_none_record_each_contract_violation() -> None:
     primary = _FakeStructureClient("docling", None)
     secondary = _FakeStructureClient("mineru", None)
+
+    with pytest.raises(DualFusionUnavailable) as caught:
+        await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert set(caught.value.failures) == {"docling", "mineru"}
+    assert all(
+        isinstance(exc, ToolboxContractViolation)
+        for exc in caught.value.failures.values()
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_failed_status_secondary_keeps_the_primary_and_records_the_violation() -> None:
+    primary = _FakeStructureClient(
+        "docling",
+        _envelope([{"type": "paragraph", "text": "Primary survives", "page_number": 1}]),
+    )
+    secondary = _FakeStructureClient(
+        "mineru", {"status": "failed", "document": {"elements": []}}
+    )
+
+    result = await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert result.fused is False
+    assert result.payload["document"]["elements"][0]["text"] == "Primary survives"
+    assert set(result.failures) == {"mineru"}
+    assert isinstance(result.failures["mineru"], ToolboxContractViolation)
+    assert result.steps == (
+        Step("document.structure.extract", "docling", {"language": "pt-BR", "source": "file"}),
+    )
+
+
+@pytest.mark.asyncio
+async def test_both_providers_answering_a_failed_status_record_each_contract_violation() -> None:
+    failed = {"status": "failed", "document": {"elements": []}}
+    primary = _FakeStructureClient("docling", failed)
+    secondary = _FakeStructureClient("mineru", failed)
 
     with pytest.raises(DualFusionUnavailable) as caught:
         await extract_dual_fused(primary, secondary, "doc.pdf")

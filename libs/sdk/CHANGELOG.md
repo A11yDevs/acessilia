@@ -7,6 +7,10 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** `extract_dual_fused` rejects a `document.structure.extract` answer
+  whose `status` is not `succeeded`, even when it carries a `document` object;
+  it is recorded as a `ToolboxContractViolation` without a `Step`, matching the
+  transport contract (#698).
 - **Fixed** `acessilia_sdk.runtime.run_sync` also closes the coroutine when
   `asyncio.run` fails before an event loop takes ownership -- for example a
   custom event loop policy whose `new_event_loop` raises, or resource
