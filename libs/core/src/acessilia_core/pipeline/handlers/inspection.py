@@ -279,6 +279,7 @@ def _persist_region_inspection(
         vision_description_complete=True,
         vision_language=item.output.language,
         vision_confidence=item.output.confidence,
+        vision_elements=list(item.output.mentioned_elements),
         vision_warnings=list(item.output.warnings),
         region_crop=crop.path,
         region_inspection=record.id,
