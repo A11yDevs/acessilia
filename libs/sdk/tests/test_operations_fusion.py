@@ -328,6 +328,8 @@ async def test_missing_artifact_without_file_path_records_failure_instead_of_upl
         {"status": "succeeded"},
         {"status": "succeeded", "document": None},
         {"status": "succeeded", "document": "nope"},
+        {"status": "failed", "document": {"elements": []}},
+        {"document": {"elements": []}},
     ],
 )
 @pytest.mark.asyncio

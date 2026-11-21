@@ -67,16 +67,21 @@ def _validated_payload(payload: Any) -> dict[str, Any]:
 
     ``extract_structure`` is typed to return a ``dict``, but a fake client or a
     caller's implementation may still answer ``None`` or a bare payload. The
-    envelope must also hold the ``document`` object the fusion reads. Recording
-    an invalid answer as a successful step would hide the provider's failure:
-    ``_collect_outcomes`` would see no payload and no error, and
-    ``DualFusionUnavailable`` would raise with an empty ``failures`` map (or the
-    fusion would fail later on an unexpected exception). A contract violation
-    keeps the provider's error.
+    envelope must have a ``succeeded`` status and hold the ``document`` object
+    the fusion reads. Recording an invalid answer as a successful step would
+    hide the provider's failure: ``_collect_outcomes`` would see no payload and
+    no error, and ``DualFusionUnavailable`` would raise with an empty
+    ``failures`` map (or the fusion would fail later on an unexpected
+    exception). A contract violation keeps the provider's error.
     """
     if not isinstance(payload, dict):
         raise ToolboxContractViolation(
             f"{STRUCTURE_CAPABILITY} returned {type(payload).__name__}, not an object"
+        )
+    status = payload.get("status")
+    if status != "succeeded":
+        raise ToolboxContractViolation(
+            f"{STRUCTURE_CAPABILITY} answered with status={status!r}, not 'succeeded'"
         )
     document = payload.get("document")
     if not isinstance(document, dict):

@@ -60,19 +60,24 @@ class ToolboxExtraction:
 
 
 def _validated_structure_result(result: Any, *, provider: str) -> dict[str, Any]:
-    """The extraction envelope, refusing a non-object, a missing or non-object
-    document, or a non-object provenance.
+    """The extraction envelope, refusing a non-object, a non-succeeded status,
+    a missing or non-object document, or a non-object provenance.
 
     The shipped client already rejects a non-object HTTP body, but an injected
     or duck-typed client can still answer ``None``. Treating that as a payload
     would let a silent ``None`` reach the manifest (or a bare assert stand in
     for a typed failure) instead of the recordable provider error (#673). The
-    provenance check also keeps ``_extract_with`` from reading ``cache_key`` and
-    ``provider_version`` off a non-mapping.
+    status and provenance checks also keep a failed or non-mapping envelope
+    from reaching the manifest (#698).
     """
     if not isinstance(result, dict):
         raise ToolboxContractViolation(
             f"{provider} returned {type(result).__name__}, not an extraction envelope"
+        )
+    status = result.get("status")
+    if status != "succeeded":
+        raise ToolboxContractViolation(
+            f"{provider} answered with status={status!r}, not 'succeeded'"
         )
     document = result.get("document")
     if not isinstance(document, dict):

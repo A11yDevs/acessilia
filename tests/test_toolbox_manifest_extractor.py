@@ -588,6 +588,8 @@ def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_cli
     {"status": "succeeded"},
     {"status": "succeeded", "document": "not-an-object"},
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
+    {"document": {"elements": []}},
 ])
 def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
     mock_client, answer
@@ -609,6 +611,7 @@ def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
     None,
     {"status": "succeeded", "document": "not-an-object"},
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
 ])
 def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -655,6 +658,7 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     None,
     {"status": "succeeded", "document": "not-an-object"},
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
 ])
 def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -692,6 +696,7 @@ def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_co
 @pytest.mark.parametrize("answer", [
     None,
     {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+    {"status": "failed", "document": {"elements": []}},
 ])
 def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
     mock_client, monkeypatch, answer
