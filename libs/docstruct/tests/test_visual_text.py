@@ -324,6 +324,9 @@ def test_deduplicate_picture_description_never_empties_description_or_cuts_visua
         ("A red circle.", (), True, False),
         ("Codigo QR apontando para o site da disciplina.", (), True, False),
         ("Grafico de barras com tres series.", (), True, False),
+        ("Logo of UFG next to the author's photograph.", (), True, False),
+        ("Logotipo da UFG ao lado da fotografia do autor.", (), True, False),
+        ("UFG coat of arms.", ("portrait",), True, False),
     ],
 )
 def test_is_confirmed_logo_description(

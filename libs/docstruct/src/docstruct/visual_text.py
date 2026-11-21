@@ -778,8 +778,9 @@ def is_confirmed_logo_description(
     """Whether a header-adjacent picture is confirmed as an institutional logo (#325).
 
     When ``described=True`` (the VLM ran on the picture), an explicit positive
-    logo/emblem/crest marker is required so icons, author photos, maps, QR
-    codes, or arbitrary shapes are never called ``Logo.``. When
+    logo/emblem/crest marker is required, and no non-logo marker may appear,
+    so icons, author photos, maps, QR codes, arbitrary shapes, or a logo shown
+    beside a photo are never called ``Logo.``. When
     ``described=False`` (dry-run or VLM unavailable), existing extractor text
     is still checked for non-logo markers before falling back to geometry.
     """
@@ -789,7 +790,9 @@ def is_confirmed_logo_description(
     has_logo = bool(_LOGO_MARKER_RE.search(combined))
     has_non_logo = bool(_NON_LOGO_MARKER_RE.search(combined))
     if described:
-        return has_logo and not (has_non_logo and not has_logo)
+        # Both cues ("logo next to the author's photograph") is not a confirmed
+        # logo: keeping the description loses nothing, folding it would.
+        return has_logo and not has_non_logo
     if has_non_logo and not has_logo:
         return False
     return True

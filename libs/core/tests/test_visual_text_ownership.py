@@ -542,6 +542,7 @@ def test_contained_scene_text_is_not_used_to_deduplicate_its_own_picture_descrip
         "A small blue icon.",
         "A map of the region.",
         "A red circle.",
+        "Logo of UFG next to the author's photograph.",
     ],
 )
 def test_case_325_non_logo_picture_beside_page_header_keeps_its_description(
