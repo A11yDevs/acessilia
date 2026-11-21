@@ -537,7 +537,7 @@ def _rebuild_routed_pages(
     for element in elements:
         page_number = _element_page_number(element)
         element_id = element.get("id")
-        if page_number is not None and element_id is not None:
+        if page_number is not None and element_id:
             ids_by_page.setdefault(page_number, []).append(element_id)
     for number, descriptor in page_descriptors.items():
         descriptor["element_ids"] = ids_by_page.get(number, [])
@@ -570,8 +570,11 @@ def _applied_evidence(
     updated: list[dict[str, Any]] = []
     for entry in page_evidence:
         copied = dict(entry)
+        stats = entry.get("stats")
+        if isinstance(stats, dict):
+            stats = dict(stats)
+            copied["stats"] = stats
         if entry.get("page_number") in routed:
-            stats = entry.get("stats")
             copied["stats"] = {
                 **(stats if isinstance(stats, dict) else {}),
                 "applied": secondary_provider,
@@ -599,13 +602,14 @@ def route_pages(
     secondary_doc = secondary_res.get("document") or {}
     secondary_by_page = _elements_by_page(secondary_doc.get("elements") or [])
     routed, missing = _select_routed_and_missing(page_evidence, secondary_by_page)
+    updated_evidence = _applied_evidence(page_evidence, routed, secondary_provider)
     if not routed:
         return PageRouteResult(
             payload=primary_res,
             replaced={},
             routed_pages=(),
             missing_pages=missing,
-            page_evidence=_applied_evidence(page_evidence, routed, secondary_provider),
+            page_evidence=updated_evidence,
         )
 
     primary_elements = primary_doc.get("elements") or []
@@ -642,7 +646,7 @@ def route_pages(
         replaced=replaced,
         routed_pages=tuple(sorted(routed)),
         missing_pages=missing,
-        page_evidence=_applied_evidence(page_evidence, routed, secondary_provider),
+        page_evidence=updated_evidence,
     )
 
 

@@ -146,7 +146,9 @@ def apply_page_routes(
     Delegates pure routing to :func:`docstruct.fusion.payload.route_pages` and
     logs routed and missing secondary pages in the core. ``docstruct`` never
     mutates ``page_evidence``; this core wrapper adopts the returned annotated
-    copy so the caller's fusion evidence stays in sync (#633).
+    copy so the caller's fusion evidence stays in sync (#633). The entries
+    themselves are replaced by copies, so an entry reference captured before
+    this call will not observe the annotation.
     """
     result = _docstruct_route_pages(
         primary_res,
