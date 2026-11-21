@@ -80,14 +80,15 @@ def build_canonical_document(
     metadata: dict[str, Any] | None = None,
     technical_warnings: list[str] | None = None,
     math_enricher: MathEnricher | None = None,
-    id_factory: Callable[[str], str] | None = None,
+    id_factory: Callable[[], str] | None = None,
     inline_math_promote: bool = True,
 ) -> dict[str, Any]:
     """Build the canonical document from a structured payload or plain text.
 
-    ``inline_math_promote`` (``FusionPolicy.inline_math_promote``) turns a
-    paragraph whose whole text is one inline math span into a display
-    ``math`` block (#296).
+    ``id_factory`` is a zero-argument callable producing the document id; the
+    default is deterministic. ``inline_math_promote``
+    (``FusionPolicy.inline_math_promote``) turns a paragraph whose whole text is
+    one inline math span into a display ``math`` block (#296).
     """
     if isinstance(source_text, dict):
         source_payload: dict[str, Any] = source_text
@@ -116,7 +117,7 @@ def build_canonical_document(
     }
     return {
         "schema_version": "1.0.0",
-        "id": (id_factory or _default_doc_id)() if id_factory else _default_doc_id(),
+        "id": (id_factory or _default_doc_id)(),
         "title": inferred_title or title or "Documento acessível",
         "language": language,
         "verbosity": verbosity,
@@ -345,20 +346,17 @@ def _build_minimal_non_textual_sections(*, title: str) -> list[dict[str, Any]]:
 
 def _infer_title(blocks: list[dict[str, Any]]) -> str:
     headings = [
-        {
-            "level": int(block.get("level", 1)),
-            "text": str(block.get("text", "")).strip(),
-        }
+        (int(block.get("level", 1)), str(block.get("text", "")).strip())
         for block in blocks
         if block.get("type") == "heading" and str(block.get("text", "")).strip()
     ]
     if not headings:
         return ""
-    first_heading = headings[0]["text"]
+    first_heading = headings[0][1]
     if _looks_like_chapter_heading(first_heading):
-        for candidate in headings[1:]:
-            if candidate["level"] <= 2:
-                return f"{first_heading} - {candidate['text']}"
+        for level, text in headings[1:]:
+            if level <= 2:
+                return f"{first_heading} - {text}"
     return first_heading
 
 

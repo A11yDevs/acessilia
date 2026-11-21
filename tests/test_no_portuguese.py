@@ -221,6 +221,11 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("libs/docstruct/README.md", "domínio"),
     ("tests/test_formula_enrichment.py", "domínio"),
     ("tests/test_formula_enrichment.py", "v m subscrito"),
+    # Chapter-heading detection (#647): the fixture feeds the pt-BR chapter
+    # heading and the subheading the functional pattern matches, plus a
+    # paragraph body.
+    ("libs/docstruct/tests/test_canonical.py", "Introdução"),
+    ("libs/docstruct/tests/test_canonical.py", "Conteúdo."),
     # Legacy TeX repair — the Portuguese crase (à) is what the grave-crase
     # rule produces, so its code, docs and tests carry it
     ("libs/docstruct/src/docstruct/text/unicode_repair.py", "à"),
