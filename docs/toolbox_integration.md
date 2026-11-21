@@ -486,11 +486,12 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 > degrades.
 >
 > A malformed answer is distinct from a transport-level contract rejection: an
-> envelope without a `document` object (or with a non-object `provenance`) is a
-> per-provider failure, so in dual mode the invalid primary hands over to the
-> secondary and an invalid secondary keeps the complete primary; if both are
-> malformed, the typed error propagates. The transport-level rejection above
-> keeps its permanence when it comes from the primary.
+> answer that is not an object, one without a `document` object, or one with a
+> non-object `provenance` is a per-provider failure, so in dual mode the invalid
+> primary hands over to the secondary and an invalid secondary keeps the
+> complete primary; if both are malformed, the typed error propagates. The
+> transport-level rejection above keeps its permanence when it comes from the
+> primary.
 
 ---
 

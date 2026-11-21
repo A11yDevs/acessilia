@@ -654,6 +654,7 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
 @pytest.mark.parametrize("answer", [
     None,
     {"status": "succeeded", "document": "not-an-object"},
+    {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
 ])
 def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -688,15 +689,19 @@ def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_co
     secondary.close.assert_awaited_once()
 
 
+@pytest.mark.parametrize("answer", [
+    None,
+    {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
+])
 def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
-    mock_client, monkeypatch
+    mock_client, monkeypatch, answer
 ):
     """#673: with no surviving provider the typed error propagates."""
-    mock_client.extract_structure.return_value = None
+    mock_client.extract_structure.return_value = answer
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
     secondary.base_url = "http://localhost:8002"
-    secondary.extract_structure.return_value = None
+    secondary.extract_structure.return_value = answer
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: secondary,
