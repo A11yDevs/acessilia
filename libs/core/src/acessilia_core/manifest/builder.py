@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from docstruct.fusion.payload import normalize_element_ids
 from docstruct.geometry import (
     ReadingItem,
     order_reading_items,
@@ -288,7 +289,7 @@ def _prepare_manifest_data(
     digest: str,
     language: str,
 ) -> dict[str, Any]:
-    data: dict[str, Any] = dict(extraction.document["document"])
+    data: dict[str, Any] = normalize_element_ids(extraction.document["document"])
     data["manifest_id"] = data.get("manifest_id") or f"manifest-{digest[:16]}-r1"
     data["source"] = {
         "document_id": f"doc-{digest[:16]}",
