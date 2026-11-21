@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-import gc
 import inspect
-import warnings
+import threading
+from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any, NoReturn
+from typing import NoReturn
 
 import pytest
+
 from acessilia_sdk import runtime
 from acessilia_sdk.runtime import run_sync
 from acessilia_sdk.toolbox.operation import current_operation, operation_context
@@ -20,7 +21,7 @@ _REQUEST_TAG: contextvars.ContextVar[str] = contextvars.ContextVar(
 )
 
 
-def _raiser(error: BaseException) -> Any:
+def _raiser(error: BaseException) -> Callable[..., NoReturn]:
     """A stand-in for any callable that fails during worker setup."""
 
     def fail(*args: object, **kwargs: object) -> NoReturn:
@@ -101,7 +102,9 @@ async def test_preserves_contextvars_and_operation_context_inside_running_loop()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failure_point", ["copy-context", "executor", "submit"])
+@pytest.mark.parametrize(
+    "failure_point", ["copy-context", "executor", "submit", "thread-start"]
+)
 async def test_worker_setup_failure_closes_the_coroutine(
     monkeypatch: pytest.MonkeyPatch, failure_point: str
 ) -> None:
@@ -126,7 +129,7 @@ async def test_worker_setup_failure_closes_the_coroutine(
                 futures=SimpleNamespace(ThreadPoolExecutor=_raiser(error))
             ),
         )
-    else:
+    elif failure_point == "submit":
         monkeypatch.setattr(
             runtime,
             "concurrent",
@@ -138,14 +141,16 @@ async def test_worker_setup_failure_closes_the_coroutine(
                 )
             ),
         )
+    else:
+        # The real-world trigger from #634: submit queues the work item before
+        # the pool starts its thread. When the thread cannot start, this fresh
+        # pool has no worker to consume the item, so run_sync must close it.
+        monkeypatch.setattr(threading.Thread, "start", _raiser(error))
 
     coro = value()
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        with pytest.raises(RuntimeError, match="worker setup failed"):
-            run_sync(coro)
-        gc.collect()
+    with pytest.raises(RuntimeError, match="worker setup failed"):
+        run_sync(coro)
 
+    # Closing is what prevents ``coroutine ... was never awaited`` when the
+    # object is collected, so the state assertion subsumes that warning check.
     assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
-    unawaited = [str(w.message) for w in caught if "never awaited" in str(w.message)]
-    assert unawaited == []
