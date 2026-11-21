@@ -49,26 +49,25 @@ própria suíte completa mais rápida.
 Todo pull request e push para `develop`, `main` ou uma branch de release executa
 o workflow `CI` do GitHub Actions:
 
-- **`tests (Python 3.11)` / `tests (Python 3.12)`** instala o projeto e roda a
+- **`tests (Python 3.12)`** instala o projeto e roda a
   suíte principal non-E2E com **quatro workers**, as suítes do docstruct, do
   SDK e da biblioteca do core com cobertura de desvios, e recusa skips
-  inesperados, publicando os artefatos JUnit (`test-reports-py*`) das duas
-  pernas. As verificações que não dependem do interpretador — o Ruff contra a
-  baseline que só diminui, o Mypy no escopo configurado de `docstruct`/SDK
-  (#366), o contrato de capacidades da Toolbox, o relatório da versão do
-  docstruct fixada pela Toolbox (só avisos; veja abaixo) e o resumo de cobertura
-  com o artefato `coverage-reports-py*` — rodam uma vez, na perna `3.12`.
-- **`SDK alone (Python 3.11)` / `SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única
+  inesperados, publicando os artefatos JUnit (`test-reports-py*`). O mesmo job
+  roda o Ruff contra a baseline que só diminui, o Mypy no escopo configurado de
+  `docstruct`/SDK (#366), o contrato de capacidades da Toolbox, o relatório da
+  versão do docstruct fixada pela Toolbox (só avisos; veja abaixo) e o resumo de
+  cobertura com o artefato `coverage-reports-py*`.
+- **`SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
   (pytest, pytest-asyncio, respx), e prova que ele funciona sem o core.
-- **`docstruct alone (Python 3.11)` / `docstruct alone (Python 3.12)`** instala apenas o docstruct, a partir do
+- **`docstruct alone (Python 3.12)`** instala apenas o docstruct, a partir do
   wheel dele, e o pytest, e roda a suíte só com a biblioteca padrão: o core, o SDK, a
   Toolbox e o acelerador opcional (`rapidfuzz`) não podem estar importáveis, e
   nenhum teste pode ser pulado (#470).
-- `tests (Python 3.11)` e `SDK alone (Python 3.11)` são checks obrigatórios nos rulesets vivos de `main` e
+- `tests (Python 3.12)` e `SDK alone (Python 3.12)` são checks obrigatórios nos rulesets vivos de `main` e
   `develop`. O `docstruct alone` ainda não é: torná-lo obrigatório é uma mudança
   de ruleset, decisão de quem mantém o repositório (CONTRIBUTING.pt-br.md).
-- **`core alone (Python 3.11)` / `core alone (Python 3.12)`** instala só o core, como wheel, a partir do
+- **`core alone (Python 3.12)`** instala só o core, como wheel, a partir do
   seu próprio lock (`libs/core/uv.lock`): nem o serviço, nem os front-ends, nem
   o FastAPI, nem o pacote da Toolbox podem ser importados. Ele roda a suíte
   completa do core a partir do wheel, o teste de fumaça a partir de uma pasta
@@ -79,10 +78,8 @@ o workflow `CI` do GitHub Actions:
 
 O check da suíte principal não tem mais uma etapa separada de coleta: a própria execução
 coleta a suíte. O template do nome do job `tests (Python ${{ matrix.python-version }})`
-mantém a perna 3.11 como `tests (Python 3.11)` de propósito (rodando
-`tests (Python 3.12)` em paralelo, com `UV_PYTHON` fixado na versão de cada
-perna da matriz), para a proteção de branch e os links existentes continuarem
-funcionando durante a transição.
+renderiza a única perna da matriz como `tests (Python 3.12)`, e o `UV_PYTHON` fixa
+esse interpretador.
 
 ### Localmente
 
@@ -422,16 +419,16 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 
 ## Onde ver os resultados
 
-- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.11)` /
-  `tests (Python 3.12)` → step `Run main test suite`. O log mostra
-  `created: 4/4 workers` e `--durations=25`.
+- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.12)` →
+  step `Run main test suite`. O log mostra `created: 4/4 workers` e
+  `--durations=25`.
 - **Artefatos:** `test-reports-py*` (principal, docstruct, SDK e biblioteca do
   core), `coverage-reports-py*`, `sdk-isolated-report-py*` e
   `docstruct-isolated-report-py*`.
 - **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
   30 dias e uma issue de acompanhamento em falhas agendadas.
-- **Rulesets:** `main` e `develop` exigem `tests (Python 3.11)` e
-  `SDK alone (Python 3.11)`.
+- **Rulesets:** `main` e `develop` exigem `tests (Python 3.12)` e
+  `SDK alone (Python 3.12)`.
 - **Localmente:** rode `time make test-all` e compare com o comando serial do
   suíte principal acima na mesma máquina ociosa.
 

@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The project's unit test suite covers the canonical pipeline, PDDL engine, API and exporters. Everything is fast and isolated: files go to temporary directories; network and LLM calls are mocked, and async flows run with `pytest-asyncio`.
 
 The merge gate is CI, which runs the non-E2E main, docstruct, SDK and core
-library suites on Python 3.11 and 3.12 in the root `uv.lock` environment. Additional jobs test the libraries
+library suites on Python 3.12 in the root `uv.lock` environment. Additional jobs test the libraries
 in isolation from their own locks. The production image carries runtime
 dependencies and passes build, startup and API health smoke checks before
 publication. See the [constitution's testing strategy](../docs/constitution.md#3-architectural-quality-rules).

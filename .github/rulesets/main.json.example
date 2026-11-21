@@ -52,11 +52,11 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
-            "context": "tests (Python 3.11)",
+            "context": "tests (Python 3.12)",
             "integration_id": 15368
           },
           {
-            "context": "SDK alone (Python 3.11)",
+            "context": "SDK alone (Python 3.12)",
             "integration_id": 15368
           }
         ]

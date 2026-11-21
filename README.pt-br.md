@@ -124,7 +124,7 @@ Execute as suítes do core sem E2E, da docstruct e do SDK:
 make test-all
 ```
 
-O GitHub Actions repete essa validação em Python 3.11 e 3.12 para todo pull request direcionado à `main`, à `develop` ou a `release/**`. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
+O GitHub Actions repete essa validação em Python 3.12 para todo pull request direcionado à `main`, à `develop` ou a `release/**`. Falhas, erros e testes pulados são rejeitados. Consulte o [guia de contribuição](CONTRIBUTING.md) para preparar o ambiente e entender o fluxo de revisão.
 
 ## Notebooks Interativos
 

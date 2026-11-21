@@ -47,23 +47,17 @@ def _rendered_job_names(job: dict) -> set[str]:
     }
 
 
-def test_required_check_names_are_unchanged() -> None:
+def test_ci_jobs_use_python_312() -> None:
     jobs = _workflow()["jobs"]
     for job_id in ("tests", "sdk-isolated", "core-isolated", "docstruct-isolated"):
-        assert jobs[job_id]["strategy"]["matrix"]["python-version"] == ["3.11", "3.12"]
+        assert jobs[job_id]["strategy"]["matrix"]["python-version"] == ["3.12"]
         assert jobs[job_id]["env"]["UV_PYTHON"] == "${{ matrix.python-version }}"
-    assert _rendered_job_names(jobs["tests"]) == {
-        "tests (Python 3.11)",
-        "tests (Python 3.12)",
-    }
-    assert _rendered_job_names(jobs["sdk-isolated"]) == {
-        "SDK alone (Python 3.11)",
-        "SDK alone (Python 3.12)",
-    }
+    assert _rendered_job_names(jobs["tests"]) == {"tests (Python 3.12)"}
+    assert _rendered_job_names(jobs["sdk-isolated"]) == {"SDK alone (Python 3.12)"}
 
 
-#: Steps of the ``tests`` job that do not depend on the interpreter (#170). Each
-#: one runs once, on ``PYTHON_DEFAULT``, instead of once per matrix leg.
+#: Steps of the ``tests`` job that do not depend on the interpreter (#170).
+#: They run once because the matrix has a single 3.12 leg.
 INTERPRETER_INDEPENDENT_STEPS = (
     "Run Ruff against the shrinking baseline",
     "Run Mypy on docstruct and SDK",
@@ -74,17 +68,28 @@ INTERPRETER_INDEPENDENT_STEPS = (
 )
 
 
-def test_interpreter_independent_steps_run_once_on_the_default_leg() -> None:
-    """The matrix proves both interpreters; the quality gates are not duplicated."""
+def test_quality_gates_run_on_the_single_python_leg() -> None:
+    """The single 3.12 leg runs every quality gate, and no gate is conditional on the matrix."""
     job = _workflow()["jobs"]["tests"]
-    default = job["env"]["PYTHON_DEFAULT"]
-    assert default in job["strategy"]["matrix"]["python-version"]
+    assert job["strategy"]["matrix"]["python-version"] == ["3.12"]
+    assert "PYTHON_DEFAULT" not in job.get("env", {})
     steps = {step.get("name"): step for step in job["steps"]}
 
     for name in INTERPRETER_INDEPENDENT_STEPS:
         condition = steps[name].get("if", "")
-        assert "matrix.python-version == env.PYTHON_DEFAULT" in condition, name
-    # The suites themselves must run on every leg, and each leg keeps its JUnit.
+        assert "matrix.python-version" not in condition, name
+        assert "PYTHON_DEFAULT" not in condition, name
+    for name in (
+        "Run Ruff against the shrinking baseline",
+        "Run Mypy on docstruct and SDK",
+        "Check the Toolbox capability contract",
+        "Report the Toolbox's docstruct pin",
+    ):
+        assert "if" not in steps[name], name
+    for name in ("Summarize per-component coverage", "Upload coverage reports"):
+        assert "always()" in steps[name].get("if", ""), name
+
+    # The suites themselves run on the only leg, and it keeps its JUnit report.
     assert "if" not in steps["Run main test suite"]
     assert "if" not in steps["Run docstruct library test suite"]
     assert "if" not in steps["Run SDK library test suite"]
@@ -120,10 +125,7 @@ def test_docstruct_runs_alone_from_its_wheel() -> None:
     job = _workflow()["jobs"]["docstruct-isolated"]
     steps = {step.get("name"): step for step in job["steps"]}
 
-    assert _rendered_job_names(job) == {
-        "docstruct alone (Python 3.11)",
-        "docstruct alone (Python 3.12)",
-    }
+    assert _rendered_job_names(job) == {"docstruct alone (Python 3.12)"}
     install = steps["Install docstruct alone from its lock"]["run"]
     assert "uv lock --check --project libs/docstruct" in install
     assert (
@@ -242,7 +244,7 @@ def test_ruleset_templates_require_the_full_gate() -> None:
     rendered = _rendered_job_names(jobs["tests"]) | _rendered_job_names(
         jobs["sdk-isolated"]
     )
-    expected = {"tests (Python 3.11)", "SDK alone (Python 3.11)"}
+    expected = {"tests (Python 3.12)", "SDK alone (Python 3.12)"}
     assert expected <= rendered
     for template in ("main.json.example", "develop.json.example"):
         ruleset = json.loads((RULESETS / template).read_text(encoding="utf-8"))

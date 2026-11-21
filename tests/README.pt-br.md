@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](README.md)
 A suíte de testes unitários do projeto cobre o pipeline canônico, o motor PDDL, a API e os exportadores. Tudo é rápido e isolado: arquivos vão para diretórios temporários; chamadas de rede e de LLM são simuladas (mock), e os fluxos assíncronos rodam com `pytest-asyncio`.
 
 O gate de merge é o CI, que executa as suítes principal, da biblioteca do core,
-da docstruct e do SDK no Python 3.11 e 3.12, no ambiente do `uv.lock` da raiz. Jobs adicionais testam as
+da docstruct e do SDK no Python 3.12, no ambiente do `uv.lock` da raiz. Jobs adicionais testam as
 bibliotecas isoladamente a partir dos próprios locks. A imagem de produção
 carrega dependências de runtime e passa por verificações de build, inicialização
 e saúde da API por smoke tests antes da publicação. Veja a
