@@ -289,9 +289,10 @@ class ToolboxManifestExtractor:
             )
 
         if result is None:
-            # Defensive: _extract_primary raises or returns a validated envelope,
-            # and _apply_dual_extraction never returns None; keep a typed error
-            # instead of an assert that ``python -O`` would strip (#673).
+            # Defensive: the paths above either return a validated envelope,
+            # raise, or hand None to _apply_dual_extraction (which returns a
+            # document or raises). Keep a typed error instead of an assert that
+            # ``python -O`` would strip (#673).
             raise primary_error or ToolboxContractViolation(
                 "The structure extraction produced no document"
             )

@@ -615,6 +615,8 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     mock_client.extract_structure = AsyncMock(return_value=answer)
     secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     secondary_payload["provider"] = "mineru"
+    secondary_payload["provenance"]["cache_key"] = "ck-mineru"
+    secondary_payload["provenance"]["provider_version"] = "mineru-1.0"
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
     secondary.base_url = "http://localhost:8002"
@@ -634,6 +636,8 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
 
     assert result.configuration["toolbox_provider"] == "mineru"
     assert result.configuration["toolbox_base_url"] == "http://localhost:8002"
+    assert result.cache_key == "ck-mineru"
+    assert result.version == "mineru-1.0"
     assert result.configuration["extraction_degraded"] is True
     assert result.configuration["extraction_failures"] == {
         "docling": "ToolboxContractViolation"
