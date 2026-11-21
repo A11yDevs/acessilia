@@ -702,3 +702,85 @@ def test_scene_text_of_a_letterhead_logo_stays_in_the_flow() -> None:
 
     assert texts[0].startswith("Logo. ")
     assert "CAMPUS DARCY" in texts
+
+
+PAGE_IMAGE_BOX = (0.0, 792.0, 612.0, 0.0)
+FORM_LABEL_BOXES = {
+    "lbl-name": (72.0, 700.0, 260.0, 686.0),
+    "lbl-birth": (72.0, 660.0, 260.0, 646.0),
+    "lbl-cpf": (72.0, 620.0, 120.0, 606.0),
+}
+FORM_LABELS = {"lbl-name": "NOME COMPLETO", "lbl-birth": "DATE OF BIRTH", "lbl-cpf": "CPF"}
+
+
+def _scanned_form(picture_metadata: dict) -> list[ManifestElement]:
+    page_image = _placed(
+        "page-image",
+        "picture",
+        "Scanned registration form.",
+        PAGE_IMAGE_BOX,
+        metadata={"vision_description_complete": True, **picture_metadata},
+        reading_order=1,
+    )
+    labels = [
+        _placed(element_id, "paragraph", FORM_LABELS[element_id], box, reading_order=idx)
+        for idx, (element_id, box) in enumerate(FORM_LABEL_BOXES.items(), start=2)
+    ]
+    declaration = _placed(
+        "declaration",
+        "paragraph",
+        "I declare that the information above is true.",
+        (72.0, 580.0, 540.0, 566.0),
+        reading_order=5,
+    )
+    return [page_image, *labels, declaration]
+
+
+@pytest.mark.parametrize("nature", ["scanned_page", "paginated_document"])
+def test_labels_inside_a_document_page_image_stay_in_the_flow(nature: str) -> None:
+    """Safeguard 8.1 with real boxes: form labels inside the page image of a document are not scene text."""
+    elements = _scanned_form({"media_inspection": {"is_image": True, "artifact_nature": nature}})
+    manifest = build_manifest(elements, [])
+    manifest.language = "en"
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+
+    [page] = _manifest_pages_to_payload(manifest)
+
+    assert _block_texts(page) == [
+        "Scanned registration form.",
+        "NOME COMPLETO",
+        "DATE OF BIRTH",
+        "CPF",
+        "I declare that the information above is true.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_enrichment_records_the_document_nature_so_the_payload_keeps_form_labels() -> None:
+    """The payload has no media inspection: the nature stamped on pictures keeps its decision aligned."""
+    elements = _scanned_form({})
+    elements[0].text = ""
+    elements[0].metadata.pop("vision_description_complete")
+    manifest = build_manifest(
+        elements,
+        [build_obligation("describe-image", ["page-image"], ["vision-description"])],
+    )
+    manifest.language = "en"
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+    RecordingVision.answers = {"page-image": _vision_answer("Scanned registration form.")}
+
+    await _enrich_photo(
+        manifest,
+        media_inspection={
+            "is_image": True,
+            "requires_visual_inspection": True,
+            "artifact_nature": "scanned_page",
+        },
+    )
+
+    assert manifest.elements[0].metadata["artifact_nature"] == "scanned_page"
+    assert all(
+        "visual_text_ownership" not in el.metadata for el in manifest.elements[1:]
+    )
+    [page] = _manifest_pages_to_payload(manifest)
+    assert _block_texts(page)[1:4] == ["NOME COMPLETO", "DATE OF BIRTH", "CPF"]

@@ -17,6 +17,7 @@ from docstruct.visual_text import (
     is_caption_text,
     is_confirmed_logo_description,
     is_document_artifact,
+    is_document_page_picture,
     is_prose_sentence,
     is_scene_artifact,
     is_scene_ocr_collection,
@@ -441,3 +442,43 @@ def test_injected_picture_of_a_scanned_page_owns_no_scene_text() -> None:
     ]
     ownership = analyze_visual_text_ownership(elements)
     assert {decision.role for decision in ownership.values()} == {"document_text"}
+
+
+@pytest.mark.parametrize(
+    "picture_metadata",
+    [
+        {"artifact_nature": "scanned_page"},
+        {"media_inspection": {"is_image": True, "artifact_nature": "paginated_document"}},
+    ],
+)
+def test_a_document_page_picture_hosts_no_contained_scene_text(picture_metadata: dict) -> None:
+    """Short labels geometrically inside a document page's image stay document text."""
+    elements = [
+        _element("pic-1", "picture", "Scanned form.", order=1, metadata=picture_metadata),
+        _element("lbl-1", "paragraph", "NOME COMPLETO", order=2),
+        _element("lbl-2", "paragraph", "CPF", order=3),
+    ]
+    boxes = {
+        "pic-1": (0.0, 0.0, 612.0, 792.0),
+        "lbl-1": (72.0, 92.0, 260.0, 106.0),
+        "lbl-2": (72.0, 132.0, 120.0, 146.0),
+    }
+    ownership = analyze_visual_text_ownership(elements, page_boxes=boxes)
+    assert ownership["lbl-1"].role == "document_text"
+    assert ownership["lbl-2"].role == "document_text"
+
+    without_nature = [
+        _element("pic-1", "picture", "Scanned form.", order=1),
+        *elements[1:],
+    ]
+    contained = analyze_visual_text_ownership(without_nature, page_boxes=boxes)
+    assert contained["lbl-1"].role == "scene_text"
+
+
+def test_is_document_page_picture_reads_both_recorded_forms() -> None:
+    """The nature may be the injected picture's inspection or the stamp from enrichment."""
+    assert is_document_page_picture(_element("p", "picture", metadata={"artifact_nature": "scanned_page"}))
+    assert not is_document_page_picture(
+        _element("p", "picture", metadata={"artifact_nature": "standalone_image"})
+    )
+    assert not is_document_page_picture(_element("p", "picture"))

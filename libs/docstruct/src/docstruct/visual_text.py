@@ -310,6 +310,19 @@ def is_document_artifact(media_inspection: Mapping[str, Any] | None) -> bool:
     return media_inspection.get("artifact_nature") in _DOCUMENT_ARTIFACT_NATURES
 
 
+def is_document_page_picture(picture: ExtractedElement) -> bool:
+    """Whether ``picture`` is part of a document page (scanned or photographed form, PDF page).
+
+    The page's nature is recorded on the picture either as the injected
+    picture's ``media_inspection`` or as ``artifact_nature`` stamped by the
+    enrichment stage. Such a picture owns no scene text: OCR lines inside it
+    are the document's own text.
+    """
+    if is_document_artifact(picture.metadata.get("media_inspection")):
+        return True
+    return picture.metadata.get("artifact_nature") in _DOCUMENT_ARTIFACT_NATURES
+
+
 def is_scene_artifact(media_inspection: Mapping[str, Any] | None) -> bool:
     """Whether a media inspection describes a standalone image whose text is scene text."""
     return (
@@ -426,6 +439,8 @@ def _find_containing_picture(
     if box is None:
         return None
     for picture in pictures:
+        if is_document_page_picture(picture):
+            continue
         pic_box = page_boxes.get(str(getattr(picture, "id", "")))
         if pic_box is not None and box_contains_center(pic_box, box):
             return str(getattr(picture, "id", ""))
@@ -512,7 +527,7 @@ def _full_page_picture_id(
     short lines are document text.
     """
     for pic in pictures:
-        if is_document_artifact(pic.metadata.get("media_inspection")):
+        if is_document_page_picture(pic):
             continue
         if pic.metadata.get("injected_picture") or standalone_image:
             return str(getattr(pic, "id", ""))
@@ -794,6 +809,7 @@ __all__ = [
     "is_caption_text",
     "is_confirmed_logo_description",
     "is_document_artifact",
+    "is_document_page_picture",
     "is_prose_sentence",
     "is_scene_artifact",
     "is_scene_ocr_collection",

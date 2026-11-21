@@ -29,6 +29,7 @@ from docstruct.visual_text import (
     analyze_visual_text_ownership,
     collect_picture_context,
     deduplicate_picture_description,
+    is_document_artifact,
     is_scene_artifact,
 )
 
@@ -408,7 +409,14 @@ def _annotate_visual_text_ownership(
 
     Only a standalone image (a photo, not a photographed or scanned document
     page, per ``artifact_nature``) makes its page-level OCR lines scene text.
+    On a document page every picture records that nature, so no picture, and
+    no later recomputation in the payload, takes the page's text as its own.
     """
+    if isinstance(media_inspection, dict) and is_document_artifact(media_inspection):
+        nature = media_inspection["artifact_nature"]
+        for element in manifest.elements:
+            if element.type == "picture":
+                element.metadata.setdefault("artifact_nature", nature)
     standalone = is_scene_artifact(media_inspection)
     boxes = {
         element.id: box
