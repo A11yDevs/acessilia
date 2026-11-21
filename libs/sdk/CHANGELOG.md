@@ -7,6 +7,12 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Fixed** `extract_dual_fused` treats a `document.structure.extract` answer
+  outside the envelope (not a JSON object, or without its `document` object) as
+  a `ToolboxContractViolation` recorded in `failures`, without emitting a
+  `Step`, instead of a successful step with an invalid payload; on the artifact
+  path the violation does not trigger an upload retry. This keeps
+  `DualFusionUnavailable` from raising with an empty `failures` map (#635).
 - **Fixed** `acessilia_sdk.runtime.run_sync` now closes the coroutine when the
   worker setup fails -- copying the context, creating the executor or
   submitting the work -- instead of leaving it unawaited and later emitting

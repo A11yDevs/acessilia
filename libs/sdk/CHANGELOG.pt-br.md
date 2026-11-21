@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido** `extract_dual_fused` trata uma resposta de
+  `document.structure.extract` fora do envelope (não é um objeto JSON, ou não
+  traz o objeto `document`) como `ToolboxContractViolation` registrada em
+  `failures`, sem emitir um `Step`, em vez de um passo bem-sucedido com um
+  payload inválido; no caminho de artefato, a violação não dispara nova
+  tentativa de upload. Assim, `DualFusionUnavailable` deixa de ser levantada com
+  `failures` vazio (#635).
 - **Corrigido** `acessilia_sdk.runtime.run_sync` agora fecha a corrotina quando
   o preparo do worker falha -- cópia do contexto, criação do executor ou envio
   do trabalho -- em vez de deixá-la sem `await` e emitir depois

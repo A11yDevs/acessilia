@@ -10,6 +10,7 @@ from acessilia_core.pipeline.fusion import (
     apply_page_routes,
     extract_fused,
 )
+from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
 from core_config_support import toolbox_config
 from docstruct.fusion.payload import group_payload_by_page as _group_by_page
 
@@ -66,7 +67,7 @@ class TestExtractFused:
     async def test_primary_failure_fallback(self, monkeypatch):
         async def fake_extract(provider):
             if provider == "docling":
-                return None
+                raise ToolboxProviderUnavailable("docling down")
             return _payload([_el("só mineru", 0)])
 
         monkeypatch.setattr(
@@ -80,13 +81,12 @@ class TestExtractFused:
     @pytest.mark.asyncio
     async def test_both_fail(self, monkeypatch):
         async def fake_extract(provider):
-            return None
+            raise ToolboxProviderUnavailable(f"{provider} down")
 
         monkeypatch.setattr(
             "acessilia_core.pipeline.fusion._structure_client",
             _FakeClientFactory(extract_fn=fake_extract),
         )
-        from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
 
         with pytest.raises(ToolboxProviderUnavailable):
             await extract_fused("arquivo.pdf", secondary_provider="mineru", toolbox=toolbox_config())

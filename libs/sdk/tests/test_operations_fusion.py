@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+from typing import Any
 from urllib.parse import parse_qs
 
 import httpx
@@ -15,6 +16,7 @@ from acessilia_sdk.operations.fusion import (
 )
 from acessilia_sdk.toolbox import (
     ToolboxArtifactNotFound,
+    ToolboxContractViolation,
     ToolboxError,
     ToolboxProviderUnavailable,
 )
@@ -71,6 +73,29 @@ def _clients() -> tuple[ToolboxStructureClient, ToolboxStructureClient]:
     primary = ToolboxStructureClient(base_url=BASE, provider="docling", timeout_seconds=5)
     secondary = ToolboxStructureClient(base_url=BASE, provider="mineru", timeout_seconds=5)
     return primary, secondary
+
+
+def _envelope(elements: list[dict]) -> dict:
+    return {"status": "succeeded", "document": {"elements": elements}}
+
+
+class _FakeStructureClient:
+    """A structure client that answers with each of ``answers`` in turn (or raises it)."""
+
+    def __init__(self, provider: str, *answers: Any) -> None:
+        self.provider = provider
+        self.calls: list[dict[str, Any]] = []
+        self._answers = list(answers)
+
+    async def extract_structure(self, file_path: object = None, **kwargs: Any) -> Any:
+        self.calls.append({"file_path": file_path, **kwargs})
+        answer = self._answers.pop(0)
+        if isinstance(answer, BaseException):
+            raise answer
+        return answer
+
+    async def close(self) -> None:
+        pass
 
 
 @pytest.mark.asyncio
@@ -291,6 +316,122 @@ async def test_missing_artifact_without_file_path_records_failure_instead_of_upl
     assert result.fused is False
     assert result.artifact_fallbacks == ()
     assert isinstance(result.failures["mineru"], ToolboxArtifactNotFound)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        None,
+        [],
+        "envelope",
+        7,
+        {"status": "succeeded"},
+        {"status": "succeeded", "document": None},
+        {"status": "succeeded", "document": "nope"},
+    ],
+)
+@pytest.mark.asyncio
+async def test_a_payload_outside_the_contract_is_a_recorded_contract_violation(
+    invalid: Any,
+) -> None:
+    primary = _FakeStructureClient("docling", invalid)
+    secondary = _FakeStructureClient(
+        "mineru",
+        _envelope([{"type": "paragraph", "text": "Secondary survives", "page_number": 1}]),
+    )
+
+    result = await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert result.fused is False
+    assert isinstance(result.failures["docling"], ToolboxContractViolation)
+    assert set(result.failures) == {"docling"}
+    assert result.payload["document"]["elements"][0]["text"] == "Secondary survives"
+    # No step for the provider whose answer violated the contract.
+    assert result.steps == (
+        Step("document.structure.extract", "mineru", {"language": "pt-BR", "source": "file"}),
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_invalid_artifact_payload_is_not_retried_as_an_upload() -> None:
+    primary = _FakeStructureClient("docling", None)
+    secondary = _FakeStructureClient("mineru", _envelope([]))
+
+    result = await extract_dual_fused(primary, secondary, "doc.pdf", artifact_id=SOURCE_ID)
+
+    assert isinstance(result.failures["docling"], ToolboxContractViolation)
+    assert result.artifact_fallbacks == ()
+    assert len(primary.calls) == 1
+    assert "artifact_id" in primary.calls[0]
+
+
+@pytest.mark.asyncio
+async def test_an_invalid_upload_after_a_missing_artifact_keeps_both_diagnostics() -> None:
+    primary = _FakeStructureClient("docling", ToolboxArtifactNotFound("gone"), None)
+    secondary = _FakeStructureClient("mineru", _envelope([]))
+
+    result = await extract_dual_fused(primary, secondary, "doc.pdf", artifact_id=SOURCE_ID)
+
+    assert isinstance(result.failures["docling"], ToolboxContractViolation)
+    assert result.artifact_fallbacks == ("docling",)
+    assert ["artifact_id" in call for call in primary.calls] == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_the_real_client_records_a_non_object_answer_without_reuploading(
+    respx_mock, tmp_path
+) -> None:
+    doc = tmp_path / "sample.pdf"
+    doc.write_bytes(b"%PDF-1.4")
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        if _provider_of(request) == "docling":
+            return httpx.Response(200, json=["not", "an", "object"])
+        return _structure_response(
+            "mineru",
+            [{"type": "paragraph", "text": "Secondary survives", "page_number": 1}],
+        )
+
+    route = respx_mock.post(f"{BASE}/v1/capabilities/document.structure.extract:execute").mock(
+        side_effect=responder
+    )
+
+    primary, secondary = _clients()
+    try:
+        result = await extract_dual_fused(primary, secondary, doc, artifact_id=SOURCE_ID)
+    finally:
+        await primary.close()
+        await secondary.close()
+
+    assert isinstance(result.failures["docling"], ToolboxContractViolation)
+    assert result.artifact_fallbacks == ()
+    assert result.steps == (
+        Step(
+            "document.structure.extract",
+            "mineru",
+            {"language": "pt-BR", "source": "artifact"},
+        ),
+    )
+    docling_calls = [
+        call for call in route.calls if _provider_of(call.request) == "docling"
+    ]
+    assert len(docling_calls) == 1
+    assert _has_artifact_id(docling_calls[0].request)
+
+
+@pytest.mark.asyncio
+async def test_both_providers_answering_none_record_each_contract_violation() -> None:
+    primary = _FakeStructureClient("docling", None)
+    secondary = _FakeStructureClient("mineru", None)
+
+    with pytest.raises(DualFusionUnavailable) as caught:
+        await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert set(caught.value.failures) == {"docling", "mineru"}
+    assert all(
+        isinstance(exc, ToolboxContractViolation)
+        for exc in caught.value.failures.values()
+    )
 
 
 @pytest.mark.asyncio
