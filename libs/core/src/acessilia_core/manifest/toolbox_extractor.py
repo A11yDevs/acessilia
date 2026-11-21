@@ -256,7 +256,7 @@ class ToolboxManifestExtractor:
         )
 
         extraction_failures: dict[str, str] = {}
-        final_provider = structure.provider
+        final_provider = structure.provider or "primary"
         final_base_url = structure.base_url
         dual_enabled = (
             fusion_config.mode == "dual"
@@ -289,6 +289,9 @@ class ToolboxManifestExtractor:
             )
 
         if result is None:
+            # Defensive: _extract_primary raises or returns a validated envelope,
+            # and _apply_dual_extraction never returns None; keep a typed error
+            # instead of an assert that ``python -O`` would strip (#673).
             raise primary_error or ToolboxContractViolation(
                 "The structure extraction produced no document"
             )
@@ -370,6 +373,9 @@ class ToolboxManifestExtractor:
                 raise
             _record_provider_failure(provider, exc, extraction_failures)
             return None, exc
+        # Validate outside the client `except`: a contract violation raised by
+        # the transport stays permanent, while a provider's malformed answer can
+        # differ by provider and degrades to the secondary (#673).
         try:
             return _validated_structure_result(result, provider=provider), None
         except ToolboxContractViolation as exc:
@@ -395,6 +401,7 @@ class ToolboxManifestExtractor:
         extraction_failures: dict[str, str],
     ) -> tuple[dict[str, Any], str, str]:
         secondary_provider = fusion_config.secondary_provider
+        primary_provider = structure.provider or "primary"
         if secondary_provider == structure.provider:
             if primary_result is None:
                 raise ToolboxContractViolation(
@@ -404,7 +411,7 @@ class ToolboxManifestExtractor:
                 **primary_result,
                 "fusion": {
                     "status": "skipped",
-                    "providers": [structure.provider],
+                    "providers": [primary_provider],
                     "failed_providers": [],
                     "reason": "identical-providers",
                 },
@@ -414,7 +421,7 @@ class ToolboxManifestExtractor:
                     provider=secondary_provider
                 )
             )
-            return skipped, structure.provider, structure.base_url
+            return skipped, primary_provider, structure.base_url
 
         secondary_client = make_toolbox_client(
             ToolboxStructureClient, toolbox_config, provider=secondary_provider
@@ -442,7 +449,7 @@ class ToolboxManifestExtractor:
                 secondary_provider=secondary_provider,
                 extraction_failures=extraction_failures,
             )
-            return degraded, structure.provider, structure.base_url
+            return degraded, primary_provider, structure.base_url
         finally:
             await secondary_client.close()
 
@@ -452,7 +459,7 @@ class ToolboxManifestExtractor:
                 "fusion": {
                     "status": "degraded",
                     "providers": [secondary_provider],
-                    "failed_providers": [structure.provider],
+                    "failed_providers": [primary_provider],
                     "reason": type(primary_error).__name__,
                 },
             }
@@ -462,13 +469,13 @@ class ToolboxManifestExtractor:
             primary_result,
             secondary_result,
             source_path=source_path,
-            primary_provider=structure.provider,
+            primary_provider=primary_provider,
             secondary_provider=secondary_provider,
             fusion_config=fusion_config,
             toolbox_config=toolbox_config,
             data_dir=data_dir,
         )
-        return fused, structure.provider, structure.base_url
+        return fused, primary_provider, structure.base_url
 
     async def _extract_secondary(
         self,
@@ -524,12 +531,13 @@ class ToolboxManifestExtractor:
     ) -> dict[str, Any]:
         # With the primary's result in hand the comparison is only a gain, so
         # any secondary failure degrades instead of discarding a complete extraction.
+        primary_provider = structure.provider or "primary"
         if primary_error is not None:
             if not _provider_failure(exc):
                 raise exc from primary_error
             raise ToolboxUnavailable(
                 [
-                    (f"{structure.base_url} ({structure.provider})", primary_error),
+                    (f"{structure.base_url} ({primary_provider})", primary_error),
                     (f"{secondary_client.base_url} ({secondary_provider})", exc),
                 ]
             ) from exc
@@ -542,7 +550,7 @@ class ToolboxManifestExtractor:
             **primary_result,
             "fusion": {
                 "status": "degraded",
-                "providers": [structure.provider],
+                "providers": [primary_provider],
                 "failed_providers": [secondary_provider],
                 "reason": type(exc).__name__,
             },

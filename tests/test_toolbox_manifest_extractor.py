@@ -591,7 +591,7 @@ def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_cli
 def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
     mock_client, answer
 ):
-    """#673: an injected client's None/bare answer is a copy of the provider error."""
+    """#673: a None/bare answer raises the typed error instead of tripping an assert."""
     mock_client.extract_structure = AsyncMock(return_value=answer)
 
     with pytest.raises(ToolboxContractViolation, match="docling"):
@@ -613,10 +613,12 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
 ):
     """#673: a primary whose answer is not an envelope hands over to the secondary."""
     mock_client.extract_structure = AsyncMock(return_value=answer)
+    secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
+    secondary_payload["provider"] = "mineru"
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
     secondary.base_url = "http://localhost:8002"
-    secondary.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    secondary.extract_structure.return_value = secondary_payload
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: secondary,
@@ -631,24 +633,31 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     )
 
     assert result.configuration["toolbox_provider"] == "mineru"
+    assert result.configuration["toolbox_base_url"] == "http://localhost:8002"
     assert result.configuration["extraction_degraded"] is True
     assert result.configuration["extraction_failures"] == {
         "docling": "ToolboxContractViolation"
     }
+    assert result.document["provider"] == "mineru"
     assert result.document["fusion"]["status"] == "degraded"
     assert result.document["fusion"]["failed_providers"] == ["docling"]
+    assert result.document["fusion"]["reason"] == "ToolboxContractViolation"
     secondary.close.assert_awaited_once()
 
 
+@pytest.mark.parametrize("answer", [
+    None,
+    {"status": "succeeded", "document": "not-an-object"},
+])
 def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_contract(
-    mock_client, monkeypatch
+    mock_client, monkeypatch, answer
 ):
     """#673: an invalid secondary answer degrades instead of discarding the primary."""
     mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
     secondary.base_url = "http://localhost:8002"
-    secondary.extract_structure.return_value = None
+    secondary.extract_structure.return_value = answer
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
         lambda *a, **k: secondary,
@@ -669,6 +678,7 @@ def test_dual_mode_keeps_the_primary_when_the_secondary_answer_is_outside_the_co
     }
     assert "fusion_evidence" not in result.document
     assert result.document["fusion"]["failed_providers"] == ["mineru"]
+    assert result.document["fusion"]["reason"] == "ToolboxContractViolation"
     secondary.close.assert_awaited_once()
 
 
@@ -697,6 +707,47 @@ def test_dual_mode_raises_when_both_answers_are_outside_the_contract(
 
     assert isinstance(caught.value.__cause__, ToolboxContractViolation)
     secondary.close.assert_awaited_once()
+
+
+def test_identical_providers_with_an_invalid_primary_answer_raise(
+    mock_client, monkeypatch
+):
+    """#673: without a distinct secondary the validation error is permanent."""
+    mock_client.extract_structure.return_value = None
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    with pytest.raises(ToolboxContractViolation, match="docling"):
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            fusion=fusion_config(mode="dual", secondary_provider="docling"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+
+def test_presentation_mode_with_an_invalid_answer_does_not_try_a_secondary(
+    mock_client, monkeypatch
+):
+    """#673: dual_fusion=False keeps the single-provider failure permanent."""
+    mock_client.extract_structure.return_value = None
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    with pytest.raises(ToolboxContractViolation, match="docling"):
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            dual_fusion=False,
+            fusion=fusion_config(mode="dual", secondary_provider="mineru"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
 
 
 @pytest.mark.parametrize("primary_ok,secondary_ok", [(True, True), (True, False), (False, True), (False, False)])
