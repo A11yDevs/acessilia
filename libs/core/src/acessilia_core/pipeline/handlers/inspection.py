@@ -279,10 +279,14 @@ def _persist_region_inspection(
         vision_description_complete=True,
         vision_language=item.output.language,
         vision_confidence=item.output.confidence,
-        vision_warnings=item.output.warnings,
+        vision_warnings=list(item.output.warnings),
         region_crop=crop.path,
         region_inspection=record.id,
     )
+    # A successful inspection replaces the failed description (#680): the
+    # failure keys would otherwise keep the element counted as undescribed.
+    replacement.metadata.pop("vision_failure_reason", None)
+    replacement.metadata.pop("vision_failure_detail", None)
     replacement.text = item.text
     replacement.type = "formula" if item.output.kind == "formula" else "picture"
     if replacement.type == "picture":
@@ -452,6 +456,9 @@ def _persist_page_inspection(
             vision_description_complete=True,
             src="data:image/png;base64," + base64.b64encode(item.image).decode("ascii"),
         )
+        # The page is now described; a previous failure is no longer true (#680).
+        replacement.metadata.pop("vision_failure_reason", None)
+        replacement.metadata.pop("vision_failure_detail", None)
     return replacement, [page_image, record], is_blank
 
 

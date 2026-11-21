@@ -145,9 +145,9 @@ It finds 63 keys, 17 of them written or read by more than one group.
 | Key | Written by | Read by | What the current order guarantees |
 |---|---|---|---|
 | `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, before planning, claims a detached negation bar for inline math only if no one has claimed it. F, during execution, skips claimed bars and marks the ones it composes. W leaves claimed bars out of the payload. Q's claim therefore wins, and F is idempotent. |
-| `metadata["vision_description_complete"]` | O, P | E, O, X | O sets it on a description and clears it when it records a failure. P sets it when a formula region turns out to be a described picture. E's vision handler skips complete pictures, and X uses it to decide which picture text the payload keeps. |
-| `metadata["vision_failure_reason"]` | O | E, O, V | O records the cause and its retry reads it. E's handler reads it. V reports it as a visible degradation (`records_visual_failures`). |
-| `metadata["vision_confidence" / "vision_elements" / "vision_language" / "vision_warnings"]` | O, P | — | Two writers of the same description fields: O for pictures, P for the vision fallback of formulas. They must keep one shape. |
+| `metadata["vision_description_complete"]` | G, O, P | E, O, X | G sets it when a region or page inspection describes an element and clears that element's failure keys. O sets it on a description and clears it when it records a failure. P sets it when a formula region turns out to be a described picture. E's vision handler skips complete pictures, and X uses it to decide which picture text the payload keeps. |
+| `metadata["vision_failure_reason"]` | G, O | E, O, V | O records the cause and its retry reads it. G clears it, with `vision_failure_detail`, when a region or page inspection describes the element. E's handler reads it. V reports it as a visible degradation (`records_visual_failures`). |
+| `metadata["vision_confidence" / "vision_elements" / "vision_language" / "vision_warnings"]` | G, O, P | — | Three writers of the same description fields: G for region and page inspection, O for pictures, P for the vision fallback of formulas. They must keep one shape. |
 | `metadata["original_type"]` | K, O, P | — | Assigned, not set once. When an element is reclassified twice, the last writer decides which original type survives, so the order is part of the behaviour. |
 | `metadata["src"]` | G, P | O | Region and page inspection and the formula crop record the image source; picture enrichment reads it. |
 | `metadata["table_ast"]` | S | E, F, I, Q, S | S writes it before planning. Q's table pass runs after S, because S can replace a table's cells. E, F and I read it during execution. |
@@ -178,7 +178,7 @@ The plan's handlers (B, E–L) run next. T's status checks and the payload (V, W
 
 **Characterization first.** Before a move touches either side of a shared key, a test should pin the pair end to end on one manifest, not each side alone:
 - F, Q and W on `negation_overlay`;
-- O, P, E and X on `vision_description_complete`;
+- G, O, P, E and X on `vision_description_complete`;
 - S before Q on `table_ast`;
 - B and E before T on the readable-formula keys;
 - O and S into V on the failure records;

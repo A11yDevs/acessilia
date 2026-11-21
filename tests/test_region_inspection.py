@@ -125,6 +125,41 @@ def test_real_region_inspection_updates_output_and_records_evidence(inspection, 
     assert ("x^2" if kind == "formula" else "A map") in payload["text"]
 
 
+def test_a_successful_region_inspection_replaces_the_failed_description_metadata(
+    inspection, tmp_path
+):
+    manifest, _, _ = inspection
+    element = manifest.elements[0]
+    element.metadata["vision_failure_reason"] = "model_failed"
+    element.metadata["vision_failure_detail"] = "timeout"
+    output = VisionOutput(
+        kind="description",
+        description="A map",
+        language="en",
+        confidence=0.9,
+        warnings=["blurred"],
+    )
+    item = inspection_handlers._InspectedRegion(
+        element=element,
+        image=b"png",
+        page_number=1,
+        rectangle=[10.0, 20.0, 90.0, 70.0],
+        output=output,
+        text="A map",
+    )
+
+    replacement, _ = inspection_handlers._persist_region_inspection(
+        manifest, "o-1", item, data_dir=tmp_path
+    )
+
+    assert replacement.metadata["vision_description_complete"] is True
+    assert replacement.metadata["vision_warnings"] == ["blurred"]
+    # #680: the manifest must not share the model output's list object.
+    assert replacement.metadata["vision_warnings"] is not output.warnings
+    assert "vision_failure_reason" not in replacement.metadata
+    assert "vision_failure_detail" not in replacement.metadata
+
+
 @pytest.mark.parametrize("enabled", [True, False])
 def test_the_region_cache_follows_the_run_config(inspection, enabled):
     manifest, _, vision = inspection
