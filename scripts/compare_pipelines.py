@@ -496,7 +496,10 @@ def _collect_inputs(file_or_dir: Path, recursive: bool) -> list[Path]:
         return [file_or_dir]
     if not file_or_dir.is_dir():
         return []
-    paths = file_or_dir.rglob("*") if recursive else file_or_dir.iterdir()
+    try:
+        paths = list(file_or_dir.rglob("*") if recursive else file_or_dir.iterdir())
+    except OSError:
+        return []
     inputs = [
         path
         for path in paths
@@ -541,7 +544,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "input",
         type=Path,
-        help="Input file or directory with input files.",
+        help=(
+            "Input file, or a directory scanned for .pdf/.jpg/.jpeg/.png "
+            "(case-insensitive)."
+        ),
     )
     parser.add_argument(
         "-o",
