@@ -322,15 +322,20 @@ def _fold_table_reading(
 ) -> None:
     """Write a kept table reading into ``element``, keeping the first replaced misread AST.
 
-    ``table_ast_replaced`` is the evidence of what the table looked like before
-    the review rewrote it. Once set, later replacements keep it instead of
-    overwriting it with the previous accepted reading (#685).
+    ``table_ast_replaced`` is the first AST a review replaced: once set, later
+    replacements keep it instead of overwriting it with the previous accepted
+    reading (#685). ``table_review`` is not a snapshot of the same pass: it
+    describes the latest review (reason, outcome, attempts), so a table
+    replaced more than once pairs the first AST with the last verdict.
     """
     element.metadata.pop("table_read_failure", None)
     rows = table_output.table_rows()
     table_ast = table_output.table_ast()
     if reason is not None:
-        element.metadata.setdefault("table_ast_replaced", element.metadata["table_ast"])
+        # A corrupt value from a hand-edited or restored manifest is not
+        # evidence; keep only a real replaced AST.
+        if not isinstance(element.metadata.get("table_ast_replaced"), dict):
+            element.metadata["table_ast_replaced"] = element.metadata["table_ast"]
         element.metadata["table_review"] = {
             "reason": reason, "outcome": "replaced",
             "attempts": _table_review_attempts(element, attempt),
