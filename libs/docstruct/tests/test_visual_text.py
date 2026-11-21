@@ -22,6 +22,7 @@ from docstruct.visual_text import (
     is_scene_ocr_collection,
     is_scene_text_covered,
     is_scene_text_fragment,
+    is_scene_text_garbage,
     scene_text_residue,
 )
 
@@ -197,8 +198,11 @@ def test_is_scene_text_covered_checks_distinctive_tokens_and_spaceless_matches()
     assert is_scene_text_covered("FAVELAVIVE", rich_description)
     assert is_scene_text_covered("MINHA GENTE", rich_description)
     assert is_scene_text_covered("PAZ NO MUNDO", rich_description)
-    # Pure OCR noise is always treated as covered once a description exists.
-    assert is_scene_text_covered("BM", "A political world map.")
+    # Garbage with no readable word is always treated as covered.
+    assert is_scene_text_covered("R:T", "A political world map.")
+    # A short word is an inscription, not noise: it must be mentioned to be covered.
+    assert not is_scene_text_covered("ZECA", "A political world map.")
+    assert is_scene_text_covered("ZECA", "Painted bricks reading 'Zeca Pagodinho'.")
 
     generic_description = "A colorful art installation photographed at night."
     assert not is_scene_text_covered("FAVELA VIVE", generic_description)
@@ -341,6 +345,26 @@ def test_scene_text_residue_keeps_every_meaningful_fragment_without_a_descriptio
         described=False,
     )
     assert residue == ("MINHA GENTE", "PAZ NO MUNDO")
+
+
+@pytest.mark.parametrize(
+    ("fragment", "garbage"),
+    [
+        ("ZECA", False),
+        ("Luci", False),
+        ("GABI", False),
+        ("BOOK.", False),
+        ("PAZ NO MUNDO", False),
+        ("R:T", True),
+        ("\u4e2d", True),
+        ("12/03", True),
+        ("  ", True),
+        ("", True),
+    ],
+)
+def test_is_scene_text_garbage_keeps_short_words(fragment: str, garbage: bool) -> None:
+    """On a photo a single short word is the inscription; only text with no readable word is garbage."""
+    assert is_scene_text_garbage(fragment) is garbage
 
 
 def test_scene_text_residue_drops_misreads_when_the_description_transcribes_the_scene() -> None:

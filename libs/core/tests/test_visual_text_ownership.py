@@ -215,10 +215,27 @@ async def test_case_398_real_ocr_is_carried_once_by_the_image_when_vision_fails(
     assert [b["type"] for b in page["blocks"]] == ["image"]
     alt = page["blocks"][0]["alt_text"]
     assert alt.startswith("Image without a text description. Text visible in the image: ")
-    for fragment in ("MINHA GENTE", "VILA ISABEL", "PAZ NO MUNDO", "MESTRE FULEIRO"):
-        assert alt.count(fragment) == 1
-    # Pure OCR noise (a stray CJK glyph, ``R:T``) is not carried.
-    assert "中" not in alt and "R:T" not in alt
+    carried = alt.removeprefix(
+        "Image without a text description. Text visible in the image: "
+    ).removesuffix(".").split("; ")
+    # Every readable inscription survives, short single words included (ZECA, Luci).
+    for fragment in (
+        "MINHA GENTE",
+        "VILA ISABEL",
+        "PAZ NO MUNDO",
+        "MESTRE FULEIRO",
+        "ZECA",
+        "GABI",
+        "Luci",
+        "DONA",
+        "MORRO",
+    ):
+        assert carried.count(fragment) == 1
+    # Only text with no readable word (a stray CJK glyph, ``R:T``) is not carried;
+    # the repeated ``SAMBA`` is carried once.
+    assert "中" not in carried and "R:T" not in carried
+    assert carried.count("SAMBA") == 1
+    assert len(carried) == len(set(ISSUE_398_FRAGMENTS)) - 2
     _assert_no_scene_text_block(manifest, page)
 
 

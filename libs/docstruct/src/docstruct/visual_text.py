@@ -284,6 +284,25 @@ def is_scene_ocr_collection(elements: Iterable[ExtractedElement]) -> bool:
     return len(text_items) >= 2
 
 
+def is_scene_text_garbage(text: str | None) -> bool:
+    """Whether a scene-text fragment carries no readable word (#398).
+
+    Unlike :func:`docstruct.placeholders.is_ocr_noise`, which answers "does
+    this document have content?", a single short word on a photo *is* the
+    content (``ZECA``, ``Luci``). Only blank text, placeholders, and text
+    with no run of two letters (``R:T``, a stray glyph, digits or symbols)
+    are garbage.
+    """
+    normalized = (text or "").strip()
+    if not normalized or is_placeholder_text(normalized):
+        return True
+    longest = run = 0
+    for ch in normalized:
+        run = run + 1 if ch.isalpha() else 0
+        longest = max(longest, run)
+    return longest < 2
+
+
 def is_document_artifact(media_inspection: Mapping[str, Any] | None) -> bool:
     """Whether a media inspection classifies the input as a document page, not a scene."""
     if not isinstance(media_inspection, Mapping):
@@ -305,9 +324,9 @@ def is_scene_text_covered(
     description: str | None,
     mentioned_elements: Iterable[str] = (),
 ) -> bool:
-    """Whether ``fragment`` is covered by ``description`` (or is pure OCR noise)."""
+    """Whether ``fragment`` is covered by ``description`` (or carries no readable word)."""
     normalized = (fragment or "").strip()
-    if is_ocr_noise(normalized) or is_placeholder_text(normalized):
+    if is_scene_text_garbage(normalized):
         return True
     combined_desc = " ".join(
         [description or "", *(str(item) for item in mentioned_elements)]
@@ -341,7 +360,8 @@ def scene_text_residue(
     Scene text is never a document block; this decides what of it the image
     keeps, once each, in reading order:
 
-    - OCR noise and placeholders are dropped;
+    - garbage with no readable word is dropped (:func:`is_scene_text_garbage`);
+      short words are kept, since on a photo they are the inscriptions;
     - without a usable description (vision failure, dry run) every meaningful
       fragment is kept, so the text is not lost;
     - fragments the description covers are dropped;
@@ -353,12 +373,7 @@ def scene_text_residue(
     meaningful: list[str] = []
     for fragment in fragments:
         normalized = " ".join((fragment or "").split())
-        if (
-            normalized
-            and not is_ocr_noise(normalized)
-            and not is_placeholder_text(normalized)
-            and normalized not in meaningful
-        ):
+        if not is_scene_text_garbage(normalized) and normalized not in meaningful:
             meaningful.append(normalized)
     if not meaningful or not described:
         return tuple(meaningful)
@@ -784,5 +799,6 @@ __all__ = [
     "is_scene_ocr_collection",
     "is_scene_text_covered",
     "is_scene_text_fragment",
+    "is_scene_text_garbage",
     "scene_text_residue",
 ]
