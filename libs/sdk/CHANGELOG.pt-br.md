@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Corrigido** `extract_dual_fused` trata uma resposta de
+  `document.structure.extract` fora do envelope (não é um objeto JSON, ou não
+  traz o objeto `document`) como `ToolboxContractViolation` registrada em
+  `failures`, sem emitir um `Step`, em vez de um passo bem-sucedido com um
+  payload inválido; no caminho de artefato, a violação não dispara nova
+  tentativa de upload. Assim, `DualFusionUnavailable` deixa de ser levantada com
+  `failures` vazio (#635).
 - **Alterado** `acessilia_sdk.runtime.run_sync` agora copia o contexto
   `contextvars` do chamador para a worker thread quando chamado dentro de um
   event loop em execução, propagando `operation_context` e variáveis de escopo
