@@ -9,10 +9,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 - **Corrigido** `acessilia_sdk.runtime.run_sync` também fecha a corrotina quando
   `asyncio.run` falha antes de um event loop assumir a posse -- por exemplo uma
-  política de event loop cujo `new_event_loop` levanta erro, ou esgotamento de
-  recursos -- para que o caminho sem loop não a deixe vazar para um
-  `RuntimeWarning: coroutine ... was never awaited` posterior (#668). A
-  docstring agora cobre os dois caminhos.
+  política de event loop personalizada cujo `new_event_loop` levanta erro, ou
+  esgotamento de recursos -- para que o caminho sem loop não a deixe vazar
+  para um `RuntimeWarning: coroutine ... was never awaited` posterior (#668).
+  A docstring agora cobre os dois caminhos.
 - **Corrigido** `extract_dual_fused` trata uma resposta de
   `document.structure.extract` fora do envelope (não é um objeto JSON, ou não
   traz o objeto `document`) como `ToolboxContractViolation` registrada em

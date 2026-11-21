@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import gc
 import inspect
 import threading
+import warnings
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import NoReturn
@@ -73,6 +75,13 @@ def test_a_failed_event_loop_creation_closes_the_coroutine() -> None:
         # Closing is what prevents ``coroutine ... was never awaited`` when
         # the object is collected, so the state assertion subsumes the warning.
         assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            del coro
+            gc.collect()
+        assert not any(
+            "was never awaited" in str(item.message) for item in caught
+        )
     finally:
         asyncio.set_event_loop_policy(previous)
 

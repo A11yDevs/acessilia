@@ -17,8 +17,10 @@ def _close_if_never_started(coro: Coroutine[Any, Any, T]) -> None:
 
     ``asyncio.run`` closes a coroutine it started, but it may fail before its
     loop exists (a broken event loop policy, resource exhaustion).  Only a
-    coroutine still in ``CORO_CREATED`` is ours to close; anything else was
-    already consumed, and the original failure must not be masked.
+    native coroutine -- one produced by ``async def`` -- exposes
+    ``CORO_CREATED``; custom ``collections.abc.Coroutine`` objects are left to
+    their owner, since they cannot emit the native "never awaited" warning and
+    their state is not observable.
     """
     if (
         inspect.iscoroutine(coro)
@@ -49,9 +51,11 @@ def run_sync(coro: Coroutine[Any, Any, T]) -> T:
     Coroutine ownership:
         ``run_sync`` consumes the coroutine object.  If it fails before an
         event loop takes ownership -- ``asyncio.run`` cannot start its loop,
-        or the worker setup fails -- the coroutine is closed before the error
-        propagates, so the failure cannot surface later as
-        ``RuntimeWarning: coroutine ... was never awaited``.
+        or the worker setup fails -- a native coroutine (one produced by
+        ``async def``) is closed before the error propagates, so the failure
+        cannot surface later as ``RuntimeWarning: coroutine ... was never
+        awaited``. Custom ``collections.abc.Coroutine`` objects are left to
+        their owner.
     """
     try:
         asyncio.get_running_loop()
