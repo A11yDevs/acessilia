@@ -199,7 +199,7 @@ def test_a_region_inspection_without_a_logo_answer_clears_the_stale_value(
 
 
 def test_the_region_handler_records_the_logo_answer(inspection):
-    """#692: the live handler carries the model's logo answer into the manifest."""
+    """#692: the live handler carries the logo answer into the manifest and payload."""
     manifest, _, vision = inspection
     vision.response = VisionOutput(
         kind="description",
@@ -216,12 +216,11 @@ def test_the_region_handler_records_the_logo_answer(inspection):
     assert result.success and result.validated, result.message
     updated = next(item for item in manifest.elements if item.id == "unknown")
     assert updated.metadata["vision_institutional_logo"] is True
-    [page] = [
-        page
-        for page in pipeline_payload._manifest_pages_to_payload(manifest)
-        if page["blocks"]
-    ]
-    assert page["blocks"][0]["metadata"]["vision_institutional_logo"] is True
+    pages = pipeline_payload._manifest_pages_to_payload(manifest)
+    page = next(item for item in pages if item["page_number"] == 1)
+    block = next(item for item in page["blocks"] if item["id"] == "unknown")
+    assert block["type"] == "image"
+    assert block["metadata"]["vision_institutional_logo"] is True
 
 
 @pytest.mark.parametrize("kind", ["description", "formula"])
