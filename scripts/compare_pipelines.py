@@ -494,6 +494,8 @@ def _collect_inputs(file_or_dir: Path, recursive: bool) -> list[Path]:
     """Collect supported inputs from a path (an explicit file or a directory)."""
     if file_or_dir.is_file():
         return [file_or_dir]
+    if not file_or_dir.is_dir():
+        return []
     paths = file_or_dir.rglob("*") if recursive else file_or_dir.iterdir()
     inputs = [
         path

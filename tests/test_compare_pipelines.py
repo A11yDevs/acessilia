@@ -549,6 +549,12 @@ def test_collect_inputs_accepts_supported_suffixes(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize("recursive", [False, True])
+def test_collect_inputs_missing_path_returns_empty(tmp_path: Path, recursive: bool) -> None:
+    """A missing input path is reported as no files, not a traceback (#695)."""
+    assert _collect_inputs(tmp_path / "missing", recursive=recursive) == []
+
+
 def test_max_files_rejects_a_negative_value(monkeypatch) -> None:
     """A negative --max-files must fail instead of slicing off the last file (#695)."""
     monkeypatch.setattr(
