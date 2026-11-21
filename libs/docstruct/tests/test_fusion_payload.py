@@ -589,11 +589,11 @@ class TestRoutePagesAndApplyPageRoutes:
         # #633: the caller's payload is input; normalization happens on copies.
         assert primary["document"]["elements"][2]["id"] is None
 
-    @pytest.mark.parametrize("missing_id", ["absent", ""])
+    @pytest.mark.parametrize("missing_id", ["absent", "", 123])
     def test_primary_elements_without_a_usable_id_get_a_deterministic_id(
-        self, missing_id: str
+        self, missing_id: object
     ) -> None:
-        """#664: a missing/empty primary id is normalized for page membership."""
+        """#664: a missing/empty/non-string primary id is normalized for membership."""
         element = {
             "type": "paragraph",
             "text": "primary without usable id",
@@ -628,7 +628,7 @@ class TestRoutePagesAndApplyPageRoutes:
         assert document["pages"][2]["element_ids"] == ["element-p3-1"]
         assert document["summary"]["element_count"] == 4
         assert primary["document"]["elements"][2].get("id") == (
-            "" if missing_id == "" else None
+            None if missing_id == "absent" else missing_id
         )
 
     def test_an_id_less_element_joins_a_page_that_already_lists_ids(self) -> None:
@@ -722,6 +722,99 @@ class TestRoutePagesAndApplyPageRoutes:
             "element-unpaged-1" not in page["element_ids"]
             for page in document["pages"]
         )
+
+    def test_a_routed_page_drops_its_id_less_primary_element(self) -> None:
+        """#664: normalization only keeps the elements that survive the routing."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                {
+                    "type": "paragraph",
+                    "text": "primary without id",
+                    "page_number": 2,
+                    "reading_order": 2,
+                },
+                _doc_element("p3", 3, 3, "docling page 3"),
+            ],
+            pages=3,
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert all(
+            element.get("text") != "primary without id"
+            for element in result.payload["document"]["elements"]
+        )
+        assert result.replaced[2][0].get("id") is None
+        assert result.payload["document"]["pages"][1]["element_ids"] == [
+            "mineru-s2",
+            "mineru-s3",
+        ]
+
+    def test_without_a_route_an_id_less_payload_is_returned_unchanged(self) -> None:
+        """#664: the no-route fast path keeps the payload identity and its ids."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                {
+                    "type": "paragraph",
+                    "text": "primary without id",
+                    "page_number": 2,
+                    "reading_order": 2,
+                },
+            ],
+            pages=2,
+        )
+
+        payload, replaced = apply_page_routes(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert payload is primary
+        assert replaced == {}
+        assert payload["document"]["elements"][1].get("id") is None
+
+    def test_an_id_less_element_with_a_zero_based_page_is_normalized(self) -> None:
+        """#664: the page scope follows the same zero-based ``page`` the routing reads."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+            ],
+            pages=3,
+        )
+        primary["document"]["elements"].append(
+            {
+                "type": "paragraph",
+                "text": "primary without id",
+                "page": 2,
+                "reading_order": 3,
+            }
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        document = result.payload["document"]
+        normalized = next(
+            element
+            for element in document["elements"]
+            if element.get("text") == "primary without id"
+        )
+        assert normalized["id"] == "element-p3-1"
+        assert document["pages"][2]["element_ids"] == ["element-p3-1"]
 
     def test_the_routed_payload_is_a_valid_structured_document(self) -> None:
         """#664: normalization keeps the routed payload valid as a manifest document."""

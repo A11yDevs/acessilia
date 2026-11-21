@@ -368,8 +368,14 @@ def _element_page_number(element: dict[str, Any]) -> int | None:
 
 
 def _has_id(element: dict[str, Any]) -> bool:
-    """Whether the element carries a non-empty id."""
+    """Whether the element carries a truthy id (``adopt_elements`` coerces it)."""
     return bool(element.get("id"))
+
+
+def _has_usable_id(element: dict[str, Any]) -> bool:
+    """Whether the element carries the non-empty string id the manifest requires."""
+    element_id = element.get("id")
+    return isinstance(element_id, str) and bool(element_id)
 
 
 def _elements_by_page(elements: list[Any]) -> dict[int, list[dict[str, Any]]]:
@@ -530,19 +536,21 @@ def _merge_routed_elements(
 def _normalize_missing_ids(elements: list[dict[str, Any]]) -> None:
     """Give the elements without a usable id a deterministic one, in place.
 
-    ``ProcessingManifest`` requires every element to carry a non-empty ``id``
-    and rebuilds page membership from it. Leaving a primary element id-less
-    drops it from ``page.element_ids`` and makes the payload fail manifest
-    validation later (#664). The generated id is page-scoped, so it stays
-    stable when elements before that page change, and a numeric suffix keeps
-    it unique when the provider already used the same shape.
+    ``ProcessingManifest`` requires every element to carry a non-empty string
+    ``id``; page membership is rebuilt from those ids by
+    ``_rebuild_routed_pages``. Leaving a primary element id-less (or with an
+    empty or non-string id) drops it from ``page.element_ids`` and makes the
+    payload fail manifest validation later (#664). The generated id is
+    page-scoped, so it stays stable when elements before that page change, and
+    a numeric suffix keeps it unique when the provider already used the same
+    shape.
     """
     used = {str(element.get("id")) for element in elements if _has_id(element)}
     positions: Counter[int | None] = Counter()
     for element in elements:
         page_number = _element_page_number(element)
         positions[page_number] += 1
-        if _has_id(element):
+        if _has_usable_id(element):
             continue
         scope = f"p{page_number}" if page_number is not None else "unpaged"
         candidate = f"element-{scope}-{positions[page_number]}"
@@ -572,7 +580,7 @@ def _rebuild_routed_pages(
     ids_by_page: dict[int, list[Any]] = {}
     for element in elements:
         page_number = _element_page_number(element)
-        if page_number is not None and _has_id(element):
+        if page_number is not None and _has_usable_id(element):
             ids_by_page.setdefault(page_number, []).append(element["id"])
     for number, descriptor in page_descriptors.items():
         descriptor["element_ids"] = ids_by_page.get(number, [])
@@ -633,11 +641,13 @@ def route_pages(
     ``page_evidence`` with ``stats["applied"] = secondary_provider`` on routed
     entries. ``page_evidence`` itself is never mutated (#633).
 
-    Primary elements kept in the payload that have no usable ``id`` receive a
-    deterministic, page-scoped one (``element-p{page}-{position}``, or
-    ``element-unpaged-{position}``), and ``page.element_ids`` is rebuilt from the
-    final elements, so the routed payload stays a valid document for
-    ``ProcessingManifest`` (#664).
+    Primary elements kept in the payload that have no usable ``id`` (missing,
+    empty or not a string) receive a deterministic, page-scoped one
+    (``element-p{page}-{position}``, or ``element-unpaged-{position}``), and
+    ``page.element_ids`` is rebuilt from the final elements, so the routed
+    payload stays a valid document for ``ProcessingManifest`` (#664). When no
+    page is routed the payload is returned unchanged, id-less elements
+    included.
     """
     primary_doc = primary_res.get("document") or {}
     secondary_doc = secondary_res.get("document") or {}
