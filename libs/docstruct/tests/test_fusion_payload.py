@@ -23,6 +23,10 @@ from docstruct.fusion.payload import (
     structure_signature,
 )
 from docstruct.fusion.types import DiffBlock
+from docstruct.manifest import (
+    structured_document_from_payload,
+    validate_structured_document,
+)
 
 PROSE = (
     "Accessibility requires clear document structure, accurate headings, "
@@ -86,6 +90,32 @@ def _routes(*providers: str) -> list[dict]:
         {"page_number": idx, "stats": {"route": route}}
         for idx, route in enumerate(providers, start=1)
     ]
+
+
+def _manifest_element(
+    element_id: str | None,
+    page_number: int,
+    reading_order: int,
+    text: str,
+) -> dict:
+    """A ``DocumentElement`` shaped for ``structured_document_from_payload``."""
+    element: dict = {
+        "type": "paragraph",
+        "raw_label": "text",
+        "reading_order": reading_order,
+        "hierarchy_level": 0,
+        "text": text,
+        "source_ref": None,
+        "parent_ref": None,
+        "parent_id": None,
+        "page_number": page_number,
+        "confidence": None,
+        "provenance": [],
+        "metadata": {},
+    }
+    if element_id is not None:
+        element["id"] = element_id
+    return element
 
 
 class TestPageSimilarity:
@@ -524,8 +554,8 @@ class TestRoutePagesAndApplyPageRoutes:
         assert result.page_evidence[1]["stats"]["applied"] == "mineru"
         assert "applied" not in evidence[1]["stats"]
 
-    def test_primary_elements_without_id_do_not_break_page_rebuild(self) -> None:
-        """#633: an unrouted primary element without id is skipped in element_ids."""
+    def test_primary_elements_without_id_get_a_deterministic_id(self) -> None:
+        """#664: an unrouted primary element without id is normalized, not dropped."""
         primary = _doc(
             [
                 _doc_element("p1", 1, 1, "docling page 1"),
@@ -547,18 +577,23 @@ class TestRoutePagesAndApplyPageRoutes:
             secondary_provider="mineru",
         )
 
-        assert result.payload["document"]["pages"][2]["element_ids"] == []
-        assert any(
-            element.get("text") == "primary without id"
-            for element in result.payload["document"]["elements"]
+        document = result.payload["document"]
+        normalized = next(
+            element
+            for element in document["elements"]
+            if element.get("text") == "primary without id"
         )
-        assert result.payload["document"]["summary"]["element_count"] == 4
+        assert normalized["id"] == "element-p3-1"
+        assert document["pages"][2]["element_ids"] == ["element-p3-1"]
+        assert document["summary"]["element_count"] == 4
+        # #633: the caller's payload is input; normalization happens on copies.
+        assert primary["document"]["elements"][2]["id"] is None
 
     @pytest.mark.parametrize("missing_id", ["absent", ""])
-    def test_primary_elements_without_a_usable_id_do_not_break_page_rebuild(
+    def test_primary_elements_without_a_usable_id_get_a_deterministic_id(
         self, missing_id: str
     ) -> None:
-        """#633: a missing/empty primary id is skipped in element_ids, not a KeyError."""
+        """#664: a missing/empty primary id is normalized for page membership."""
         element = {
             "type": "paragraph",
             "text": "primary without usable id",
@@ -583,12 +618,160 @@ class TestRoutePagesAndApplyPageRoutes:
             secondary_provider="mineru",
         )
 
-        assert result.payload["document"]["pages"][2]["element_ids"] == []
-        assert any(
-            item.get("text") == "primary without usable id"
-            for item in result.payload["document"]["elements"]
+        document = result.payload["document"]
+        normalized = next(
+            item
+            for item in document["elements"]
+            if item.get("text") == "primary without usable id"
         )
-        assert result.payload["document"]["summary"]["element_count"] == 4
+        assert normalized["id"] == "element-p3-1"
+        assert document["pages"][2]["element_ids"] == ["element-p3-1"]
+        assert document["summary"]["element_count"] == 4
+        assert primary["document"]["elements"][2].get("id") == (
+            "" if missing_id == "" else None
+        )
+
+    def test_an_id_less_element_joins_a_page_that_already_lists_ids(self) -> None:
+        """#664: an existing element_ids list no longer hides the normalized id."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+                _doc_element("p3", 3, 3, "docling page 3"),
+                {
+                    "type": "paragraph",
+                    "text": "primary without id",
+                    "page_number": 3,
+                    "reading_order": 4,
+                },
+            ],
+            pages=3,
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert result.payload["document"]["pages"][2]["element_ids"] == [
+            "p3",
+            "element-p3-2",
+        ]
+
+    def test_a_generated_id_never_collides_with_a_provider_id(self) -> None:
+        """#664: the generated id is unique even when its shape is already taken."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+                _doc_element("element-p3-2", 3, 3, "docling page 3"),
+                {
+                    "type": "paragraph",
+                    "text": "primary without id",
+                    "page_number": 3,
+                    "reading_order": 4,
+                },
+            ],
+            pages=3,
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        assert result.payload["document"]["pages"][2]["element_ids"] == [
+            "element-p3-2",
+            "element-p3-2-2",
+        ]
+
+    def test_an_unpaged_id_less_element_gets_an_id_outside_page_membership(self) -> None:
+        """#664: unpaged elements still need an id for the manifest, on no page."""
+        primary = _doc(
+            [
+                _doc_element("p1", 1, 1, "docling page 1"),
+                _doc_element("p2", 2, 2, "docling page 2"),
+                {
+                    "type": "paragraph",
+                    "text": "unpaged without id",
+                    "reading_order": 3,
+                },
+            ],
+            pages=3,
+        )
+
+        result = route_pages(
+            primary,
+            self.SECONDARY,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        document = result.payload["document"]
+        normalized = next(
+            element
+            for element in document["elements"]
+            if element.get("text") == "unpaged without id"
+        )
+        assert normalized["id"] == "element-unpaged-1"
+        assert all(
+            "element-unpaged-1" not in page["element_ids"]
+            for page in document["pages"]
+        )
+
+    def test_the_routed_payload_is_a_valid_structured_document(self) -> None:
+        """#664: normalization keeps the routed payload valid as a manifest document."""
+        primary = {
+            "status": "succeeded",
+            "document": {
+                "title": "Doc",
+                "language": "pt-BR",
+                "pages": [
+                    {
+                        "page_number": number,
+                        "width": 100.0,
+                        "height": 200.0,
+                        "element_ids": [],
+                    }
+                    for number in (1, 2, 3)
+                ],
+                "elements": [
+                    _manifest_element("p1", 1, 1, "primary page 1"),
+                    _manifest_element("p2", 2, 2, "primary page 2"),
+                    _manifest_element(None, 3, 3, "primary without id"),
+                ],
+            },
+        }
+        secondary = {
+            "status": "succeeded",
+            "document": {
+                "title": "Doc",
+                "language": "pt-BR",
+                "pages": [
+                    {
+                        "page_number": 2,
+                        "width": 100.0,
+                        "height": 200.0,
+                        "element_ids": ["s2"],
+                    }
+                ],
+                "elements": [_manifest_element("s2", 2, 1, "secondary page 2")],
+            },
+        }
+
+        result = route_pages(
+            primary,
+            secondary,
+            _routes("docling", "mineru", "docling"),
+            secondary_provider="mineru",
+        )
+
+        document = structured_document_from_payload(result.payload["document"])
+        assert validate_structured_document(document) == []
 
     def test_apply_page_routes_wrapper_keeps_its_two_value_contract(self) -> None:
         """#633: the historical wrapper does not expose the annotated evidence copy."""

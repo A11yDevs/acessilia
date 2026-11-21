@@ -367,6 +367,11 @@ def _element_page_number(element: dict[str, Any]) -> int | None:
     return zero_based + 1 if isinstance(zero_based, int) else None
 
 
+def _has_id(element: dict[str, Any]) -> bool:
+    """Whether the element carries a non-empty id."""
+    return bool(element.get("id"))
+
+
 def _elements_by_page(elements: list[Any]) -> dict[int, list[dict[str, Any]]]:
     ordered = sorted(
         (item for item in elements if isinstance(item, dict)),
@@ -460,7 +465,7 @@ def adopt_elements(
         element["id"]: f"{provider}-{element['id']}"
         for page_elements in pages.values()
         for element in page_elements
-        if element.get("id")
+        if _has_id(element)
     }
     adopted: dict[int, list[dict[str, Any]]] = {}
     for page_number, page_elements in pages.items():
@@ -468,7 +473,11 @@ def adopt_elements(
         page_copies: list[dict[str, Any]] = []
         for position, element in enumerate(page_elements, start=1):
             copied = dict(element)
-            copied["id"] = id_map.get(element.get("id"), f"{provider}-p{page_number}-{position}")
+            copied["id"] = (
+                id_map[element["id"]]
+                if _has_id(element)
+                else f"{provider}-p{page_number}-{position}"
+            )
             copied["parent_id"] = id_map.get(element.get("parent_id"))
             copied["metadata"] = {**(element.get("metadata") or {}), "provider": provider}
             if scale is not None:
@@ -518,6 +527,33 @@ def _merge_routed_elements(
     return merged, replaced
 
 
+def _normalize_missing_ids(elements: list[dict[str, Any]]) -> None:
+    """Give the elements without a usable id a deterministic one, in place.
+
+    ``ProcessingManifest`` requires every element to carry a non-empty ``id``
+    and rebuilds page membership from it. Leaving a primary element id-less
+    drops it from ``page.element_ids`` and makes the payload fail manifest
+    validation later (#664). The generated id is page-scoped, so it stays
+    stable when elements before that page change, and a numeric suffix keeps
+    it unique when the provider already used the same shape.
+    """
+    used = {str(element.get("id")) for element in elements if _has_id(element)}
+    positions: Counter[int | None] = Counter()
+    for element in elements:
+        page_number = _element_page_number(element)
+        positions[page_number] += 1
+        if _has_id(element):
+            continue
+        scope = f"p{page_number}" if page_number is not None else "unpaged"
+        candidate = f"element-{scope}-{positions[page_number]}"
+        suffix = 2
+        while candidate in used:
+            candidate = f"element-{scope}-{positions[page_number]}-{suffix}"
+            suffix += 1
+        element["id"] = candidate
+        used.add(candidate)
+
+
 def _rebuild_routed_pages(
     primary_doc: dict[str, Any],
     secondary_doc: dict[str, Any],
@@ -536,9 +572,8 @@ def _rebuild_routed_pages(
     ids_by_page: dict[int, list[Any]] = {}
     for element in elements:
         page_number = _element_page_number(element)
-        element_id = element.get("id")
-        if page_number is not None and element_id:
-            ids_by_page.setdefault(page_number, []).append(element_id)
+        if page_number is not None and _has_id(element):
+            ids_by_page.setdefault(page_number, []).append(element["id"])
     for number, descriptor in page_descriptors.items():
         descriptor["element_ids"] = ids_by_page.get(number, [])
     return [page_descriptors[number] for number in sorted(page_descriptors)]
@@ -597,6 +632,12 @@ def route_pages(
     page, the sorted routed and missing page numbers, and a copy of
     ``page_evidence`` with ``stats["applied"] = secondary_provider`` on routed
     entries. ``page_evidence`` itself is never mutated (#633).
+
+    Primary elements kept in the payload that have no usable ``id`` receive a
+    deterministic, page-scoped one (``element-p{page}-{position}``, or
+    ``element-unpaged-{position}``), and ``page.element_ids`` is rebuilt from the
+    final elements, so the routed payload stays a valid document for
+    ``ProcessingManifest`` (#664).
     """
     primary_doc = primary_res.get("document") or {}
     secondary_doc = secondary_res.get("document") or {}
@@ -630,6 +671,7 @@ def route_pages(
     elements, replaced = _merge_routed_elements(
         primary_by_page, unpaged, adopted, routed
     )
+    _normalize_missing_ids(elements)
     rebuilt_pages = _rebuild_routed_pages(primary_doc, secondary_doc, elements, routed)
 
     document: dict[str, Any] = {
