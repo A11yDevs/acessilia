@@ -587,6 +587,7 @@ def test_permanent_upload_failure_is_not_bypassed(mock_client, mock_artifact_cli
     [],
     {"status": "succeeded"},
     {"status": "succeeded", "document": "not-an-object"},
+    {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
 ])
 def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
     mock_client, answer
@@ -607,6 +608,7 @@ def test_a_structure_answer_outside_the_contract_is_a_typed_failure(
 @pytest.mark.parametrize("answer", [
     None,
     {"status": "succeeded", "document": "not-an-object"},
+    {"status": "succeeded", "document": {}, "provenance": "not-an-object"},
 ])
 def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     mock_client, monkeypatch, answer
@@ -619,7 +621,7 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     secondary_payload["provenance"]["provider_version"] = "mineru-1.0"
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.provider = "mineru"
-    secondary.base_url = "http://localhost:8002"
+    secondary.base_url = "http://secondary.test"
     secondary.extract_structure.return_value = secondary_payload
     monkeypatch.setattr(
         "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
@@ -635,7 +637,7 @@ def test_dual_mode_degrades_when_the_primary_answer_is_outside_the_contract(
     )
 
     assert result.configuration["toolbox_provider"] == "mineru"
-    assert result.configuration["toolbox_base_url"] == "http://localhost:8002"
+    assert result.configuration["toolbox_base_url"] == "http://secondary.test"
     assert result.cache_key == "ck-mineru"
     assert result.version == "mineru-1.0"
     assert result.configuration["extraction_degraded"] is True
@@ -752,6 +754,36 @@ def test_presentation_mode_with_an_invalid_answer_does_not_try_a_secondary(
             paths=paths_config(),
             operations=None,
         )
+
+
+def test_dual_mode_uses_the_normalized_primary_in_the_identity_gate(
+    mock_client, monkeypatch
+):
+    """#696: a provider-less primary and a secondary named 'primary' are the same."""
+    mock_client.provider = None
+    mock_client.base_url = "http://primary.test"
+    mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    result = ToolboxManifestExtractor(client=mock_client).extract(
+        FIXTURE_PDF,
+        fusion=fusion_config(mode="dual", secondary_provider="primary"),
+        toolbox=toolbox_config(use_artifact_store=False),
+        paths=paths_config(),
+        operations=None,
+    )
+
+    assert result.configuration["toolbox_provider"] == "primary"
+    assert result.configuration["toolbox_base_url"] == "http://primary.test"
+    assert result.document["fusion"] == {
+        "status": "skipped",
+        "providers": ["primary"],
+        "failed_providers": [],
+        "reason": "identical-providers",
+    }
 
 
 @pytest.mark.parametrize("primary_ok,secondary_ok", [(True, True), (True, False), (False, True), (False, False)])

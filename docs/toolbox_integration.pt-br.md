@@ -485,6 +485,13 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 > `extraction_failures`) e não é cacheado. Uma recusa do próprio documento
 > (mídia não suportada, entrada inválida, contrato, autenticação) pelo primário
 > derruba o job; pelo secundário, só degrada.
+>
+> Uma resposta malformada é distinta de uma recusa de contrato no transporte:
+> um envelope sem objeto `document` (ou com `provenance` que não seja objeto) é
+> uma falha por provider, então no modo dual o primário inválido passa para o
+> secundário e um secundário inválido mantém o primário completo; se ambos
+> estiverem malformados, o erro tipado propaga. A recusa de transporte acima
+> mantém sua permanência quando vem do primário.
 
 ---
 
