@@ -85,9 +85,10 @@ def build_canonical_document(
 ) -> dict[str, Any]:
     """Build the canonical document from a structured payload or plain text.
 
-    ``inline_math_promote`` (``FusionPolicy.inline_math_promote``) turns a
-    paragraph whose whole text is one inline math span into a display
-    ``math`` block (#296).
+    ``id_factory`` is a zero-argument callable producing the document id; the
+    default is deterministic. ``inline_math_promote``
+    (``FusionPolicy.inline_math_promote``) turns a paragraph whose whole text is
+    one inline math span into a display ``math`` block (#296).
     """
     if isinstance(source_text, dict):
         source_payload: dict[str, Any] = source_text
