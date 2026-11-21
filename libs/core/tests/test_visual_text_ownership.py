@@ -29,6 +29,8 @@ FURNITURE = {"content_layer": "furniture"}
 class RecordingVision:
     calls: ClassVar[list[dict]] = []
     answers: ClassVar[dict[str, VisionOutput | None]] = {}
+    #: Per-picture answers consumed one per call, for passes that ask twice.
+    answer_sequences: ClassVar[dict[str, list[VisionOutput | None]]] = {}
 
     def __init__(self, mode: str, *, region_cache, toolbox, models) -> None:
         pass
@@ -36,7 +38,11 @@ class RecordingVision:
     async def describe_region(self, *, image_bytes, errors=None, **kwargs):
         key = image_bytes.decode()
         type(self).calls.append({"id": key, **kwargs})
-        answer = type(self).answers.get(key)
+        sequence = type(self).answer_sequences.get(key)
+        if sequence:
+            answer = sequence.pop(0)
+        else:
+            answer = type(self).answers.get(key)
         if answer is None and errors is not None:
             errors.append("vision unavailable")
         return answer
@@ -44,7 +50,9 @@ class RecordingVision:
 
 @pytest.fixture(autouse=True)
 def fake_vision(monkeypatch):
-    RecordingVision.calls, RecordingVision.answers = [], {}
+    RecordingVision.calls = []
+    RecordingVision.answers = {}
+    RecordingVision.answer_sequences = {}
     monkeypatch.setattr(picture_stage, "VisionAgent", RecordingVision)
     monkeypatch.setattr(
         picture_stage,
@@ -708,6 +716,93 @@ async def test_case_325_vision_non_logo_answer_keeps_a_logo_sounding_description
     assert [b["type"] for b in blocks] == ["paragraph", "image", "paragraph", "paragraph"]
     assert blocks[1]["alt_text"] == description
     assert all("Logo." not in (b.get("text") or "") for b in blocks)
+
+
+@pytest.mark.asyncio
+async def test_case_325_a_later_answer_without_a_classification_clears_the_old_one() -> None:
+    """A later fold with ``institutional_logo=None`` must not reuse the old True."""
+    line_1 = _placed(
+        "line-1",
+        "page_header",
+        "University of Brasilia",
+        LINE_1_BOX,
+        metadata=FURNITURE,
+        reading_order=1,
+    )
+    picture = _placed("pic-header", "picture", "", LOGO_BOX, reading_order=2)
+    line_2 = _placed(
+        "line-2",
+        "page_header",
+        "Department of Mathematics",
+        LINE_2_BOX,
+        metadata=FURNITURE,
+        reading_order=3,
+    )
+    body = _placed(
+        "body",
+        "paragraph",
+        "Lecture notes on calculus.",
+        (72, 650, 540, 600),
+        reading_order=4,
+    )
+    manifest = build_manifest(
+        [line_1, picture, line_2, body],
+        [build_obligation("describe-image", ["pic-header"], ["vision-description"])],
+    )
+    manifest.pages[0].width, manifest.pages[0].height = WIDTH, HEIGHT
+    # Neutral on purpose: only the classification can fold this picture into
+    # the letterhead, so the cleanup below is what keeps it an image.
+    neutral_description = "A red shield with a green triangle and three stars."
+    RecordingVision.answer_sequences = {
+        "pic-header": [
+            _vision_answer(neutral_description, institutional_logo=True),
+            _vision_answer(neutral_description, institutional_logo=None),
+        ]
+    }
+
+    await picture_stage._enrich_picture_descriptions(
+        manifest,
+        Path("velocidade-instantanea.pdf"),
+        mode="medio",
+        vision=vision_config(retry_pass_delay_seconds=0),
+        toolbox=toolbox_config(),
+        models=model_config(),
+        region_cache=None,
+    )
+
+    assert picture.metadata["vision_institutional_logo"] is True
+    [first_page] = _manifest_pages_to_payload(manifest)
+    first_blocks = first_page["blocks"]
+    assert [b["type"] for b in first_blocks] == ["paragraph", "paragraph"]
+    assert first_blocks[0]["metadata"]["letterhead_members"] == [
+        "line-1",
+        "pic-header",
+        "line-2",
+    ]
+
+    # A second fold for the same element. The pipeline describes a picture
+    # once per run; this pins the invariant that a later fold cannot reuse
+    # the previous answer's classification.
+    picture.metadata.pop("vision_description_complete")
+    await picture_stage._enrich_picture_descriptions(
+        manifest,
+        Path("velocidade-instantanea.pdf"),
+        mode="medio",
+        vision=vision_config(retry_pass_delay_seconds=0),
+        toolbox=toolbox_config(),
+        models=model_config(),
+        region_cache=None,
+    )
+
+    assert len(RecordingVision.calls) == 2
+    assert "vision_institutional_logo" not in picture.metadata
+    [page] = _manifest_pages_to_payload(manifest)
+    blocks = page["blocks"]
+
+    assert [b["type"] for b in blocks] == ["paragraph", "image", "paragraph", "paragraph"]
+    assert blocks[1]["alt_text"] == neutral_description
+    # Language-independent: no block stands for a merged letterhead.
+    assert all("letterhead_members" not in b.get("metadata", {}) for b in blocks)
 
 
 def test_surrounding_text_prompt_bounds_item_and_total_char_overhead() -> None:
