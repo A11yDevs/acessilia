@@ -400,6 +400,11 @@ jobs:
         python-version: ["3.11", "3.12"]
     env:
       UV_PYTHON: ${{ matrix.python-version }}
+      # The matrix proves both interpreters can run the suites. Everything that
+      # does not depend on the interpreter — the Ruff baseline, Mypy, the
+      # Toolbox contract, coverage — runs once, on this leg, so the matrix does
+      # not duplicate it (#170).
+      PYTHON_DEFAULT: "3.12"
 
     steps:
       - name: Check out repository
@@ -434,9 +439,11 @@ jobs:
           uv sync --locked --extra dev
 
       - name: Run Ruff against the shrinking baseline
+        if: matrix.python-version == env.PYTHON_DEFAULT
         run: uv run --locked --extra dev python scripts/check_ruff_baseline.py
 
       - name: Run Mypy on docstruct and SDK
+        if: matrix.python-version == env.PYTHON_DEFAULT
         run: uv run --locked --extra dev mypy --no-incremental
 
       # The SDK registry must match the contract the Toolbox publishes on the
@@ -446,6 +453,7 @@ jobs:
       # cycle (both are cut together, the Toolbox first), and everything else
       # against its develop. See scripts/toolbox_contract_ref.py.
       - name: Check the Toolbox capability contract
+        if: matrix.python-version == env.PYTHON_DEFAULT
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
@@ -466,6 +474,7 @@ jobs:
       # the Toolbox can move that pin, so a pull request is not blocked by it:
       # findings are warnings here, and the scheduled monitoring fails on them.
       - name: Report the Toolbox's docstruct pin
+        if: matrix.python-version == env.PYTHON_DEFAULT
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
@@ -528,7 +537,7 @@ jobs:
             --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/core/coverage.json"
 
       - name: Summarize per-component coverage
-        if: always()
+        if: always() && matrix.python-version == env.PYTHON_DEFAULT
         run: |
           uv run --locked --extra dev python - <<'PY'
           import json
@@ -605,7 +614,7 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage reports
-        if: always()
+        if: always() && matrix.python-version == env.PYTHON_DEFAULT
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-reports-py${{ matrix.python-version }}

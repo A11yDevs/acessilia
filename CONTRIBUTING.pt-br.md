@@ -457,7 +457,7 @@ Durante um ciclo de refatoração, `is:open -type:Feature` mostra o backlog do c
 
 A esteira de CI/CD está definida em três workflows:
 
-- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), executa a verificação da baseline do Ruff e o Mypy no escopo configurado de `docstruct`/SDK, roda as suítes principal, da docstruct, do SDK e do core no Python 3.11 e 3.12 com relatórios de cobertura de desvios por componente publicados nos artefatos `coverage-reports-py*`, e rejeita testes pulados inesperados.
+- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), executa a verificação da baseline do Ruff e o Mypy no escopo configurado de `docstruct`/SDK uma vez, na perna 3.12, roda as suítes principal, da docstruct, do SDK e do core no Python 3.11 e 3.12 com relatórios de cobertura de desvios por componente publicados uma vez no artefato `coverage-reports-py*`, e rejeita testes pulados inesperados.
 - **`.github/workflows/delivery.yml`** — depois que o CI passa num push, constrói a imagem, roda um smoke test de saúde e uma verificação de tamanho, e a publica no GHCR.
 - **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria a GitHub Release.
 

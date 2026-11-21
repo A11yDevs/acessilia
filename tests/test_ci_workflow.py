@@ -62,6 +62,36 @@ def test_required_check_names_are_unchanged() -> None:
     }
 
 
+#: Steps of the ``tests`` job that do not depend on the interpreter (#170). Each
+#: one runs once, on ``PYTHON_DEFAULT``, instead of once per matrix leg.
+INTERPRETER_INDEPENDENT_STEPS = (
+    "Run Ruff against the shrinking baseline",
+    "Run Mypy on docstruct and SDK",
+    "Check the Toolbox capability contract",
+    "Report the Toolbox's docstruct pin",
+    "Summarize per-component coverage",
+    "Upload coverage reports",
+)
+
+
+def test_interpreter_independent_steps_run_once_on_the_default_leg() -> None:
+    """The matrix proves both interpreters; the quality gates are not duplicated."""
+    job = _workflow()["jobs"]["tests"]
+    default = job["env"]["PYTHON_DEFAULT"]
+    assert default in job["strategy"]["matrix"]["python-version"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    for name in INTERPRETER_INDEPENDENT_STEPS:
+        condition = steps[name].get("if", "")
+        assert "matrix.python-version == env.PYTHON_DEFAULT" in condition, name
+    # The suites themselves must run on every leg, and each leg keeps its JUnit.
+    assert "if" not in steps["Run main test suite"]
+    assert "if" not in steps["Run docstruct library test suite"]
+    assert "if" not in steps["Run SDK library test suite"]
+    assert "if" not in steps["Run core library test suite"]
+    assert "PYTHON_DEFAULT" not in steps["Upload test reports"].get("if", "")
+
+
 def test_core_suite_runs_with_bounded_parallelism() -> None:
     steps = _workflow()["jobs"]["tests"]["steps"]
     names = [step.get("name") for step in steps]

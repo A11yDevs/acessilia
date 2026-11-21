@@ -49,14 +49,15 @@ make the full suite itself faster.
 Every pull request and push to `develop`, `main` or a release branch runs the
 GitHub Actions workflow `CI`:
 
-- **`tests (Python 3.11)` / `tests (Python 3.12)`** installs the project, runs Ruff against the
-  shrinking baseline and Mypy on the configured `docstruct`/SDK scope (#366),
-  checks the Toolbox capability contract, reports whether the Toolbox's
-  docstruct pin follows the core (warnings only; see below), runs the non-E2E
-  main suite with **four workers**, runs the docstruct, SDK and core library
-  suites with branch coverage, summarizes per-component coverage in the job
-  summary, rejects unexpected skipped tests and uploads JUnit (`test-reports-py*`)
-  and coverage (`coverage-reports-py*`) artifacts.
+- **`tests (Python 3.11)` / `tests (Python 3.12)`** installs the project and runs
+  the non-E2E main suite with **four workers**, the docstruct, SDK and core
+  library suites with branch coverage, and rejects unexpected skipped tests,
+  uploading JUnit (`test-reports-py*`) artifacts from both legs. The checks
+  that do not depend on the interpreter — Ruff against the shrinking baseline,
+  Mypy on the configured `docstruct`/SDK scope (#366), the Toolbox capability
+  contract, the Toolbox's docstruct pin report (warnings only; see below) and
+  the coverage summary with its `coverage-reports-py*` artifact — run once, on
+  the `3.12` leg.
 - **`SDK alone (Python 3.11)` / `SDK alone (Python 3.12)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,
   pytest-asyncio, respx), and proves that it works without the core.
@@ -393,10 +394,10 @@ The test run collects the suite itself, so the separate `--collect-only` step
 was redundant.
 
 **Where are the slow-test reports?**
-`make` and CI pass `--durations=25`. CI also uploads JUnit and coverage reports
-per matrix leg as `test-reports-py*`, `coverage-reports-py*`,
-`sdk-isolated-report-py*` and `docstruct-isolated-report-py*`, with 7-day
-retention.
+`make` and CI pass `--durations=25`. CI also uploads JUnit reports per matrix leg
+as `test-reports-py*`, coverage reports once per run as `coverage-reports-py*`,
+and the isolation reports as `sdk-isolated-report-py*` and
+`docstruct-isolated-report-py*`, with 7-day retention.
 
 **Where do I see the scheduled comparison?**
 After the workflow reaches the default branch, open Actions →

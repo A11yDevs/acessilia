@@ -49,14 +49,15 @@ própria suíte completa mais rápida.
 Todo pull request e push para `develop`, `main` ou uma branch de release executa
 o workflow `CI` do GitHub Actions:
 
-- **`tests (Python 3.11)` / `tests (Python 3.12)`** instala o projeto, executa o Ruff contra a baseline
-  que só diminui e o Mypy no escopo configurado de `docstruct`/SDK (#366),
-  confere o contrato de capacidades da Toolbox, informa se a versão do
-  docstruct fixada pela Toolbox acompanha o core (só avisos; veja abaixo), roda
-  a suíte principal non-E2E com **quatro workers**, roda as suítes do
-  docstruct, do SDK e da biblioteca do core com cobertura de desvios, resume a
-  cobertura por componente no resumo do job, recusa skips inesperados e publica
-  os artefatos JUnit (`test-reports-py*`) e de cobertura (`coverage-reports-py*`).
+- **`tests (Python 3.11)` / `tests (Python 3.12)`** instala o projeto e roda a
+  suíte principal non-E2E com **quatro workers**, as suítes do docstruct, do
+  SDK e da biblioteca do core com cobertura de desvios, e recusa skips
+  inesperados, publicando os artefatos JUnit (`test-reports-py*`) das duas
+  pernas. As verificações que não dependem do interpretador — o Ruff contra a
+  baseline que só diminui, o Mypy no escopo configurado de `docstruct`/SDK
+  (#366), o contrato de capacidades da Toolbox, o relatório da versão do
+  docstruct fixada pela Toolbox (só avisos; veja abaixo) e o resumo de cobertura
+  com o artefato `coverage-reports-py*` — rodam uma vez, na perna `3.12`.
 - **`SDK alone (Python 3.11)` / `SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
   (pytest, pytest-asyncio, respx), e prova que ele funciona sem o core.
@@ -403,9 +404,10 @@ A execução de testes coleta a suíte sozinha, então a etapa separada de
 
 **Onde estão os relatórios de testes lentos?**
 O `make` e a CI passam `--durations=25`. A CI também publica os relatórios JUnit
-e de cobertura por perna da matriz como `test-reports-py*`,
-`coverage-reports-py*`, `sdk-isolated-report-py*` e
-`docstruct-isolated-report-py*`, com retenção de 7 dias.
+por perna da matriz como `test-reports-py*`, os relatórios de cobertura uma vez
+por execução como `coverage-reports-py*`, e os relatórios de isolamento como
+`sdk-isolated-report-py*` e `docstruct-isolated-report-py*`, com retenção de 7
+dias.
 
 **Onde vejo a comparação agendada?**
 Depois que o workflow chega ao branch padrão, abra Actions →
