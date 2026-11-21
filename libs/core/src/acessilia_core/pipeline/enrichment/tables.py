@@ -320,12 +320,17 @@ def _fold_table_reading(
     reason: str | None,
     attempt: int,
 ) -> None:
-    """Write a kept table reading into ``element``, keeping a replaced misread AST."""
+    """Write a kept table reading into ``element``, keeping the first replaced misread AST.
+
+    ``table_ast_replaced`` is the evidence of what the table looked like before
+    the review rewrote it. Once set, later replacements keep it instead of
+    overwriting it with the previous accepted reading (#685).
+    """
     element.metadata.pop("table_read_failure", None)
     rows = table_output.table_rows()
     table_ast = table_output.table_ast()
     if reason is not None:
-        element.metadata["table_ast_replaced"] = element.metadata["table_ast"]
+        element.metadata.setdefault("table_ast_replaced", element.metadata["table_ast"])
         element.metadata["table_review"] = {
             "reason": reason, "outcome": "replaced",
             "attempts": _table_review_attempts(element, attempt),
