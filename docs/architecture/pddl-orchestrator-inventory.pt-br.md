@@ -140,15 +140,16 @@ São as funções que a #365 pediu para dividir, no tamanho atual. Todas ficam n
 - o `extractor.configuration["…"]`;
 - atribuições a campos de elementos e de obrigações.
 
-Ele encontra 63 chaves, 17 delas gravadas ou lidas por mais de um grupo.
+Ele encontra 63 chaves, 18 delas gravadas ou lidas por mais de um grupo.
 
 | Chave | Gravada por | Lida por | O que a ordem atual garante |
 |---|---|---|---|
 | `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, antes do planejamento, reivindica uma barra de negação solta para matemática inline só se ninguém a reivindicou. F, na execução, pula barras reivindicadas e marca as que compõe. W deixa barras reivindicadas fora do payload. A reivindicação de Q, portanto, prevalece, e F é idempotente. |
 | `metadata["vision_description_complete"]` | G, O, P | E, O, X | G a define quando uma inspeção de região ou página descreve um elemento e apaga as chaves de falha dele. O a define numa descrição e a apaga quando registra uma falha. P a define quando uma região de fórmula se revela uma figura descrita. O handler de visão de E pula figuras completas, e X a usa para decidir qual texto de figura o payload mantém. |
-| `metadata["vision_failure_reason"]` | G, O | E, O, V | O registra a causa e a nova tentativa dele a lê. G a apaga, junto com `vision_failure_detail`, quando uma inspeção de região ou página descreve o elemento. O handler de E a lê. V a informa como degradação visível (`records_visual_failures`). |
-| `metadata["vision_confidence" / "vision_elements" / "vision_language" / "vision_warnings"]` | G, O, P | — | Três gravadores dos mesmos campos de descrição: G para inspeção de região e página, O para figuras, P para o fallback de visão das fórmulas. Eles precisam manter um só formato. |
-| `metadata["original_type"]` | K, O, P | — | Atribuída, e não definida uma vez só. Quando um elemento é reclassificado duas vezes, o último a gravar decide qual tipo original sobrevive, então a ordem faz parte do comportamento. |
+| `metadata["vision_failure_reason" / "vision_failure_detail"]` | G, O | E, O, V | O registra a causa e a nova tentativa dele a lê. G apaga as duas chaves quando uma inspeção de região ou página descreve o elemento. O handler de E lê a razão. V a informa como degradação visível (`records_visual_failures`). |
+| `metadata["vision_confidence" / "vision_language" / "vision_warnings"]` | G, O, P | — | Três gravadores dos mesmos campos de descrição: G para inspeção de região e página, O para figuras, P para o fallback de visão das fórmulas. Eles precisam manter um só formato. |
+| `metadata["vision_elements"]` | O, P | V | O enriquecimento de figuras e o fallback de fórmulas registram os elementos mencionados pelo modelo; V os usa para classificação de letterhead e scene text. As inspeções não os registram. |
+| `metadata["original_type"]` | G, K, O, P | — | Atribuída, e não definida uma vez só. Quando um elemento é reclassificado duas vezes, o último a gravar decide qual tipo original sobrevive, então a ordem faz parte do comportamento. |
 | `metadata["src"]` | G, P | O | A inspeção de região e de página e o recorte de fórmula registram a origem da imagem; o enriquecimento de figuras a lê. |
 | `metadata["table_ast"]` | S | E, F, I, Q, S | S a grava antes do planejamento. A passada de tabelas de Q roda depois de S, porque S pode substituir as células de uma tabela. E, F e I a leem na execução. |
 | `metadata["table_read_failure"]` | S | S, V | S registra por que uma tabela não foi lida, e V a informa como degradação. |
@@ -181,8 +182,8 @@ Os handlers do plano (B, E–L) vêm em seguida. As checagens de situação de T
 - G, O, P, E e X em `vision_description_complete`;
 - S antes de Q em `table_ast`;
 - B e E antes de T nas chaves de fórmula legível;
-- O e S até V nos registros de falha;
-- K, O e P em `original_type`.
+- G, O e S até V nos registros de falha;
+- G, K, O e P em `original_type`.
 
 ## Achados
 

@@ -160,6 +160,35 @@ def test_a_successful_region_inspection_replaces_the_failed_description_metadata
     assert "vision_failure_detail" not in replacement.metadata
 
 
+@pytest.mark.parametrize("kind", ["description", "formula"])
+def test_the_region_handler_replaces_a_failed_description(inspection, kind):
+    """#680: the live path clears the failure keys for description and formula."""
+    manifest, _, vision = inspection
+    element = manifest.elements[0]
+    element.metadata["vision_failure_reason"] = "model_failed"
+    element.metadata["vision_failure_detail"] = "timeout"
+    vision.response = (
+        VisionOutput(
+            kind="formula", formula_latex="x^2", language="und", confidence=0.9
+        )
+        if kind == "formula"
+        else VisionOutput(
+            kind="description", description="A map", language="en", confidence=0.9
+        )
+    )
+
+    result = inspection_handlers._handle_pymupdf_region_method(
+        manifest, "o-1", config=core_config(), ports=RunPorts.none()
+    )
+
+    assert result.success and result.validated, result.message
+    updated = next(item for item in manifest.elements if item.id == "unknown")
+    assert updated.type == ("formula" if kind == "formula" else "picture")
+    assert updated.metadata["vision_description_complete"] is True
+    assert "vision_failure_reason" not in updated.metadata
+    assert "vision_failure_detail" not in updated.metadata
+
+
 @pytest.mark.parametrize("enabled", [True, False])
 def test_the_region_cache_follows_the_run_config(inspection, enabled):
     manifest, _, vision = inspection
