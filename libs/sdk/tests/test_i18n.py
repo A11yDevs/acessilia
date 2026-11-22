@@ -1,8 +1,17 @@
-"""The SDK's generic locale parsing and normalization (#712, PR #711)."""
+"""The SDK's generic locale parsing, normalization and context (#712)."""
 
 from __future__ import annotations
 
+import asyncio
+
+import pytest
+
 from acessilia_sdk.i18n import normalize_locale, parse_locales
+from acessilia_sdk.i18n.context import (
+    request_locale,
+    reset_request_locale,
+    set_request_locale,
+)
 from acessilia_sdk.i18n.negotiation import (
     expand_locale_candidates,
     negotiate_locale,
@@ -74,3 +83,58 @@ def test_shell_candidates_keep_locale_colons_but_split_language_colons() -> None
 
 def test_negotiate_locale_falls_back_to_the_caller_default() -> None:
     assert negotiate_locale(["de"], ("en_US", "pt_BR"), "en_US") == "en_US"
+
+
+def test_request_locale_context_resets() -> None:
+    assert request_locale() is None
+
+    token = set_request_locale("pt_BR")
+    try:
+        assert request_locale() == "pt_BR"
+    finally:
+        reset_request_locale(token)
+
+    assert request_locale() is None
+
+
+def test_request_locale_nested_tokens_and_empty_override() -> None:
+    outer = set_request_locale("pt_BR")
+    try:
+        assert request_locale() == "pt_BR"
+        inner = set_request_locale("")
+        try:
+            assert request_locale() == ""
+        finally:
+            reset_request_locale(inner)
+        assert request_locale() == "pt_BR"
+    finally:
+        reset_request_locale(outer)
+
+    assert request_locale() is None
+
+
+@pytest.mark.asyncio
+async def test_child_task_inherits_request_locale() -> None:
+    token = set_request_locale("pt_BR")
+    try:
+        async def child() -> None:
+            assert request_locale() == "pt_BR"
+
+        await asyncio.create_task(child())
+    finally:
+        reset_request_locale(token)
+
+
+@pytest.mark.asyncio
+async def test_request_locale_is_task_local() -> None:
+    async def worker(locale: str) -> None:
+        token = set_request_locale(locale)
+        try:
+            await asyncio.sleep(0)
+            assert request_locale() == locale
+        finally:
+            reset_request_locale(token)
+
+    await asyncio.gather(worker("pt_BR"), worker("en_US"))
+
+    assert request_locale() is None

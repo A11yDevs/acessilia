@@ -7,6 +7,9 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `acessilia_sdk.i18n.context` com o override de locale por
+  tarefa (`request_locale`, `set_request_locale`, `reset_request_locale`); o
+  core mantém a política do locale do servidor e compõe os dois (#712).
 - **Adicionado** `acessilia_sdk.i18n.negotiation` com expansão de candidatos,
   dicas do shell e negociação via Babel (`negotiate_locale`,
   `negotiate_server_locale`); quem chama fornece os locales disponíveis e o
@@ -14,8 +17,8 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   depende de Babel para essa infraestrutura genérica.
 - **Adicionado** `acessilia_sdk.i18n` com `parse_locales` e `normalize_locale`,
   o parser e o normalizador genéricos de listas de locales compartilhados pelo
-  core e pelo serviço. O core mantém seus catálogos, políticas e contexto de
-  requisição; a extração completa da infraestrutura restante é a #712.
+  core e pelo serviço. O core mantém seus catálogos e políticas; a extração
+  completa da infraestrutura restante é a #712.
 - **Corrigido** `extract_dual_fused` rejeita uma resposta de
   `document.structure.extract` cujo `status` não seja `succeeded`, mesmo que
   traga um objeto `document`; ela é registrada como
