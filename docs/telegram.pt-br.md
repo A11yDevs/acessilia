@@ -45,24 +45,9 @@ Se o token vazar, gere outro com `/revoke` no BotFather; o antigo deixa de funci
 
 Estes ajustes não são obrigatórios para conversa privada, mas evitam surpresas depois:
 
-- **Lista de comandos** (`/setcommands`): faz o Telegram sugerir os comandos quando o usuário digita `/`. Cole a lista abaixo:
-
-  ```text
-  start - Iniciar o bot
-  help - Listar os comandos
-  formats - Formatos aceitos e gerados
-  detailed - Próximo arquivo com descrição detalhada
-  medium - Próximo arquivo com descrição média (padrão)
-  low - Próximo arquivo com descrição concisa
-  ocr - Próximo arquivo só com extração de texto
-  email - Enviar o resultado do próximo arquivo por e-mail
-  status - Andamento da sua tarefa
-  cancel - Cancelar a sua tarefa
-  deactivate - Pausar o bot neste chat
-  activate - Reativar o bot neste chat
-  health - Verificar API, modelo e disco
-  feedback - Enviar uma opinião sobre o resultado
-  ```
+- **Lista de comandos:** o bot publica os comandos com `setMyCommands` na
+  inicialização, a partir do mesmo texto do `/help`, para cada idioma de
+  `I18N_LOCALES_ACTIVE`. Não há passo de `/setcommands` para manter à mão.
 
 - **Entrada em grupos** (`/setjoingroups`): deixe *Enable* se o bot vai ser usado em grupos.
 - **Privacidade em grupos** (`/setprivacy`): veja a [seção 3.1](#31-entenda-o-modo-de-privacidade). Se o bot vai processar arquivos em grupos, escolha *Disable*.
@@ -91,7 +76,7 @@ No `.env` do ambiente (copiado de [.env.example](../.env.example)), as variávei
 uv run python -m frontend.run
 ```
 
-No log, procure a linha `Telegram interface enabled`. Se aparecer `Telegram interface enabled but BOT_TOKEN not configured`, o `BOT_TOKEN` está vazio ou não foi lido.
+No log, procure a linha `Telegram interface enabled`. Se aparecer `Telegram interface enabled but BOT_TOKEN not configured`, o `BOT_TOKEN` está vazio ou não foi lido. A inicialização também registra o username do bot e avisa quando `can_read_all_group_messages` é `false` (modo de privacidade ligado).
 
 **Na homologação:** o container lê o `.env` só quando é criado, então reiniciá-lo não basta. Depois de editar `/opt/acessilia/src/.env`:
 

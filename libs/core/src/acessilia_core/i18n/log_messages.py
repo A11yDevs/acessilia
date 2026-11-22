@@ -40,6 +40,20 @@ LOG_BOT_INTERRUPTED_BY_USER: str = "Bot interrupted by the user"
 LOG_FATAL_ERROR_IN_BOT: str = "Fatal error in the bot"
 #: Info logged by the Telegram bot once it has started and registered its routers.
 LOG_BOT_STARTED: str = "Bot started (Acessilia API client)"
+#: Info logged at Telegram startup with the bot username returned by getMe; {username} is the @handle.
+LOG_TELEGRAM_BOT_CONNECTED: str = "Telegram bot @{username} connected"
+#: Warning logged at Telegram startup when privacy mode withholds group files; {username} is the @handle.
+LOG_TELEGRAM_PRIVACY_MODE: str = (
+    "Telegram bot @{username} has privacy mode enabled: files sent in groups only "
+    "reach it when it is a group administrator or when sent as a reply to the bot; "
+    "see docs/telegram.md section 3.1 (BotFather /setprivacy)"
+)
+#: Warning logged when the Telegram getMe call fails at startup; {error} is the reason.
+LOG_TELEGRAM_GETME_FAILED: str = "Telegram getMe failed: {error}"
+#: Warning logged when publishing a Telegram command list fails; {scope} is the language/default scope, {error} the reason.
+LOG_TELEGRAM_SET_COMMANDS_FAILED: str = (
+    "Telegram setMyCommands failed for {scope}: {error}"
+)
 #: Info logged while the Telegram bot dispatcher tears down on shutdown.
 LOG_BOT_SHUTTING_DOWN: str = "Bot shutting down"
 #: Critical message logged when the bot token is missing or invalid, before the process exits.

@@ -45,24 +45,9 @@ If the token leaks, issue a new one with `/revoke` in BotFather; the old one sto
 
 These are not required for private chats, but they prevent surprises later:
 
-- **Command list** (`/setcommands`): makes Telegram suggest the commands when the user types `/`. Paste this list:
-
-  ```text
-  start - Start the bot
-  help - List the commands
-  formats - Accepted and generated formats
-  detailed - Detailed description for the next file
-  medium - Medium description for the next file (default)
-  low - Concise description for the next file
-  ocr - Text extraction only for the next file
-  email - Also e-mail the result of the next file
-  status - Progress of your task
-  cancel - Cancel your task
-  deactivate - Pause the bot in this chat
-  activate - Resume the bot in this chat
-  health - Check the API, model and disk
-  feedback - Send your opinion about the result
-  ```
+- **Command list:** the bot publishes its commands with `setMyCommands` on
+  startup, from the same `/help` text, for every language in
+  `I18N_LOCALES_ACTIVE`. There is no `/setcommands` step to keep in sync by hand.
 
 - **Joining groups** (`/setjoingroups`): keep *Enable* if the bot will be used in groups.
 - **Group privacy** (`/setprivacy`): see [section 3.1](#31-understand-privacy-mode). If the bot will process files in groups, choose *Disable*.
@@ -91,7 +76,7 @@ In the environment's `.env` (copied from [.env.example](../.env.example)), these
 uv run python -m frontend.run
 ```
 
-Look for the `Telegram interface enabled` log line. `Telegram interface enabled but BOT_TOKEN not configured` means `BOT_TOKEN` is empty or was not read.
+Look for the `Telegram interface enabled` log line. `Telegram interface enabled but BOT_TOKEN not configured` means `BOT_TOKEN` is empty or was not read. Startup also logs the bot username and warns when `can_read_all_group_messages` is `false` (privacy mode on).
 
 **On staging:** the container reads `.env` only when it is created, so a restart is not enough. After editing `/opt/acessilia/src/.env`:
 

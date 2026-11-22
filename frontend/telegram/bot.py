@@ -16,25 +16,73 @@ from backend.config.process_setup import setup_process
 from acessilia_core.logger import logger
 from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
-from acessilia_core.i18n import t
+from frontend.telegram.commands import bot_commands, telegram_language
+from acessilia_core.i18n import active_locale, active_locales, t
 from acessilia_core.i18n.log_messages import (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
     LOG_BOT_STARTING_POLLING,
     LOG_BOT_STARTED,
+    LOG_TELEGRAM_BOT_CONNECTED,
+    LOG_TELEGRAM_GETME_FAILED,
+    LOG_TELEGRAM_PRIVACY_MODE,
+    LOG_TELEGRAM_SET_COMMANDS_FAILED,
     LOG_BOT_TOKEN_NOT_CONFIGURED,
     LOG_FATAL_ERROR_IN_BOT,
 )
 from backend.config.settings import settings
 
 
+async def _announce_identity(bot: Bot) -> None:
+    """Log the bot username and warn when privacy mode withholds group files."""
+    me = await bot.get_me()
+    logger.info(t(LOG_TELEGRAM_BOT_CONNECTED).format(username=me.username))
+    if not getattr(me, "can_read_all_group_messages", True):
+        logger.warning(t(LOG_TELEGRAM_PRIVACY_MODE).format(username=me.username))
+
+
+async def _set_commands(bot: Bot, commands, scope: str | None) -> None:
+    """Publish one command list; a failure is logged without skipping the rest."""
+    try:
+        await bot.set_my_commands(commands, language_code=scope)
+    except Exception as error:
+        logger.warning(
+            t(LOG_TELEGRAM_SET_COMMANDS_FAILED).format(
+                scope=scope or "default", error=error
+            )
+        )
+
+
+async def _register_commands(bot: Bot) -> None:
+    """Publish `/help` commands through the Bot API for every active locale."""
+    active = active_locales()
+    server_locale = active_locale()
+    default_locale = server_locale if server_locale in active else active[0]
+    await _set_commands(bot, bot_commands(default_locale), None)
+    registered = {telegram_language(default_locale)}
+    for locale in active:
+        language = telegram_language(locale)
+        if language in registered:
+            continue
+        await _set_commands(bot, bot_commands(locale), language)
+        registered.add(language)
+
+
 async def on_startup(bot: Bot) -> None:
-    """Log a startup notice marking the bot as an Acessilia API client.
+    """Log startup, announce the bot, publish commands and resume tracked tasks.
 
     Args:
         bot (Bot): Aiogram Bot instance that finished starting up; no default (required).
     """
     logger.info(t(LOG_BOT_STARTED))
+    try:
+        await _announce_identity(bot)
+    except Exception as error:
+        logger.warning(t(LOG_TELEGRAM_GETME_FAILED).format(error=error))
+    try:
+        await _register_commands(bot)
+    except Exception as error:
+        logger.warning(t(LOG_TELEGRAM_SET_COMMANDS_FAILED).format(scope="default", error=error))
     await resume_tracked_tasks(bot)
 
 
