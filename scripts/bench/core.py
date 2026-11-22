@@ -32,9 +32,9 @@ class _SdkMathEnricher(MathEnricher):
     """Enrich math blocks directly via ``acessilia_sdk.operations.formula``.
 
     Calls ``convert_formula`` and ``verbalize_formula`` through
-    :mod:`scripts.bench.toolbox`. Normalization uses ``bare_latex`` (matching
-    ``acessilia_core.formula_tools.normalize_latex``: delimiters and whitespace
-    only). Display-formula speech intentionally keeps the raw ``math.verbalize``
+    :mod:`scripts.bench.toolbox`. Normalization uses ``bare_latex``
+    (``docstruct.text.latex.bare_latex``: delimiters and whitespace only).
+    Display-formula speech intentionally keeps the raw ``math.verbalize``
     output without the core's ``label_spoken_formula`` presentation prefix
     (ADR-0017: presentation labeling stays in the core). A rejected expression
     (``ToolboxInvalidInput``) degrades to empty text; the first outage of a
@@ -48,7 +48,7 @@ class _SdkMathEnricher(MathEnricher):
         self.rejected: dict[str, int] = {}
 
     def normalize(self, latex: str) -> str:
-        # Matches acessilia_core.formula_tools.normalize_latex (bare_latex alias).
+        # Matches docstruct.text.latex.bare_latex (the conservative alias).
         return bare_latex(latex)
 
     def to_mathml(self, latex: str) -> str:

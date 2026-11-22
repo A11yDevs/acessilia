@@ -43,10 +43,13 @@ def test_docstruct_reexports_are_deprecated() -> None:
     from acessilia_core import formula_tools
     from docstruct.text.latex import bare_latex, ensure_math_delimiters as ensure
 
-    with pytest.warns(DeprecationWarning, match="docstruct.text.latex"):
+    with pytest.warns(DeprecationWarning, match=r"bare_latex from docstruct\.text\.latex"):
         from acessilia_core.formula_tools import normalize_latex as deprecated
 
-    with pytest.warns(DeprecationWarning, match="docstruct.text.latex"):
+    with pytest.warns(
+        DeprecationWarning,
+        match=r"ensure_math_delimiters from docstruct\.text\.latex",
+    ):
         from acessilia_core.formula_tools import (
             ensure_math_delimiters as deprecated_ensure,
         )

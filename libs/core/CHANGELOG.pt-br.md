@@ -4,12 +4,12 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 
 ## 0.3.2 — reexportações da docstruct em formula_tools depreciadas
 
-Sem mudança de comportamento. `acessilia_core.formula_tools` mantém
-`wrap_latex` e `label_spoken_formula`, mas `normalize_latex` e
-`ensure_math_delimiters` agora emitem `DeprecationWarning`; importe de
-`docstruct.text.latex`. Os consumidores do repositório foram migrados, e os
-nomes de compatibilidade ficam até uma versão incompatível posterior removê-los
-(#656).
+Sem mudança de comportamento para consumidores migrados; os nomes antigos agora
+emitem `DeprecationWarning`. `acessilia_core.formula_tools` mantém `wrap_latex`
+e `label_spoken_formula`. Importe os substitutos de `docstruct.text.latex`:
+`bare_latex` para `normalize_latex` e `ensure_math_delimiters` para o nome
+homônimo. Os consumidores do repositório foram migrados, e os nomes de
+compatibilidade ficam até uma versão incompatível posterior removê-los (#656).
 
 ## 0.3.1 — reexportações da docstruct depreciadas nas bridges do pipeline
 
