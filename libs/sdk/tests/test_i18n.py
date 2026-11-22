@@ -89,10 +89,40 @@ def test_request_locale_context_resets() -> None:
     assert request_locale() is None
 
     token = set_request_locale("pt_BR")
-    assert request_locale() == "pt_BR"
+    try:
+        assert request_locale() == "pt_BR"
+    finally:
+        reset_request_locale(token)
 
-    reset_request_locale(token)
     assert request_locale() is None
+
+
+def test_request_locale_nested_tokens_and_empty_override() -> None:
+    outer = set_request_locale("pt_BR")
+    try:
+        assert request_locale() == "pt_BR"
+        inner = set_request_locale("")
+        try:
+            assert request_locale() == ""
+        finally:
+            reset_request_locale(inner)
+        assert request_locale() == "pt_BR"
+    finally:
+        reset_request_locale(outer)
+
+    assert request_locale() is None
+
+
+@pytest.mark.asyncio
+async def test_child_task_inherits_request_locale() -> None:
+    token = set_request_locale("pt_BR")
+    try:
+        async def child() -> None:
+            assert request_locale() == "pt_BR"
+
+        await asyncio.create_task(child())
+    finally:
+        reset_request_locale(token)
 
 
 @pytest.mark.asyncio

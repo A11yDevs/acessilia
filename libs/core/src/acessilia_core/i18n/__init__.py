@@ -14,7 +14,7 @@ from babel.support import NullTranslations, Translations
 
 from acessilia_sdk.i18n import normalize_locale, parse_locales as parse_locales
 from acessilia_sdk.i18n.context import (
-    request_locale,
+    request_locale as _request_locale,
     reset_request_locale as reset_request_locale,
     set_request_locale as set_request_locale,
 )
@@ -102,7 +102,7 @@ def server_locale() -> str:
 
 def _active_locale() -> str:
     """Return the lookup locale for t()/n(): the per-task override if set, else the server-side locale."""
-    override = request_locale()
+    override = _request_locale()
     if override:
         return override
     return server_locale()
