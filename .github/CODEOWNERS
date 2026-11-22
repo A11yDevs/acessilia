@@ -1,0 +1,14 @@
+# Automatic review requests for shared and governance-critical paths (#367).
+#
+# CODEOWNERS only requests reviewers. It does not require their approval: that
+# depends on the branch rulesets, and this file adds no such requirement.
+# Keep this file as the operational owner list; CONTRIBUTING.md points here
+# instead of repeating it. Update it by pull request when the team changes.
+
+/.github/        @marceloakira @jhonata192 @fragaeduardo
+/schemas/        @marceloakira @jhonata192 @fragaeduardo
+/libs/           @marceloakira @jhonata192 @fragaeduardo
+/libs/core/      @marceloakira @jhonata192 @fragaeduardo
+/libs/sdk/       @marceloakira @jhonata192 @fragaeduardo
+/libs/docstruct/ @marceloakira @jhonata192 @fragaeduardo
+/docs/adr/       @marceloakira @jhonata192 @fragaeduardo
