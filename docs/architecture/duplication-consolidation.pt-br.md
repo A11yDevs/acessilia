@@ -1,8 +1,8 @@
-# Classificação de duplicatas e primeira consolidação, novembro de 2026
+# Classificação de duplicatas e consolidações, novembro de 2026
 
 > [duplication-consolidation.md](duplication-consolidation.md). A versão em inglês é a fonte.
 
-Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656). Ele classifica os grupos de duplicatas do [baseline de novembro](quality-baseline.pt-br.md) e implementa a primeira consolidação de baixo risco. O snapshot que originou a triagem é `develop` em `b00636fc`: **23 grupos, 57 funções e 699 linhas**.
+Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656). Ele classifica os grupos de duplicatas do [baseline de novembro](quality-baseline.pt-br.md) e registra as consolidações de baixo risco implementadas até aqui. O snapshot que originou a triagem é `develop` em `b00636fc`: **23 grupos, 57 funções e 699 linhas**.
 
 ## Método
 
@@ -30,7 +30,24 @@ O comportamento é fixado por `tests/test_i18n_locales.py` e pelo `tests/test_i1
 
 A fachada do core era um nome novo de compatibilidade, não um chamador pré-existente preservado: `_locales_from_raw` era código morto antes deste PR. Ela existiu para a migração restante acontecer sem um flag day; a #712 a removeu e moveu o pin do core para `acessilia-sdk>=0.4,<0.5` quando o SDK 0.4.0 publicou a API completa de i18n.
 
-**Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. O [JSON do baseline](quality-baseline.json) inicial permanece como snapshot histórico; esta página registra a primeira mudança contra ele.
+**Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. O [JSON do baseline](quality-baseline.json) inicial permanece como snapshot histórico; esta página registra as mudanças contra ele.
+
+## Segunda consolidação: o writer de JSON Schema
+
+As quatro funções `write_*_schema` em `execution/schema.py`, `manifest/schema.py`
+e `planning/schema.py` repetiam a criação do diretório pai, a codificação UTF-8,
+o `json.dumps(ensure_ascii=False, indent=2)` e a quebra de linha final. Agora
+delegam para `acessilia_core.schema_files.write_schema`, enquanto cada módulo
+mantém sua função de schema e seu nome público de writer. Os testes comparam a
+saída de cada writer com sua função de schema e cobrem criação do diretório pai
+e JSON não-ASCII.
+
+A formatação dos arquivos de schema versionados não muda; este PR não regenera
+o conteúdo deles. O grupo `write_*_schema` sai dos candidatos restantes.
+
+**Delta medido no commit de código deste PR:** 24 grupos / 59 funções / 705
+linhas → **23 grupos / 55 funções / 672 linhas**. Apenas o grupo
+`write_*_schema` desaparece.
 
 ## Classificação dos grupos restantes
 
@@ -40,7 +57,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 |---:|---|---|
 | 0 | Handlers do Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | Adiar para um PR de frontend: confirmar diferenças de texto e menu antes de extrair um helper de comando. |
 | 1 | Leitores de dataset gerados do SDK (5/15) | Arquivo gerado (`_dataset_generated.py`): corrigir o gerador, não as funções geradas. |
-| 2 | Escritores de schema do core `write_*_schema` (4/33) | Candidato: helper compartilhado de escrita JSON com testes de caminho de schema. |
+| 2 | Escritores de schema do core `write_*_schema` (4/33) | **Consolidado:** `schema_files.write_schema` compartilhado, com testes de writer/schema. |
 | 3 | Helpers de config do core `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Adiar: os dataclasses de configuração ao redor diferem. |
 | 4 | Leitores de resultado do SDK em adjudicate/pdf/pdf_validate (3/48) | Candidato: leitor genérico tipado após os testes de contrato do SDK. |
 | 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | Candidato: o mesmo leitor genérico. |
@@ -62,14 +79,22 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 21 | Leitores de layout/structure do SDK (2/32) | Candidato: mesmo leitor genérico dos grupos 4–5. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidato a helper pequeno de validação. |
 
-Os próximos candidatos de maior valor são o trio startup/lock do frontend (grupos 8–10), os leitores de resultado do SDK (4, 5, 21) e os escritores de schema do core (2). Cada um deve ter seu próprio PR focado com os testes de caracterização relevantes; nenhum foi alterado aqui.
+A tabela é ancorada no baseline de novembro. O tool atual também reporta dois
+grupos introduzidos por PRs posteriores: `pause_chat`/`resume_chat` (2/14) e as
+duas funções de depreciação `__getattr__` em `table_ast`/`validators` (2/20);
+eles são acompanhados separadamente das linhas do baseline.
+
+Os próximos candidatos de maior valor são o trio startup/lock do frontend
+(grupos 8–10) e os leitores de resultado do SDK (4, 5, 21). Cada um deve ter seu
+próprio PR focado com os testes de caracterização relevantes; os restantes não
+foram alterados aqui.
 
 ## Reprodução
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

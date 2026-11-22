@@ -1,9 +1,9 @@
-# Duplication classification and first consolidation, November 2026
+# Duplication classification and consolidations, November 2026
 
 > A Brazilian Portuguese translation is available in
 > [duplication-consolidation.pt-br.md](duplication-consolidation.pt-br.md).
 
-This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). It triages the duplicate groups from the [November baseline](quality-baseline.md) and implements the first low-risk consolidation. The snapshot that seeded the triage is `develop` at `b00636fc`: **23 groups, 57 functions and 699 lines**.
+This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). It triages the duplicate groups from the [November baseline](quality-baseline.md) and records the low-risk consolidations implemented so far. The snapshot that seeded the triage is `develop` at `b00636fc`: **23 groups, 57 functions and 699 lines**.
 
 ## Method
 
@@ -31,7 +31,24 @@ The behaviour is pinned by `tests/test_i18n_locales.py` and the SDK's `tests/tes
 
 The core facade was a new compatibility name, not a preserved pre-existing caller: `_locales_from_raw` was dead code before this PR. It existed so the remaining migration could proceed without a flag day; #712 removed it and moved the core pin to `acessilia-sdk>=0.4,<0.5` when SDK 0.4.0 published the full i18n API.
 
-**Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. The initial [baseline JSON](quality-baseline.json) stays as the historical snapshot; this page records the first change against it.
+**Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. The initial [baseline JSON](quality-baseline.json) stays as the historical snapshot; this page records the changes against it.
+
+## Second consolidation: the JSON Schema writer
+
+The four `write_*_schema` functions in `execution/schema.py`, `manifest/schema.py`
+and `planning/schema.py` repeated the same parent creation, UTF-8 encoding,
+`json.dumps(ensure_ascii=False, indent=2)` and trailing newline. They now delegate
+to `acessilia_core.schema_files.write_schema`, while each module keeps its own
+schema function and public writer name. The tests compare each writer's output
+with its schema function and cover parent creation and non-ASCII JSON.
+
+The formatting of the committed schema files is unchanged; this PR does not
+regenerate their contents. This removes the `write_*_schema` group from the
+remaining candidates.
+
+**Measured delta on this PR's code commit:** 24 groups / 59 functions / 705
+lines → **23 groups / 55 functions / 672 lines**. Only the `write_*_schema`
+group disappears.
 
 ## Classification of the remaining groups
 
@@ -41,7 +58,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 |---:|---|---|
 | 0 | Frontend Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | Defer to a frontend PR: confirm user-facing copy and menu differences before extracting a command helper. |
 | 1 | Generated SDK dataset readers (5/15) | Generated file (`_dataset_generated.py`): fix the generator, not the generated functions. |
-| 2 | Core schema writers `write_*_schema` (4/33) | Candidate: a shared JSON-writer helper with schema-path tests. |
+| 2 | Core schema writers `write_*_schema` (4/33) | **Consolidated:** shared `schema_files.write_schema`, with writer/schema tests. |
 | 3 | Core config helpers `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Defer: the surrounding config dataclasses differ. |
 | 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | Candidate: a generic typed-result reader after the SDK contract tests. |
 | 5 | SDK result readers in math/media_inspect (3/38) | Candidate: same generic reader. |
@@ -63,14 +80,22 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 21 | SDK layout/structure result readers (2/32) | Candidate: same generic result reader as groups 4–5. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
-The next highest-value candidates are the frontend startup/lock trio (groups 8–10), the SDK result readers (4, 5, 21) and the core schema writers (2). Each should get its own focused PR with the relevant characterization tests; none was changed here.
+The table is anchored to the November baseline. The current tool also reports two
+groups introduced by later PRs: `pause_chat`/`resume_chat` (2/14) and the two
+deprecation `__getattr__` functions in `table_ast`/`validators` (2/20); they are
+tracked separately from the baseline rows.
+
+The next highest-value candidates are the frontend startup/lock trio (groups
+8–10) and the SDK result readers (4, 5, 21). Each should get its own focused PR
+with the relevant characterization tests; the remaining ones were not changed
+here.
 
 ## Reproduction
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

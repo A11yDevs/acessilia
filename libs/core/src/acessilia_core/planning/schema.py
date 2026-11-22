@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from acessilia_core.planning.models import NominalPlan, PlanningComparison
+from acessilia_core.schema_files import write_schema
 
 
 def nominal_plan_schema() -> dict[str, Any]:
@@ -12,12 +12,7 @@ def nominal_plan_schema() -> dict[str, Any]:
 
 
 def write_nominal_plan_schema(destination: Path) -> Path:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(nominal_plan_schema(), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return destination
+    return write_schema(nominal_plan_schema(), destination)
 
 
 def planning_comparison_schema() -> dict[str, Any]:
@@ -27,14 +22,4 @@ def planning_comparison_schema() -> dict[str, Any]:
 
 
 def write_planning_comparison_schema(destination: Path) -> Path:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(
-            planning_comparison_schema(),
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return destination
+    return write_schema(planning_comparison_schema(), destination)
