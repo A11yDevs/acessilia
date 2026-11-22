@@ -31,7 +31,7 @@ make the full suite itself faster.
 | I want the full local confidence check | `make test-all` | Main suite with four workers, then docstruct, SDK and `libs/core` |
 | I want to check linting (Ruff baseline) | `make lint` | Runs Ruff (`F`, `I`, `E` without `E501`) via `scripts/check_ruff_baseline.py` |
 | I want to check static types (Mypy) | `make typecheck` | Runs Mypy on the configured `docstruct`, `acessilia_sdk`, `acessilia_core` and `backend` scope |
-| I want per-component coverage reports | `make coverage` | Runs all four suites with branch coverage into `var/coverage/{app,core,sdk,docstruct}/` |
+| I want per-component coverage reports | `make coverage` | Runs all four suites with branch coverage, writes `var/coverage/{app,core,sdk,docstruct}/`, and enforces the thresholds |
 | I want the main suite only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E main suite with four workers |
 | I want only the core library | `(cd libs/core && uv run --extra dev pytest)` | Runs the core library suite, without the service |
 | I need the exact commands `make` uses | `make -n test-all` | Prints the commands without running them |
@@ -55,7 +55,7 @@ GitHub Actions workflow `CI`:
   uploading JUnit (`test-reports-py*`) artifacts. The same job runs Ruff against
   the shrinking baseline, Mypy on the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass (#366),
   the Toolbox capability contract, the Toolbox's docstruct pin report (warnings
-  only; see below) and the coverage summary with its `coverage-reports-py*`
+  only; see below) enforces the per-component coverage thresholds and publishes the summary with its `coverage-reports-py*`
   artifact.
 - **`SDK alone (Python 3.12)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,

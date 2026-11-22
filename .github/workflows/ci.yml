@@ -536,6 +536,10 @@ jobs:
             --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/core/coverage.xml" \
             --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/core/coverage.json"
 
+      - name: Check per-component coverage thresholds
+        if: always()
+        run: uv run --locked --extra dev python scripts/check_coverage_thresholds.py --coverage-dir var/coverage
+
       - name: Summarize per-component coverage
         if: always()
         run: |
