@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from docstruct.profiles import OUTPUT_PROFILES
 from docstruct.schemas import accessible_document_schema
@@ -17,7 +17,7 @@ from docstruct.sections import explicit_section_title
 from docstruct.tables.ast import effective_section_row_widths, row_header_column_count
 from docstruct.text.sanitize import contains_markdown_artifacts, contains_prompt_leak
 
-SchemaValidator = Callable[[Any, dict[str, Any]], Any]
+SchemaValidator = Callable[[Any, dict[str, Any]], None]
 
 
 def validate_against_schema(document: Any, validator: SchemaValidator) -> None:
@@ -29,7 +29,7 @@ def validate_against_schema(document: Any, validator: SchemaValidator) -> None:
     The original document is passed through and must be treated as read-only.
     This opt-in API neither changes the existing audit nor enables an export gate.
     """
-    result = validator(document, accessible_document_schema())
+    result = cast(Any, validator)(document, accessible_document_schema())
     if result is not None:
         raise TypeError("validator must return None on success and raise on failure")
 
@@ -86,7 +86,7 @@ def validate_canonical_document(document: dict[str, Any]) -> list[FindingTuple]:
         document (dict): Canonical document mapping expected to carry the schema_version, id, title, language and sections keys.
 
     Returns:
-        list[str]: Finding tuples (msgid constant + kwargs) describing every structural problem found; empty when the document is well-formed.
+        list[FindingTuple]: Finding tuples (msgid constant + kwargs) describing every structural problem found; empty when the document is well-formed.
     """
     errors: list[FindingTuple] = []
     if not isinstance(document, dict):
@@ -171,7 +171,7 @@ def validate_export_profile(
         document (dict): Canonical document mapping whose section blocks are walked for verbosity compliance.
 
     Returns:
-        list[str]: Finding tuples (msgid constant + kwargs) for blocks whose verbosity the profile forbids; empty when all blocks comply.
+        list[FindingTuple]: Finding tuples (msgid constant + kwargs) for blocks whose verbosity the profile forbids; empty when all blocks comply.
     """
     profile = OUTPUT_PROFILES.get(profile_name)
     if not profile:
@@ -206,7 +206,7 @@ def validate_output_text(text: str, profile_name: str) -> list[FindingTuple]:
         profile_name (str): Export profile the text was produced for; only non-html profiles are scanned for markdown and only "txt" is scanned for audiodescription metadata leaks.
 
     Returns:
-        list[str]: Finding tuples (msgid constant + kwargs) for each forbidden artifact found; empty when the text is clean.
+        list[FindingTuple]: Finding tuples (msgid constant + kwargs) for each forbidden artifact found; empty when the text is clean.
     """
     errors: list[FindingTuple] = []
     if contains_prompt_leak(text):
@@ -229,7 +229,7 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[Finding
         document (dict): Canonical document mapping to audit; must be a dict for base validation and section walking.
 
     Returns:
-        dict[str, list[str]]: Report with "BLOCKER" (structural failures from base validation plus missing sections) and "WARNING" (accessibility findings such as images without alt text and tables without explicit AST headers) keys.
+        dict[str, list[FindingTuple]]: Report with "BLOCKER" (structural failures from base validation plus missing sections) and "WARNING" (accessibility findings such as images without alt text and tables without explicit AST headers) keys.
     """
     report: dict[str, list[FindingTuple]] = {"BLOCKER": [], "WARNING": []}
 
@@ -373,7 +373,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[FindingTuple]:
         block (dict): Table block mapping whose optional rows list and/or table_ast mapping are checked for structure, type and width consistency.
 
     Returns:
-        list[str]: Finding tuples (msgid constant + kwargs) for every table structure problem found; empty when the table is well-formed.
+        list[FindingTuple]: Finding tuples (msgid constant + kwargs) for every table structure problem found; empty when the table is well-formed.
     """
     errors: list[FindingTuple] = []
     block_id = block.get("id") or Finding(MSG_NO_ID_PLACEHOLDER)

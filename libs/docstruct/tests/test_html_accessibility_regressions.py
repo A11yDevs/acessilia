@@ -49,6 +49,16 @@ def test_explicit_details_respect_the_output_profile(collapsible, tag):
     assert "".join(root.itertext()) == "MoreBody."
 
 
+def test_details_with_an_empty_title_falls_back_to_the_type_label():
+    root = ET.fromstring(_render_block(
+        {"type": "details", "id": "d1", "title": "", "text": "Body."},
+        {"collapsible": True},
+    ))
+    summary = root.find("summary")
+    assert summary is not None
+    assert "".join(summary.itertext()) == "Details"
+
+
 @pytest.mark.parametrize("source", ["ast", "caption", "title"])
 def test_scroll_region_uses_available_caption_without_mutating_the_table(source):
     block = {"type": "table", "id": "t1", "table_ast": {"body": [{"cells": [{"text": "Column"}]}, {"cells": [{"text": "Value"}]}]}}

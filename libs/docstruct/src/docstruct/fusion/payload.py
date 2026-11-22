@@ -392,6 +392,13 @@ def _elements_by_page(elements: list[Any]) -> dict[int, list[dict[str, Any]]]:
     return by_page
 
 
+def _page_number(value: Any) -> int | None:
+    """``value`` as an int page number, accepting integer-valued floats."""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return value if isinstance(value, int) else None
+
+
 def _routed_page_sizes(
     pages: list[Any], routed: AbstractSet[int]
 ) -> dict[int, tuple[float, float]]:
@@ -399,10 +406,10 @@ def _routed_page_sizes(
     for page in pages:
         if not isinstance(page, dict):
             continue
-        number = page.get("page_number")
+        number = _page_number(page.get("page_number"))
         width, height = page.get("width"), page.get("height")
         if (
-            isinstance(number, int)
+            number is not None
             and number in routed
             and isinstance(width, (int, float))
             and isinstance(height, (int, float))
@@ -505,10 +512,9 @@ def _select_routed_and_missing(
 ) -> tuple[set[int], tuple[Any, ...]]:
     preferred: set[int] = set()
     for entry in page_evidence:
-        number = entry.get("page_number")
-        if isinstance(number, float) and number.is_integer():
-            number = int(number)
-        if isinstance(number, int) and (entry.get("stats") or {}).get("route") == "mineru":
+        number = _page_number(entry.get("page_number"))
+        # Evidence without a usable page number cannot name a page to route or report.
+        if number is not None and (entry.get("stats") or {}).get("route") == "mineru":
             preferred.add(number)
     routed = {
         number for number in preferred if secondary_by_page.get(number)

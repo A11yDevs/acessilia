@@ -410,6 +410,12 @@ class TestScalingAndAdoption:
         ]
         assert page_scales(primary_pages, secondary_pages, {1, 2, 3}) == {2: (0.5, 0.5)}
 
+    def test_page_scales_accepts_integer_valued_float_page_numbers(self) -> None:
+        primary_pages = [{"page_number": 2.0, "width": 100, "height": 200}]
+        secondary_pages = [{"page_number": 2, "width": 200, "height": 400}]
+
+        assert page_scales(primary_pages, secondary_pages, {2}) == {2: (0.5, 0.5)}
+
     def test_scaled_box_handles_dict_sequence_and_passthrough(self) -> None:
         assert scaled_box(
             {"left": 10, "top": 20, "right": 110, "bottom": 220, "coord_origin": "TOPLEFT"},
