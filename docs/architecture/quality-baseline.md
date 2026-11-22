@@ -3,7 +3,7 @@
 > A Brazilian Portuguese translation is available in
 > [quality-baseline.pt-br.md](quality-baseline.pt-br.md).
 
-This is the instrumentation and baseline of [issue #656](https://github.com/A11yDevs/acessilia/issues/656), PR 1. It measures the current revision and records the numbers that the next PRs will use for duplication (PR 2), coupling and cohesion (PR 3), boundaries and migrations (PR 4), and CI guards (PR 5). It changes no production code.
+This is the instrumentation and baseline of [issue #656](https://github.com/A11yDevs/acessilia/issues/656), PR 1. It measures the current revision and records the numbers that the next PRs will use for duplication (PR 2), coupling and cohesion (PR 3), boundaries and migrations (PR 4), and CI guards (PR 5). It changes no production code. The classification of the duplicate groups and the first consolidation are in [duplication-consolidation.md](duplication-consolidation.md).
 
 - **Snapshot:** `develop` at `b00636fc` (2026-11-21), Python 3.12.13.
 - **Tool:** [`scripts/architecture_quality.py`](../../scripts/architecture_quality.py), stdlib only.

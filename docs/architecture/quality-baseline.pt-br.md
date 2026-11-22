@@ -2,7 +2,7 @@
 
 > [quality-baseline.md](quality-baseline.md). A versão em inglês é a fonte.
 
-Esta é a instrumentação e o baseline da [issue #656](https://github.com/A11yDevs/acessilia/issues/656), PR 1. Ela mede a revisão atual e registra os números que os próximos PRs usarão para duplicação (PR 2), acoplamento e coesão (PR 3), fronteiras e migrações (PR 4) e guardas de CI (PR 5). Nenhum código de produção muda.
+Esta é a instrumentação e o baseline da [issue #656](https://github.com/A11yDevs/acessilia/issues/656), PR 1. Ela mede a revisão atual e registra os números que os próximos PRs usarão para duplicação (PR 2), acoplamento e coesão (PR 3), fronteiras e migrações (PR 4) e guardas de CI (PR 5). Nenhum código de produção muda. A classificação dos grupos de duplicatas e a primeira consolidação estão em [duplication-consolidation.pt-br.md](duplication-consolidation.pt-br.md).
 
 - **Snapshot:** `develop` em `b00636fc` (2026-11-21), Python 3.12.13.
 - **Ferramenta:** [`scripts/architecture_quality.py`](../../scripts/architecture_quality.py), somente biblioteca padrão.
