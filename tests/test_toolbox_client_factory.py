@@ -27,6 +27,21 @@ def toolbox_settings(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_timeout_seconds", 120)
 
 
+def test_the_adapter_exposes_only_its_config_and_factory():
+    assert set(toolbox_client.__all__) == {
+        "TIMEOUT_KEYS",
+        "endpoints_from",
+        "make_toolbox_client",
+        "toolbox_client_config",
+        "toolbox_endpoints",
+        "toolbox_vlm_endpoint",
+    }
+    assert not hasattr(toolbox_client, "ToolboxError")
+    assert not hasattr(toolbox_client, "ToolboxCapabilityClient")
+    assert not hasattr(toolbox_client, "PROVIDER_DEFAULTS")
+    assert not hasattr(toolbox_client, "execute_capability")
+
+
 def test_takes_endpoint_provider_key_and_timeout_from_settings(monkeypatch):
     monkeypatch.setattr(settings, "toolbox_ocr_provider", "mineru-ocr")
 

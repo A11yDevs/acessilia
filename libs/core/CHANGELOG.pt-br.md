@@ -2,6 +2,13 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.2.7 — o adaptador da Toolbox não reexporta mais o SDK
+
+Sem mudança de comportamento. `acessilia_core.toolbox.toolbox_client` agora só
+mapeia a `ToolboxConfig` da execução para a configuração de cliente do SDK e
+constrói clientes. Erros, clientes e transporte são importados diretamente de
+`acessilia_sdk.toolbox`, então o Core não atua mais como fachada do SDK (#656).
+
 ## 0.2.6 — infraestrutura de i18n pelo SDK
 
 Sem mudança de comportamento. A infraestrutura genérica de i18n agora vive em

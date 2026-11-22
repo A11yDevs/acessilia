@@ -12,7 +12,7 @@ from acessilia_core.pipeline.fusion import (
     apply_page_routes,
     extract_fused,
 )
-from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from docstruct.fusion.payload import group_payload_by_page as _group_by_page
 
 
@@ -292,7 +292,7 @@ class _RecordingClient:
     async def extract_structure(
         self, file_path=None, *, artifact_id=None, language="pt-BR", **kw
     ):
-        from acessilia_core.toolbox.toolbox_client import ToolboxArtifactNotFound
+        from acessilia_sdk.toolbox import ToolboxArtifactNotFound
 
         self._recorder.calls.append((self.provider, artifact_id, file_path))
         if artifact_id and self._recorder.missing_artifact:
@@ -406,7 +406,7 @@ async def test_extract_fused_logs_both_failures_and_artifact_fallbacks_when_both
     monkeypatch,
 ):
     from acessilia_core.logger import logger
-    from acessilia_core.toolbox.toolbox_client import (
+    from acessilia_sdk.toolbox import (
         ToolboxArtifactNotFound,
         ToolboxProviderUnavailable,
     )

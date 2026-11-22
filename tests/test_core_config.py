@@ -24,7 +24,8 @@ from acessilia_core.config import CoreConfig
 from acessilia_core.pipeline import preflight as pipeline_preflight
 from acessilia_core.pipeline.checkpointing import RunCheckpoints
 from acessilia_core.ports import RunPorts
-from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
+from acessilia_core.toolbox.toolbox_client import TIMEOUT_KEYS
+from acessilia_sdk.toolbox import PROVIDER_DEFAULTS
 from backend.config import settings as settings_module
 from backend.config.core_config import core_config_from_settings
 from tests.core_config_support import core_config

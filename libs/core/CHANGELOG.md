@@ -2,6 +2,13 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.2.7 — the Toolbox adapter no longer re-exports the SDK
+
+No behaviour change. `acessilia_core.toolbox.toolbox_client` now only maps the
+run's `ToolboxConfig` to the SDK client configuration and builds clients.
+Errors, clients and transport are imported directly from
+`acessilia_sdk.toolbox`, so the Core no longer acts as an SDK facade (#656).
+
 ## 0.2.6 — i18n infrastructure through the SDK
 
 No behaviour change. The generic i18n infrastructure now lives in

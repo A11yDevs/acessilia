@@ -1,12 +1,13 @@
-"""Core-side access to the Acessilia Toolbox.
+"""Core-side adapter that maps the run's Toolbox settings to SDK clients.
 
 The transport, the capability registry, the per-capability clients and the
 client factory live in the SDK (``libs/sdk``, package ``acessilia_sdk``). This
-module maps the run's :class:`~acessilia_core.config.ToolboxConfig` onto the
-SDK's :class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
-(:func:`toolbox_client_config`, constitution 3.2; ADR-0016 step 3), states the endpoint rule
-both the clients and the planning gate follow (:func:`endpoints_from`), and
-keeps the names other modules import from here.
+module only maps the run's :class:`~acessilia_core.config.ToolboxConfig` onto
+the SDK's :class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
+(:func:`toolbox_client_config`, constitution 3.2; ADR-0016 step 3) and states
+the endpoint rule both the clients and the planning gate follow
+(:func:`endpoints_from`). It does not re-export the SDK API: callers import
+errors, clients and transport from ``acessilia_sdk`` directly (#656).
 """
 
 from __future__ import annotations
@@ -17,46 +18,34 @@ from typing import Any, TypeVar
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.logger import logger
 from acessilia_sdk.toolbox import (
-    PROVIDER_DEFAULTS,
-    ToolboxArtifactNotFound,
-    ToolboxAuthenticationError,
-    ToolboxCapabilityClient,
-    ToolboxCapabilityError,
-    ToolboxClientConfig,
-    ToolboxContractViolation,
-    ToolboxEndpoint,
-    ToolboxError,
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    ToolboxUnavailable,
-    ToolboxUnsupportedMediaType,
-    auth_headers,
+    ToolboxCapabilityClient as _ToolboxCapabilityClient,
+    ToolboxClientConfig as _ToolboxClientConfig,
+    ToolboxEndpoint as _ToolboxEndpoint,
     clients as _sdk_clients,
-    execute_capability,
-    make_client,
-    parse_endpoints,
-    require_capability,
+    make_client as _make_client,
+    parse_endpoints as _parse_endpoints,
 )
+from acessilia_sdk.toolbox.errors import ToolboxError as _ToolboxError
 
-ClientT = TypeVar("ClientT", bound=ToolboxCapabilityClient)
+ClientT = TypeVar("ClientT", bound=_ToolboxCapabilityClient)
 
 
-def endpoints_from(base_urls: str, base_url: str) -> tuple[ToolboxEndpoint, ...]:
+def endpoints_from(base_urls: str, base_url: str) -> tuple[_ToolboxEndpoint, ...]:
     """The Toolbox endpoints, in the order they are tried.
 
     ``base_urls`` (``TOOLBOX_BASE_URLS``) lists independent deployments;
     without it, ``base_url`` (``TOOLBOX_BASE_URL``) is the only endpoint
     (docs/adr/0006). Raises ``ValueError`` for a URL the SDK cannot use.
     """
-    return parse_endpoints(base_urls.strip() or base_url)
+    return _parse_endpoints(base_urls.strip() or base_url)
 
 
-def toolbox_endpoints(toolbox: ToolboxConfig) -> tuple[ToolboxEndpoint, ...]:
+def toolbox_endpoints(toolbox: ToolboxConfig) -> tuple[_ToolboxEndpoint, ...]:
     """The Toolbox endpoints of ``toolbox`` for the capability clients (:func:`endpoints_from`)."""
     return endpoints_from(toolbox.base_urls, toolbox.base_url)
 
 
-def toolbox_vlm_endpoint(toolbox: ToolboxConfig) -> ToolboxEndpoint:
+def toolbox_vlm_endpoint(toolbox: ToolboxConfig) -> _ToolboxEndpoint:
     """The endpoint that receives the agents' VLM chats with ``AI_CLIENT=toolbox``.
 
     The first of :func:`toolbox_endpoints`: an Agno model takes one base URL,
@@ -66,7 +55,7 @@ def toolbox_vlm_endpoint(toolbox: ToolboxConfig) -> ToolboxEndpoint:
     return toolbox_endpoints(toolbox)[0]
 
 
-def _log_failover(endpoint: ToolboxEndpoint, error: ToolboxError) -> None:
+def _log_failover(endpoint: _ToolboxEndpoint, error: _ToolboxError) -> None:
     logger.warning(
         "Toolbox endpoint {} failed ({}: {}); trying the next one",
         endpoint.base_url,
@@ -81,19 +70,19 @@ TIMEOUT_KEYS: frozenset[str] = frozenset(
     value.timeout_key
     for value in vars(_sdk_clients).values()
     if inspect.isclass(value)
-    and issubclass(value, ToolboxCapabilityClient)
+    and issubclass(value, _ToolboxCapabilityClient)
     and value.timeout_key
 )
 
 
-def toolbox_client_config(toolbox: ToolboxConfig) -> ToolboxClientConfig:
+def toolbox_client_config(toolbox: ToolboxConfig) -> _ToolboxClientConfig:
     """The SDK client configuration of the run's ``toolbox``.
 
-    Providers come from ``toolbox.providers``, keyed like
+    Providers come from ``toolbox.providers``, keyed like the SDK's
     ``PROVIDER_DEFAULTS``, and export timeouts from ``toolbox.timeouts``,
     keyed by each client's ``timeout_key``.
     """
-    return ToolboxClientConfig(
+    return _ToolboxClientConfig(
         endpoints=toolbox_endpoints(toolbox),
         api_key=toolbox.api_key,
         timeout_seconds=toolbox.timeout_seconds,
@@ -123,27 +112,14 @@ def make_toolbox_client(
     only. The SDK decides per call from its registry (#406): a call to a
     non-idempotent capability (``dataset.sample``) gets one attempt.
     """
-    return make_client(client_cls, toolbox_client_config(toolbox), **overrides)
+    return _make_client(client_cls, toolbox_client_config(toolbox), **overrides)
 
 
 __all__ = [
-    "PROVIDER_DEFAULTS",
     "TIMEOUT_KEYS",
-    "ToolboxArtifactNotFound",
-    "ToolboxAuthenticationError",
-    "ToolboxCapabilityClient",
-    "ToolboxCapabilityError",
-    "ToolboxContractViolation",
-    "ToolboxError",
-    "ToolboxProviderUnavailable",
-    "ToolboxTimeout",
-    "ToolboxUnavailable",
-    "ToolboxUnsupportedMediaType",
-    "auth_headers",
     "endpoints_from",
-    "execute_capability",
     "make_toolbox_client",
-    "require_capability",
     "toolbox_client_config",
     "toolbox_endpoints",
+    "toolbox_vlm_endpoint",
 ]

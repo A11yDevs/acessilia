@@ -17,10 +17,8 @@ import httpx
 import pytest
 
 from acessilia_core.export import pandoc_exporter
-from acessilia_core.toolbox.toolbox_client import (
-    ToolboxProviderUnavailable,
-    make_toolbox_client,
-)
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
 from backend.config.settings import settings

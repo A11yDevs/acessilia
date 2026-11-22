@@ -17,7 +17,7 @@ from core_config_support import toolbox_config
 from pddl_support import build_element, build_manifest
 
 from acessilia_core.pipeline import judge
-from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
 PNG = b"\x89PNG\r\n\x1a\njudged-page"
 

@@ -17,7 +17,7 @@ import pytest
 
 from acessilia_core.manifest import toolbox_extractor
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from acessilia_core.toolbox.toolbox_client import ToolboxTimeout
+from acessilia_sdk.toolbox import ToolboxTimeout
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from acessilia_sdk.toolbox.errors import ToolboxProviderUnavailable
 from tests.core_config_support import fusion_config, paths_config, toolbox_config

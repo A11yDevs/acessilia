@@ -365,7 +365,7 @@ def test_export_accessible_document_sanitizes_legacy_block_markdown():
 
 def test_export_accessible_document_pdf_ua_never_runs_local_pandoc(monkeypatch):
     """PDF/UA is rendered only by the Toolbox (docs/adr/0003)."""
-    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
 
     def toolbox_down(ast, output_path, *, lang, toolbox):

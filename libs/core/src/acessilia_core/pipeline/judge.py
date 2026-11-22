@@ -170,7 +170,7 @@ def _judge_one_page(
     that cannot be rendered, a refused or failed call, and an answer without a
     valid ``pB`` are failures of the method.
     """
-    from acessilia_core.toolbox.toolbox_client import (
+    from acessilia_sdk.toolbox import (
         ToolboxAuthenticationError,
         ToolboxContractViolation,
         ToolboxError,
