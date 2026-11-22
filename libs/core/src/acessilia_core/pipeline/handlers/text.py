@@ -15,13 +15,8 @@ from typing import Any
 
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _element_bbox,
-)
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.pipeline.elements import _element_bbox
 from acessilia_core.pipeline.handlers.common import (
     _fusion_agent,
     _missing_obligation,
@@ -55,9 +50,7 @@ from acessilia_core.pipeline.handlers.unicode_repair import (
     _reattach_negation_overlays,
     _repair_table_cells,
 )
-from docstruct.fusion.noise import (
-    element_role,
-)
+from docstruct.fusion.noise import element_role
 from docstruct.fusion.tailjoin import page_number_position
 from docstruct.sections import repair_heading_levels
 from docstruct.text.norm_fix import norm_fix

@@ -20,20 +20,14 @@ from acessilia_core.config import ToolboxConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.handlers import messages as step_messages
 from acessilia_core.pipeline.secondary import (
     _CALIBRATED_PAIR,
     _page_markdown,
     _SecondaryExtraction,
 )
-from acessilia_core.pipeline.toolbox import (
-    _render_client,
-    _source_artifact_id,
-)
+from acessilia_core.pipeline.toolbox import _render_client, _source_artifact_id
 from acessilia_sdk.toolbox.clients.pdf import check_renderable
 
 if TYPE_CHECKING:

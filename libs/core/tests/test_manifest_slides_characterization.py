@@ -32,10 +32,7 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     Provenance,
 )
-from acessilia_core.manifest.slides import (
-    _split_across_slides,
-    structure_as_slides,
-)
+from acessilia_core.manifest.slides import _split_across_slides, structure_as_slides
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
 
 TOOLBOX_FIXTURE = Path(__file__).parent / "fixtures" / "toolbox-v2-contract.json"

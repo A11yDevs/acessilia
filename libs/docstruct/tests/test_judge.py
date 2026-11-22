@@ -6,12 +6,7 @@ import math
 
 import pytest
 
-from docstruct.fusion.judge import (
-    debias,
-    decide_pair,
-    p2_from_logprobs,
-    should_judge,
-)
+from docstruct.fusion.judge import debias, decide_pair, p2_from_logprobs, should_judge
 
 
 class TestDebias:

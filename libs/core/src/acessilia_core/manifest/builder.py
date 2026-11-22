@@ -44,11 +44,7 @@ from acessilia_core.manifest.slides import (
     structure_as_slides,
 )
 from docstruct.fusion.payload import normalize_element_ids
-from docstruct.geometry import (
-    ReadingItem,
-    order_reading_items,
-    reading_role,
-)
+from docstruct.geometry import ReadingItem, order_reading_items, reading_role
 from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_FLAG,
     UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,

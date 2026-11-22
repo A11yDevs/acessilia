@@ -34,9 +34,7 @@ from acessilia_core.manifest.models import (
     PageDescriptor,
     ProcessingManifest,
 )
-from acessilia_core.pipeline.elements import (
-    _element_bbox,
-)
+from acessilia_core.pipeline.elements import _element_bbox
 from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
@@ -60,9 +58,7 @@ from acessilia_core.pipeline.secondary import (
     _secondary_or_failure,
     _SecondaryExtraction,
 )
-from acessilia_core.pipeline.toolbox import (
-    _source_artifact_id,
-)
+from acessilia_core.pipeline.toolbox import _source_artifact_id
 from acessilia_core.run_identity import fusion_reuse_identity
 from acessilia_sdk.runtime import run_sync
 from docstruct.tables.ast import analyze_table_complexity

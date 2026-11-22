@@ -14,15 +14,9 @@ from __future__ import annotations
 import pytest
 
 from acessilia_core.manifest.builder import inspect_document_needs
-from acessilia_core.manifest.detectors import (
-    MAX_ID_SUFFIX,
-    VLM_JUDGE_METHODS,
-)
+from acessilia_core.manifest.detectors import MAX_ID_SUFFIX, VLM_JUDGE_METHODS
 from acessilia_core.manifest.models import ManifestElement
-from acessilia_core.pipeline.fusion import (
-    apply_page_routes,
-    fuse_extraction_payloads,
-)
+from acessilia_core.pipeline.fusion import apply_page_routes, fuse_extraction_payloads
 from docstruct.fusion.judge import should_judge
 from docstruct.fusion.page_select import page_norm, ratio
 from docstruct.fusion.payload import page_similarity as _similarity

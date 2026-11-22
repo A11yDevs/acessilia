@@ -26,23 +26,14 @@ from acessilia_core.agents.vision_agent import VisionAgent
 from acessilia_core.config import CoreConfig, ModelConfig, ToolboxConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.formula_tools import normalize_latex
-from acessilia_core.manifest.builder import (
-    is_unstructured_page_placeholder,
-)
-from acessilia_core.manifest.models import (
-    Artifact,
-    ManifestElement,
-    ProcessingManifest,
-)
+from acessilia_core.manifest.builder import is_unstructured_page_placeholder
+from acessilia_core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
     write_atomic_artifact,
 )
-from acessilia_core.pipeline.toolbox import (
-    _source_artifact_id,
-    _toolbox_render,
-)
+from acessilia_core.pipeline.toolbox import _source_artifact_id, _toolbox_render
 from acessilia_core.ports import RegionCache, RunPorts, region_cache_for
 from acessilia_sdk.runtime import run_sync
 

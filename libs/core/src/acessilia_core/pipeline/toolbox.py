@@ -18,9 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from acessilia_core.config import ToolboxConfig
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
+from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_sdk.toolbox.clients.pdf import check_renderable
 
 if TYPE_CHECKING:

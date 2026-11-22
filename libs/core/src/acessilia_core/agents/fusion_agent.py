@@ -48,10 +48,7 @@ from docstruct.fusion.tailjoin import join_tail, tailjoin3
 from docstruct.fusion.types import DiffBlock
 from docstruct.fusion.verse import verse_blocks
 from docstruct.fusion.xycut import xycut_order
-from docstruct.regions.classify import (
-    classify_region,
-    region_needs_vision,
-)
+from docstruct.regions.classify import classify_region, region_needs_vision
 from docstruct.text.latex import normalize_latex
 from docstruct.text.norm_fix import norm_fix
 from docstruct.types import Region

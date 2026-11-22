@@ -10,15 +10,9 @@ from __future__ import annotations
 
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _table_element_has_structured_content,
-)
-from acessilia_core.pipeline.handlers.common import (
-    _target_elements,
-)
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.pipeline.elements import _table_element_has_structured_content
+from acessilia_core.pipeline.handlers.common import _target_elements
 from acessilia_core.pipeline.handlers.messages import (
     MSG_CODE_NO_CODE,
     MSG_CODE_NORMALIZED,

@@ -12,10 +12,7 @@ import pytest
 from pddl_support import build_element, build_manifest
 
 from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
-from acessilia_core.pipeline.secondary import (
-    _pair_block,
-    _SecondaryExtraction,
-)
+from acessilia_core.pipeline.secondary import _pair_block, _SecondaryExtraction
 
 W, H = 600.0, 800.0
 

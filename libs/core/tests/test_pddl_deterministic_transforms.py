@@ -18,11 +18,7 @@ from pddl_support import (
     build_orchestrator as _orchestrator,
 )
 
-from acessilia_core.manifest.models import (
-    BoundingBox,
-    ProcessingManifest,
-    Provenance,
-)
+from acessilia_core.manifest.models import BoundingBox, ProcessingManifest, Provenance
 from acessilia_core.pipeline.handlers.text import (
     _handle_chunk_verse_method,
     _handle_extract_line_numbers_method,

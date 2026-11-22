@@ -107,6 +107,9 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 # Keep aliased re-exports compact when they come from the same module (#722).
 combine-as-imports = true
+# Collapse imports to one line whenever they fit, regardless of the source's
+# trailing comma, so the style does not depend on how the block was written (#725).
+split-on-trailing-comma = false
 known-first-party = [
     "acessilia_core",
     "acessilia_sdk",

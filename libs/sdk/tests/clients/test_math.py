@@ -9,9 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from acessilia_sdk.toolbox import (
-    ToolboxTimeout,
-)
+from acessilia_sdk.toolbox import ToolboxTimeout
 from acessilia_sdk.toolbox.clients.math import ToolboxMathClient, recognized_formulas
 
 FIXTURE_IMAGE = Path(__file__).parent / "fixtures" / "sample.pdf"

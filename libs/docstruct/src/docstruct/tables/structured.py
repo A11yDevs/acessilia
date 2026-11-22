@@ -4,11 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, Protocol
 
-from docstruct.tables.ast import (
-    ALLOWED_SCOPES,
-    TABLE_SECTIONS,
-    raw_rows_from_table_ast,
-)
+from docstruct.tables.ast import ALLOWED_SCOPES, TABLE_SECTIONS, raw_rows_from_table_ast
 
 
 class StructuredTableCell(Protocol):
