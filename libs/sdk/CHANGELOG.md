@@ -7,6 +7,10 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `acessilia_sdk.i18n` with `parse_locales` and `normalize_locale`,
+  the generic locale-list parser and normalizer shared by the core and the
+  service. The core keeps its catalogs, policies and request context; the full
+  extraction of the remaining infrastructure is #712.
 - **Fixed** `extract_dual_fused` rejects a `document.structure.extract` answer
   whose `status` is not `succeeded`, even when it carries a `document` object;
   it is recorded as a `ToolboxContractViolation` without a `Step`, matching the

@@ -7,6 +7,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `acessilia_sdk.i18n` com `parse_locales` e `normalize_locale`,
+  o parser e o normalizador genéricos de listas de locales compartilhados pelo
+  core e pelo serviço. O core mantém seus catálogos, políticas e contexto de
+  requisição; a extração completa da infraestrutura restante é a #712.
 - **Corrigido** `extract_dual_fused` rejeita uma resposta de
   `document.structure.extract` cujo `status` não seja `succeeded`, mesmo que
   traga um objeto `document`; ela é registrada como
