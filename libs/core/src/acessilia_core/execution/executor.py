@@ -36,10 +36,14 @@ from acessilia_core.execution.models import (
     ExecutionReport,
     ExecutionStepResult,
     MethodResult,
+    ReportMode,
+    ReportStatus,
+    StepStatus,
 )
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
 from acessilia_core.manifest.models import (
+    AttemptStatus,
     Obligation,
     ObligationAttempt,
     ProcessingManifest,
@@ -279,8 +283,9 @@ class ExecutorAgent:
     @staticmethod
     def _conclude(
         manifest: ProcessingManifest, state: _ExecutionState, *, dry_run: bool
-    ) -> tuple[ProcessingManifest, str, int]:
+    ) -> tuple[ProcessingManifest, ReportStatus, int]:
         """The manifest to return, the report status and the revision after the run."""
+        status: ReportStatus
         if dry_run:
             status = "failed" if state.failed_step_index is not None else "dry-run-completed"
             return deepcopy(manifest), status, manifest.revision
@@ -300,12 +305,12 @@ class ExecutorAgent:
         manifest: ProcessingManifest,
         state: _ExecutionState,
         *,
-        status: str,
+        status: ReportStatus,
         revision_after: int,
         started_at: datetime,
         completed_at: datetime,
     ) -> ExecutionReport:
-        mode = "dry-run" if state.dry_run else "live"
+        mode: ReportMode = "dry-run" if state.dry_run else "live"
         execution_seed = (
             f"{plan.plan_id}:{manifest.manifest_id}:"
             f"{started_at.isoformat()}:{'dry' if state.dry_run else 'live'}"
@@ -335,7 +340,7 @@ class ExecutorAgent:
         method: str,
         started_at: datetime,
         completed_at: datetime,
-        status: str,
+        status: AttemptStatus,
         message: str | None,
         artifact_ids: list[str],
     ) -> None:
@@ -404,7 +409,7 @@ class ExecutorAgent:
         state: _ExecutionState,
     ) -> ExecutionStepResult:
         started_at = datetime.now(timezone.utc)
-        status = "simulated" if state.dry_run else "succeeded"
+        status: StepStatus = "simulated" if state.dry_run else "succeeded"
         message: str | None = None
         artifact_ids: list[str] = []
 

@@ -34,6 +34,7 @@ import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
@@ -308,7 +309,7 @@ def _provenance_page_runs(
         return None
     # Consecutive entries on one page (the lines of one slide) make one part.
     runs: list[list[Provenance]] = []
-    for entry in sorted(provenance, key=lambda item: item.char_start):
+    for entry in sorted(provenance, key=lambda item: cast(int, item.char_start)):
         if runs and runs[-1][0].page_number == entry.page_number:
             runs[-1].append(entry)
         else:
@@ -322,7 +323,8 @@ def _contiguous_run_spans(
     spans: list[tuple[int, int]] = []
     previous_end = 0
     for run in runs:
-        start, end = run[0].char_start, max(entry.char_end for entry in run)
+        start = cast(int, run[0].char_start)
+        end = max(cast(int, entry.char_end) for entry in run)
         if start < previous_end or end <= start or text[previous_end:start].strip():
             return None
         spans.append((start, end))
@@ -750,7 +752,8 @@ def _grow(host: ManifestElement, other: ManifestElement) -> bool:
     """Grow ``host``'s source box to cover ``other``'s; False when it cannot."""
     if not _growable(host, other):
         return False
-    first, second = host.provenance[0].bbox, other.provenance[0].bbox
+    first = cast(BoundingBox, host.provenance[0].bbox)
+    second = cast(BoundingBox, other.provenance[0].bbox)
     upward = _upward(first)
     host.provenance[0].bbox = BoundingBox(
         left=min(first.left, second.left),

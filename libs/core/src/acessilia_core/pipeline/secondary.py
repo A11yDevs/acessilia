@@ -200,9 +200,9 @@ def _provider_pair_problem(
 def _secondary_or_failure(
     manifest: ProcessingManifest,
 ) -> tuple[_SecondaryExtraction | None, MethodResult | None]:
-    secondary, problem = _load_secondary_extraction(manifest)
+    secondary, load_problem = _load_secondary_extraction(manifest)
     if secondary is None:
-        return None, MethodResult(success=False, validated=False, message=problem)
+        return None, MethodResult(success=False, validated=False, message=load_problem)
     problem = _provider_pair_problem(manifest, secondary)
     if problem:
         return None, MethodResult(success=False, validated=False, message=problem)

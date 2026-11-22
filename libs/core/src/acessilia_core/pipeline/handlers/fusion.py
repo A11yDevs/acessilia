@@ -147,6 +147,7 @@ def _handle_table_smart_fusion_method(
     secondary, failure = _secondary_or_failure(manifest)
     if failure is not None:
         return failure
+    assert secondary is not None
 
     secondary_name = _CALIBRATED_PAIR[1]
     primary_tables_by_page = Counter(
@@ -208,6 +209,7 @@ def _handle_agreement_rule_method(
     secondary, failure = _secondary_or_failure(manifest)
     if failure is not None:
         return failure
+    assert secondary is not None
 
     primary_name = _CALIBRATED_PAIR[0]
     routes: dict[int, tuple[str, str]] = {}

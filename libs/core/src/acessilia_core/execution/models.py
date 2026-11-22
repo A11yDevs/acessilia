@@ -13,8 +13,17 @@ from acessilia_core.execution.messages import (  # noqa: E402
 from acessilia_core.i18n import t  # noqa: E402
 from acessilia_core.manifest.models import Artifact  # noqa: E402
 
-EXECUTION_SCHEMA_VERSION = "1.0.0"
+EXECUTION_SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
 EXECUTION_SCHEMA_ID = "urn:a11y-devs:schema:execution-report:1.0.0"
+
+ReportMode = Literal["live", "dry-run"]
+ReportStatus = Literal[
+    "completed",
+    "failed",
+    "dry-run-completed",
+    "replan-required",
+]
+StepStatus = Literal["succeeded", "failed", "simulated", "skipped"]
 
 
 class StrictModel(BaseModel):
@@ -40,7 +49,7 @@ class MethodResult(StrictModel):
 class ExecutionStepResult(StrictModel):
     index: int = Field(ge=0)
     action: str = Field(min_length=1)
-    status: Literal["succeeded", "failed", "simulated", "skipped"]
+    status: StepStatus
     obligation_id: str | None = None
     method: str | None = None
     started_at: datetime
@@ -59,13 +68,8 @@ class ExecutionReport(StrictModel):
     manifest_revision_after: int = Field(ge=1)
     started_at: datetime
     completed_at: datetime
-    mode: Literal["live", "dry-run"]
-    status: Literal[
-        "completed",
-        "failed",
-        "dry-run-completed",
-        "replan-required",
-    ]
+    mode: ReportMode
+    status: ReportStatus
     replan_required: bool
     failed_step_index: int | None = Field(default=None, ge=0)
     steps: list[ExecutionStepResult]

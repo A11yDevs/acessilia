@@ -9,6 +9,7 @@ logging.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from typing import Any
 
@@ -33,7 +34,7 @@ def _log_fusion_events(
     *,
     artifact_id: str | None,
     artifact_fallbacks: tuple[str, ...],
-    failures: dict[str, Exception],
+    failures: Mapping[str, Exception],
 ) -> None:
     for provider in artifact_fallbacks:
         logger.info(

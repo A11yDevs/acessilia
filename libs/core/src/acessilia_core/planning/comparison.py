@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections import Counter
 from datetime import datetime, timezone
+from typing import Literal
 
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.planning.domain_bundle import DomainBundle
@@ -10,6 +11,7 @@ from acessilia_core.planning.models import (
     ComparisonDetails,
     DomainIdentity,
     NominalPlan,
+    PlannerBackend,
     PlannerOutcome,
     PlanningComparison,
 )
@@ -21,9 +23,9 @@ def build_planning_comparison(
     manifest: ProcessingManifest,
     domain: DomainBundle,
     compiled: CompiledProblem,
-    outcomes: dict[str, PlannerOutcome],
+    outcomes: dict[PlannerBackend, PlannerOutcome],
     plans: dict[str, NominalPlan],
-    preferred_backend: str,
+    preferred_backend: PlannerBackend,
 ) -> PlanningComparison:
     """Compares planner outputs without conflating equivalently valid causal orderings."""
     details = _compare_plans(plans.get("internal"), plans.get("fast-downward"))
@@ -98,7 +100,7 @@ def _compare_plans(
             same_multiset,
         )
     )
-    verdict = (
+    verdict: Literal["identical", "equivalent", "different", "inconclusive"] = (
         "identical"
         if semantic_equivalence and same_sequence
         else "equivalent"

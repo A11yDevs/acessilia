@@ -26,7 +26,7 @@ from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the cata
     document_invariant_findings,
 )
 
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION: Literal["1.1.0"] = "1.1.0"
 SCHEMA_ID = "urn:a11y-devs:schema:processing-manifest:1.1.0"
 
 ElementType = Literal[

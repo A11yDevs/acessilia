@@ -47,6 +47,7 @@ def _handle_skeleton_order_method(
     secondary, failure = _secondary_or_failure(manifest)
     if failure is not None:
         return failure
+    assert secondary is not None
 
     by_page: dict[int, list[ManifestElement]] = {}
     for element in elements:

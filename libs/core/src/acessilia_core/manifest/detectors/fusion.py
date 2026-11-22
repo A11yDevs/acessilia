@@ -182,6 +182,8 @@ def _collect_page_entries(
             continue
         page_stats = page_data.get("stats")
         page_number = page_data.get("page_number")
+        if not isinstance(page_number, int):
+            continue
         page_targets = by_page.get(page_number, [])
         if not isinstance(page_stats, dict) or not page_targets:
             continue

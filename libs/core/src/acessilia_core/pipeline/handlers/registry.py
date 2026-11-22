@@ -19,11 +19,11 @@ import sys
 import typing
 from collections.abc import Callable, Mapping
 from functools import partial
+from typing import cast
 
 from acessilia_core.config import CoreConfig
-from acessilia_core.execution.executor import MethodRegistry
+from acessilia_core.execution.executor import MethodHandler, MethodRegistry
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
@@ -63,7 +63,7 @@ from acessilia_core.pipeline.handlers.text import (
 from acessilia_core.ports import RunPorts
 
 #: Method name -> handler.
-METHOD_HANDLERS: dict[str, Callable[[ProcessingManifest, str], MethodResult]] = {
+METHOD_HANDLERS: dict[str, Callable[..., MethodResult]] = {
     # Methods that call a Toolbox capability or a model and fail explicitly
     # when it is unavailable, and the provider fusion and choice.
     "mathml": _handle_mathml_method,
@@ -108,7 +108,7 @@ def build_method_registry() -> MethodRegistry:
     registry = MethodRegistry()
     for method, handler in METHOD_HANDLERS.items():
         run_parameters(handler)
-        registry.register(method, handler)
+        registry.register(method, cast(MethodHandler, handler))
     return registry
 
 

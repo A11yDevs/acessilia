@@ -45,13 +45,13 @@ def _openrouter_model(
     from agno.models.openrouter import OpenRouter
 
     base_url = models.openrouter_base_url.replace("/chat/completions", "").rstrip("/")
-    extra_headers = {}
+    extra_headers: dict[str, str] = {}
     if models.openrouter_site_url:
         extra_headers["HTTP-Referer"] = models.openrouter_site_url
     if models.openrouter_app_name:
         extra_headers["X-Title"] = models.openrouter_app_name
 
-    reasoning_options = (
+    reasoning_options: dict[str, Any] = (
         {"extra_body": {"reasoning": {"enabled": reasoning_enabled}}}
         if reasoning_enabled is not None else {}
     )
@@ -81,7 +81,7 @@ def _ollama_model(
     from agno.models.ollama import Ollama
 
     host = models.ollama_base_url.replace("/api/chat", "").rstrip("/")
-    options = {
+    options: dict[str, Any] = {
         "temperature": 1.0,
         "top_p": 0.95,
         "top_k": 64,
@@ -90,7 +90,7 @@ def _ollama_model(
     if max_tokens is not None:
         options["num_predict"] = max_tokens
 
-    reasoning_options = (
+    reasoning_options: dict[str, Any] = (
         {"request_params": {"think": reasoning_enabled}}
         if reasoning_enabled is not None else {}
     )

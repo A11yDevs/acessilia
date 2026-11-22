@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal
+from typing import Any, Literal
 
 from acessilia_core.export.messages import (
     MSG_FORMAT_DOCX,
@@ -50,7 +50,7 @@ class FormatDelivery:
         return f"{stem}{separator}{self.output_suffix}"
 
 
-def _remote_spec(format_id: str, client: type, extension: str) -> FormatSpec:
+def _remote_spec(format_id: str, client: type[Any], extension: str) -> FormatSpec:
     capability = TOOLBOX_CAPABILITIES[client.capability]
     return FormatSpec(format_id, str(capability.contract_version), client.media_type, extension, "remote")
 

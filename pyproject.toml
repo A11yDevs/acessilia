@@ -135,10 +135,11 @@ exclude_also = [
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["libs/docstruct/src", "libs/sdk/src"]
+mypy_path = ["libs/docstruct/src", "libs/sdk/src", "libs/core/src"]
 files = [
     "libs/docstruct/src/docstruct",
     "libs/sdk/src/acessilia_sdk",
+    "libs/core/src/acessilia_core",
 ]
 explicit_package_bases = true
 ignore_missing_imports = true

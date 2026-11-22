@@ -104,7 +104,7 @@ def _handle_pandoc_table_method(
         try:
             usable = _table_element_has_structured_content(element)
             table_ast = element.metadata.get("table_ast")
-            if usable:
+            if usable and isinstance(table_ast, dict):
                 usable = any(
                     value.strip() for row in _rows_from_table_ast(table_ast) for value in row
                 )

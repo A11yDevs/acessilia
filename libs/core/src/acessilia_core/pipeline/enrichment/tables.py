@@ -263,10 +263,11 @@ async def _read_table(
         if not isinstance(candidate, DataOutput) or candidate.kind != "table":
             continue
         if reason is not None:
-            why = _table_reread_disqualified(
+            disqualified = _table_reread_disqualified(
                 element.metadata["table_ast"], candidate.table_rows()
             )
-            if why:
+            if disqualified:
+                why = disqualified
                 continue
         table_output = candidate
         break

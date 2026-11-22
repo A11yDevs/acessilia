@@ -55,6 +55,7 @@ def _handle_vlm_pairwise_judge_method(
     secondary, failure = _secondary_or_failure(manifest)
     if failure is not None:
         return failure
+    assert secondary is not None
 
     judgements: dict[int, dict[str, Any]] = {}
     for page_number in sorted({e.page_number for e in elements if e.page_number}):
@@ -73,6 +74,7 @@ def _handle_vlm_pairwise_judge_method(
         )
         if failure is not None:
             return failure
+        assert judgement is not None
         judgements[page_number] = judgement
 
     return _judgement_result(elements, judgements)
