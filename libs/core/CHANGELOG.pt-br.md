@@ -2,6 +2,20 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.2.6 — infraestrutura de i18n pelo SDK
+
+Sem mudança de comportamento. A infraestrutura genérica de i18n agora vive em
+`acessilia_sdk.i18n` (#712): parsing e normalização de locales, negociação,
+contexto de requisição por tarefa, compilação de catálogo e lookup
+gettext/plural. O core mantém seus catálogos, ids de mensagem, políticas de
+locale e a API pública de tradução `t()`/`n()`. A fachada temporária
+`acessilia_core.i18n.parse_locales` foi removida; os nomes existentes
+`set_request_locale`/`reset_request_locale` permanecem como reexportações de
+compatibilidade, e código novo deve importá-los do SDK. O core agora exige
+`acessilia-sdk>=0.4,<0.5`. O novo piso também cobre as APIs do SDK que o Core
+0.2.5 já consumia -- fusão dual, downscale/validação de render e `run_sync` --
+que o SDK publica na 0.4.0; os metadados do 0.2.5 ainda apontavam para 0.3.x.
+
 ## 0.2.5 — fusão dual, downscale, validação de render e bridge sync/async via SDK e docstruct
 
 Sem mudança de comportamento, exceto dois casos-limite menores descritos

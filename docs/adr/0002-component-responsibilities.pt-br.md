@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](0002-component-respo
 - **Status:** Aceito
 - **Data:** 2026-10-18
 - **Componentes:** core, SDK, docstruct, Toolbox
-- **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152), [#712](https://github.com/A11yDevs/acessilia/issues/712)
 - **Emendada pela:** [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) (a linha do SDK e as perguntas de "onde fica o código novo?")
 
 ## Contexto
@@ -27,7 +27,7 @@ executa capacidades operacionais.
 | Componente | É dono de | Não deve |
 |---|---|---|
 | **Core** (`backend/`) | Agentes, planejamento PDDL, estratégias, políticas, fluxos; quando chamar uma capacidade, qual perfil usar, se deve degradar | Implementar algoritmos documentais genéricos ou executores operacionais; importar o pacote da Toolbox; redefinir contratos |
-| **SDK** (`libs/sdk`) | Contratos como os clientes os consomem, clientes e transporte da Toolbox, referências de artefatos, regras de disponibilidade e failover, acesso no próprio processo aos algoritmos puros da docstruct | Conter política de planejamento ou lógica de agentes; exigir dependências operacionais pesadas; ler settings ou ambiente; importar o core ou o pacote da Toolbox. Emendada pela [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md): o SDK também guarda operações reutilizáveis, sequências fixas de capacidades e algoritmos do docstruct com parâmetros explícitos |
+| **SDK** (`libs/sdk`) | Contratos como os clientes os consomem, clientes e transporte da Toolbox, referências de artefatos, regras de disponibilidade e failover, acesso no próprio processo aos algoritmos puros da docstruct, e infraestrutura genérica de i18n (parsing/normalização de locales, negociação, contexto de requisição e tradução de catálogo) | Conter política de planejamento ou lógica de agentes; exigir dependências operacionais pesadas; ler settings ou ambiente; importar o core ou o pacote da Toolbox. Emendada pela [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md): o SDK também guarda operações reutilizáveis, sequências fixas de capacidades e algoritmos do docstruct com parâmetros explícitos |
 | **docstruct** (`libs/docstruct`) | Modelos e schemas documentais canônicos, normalização, comparação, matching, fusão, validação estrutural: determinísticos e livres de infraestrutura | Depender do core, do SDK, da Toolbox, de Docker, REST, MCP, rede, arquivos, subprocessos ou armazenamento remoto |
 | **Toolbox** (repositório separado) | Providers, conversão, renderização, OCR, validação, processamento especializado; artefatos, jobs, sidecars; interfaces REST e MCP; os contratos operacionais publicados | Reimplementar algoritmos da docstruct; depender do SDK ou da lógica de agentes do core; fazer escolhas semânticas que cabem ao core |
 
@@ -77,7 +77,7 @@ num provider da Toolbox).
     fora da biblioteca padrão, exceto aceleradores opcionais protegidos, como
     o `rapidfuzz`).
   - `libs/sdk/tests/test_purity.py` (o SDK não importa o core nem a Toolbox,
-    e suas dependências ficam restritas a `httpx` e à docstruct).
+    e suas dependências ficam restritas a `httpx`, ao Babel e à docstruct).
 - **Previsto na #152:**
   - um teste na Toolbox que proíba imports de `acessilia_sdk` e `backend`.
 - **Desvios conhecidos, registrados na [#203](https://github.com/A11yDevs/acessilia/issues/203):**

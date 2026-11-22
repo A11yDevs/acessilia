@@ -44,8 +44,6 @@ from acessilia_core.execution.models import ExecutionReport
 from acessilia_core.i18n import (
     locale_for_user,
     n,
-    reset_request_locale,
-    set_request_locale,
     t,
 )
 from acessilia_core.i18n.log_messages import (
@@ -71,6 +69,7 @@ from acessilia_core.pipeline.obligations import (
     _unsatisfied_summary,
 )
 from acessilia_core.planning.models import NominalPlan, PlanningComparison
+from acessilia_sdk.i18n.context import reset_request_locale, set_request_locale
 
 #: Canonical English msgid for an institutional header read as one paragraph:
 #: the logo, then its header lines; {lines} is substituted by callers after lookup.

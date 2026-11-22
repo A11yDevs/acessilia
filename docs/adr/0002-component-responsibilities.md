@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Status:** Accepted
 - **Date:** 2026-10-18
 - **Components:** core, SDK, docstruct, Toolbox
-- **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152)
+- **Issues:** [#150](https://github.com/A11yDevs/acessilia/issues/150), [#152](https://github.com/A11yDevs/acessilia/issues/152), [#712](https://github.com/A11yDevs/acessilia/issues/712)
 - **Amended by:** [ADR-0017](0017-operational-sdk-and-agentic-core.md) (the SDK's row and the "where does new code go?" questions)
 
 ## Context
@@ -27,7 +27,7 @@ Toolbox executes operational capabilities.
 | Component | Owns | Must not |
 |---|---|---|
 | **Core** (`backend/`) | Agents, PDDL planning, strategies, policies, workflows; when to call a capability, which profile, whether to degrade | Implement generic document algorithms or operational executors; import the Toolbox package; redefine contracts |
-| **SDK** (`libs/sdk`) | Contracts as consumed by clients, Toolbox clients and transport, artifact references, availability and failover rules, in-process access to docstruct's pure algorithms | Hold planning policy or agent logic; require heavy operational dependencies; read settings or environment; import the core or the Toolbox package. Amended by [ADR-0017](0017-operational-sdk-and-agentic-core.md): the SDK also holds reusable operations, fixed sequences of capabilities and docstruct algorithms with explicit parameters |
+| **SDK** (`libs/sdk`) | Contracts as consumed by clients, Toolbox clients and transport, artifact references, availability and failover rules, in-process access to docstruct's pure algorithms, and generic i18n infrastructure (locale parsing/normalization, negotiation, request context and catalog translation) | Hold planning policy or agent logic; require heavy operational dependencies; read settings or environment; import the core or the Toolbox package. Amended by [ADR-0017](0017-operational-sdk-and-agentic-core.md): the SDK also holds reusable operations, fixed sequences of capabilities and docstruct algorithms with explicit parameters |
 | **docstruct** (`libs/docstruct`) | Canonical document models and schemas, normalization, comparison, matching, fusion, structural validation: deterministic and infrastructure-free | Depend on the core, the SDK, the Toolbox, Docker, REST, MCP, the network, files, subprocesses or remote storage |
 | **Toolbox** (separate repository) | Providers, conversion, rendering, OCR, validation, specialized processing; artifacts, jobs, sidecars; REST and MCP interfaces; the published operational contracts | Re-implement docstruct algorithms; depend on the SDK or on the core's agent logic; make semantic choices that belong to the core |
 
@@ -76,7 +76,7 @@ provider).
     nothing outside the standard library except guarded optional
     accelerators such as `rapidfuzz`).
   - `libs/sdk/tests/test_purity.py` (the SDK does not import the core or the
-    Toolbox, and its dependencies stay within `httpx` and docstruct).
+    Toolbox, and its dependencies stay within `httpx`, Babel and docstruct).
 - **Planned in #152:**
   - a Toolbox test forbidding `acessilia_sdk` and `backend` imports.
 - **Known deviations, tracked in [#203](https://github.com/A11yDevs/acessilia/issues/203):**
