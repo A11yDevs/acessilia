@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -10,9 +11,10 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
-      - ci
+      - ci-cd
   - package-ecosystem: uv
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -24,6 +26,7 @@ updates:
       - security
   - package-ecosystem: uv
     directory: /libs/docstruct
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -35,6 +38,7 @@ updates:
       - security
   - package-ecosystem: uv
     directory: /libs/sdk
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -46,6 +50,7 @@ updates:
       - security
   - package-ecosystem: docker
     directory: /infra
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday

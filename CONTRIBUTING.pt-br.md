@@ -362,6 +362,21 @@ vMAJOR.MINOR.PATCH
 7. **Testes obrigatórios** — toda `feat` ou `fix` deve incluir ou atualizar testes.
 8. **Rodar `make test-all` antes do push** — garantir que nada está quebrado.
 
+## Responsáveis por código (revisão automática)
+
+O `.github/CODEOWNERS` solicita os mantenedores para mudanças na governança do
+repositório (`.github/`), nos contratos compartilhados (`schemas/`), nas
+bibliotecas de componentes (`libs/core/`, `libs/sdk/`, `libs/docstruct/`) e nas
+decisões arquiteturais (`docs/adr/`). Ele é a lista operacional de
+responsáveis; não repita os nomes neste documento.
+
+A solicitação é automática, mas a aprovação não é obrigatória: se uma revisão
+bloqueia o merge depende dos rulesets de branch, e este arquivo não adiciona
+essa exigência. Mudanças que alteram responsabilidades, dependências, modo de
+execução ou contrato público continuam exigindo a revisão arquitetural descrita
+acima. Atualize o `CODEOWNERS` por pull request, com concordância dos
+mantenedores, sempre que o time ou a responsabilidade por um componente mudar.
+
 ## Rulesets (proteção de branches)
 
 O repositório utiliza **GitHub Rulesets** para proteger a `main` contra deleção, force-push e merges sem revisão, e para exigir o gate de CI na `main` e na `develop`. Rulesets são configurados **via API REST**, não por arquivos no repositório.

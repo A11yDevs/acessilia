@@ -358,6 +358,21 @@ vMAJOR.MINOR.PATCH
 7. **Tests are mandatory** — every `feat` or `fix` must add or update tests.
 8. **Run `make test-all` before pushing** — make sure nothing is broken.
 
+## Code owners (automatic review)
+
+`.github/CODEOWNERS` requests the maintainers for changes to repository
+governance (`.github/`), shared contracts (`schemas/`), the component libraries
+(`libs/core/`, `libs/sdk/`, `libs/docstruct/`) and architectural decisions
+(`docs/adr/`). It is the operational owner list; do not repeat the names in
+this document.
+
+The request is automatic, but approval is not mandatory: whether a review
+blocks a merge depends on the branch rulesets, and this file adds no such
+requirement. Changes that move responsibilities, dependencies, execution mode
+or a public contract still need the architectural review described above.
+Update `CODEOWNERS` by pull request, with maintainer agreement, whenever the
+team or a component's ownership changes.
+
 ## Rulesets (branch protection)
 
 The repository uses **GitHub Rulesets** to protect `main` from deletion, force pushes, and unreviewed merges, and to require the CI gate on both `main` and `develop`. Rulesets are configured **via the REST API**, not through files in the repo itself.
