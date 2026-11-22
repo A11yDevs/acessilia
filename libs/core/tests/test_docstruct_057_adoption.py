@@ -4,18 +4,8 @@ from __future__ import annotations
 import struct
 
 import pytest
-from docstruct.fusion.noise import is_legitimate_text as docstruct_is_legitimate_text
-from docstruct.fusion.skeleton import (
-    DEFAULT_MIN_SKELETON_MATCH as docstruct_min_skeleton_match,
-    skeleton_reading_order as docstruct_skeleton_reading_order,
-)
-from docstruct.geometry.boxes import (
-    box_contains_center,
-    box_distance,
-    boxes_side_by_side,
-    expand_box,
-    spans_horizontally,
-)
+from core_config_support import toolbox_config
+from pddl_support import build_manifest, build_obligation
 
 from acessilia_core.agents.output_schemas import DataCell, DataOutput, DataRow
 from acessilia_core.manifest import slides
@@ -27,10 +17,24 @@ from acessilia_core.pipeline.elements import (
 )
 from acessilia_core.pipeline.handlers import order as order_handler
 from acessilia_core.pipeline.handlers.rescue import is_legitimate_text
-from acessilia_core.pipeline.handlers.text import _handle_deterministic_heading_repair_method
+from acessilia_core.pipeline.handlers.text import (
+    _handle_deterministic_heading_repair_method,
+)
 from acessilia_core.toolbox import vision_payload
-from core_config_support import toolbox_config
-from pddl_support import build_manifest, build_obligation
+from docstruct.fusion.noise import is_legitimate_text as docstruct_is_legitimate_text
+from docstruct.fusion.skeleton import (
+    DEFAULT_MIN_SKELETON_MATCH as docstruct_min_skeleton_match,
+)
+from docstruct.fusion.skeleton import (
+    skeleton_reading_order as docstruct_skeleton_reading_order,
+)
+from docstruct.geometry.boxes import (
+    box_contains_center,
+    box_distance,
+    boxes_side_by_side,
+    expand_box,
+    spans_horizontally,
+)
 
 
 def test_rescue_is_legitimate_text_is_docstruct_function() -> None:

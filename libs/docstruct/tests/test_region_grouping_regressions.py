@@ -3,7 +3,9 @@ from typing import get_type_hints
 import pytest
 
 from docstruct.regions.grouping import (
-    _add_unknown_gaps, _extract_callout_title, _fill_gaps_with_unknown,
+    _add_unknown_gaps,
+    _extract_callout_title,
+    _fill_gaps_with_unknown,
 )
 from docstruct.types import Region
 

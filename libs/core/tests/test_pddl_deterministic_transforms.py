@@ -11,6 +11,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pddl_support import (
+    build_element as _element,
+)
+from pddl_support import (
+    build_manifest as _manifest,
+)
+from pddl_support import (
+    build_obligation as _obligation,
+)
+from pddl_support import (
+    build_orchestrator as _orchestrator,
+)
 
 from acessilia_core.manifest.models import (
     BoundingBox,
@@ -23,13 +35,6 @@ from acessilia_core.pipeline.handlers.text import (
     _handle_tailjoin_method,
 )
 from acessilia_core.pipeline.payload import build_pddl_structured_payload
-
-from pddl_support import (
-    build_element as _element,
-    build_manifest as _manifest,
-    build_obligation as _obligation,
-    build_orchestrator as _orchestrator,
-)
 
 #: Long paragraph with the marginal numbers 3964, 3969 and 3974 (step 5).
 _LONG_VERSE_TEXT = (

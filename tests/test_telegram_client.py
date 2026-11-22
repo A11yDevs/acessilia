@@ -5,26 +5,30 @@ import httpx
 import pytest
 import respx
 
-from frontend.clients.api_client import ApiClient, ApiError
-from backend.config.settings import settings
-from acessilia_core.i18n import get_translations, reset_request_locale, set_request_locale, t
-from backend.services.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
+from acessilia_core.i18n import (
+    get_translations,
+    reset_request_locale,
+    set_request_locale,
+    t,
+)
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_GENERATION_FAILED
-from frontend.telegram import user_context
-from frontend.telegram import state_store
-from frontend.telegram.middlewares import pause_middleware
+from backend.config.settings import settings
+from backend.services.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
+from frontend.clients.api_client import ApiClient, ApiError
+from frontend.telegram import state_store, user_context
+from frontend.telegram.handlers import document as doc_module
+from frontend.telegram.handlers import start as start_module
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
-    MSG_CACHE_CLEARED,
     MSG_CACHE_CLEAR_FAILED,
+    MSG_CACHE_CLEARED,
+    MSG_CONTACT_SERVER_FAILED,
     MSG_FILE_RECEIVED,
     MSG_HELP_TEXT,
-    MSG_CONTACT_SERVER_FAILED,
     MSG_PACKAGE_PDF_UA_MISSING,
     MSG_TELEGRAM_FILE_TOO_LARGE,
 )
-from frontend.telegram.handlers import document as doc_module
-from frontend.telegram.handlers import start as start_module
+from frontend.telegram.middlewares import pause_middleware
 
 BASE = "http://localhost:8000"
 

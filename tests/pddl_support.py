@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from acessilia_core.pipeline.handlers.registry import bind_run
-from acessilia_core.ports import RunPorts
-from tests.core_config_support import core_config
-from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
@@ -21,7 +17,11 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
+from acessilia_core.pipeline.handlers.registry import bind_run
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 from acessilia_core.planning.planner_agent import PlannerAgent
+from acessilia_core.ports import RunPorts
+from tests.core_config_support import core_config
 
 NOW = datetime(2026, 10, 14, tzinfo=timezone.utc)
 
@@ -144,9 +144,8 @@ def install_formula_recognizer(monkeypatch, answer) -> None:
     provider's formulas ranked by ``ranked_latex_candidates``. The stand-in
     applies the same ranking, so a test states what the provider said.
     """
-    from docstruct.text.latex import ranked_latex_candidates
-
     from acessilia_core.pipeline.enrichment import formulas as formula_stage
+    from docstruct.text.latex import ranked_latex_candidates
 
     def recognize(image, *, toolbox, **kwargs):
         # The stand-in requires the run's ToolboxConfig, as the real function does.

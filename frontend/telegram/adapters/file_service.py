@@ -5,8 +5,8 @@ from aiogram.types import FSInputFile
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
-    LOG_TELEGRAM_FILE_DOWNLOADING,
     LOG_TELEGRAM_FILE_DOWNLOADED,
+    LOG_TELEGRAM_FILE_DOWNLOADING,
 )
 from acessilia_core.logger import logger
 

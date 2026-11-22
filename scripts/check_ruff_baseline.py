@@ -126,7 +126,7 @@ def write_baseline(path: Path, counts: Baseline) -> None:
     """Write a deterministic baseline JSON file."""
     payload = {
         "_comment": (
-            "Pre-existing Ruff violations (rules F, E excluding E501; #366), "
+            "Pre-existing Ruff violations (rules F, I, E excluding E501; #366, #648), "
             "counted per file and rule code. Counts may only go down: when you "
             "fix violations, run `uv run python scripts/check_ruff_baseline.py --update`."
         ),

@@ -11,11 +11,11 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from core_config_support import toolbox_config
+
 from acessilia_core.toolbox import text_spans
 from acessilia_sdk.toolbox.clients.pdf import TEXT_SPANS_MAX_PAGES, ToolboxPdfClient
 from acessilia_sdk.toolbox.errors import ToolboxError
-
-from core_config_support import toolbox_config
 
 
 class _FakeSpansClient(ToolboxPdfClient):

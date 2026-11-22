@@ -8,6 +8,8 @@ them and the replan takes them as roots, and a checkpoint resume keeps them.
 from __future__ import annotations
 
 import pytest
+from pddl_support import build_element, build_manifest, build_obligation
+
 from acessilia_core.execution.executor import (
     ExecutionResume,
     ExecutorAgent,
@@ -18,8 +20,6 @@ from acessilia_core.manifest.models import Obligation, ProcessingManifest
 from acessilia_core.pipeline.obligations import _replannable_obligation_ids
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.planner_agent import PlannerAgent
-
-from pddl_support import build_element, build_manifest, build_obligation
 
 DISCOVERED = "o-discovered"
 
@@ -226,15 +226,15 @@ async def test_a_restored_block_is_repaired_in_the_same_job(monkeypatch, tmp_pat
     """#594 acceptance: the rescue's new obligation is planned and run."""
     from types import SimpleNamespace
 
-    from acessilia_core.agents.model_calls import current_model_calls
-    from acessilia_core.pipeline import orchestrator as pddl
-    from acessilia_core.pipeline import preflight as pipeline_preflight
-    from acessilia_core.ports import RunPorts
-
     from core_config_support import core_config
     from pddl_support import build_orchestrator
     from test_rescue_omitted_method import LOWER, MIDDLE, _adopted, _row
     from test_rescue_omitted_method import _manifest as rescue_manifest
+
+    from acessilia_core.agents.model_calls import current_model_calls
+    from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline import preflight as pipeline_preflight
+    from acessilia_core.ports import RunPorts
 
     legacy = "The capital moved to Bras\u0131\u0301lia in the sixties."
     body = "The first paragraph of the body text."

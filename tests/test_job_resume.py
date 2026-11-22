@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 import asyncio
 import threading
 from pathlib import Path
@@ -13,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.config.settings import settings
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.execution.executor import (
     ExecutionResume,
     ExecutorAgent,
@@ -24,12 +20,25 @@ from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.planner_agent import PlannerAgent
-from acessilia_core.ports import PHASE_ENRICHED, PHASE_EXECUTION, PHASE_MANIFEST, PHASE_MEDIA, PHASE_PLAN
+from acessilia_core.ports import (
+    PHASE_ENRICHED,
+    PHASE_EXECUTION,
+    PHASE_MANIFEST,
+    PHASE_MEDIA,
+    PHASE_PLAN,
+    RunPorts,
+)
+from backend.config.settings import settings
 from backend.services import job_checkpoint
-from backend.services.run_ports import service_run_ports
 from backend.services.operation_registry import OperationRegistry
+from backend.services.run_ports import service_run_ports
+from tests.core_config_support import (
+    core_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
-from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
 
 
 @pytest.fixture

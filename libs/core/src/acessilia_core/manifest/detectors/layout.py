@@ -4,12 +4,6 @@ from __future__ import annotations
 
 from collections import Counter
 
-from docstruct.fusion.line_numbers import extract_line_numbers
-from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
-from docstruct.fusion.types import DiffBlock
-from docstruct.fusion.verse import verse_blocks
-from docstruct.fusion.xycut import xycut_order
-
 from acessilia_core.manifest.detectors.types import (
     NeedCandidate,
     PageSizes,
@@ -17,6 +11,11 @@ from acessilia_core.manifest.detectors.types import (
 )
 from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.manifest.slides import is_slide_heading
+from docstruct.fusion.line_numbers import extract_line_numbers
+from docstruct.fusion.tailjoin import join_tail, page_number_position, tailjoin3
+from docstruct.fusion.types import DiffBlock
+from docstruct.fusion.verse import verse_blocks
+from docstruct.fusion.xycut import xycut_order
 
 _NON_TEXT_ELEMENT_TYPES = frozenset({"formula", "table", "picture"})
 _ROLE_BY_TYPE = {

@@ -2,35 +2,37 @@ import asyncio
 import sys
 
 from aiogram import Bot, Dispatcher
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 
-from frontend.telegram.handlers.start import router as start_router
-from frontend.telegram.handlers.document import (
-    resume_tracked_tasks,
-    router as document_router,
-)
-from frontend.telegram.handlers.errors import router as error_router
-from backend.config.process_setup import setup_process
-from acessilia_core.logger import logger
-from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
-from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
-from frontend.telegram.commands import bot_commands, telegram_language
 from acessilia_core.i18n import active_locale, active_locales, t
 from acessilia_core.i18n.log_messages import (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
-    LOG_BOT_STARTING_POLLING,
     LOG_BOT_STARTED,
+    LOG_BOT_STARTING_POLLING,
+    LOG_BOT_TOKEN_NOT_CONFIGURED,
+    LOG_FATAL_ERROR_IN_BOT,
     LOG_TELEGRAM_BOT_CONNECTED,
     LOG_TELEGRAM_GETME_FAILED,
     LOG_TELEGRAM_PRIVACY_MODE,
     LOG_TELEGRAM_SET_COMMANDS_FAILED,
-    LOG_BOT_TOKEN_NOT_CONFIGURED,
-    LOG_FATAL_ERROR_IN_BOT,
 )
+from acessilia_core.logger import logger
+from backend.config.process_setup import setup_process
 from backend.config.settings import settings
+from frontend.telegram.commands import bot_commands, telegram_language
+from frontend.telegram.handlers.document import (
+    resume_tracked_tasks,
+)
+from frontend.telegram.handlers.document import (
+    router as document_router,
+)
+from frontend.telegram.handlers.errors import router as error_router
+from frontend.telegram.handlers.start import router as start_router
+from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
+from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
 
 
 async def _announce_identity(bot: Bot) -> None:

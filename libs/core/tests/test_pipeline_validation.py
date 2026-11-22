@@ -8,15 +8,19 @@ verbosity defaults. Locale is pinned to en_US for deterministic canonical-Englis
 from __future__ import annotations
 
 import pytest
+from locale_support import use_server_locale
 
 import acessilia_core.i18n as i8n
-from acessilia_core.pipeline.validators import validate_canonical_document
-from acessilia_core.pipeline.validators import validate_export_profile
-from acessilia_core.pipeline.validators import validate_output_text
-from docstruct.profiles import filter_blocks_for_profile
-from docstruct.profiles import normalize_profile
-from docstruct.profiles import verbosity_for_mode
-from locale_support import use_server_locale
+from acessilia_core.pipeline.validators import (
+    validate_canonical_document,
+    validate_export_profile,
+    validate_output_text,
+)
+from docstruct.profiles import (
+    filter_blocks_for_profile,
+    normalize_profile,
+    verbosity_for_mode,
+)
 
 
 @pytest.fixture(autouse=True)

@@ -14,6 +14,7 @@ from docstruct.fusion.adjudication import (
     nrm,
     useful_text,
 )
+from docstruct.fusion.convert import block_to_diff
 from docstruct.fusion.differ import merge_blocks
 from docstruct.fusion.flood import flood_guard
 from docstruct.fusion.hf_end import (
@@ -23,6 +24,13 @@ from docstruct.fusion.hf_end import (
     move_body_hf_to_tail,
     move_hf_to_end,
 )
+from docstruct.fusion.judge import (
+    debias,
+    decide_pair,
+    p2_from_logprobs,
+    should_judge,
+)
+from docstruct.fusion.line_numbers import extract_line_numbers, line_number_chain
 from docstruct.fusion.noise import (
     MIN_LEGITIMATE_QUALITY,
     is_junk,
@@ -37,15 +45,6 @@ from docstruct.fusion.oracle import (
     page_scores,
     summarize,
 )
-from docstruct.fusion.types import DiffBlock, ProviderBlocks
-from docstruct.fusion.convert import block_to_diff
-from docstruct.fusion.judge import (
-    debias,
-    decide_pair,
-    p2_from_logprobs,
-    should_judge,
-)
-from docstruct.fusion.line_numbers import extract_line_numbers, line_number_chain
 from docstruct.fusion.page_select import (
     blocks,
     fuse,
@@ -84,13 +83,6 @@ from docstruct.fusion.skeleton import (
     DEFAULT_MIN_SKELETON_MATCH,
     skeleton_reading_order,
 )
-from docstruct.fusion.tailjoin import (
-    is_page_number,
-    join_tail,
-    page_number_position,
-    tail_start,
-    tailjoin3,
-)
 from docstruct.fusion.table_specialist import (
     build_candidates,
     extract_table,
@@ -101,6 +93,14 @@ from docstruct.fusion.table_specialist import (
     select_greedy,
     select_table,
 )
+from docstruct.fusion.tailjoin import (
+    is_page_number,
+    join_tail,
+    page_number_position,
+    tail_start,
+    tailjoin3,
+)
+from docstruct.fusion.types import DiffBlock, ProviderBlocks
 from docstruct.fusion.verse import (
     chunk_verse,
     record_like,

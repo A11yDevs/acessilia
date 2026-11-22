@@ -23,12 +23,12 @@ from acessilia_sdk.toolbox.capabilities import (
     ROUTE_PROVIDER_DEFAULTS,
     TOOLBOX_CAPABILITIES,
 )
-from backend.config import settings as settings_module
 from acessilia_sdk.toolbox.clients import (
     ToolboxAdjudicateClient,
     ToolboxOrientationClient,
     ToolboxPageOcrClient,
 )
+from backend.config import settings as settings_module
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"

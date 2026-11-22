@@ -35,18 +35,6 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from docstruct.fusion.similarity import area
-from docstruct.geometry import is_bottom_left, union
-from docstruct.geometry.boxes import (
-    box_contains_center,
-    box_distance,
-    boxes_overlap,
-    boxes_side_by_side,
-    expand_box,
-    spans_horizontally,
-    union_area,
-)
-
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     MSG_SLIDE_HEADING,
@@ -57,6 +45,17 @@ from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
     Provenance,
+)
+from docstruct.fusion.similarity import area
+from docstruct.geometry import is_bottom_left, union
+from docstruct.geometry.boxes import (
+    box_contains_center,
+    box_distance,
+    boxes_overlap,
+    boxes_side_by_side,
+    expand_box,
+    spans_horizontally,
+    union_area,
 )
 
 #: Default share of the slide its pictures must cover for the slide to be

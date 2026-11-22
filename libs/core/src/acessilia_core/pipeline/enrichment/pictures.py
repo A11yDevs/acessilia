@@ -20,6 +20,45 @@ from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
 
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.agents.vision_agent import VisionAgent
+from acessilia_core.blocking import run_blocking
+from acessilia_core.config import ModelConfig, ToolboxConfig, VisionConfig
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    LOG_PDDL_EMPTY_VISION_DESCRIPTION,
+    LOG_PDDL_IMAGES_ENRICHED,
+    LOG_VISION_ELEMENT_DESCRIPTION,
+)
+from acessilia_core.i18n.stage_messages import (
+    STAGE_DESCRIBING_IMAGE,
+)
+from acessilia_core.logger import logger
+from acessilia_core.manifest.builder import (
+    _derive_processing_needs,
+    is_unstructured_page_placeholder,
+    reconcile_reclassified_element_processing_needs,
+)
+from acessilia_core.manifest.models import (
+    ManifestElement,
+    ProcessingManifest,
+)
+from acessilia_core.pipeline.elements import (
+    _element_bbox,
+)
+from acessilia_core.pipeline.enrichment.common import (
+    _RETRIED_VISION_FAILURES,
+    _extract_picture_bytes,
+    _retry_failed,
+)
+from acessilia_core.pipeline.obligations import (
+    _pages_label,
+)
+from acessilia_core.pipeline.toolbox import (
+    _source_artifact_id,
+)
+from acessilia_core.ports import RegionCache
 from docstruct.placeholders import (
     has_meaningful_text,
     is_mostly_visual,
@@ -33,46 +72,6 @@ from docstruct.visual_text import (
     is_document_artifact,
     is_scene_artifact,
 )
-
-from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.agents.provider_breaker import ProviderBreaker
-from acessilia_core.agents.vision_agent import VisionAgent
-from acessilia_core.config import ModelConfig, ToolboxConfig, VisionConfig
-from acessilia_core.manifest.builder import (
-    _derive_processing_needs,
-    is_unstructured_page_placeholder,
-    reconcile_reclassified_element_processing_needs,
-)
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.enrichment.common import (
-    _RETRIED_VISION_FAILURES,
-    _extract_picture_bytes,
-    _retry_failed,
-)
-from acessilia_core.pipeline.elements import (
-    _element_bbox,
-)
-from acessilia_core.pipeline.obligations import (
-    _pages_label,
-)
-from acessilia_core.pipeline.toolbox import (
-    _source_artifact_id,
-)
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import (
-    LOG_PDDL_EMPTY_VISION_DESCRIPTION,
-    LOG_PDDL_IMAGES_ENRICHED,
-    LOG_VISION_ELEMENT_DESCRIPTION,
-)
-from acessilia_core.blocking import run_blocking
-from acessilia_core.ports import RegionCache
-from acessilia_core.i18n.stage_messages import (
-    STAGE_DESCRIBING_IMAGE,
-)
-from acessilia_core.logger import logger
 
 #: Why a picture was left undescribed, recorded in metadata["vision_failure_reason"]
 #: for the operator: the crop could not be rendered, the source has no page to

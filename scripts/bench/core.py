@@ -21,7 +21,6 @@ from docstruct.canonical import (
     sanitize_canonical_document,
 )
 from docstruct.text.latex import bare_latex
-
 from scripts.bench import toolbox
 
 _PLACEHOLDER_TITLE = "Benchmark page"

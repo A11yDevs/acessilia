@@ -2,20 +2,25 @@
 from pathlib import Path
 
 import pytest
-
-from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline.enrichment import formulas as formula_stage
-from core_config_support import document_config, model_config, toolbox_config, vision_config
-from acessilia_core.pipeline.handlers import review as review_handlers
-from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.pipeline.elements import _element_to_block
+from core_config_support import (
+    document_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from pddl_support import (
     build_element,
     build_manifest,
     build_obligation,
     install_formula_recognizer,
 )
+
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.elements import _element_to_block
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.handlers import review as review_handlers
 
 
 def manifest_for(text=None):

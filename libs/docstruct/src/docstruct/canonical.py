@@ -6,13 +6,9 @@ enrichment is injected via the ``MathEnricher`` protocol and ids via
 """
 from __future__ import annotations
 
-
-from typing import Any, Callable, Iterator
-
-
 import re
 from copy import deepcopy
-
+from typing import Any, Callable, Iterator
 
 
 class MathEnricher:
@@ -52,20 +48,32 @@ def _source_type(source_path: str) -> str:
     return ""
 
 
-from docstruct.text.sanitize import sanitize_block_text
-from docstruct.text.sanitize import sanitize_text
-from docstruct.text.sanitize import sanitize_title_text
 from docstruct.blocks.parser import parse_text_to_blocks
 from docstruct.tables.ast import raw_rows_from_table_ast
-from docstruct.text.math_spans import block_prose
-from docstruct.text.math_spans import inline_math_entries
-from docstruct.text.math_spans import inline_math_sources
-from docstruct.text.equations import equation_number, numbered_speech
-from docstruct.text.equations import preserve_equation_number
-from docstruct.text.implicit_products import implicit_product_variables
-from docstruct.text.implicit_products import mark_implicit_products
-from docstruct.text.named_operators import normalize_named_operators, speak_named_operators
-from docstruct.text.math_spans import whole_inline_math
+from docstruct.text.equations import (
+    equation_number,
+    numbered_speech,
+    preserve_equation_number,
+)
+from docstruct.text.implicit_products import (
+    implicit_product_variables,
+    mark_implicit_products,
+)
+from docstruct.text.math_spans import (
+    block_prose,
+    inline_math_entries,
+    inline_math_sources,
+    whole_inline_math,
+)
+from docstruct.text.named_operators import (
+    normalize_named_operators,
+    speak_named_operators,
+)
+from docstruct.text.sanitize import (
+    sanitize_block_text,
+    sanitize_text,
+    sanitize_title_text,
+)
 
 
 def build_canonical_document(

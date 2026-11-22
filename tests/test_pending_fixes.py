@@ -10,7 +10,12 @@ import pytest
 from backend.api import worker
 from backend.api.routes import jobs
 from backend.config.settings import settings
-from backend.services import download_token_service, history_service, job_store, queue_service
+from backend.services import (
+    download_token_service,
+    history_service,
+    job_store,
+    queue_service,
+)
 from backend.services.queue_service import QueueItem, UnifiedQueue
 
 
@@ -421,9 +426,9 @@ def test_status_persistence_excludes_canonical_result(isolated_runtime):
 
 @pytest.mark.asyncio
 async def test_queue_status_uses_actual_enqueue_position(isolated_runtime, monkeypatch):
-    from backend.api.app import create_app
     from acessilia_core.i18n import t
     from acessilia_core.i18n.stage_messages import STAGE_QUEUE_WAITING_POSITION
+    from backend.api.app import create_app
     queue, _ = isolated_runtime
     monkeypatch.setattr(queue, "qsize", lambda: 99)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(create_app()), base_url="http://test") as client:

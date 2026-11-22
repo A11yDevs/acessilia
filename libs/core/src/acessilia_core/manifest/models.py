@@ -4,6 +4,13 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    MSG_PLANNER_NOT_STARTED,
+    MSG_TIMESTAMPS_MIXED_TIMEZONES,
+)
 from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
@@ -17,13 +24,6 @@ from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the cata
     MSG_SELF_PARENT,
     MSG_UNKNOWN_PARENT,
     document_invariant_findings,
-)
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import (
-    MSG_PLANNER_NOT_STARTED,
-    MSG_TIMESTAMPS_MIXED_TIMEZONES,
 )
 
 SCHEMA_VERSION = "1.1.0"

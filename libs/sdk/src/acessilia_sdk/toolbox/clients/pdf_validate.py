@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
-from acessilia_sdk.toolbox.results import PdfValidationReport, read_result
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.results import PdfValidationReport, read_result
 
 CAPABILITY = "pdf.validate.pdf_ua"
 

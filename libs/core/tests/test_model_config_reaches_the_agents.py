@@ -8,21 +8,11 @@ so only identity passes.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-from acessilia_core.agents.provider_breaker import ProviderBreaker
-from acessilia_core.pipeline.enrichment import formulas as formula_stage
-from acessilia_core.pipeline.enrichment import pictures as picture_stage
-from acessilia_core.pipeline.enrichment import tables as table_stage
-from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from core_config_support import (
     core_config,
     document_config,
@@ -31,6 +21,14 @@ from core_config_support import (
     vision_config,
 )
 from pddl_support import build_element, build_manifest
+
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.ports import RunPorts
 
 #: The run's model config: its own object, unlike one built from the settings.
 MODELS = model_config(openrouter_max_tokens=7)
@@ -134,9 +132,10 @@ def test_the_inspection_helpers_build_their_agent_with_the_run_models(
 async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
     monkeypatch, tmp_path
 ) -> None:
+    from pddl_support import build_orchestrator
+
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline import preflight
-    from pddl_support import build_orchestrator
 
     seen: dict[str, object] = {}
 

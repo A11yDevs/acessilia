@@ -10,6 +10,19 @@ The application supplies a shared runner with bounded admission; abandoned
 calls retain its capacity, independently of transient event loops (#276).
 """
 
+from agno.agent import Agent
+from agno.media import Image
+
+from acessilia_core.agents.ai_client import get_agno_model
+from acessilia_core.agents.model_call_policy import model_call_deadline
+from acessilia_core.agents.model_calls import ModelCallRunner, current_model_calls
+from acessilia_core.agents.output_schemas import (
+    DATA_SCHEMA_INSTRUCTION,
+    DataOutput,
+    validate_structured_run,
+)
+from acessilia_core.agents.prompt_tools import load_region_prompt
+from acessilia_core.config import ModelConfig, ToolboxConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_DATA_AGENT_PROCESSING_REGION,
@@ -17,19 +30,6 @@ from acessilia_core.i18n.log_messages import (
     LOG_DATA_AGENT_REGION_ERROR,
 )
 from acessilia_core.logger import logger
-from acessilia_core.agents.prompt_tools import load_region_prompt
-from acessilia_core.agents.ai_client import get_agno_model
-from acessilia_core.agents.model_call_policy import model_call_deadline
-from acessilia_core.agents.model_calls import ModelCallRunner, current_model_calls
-from acessilia_core.config import ModelConfig, ToolboxConfig
-from acessilia_core.agents.output_schemas import (
-    DATA_SCHEMA_INSTRUCTION,
-    DataOutput,
-    validate_structured_run,
-)
-from agno.agent import Agent
-from agno.media import Image
-
 
 # Region classification to region prompt key mapping.
 DATA_PROMPT_KEY_MAP = {

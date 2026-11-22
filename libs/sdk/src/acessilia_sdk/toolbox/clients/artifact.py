@@ -9,7 +9,11 @@ from typing import Any
 
 import httpx
 
-from acessilia_sdk.toolbox.artifacts import ArtifactRef, download_artifact, parse_reference
+from acessilia_sdk.toolbox.artifacts import (
+    ArtifactRef,
+    download_artifact,
+    parse_reference,
+)
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.reference import ArtifactReference

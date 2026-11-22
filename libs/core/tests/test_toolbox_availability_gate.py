@@ -7,28 +7,31 @@ out of the plan and fails closed without a catalogue.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
-from collections import OrderedDict
-
 import json
+from collections import OrderedDict
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
-
-from acessilia_sdk.toolbox import snapshot_from_payloads
-from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
-from acessilia_core.planning import toolbox_gate
 from core_config_support import core_config, toolbox_config
 from pddl_support import (
     build_element as _element,
+)
+from pddl_support import (
     build_manifest as _manifest,
+)
+from pddl_support import (
     build_obligation as _obligation,
+)
+from pddl_support import (
     build_orchestrator as _orchestrator,
 )
+
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
+from acessilia_core.planning import toolbox_gate
+from acessilia_core.ports import RunPorts
+from acessilia_sdk.toolbox import snapshot_from_payloads
 
 CONTRACT_SNAPSHOT = Path(__file__).parent / "fixtures" / "toolbox-contract.json"
 FUSE_METHODS = ["dual-provider-fusion", "single-provider", "human-review"]

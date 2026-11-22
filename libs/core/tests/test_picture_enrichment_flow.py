@@ -11,13 +11,13 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+from core_config_support import model_config, toolbox_config, vision_config
+from pddl_support import build_element, build_manifest, build_obligation
 
-from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.manifest.models import PageDescriptor
-from pddl_support import build_element, build_manifest, build_obligation
+from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
-from core_config_support import model_config, toolbox_config, vision_config
 
 
 class Vision:

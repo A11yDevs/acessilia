@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 
-from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
@@ -17,6 +16,7 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from docstruct.export.html import document_to_html
 from docstruct.export.markdown import document_to_markdown
 from docstruct.export.pandoc_ast import build_pandoc_ast

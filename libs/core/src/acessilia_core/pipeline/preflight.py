@@ -15,9 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_core.config import DocumentConfig, ToolboxConfig
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_FAILED,
@@ -26,6 +23,9 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_DOCUMENT_TOO_MANY_PAGES,
 )
 from acessilia_core.logger import logger
+from acessilia_core.manifest.models import (
+    ProcessingManifest,
+)
 from acessilia_core.toolbox.media_inspect import inspect_source_media
 
 

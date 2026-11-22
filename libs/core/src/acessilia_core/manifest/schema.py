@@ -4,9 +4,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from acessilia_core.manifest.models import ProcessingManifest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
+
+from acessilia_core.manifest.models import ProcessingManifest
 
 
 def processing_manifest_schema() -> dict[str, Any]:

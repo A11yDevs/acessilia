@@ -3,44 +3,42 @@ import sqlite3
 from datetime import datetime
 
 from aiogram import Router
-from aiogram.filters import CommandStart, Command, StateFilter
+from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
-from backend.config.settings import settings
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_TELEGRAM_FEEDBACK_RECEIVED
 from acessilia_core.logger import logger
-from frontend.clients.api_client import ApiError
+from backend.config.settings import settings
 from frontend.clients import default_client
+from frontend.clients.api_client import ApiError
 from frontend.telegram import user_context
 from frontend.telegram.formats import input_formats_text
-from frontend.telegram.middlewares.pause_middleware import pause_chat, resume_chat
-from frontend.telegram.state_store import get_state_store
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_BOT_PAUSED,
     MSG_BOT_RESUMED,
-    MSG_CACHE_CLEARED,
     MSG_CACHE_CLEAR_FAILED,
-    MSG_CONTACT_SERVER_FAILED,
+    MSG_CACHE_CLEARED,
     MSG_CANCEL_NO_TASK,
+    MSG_CONTACT_SERVER_FAILED,
     MSG_EMAIL_CONFIGURED,
     MSG_EMAIL_HINT,
     MSG_FEEDBACK_PROMPT,
     MSG_FEEDBACK_THANKS,
     MSG_FORMATS_TEXT,
-    MSG_HELP_TEXT,
+    MSG_HEALTH_ACTIVE_MODEL,
     MSG_HEALTH_API,
     MSG_HEALTH_API_ERROR,
     MSG_HEALTH_API_OFFLINE,
-    MSG_HEALTH_ACTIVE_MODEL,
     MSG_HEALTH_DISK_FREE,
     MSG_HEALTH_PROVIDER,
     MSG_HEALTH_TEMP_MISSING,
     MSG_HEALTH_TEMP_OK,
     MSG_HEALTH_UNKNOWN,
+    MSG_HELP_TEXT,
     MSG_MODE_BAIXO_ON,
     MSG_MODE_DETAILED_ON,
     MSG_MODE_MEDIO_ON,
@@ -53,6 +51,8 @@ from frontend.telegram.messages import (
     MSG_TASK_CANCEL_DONE,
     MSG_TASK_CANCEL_FAILED,
 )
+from frontend.telegram.middlewares.pause_middleware import pause_chat, resume_chat
+from frontend.telegram.state_store import get_state_store
 
 router = Router()
 

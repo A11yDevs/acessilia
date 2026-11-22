@@ -13,13 +13,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from docstruct.fusion.noise import (
-    element_role,
-)
-from docstruct.fusion.tailjoin import page_number_position
-from docstruct.sections import repair_heading_levels
-from docstruct.text.norm_fix import norm_fix
-
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
 from acessilia_core.manifest.models import (
@@ -62,6 +55,12 @@ from acessilia_core.pipeline.handlers.unicode_repair import (
     _reattach_negation_overlays,
     _repair_table_cells,
 )
+from docstruct.fusion.noise import (
+    element_role,
+)
+from docstruct.fusion.tailjoin import page_number_position
+from docstruct.sections import repair_heading_levels
+from docstruct.text.norm_fix import norm_fix
 
 __all__ = [
     "_handle_chunk_verse_method",

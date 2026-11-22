@@ -24,7 +24,6 @@ import sqlite3
 import time
 
 from acessilia_core.logger import logger
-
 from backend.config.settings import settings
 
 #: A journal row is only useful while its job can still resume. After the

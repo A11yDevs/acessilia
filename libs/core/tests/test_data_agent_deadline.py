@@ -8,7 +8,6 @@ from unittest.mock import Mock
 import httpx
 import pytest
 import pytest_asyncio
-
 from core_config_support import model_config, toolbox_config
 
 from acessilia_core.agents import data_agent as data_module

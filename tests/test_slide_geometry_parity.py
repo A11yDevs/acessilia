@@ -19,6 +19,7 @@ import random
 from itertools import pairwise
 
 import pytest
+
 from docstruct.fusion.similarity import area
 from docstruct.geometry.boxes import boxes_overlap, union_area
 

@@ -33,8 +33,9 @@ def _region(type_, text, bbox=(0, 0, 100, 50), **kw):
 class TestNoOverfitting:
     def test_sem_constantes_de_documento(self):
         """The lib must NOT ship document-specific callout titles."""
-        import docstruct.regions.grouping as g
         import inspect
+
+        import docstruct.regions.grouping as g
 
         src = inspect.getsource(g)
         assert "precisamos mesmo de outra classe" not in src

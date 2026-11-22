@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from acessilia_core.ports import RunPorts
-
 from backend.config.settings import settings
 from backend.services.cache import ContentCache
 from backend.services.job_checkpoint import FileJobCheckpoints

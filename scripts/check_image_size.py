@@ -6,7 +6,6 @@ import re
 import subprocess
 from typing import Any
 
-
 UNITS = {
     "B": 1,
     "KB": 1_000,

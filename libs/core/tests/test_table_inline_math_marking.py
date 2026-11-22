@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 import asyncio
-from acessilia_core.pipeline.handlers import text as text_handlers
 from pathlib import Path
 
 import pytest
-
-from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
-from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from core_config_support import document_config, toolbox_config
 from pddl_support import build_element, build_manifest
+
+from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
+from acessilia_core.pipeline.handlers import text as text_handlers
 
 HEIGHT = 792.0
 FRACTION = r"\frac{s(3+h)-s(3)}{(3+h)-3}"

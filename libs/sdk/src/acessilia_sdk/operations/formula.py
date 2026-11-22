@@ -34,9 +34,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from docstruct.geometry.boxes import PageBox, best_effort_clip
-from docstruct.text.latex import ranked_latex_candidates
-
 from acessilia_sdk.toolbox.clients.math import (
     CONVERT_CAPABILITY,
     RECOGNIZE_CAPABILITY,
@@ -46,6 +43,8 @@ from acessilia_sdk.toolbox.clients.math import (
 )
 from acessilia_sdk.toolbox.clients.pdf import RENDER_CAPABILITY, ToolboxPdfClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from docstruct.geometry.boxes import PageBox, best_effort_clip
+from docstruct.text.latex import ranked_latex_candidates
 
 #: Resolution of a formula crop: chips read small subscripts better at 200 dpi.
 FORMULA_CROP_DPI = 200

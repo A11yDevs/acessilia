@@ -8,6 +8,7 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
+
 from acessilia_sdk.operations.formula import Step
 from acessilia_sdk.operations.fusion import (
     DualFusionResult,

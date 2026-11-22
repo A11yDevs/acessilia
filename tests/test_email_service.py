@@ -7,7 +7,11 @@ active locale's Babel catalog (acessilia_core.i18n.t) so the assertions stay cor
 import pytest
 
 from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import EMAIL_FAILURE_SUBJECT, EMAIL_FORMAT_MP3, EMAIL_FORMAT_TXT
+from acessilia_core.i18n.log_messages import (
+    EMAIL_FAILURE_SUBJECT,
+    EMAIL_FORMAT_MP3,
+    EMAIL_FORMAT_TXT,
+)
 from backend.config.settings import settings
 from backend.services.email_service import send_failure_email, send_result_email
 
@@ -52,6 +56,7 @@ async def test_failure_email_names_the_file_and_the_reason(monkeypatch):
 @pytest.mark.parametrize("recipient", ["invalid\nrecipient@example.test", "invalid\rrecipient@example.test"])
 async def test_invalid_legacy_recipient_returns_false_without_smtp(monkeypatch, recipient):
     from unittest.mock import AsyncMock
+
     from backend.services import email_service
 
     monkeypatch.setattr(settings, "smtp_user", "audit@example.test")

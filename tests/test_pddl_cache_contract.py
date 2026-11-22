@@ -1,15 +1,20 @@
 """Execution policy must be part of the cached-document contract."""
 
 import asyncio
-from acessilia_core.pipeline import payload as pipeline_payload
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from tests.test_pending_fixes import isolated_runtime as runtime_fixture
+from acessilia_core.pipeline import payload as pipeline_payload
 from acessilia_core.pipeline.enrichment import tables as table_stage
-from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
+from tests.core_config_support import (
+    core_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
+from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 
 isolated_runtime = runtime_fixture
 
@@ -33,8 +38,8 @@ def test_execution_configuration_invalidates_document_cache(monkeypatch, field, 
 
 
 def test_domain_identity_invalidates_document_cache(monkeypatch):
-    from backend import service
     from acessilia_core.planning.domain_bundle import DomainBundle
+    from backend import service
 
     config = core_config()  # the job's, fixed: the service's own setting moves
     before = service._cache_version(config)
@@ -148,11 +153,11 @@ def _payload(manifest):
 
 
 def _warnings(failures):
+    from acessilia_core.i18n import n
     from acessilia_core.pipeline.payload import (
         MSG_PICTURES_NOT_DESCRIBED,
         MSG_TABLES_NOT_READ,
     )
-    from acessilia_core.i18n import n
 
     expected = []
     for kind, msgids in (("pictures", MSG_PICTURES_NOT_DESCRIBED), ("tables", MSG_TABLES_NOT_READ)):

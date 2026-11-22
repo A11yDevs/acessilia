@@ -1,6 +1,8 @@
-import aiosmtplib
 from email.message import EmailMessage
 from pathlib import Path
+
+import aiosmtplib
+
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     EMAIL_CONFIRMATION_BODY,
@@ -13,8 +15,8 @@ from acessilia_core.i18n.log_messages import (
     EMAIL_FORMAT_PDF_UA,
     EMAIL_FORMAT_TXT,
     EMAIL_FORMAT_ZIP,
-    EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_RESULT_AUDIT_HEADER,
+    EMAIL_RESULT_BODY_ATTACHED,
     EMAIL_RESULT_BODY_WITH_LINK,
     EMAIL_RESULT_SUBJECT,
     EMAIL_RESULT_WARNINGS_HEADER,
@@ -24,7 +26,6 @@ from acessilia_core.i18n.log_messages import (
 )
 from acessilia_core.logger import logger
 from backend.config.settings import settings
-
 
 #: Export-format name -> canonical English msgid of its localized display label; resolved through t() at send time.
 FORMAT_LABELS = {

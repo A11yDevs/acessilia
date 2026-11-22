@@ -6,30 +6,28 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
-from aiogram import Router, F
-from aiogram.types import Message, Document, PhotoSize
+from aiogram import F, Router
 from aiogram.exceptions import TelegramRetryAfter
+from aiogram.types import Document, Message, PhotoSize
 
-from frontend.telegram.adapters.file_service import download_file
-from frontend.clients.api_client import ApiError
-from frontend.clients import default_client
-from frontend.telegram import user_context
-from frontend.telegram.state_store import TrackedTask, get_state_store
-
-from acessilia_core.logger import logger
 from acessilia_core.i18n import SUPPORTED_LOCALES, get_translations, t
 from acessilia_core.i18n.log_messages import (
-    LOG_TELEGRAM_API_JOB_REJECTED,
-    LOG_TELEGRAM_API_CONTACT_FAILED,
-    LOG_TELEGRAM_FILE_PROCESSING_ERROR,
     LOG_PDF_UA_GENERATION_FAILED,
+    LOG_TELEGRAM_API_CONTACT_FAILED,
+    LOG_TELEGRAM_API_JOB_REJECTED,
+    LOG_TELEGRAM_FILE_PROCESSING_ERROR,
     LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED,
     LOG_TELEGRAM_RATE_LIMIT_WAIT,
     LOG_TELEGRAM_SEND_FAILED_AFTER_RETRIES,
 )
-from backend.services.validators import validate_file
-from frontend.telegram.adapters.status_tracker import StatusTracker
+from acessilia_core.logger import logger
 from backend.config.settings import settings
+from backend.services.validators import validate_file
+from frontend.clients import default_client
+from frontend.clients.api_client import ApiError
+from frontend.telegram import user_context
+from frontend.telegram.adapters.file_service import download_file
+from frontend.telegram.adapters.status_tracker import StatusTracker
 from frontend.telegram.messages import (
     MSG_ACCESSIBLE_PACKAGE_READY,
     MSG_CONTACT_SERVER_FAILED,
@@ -44,11 +42,12 @@ from frontend.telegram.messages import (
     MSG_QUEUE_POSITION,
     MSG_STATUS_TASK_NOT_FOUND,
     MSG_SUBMIT_FAILED,
-    MSG_TELEGRAM_FILE_TOO_LARGE,
     MSG_TASK_CANCELLED,
     MSG_TASK_ENQUEUED,
+    MSG_TELEGRAM_FILE_TOO_LARGE,
     MSG_WAITING_IN_QUEUE,
 )
+from frontend.telegram.state_store import TrackedTask, get_state_store
 
 router = Router()
 

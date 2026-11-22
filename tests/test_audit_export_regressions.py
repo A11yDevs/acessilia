@@ -1,26 +1,33 @@
 """Regression coverage for planning and portable accessible exports."""
 import base64
-from acessilia_core.pipeline import payload as pipeline_payload
 import re
 from pathlib import Path
 
 import pytest
 
-from acessilia_core.manifest.builder import _derive_processing_needs
 from acessilia_core.export.pandoc_exporter import export_accessible_document
+from acessilia_core.manifest.builder import _derive_processing_needs
+from acessilia_core.pipeline import payload as pipeline_payload
 from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.validation import (
-    audit_canonical_document, validate_canonical_document,
-    MSG_MISSING_FIRST_H1, MSG_MULTIPLE_H1, MSG_IMAGE_MISSING_ALT,
+    MSG_IMAGE_MISSING_ALT,
+    MSG_MISSING_FIRST_H1,
+    MSG_MULTIPLE_H1,
+    audit_canonical_document,
+    validate_canonical_document,
 )
+from tests.core_config_support import toolbox_config
 from tests.pddl_support import (
     build_element as _element,
+)
+from tests.pddl_support import (
     build_manifest as _manifest,
+)
+from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from tests.test_region_inspection import inspection as inspection
-from tests.core_config_support import toolbox_config
 
 
 @pytest.mark.parametrize("levels, finding", [([2, 3], MSG_MISSING_FIRST_H1), ([1, 1], MSG_MULTIPLE_H1), ([0, 2], MSG_MISSING_FIRST_H1), ([1, 7], MSG_MISSING_FIRST_H1)])

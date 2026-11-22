@@ -7,23 +7,25 @@ its own observations and obligations.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from core_config_support import (
+    document_config,
+    fusion_config,
+    paths_config,
+    toolbox_config,
+)
 
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
-from core_config_support import document_config, fusion_config, paths_config, toolbox_config
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.manifest.builder import build_processing_manifest
 from acessilia_core.manifest.schema import processing_manifest_schema, validate_manifest
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
-
+from acessilia_core.ports import RunPorts
 
 SCHEMA_PATH = (
     Path(__file__).resolve().parents[3]
@@ -285,9 +287,10 @@ def test_process_passes_the_run_document_config_to_the_builder(tmp_path, monkeyp
 @pytest.mark.asyncio
 async def test_a_run_passes_its_document_config_to_the_extraction(tmp_path, monkeypatch):
     """``execute`` hands ``config.document`` to ``process``; the run stops there."""
-    from acessilia_core.pipeline import preflight
     from core_config_support import core_config
     from pddl_support import build_orchestrator
+
+    from acessilia_core.pipeline import preflight
 
     class Stop(Exception):
         pass

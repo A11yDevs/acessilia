@@ -3,7 +3,6 @@
 import pytest
 
 from acessilia_sdk.toolbox.capabilities import provider_default
-
 from backend.config.settings import Settings
 
 

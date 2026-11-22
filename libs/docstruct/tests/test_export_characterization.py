@@ -4,9 +4,9 @@ Golden text is byte-exact; Pandoc objects are compared structurally, retaining
 array order and all content. The fixture harness only calls public pure APIs.
 """
 
-from copy import deepcopy
 import importlib.util
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 

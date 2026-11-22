@@ -9,8 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from docstruct.imaging import image_dimensions
-
 from acessilia_sdk.toolbox.artifacts import ArtifactRef, read_artifact
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
@@ -20,6 +18,7 @@ from acessilia_sdk.toolbox.results import (
     read_result,
 )
 from acessilia_sdk.toolbox.transport import media_type_for
+from docstruct.imaging import image_dimensions
 
 SPLIT_CAPABILITY = "pdf.split"
 RENDER_CAPABILITY = "pdf.render"

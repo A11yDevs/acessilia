@@ -10,14 +10,16 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from core_config_support import export_config, toolbox_config
+from locale_support import use_server_locale
 
 import acessilia_core.i18n as i8n
-from core_config_support import export_config, toolbox_config
 from acessilia_core.export.pandoc_exporter import export_accessible_document
 from acessilia_core.pipeline.canonical_builder import build_canonical_document
-from acessilia_core.pipeline.validators import validate_canonical_document
-from acessilia_core.pipeline.validators import validate_output_text
-from locale_support import use_server_locale
+from acessilia_core.pipeline.validators import (
+    validate_canonical_document,
+    validate_output_text,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -177,6 +179,7 @@ def test_build_canonical_document_normalizes_docling_tabs_in_prose():
     assert "Second list item" in html
 
     from html.parser import HTMLParser
+
     from docstruct.export.pandoc_ast import build_pandoc_ast
 
     class TextCollector(HTMLParser):

@@ -13,10 +13,6 @@ with the generic alt text and a pending human review instead of failing.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 import base64
 import io
 from types import SimpleNamespace
@@ -24,18 +20,28 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
+from acessilia_core.i18n import t
+from acessilia_core.manifest.models import Obligation
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline.elements import (
+    MSG_UNDESCRIBED_PICTURE_ALT,
+    _element_to_block,
+)
+from acessilia_core.pipeline.enrichment import common as enrichment_common
 from acessilia_core.pipeline.enrichment.common import _extract_picture_bytes
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
-from acessilia_core.manifest.models import Obligation
-from acessilia_core.i18n import t
+from acessilia_core.ports import RunPorts
+from tests.core_config_support import (
+    core_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
-from acessilia_core.pipeline.enrichment import common as enrichment_common
-from acessilia_core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config, model_config, toolbox_config, vision_config
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 

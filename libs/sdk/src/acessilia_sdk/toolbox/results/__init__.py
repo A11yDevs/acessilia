@@ -9,19 +9,20 @@ clients that download binary payloads.
 from __future__ import annotations
 
 from typing import Any, TypeVar
+
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.results._model import ResultModel
 from acessilia_sdk.toolbox.results.execute import (
     LatexResult,
     MathmlResult,
-    VerbalizedResult,
-    PageJudgement,
-    RegionTranscription,
-    PdfValidationReport,
     MediaInspection,
+    PageJudgement,
+    PdfValidationReport,
+    RegionTranscription,
     RenderedPageMetadata,
     TextSpansResult,
+    VerbalizedResult,
 )
-from acessilia_sdk.toolbox.results._model import ResultModel
 
 T = TypeVar("T", bound=ResultModel)
 

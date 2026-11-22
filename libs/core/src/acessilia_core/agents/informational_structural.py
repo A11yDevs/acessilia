@@ -4,7 +4,13 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_core.agents.agno_support import build_agent
-from acessilia_core.config import CoreConfig, DocumentConfig, FusionConfig, PathsConfig, ToolboxConfig
+from acessilia_core.config import (
+    CoreConfig,
+    DocumentConfig,
+    FusionConfig,
+    PathsConfig,
+    ToolboxConfig,
+)
 from acessilia_core.manifest.builder import build_processing_manifest
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor

@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from acessilia_core.i18n import t
-from tests.core_config_support import core_config
 from acessilia_core.manifest.models import (
     MSG_ELEMENT_UNKNOWN_PAGE,
     MSG_PAGE_DUPLICATE_ELEMENT_IDS,
@@ -26,6 +25,7 @@ from docstruct.manifest import (
     structured_document_from_payload,
     validate_structured_document,
 )
+from tests.core_config_support import core_config
 
 FIXTURES = Path(__file__).parent / "fixtures" / "manifests"
 

@@ -1,5 +1,7 @@
-from docstruct.export.filters import apply_output_profile_filter
-from docstruct.export.filters import strip_internal_audit_blocks
+from docstruct.export.filters import (
+    apply_output_profile_filter,
+    strip_internal_audit_blocks,
+)
 
 
 def _sample_document() -> dict:

@@ -239,6 +239,7 @@ async def test_valid_or_optional_recipient_is_accepted(isolated, email):
 @pytest.mark.parametrize("unexpected_failure", [False, True])
 async def test_notification_failure_does_not_stop_recovery(isolated, monkeypatch, tmp_path, unexpected_failure):
     from unittest.mock import AsyncMock
+
     from backend.api import worker
     from backend.services import email_service
 

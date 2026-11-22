@@ -11,14 +11,18 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
-from docstruct.export.formats import FormatSpec
+from acessilia_core.export.messages import (
+    MSG_FORMAT_DOCX,
+    MSG_FORMAT_HTML,
+    MSG_FORMAT_MP3,
+    MSG_FORMAT_PDF,
+    MSG_FORMAT_PDF_UA,
+    MSG_FORMAT_TXT,
+    MSG_FORMAT_ZIP,
+)
 from acessilia_sdk.toolbox.capabilities import TOOLBOX_CAPABILITIES
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient, ToolboxPdfUaClient
-
-from acessilia_core.export.messages import (
-    MSG_FORMAT_DOCX, MSG_FORMAT_HTML, MSG_FORMAT_MP3, MSG_FORMAT_PDF,
-    MSG_FORMAT_PDF_UA, MSG_FORMAT_TXT, MSG_FORMAT_ZIP,
-)
+from docstruct.export.formats import FormatSpec
 
 DETAIL_LEVELS = frozenset({"basic", "detailed", "technical"})
 

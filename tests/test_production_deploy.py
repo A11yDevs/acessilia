@@ -1,11 +1,11 @@
 import copy
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 import pytest
 import yaml

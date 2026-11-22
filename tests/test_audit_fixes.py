@@ -1,6 +1,8 @@
 import sqlite3
+
 import httpx
 import pytest
+
 from backend.api import worker
 from backend.api.routes import jobs
 from backend.config.settings import settings

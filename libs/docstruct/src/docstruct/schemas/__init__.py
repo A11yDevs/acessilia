@@ -1,7 +1,7 @@
 """Bundled canonical schemas, owned by docstruct (ADR-0004)."""
 
-from importlib.resources import files
 import json
+from importlib.resources import files
 from typing import Any
 
 __all__ = ["accessible_document_schema"]

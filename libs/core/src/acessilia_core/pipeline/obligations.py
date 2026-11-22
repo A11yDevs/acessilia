@@ -9,21 +9,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
-
 from acessilia_core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
+from acessilia_core.formula_tools import normalize_latex
+from acessilia_core.i18n import t
+from acessilia_core.i18n.stage_messages import (
+    STAGE_PAGE,
+    STAGE_PAGE_OF,
+    STAGE_PAGE_UNKNOWN,
+    STAGE_PAGES,
+)
 from acessilia_core.manifest.models import (
     ManifestElement,
     Obligation,
     ProcessingManifest,
 )
-from acessilia_core.i18n import t
-from acessilia_core.i18n.stage_messages import (
-    STAGE_PAGE,
-    STAGE_PAGE_OF,
-    STAGE_PAGES,
-    STAGE_PAGE_UNKNOWN,
-)
-from acessilia_core.formula_tools import normalize_latex
 
 if TYPE_CHECKING:
     pass

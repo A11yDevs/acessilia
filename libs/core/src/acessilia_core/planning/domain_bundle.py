@@ -5,7 +5,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 DEFAULT_DOMAIN_DIR = Path(__file__).resolve().parent / "domains"
 DEFAULT_DOMAIN_PATH = DEFAULT_DOMAIN_DIR / "domain_v2.3.pddl"
 DEFAULT_DESCRIPTION_PATH = DEFAULT_DOMAIN_DIR / "domain_description_v2.3.md"

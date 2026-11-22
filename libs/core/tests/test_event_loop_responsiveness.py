@@ -7,12 +7,11 @@ import time
 from typing import Any, Awaitable, Callable
 
 import pytest
+from core_config_support import model_config, toolbox_config
 
 from acessilia_core.agents.data_agent import DataAgent
 from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
 from acessilia_core.agents.vision_agent import VisionAgent
-from core_config_support import model_config, toolbox_config
-
 
 BLOCK_SECONDS = 0.2
 MAX_TICK_SECONDS = 0.1

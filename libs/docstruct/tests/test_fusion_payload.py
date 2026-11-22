@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 
 import pytest
+
 from docstruct.fusion import payload as fusion_payload
 from docstruct.fusion.payload import (
     STRUCTURAL_TYPES,

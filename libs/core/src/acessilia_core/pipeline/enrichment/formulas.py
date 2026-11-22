@@ -23,14 +23,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
-from docstruct.text.equations import preserve_equation_number, split_equation_number
-from docstruct.text.latex import has_latex_markup, latex_text_agreement
-
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.agents.vision_agent import VisionAgent
-from acessilia_core.config import DocumentConfig, ModelConfig, ToolboxConfig, VisionConfig
+from acessilia_core.blocking import run_blocking
+from acessilia_core.config import (
+    DocumentConfig,
+    ModelConfig,
+    ToolboxConfig,
+    VisionConfig,
+)
+from acessilia_core.formula_tools import normalize_latex
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
+    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
+    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
+    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
+    LOG_PDDL_FORMULAS_RECOGNIZED,
+)
+from acessilia_core.i18n.stage_messages import (
+    STAGE_ENRICHING_FORMULAS,
+    STAGE_RECOGNIZING_FORMULA,
+)
+from acessilia_core.logger import logger
 from acessilia_core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
     reconcile_reclassified_element_processing_needs,
@@ -47,26 +63,14 @@ from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
     _toolbox_formula_crop,
 )
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import (
-    LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
-    LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE,
-    LOG_PDDL_FORMULA_TEXT_LAYER_DISAGREES,
-    LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
-    LOG_PDDL_FORMULAS_RECOGNIZED,
-)
-from acessilia_core.blocking import run_blocking
 from acessilia_core.ports import RegionCache
-from acessilia_core.i18n.stage_messages import (
-    STAGE_ENRICHING_FORMULAS,
-    STAGE_RECOGNIZING_FORMULA,
-)
-from acessilia_core.formula_tools import normalize_latex
-from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_math_tools import (
     MathCapabilityUnavailable,
     toolbox_recognize_formula,
 )
+from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
+from docstruct.text.equations import preserve_equation_number, split_equation_number
+from docstruct.text.latex import has_latex_markup, latex_text_agreement
 
 
 def _formula_recognition_crop(

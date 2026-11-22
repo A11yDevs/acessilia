@@ -5,22 +5,25 @@ document dict -> Pandoc JSON AST (in-memory dict), no I/O.
 """
 from __future__ import annotations
 
-from collections.abc import Collection
 import re
+from collections.abc import Collection
 from typing import Any
+
 from docstruct.blocks.lists import list_numbering, list_start
 from docstruct.export.walk import SectionContext, Visitor, walk
-
-from docstruct.tables.ast import effective_section_width, row_header_column_count
-from docstruct.tables.ast import split_header_and_body
-from docstruct.tables.ast import table_ast_from_block
-from docstruct.text.equations import equation_number
-from docstruct.text.equations import numbered_latex
-from docstruct.text.equations import numbered_speech
-from docstruct.text.equations import split_equation_number
-from docstruct.text.math_spans import inline_math_entries
-from docstruct.text.math_spans import split_inline_math
-
+from docstruct.tables.ast import (
+    effective_section_width,
+    row_header_column_count,
+    split_header_and_body,
+    table_ast_from_block,
+)
+from docstruct.text.equations import (
+    equation_number,
+    numbered_latex,
+    numbered_speech,
+    split_equation_number,
+)
+from docstruct.text.math_spans import inline_math_entries, split_inline_math
 
 #: Control sequences that read files, execute programs or change TeX's
 #: internals. Math text comes from OCR and vision models, and the PDF/UA

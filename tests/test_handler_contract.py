@@ -15,8 +15,9 @@ from functools import partial
 from types import ModuleType, SimpleNamespace
 from typing import Annotated
 
-import acessilia_core.config
 import pytest
+
+import acessilia_core.config
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.executor import MethodRegistry
 from acessilia_core.pipeline.handlers import registry as handler_registry
@@ -28,7 +29,6 @@ from acessilia_core.pipeline.handlers.registry import (
     run_parameters,
 )
 from acessilia_core.ports import RunPorts
-
 from tests.core_config_support import core_config
 
 #: The handlers that take run parameters, by method. Any other handler takes none.

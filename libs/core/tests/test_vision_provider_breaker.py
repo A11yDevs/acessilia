@@ -9,22 +9,27 @@ deadlines before it degraded.
 from __future__ import annotations
 
 import asyncio
-from acessilia_core.pipeline import payload as pipeline_payload
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
-from acessilia_core.pipeline.enrichment import common as enrichment_common
-from acessilia_core.pipeline.enrichment.formulas import _enrich_formula_latex
-from core_config_support import document_config, model_config, toolbox_config, vision_config
-from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
-from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from acessilia_core.agents.provider_breaker import ProviderBreaker
+from core_config_support import (
+    document_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from pddl_support import build_element as _element
 from pddl_support import build_manifest as _manifest
 from pddl_support import install_formula_recognizer
+
+from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline.enrichment import common as enrichment_common
+from acessilia_core.pipeline.enrichment.formulas import _enrich_formula_latex
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
 
 _DESCRIPTION = VisionOutput(
     kind="description",

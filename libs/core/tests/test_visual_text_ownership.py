@@ -6,19 +6,25 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+from core_config_support import model_config, toolbox_config, vision_config
+from pddl_support import build_element, build_manifest, build_obligation
+from test_page_number_furniture import HEIGHT, WIDTH, _placed
+
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.prompt_tools import build_surrounding_text_prompt
-from acessilia_core.manifest.models import BoundingBox, ManifestElement, PageDescriptor, Provenance
+from acessilia_core.manifest.models import (
+    BoundingBox,
+    ManifestElement,
+    PageDescriptor,
+    Provenance,
+)
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline.payload import _manifest_pages_to_payload
-from core_config_support import model_config, toolbox_config, vision_config
 from docstruct.visual_text import (
     MAX_CONTEXT_ITEM_CHARS,
     MAX_CONTEXT_TOTAL_CHARS,
     bound_surrounding_items,
 )
-from pddl_support import build_element, build_manifest, build_obligation
-from test_page_number_furniture import HEIGHT, WIDTH, _placed
 
 LINE_1_BOX = (117.0, 722.4, 241.4, 711.0)
 LINE_2_BOX = (117.0, 705.1, 270.2, 693.7)

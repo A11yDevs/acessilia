@@ -5,7 +5,6 @@ locale strings files under each supported locale (en_US identity lookup vs pt_BR
 """
 
 from acessilia_core.i18n import _catalog_for
-
 from backend.config.settings import settings
 from backend.services.validators import (
     is_extension_allowed,

@@ -5,29 +5,8 @@ from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import Any
 
-from docstruct.profiles import verbosity_for_mode
-from docstruct.text.paragraphs import merge_broken_paragraphs
-
-from backend.agents.state_manager import TaskCancelledError, state_manager
-from acessilia_core.config import CoreConfig
-from backend.config.settings import settings
-from acessilia_core.pipeline.canonical_builder import build_canonical_document
-from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from acessilia_core.pipeline.payload import (
-    records_extraction_degradation,
-    records_visual_failures,
-)
 from acessilia_core.cache_keys import options_cache_key
-from backend.services.cache import (
-    drop_cache,
-    get_cached,
-    processing_cache_configuration,
-    set_cache,
-)
-from backend.services.history_service import (
-    finalizar_conversao,
-    registrar_conversao,
-)
+from acessilia_core.config import CoreConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_CANONICAL_JSON_SAVE_FAILED,
@@ -43,11 +22,31 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PROCESSING_FINISHED,
     STAGE_PROCESSING_WITH_AI,
 )
-from backend.services.model_calls import get_model_calls
-from backend.services.run_ports import service_run_ports
-from backend.services.operation_registry import operation_registry
-from backend.services import shutdown
 from acessilia_core.logger import logger
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.pipeline.payload import (
+    records_extraction_degradation,
+    records_visual_failures,
+)
+from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.config.settings import settings
+from backend.services import shutdown
+from backend.services.cache import (
+    drop_cache,
+    get_cached,
+    processing_cache_configuration,
+    set_cache,
+)
+from backend.services.history_service import (
+    finalizar_conversao,
+    registrar_conversao,
+)
+from backend.services.model_calls import get_model_calls
+from backend.services.operation_registry import operation_registry
+from backend.services.run_ports import service_run_ports
+from docstruct.profiles import verbosity_for_mode
+from docstruct.text.paragraphs import merge_broken_paragraphs
 
 
 def _normalized_engine() -> str:

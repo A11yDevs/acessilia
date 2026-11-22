@@ -13,6 +13,8 @@ import inspect
 from dataclasses import replace
 
 import pytest
+from pddl_support import NOW, build_element, build_manifest, build_obligation
+
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.executor import (
     ExecutionResume,
@@ -33,7 +35,6 @@ from acessilia_core.planning.pddl_processor import (
     _validate_action_sequence,
 )
 from acessilia_core.ports import RunPorts
-from pddl_support import NOW, build_element, build_manifest, build_obligation
 
 
 def _plan(steps: list[PlanStep], cost: int | None = None) -> NominalPlan:

@@ -10,19 +10,19 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.results._layout_generated import (
+    MANIFEST_RULE,
+    LayoutPages,
+    MineruLayoutConfiguration,
+)
+from acessilia_sdk.toolbox.results._model import decode
 from docstruct.manifest import (
     BoundingBox,
     StructuredDocument,
     structured_document_from_payload,
     validate_structured_document,
 )
-from acessilia_sdk.toolbox.errors import ToolboxContractViolation
-from acessilia_sdk.toolbox.results._layout_generated import (
-    LayoutPages,
-    MineruLayoutConfiguration,
-    MANIFEST_RULE,
-)
-from acessilia_sdk.toolbox.results._model import decode
 
 _DOCUMENT_FIELDS = {"title", "language", "pages", "elements"}
 

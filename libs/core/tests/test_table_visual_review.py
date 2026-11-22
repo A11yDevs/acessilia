@@ -12,13 +12,16 @@ import asyncio
 from pathlib import Path
 
 import pytest
-
-from acessilia_core.agents.output_schemas import DataOutput
-from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures, _fold_table_reading
+from core_config_support import model_config, toolbox_config, vision_config
 from pddl_support import build_element as _element
 from pddl_support import build_manifest as _manifest
+
+from acessilia_core.agents.output_schemas import DataOutput
 from acessilia_core.pipeline.enrichment import tables as table_stage
-from core_config_support import model_config, toolbox_config, vision_config
+from acessilia_core.pipeline.enrichment.tables import (
+    _enrich_table_structures,
+    _fold_table_reading,
+)
 
 
 def _ast(rows: list[list[str]]) -> dict:

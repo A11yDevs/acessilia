@@ -15,6 +15,19 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from acessilia_core.config import DocumentConfig, ToolboxConfig
+from acessilia_core.logger import logger
+from acessilia_core.manifest.models import (
+    ManifestElement,
+    ProcessingManifest,
+)
+from acessilia_core.pipeline.elements import (
+    _OVERLAY_HOST_TOLERANCE,
+    _bbox,
+)
+from acessilia_core.pipeline.toolbox import (
+    _source_artifact_id,
+)
 from docstruct.geometry.boxes import holds_point
 from docstruct.tables.ast import (
     TABLE_SECTIONS,
@@ -29,20 +42,6 @@ from docstruct.text.inline_math import (
 from docstruct.text.negation_overlay import (
     is_detached_overlay,
 )
-
-from acessilia_core.config import DocumentConfig, ToolboxConfig
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _OVERLAY_HOST_TOLERANCE,
-    _bbox,
-)
-from acessilia_core.pipeline.toolbox import (
-    _source_artifact_id,
-)
-from acessilia_core.logger import logger
 
 #: Element types whose text the exporters render as prose with inline math.
 _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})
@@ -68,9 +67,8 @@ class _TextSpanReader:
     async def pages(self, wanted: Iterable[int]) -> dict[int, dict[str, Any]] | None:
         """The spans of every page read so far, ``wanted`` included; ``None`` when
         the Toolbox cannot read them (recorded as ``unavailable``)."""
-        from acessilia_sdk.toolbox.errors import ToolboxError
-
         from acessilia_core.toolbox.text_spans import fetch_text_spans
+        from acessilia_sdk.toolbox.errors import ToolboxError
 
         if self._failed:
             return None

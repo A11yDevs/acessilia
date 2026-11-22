@@ -16,12 +16,15 @@ from pathlib import Path
 import httpx
 import pytest
 
+from acessilia_core.export import pandoc_exporter
+from acessilia_core.toolbox.toolbox_client import (
+    ToolboxProviderUnavailable,
+    make_toolbox_client,
+)
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 from acessilia_sdk.toolbox.clients.docx import DOCX_MEDIA_TYPE
-from tests.core_config_support import export_config, toolbox_config
 from backend.config.settings import settings
-from acessilia_core.export import pandoc_exporter
-from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable, make_toolbox_client
+from tests.core_config_support import export_config, toolbox_config
 
 BASE_URL = "http://localhost:8002"
 EXECUTE_URL = f"{BASE_URL}/v1/capabilities/document.export.docx:execute"

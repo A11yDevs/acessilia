@@ -1,6 +1,6 @@
 from aiogram import Router
-from aiogram.types import ErrorEvent
 from aiogram.filters import ExceptionTypeFilter
+from aiogram.types import ErrorEvent
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_TELEGRAM_UNHANDLED_ERROR

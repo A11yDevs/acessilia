@@ -14,6 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pddl_support import build_element, build_manifest
 
 from acessilia_core.manifest.models import (
     BoundingBox,
@@ -27,7 +28,6 @@ from acessilia_core.pipeline.handlers.fusion import _persist_fusion_payload
 from acessilia_core.pipeline.handlers.inspection import _save_region_artifact
 from acessilia_core.pipeline.handlers.rescue import _rescue_page
 from acessilia_core.pipeline.secondary import _SecondaryExtraction
-from pddl_support import build_element, build_manifest
 
 
 def _box(**overrides: object) -> dict[str, object]:

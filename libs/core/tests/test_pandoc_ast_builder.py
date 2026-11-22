@@ -1,10 +1,10 @@
 import json
 
 import pytest
+from core_config_support import toolbox_config
 
 from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
-from core_config_support import toolbox_config
 
 
 def test_build_pandoc_ast_emits_table_node_from_table_ast():

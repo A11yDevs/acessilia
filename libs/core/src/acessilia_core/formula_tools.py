@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from docstruct.text.latex import (  # noqa: F401
     bare_latex as normalize_latex,
+)
+from docstruct.text.latex import (
     ensure_math_delimiters,
 )
 

@@ -9,10 +9,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from acessilia_core.pipeline.secondary import _SecondaryExtraction
-from acessilia_core.pipeline.elements import _element_bbox as orchestrator_bbox
-from docstruct.geometry import is_bottom_left
-from docstruct.geometry.boxes import best_effort_clip
 from acessilia_core.manifest.builder import (
     _normalized_element_bbox,
     _refine_reading_order,
@@ -23,6 +19,10 @@ from acessilia_core.manifest.models import (
     PageDescriptor,
     Provenance,
 )
+from acessilia_core.pipeline.elements import _element_bbox as orchestrator_bbox
+from acessilia_core.pipeline.secondary import _SecondaryExtraction
+from docstruct.geometry import is_bottom_left
+from docstruct.geometry.boxes import best_effort_clip
 
 PAGE_HEIGHT = 842.0
 

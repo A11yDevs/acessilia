@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from acessilia_core import i18n
 
+from acessilia_core import i18n
 from backend.config.settings import settings
 
 
@@ -20,7 +20,6 @@ def test_setup_process_passes_the_settings_to_the_logger_and_the_catalogs(
     monkeypatch, tmp_path, unconfigured_locales
 ) -> None:
     from acessilia_core import logger as core_logger
-
     from backend.config import process_setup
 
     received = {}
@@ -57,7 +56,6 @@ def test_setup_process_negotiates_the_server_locale(
     """The service reads its environment and the core gets the result: the
     ``LOCALE`` setting, then the shell's hints, then the C locale."""
     from acessilia_core import logger as core_logger
-
     from backend.config import process_setup
 
     monkeypatch.setattr(core_logger, "setup_logger", lambda **_kwargs: None)
@@ -123,8 +121,9 @@ def test_setting_the_locales_after_startup_does_not_change_them(
 
 
 def test_setup_logger_writes_under_the_given_directory(tmp_path) -> None:
-    from acessilia_core.logger import setup_logger
     from loguru import logger
+
+    from acessilia_core.logger import setup_logger
 
     try:
         setup_logger(level="INFO", logs_dir=tmp_path / "logs")
@@ -169,7 +168,6 @@ def test_a_composite_c_locale_reaches_the_server_locale(monkeypatch) -> None:
     import locale
 
     from acessilia_core import logger as core_logger
-
     from backend.config import process_setup
 
     monkeypatch.setattr(core_logger, "setup_logger", lambda **_kwargs: None)

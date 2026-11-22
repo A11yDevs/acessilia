@@ -3,9 +3,9 @@
 from io import BytesIO
 
 import pytest
-from acessilia_core.toolbox.vision_payload import downscale_image
 from PIL import Image
 
+from acessilia_core.toolbox.vision_payload import downscale_image
 from tests.core_config_support import toolbox_config
 
 

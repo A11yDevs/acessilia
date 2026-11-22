@@ -14,6 +14,9 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from pddl_support import NOW, build_element, build_manifest, build_obligation
+from pydantic import ValidationError
+
 from acessilia_core.manifest.builder import (
     SECONDARY_EXTRACTION_ARTIFACT_ID,
     build_processing_manifest,
@@ -34,8 +37,6 @@ from acessilia_core.manifest.slides import (
     structure_as_slides,
 )
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
-from pddl_support import NOW, build_element, build_manifest, build_obligation
-from pydantic import ValidationError
 
 TOOLBOX_FIXTURE = Path(__file__).parent / "fixtures" / "toolbox-v2-contract.json"
 

@@ -8,13 +8,13 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
+
 from acessilia_core.toolbox.toolbox_math_tools import (
     MathCapabilityUnavailable,
     toolbox_convert_latex,
     toolbox_recognize_formula,
     toolbox_verbalize_latex,
 )
-
 from backend.config.settings import settings
 from tests.core_config_support import toolbox_config
 

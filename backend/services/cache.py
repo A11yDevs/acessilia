@@ -2,9 +2,9 @@ import asyncio
 import hashlib
 import json
 import time
-from uuid import uuid4
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import aiofiles
 import aiofiles.os
@@ -72,8 +72,8 @@ SERVICE_PROCESSING_SETTINGS = (
 def processing_cache_configuration(config: CoreConfig) -> dict[str, Any]:
     """What a processed document depends on: the run's ``config`` (#544) and
     the service's own options, with the manifest rules and the PDDL domain."""
-    from backend.config.settings import settings
     from acessilia_core.run_identity import processing_identity
+    from backend.config.settings import settings
 
     configuration: dict[str, Any] = {"core": processing_identity(config)}
     configuration.update({name: getattr(settings, name) for name in SERVICE_PROCESSING_SETTINGS})

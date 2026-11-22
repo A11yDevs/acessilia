@@ -9,39 +9,13 @@ import traceback
 from collections.abc import Sequence
 from typing import Any, Generic
 
-from docstruct.fusion.repetition import collapse
+from agno.agent import Agent
+from agno.media import Image
 from pydantic import ValidationError
 
-from acessilia_core.config import ModelConfig, ToolboxConfig
-from acessilia_core.i18n import active_locale, t
-from acessilia_core.i18n.log_messages import (
-    LOG_VISION_AGENT_CONTEXT_RETRY,
-    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
-    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
-    LOG_VISION_AGENT_TIMEOUT_RETRY,
-    LOG_VISION_AGENT_REGION_ERROR,
-    LOG_VISION_AGENT_REGION_RECOVERED,
-    LOG_VISION_AGENT_REGION_RETRY,
-    LOG_VISION_AGENT_REGION_SALVAGED,
-    LOG_VISION_AGENT_SENDING_REGION,
-    MSG_VISION_TRUNCATION_NOTICE,
-)
-from docstruct.regions.classify import region_prompt_key
-from acessilia_core.toolbox.vision_payload import downscale_image
-from acessilia_core.logger import logger
-
-from acessilia_core.agents.prompt_tools import (
-    build_page_prompt,
-    build_surrounding_text_prompt,
-    load_chemistry_prompt,
-    load_region_prompt,
-    load_system_prompt,
-)
 from acessilia_core.agents.ai_client import active_model_name, get_agno_model
 from acessilia_core.agents.model_call_policy import model_call_deadline
 from acessilia_core.agents.model_calls import ModelCallRunner, current_model_calls
-from acessilia_core.cache_keys import options_cache_key
-from acessilia_core.ports import RegionCache
 from acessilia_core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
@@ -51,8 +25,33 @@ from acessilia_core.agents.output_schemas import (
     VisionOutput,
     validate_structured_run,
 )
-from agno.agent import Agent
-from agno.media import Image
+from acessilia_core.agents.prompt_tools import (
+    build_page_prompt,
+    build_surrounding_text_prompt,
+    load_chemistry_prompt,
+    load_region_prompt,
+    load_system_prompt,
+)
+from acessilia_core.cache_keys import options_cache_key
+from acessilia_core.config import ModelConfig, ToolboxConfig
+from acessilia_core.i18n import active_locale, t
+from acessilia_core.i18n.log_messages import (
+    LOG_VISION_AGENT_CONTEXT_RETRY,
+    LOG_VISION_AGENT_DESCRIPTION_TRUNCATED,
+    LOG_VISION_AGENT_RATE_LIMIT_RETRY,
+    LOG_VISION_AGENT_REGION_ERROR,
+    LOG_VISION_AGENT_REGION_RECOVERED,
+    LOG_VISION_AGENT_REGION_RETRY,
+    LOG_VISION_AGENT_REGION_SALVAGED,
+    LOG_VISION_AGENT_SENDING_REGION,
+    LOG_VISION_AGENT_TIMEOUT_RETRY,
+    MSG_VISION_TRUNCATION_NOTICE,
+)
+from acessilia_core.logger import logger
+from acessilia_core.ports import RegionCache
+from acessilia_core.toolbox.vision_payload import downscale_image
+from docstruct.fusion.repetition import collapse
+from docstruct.regions.classify import region_prompt_key
 
 #: Tries per region or page. Sampled models sometimes fall into a repetition
 #: loop (the same LaTeX token over and over in a formula) until max_tokens cuts

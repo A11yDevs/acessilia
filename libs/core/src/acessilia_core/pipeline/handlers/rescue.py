@@ -35,8 +35,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from docstruct.fusion.noise import is_legitimate_text
-from docstruct.fusion.similarity import is_duplicate, pair_block
 from pydantic import ValidationError
 
 from acessilia_core.config import CoreConfig
@@ -72,6 +70,8 @@ from acessilia_core.pipeline.secondary import (
     _load_secondary_extraction,
     _SecondaryExtraction,
 )
+from docstruct.fusion.noise import is_legitimate_text
+from docstruct.fusion.similarity import is_duplicate, pair_block
 
 #: Element types whose text the method rescues. Tables, formulas and pictures
 #: are what the router took the secondary page for; page headers and footers

@@ -97,12 +97,11 @@ target-version = "py311"
 extend-exclude = ["var", "tests/dataset", "docs/notebooks"]
 
 [tool.ruff.lint]
-# Initial enforced rule set (#366): Pyflakes (F) and pycodestyle errors (E),
-# excluding line-length (E501) so existing files are not mass-reformatted.
-# Import sorting (I) is configured below for advisory runs (`ruff check --select I`)
-# and deferred to a dedicated low-conflict cleanup sweep so the count-based
-# baseline never hides a newly misordered import block.
-select = ["F", "E"]
+# Enforced rule set (#366, #648): Pyflakes (F), import sorting (I) and
+# pycodestyle errors (E), excluding line-length (E501) so existing files are
+# not mass-reformatted. Import sorting was enabled at zero violations; the
+# shrinking baseline tracks the remaining F/E violations.
+select = ["F", "I", "E"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]

@@ -11,10 +11,6 @@ from pathlib import Path
 from typing import Iterable
 
 from acessilia_core.hashing import json_sha256 as _json_sha256
-from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
-from acessilia_core.manifest.models import Obligation, ProcessingManifest
-from acessilia_core.planning.domain_bundle import DomainBundle
-from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_DOMAIN_DESCRIPTION_HASH_MISMATCH,
@@ -22,7 +18,10 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDDL_PROBLEM_HASH_MISMATCH,
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
 )
-
+from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
+from acessilia_core.manifest.models import Obligation, ProcessingManifest
+from acessilia_core.planning.domain_bundle import DomainBundle
+from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
 
 PDDL_SYMBOL = re.compile(r"^[a-z][a-z0-9-]*$")
 

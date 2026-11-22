@@ -28,7 +28,15 @@ from docstruct.fusion.noise import (
     split_decor,
     suppress_in_regions,
 )
-from docstruct.fusion.similarity import PAGENUM_RE, center, contain_frac, iou, is_duplicate, sim, swallows
+from docstruct.fusion.similarity import (
+    PAGENUM_RE,
+    center,
+    contain_frac,
+    iou,
+    is_duplicate,
+    sim,
+    swallows,
+)
 from docstruct.fusion.types import DiffBlock
 from docstruct.fusion.xycut import reorder as xycut_reorder
 from docstruct.policy import FusionPolicy

@@ -12,8 +12,8 @@ from acessilia_core.export.messages import MSG_DEFAULT_ACCESSIBLE_TITLE
 from acessilia_core.i18n import t
 from docstruct.export.html import (  # noqa: F401
     HtmlLabels,
-    _collect_section,
     _all_blocks,
+    _collect_section,
     _render_block,
     _render_html_table_row,
     document_to_html,

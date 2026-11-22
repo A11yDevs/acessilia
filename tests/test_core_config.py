@@ -11,8 +11,6 @@ requires the config its agent was built with: nothing falls back to
 
 from __future__ import annotations
 
-from acessilia_core.agents.model_calls import current_model_calls
-
 import ast
 import copy
 import dataclasses
@@ -21,13 +19,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.config import settings as settings_module
-from backend.config.core_config import core_config_from_settings
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.config import CoreConfig
 from acessilia_core.pipeline import preflight as pipeline_preflight
 from acessilia_core.pipeline.checkpointing import RunCheckpoints
 from acessilia_core.ports import RunPorts
 from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
+from backend.config import settings as settings_module
+from backend.config.core_config import core_config_from_settings
 from tests.core_config_support import core_config
 from tests.pddl_support import build_orchestrator
 
@@ -885,7 +884,9 @@ def test_the_caller_scan_sees_a_method_call_that_leaves_out_the_paths() -> None:
 def test_the_agno_tools_refuse_to_run_without_their_agent_config(tmp_path) -> None:
     """No bridge: an Agno tool without a run takes the config its agent was built with."""
     from acessilia_core.agents.fusion_agent import FusionAgent
-    from acessilia_core.agents.informational_structural import InformationalStructuralAgent
+    from acessilia_core.agents.informational_structural import (
+        InformationalStructuralAgent,
+    )
 
     with pytest.raises(RuntimeError, match="config="):
         InformationalStructuralAgent(extractor=object()).extract_processing_manifest(
@@ -897,7 +898,9 @@ def test_the_agno_tools_refuse_to_run_without_their_agent_config(tmp_path) -> No
 
 def test_the_agno_tools_run_with_their_agent_config(monkeypatch, tmp_path) -> None:
     from acessilia_core.agents.fusion_agent import FusionAgent
-    from acessilia_core.agents.informational_structural import InformationalStructuralAgent
+    from acessilia_core.agents.informational_structural import (
+        InformationalStructuralAgent,
+    )
 
     config = core_config(fusion={"secondary_provider": "from-the-agent"})
     seen = {}

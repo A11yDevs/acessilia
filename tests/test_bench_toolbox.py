@@ -17,6 +17,7 @@ import httpx
 import pytest
 import respx
 
+from acessilia_core.toolbox import toolbox_client
 from acessilia_sdk.toolbox import (
     ToolboxEndpoint,
     ToolboxProviderUnavailable,
@@ -32,7 +33,6 @@ from acessilia_sdk.toolbox.clients import (
 )
 from backend.config.core_config import core_config_from_settings
 from backend.config.settings import Settings, settings
-from acessilia_core.toolbox import toolbox_client
 from scripts.bench import toolbox
 
 PRIMARY = "http://toolbox-a.test"

@@ -1,14 +1,14 @@
 import asyncio
 import os
-import time
 import sqlite3
+import time
 
 import pytest
 
 from backend.config.settings import settings
 from backend.services import cleanup_service
-from backend.services.cleanup_service import _clean_output_directory
 from backend.services import download_token_service as tokens
+from backend.services.cleanup_service import _clean_output_directory
 
 
 @pytest.fixture(autouse=True)

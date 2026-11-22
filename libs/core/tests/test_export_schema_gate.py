@@ -1,18 +1,18 @@
 """E1.2b: the old acceptance matrix, newly rejected inputs and retained outputs."""
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import traceback
+from copy import deepcopy
+from pathlib import Path
 
 import pytest
+from core_config_support import export_config, toolbox_config
+from jsonschema import Draft202012Validator
 
 from acessilia_core.export import pandoc_exporter
 from acessilia_core.export.messages import MSG_CANONICAL_SCHEMA_FAILED
-from acessilia_core.i18n import t, set_request_locale, reset_request_locale
+from acessilia_core.i18n import reset_request_locale, set_request_locale, t
 from docstruct.schemas import accessible_document_schema
-from jsonschema import Draft202012Validator
-from core_config_support import export_config, toolbox_config
 
 MATRIX = json.loads((Path(__file__).parent / 'fixtures/export_schema_gate/compatibility.json').read_text())
 

@@ -11,12 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from acessilia_core.config import ToolboxConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_MEDIA_INSPECT_SKIPPED_DISABLED,
     LOG_MEDIA_INSPECT_TOOLBOX_FINISHED,
 )
-from acessilia_core.config import ToolboxConfig
 from acessilia_core.logger import logger
 
 
@@ -47,10 +47,9 @@ async def inspect_source_media(
         logger.info(t(LOG_MEDIA_INSPECT_SKIPPED_DISABLED))
         return None
 
+    from acessilia_core.toolbox.toolbox_client import make_toolbox_client
     from acessilia_sdk.toolbox.clients import ToolboxMediaInspectClient
     from acessilia_sdk.toolbox.errors import ToolboxContractViolation
-
-    from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 
     owned_client = client is None
     inspect_client = client or make_toolbox_client(ToolboxMediaInspectClient, toolbox)

@@ -6,11 +6,10 @@ import json
 import sys
 from pathlib import Path
 
-from backend.config.core_config import core_config_from_settings
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
-from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.manifest.schema import validate_manifest
-
+from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+from backend.config.core_config import core_config_from_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SCHEMA = PROJECT_ROOT / "schemas" / "processing_manifest.schema.json"

@@ -9,23 +9,27 @@ settings. The run's config is a distinct object, so only identity passes.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from core_config_support import (
+    core_config,
+    document_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
+from judge_support import judged
+from pddl_support import build_element, build_manifest
 
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline.enrichment import tables as table_stage
-from judge_support import judged
-from core_config_support import core_config, document_config, model_config, toolbox_config, vision_config
-from pddl_support import build_element, build_manifest
+from acessilia_core.ports import RunPorts
 
 #: The run's Toolbox config: its own object, unlike one built from the settings.
 RUN = toolbox_config(retries=7)
@@ -146,9 +150,8 @@ async def test_the_formula_recognition_gives_its_agent_crops_and_recognizer_the_
 
 
 def test_a_formula_crop_renders_with_the_run_config(monkeypatch) -> None:
-    from docstruct.geometry.boxes import PageBox  # noqa: F401 - the type the box has
-
     from acessilia_core.manifest.models import BoundingBox, Provenance
+    from docstruct.geometry.boxes import PageBox  # noqa: F401 - the type the box has
 
     seen: list = []
 
@@ -172,9 +175,10 @@ def test_a_formula_crop_renders_with_the_run_config(monkeypatch) -> None:
 async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     monkeypatch, tmp_path
 ) -> None:
+    from pddl_support import build_orchestrator
+
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline import preflight
-    from pddl_support import build_orchestrator
 
     seen: dict[str, object] = {}
 

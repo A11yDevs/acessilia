@@ -14,18 +14,16 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from tests.core_config_support import fusion_config, paths_config, toolbox_config
 from acessilia_core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
-from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
-
 from acessilia_core.toolbox.toolbox_client import (
     ToolboxContractViolation,
     ToolboxTimeout,
 )
-
+from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
+from tests.core_config_support import fusion_config, paths_config, toolbox_config
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
 
@@ -305,9 +303,8 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
 
 
 def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
-    from docstruct.policy import FusionPolicy
-
     from backend.config.settings import settings
+    from docstruct.policy import FusionPolicy
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -341,8 +338,8 @@ def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
 def test_matching_dual_providers_do_not_create_fusion_obligations(
     mock_client, monkeypatch
 ):
-    from backend.config.settings import settings
     from acessilia_core.manifest.builder import build_processing_manifest
+    from backend.config.settings import settings
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -372,8 +369,8 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
 def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     mock_client, monkeypatch
 ):
-    from backend.config.settings import settings
     from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from backend.config.settings import settings
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -397,8 +394,8 @@ def test_secondary_extraction_write_failure_does_not_fail_extraction(
     tmp_path, monkeypatch
 ):
     """The artifact only feeds the provider-choice methods, which fail without it."""
-    from backend.config.settings import settings
     from acessilia_core.manifest.toolbox_extractor import _persist_secondary_extraction
+    from backend.config.settings import settings
 
     blocker = tmp_path / "artifacts"
     blocker.write_text("not a directory")
@@ -808,8 +805,11 @@ def test_dual_mode_uses_the_normalized_primary_in_the_identity_gate(
 def test_dual_extraction_handles_each_provider_independently(
     mock_client, monkeypatch, primary_ok, secondary_ok
 ):
+    from acessilia_sdk.toolbox.errors import (
+        ToolboxProviderUnavailable,
+        ToolboxUnavailable,
+    )
     from backend.config.settings import settings
-    from acessilia_sdk.toolbox.errors import ToolboxProviderUnavailable, ToolboxUnavailable
 
     primary = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
@@ -917,6 +917,7 @@ def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, mon
 
 def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
     import httpx
+
     from acessilia_sdk.toolbox.errors import ToolboxError
     from acessilia_sdk.toolbox.transport import raise_for_error
     from backend.config.settings import settings
@@ -939,10 +940,10 @@ def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
 
 
 def test_independent_endpoints_log_the_direct_input_policy_once(mock_client, mock_artifact_client, monkeypatch):
-    from acessilia_sdk.toolbox import ToolboxEndpoint
-    from acessilia_core.manifest import toolbox_extractor as module
     from acessilia_core.i18n import t
     from acessilia_core.i18n.log_messages import LOG_ARTIFACT_STORE_DIRECT_INPUT
+    from acessilia_core.manifest import toolbox_extractor as module
+    from acessilia_sdk.toolbox import ToolboxEndpoint
 
     mock_client.endpoints = (
         ToolboxEndpoint("http://toolbox-a.test"), ToolboxEndpoint("http://toolbox-b.test"),
@@ -1155,7 +1156,6 @@ def test_cancelling_during_upload_refuses_the_next_operation(
 def test_two_extractions_at_once_each_use_their_own_toolbox_config(mock_client):
     """One extractor, two runs in two threads: each call carries its own run's options."""
     import threading
-
     from concurrent.futures import ThreadPoolExecutor
 
     both_started = threading.Barrier(2)

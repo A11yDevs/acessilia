@@ -31,7 +31,6 @@ from typing import Any
 
 from acessilia_core.logger import logger
 from acessilia_core.ports import CHECKPOINT_PHASES
-
 from backend.config.settings import settings
 
 #: Version of the checkpoint document. A job never resumes on another version:

@@ -14,10 +14,10 @@ import zlib
 from pathlib import Path
 
 import pytest
-from acessilia_core.toolbox import toolbox_client
-
 from core_config_support import fusion_config, paths_config, toolbox_config
 from pddl_support import build_element
+
+from acessilia_core.toolbox import toolbox_client
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
 

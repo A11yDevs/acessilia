@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from collections import Counter
 
+from acessilia_core.manifest.detectors.types import NeedCandidate
+from acessilia_core.manifest.models import ManifestElement
 from docstruct.tables.ast import raw_rows_from_table_ast as _rows_from_table_ast
 from docstruct.text.latex import normalize_latex
 from docstruct.text.norm_fix import norm_fix
 from docstruct.text.unicode_repair import detect_legacy_unicode
-
-from acessilia_core.manifest.detectors.types import NeedCandidate
-from acessilia_core.manifest.models import ManifestElement
 
 TEXT_NORMALIZATION_ELEMENT_TYPES = frozenset(
     {"paragraph", "heading", "title", "list_item", "caption"}

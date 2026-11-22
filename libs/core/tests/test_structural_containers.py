@@ -8,10 +8,11 @@ their escalation failed the whole job.
 
 from __future__ import annotations
 
+from pddl_support import build_element
+
+from acessilia_core.logger import logger
 from acessilia_core.manifest.builder import _derive_processing_needs
 from acessilia_core.manifest.models import BoundingBox, Provenance
-from acessilia_core.logger import logger
-from pddl_support import build_element
 
 
 def _key_value_group(element_id: str = "element-000110"):

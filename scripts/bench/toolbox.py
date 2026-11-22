@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
 from acessilia_sdk.operations.formula import (
     FORMULA_CROP_DPI,
     FormulaChain,
@@ -36,7 +38,6 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxPdfClient,
     ToolboxStructureClient,
 )
-from dotenv import load_dotenv
 
 # The same .env the core's settings load; variables already set win.
 load_dotenv()

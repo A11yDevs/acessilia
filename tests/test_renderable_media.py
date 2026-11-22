@@ -12,10 +12,10 @@ from pathlib import Path
 
 import fitz
 import pytest
+
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
-
 from tests.core_config_support import (
     document_config,
     model_config,

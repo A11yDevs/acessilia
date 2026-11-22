@@ -1,34 +1,32 @@
 import logging
+import re
 import traceback
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
-import re
-from starlette.concurrency import run_in_threadpool
 
 from fastapi import (
     FastAPI,
     File,
     Form,
-    Request,
-    UploadFile,
     HTTPException,
     Query,
+    Request,
+    UploadFile,
 )
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from starlette.background import BackgroundTask
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.background import BackgroundTask
+from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.config.settings import settings
 from acessilia_core.export import catalog as format_catalog
-from acessilia_core.i18n import t, active_locale
-from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
+from acessilia_core.i18n import active_locale, t
 from acessilia_core.i18n.log_messages import (
     LOG_WEB_API_UPLOAD_ERROR,
     LOG_WEB_DOWNLOAD_QUERY_FAILED,
@@ -37,13 +35,14 @@ from acessilia_core.i18n.log_messages import (
     LOG_WEB_RATE_LIMIT_EXCEEDED,
     LOG_WEB_UPLOAD_ERROR,
 )
-from backend.services.access_log_filter import AccessLogFilter
 from acessilia_core.logger import logger
+from backend.config.settings import settings
+from backend.services.access_log_filter import AccessLogFilter
+from backend.services.download_token_service import TOKEN_EXPIRY_DAYS
 from backend.services.validators import MSG_FILE_TOO_LARGE
-from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
+from frontend.clients.api_client import ApiError
 from frontend.web.messages import (
-    WEB_ERROR_INVALID_RECEIPT,
     WEB_DOWNLOAD_HEADLINE,
     WEB_DOWNLOAD_NO_FORMATS,
     WEB_DOWNLOAD_SUBHEAD,
@@ -53,6 +52,7 @@ from frontend.web.messages import (
     WEB_ERROR_DOWNLOAD_INVALID,
     WEB_ERROR_DOWNLOAD_UNAVAILABLE,
     WEB_ERROR_INTERNAL,
+    WEB_ERROR_INVALID_RECEIPT,
     WEB_ERROR_UPLOAD_GENERIC,
     WEB_FOOTER,
     WEB_INDEX_DOC_LABEL,
@@ -62,22 +62,22 @@ from frontend.web.messages import (
     WEB_INDEX_INTRO,
     WEB_INDEX_SUBMIT_BUTTON,
     WEB_INDEX_TITLE,
-    WEB_LOGO_ALT,
-    WEB_RATE_LIMIT_EXCEEDED,
-    WEB_SUCCESS_QUEUED,
-    WEB_JOB_TITLE,
-    WEB_JOB_PENDING,
     WEB_JOB_CLOSE_INFO,
     WEB_JOB_DOWNLOAD,
     WEB_JOB_EMAIL_FAILED,
     WEB_JOB_EMAIL_SENT,
     WEB_JOB_EMAIL_UNKNOWN,
+    WEB_JOB_ERRORS,
     WEB_JOB_FAILURE_EMAIL_FAILED,
     WEB_JOB_FAILURE_EMAIL_SENT,
-    WEB_JOB_UNAVAILABLE,
-    WEB_JOB_STATUS,
-    WEB_JOB_ERRORS,
     WEB_JOB_HOME,
+    WEB_JOB_PENDING,
+    WEB_JOB_STATUS,
+    WEB_JOB_TITLE,
+    WEB_JOB_UNAVAILABLE,
+    WEB_LOGO_ALT,
+    WEB_RATE_LIMIT_EXCEEDED,
+    WEB_SUCCESS_QUEUED,
 )
 
 

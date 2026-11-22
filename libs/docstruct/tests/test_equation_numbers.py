@@ -1,12 +1,16 @@
 """Equation labels are preserved without consuming mathematical parentheses."""
 import pytest
 
-from docstruct.text.equations import numbered_latex, preserve_equation_number, split_equation_number
 from docstruct.canonical import MathEnricher, build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.markdown import document_to_markdown
 from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines
+from docstruct.text.equations import (
+    numbered_latex,
+    preserve_equation_number,
+    split_equation_number,
+)
 
 
 @pytest.mark.parametrize("source,expression,number", [

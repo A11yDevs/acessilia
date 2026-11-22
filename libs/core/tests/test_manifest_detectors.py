@@ -9,8 +9,6 @@ materialization step and the ``inspect_document_needs`` facade.
 
 from __future__ import annotations
 
-from docstruct.fusion.types import DiffBlock
-
 from acessilia_core.manifest import builder
 from acessilia_core.manifest.detectors import (
     MAX_ID_SUFFIX,
@@ -31,6 +29,7 @@ from acessilia_core.manifest.detectors import (
     pages_for_vlm_judge,
 )
 from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
+from docstruct.fusion.types import DiffBlock
 
 
 def _element(

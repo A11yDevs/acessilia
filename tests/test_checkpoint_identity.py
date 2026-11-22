@@ -12,6 +12,8 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from loguru import logger
+
 from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.checkpointing import (
@@ -23,8 +25,6 @@ from acessilia_core.pipeline.checkpointing import (
 )
 from acessilia_core.ports import CHECKPOINT_PHASES, NoRegionCache, RunPorts
 from acessilia_core.run_identity import PROCESSING_FIELDS, STAGE_FIELDS, stage_identity
-from loguru import logger
-
 from tests.core_config_support import core_config
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
 from tests.test_run_ports import MemoryCheckpoints

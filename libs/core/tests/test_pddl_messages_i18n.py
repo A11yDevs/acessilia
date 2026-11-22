@@ -10,13 +10,28 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from core_config_support import core_config
+from pddl_support import (
+    build_element as _element,
+)
+from pddl_support import (
+    build_manifest as _manifest,
+)
+from pddl_support import (
+    build_obligation as _obligation,
+)
+from pddl_support import (
+    build_orchestrator as _orchestrator,
+)
 
-from acessilia_core.pipeline.handlers.formula import _handle_latex_normalizer_method
+from acessilia_core.blocking import run_blocking
+from acessilia_core.i18n import n, reset_request_locale, set_request_locale
 from acessilia_core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,
     _handle_vision_description_method,
 )
+from acessilia_core.pipeline.handlers.formula import _handle_latex_normalizer_method
 from acessilia_core.pipeline.handlers.messages import (
     MSG_BLOCK_COUNT,
     MSG_CODE_NORMALIZED,
@@ -28,16 +43,6 @@ from acessilia_core.pipeline.handlers.text import (
     _handle_extract_line_numbers_method,
 )
 from acessilia_core.pipeline.obligations import _unsatisfied_obligations
-from acessilia_core.i18n import n, reset_request_locale, set_request_locale
-from acessilia_core.blocking import run_blocking
-
-from pddl_support import (
-    build_element as _element,
-    build_manifest as _manifest,
-    build_obligation as _obligation,
-    build_orchestrator as _orchestrator,
-)
-from core_config_support import core_config
 
 LOCALES = ("en_US", "pt_BR")
 

@@ -13,21 +13,24 @@ never raises out of the gate: the cache records it and the gate reports it as
 
 from __future__ import annotations
 
-from collections import OrderedDict
-
 import json
+from collections import OrderedDict
 from pathlib import Path
 
 import httpx
 import pytest
 import respx
 
-from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxProviderUnavailable, ToolboxTimeout
-from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-from backend.config.settings import settings
 from acessilia_core.planning import toolbox_gate
 from acessilia_core.toolbox import toolbox_client
 from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+from acessilia_sdk.toolbox import (
+    ToolboxCapabilityError,
+    ToolboxProviderUnavailable,
+    ToolboxTimeout,
+)
+from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+from backend.config.settings import settings
 from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import build_element, build_manifest, build_obligation
 
@@ -359,9 +362,8 @@ async def test_the_gate_and_the_clients_follow_a_run_config_unlike_the_settings(
 
 
 def test_the_client_configuration_is_the_run_config(run_unlike_the_settings) -> None:
-    from acessilia_sdk.toolbox.clients import ToolboxDocxClient
-
     from acessilia_core.toolbox.toolbox_client import toolbox_client_config
+    from acessilia_sdk.toolbox.clients import ToolboxDocxClient
 
     toolbox = replace_timeouts(run_unlike_the_settings.toolbox)
     sdk = toolbox_client_config(toolbox)

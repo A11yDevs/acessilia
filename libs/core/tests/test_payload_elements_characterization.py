@@ -11,6 +11,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pddl_support import NOW, build_element, build_manifest, build_obligation
+
 from acessilia_core.execution.models import ExecutionReport
 from acessilia_core.i18n import n, t
 from acessilia_core.i18n.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
@@ -34,7 +36,6 @@ from acessilia_core.pipeline.payload import (
     build_pddl_structured_payload,
 )
 from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
-from pddl_support import NOW, build_element, build_manifest, build_obligation
 
 
 def _element(

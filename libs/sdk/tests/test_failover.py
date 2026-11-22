@@ -23,7 +23,6 @@ from acessilia_sdk.toolbox import (
     download_artifact,
     parse_endpoints,
 )
-
 from acessilia_sdk.toolbox import client as client_module
 
 PRIMARY = "http://toolbox-a.test"

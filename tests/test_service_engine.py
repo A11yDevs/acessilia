@@ -13,7 +13,6 @@ import pytest
 
 from backend.config.settings import settings
 
-
 # ---------------------------------------------------------------------------
 # _normalized_engine
 # ---------------------------------------------------------------------------
@@ -93,8 +92,8 @@ def test_build_orchestrator_returns_pddl_when_configured(monkeypatch):
 
 def test_build_orchestrator_pddl_with_toolbox_uses_toolbox_extractor(monkeypatch):
     """PIPELINE_ENGINE=pddl always extracts through ToolboxManifestExtractor."""
-    from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
     from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
 
     monkeypatch.setattr(settings, "pddl_fast_downward", "")
     monkeypatch.setattr(settings, "pddl_fast_downward_alias", "")

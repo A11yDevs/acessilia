@@ -17,12 +17,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from acessilia_sdk.toolbox.clients.pdf import check_renderable
-
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
+from acessilia_sdk.toolbox.clients.pdf import check_renderable
 
 if TYPE_CHECKING:
     from acessilia_sdk.operations.formula import FormulaCrop
@@ -101,9 +100,8 @@ def _render_client(artifact_id: str | None, toolbox: ToolboxConfig):
 
     With ``artifact_id``, a source the Toolbox no longer stores is sent again.
     """
-    from acessilia_sdk.toolbox.clients import ToolboxPdfClient
-
     from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+    from acessilia_sdk.toolbox.clients import ToolboxPdfClient
 
     return make_toolbox_client(
         ToolboxPdfClient, toolbox, resend_file_on_missing_artifact=artifact_id is not None

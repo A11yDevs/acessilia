@@ -12,13 +12,13 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from core_config_support import model_config, toolbox_config, vision_config
+from pddl_support import build_element, build_manifest
 
-from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.agents.output_schemas import DataOutput
 from acessilia_core.manifest.models import PageDescriptor
-from pddl_support import build_element, build_manifest
+from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import tables as table_stage
-from core_config_support import model_config, toolbox_config, vision_config
 
 
 def _reading(rows, *, warnings=()):

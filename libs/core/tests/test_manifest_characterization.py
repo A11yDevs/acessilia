@@ -17,9 +17,6 @@ from pathlib import Path
 
 import pytest
 
-from docstruct.geometry import is_bottom_left
-from docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL
-
 from acessilia_core import i18n
 from acessilia_core.manifest.builder import (
     _element_bbox,
@@ -35,6 +32,8 @@ from acessilia_core.manifest.models import (
     Provenance,
 )
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
+from docstruct.geometry import is_bottom_left
+from docstruct.placeholders import UNSTRUCTURED_PAGE_LABEL
 
 FIXTURES = Path(__file__).parent / "fixtures"
 GOLDEN_MANIFESTS = FIXTURES / "manifests"

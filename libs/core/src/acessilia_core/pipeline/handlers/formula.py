@@ -14,18 +14,11 @@ ADR-0017 was accepted (#402, phase 3, step 6).
 
 from __future__ import annotations
 
-from docstruct.text.implicit_products import (
-    implicit_product_variables,
-    mark_implicit_products,
-)
-from docstruct.text.math_spans import block_prose, inline_math_sources
-from docstruct.text.named_operators import (
-    normalize_named_operators,
-    speak_named_operators,
-)
-
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
+from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.i18n import n, t
+from acessilia_core.logger import logger
 from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
@@ -40,15 +33,21 @@ from acessilia_core.pipeline.handlers.common import (
 from acessilia_core.pipeline.obligations import (
     _formula_elements_for_obligation,
 )
-from acessilia_core.i18n import n, t
-from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
-from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_math_tools import (
     MSG_MATHML_UNAVAILABLE,
     MSG_SPEECH_UNAVAILABLE,
     MathCapabilityUnavailable,
     toolbox_convert_latex,
     toolbox_verbalize_latex,
+)
+from docstruct.text.implicit_products import (
+    implicit_product_variables,
+    mark_implicit_products,
+)
+from docstruct.text.math_spans import block_prose, inline_math_sources
+from docstruct.text.named_operators import (
+    normalize_named_operators,
+    speak_named_operators,
 )
 
 

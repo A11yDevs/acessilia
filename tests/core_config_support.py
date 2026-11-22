@@ -19,7 +19,6 @@ from acessilia_core.config import (
     ToolboxConfig,
     VisionConfig,
 )
-
 from backend.config.core_config import core_config_from_settings
 
 

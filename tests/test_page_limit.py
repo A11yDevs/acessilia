@@ -9,10 +9,6 @@ limit; nothing is planned or described.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,10 +16,12 @@ from types import SimpleNamespace
 import pytest
 
 from acessilia_core import i18n
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.ports import RunPorts
 from tests.core_config_support import core_config
 from tests.pddl_support import build_orchestrator
-from acessilia_core.pipeline import preflight as pipeline_preflight
 
 # The Toolbox's ``media.inspect`` document (``artifact/media-inspection@1``,
 # pure-media-inspect 1.1.0) for tests/fixtures/tutorials/java-oo-3pgs.pdf.

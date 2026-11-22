@@ -25,9 +25,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from acessilia_sdk.runtime import run_sync
-from docstruct.tables.ast import analyze_table_complexity
-
 from acessilia_core.config import CoreConfig, ToolboxConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
@@ -67,6 +64,8 @@ from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
 )
 from acessilia_core.run_identity import fusion_reuse_identity
+from acessilia_sdk.runtime import run_sync
+from docstruct.tables.ast import analyze_table_complexity
 
 #: Accepted Dr.DocBench table preference (TEDS): MinerU's table, unless Docling's
 #: has spans or is the only one.

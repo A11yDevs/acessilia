@@ -18,9 +18,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from docstruct.fusion.payload import fuse_extraction_payloads
-from docstruct.policy import FusionPolicy
-
 from acessilia_sdk.operations.formula import Step
 from acessilia_sdk.toolbox.clients.structure import (
     CAPABILITY as STRUCTURE_CAPABILITY,
@@ -34,6 +31,8 @@ from acessilia_sdk.toolbox.errors import (
     ToolboxError,
     ToolboxProviderUnavailable,
 )
+from docstruct.fusion.payload import fuse_extraction_payloads
+from docstruct.policy import FusionPolicy
 
 
 class DualFusionUnavailable(ToolboxProviderUnavailable):

@@ -7,6 +7,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
+
 from acessilia_core.agents.model_calls import (
     ModelCallRejected,
     ModelCallTimeout,
@@ -16,7 +17,6 @@ from acessilia_core.agents.model_calls import (
 from acessilia_core.blocking import run_blocking
 from acessilia_core.i18n import active_locale, reset_request_locale, set_request_locale
 from acessilia_core.ports import RunPorts
-
 from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
 from tests.core_config_support import core_config, model_config, toolbox_config
 
@@ -284,7 +284,6 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
     from acessilia_core.agents.vision_agent import VisionAgent
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline import preflight
-
     from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
     observed = []

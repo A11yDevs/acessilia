@@ -8,7 +8,6 @@ if str(ROOT) not in sys.path:
 
 from acessilia_core.manifest.schema import write_processing_manifest_schema
 
-
 if __name__ == "__main__":
     path = write_processing_manifest_schema(
         ROOT / "schemas" / "processing_manifest.schema.json"

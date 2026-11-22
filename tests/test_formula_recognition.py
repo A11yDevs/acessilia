@@ -14,13 +14,8 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
-from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
-from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline.enrichment import formulas as formula_stage
-from tests.core_config_support import document_config, model_config, toolbox_config, vision_config
 from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
@@ -32,12 +27,22 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE,
     STAGE_RECOGNIZING_FORMULA,
 )
+from acessilia_core.manifest.models import ManifestElement
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+from tests.core_config_support import (
+    document_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from tests.pddl_support import (
-    install_formula_recognizer,
     build_element,
     build_manifest,
     build_obligation,
+    install_formula_recognizer,
 )
 
 
@@ -261,8 +266,8 @@ async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropp
     """A page-level provider (docling-math) finds nothing in a chip and is not
     an outage: each fallback is a DEBUG line and the document gets one INFO
     line that names the provider."""
-    from backend.config.settings import settings
     from acessilia_core.logger import logger
+    from backend.config.settings import settings
 
     manifest = _formula_manifest(None, None)
     FakeVision.output = VisionOutput(
@@ -298,10 +303,9 @@ async def test_a_recognizer_answering_without_latex_is_logged(monkeypatch, cropp
 
 @pytest.mark.asyncio
 async def test_an_empty_provider_setting_logs_the_registry_default(monkeypatch, cropped):
-    from acessilia_sdk.toolbox.capabilities import provider_default
-
-    from backend.config.settings import settings
     from acessilia_core.logger import logger
+    from acessilia_sdk.toolbox.capabilities import provider_default
+    from backend.config.settings import settings
 
     manifest = _formula_manifest()
     _recognizer_answers(monkeypatch, [])

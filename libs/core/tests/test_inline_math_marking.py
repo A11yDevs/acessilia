@@ -5,11 +5,11 @@ import asyncio
 from pathlib import Path
 
 import pytest
-
-from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
-from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
-from pddl_support import build_element, build_manifest
 from core_config_support import document_config, toolbox_config
+from pddl_support import build_element, build_manifest
+
+from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
 
 HEIGHT = 792.0
 

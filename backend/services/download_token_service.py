@@ -1,10 +1,9 @@
-from backend.services.blocking import offload
-from contextlib import contextmanager
 import json
-import sqlite3
-import uuid
-import threading
 import shutil
+import sqlite3
+import threading
+import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from acessilia_core.export import catalog
@@ -17,6 +16,7 @@ from acessilia_core.i18n.log_messages import (
 )
 from acessilia_core.logger import logger
 from backend.config.settings import settings
+from backend.services.blocking import offload
 
 # Database connection configuration
 _connection = None

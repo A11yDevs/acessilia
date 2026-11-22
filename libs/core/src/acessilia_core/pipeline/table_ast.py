@@ -8,6 +8,7 @@ translation).
 """
 from __future__ import annotations
 
+from acessilia_core.i18n import t
 from docstruct.tables.ast import (  # noqa: F401
     ALLOWED_SCOPES,
     MSG_TABLE_TEXT_CAPTION,
@@ -19,7 +20,6 @@ from docstruct.tables.ast import (  # noqa: F401
     table_ast_from_block,
     table_ast_from_rows,
 )
-from acessilia_core.i18n import t
 
 __all__ = [
     "ALLOWED_SCOPES",

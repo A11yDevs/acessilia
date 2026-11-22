@@ -16,8 +16,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from acessilia_sdk.toolbox.clients.pdf import check_renderable
-
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
@@ -36,6 +34,7 @@ from acessilia_core.pipeline.toolbox import (
     _render_client,
     _source_artifact_id,
 )
+from acessilia_sdk.toolbox.clients.pdf import check_renderable
 
 if TYPE_CHECKING:
     from acessilia_sdk.operations.page_judge import PageJudgement
@@ -78,11 +77,10 @@ def _judge_page(
     image: bytes, candidate_a: str, candidate_b: str, *, toolbox: ToolboxConfig
 ) -> PageJudgement:
     """The SDK's ``judge_page`` with the run's ``toolbox`` (sync wrapper)."""
+    from acessilia_core.toolbox.toolbox_client import make_toolbox_client
     from acessilia_sdk.operations.page_judge import judge_page
     from acessilia_sdk.runtime import run_sync
     from acessilia_sdk.toolbox.clients import ToolboxAdjudicateClient
-
-    from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 
     async def call() -> PageJudgement:
         client = make_toolbox_client(ToolboxAdjudicateClient, toolbox)
@@ -172,13 +170,12 @@ def _judge_one_page(
     that cannot be rendered, a refused or failed call, and an answer without a
     valid ``pB`` are failures of the method.
     """
-    from docstruct.fusion.judge import DEFAULT_NEW_THR
-
     from acessilia_core.toolbox.toolbox_client import (
         ToolboxAuthenticationError,
         ToolboxContractViolation,
         ToolboxError,
     )
+    from docstruct.fusion.judge import DEFAULT_NEW_THR
 
     source_path = Path(manifest.source.path)
     try:

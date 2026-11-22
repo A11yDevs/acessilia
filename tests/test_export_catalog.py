@@ -5,8 +5,16 @@ from dataclasses import replace
 import pytest
 
 from acessilia_core.export.catalog import (
-    CATALOG, DOCX, DOWNLOAD_LABELS, DOWNLOAD_MEDIA_TYPES, DOWNLOAD_SUFFIXES,
-    DRBENCH_MD, PDF, PDF_UA, TXT, downloadable_formats,
+    CATALOG,
+    DOCX,
+    DOWNLOAD_LABELS,
+    DOWNLOAD_MEDIA_TYPES,
+    DOWNLOAD_SUFFIXES,
+    DRBENCH_MD,
+    PDF,
+    PDF_UA,
+    TXT,
+    downloadable_formats,
 )
 from acessilia_sdk.toolbox.capabilities import TOOLBOX_CAPABILITIES
 from acessilia_sdk.toolbox.clients import ToolboxDocxClient, ToolboxPdfUaClient

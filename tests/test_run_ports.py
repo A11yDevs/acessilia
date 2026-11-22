@@ -7,10 +7,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
 from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.config import CoreConfig
 from acessilia_core.ports import NoRegionCache, RunPorts, region_cache_for
-
 from tests.core_config_support import core_config, vision_config
 from tests.pddl_support import build_orchestrator
 
@@ -72,7 +72,6 @@ class MemoryCheckpoints:
 def _stopped_before_execution(monkeypatch, counts):
     """An orchestrator whose stages are stubs and whose plan run stops the job."""
     from acessilia_core.pipeline import orchestrator as pddl
-
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -272,7 +271,6 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     """Through ``execute``: each vision stage gets the run's cache (or ``None``
     when its config turns it off), and the inspection handlers get the ports."""
     from acessilia_core.pipeline import orchestrator as pddl
-
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -446,7 +444,6 @@ def _extractor(seen, *, fail_primary=False):
         ToolboxStructureClient,
     )
     from acessilia_sdk.toolbox.operation import current_operation
-
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
     def labelled(kind, answer):

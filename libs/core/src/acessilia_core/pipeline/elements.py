@@ -13,6 +13,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from acessilia_core.i18n import t
+from acessilia_core.manifest.models import (
+    ManifestElement,
+    ProcessingManifest,
+)
 from docstruct.blocks.lists import (
     marker_numbering,
 )
@@ -28,12 +33,6 @@ from docstruct.tables.structured import (
     table_ast_has_structured_content,
 )
 from docstruct.text.code_reflow import normalize_code_text
-
-from acessilia_core.i18n import t
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
 
 #: Canonical English msgid for the alt text of a picture the vision model left
 #: undescribed; why it was left so goes to the operator, not the reader.
