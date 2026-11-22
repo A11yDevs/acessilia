@@ -141,7 +141,7 @@ import inspect  # noqa: E402
 from acessilia_sdk.toolbox import (  # noqa: E402
     PROVIDER_DEFAULTS,
     ToolboxCapabilityClient,
-    clients as sdk_clients,  # noqa: E402
+    clients as sdk_clients,
 )
 
 CLIENT_CLASSES = sorted(
