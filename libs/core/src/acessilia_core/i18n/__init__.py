@@ -53,7 +53,7 @@ def _normalize_locale(raw_value: str) -> str:
     return f"{language}_{region}" if region else language
 
 
-def _locales_from_raw(raw_value: str) -> tuple[str, ...]:
+def parse_locales(raw_value: str) -> tuple[str, ...]:
     """Split a comma-separated locale list into a de-duplicated, order-preserving tuple.
 
     Args:

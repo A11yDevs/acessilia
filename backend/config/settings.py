@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from acessilia_core.i18n import parse_locales
 from acessilia_sdk.toolbox.capabilities import provider_default
 
 load_dotenv()
@@ -557,7 +558,7 @@ class Settings:
     # Comma-separated list of locales the software makes available to remote
     # users. Anything outside this list is not offered as a bot-facing locale.
     i18n_locales_active: tuple[str, ...] = field(
-        default_factory=lambda: _locales_from_env(
+        default_factory=lambda: parse_locales(
             os.getenv("I18N_LOCALES_ACTIVE", "en_US,pt_BR")
         )
     )
@@ -726,23 +727,6 @@ def _int_set_from_env(env_var: str) -> frozenset[int]:
         except ValueError:
             continue
     return frozenset(values)
-
-
-def _locales_from_env(raw_value: str) -> tuple[str, ...]:
-    """Parse a comma-separated locale list from an environment string.
-
-    Args:
-        raw_value (str): Comma-separated locale identifiers read from I18N_LOCALES_ACTIVE; blank entries are dropped and the result keeps first-seen order with duplicates removed.
-
-    Returns:
-        tuple: Locally supported locale identifiers in declared order; an empty tuple when the input lists no usable entry.
-    """
-    seen: list[str] = []
-    for entry in raw_value.split(","):
-        locale = entry.strip()
-        if locale and locale not in seen:
-            seen.append(locale)
-    return tuple(seen)
 
 
 def _bool_from_env_alias(env_vars: tuple[str, ...], default: bool) -> bool:
