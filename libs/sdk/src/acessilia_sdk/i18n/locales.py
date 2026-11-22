@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import re
 
+__all__ = ["normalize_locale", "parse_locales"]
+
 
 def normalize_locale(raw_value: str) -> str:
     """Normalize a raw locale token to a bare language_region form.
