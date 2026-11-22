@@ -263,7 +263,7 @@ def _math(
     # reaches every Pandoc writer: DOCX typesets it as a display equation
     # (oMathPara) where it used to be inline. (The HTML export does not go
     # through this AST.)
-    math = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
+    math: dict[str, Any] = {"t": "Math", "c": [{"t": "DisplayMath"}, latex]}
     speech = block.get("alt_text") or (block.get("text", "") if equation_number(metadata) else "")
     alt_text = numbered_speech(str(speech).strip(), metadata)
     if alt_text:
@@ -611,8 +611,10 @@ def _pandoc_cell(
     tracker: _MathStatusTracker | None = None,
 ) -> list[Any]:
     text = str(cell.get("text", "")).strip()
-    rowspan = cell.get("rowspan") if isinstance(cell.get("rowspan"), int) else 1
-    colspan = cell.get("colspan") if isinstance(cell.get("colspan"), int) else 1
+    rowspan_value = cell.get("rowspan")
+    colspan_value = cell.get("colspan")
+    rowspan = rowspan_value if isinstance(rowspan_value, int) else 1
+    colspan = colspan_value if isinstance(colspan_value, int) else 1
 
     scope = str(cell.get("scope", "")).strip().lower()
     if scope in {"row", "rowgroup"}:

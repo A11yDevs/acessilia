@@ -22,6 +22,7 @@ from docstruct.fusion.types import DiffBlock
 from docstruct.policy import FusionPolicy
 from docstruct.types import CanonicalBlock
 
+_rapidfuzz_fuzz: Any
 try:  # optional accelerator; the library itself has no dependencies
     from rapidfuzz import fuzz as _rapidfuzz_fuzz
 except ImportError:
@@ -401,7 +402,8 @@ def _routed_page_sizes(
         number = page.get("page_number")
         width, height = page.get("width"), page.get("height")
         if (
-            number in routed
+            isinstance(number, int)
+            and number in routed
             and isinstance(width, (int, float))
             and isinstance(height, (int, float))
             and width > 0
@@ -501,11 +503,13 @@ def _select_routed_and_missing(
     page_evidence: list[dict[str, Any]],
     secondary_by_page: dict[int, list[dict[str, Any]]],
 ) -> tuple[set[int], tuple[Any, ...]]:
-    preferred = {
-        entry.get("page_number")
-        for entry in page_evidence
-        if (entry.get("stats") or {}).get("route") == "mineru"
-    }
+    preferred: set[int] = set()
+    for entry in page_evidence:
+        number = entry.get("page_number")
+        if isinstance(number, float) and number.is_integer():
+            number = int(number)
+        if isinstance(number, int) and (entry.get("stats") or {}).get("route") == "mineru":
+            preferred.add(number)
     routed = {
         number for number in preferred if secondary_by_page.get(number)
     }

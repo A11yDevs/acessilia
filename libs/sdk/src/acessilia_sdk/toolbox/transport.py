@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -170,6 +170,7 @@ async def execute_capability(
         elif upload is not None:
             response = await http.post(path, files={"file": upload}, data=form, headers=headers)
         else:
+            file_path = cast(Path, file_path)
             with open(file_path, "rb") as f:
                 files = {"file": (file_path.name, f, media_type_for(file_path))}
                 response = await http.post(path, files=files, data=form, headers=headers)

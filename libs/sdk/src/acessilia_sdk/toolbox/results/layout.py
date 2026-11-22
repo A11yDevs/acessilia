@@ -110,7 +110,7 @@ def read_layout(document: Any) -> LayoutResult:
                 region.page_number,
                 region.type,
                 region.label,
-                BoundingBox(*region.bbox, coord_origin="TOPLEFT"),
+                BoundingBox(region.bbox[0], region.bbox[1], region.bbox[2], region.bbox[3], coord_origin="TOPLEFT"),
                 region.confidence,
                 region.text,
             )
@@ -130,7 +130,10 @@ def read_layout(document: Any) -> LayoutResult:
                 region.type,
                 region.raw_label,
                 BoundingBox(
-                    *(region.bbox[key] for key in ("left", "top", "right", "bottom")),
+                    region.bbox["left"],
+                    region.bbox["top"],
+                    region.bbox["right"],
+                    region.bbox["bottom"],
                     coord_origin="UNKNOWN",
                 ),
                 None,

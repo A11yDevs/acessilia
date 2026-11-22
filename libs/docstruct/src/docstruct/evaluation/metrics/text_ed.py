@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+_rapidfuzz: Any
 try:  # optional accelerator; the library itself has no dependencies
     from rapidfuzz.distance import Levenshtein as _rapidfuzz
 except ImportError:

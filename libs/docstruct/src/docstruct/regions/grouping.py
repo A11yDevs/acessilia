@@ -252,7 +252,7 @@ def _merge_bboxes(
             merged[-1][3] = max(merged[-1][3], b[3])
         else:
             merged.append(list(b))
-    return [tuple(b) for b in merged]
+    return [(b[0], b[1], b[2], b[3]) for b in merged]
 
 
 

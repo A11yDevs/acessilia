@@ -416,10 +416,10 @@ def suppress_in_regions(
         )
         full_page = area(pb) >= pic_full_page
         if pic_rule == "quality":
-            hit = len(inside) >= pic_min_blocks and q < pic_max_quality
+            picture_hit = len(inside) >= pic_min_blocks and q < pic_max_quality
         else:
-            hit = len(inside) >= pic_min_blocks or q < pic_max_quality
-        if not full_page and hit:
+            picture_hit = len(inside) >= pic_min_blocks or q < pic_max_quality
+        if not full_page and picture_hit:
             drop.update(inside)
             stats["suppress-in-picture"] += len(inside)
         elif full_page and q < 0.34:
@@ -528,7 +528,8 @@ def fuse_line_runs(
         )
 
     def adjacent(p: DiffBlock, n: DiffBlock) -> bool:
-        pb, nb = p.box, n.box
+        pb = cast(tuple[float, float, float, float], p.box)
+        nb = cast(tuple[float, float, float, float], n.box)
         hp, hn = max(pb[3] - pb[1], 1e-3), max(nb[3] - nb[1], 1e-3)
         h = max(hp, hn)
         gap = nb[1] - pb[3]
@@ -538,17 +539,22 @@ def fuse_line_runs(
             and min(hp, hn) / h >= h_ratio
         )
 
-    cand = [i for i, b in enumerate(blocks) if short_text(b)]
-    cand.sort(key=lambda i: (blocks[i].box[0], blocks[i].box[1]))
+    boxes = {
+        i: cast(tuple[float, float, float, float], b.box)
+        for i, b in enumerate(blocks)
+        if short_text(b)
+    }
+    cand = list(boxes)
+    cand.sort(key=lambda i: (boxes[i][0], boxes[i][1]))
     columns: list[list[int]] = []
     for i in cand:
-        if columns and abs(blocks[columns[-1][0]].box[0] - blocks[i].box[0]) <= x_tol:
+        if columns and abs(boxes[columns[-1][0]][0] - boxes[i][0]) <= x_tol:
             columns[-1].append(i)
         else:
             columns.append([i])
     runs: list[list[int]] = []
     for col in columns:
-        col.sort(key=lambda i: blocks[i].box[1])
+        col.sort(key=lambda i: boxes[i][1])
         run = [col[0]]
         for i in col[1:]:
             if adjacent(blocks[run[-1]], blocks[i]):

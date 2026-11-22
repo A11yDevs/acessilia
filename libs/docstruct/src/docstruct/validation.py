@@ -17,7 +17,7 @@ from docstruct.sections import explicit_section_title
 from docstruct.tables.ast import effective_section_row_widths, row_header_column_count
 from docstruct.text.sanitize import contains_markdown_artifacts, contains_prompt_leak
 
-SchemaValidator = Callable[[Any, dict[str, Any]], None]
+SchemaValidator = Callable[[Any, dict[str, Any]], Any]
 
 
 def validate_against_schema(document: Any, validator: SchemaValidator) -> None:
@@ -34,7 +34,10 @@ def validate_against_schema(document: Any, validator: SchemaValidator) -> None:
         raise TypeError("validator must return None on success and raise on failure")
 
 
-def Finding(msgid: str, **kwargs: Any) -> tuple[str, dict[str, Any]]:
+FindingTuple = tuple[str, dict[str, Any]]
+
+
+def Finding(msgid: str, **kwargs: Any) -> FindingTuple:
     """A structured validation finding: canonical msgid + format kwargs."""
     return (msgid, kwargs)
 
@@ -76,7 +79,7 @@ MSG_TABLE_AST_CELL_NO_TEXT: str = "table_ast cell without text in {block_id} ({s
 MSG_TABLE_AST_WIDTH_INCONSISTENT: str = "table_ast.{section_name} with inconsistent width in {block_id} (row {row_index})"
 
 
-def validate_canonical_document(document: dict[str, Any]) -> list[str]:
+def validate_canonical_document(document: dict[str, Any]) -> list[FindingTuple]:
     """Validate a canonical document structure and collect structured findings (msgid, kwargs).
 
     Args:
@@ -85,7 +88,7 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
     Returns:
         list[str]: Finding tuples (msgid constant + kwargs) describing every structural problem found; empty when the document is well-formed.
     """
-    errors: list[str] = []
+    errors: list[FindingTuple] = []
     if not isinstance(document, dict):
         return [Finding(MSG_CANONICAL_DOC_NOT_OBJECT)]
     for field in ["schema_version", "id", "title", "language", "sections"]:
@@ -160,7 +163,7 @@ def validate_canonical_document(document: dict[str, Any]) -> list[str]:
 def validate_export_profile(
     profile_name: str,
     document: dict[str, Any],
-) -> list[str]:
+) -> list[FindingTuple]:
     """Check that every block's verbosity is allowed by the named export profile.
 
     Args:
@@ -174,7 +177,7 @@ def validate_export_profile(
     if not profile:
         return [Finding(MSG_UNKNOWN_EXPORT_PROFILE, profile_name=profile_name)]
     allowed = set(profile["verbosity"])
-    errors: list[str] = []
+    errors: list[FindingTuple] = []
 
     def walk(blocks: list[dict[str, Any]]) -> None:
         for block in blocks:
@@ -195,7 +198,7 @@ def validate_export_profile(
     return errors
 
 
-def validate_output_text(text: str, profile_name: str) -> list[str]:
+def validate_output_text(text: str, profile_name: str) -> list[FindingTuple]:
     """Scan the final exported text for prompt leaks, stray markdown and technical metadata.
 
     Args:
@@ -205,7 +208,7 @@ def validate_output_text(text: str, profile_name: str) -> list[str]:
     Returns:
         list[str]: Finding tuples (msgid constant + kwargs) for each forbidden artifact found; empty when the text is clean.
     """
-    errors: list[str] = []
+    errors: list[FindingTuple] = []
     if contains_prompt_leak(text):
         errors.append(Finding(MSG_PROMPT_LEAK_IN_OUTPUT))
     if profile_name != "html" and contains_markdown_artifacts(text):
@@ -219,7 +222,7 @@ def validate_output_text(text: str, profile_name: str) -> list[str]:
     return errors
 
 
-def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
+def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[FindingTuple]]:
     """Perform a detailed structural audit separating findings into severity levels.
 
     Args:
@@ -228,7 +231,7 @@ def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
     Returns:
         dict[str, list[str]]: Report with "BLOCKER" (structural failures from base validation plus missing sections) and "WARNING" (accessibility findings such as images without alt text and tables without explicit AST headers) keys.
     """
-    report = {"BLOCKER": [], "WARNING": []}
+    report: dict[str, list[FindingTuple]] = {"BLOCKER": [], "WARNING": []}
 
     # Base validation (original logic kept as BLOCKER severity).
     base_errors = validate_canonical_document(document)
@@ -363,7 +366,7 @@ def _indentation_lost(text: str) -> bool:
     return not any(line.startswith((" ", "\t")) for line in candidate_lines)
 
 
-def _validate_table_block(block: dict[str, Any]) -> list[str]:
+def _validate_table_block(block: dict[str, Any]) -> list[FindingTuple]:
     """Validate the rows or table_ast payload of a single table block.
 
     Args:
@@ -372,7 +375,7 @@ def _validate_table_block(block: dict[str, Any]) -> list[str]:
     Returns:
         list[str]: Finding tuples (msgid constant + kwargs) for every table structure problem found; empty when the table is well-formed.
     """
-    errors: list[str] = []
+    errors: list[FindingTuple] = []
     block_id = block.get("id") or Finding(MSG_NO_ID_PLACEHOLDER)
 
     rows = block.get("rows")
