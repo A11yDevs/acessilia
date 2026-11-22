@@ -68,6 +68,8 @@ def shell_locale_candidates(
     candidates = expand_locale_candidates(raw_variables)
     if candidates:
         return candidates
+    # Last hint: the process C locale inherited from the shell; C/POSIX
+    # identities carry no translatable language.
     if c_locale and c_locale not in ("C", "POSIX"):
         return expand_locale_candidates([c_locale])
     return [default]
@@ -105,6 +107,8 @@ def negotiate_server_locale(
     env_locale = (environ.get("LOCALE") or "").strip()
     if env_locale:
         preferred.append(env_locale)
+    # LOCALE is also read by shell_locale_candidates for historical
+    # compatibility; duplicates are harmless and Babel resolves the list.
     preferred.extend(shell_locale_candidates(environ, c_locale, default=default))
     preferred.append(default)
     return negotiate_locale(preferred, available, default)
