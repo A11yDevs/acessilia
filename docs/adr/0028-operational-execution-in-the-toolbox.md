@@ -5,7 +5,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Status:** Proposed
 - **Date:** 2026-11-22
 - **Components:** core, SDK, docstruct, Toolbox
-- **Issues:** [#735](https://github.com/A11yDevs/acessilia/issues/735), [#639](https://github.com/A11yDevs/acessilia/issues/639), [#656](https://github.com/A11yDevs/acessilia/issues/656)
+- **Issues:** [#735](https://github.com/A11yDevs/acessilia/issues/735), [#632](https://github.com/A11yDevs/acessilia/issues/632), [#639](https://github.com/A11yDevs/acessilia/issues/639), related: [#656](https://github.com/A11yDevs/acessilia/issues/656)
 - **Amends, if accepted:** [ADR-0017](0017-operational-sdk-and-agentic-core.md) (operations run by the caller), [ADR-0003](0003-remote-only-operational-capabilities.md) (what "operational" covers), and principles P2, P3 and 5 of the [constitution](../constitution.md)
 
 ## Context

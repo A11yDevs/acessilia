@@ -11,7 +11,7 @@ Também disponível em **inglês (EUA)**: [English version](0027-mcp-core-toolbo
 ## Contexto
 
 A [#735](https://github.com/A11yDevs/acessilia/issues/735) define a direção das
-etapas de refatoração #639, #640 e #656: o core planeja simbolicamente, a
+etapas de refatoração #632, #639 e #640: o core planeja simbolicamente, a
 Toolbox executa todas as capacidades, e os dois se comunicam por MCP,
 endereçado por capacidade. Medido em `develop` (`46f2fe7e`) e
 `acessilia-toolbox@main`:

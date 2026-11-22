@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](0028-operational-exe
 - **Status:** Proposto
 - **Data:** 2026-11-22
 - **Componentes:** core, SDK, docstruct, Toolbox
-- **Issues:** [#735](https://github.com/A11yDevs/acessilia/issues/735), [#639](https://github.com/A11yDevs/acessilia/issues/639), [#656](https://github.com/A11yDevs/acessilia/issues/656)
+- **Issues:** [#735](https://github.com/A11yDevs/acessilia/issues/735), [#632](https://github.com/A11yDevs/acessilia/issues/632), [#639](https://github.com/A11yDevs/acessilia/issues/639), relacionada: [#656](https://github.com/A11yDevs/acessilia/issues/656)
 - **Emenda, se aceita:** [ADR-0017](0017-operational-sdk-and-agentic-core.pt-br.md) (operações executadas pelo chamador), [ADR-0003](0003-remote-only-operational-capabilities.pt-br.md) (o que "operacional" abrange) e os princípios P2, P3 e 5 da [constituição](../constitution.pt-br.md)
 
 ## Contexto

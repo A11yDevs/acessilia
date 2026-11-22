@@ -11,7 +11,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Context
 
 [#735](https://github.com/A11yDevs/acessilia/issues/735) sets the direction for
-the refactoring stages #639, #640 and #656: the core plans symbolically, the
+the refactoring stages #632, #639 and #640: the core plans symbolically, the
 Toolbox executes every capability, and the two talk through MCP, addressed by
 capability. As measured on `develop` (`46f2fe7e`) and `acessilia-toolbox@main`:
 
