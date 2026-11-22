@@ -300,8 +300,8 @@ async def process(
             if not shutdown.shutting_down():
                 operation_registry.clear(task_id)
 
-        canonical_metadata = None
-        technical_warnings = None
+        canonical_metadata: dict[str, Any] | None = None
+        technical_warnings: list[str] | None = None
         if isinstance(resultado, dict):
             raw_text = resultado["text"]
             payload_metadata = resultado.get("canonical_metadata")

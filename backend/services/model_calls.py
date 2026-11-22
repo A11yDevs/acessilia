@@ -163,7 +163,7 @@ class ModelCallExecutor:
             self._log(LOG_MODEL_CALL_STATE, entry.label, event="started",
                       queue_wait=entry.started - entry.submitted, execution=0)
             try:
-                value = cast(Callable[[], T], call)()
+                value = cast(Callable[[], Any], call)()
             except BaseException as error:
                 # A worker is an exception-transfer boundary, like
                 # concurrent.futures: even SystemExit/CancelledError must reach

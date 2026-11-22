@@ -53,7 +53,7 @@ GitHub Actions workflow `CI`:
   the non-E2E main suite with **four workers**, the docstruct, SDK and core
   library suites with branch coverage, and rejects unexpected skipped tests,
   uploading JUnit (`test-reports-py*`) artifacts. The same job runs Ruff against
-  the shrinking baseline, Mypy on the configured `docstruct`/SDK/core/backend scope (#366),
+  the shrinking baseline, Mypy on the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass (#366),
   the Toolbox capability contract, the Toolbox's docstruct pin report (warnings
   only; see below) and the coverage summary with its `coverage-reports-py*`
   artifact.

@@ -54,7 +54,7 @@ o workflow `CI` do GitHub Actions:
   SDK e da biblioteca do core com cobertura de desvios, e recusa skips
   inesperados, publicando os artefatos JUnit (`test-reports-py*`). O mesmo job
   roda o Ruff contra a baseline que só diminui, o Mypy no escopo configurado de
-  `docstruct`/SDK/core/backend (#366), o contrato de capacidades da Toolbox, o relatório da
+  `docstruct`/SDK/core/backend e um passe 3.11 das bibliotecas (#366), o contrato de capacidades da Toolbox, o relatório da
   versão do docstruct fixada pela Toolbox (só avisos; veja abaixo) e o resumo de
   cobertura com o artefato `coverage-reports-py*`.
 - **`SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única

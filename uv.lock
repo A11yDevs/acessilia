@@ -79,7 +79,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.17,<1" },
     { name = "slowapi", specifier = ">=0.1.10,<0.2" },
     { name = "sqlalchemy", specifier = ">=2.0.51,<3" },
-    { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=25.1.0.20261107" },
+    { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=25.1.0.20261107,<26" },
     { name = "uvicorn", specifier = ">=0.30,<0.31" },
 ]
 provides-extras = ["dev"]

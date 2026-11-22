@@ -65,7 +65,7 @@ dev = [
     "ruff>=0.17,<1",
     "mypy>=1.15,<2",
     # Stubs for the async file helpers the service uses.
-    "types-aiofiles>=25.1.0.20261107",
+    "types-aiofiles>=25.1.0.20261107,<26",
 ]
 
 [project.scripts]
