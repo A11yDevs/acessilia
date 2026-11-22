@@ -10,6 +10,7 @@ normalizer now live in the SDK; the core no longer re-exports the parser
 from __future__ import annotations
 
 import acessilia_core.i18n as core_i18n
+from acessilia_sdk.i18n import context as sdk_context
 from acessilia_sdk.i18n import normalize_locale, parse_locales
 from backend.config.settings import Settings
 
@@ -35,6 +36,11 @@ def test_normalize_locale_handles_encodings_and_separators() -> None:
 
 def test_the_core_no_longer_re_exports_the_shared_parser() -> None:
     assert not hasattr(core_i18n, "parse_locales")
+
+
+def test_the_core_re_exports_the_sdk_request_context_unchanged() -> None:
+    assert core_i18n.set_request_locale is sdk_context.set_request_locale
+    assert core_i18n.reset_request_locale is sdk_context.reset_request_locale
 
 
 def test_settings_defaults_to_the_supported_locales(monkeypatch) -> None:

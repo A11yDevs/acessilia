@@ -8,7 +8,7 @@ Pacotes Python compartilhados que vivem neste repositório: o core e as duas bib
 |---|---|---|
 | `acessilia-core` | [core/](core/) | **Quando e por quê**: o pipeline PDDL que planeja e executa a acessibilidade de um documento, com seus agentes, etapas de enriquecimento e exportadores ([ADR-0016](../docs/adr/0016-core-package.pt-br.md)). |
 | `acessilia-docstruct` | [docstruct/](docstruct/) | **O que** se calcula sobre um documento: algoritmos estruturais puros. |
-| `acessilia-sdk` | [sdk/](sdk/) | **Como** o core pede à Toolbox que execute uma operação: contratos, transporte HTTP, clientes, referências de artefatos e failover. |
+| `acessilia-sdk` | [sdk/](sdk/) | **Como** o core pede à Toolbox que execute uma operação: contratos, transporte HTTP, clientes, referências de artefatos e failover; **infraestrutura genérica compartilhada** para locales e tradução de catálogo. |
 
 ## docstruct vs. SDK
 

@@ -11,7 +11,10 @@ core keeps its catalogs, message ids, locale policies and the public `t()`/`n()`
 translation API. The temporary `acessilia_core.i18n.parse_locales` facade is
 removed; the existing `set_request_locale`/`reset_request_locale` names remain
 as compatibility re-exports, and new code should import them from the SDK. The
-core now requires `acessilia-sdk>=0.4,<0.5`.
+core now requires `acessilia-sdk>=0.4,<0.5`. The new floor also covers the SDK
+APIs Core 0.2.5 already consumed -- dual-provider fusion, downscale/renderable
+check and `run_sync` -- which the SDK publishes in 0.4.0; the 0.2.5 metadata
+still pointed at 0.3.x.
 
 ## 0.2.5 — dual-provider fusion, downscale, render check and sync bridge via SDK and docstruct
 

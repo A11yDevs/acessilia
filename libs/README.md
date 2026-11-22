@@ -8,7 +8,7 @@ Shared Python packages that live in this repository: the core and the two librar
 |---|---|---|
 | `acessilia-core` | [core/](core/) | **When and why**: the PDDL pipeline that plans and executes a document's accessibility, with its agents, enrichment stages and exporters ([ADR-0016](../docs/adr/0016-core-package.md)). |
 | `acessilia-docstruct` | [docstruct/](docstruct/) | **What** is computed on a document: pure structural algorithms. |
-| `acessilia-sdk` | [sdk/](sdk/) | **How** the core asks the Toolbox to run an operation: contracts, HTTP transport, clients, artifact references and failover. |
+| `acessilia-sdk` | [sdk/](sdk/) | **How** the core asks the Toolbox to run an operation: contracts, HTTP transport, clients, artifact references and failover; **shared generic infrastructure** for locale handling and catalog translation. |
 
 ## docstruct vs. SDK
 

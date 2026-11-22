@@ -6,7 +6,8 @@ the server-side locale the software logs in locally.
 
 from typing import Any, Awaitable, Callable, Dict
 
-from acessilia_core.i18n import locale_for_user, set_request_locale
+from acessilia_core.i18n import locale_for_user
+from acessilia_sdk.i18n.context import set_request_locale
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 

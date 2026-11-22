@@ -176,7 +176,7 @@ The heavy models run in a separate service, the [Acessilia Toolbox](https://gith
 |---|---|---|---|
 | 0 | `libs/docstruct` (`acessilia-docstruct`) | Pure document-structure algorithms (fusion, tables, reading order), no dependencies of its own | nothing |
 | 1 | Toolbox (separate repository) | Heavy providers, artifact storage, capability execution over REST/MCP | docstruct |
-| 2 | `libs/sdk` (`acessilia-sdk`) | Capability allowlist, HTTP transport, catalogue checks, artifact references, retries and failover; configuration is passed in | the Toolbox's **published contract** (capability ids, versions, schemas), never its package |
+| 2 | `libs/sdk` (`acessilia-sdk`) | Capability allowlist, HTTP transport, catalogue checks, artifact references, retries and failover; generic i18n infrastructure (locale parsing/normalization, negotiation, request context and catalog translation); configuration is passed in | the Toolbox's **published contract** (capability ids, versions, schemas), never its package |
 | 3 | Core (`libs/core/src/acessilia_core`) | Agents, PDDL planning, obligations, policies | SDK, docstruct |
 
 - **The core decides what to do and when; the SDK defines how to reach an operation; the Toolbox provides where and with which resources it runs.** Obligations, admissible methods and costs are the core's planning policy: the Toolbox reports what it found, and the core derives the obligations ([#138](https://github.com/A11yDevs/acessilia/pull/138)).
@@ -184,7 +184,7 @@ The heavy models run in a separate service, the [Acessilia Toolbox](https://gith
 - **Availability comes from Toolbox replicas** behind a load balancer that share the artifact store, with bounded SDK retries; the SDK's multi-endpoint failover is reserved for independent deployments ([ADR-0006](adr/0006-availability-and-failover.md)). Persisted artifacts travel as `ArtifactRef` references ([ADR-0015](adr/0015-artifact-reference-v1.md)).
 - **One source of truth per contract:** docstruct owns the canonical document models; the Toolbox owns the operational API contracts; the SDK consumes them ([ADR-0004](adr/0004-single-source-of-truth-for-contracts.md)). Cross-component decisions are recorded in [docs/adr/](adr/README.md).
 - **The Toolbox catalogue only restricts.** Methods that call the Toolbox are checked against the live catalogue before a document is planned (`TOOLBOX_AVAILABILITY_GATE`); a capability outside the SDK allowlist is never made available. See [toolbox_integration.md](toolbox_integration.md).
-- **docstruct is distributed as a release wheel.** The core installs it from this checkout. The Toolbox pins the wheel of a `docstruct-vX.Y.Z` GitHub Release by URL and `#sha256=` ([Releases](../libs/docstruct/README.md#releases)). The SDK has a single consumer, the core, and is not published yet.
+- **docstruct is distributed as a release wheel.** The core installs it from this checkout. The Toolbox pins the wheel of a `docstruct-vX.Y.Z` GitHub Release by URL and `#sha256=` ([Releases](../libs/docstruct/README.md#releases)). The SDK is not published yet; its consumers in this repository are the core, the service, the frontend and the benchmark scripts.
 - **Enforced by tests:** `libs/docstruct/tests/test_purity.py` and `libs/sdk/tests/test_purity.py` import every module with the upper layers refused; `tests/test_architecture_layers.py` fails if `backend` imports the Toolbox package.
 
 ---
