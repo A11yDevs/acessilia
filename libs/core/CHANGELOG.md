@@ -2,6 +2,14 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.3 — Toolbox timeout metadata through the SDK
+
+No behaviour change. The Core reads the clients' own timeout keys through
+`acessilia_sdk.toolbox.clients.client_timeout_keys()` instead of introspecting
+the SDK clients module's internals; `TIMEOUT_KEYS` remains the public Core name
+used by the service configuration. The core now requires
+`acessilia-sdk>=0.5,<0.6` (#656).
+
 ## 0.3.2 — formula_tools docstruct re-exports deprecated
 
 No behaviour change for migrated callers; the old names now emit a

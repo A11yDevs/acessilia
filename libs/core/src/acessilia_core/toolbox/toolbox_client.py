@@ -12,7 +12,6 @@ errors, clients and transport from ``acessilia_sdk`` directly (#656).
 
 from __future__ import annotations
 
-import inspect
 from typing import Any, TypeVar
 
 from acessilia_core.config import ToolboxConfig
@@ -21,10 +20,10 @@ from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient as _ToolboxCapabilityClient,
     ToolboxClientConfig as _ToolboxClientConfig,
     ToolboxEndpoint as _ToolboxEndpoint,
-    clients as _sdk_clients,
     make_client as _make_client,
     parse_endpoints as _parse_endpoints,
 )
+from acessilia_sdk.toolbox.clients import client_timeout_keys
 from acessilia_sdk.toolbox.errors import ToolboxError as _ToolboxError
 
 ClientT = TypeVar("ClientT", bound=_ToolboxCapabilityClient)
@@ -66,13 +65,7 @@ def _log_failover(endpoint: _ToolboxEndpoint, error: _ToolboxError) -> None:
 
 #: The ``timeout_key`` of every SDK client that has its own timeout (the
 #: exports): the keys of ``ToolboxConfig.timeouts``, each named after a setting.
-TIMEOUT_KEYS: frozenset[str] = frozenset(
-    value.timeout_key
-    for value in vars(_sdk_clients).values()
-    if inspect.isclass(value)
-    and issubclass(value, _ToolboxCapabilityClient)
-    and value.timeout_key
-)
+TIMEOUT_KEYS: frozenset[str] = client_timeout_keys()
 
 
 def toolbox_client_config(toolbox: ToolboxConfig) -> _ToolboxClientConfig:

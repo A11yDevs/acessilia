@@ -5,6 +5,12 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
+## 0.5.0 (2026-11-22)
+
+- **Added** `client_timeout_keys()` in `acessilia_sdk.toolbox.clients`: the
+  `timeout_key` of every exported client that has its own timeout, for a
+  caller building a `ToolboxClientConfig` from its settings (#656).
+
 ## 0.4.0 (2026-11-22)
 
 - **Added** `acessilia_sdk.i18n.translation` with `compile_catalog`,

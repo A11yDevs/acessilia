@@ -5,6 +5,12 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
+## 0.5.0 (2026-11-22)
+
+- **Adicionado** `client_timeout_keys()` em `acessilia_sdk.toolbox.clients`: o
+  `timeout_key` de cada cliente exportado que tem timeout próprio, para quem
+  monta um `ToolboxClientConfig` a partir das suas configurações (#656).
+
 ## 0.4.0 (2026-11-22)
 
 - **Adicionado** `acessilia_sdk.i18n.translation` com `compile_catalog`,
