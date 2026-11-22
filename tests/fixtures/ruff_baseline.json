@@ -46,12 +46,6 @@
     "tests/test_formula_crop.py": {
       "F401": 1
     },
-    "tests/test_formula_recognition.py": {
-      "F401": 2
-    },
-    "tests/test_sdk_dataset_schema.py": {
-      "F401": 1
-    },
     "tests/test_slides.py": {
       "F401": 1
     },

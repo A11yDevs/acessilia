@@ -1,6 +1,5 @@
 """REST readers follow precise published array schemas and shared record sources."""
 
-import copy
 import importlib.util
 import json
 from pathlib import Path

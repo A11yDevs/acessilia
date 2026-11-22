@@ -69,10 +69,9 @@ def _get_pdf() -> Path:
 
 def _make_formula_image() -> bytes:
     """Create a small PNG image with a formula-like drawing."""
-    try:
-        from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
-    except ImportError:
-        pytest.skip("Pillow not available — cannot create test image")
+    Image = pytest.importorskip("PIL.Image")
+    ImageDraw = pytest.importorskip("PIL.ImageDraw")
+    ImageFont = pytest.importorskip("PIL.ImageFont")
     img = Image.new("RGB", (400, 100), color="white")
     draw = ImageDraw.Draw(img)
     draw.text((10, 30), "E = mc", fill="black", font=ImageFont.load_default(size=36))

@@ -1276,11 +1276,11 @@ async def test_the_token_budget_of_each_vision_call(monkeypatch, call, answer, b
     [
         # Complete, but with an unquoted label inside the description.
         '{"kind": "description", "description": "A bar chart of monthly revenue '
-        'for the whole year, labelled "Revenue" on its axis.", "language": "en", '
+        + 'for the whole year, labelled "Revenue" on its axis.", "language": "en", '
         '"confidence": 0.9}',
         # Complete, but with an invalid escape.
         '{"kind": "description", "description": "A bar chart of monthly revenue '
-        'for the whole year \\q with its axis.", "language": "en", "confidence": 0.9}',
+        + 'for the whole year \\q with its axis.", "language": "en", "confidence": 0.9}',
     ],
     ids=["inner-quote", "invalid-escape"],
 )

@@ -27,8 +27,6 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE,
     STAGE_RECOGNIZING_FORMULA,
 )
-from acessilia_core.manifest.models import ManifestElement
-from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
