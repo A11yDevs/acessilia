@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from acessilia_core.i18n import parse_locales
+from acessilia_sdk.i18n import parse_locales
 from acessilia_sdk.toolbox.capabilities import provider_default
 
 load_dotenv()

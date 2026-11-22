@@ -20,12 +20,13 @@ Antes deste PR, duas funções de 15 linhas implementavam a mesma regra — divi
 
 Depois:
 
-- o core expõe `acessilia_core.i18n.parse_locales`;
-- `Settings.i18n_locales_active` a chama com `I18N_LOCALES_ACTIVE`;
+- `acessilia_sdk.i18n` expõe `parse_locales` e `normalize_locale` como infraestrutura genérica;
+- `acessilia_core.i18n.parse_locales` permanece como fachada temporária de compatibilidade, importando a implementação do SDK;
+- `Settings.i18n_locales_active` chama o SDK diretamente com `I18N_LOCALES_ACTIVE`;
 - a cópia privada do backend foi removida;
 - `configure_locales` continua filtrando a lista contra `SUPPORTED_LOCALES`, então uma lista vazia ou sem locale suportado mantém o fallback “oferecer todos os locales suportados”.
 
-O comportamento é fixado por `tests/test_i18n_locales.py`: entradas vazias, duplicatas, ordem e o caminho de ambiente de `Settings`. O core é dono do parser porque é dono de i18n; o serviço já importa o core no process setup (ADR-0016) e o ADR-0002 permite a dependência.
+O comportamento é fixado por `tests/test_i18n_locales.py` (incluindo a fachada do core) e pelo `tests/test_i18n.py` do SDK: entradas vazias, duplicatas, ordem, normalização e o caminho de ambiente de `Settings`. O SDK é dono do parsing/normalização genéricos; o core mantém catálogos, políticas e contexto de requisição. A migração do restante da infraestrutura de i18n está na [#712](https://github.com/A11yDevs/acessilia/issues/712). Isso evita tornar o core dono obrigatório de um utilitário transversal e permite que o serviço o consuma sem importar o core.
 
 **Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. O [JSON do baseline](quality-baseline.json) inicial permanece como snapshot histórico; esta página registra a primeira mudança contra ele.
 

@@ -21,12 +21,13 @@ Before this PR, two 15-line functions implemented the same rule — split on com
 
 After:
 
-- the core exposes `acessilia_core.i18n.parse_locales`;
-- `Settings.i18n_locales_active` calls it with `I18N_LOCALES_ACTIVE`;
+- `acessilia_sdk.i18n` exposes `parse_locales` and `normalize_locale` as generic infrastructure;
+- `acessilia_core.i18n.parse_locales` remains as a temporary compatibility facade importing the SDK implementation;
+- `Settings.i18n_locales_active` calls the SDK directly with `I18N_LOCALES_ACTIVE`;
 - the backend's private copy is removed;
 - `configure_locales` still filters the parsed list against `SUPPORTED_LOCALES`, so an empty or unsupported list keeps the existing “offer every supported locale” fallback.
 
-The behaviour is pinned by `tests/test_i18n_locales.py`: blank entries, duplicates, ordering and the `Settings` environment path. The core owns the parser because it owns i18n; the service already imports the core during process setup (ADR-0016) and ADR-0002 allows the dependency.
+The behaviour is pinned by `tests/test_i18n_locales.py` (including the core facade) and the SDK's `tests/test_i18n.py`: blank entries, duplicates, ordering, normalization and the `Settings` environment path. The SDK owns generic locale parsing/normalization; the core keeps its catalogs, policies and request context. The remaining i18n infrastructure migration is tracked in [#712](https://github.com/A11yDevs/acessilia/issues/712). This avoids making the core the mandatory owner of a cross-cutting utility and lets the service consume it without importing the core.
 
 **Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. The initial [baseline JSON](quality-baseline.json) stays as the historical snapshot; this page records the first change against it.
 

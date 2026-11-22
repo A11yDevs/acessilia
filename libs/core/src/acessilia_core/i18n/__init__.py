@@ -1,7 +1,11 @@
-"""Internationalization module backed by Babel locale strings files."""
+"""Internationalization module backed by Babel locale strings files.
+
+Generic locale parsing and normalization live in ``acessilia_sdk.i18n``; this
+module keeps the core's catalogs, policies and request context, and re-exports
+``parse_locales`` as a temporary compatibility facade (#712).
+"""
 
 import contextvars
-import re
 from collections.abc import Mapping
 from functools import lru_cache
 from io import BytesIO
@@ -9,6 +13,8 @@ from pathlib import Path
 
 from babel import negotiate_locale
 from babel.support import NullTranslations, Translations
+
+from acessilia_sdk.i18n import normalize_locale, parse_locales as parse_locales
 
 BASE_DIR = Path(__file__).resolve().parent
 LOCALE_CATALOGS_DIR = BASE_DIR / "locales"
@@ -26,48 +32,6 @@ DEFAULT_LOCALE: str = "en_US"
 _REQUEST_LOCALE_VAR: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "acessilia_request_locale", default=None
 )
-
-
-def _normalize_locale(raw_value: str) -> str:
-    """Normalize a raw locale token to a bare language_region form (e.g. ``pt_BR.UTF-8`` -> ``pt_BR``).
-
-    Args:
-        raw_value (str): Candidate locale such as an environment LANG value, a Telegram language code with hyphen, or a bare identifier; blank input normalizes to empty string.
-
-    Returns:
-        str: Lower-cased language code optionally joined with an upper-cased region code, with character-set encoding tails dropped; empty string when the input carried no usable language code.
-    """
-    cleaned = raw_value.strip()
-    if not cleaned:
-        return ""
-    # Drop the character-set / encoding tail (e.g. ".UTF-8", ".utf8") before
-    # splitting the language and region codes, which may be separated by "_",
-    # "-" or "." (e.g. "pt-BR", "pt_BR.UTF-8", "pt.BR").
-    head = cleaned.split(".", 1)[0]
-    parts = [part for part in re.split(r"[-_.]+", head) if part]
-    if not parts:
-        return ""
-    language = parts[0].lower()
-    # A region part must be purely alphabetic; numeric or mixed tails are ignored.
-    region = parts[1].upper() if len(parts) > 1 and parts[1].isalpha() else ""
-    return f"{language}_{region}" if region else language
-
-
-def parse_locales(raw_value: str) -> tuple[str, ...]:
-    """Split a comma-separated locale list into a de-duplicated, order-preserving tuple.
-
-    Args:
-        raw_value (str): Raw comma-separated locale identifiers; blank entries are dropped.
-
-    Returns:
-        tuple: Locale identifiers in first-seen order with duplicates removed.
-    """
-    seen: list[str] = []
-    for entry in raw_value.split(","):
-        candidate = entry.strip()
-        if candidate and candidate not in seen:
-            seen.append(candidate)
-    return tuple(seen)
 
 
 #: Locales the process offers remote users, set once at startup by
@@ -110,7 +74,7 @@ def _expand_candidates(raw_values: list[str]) -> list[str]:
     """
     candidates: list[str] = []
     for raw in raw_values:
-        normalized = _normalize_locale(raw)
+        normalized = normalize_locale(raw)
         for candidate in (normalized, normalized.split("_")[0] if normalized else ""):
             if candidate and candidate not in candidates:
                 candidates.append(candidate)
@@ -238,7 +202,7 @@ def locale_for_user(raw_locale: str | None) -> str:
         str: An offered locale that matches the hint, or the server-side locale from :func:`_active_locale` when the hint is absent or matches no offered locale.
     """
     if raw_locale:
-        normalized = _normalize_locale(raw_locale)
+        normalized = normalize_locale(raw_locale)
         if normalized:
             available = list(active_locales())
             # Exact regional-form match first (e.g. "pt_BR" -> "pt_BR").
@@ -294,7 +258,7 @@ def _catalog_for(locale: str) -> Translations | NullTranslations:
     """
     # Normalized like ``Translations.load`` did: ``pt_BR.UTF-8``, ``pt_br``
     # and ``pt-BR`` find the ``pt_BR`` catalog (review of #569).
-    for candidate in (_normalize_locale(locale) or locale, DEFAULT_LOCALE):
+    for candidate in (normalize_locale(locale) or locale, DEFAULT_LOCALE):
         catalog = _compiled_catalog(candidate)
         if catalog is not None:
             return catalog
