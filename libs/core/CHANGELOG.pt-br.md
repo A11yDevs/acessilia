@@ -2,6 +2,13 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.4 — findings estruturados renderizados pelo SDK
+
+Sem mudança de comportamento. `acessilia_core.pipeline.validators` renderiza
+seus findings `(msgid, kwargs)` por
+`acessilia_sdk.i18n.translation.resolve_findings` em vez de manter o loop de
+formatação no Core. O core agora exige `acessilia-sdk>=0.6,<0.7` (#656).
+
 ## 0.3.3 — metadados de timeout da Toolbox pelo SDK
 
 Sem mudança de comportamento. O Core lê os timeout keys próprios dos clientes

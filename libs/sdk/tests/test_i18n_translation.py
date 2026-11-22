@@ -9,6 +9,7 @@ from acessilia_sdk.i18n.translation import (
     compile_catalog,
     gettext,
     ngettext,
+    resolve_findings,
 )
 
 PO = """\
@@ -19,6 +20,9 @@ msgstr ""
 
 msgid "Hello"
 msgstr "Bonjour"
+
+msgid "Missing {field}"
+msgstr "Champ manquant : {field}"
 
 msgid "One file"
 msgid_plural "%(count)d files"
@@ -74,6 +78,32 @@ def test_gettext_and_ngettext_normalize_bytes_results() -> None:
     assert gettext(_BytesTranslations(b"Bonjour"), "Hello") == "Bonjour"
     assert ngettext(_BytesTranslations(b"Bonjour"), "One", "Many", 2) == "Bonjour"
     assert gettext(_BytesTranslations(b"\xff"), "Hello") == str(b"\xff")
+
+
+def test_resolve_findings_formats_structured_messages() -> None:
+    findings = [
+        ("Missing {field}", {"field": "title"}),
+        ("Duplicate id: {block_id}", {"block_id": "s1"}),
+    ]
+
+    assert resolve_findings(findings, lambda msgid: f"<{msgid}>") == [
+        "<Missing {field}>".format(field="title"),
+        "<Duplicate id: {block_id}>".format(block_id="s1"),
+    ]
+
+
+def test_resolve_findings_uses_a_catalog_and_identity(tmp_path: Path) -> None:
+    translations = catalog_for(_catalog_dir(tmp_path), "fr_FR", "en_US")
+    assert resolve_findings(
+        [("Missing {field}", {"field": "title"})],
+        lambda msgid: gettext(translations, msgid),
+    ) == ["Champ manquant : title"]
+
+    identity = catalog_for(tmp_path / "missing", "en_US", "en_US")
+    assert resolve_findings(
+        [("Missing {field}", {"field": "title"})],
+        lambda msgid: gettext(identity, msgid),
+    ) == ["Missing title"]
 
 
 def test_compile_catalog_returns_none_without_a_source(tmp_path: Path) -> None:

@@ -2,6 +2,14 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.4 — structured findings rendered through the SDK
+
+No behaviour change. `acessilia_core.pipeline.validators` renders its
+`(msgid, kwargs)` findings through
+`acessilia_sdk.i18n.translation.resolve_findings` instead of keeping the
+formatting loop in the Core. The core now requires `acessilia-sdk>=0.6,<0.7`
+(#656).
+
 ## 0.3.3 — Toolbox timeout metadata through the SDK
 
 No behaviour change. The Core reads the clients' own timeout keys through

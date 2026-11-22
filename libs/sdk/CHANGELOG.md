@@ -5,6 +5,13 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
+## 0.6.0 (2026-11-22)
+
+- **Added** `resolve_findings` in `acessilia_sdk.i18n.translation`: formats
+  structured `(msgid, kwargs)` findings through a caller-supplied locale
+  lookup, so validation results can be localized without reconstructing
+  arguments from formatted strings (#656).
+
 ## 0.5.0 (2026-11-22)
 
 - **Added** `client_timeout_keys()` in `acessilia_sdk.toolbox.clients`: the
