@@ -61,6 +61,7 @@ Each module's `__all__` is the SDK's public API ([ADR-0018](../../docs/adr/0018-
 | `acessilia_sdk.operations.fusion` | `extract_dual_fused` — run two `document.structure.extract` clients in parallel (reusing an artifact id with upload fallback when missing) and fuse both payloads with `docstruct.fusion.payload`; returns `DualFusionResult` (`payload`, `fused`, `failures`, `artifact_fallbacks`, `steps`) or raises `DualFusionUnavailable` with both provider errors when neither succeeds ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)) |
 | `acessilia_sdk.runtime` | `run_sync` — run a coroutine from sync code, inside or outside an event loop, preserving contextvars across the worker thread |
 | `acessilia_sdk.i18n` | `parse_locales`, `normalize_locale` — locale list parsing and normalization shared across components; the core keeps catalogs and policies (#712) |
+| `acessilia_sdk.i18n.negotiation` | `expand_locale_candidates`, `shell_locale_candidates`, `negotiate_locale`, `negotiate_server_locale` — generic environment/candidate negotiation; the caller supplies available locales and default (#712) |
 | `acessilia_sdk.cli` | `main` — the command line, `python -m acessilia_sdk` (see [Command line](#command-line)); `formula_document`, the JSON its formula command prints; `judge_document`, the JSON its judge command prints |
 
 ## Configuring a client

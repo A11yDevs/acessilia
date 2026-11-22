@@ -11,10 +11,13 @@ from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 
-from babel import negotiate_locale
 from babel.support import NullTranslations, Translations
 
 from acessilia_sdk.i18n import normalize_locale, parse_locales as parse_locales
+from acessilia_sdk.i18n.negotiation import (
+    expand_locale_candidates,
+    negotiate_server_locale as _negotiate_server_locale,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 LOCALE_CATALOGS_DIR = BASE_DIR / "locales"
@@ -63,70 +66,22 @@ def active_locales() -> tuple[str, ...]:
     return _ACTIVE_LOCALES if _ACTIVE_LOCALES is not None else tuple(SUPPORTED_LOCALES)
 
 
-def _expand_candidates(raw_values: list[str]) -> list[str]:
-    """Expand raw locale tokens into ordered negotiation candidates (full form plus base language form).
-
-    Args:
-        raw_values (list[str]): Raw locale tokens (e.g. from one environment variable) that may carry encoding suffixes or use hyphens.
-
-    Returns:
-        list: Normalized candidate identifiers, most specific first, de-duplicated while preserving order; blank tokens contribute no candidates.
-    """
-    candidates: list[str] = []
-    for raw in raw_values:
-        normalized = normalize_locale(raw)
-        for candidate in (normalized, normalized.split("_")[0] if normalized else ""):
-            if candidate and candidate not in candidates:
-                candidates.append(candidate)
-    return candidates
-
-
-def _shell_locale_candidates(environ: Mapping[str, str], c_locale: str | None) -> list[str]:
-    """Collect locale hints from a process environment in priority order.
-
-    Args:
-        environ (Mapping[str, str]): The environment to read; the service passes its own.
-        c_locale (str | None): The process C locale's language, the last hint.
-
-    Returns:
-        list: Normalized candidate locale identifiers from LOCALE, LANGUAGE, LC_ALL and LANG, most specific first, skipping blank and C/POSIX values, then ``c_locale``; falls back to DEFAULT_LOCALE when nothing is set.
-    """
-    raw_variables: list[str] = []
-    for env_var in ("LOCALE", "LANGUAGE", "LC_ALL", "LANG"):
-        value = (environ.get(env_var) or "").strip()
-        if value and value not in ("C", "POSIX"):
-            raw_variables.append(value if env_var == "LOCALE" else value.split(":")[0])
-    candidates = _expand_candidates(raw_variables)
-    if candidates:
-        return candidates
-    # Last hint: the process C locale inherited from the shell; C/POSIX
-    # identities carry no translatable language.
-    if c_locale and c_locale not in ("C", "POSIX"):
-        return _expand_candidates([c_locale])
-    return [DEFAULT_LOCALE]
-
-
 def negotiate_server_locale(environ: Mapping[str, str], c_locale: str | None = None) -> str:
     """Negotiate the server-side locale for local logging and default outputs.
 
     Negotiation order: the LOCALE value (if set), then the shell locale hints
     (LANGUAGE/LC_ALL/LANG), then ``c_locale``, then :data:`DEFAULT_LOCALE`.
     The core reads no environment (ADR-0016, step 5): the service passes its
-    own at startup (``backend/config/process_setup.py``).
+    own at startup (``backend/config/process_setup.py``). The generic
+    mechanism lives in :mod:`acessilia_sdk.i18n.negotiation`; this wrapper
+    supplies the core's locale policy.
 
     Returns:
         str: Negotiated locale identifier restricted to :data:`SUPPORTED_LOCALES`; falls back to DEFAULT_LOCALE when no input yields a supported locale.
     """
-    preferred: list[str] = []
-    env_locale = (environ.get("LOCALE") or "").strip()
-    if env_locale:
-        preferred.append(env_locale)
-    preferred.extend(_shell_locale_candidates(environ, c_locale))
-    preferred.append(DEFAULT_LOCALE)
-
-    available_languages = list(SUPPORTED_LOCALES)
-    negotiated_locale = negotiate_locale(preferred, available_languages)
-    return negotiated_locale or DEFAULT_LOCALE
+    return _negotiate_server_locale(
+        environ, SUPPORTED_LOCALES, DEFAULT_LOCALE, c_locale
+    )
 
 
 #: The server-side locale, set once at startup by
@@ -206,7 +161,7 @@ def locale_for_user(raw_locale: str | None) -> str:
         if normalized:
             available = list(active_locales())
             # Exact regional-form match first (e.g. "pt_BR" -> "pt_BR").
-            for candidate in _expand_candidates([normalized]):
+            for candidate in expand_locale_candidates([normalized]):
                 if candidate in available:
                     return candidate
             # Lenient base-language match so Telegram's bare "pt" resolves to the

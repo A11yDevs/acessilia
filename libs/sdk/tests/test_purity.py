@@ -21,7 +21,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 #: The only runtime dependencies the SDK may have (ADR-0002, P2): the HTTP
 #: client, and docstruct for shared pure algorithms.
-ALLOWED_DEPENDENCIES = {"httpx": "httpx", "acessilia-docstruct": "docstruct"}
+ALLOWED_DEPENDENCIES = {
+    "httpx": "httpx",
+    "acessilia-docstruct": "docstruct",
+    "babel": "babel",
+}
 FORBIDDEN = ("backend", "acessilia_core", "acessilia_toolbox")
 
 _PROBE = f"""
