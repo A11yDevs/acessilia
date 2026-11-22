@@ -42,6 +42,9 @@ ones here instead of restating them.
 | [0024](0024-legacy-canonical-type-deprecation.md) | Deprecate legacy canonical dataclasses while retaining compatibility | Accepted |
 | [0025](0025-format-catalogue-ownership.md) | Share format identity and delivery metadata with a worker-owned plan | Accepted |
 | [0026](0026-strict-canonical-export-gate.md) | Validate the canonical schema at the Core export gate | Accepted |
+| [0027](0027-mcp-core-toolbox-contract.md) | MCP is the contract between the core and the Toolbox | Proposed |
+| [0028](0028-operational-execution-in-the-toolbox.md) | All document computation runs in the Toolbox | Proposed |
+| [0029](0029-symbolic-core-every-step-planned.md) | A symbolic core: every processing step is planned | Proposed |
 
 ## Process
 

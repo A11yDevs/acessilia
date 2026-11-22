@@ -42,6 +42,9 @@ ADRs apontam para os daqui em vez de repeti-los.
 | [0024](0024-legacy-canonical-type-deprecation.pt-br.md) | Descontinuar dataclasses canônicas legadas preservando compatibilidade | Aceita |
 | [0025](0025-format-catalogue-ownership.pt-br.md) | Compartilhar identidade e entrega de formatos com plano do worker | Aceita |
 | [0026](0026-strict-canonical-export-gate.pt-br.md) | Validar o schema canônico no gate de exportação do Core | Aceita |
+| [0027](0027-mcp-core-toolbox-contract.pt-br.md) | MCP é o contrato entre o core e a Toolbox | Proposta |
+| [0028](0028-operational-execution-in-the-toolbox.pt-br.md) | Toda computação documental roda na Toolbox | Proposta |
+| [0029](0029-symbolic-core-every-step-planned.pt-br.md) | Um core simbólico: todo passo do processamento é planejado | Proposta |
 
 ## Processo
 
