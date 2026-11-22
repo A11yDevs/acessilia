@@ -30,7 +30,7 @@ própria suíte completa mais rápida.
 | Corrigi uma falha e quero confirmar | `make test-failed` | Reexecuta as falhas registradas nos caches da suíte principal, do docstruct, do SDK e do `libs/core` |
 | Quero a confiança local completa | `make test-all` | Suíte principal com quatro workers, depois docstruct, SDK e `libs/core` |
 | Quero verificar o lint (baseline do Ruff) | `make lint` | Executa o Ruff (`F`, `I`, `E` sem `E501`) via `scripts/check_ruff_baseline.py` |
-| Quero verificar tipos estáticos (Mypy) | `make typecheck` | Executa o Mypy no escopo configurado de `docstruct`, `acessilia_sdk` e `acessilia_core` |
+| Quero verificar tipos estáticos (Mypy) | `make typecheck` | Executa o Mypy no escopo configurado de `docstruct`, `acessilia_sdk`, `acessilia_core` e `backend` |
 | Quero relatórios de cobertura por componente | `make coverage` | Executa as quatro suítes com cobertura de desvios em `var/coverage/{app,core,sdk,docstruct}/` |
 | Quero só a suíte principal, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda a suíte principal non-E2E com quatro workers |
 | Quero só a biblioteca do core | `(cd libs/core && uv run --extra dev pytest)` | Roda a suíte do core, sem o serviço |
@@ -54,7 +54,7 @@ o workflow `CI` do GitHub Actions:
   SDK e da biblioteca do core com cobertura de desvios, e recusa skips
   inesperados, publicando os artefatos JUnit (`test-reports-py*`). O mesmo job
   roda o Ruff contra a baseline que só diminui, o Mypy no escopo configurado de
-  `docstruct`/SDK/core (#366), o contrato de capacidades da Toolbox, o relatório da
+  `docstruct`/SDK/core/backend (#366), o contrato de capacidades da Toolbox, o relatório da
   versão do docstruct fixada pela Toolbox (só avisos; veja abaixo) e o resumo de
   cobertura com o artefato `coverage-reports-py*`.
 - **`SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única

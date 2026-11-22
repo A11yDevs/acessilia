@@ -228,7 +228,7 @@ async def process(
         if cached is not None:
             logger.info("Cache hit para {}", file_path.name)
             cached = _payload_for_source(cached, file_path)
-            canonical_metadata, technical_warnings = _canonical_details(cached)
+            cached_metadata, cached_warnings = _canonical_details(cached)
             canonical_document = build_canonical_document(
                 cached,
                 toolbox=config.toolbox,
@@ -238,8 +238,8 @@ async def process(
                 source_name=shown_name,
                 source_path=str(file_path),
                 audience=["reader"],
-                metadata=canonical_metadata,
-                technical_warnings=technical_warnings,
+                metadata=cached_metadata,
+                technical_warnings=cached_warnings,
             )
             if not external_task_id:
                 state_manager.finalizar(
@@ -300,8 +300,8 @@ async def process(
             if not shutdown.shutting_down():
                 operation_registry.clear(task_id)
 
-        canonical_metadata: dict[str, Any] | None = None
-        technical_warnings: list[str] | None = None
+        canonical_metadata = None
+        technical_warnings = None
         if isinstance(resultado, dict):
             raw_text = resultado["text"]
             payload_metadata = resultado.get("canonical_metadata")

@@ -212,11 +212,15 @@ async def cancel_job(request: Request, task_id: str):
     # Persist the local cancellation first: a slow or failed remote cancel must
     # not lose a user's request. The sync helper is live-only.
     status = await get_job_status_async(task_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
     await run_blocking(save_status, task_id, status)
     remote = await cancel_task_operations(task_id)
     worker.state_manager.set_remote_cancellation(task_id, remote)
     status = await get_job_status_async(task_id)
-    if status is not None and status.get("status") == "cancelled":
+    if status is None:
+        raise HTTPException(status_code=404, detail=t(API_TASK_NOT_FOUND))
+    if status.get("status") == "cancelled":
         # A queued job has no worker that would clear its cancellation marker.
         
 

@@ -26,7 +26,7 @@ from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from threading import RLock
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from acessilia_core.agents.model_calls import ModelCallRejected, ModelCallTimeout
 from acessilia_core.i18n import t
@@ -87,8 +87,8 @@ class ModelCallExecutor:
                 "closed": self._closed,
             }
 
-    def _log(self, message: str, label: str, *, warning=False, **fields):
-        values = self.snapshot()
+    def _log(self, message: str, label: str, *, warning: bool = False, **fields: Any):
+        values: dict[str, Any] = self.snapshot()
         values.update(fields, label=label)
         (logger.warning if warning else logger.debug)(t(message).format(**values))
 
@@ -145,8 +145,8 @@ class ModelCallExecutor:
     def _invoke(self, entry: _Call):
         expired = False
         completed = False
-        value = None
-        failure = None
+        value: Any = None
+        failure: BaseException | None = None
         try:
             with self._lock:
                 if entry.abandoned or self._closed:
@@ -163,7 +163,7 @@ class ModelCallExecutor:
             self._log(LOG_MODEL_CALL_STATE, entry.label, event="started",
                       queue_wait=entry.started - entry.submitted, execution=0)
             try:
-                value = call()
+                value = cast(Callable[[], T], call)()
             except BaseException as error:
                 # A worker is an exception-transfer boundary, like
                 # concurrent.futures: even SystemExit/CancelledError must reach

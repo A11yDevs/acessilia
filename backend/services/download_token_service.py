@@ -72,7 +72,7 @@ def _get_connection():
 def criar_token(
     output_dir: Path,
     filename: str,
-    formats: list = None,
+    formats: list[str] | None = None,
     task_id: str = "",
     owner: str = "",
 ) -> str:
