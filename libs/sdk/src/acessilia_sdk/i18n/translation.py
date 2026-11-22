@@ -3,7 +3,9 @@
 The SDK owns the generic mechanics: compile a ``.po`` source in memory, fall
 back to a default locale and then to the English identity, and normalize the
 string returned by Babel. The owning component supplies the catalog directory,
-default locale and active-locale policy.
+default locale and active-locale policy. It also renders structured
+``(msgid, kwargs)`` findings through a caller-supplied lookup
+(:func:`resolve_findings`), which owns no catalog policy of its own.
 """
 
 from __future__ import annotations
@@ -139,6 +141,9 @@ def resolve_findings(
     The producer keeps its msgids and arguments structured; the caller supplies
     the locale-aware lookup (for example the Core's active-locale ``t``). This
     avoids reconstructing arguments from already formatted strings.
+
+    Placeholders in the msgid and its translations must use ``str.format``
+    ``{name}`` syntax; they are substituted with ``kwargs``.
 
     Args:
         findings (Iterable[tuple[str, Mapping[str, Any]]]): Message id and

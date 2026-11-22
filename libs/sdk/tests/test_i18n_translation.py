@@ -21,6 +21,9 @@ msgstr ""
 msgid "Hello"
 msgstr "Bonjour"
 
+msgid "Missing {field}"
+msgstr "Champ manquant : {field}"
+
 msgid "One file"
 msgid_plural "%(count)d files"
 msgstr[0] "Un fichier"
@@ -87,6 +90,20 @@ def test_resolve_findings_formats_structured_messages() -> None:
         "<Missing {field}>".format(field="title"),
         "<Duplicate id: {block_id}>".format(block_id="s1"),
     ]
+
+
+def test_resolve_findings_uses_a_catalog_and_identity(tmp_path: Path) -> None:
+    translations = catalog_for(_catalog_dir(tmp_path), "fr_FR", "en_US")
+    assert resolve_findings(
+        [("Missing {field}", {"field": "title"})],
+        lambda msgid: gettext(translations, msgid),
+    ) == ["Champ manquant : title"]
+
+    identity = catalog_for(tmp_path / "missing", "en_US", "en_US")
+    assert resolve_findings(
+        [("Missing {field}", {"field": "title"})],
+        lambda msgid: gettext(identity, msgid),
+    ) == ["Missing title"]
 
 
 def test_compile_catalog_returns_none_without_a_source(tmp_path: Path) -> None:
