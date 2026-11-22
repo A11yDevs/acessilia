@@ -15,7 +15,8 @@ from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.telegram import user_context
 from frontend.telegram.formats import input_formats_text
-from frontend.telegram.middlewares.pause_middleware import get_paused_chats
+from frontend.telegram.middlewares.pause_middleware import pause_chat, resume_chat
+from frontend.telegram.state_store import get_state_store
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_BOT_PAUSED,
@@ -316,6 +317,7 @@ async def cmd_cancel(message: Message) -> None:
         )
         return
     user_context.user_task_ids.pop(state_key, None)
+    get_state_store().remove_task(state_key)
     cancelled_id = result.get('task_id', task_id)
     await message.answer(t(MSG_TASK_CANCEL_DONE).format(task_id=cancelled_id))
 
@@ -329,8 +331,7 @@ async def cmd_desativar(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /desativar (or its English alias /deactivate) command; no default (required).
     """
-    paused = get_paused_chats()
-    paused.add(message.chat.id)
+    pause_chat(message.chat.id)
     await message.answer(t(MSG_BOT_PAUSED))
 
 
@@ -343,8 +344,7 @@ async def cmd_ativar(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /ativar (or its English alias /activate) command; no default (required).
     """
-    paused = get_paused_chats()
-    paused.discard(message.chat.id)
+    resume_chat(message.chat.id)
     await message.answer(t(MSG_BOT_RESUMED))
 
 

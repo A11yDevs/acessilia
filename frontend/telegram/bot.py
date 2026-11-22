@@ -7,7 +7,10 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from frontend.telegram.handlers.start import router as start_router
-from frontend.telegram.handlers.document import router as document_router
+from frontend.telegram.handlers.document import (
+    resume_tracked_tasks,
+    router as document_router,
+)
 from frontend.telegram.handlers.errors import router as error_router
 from backend.config.process_setup import setup_process
 from acessilia_core.logger import logger
@@ -32,6 +35,7 @@ async def on_startup(bot: Bot) -> None:
         bot (Bot): Aiogram Bot instance that finished starting up; no default (required).
     """
     logger.info(t(LOG_BOT_STARTED))
+    await resume_tracked_tasks(bot)
 
 
 async def on_shutdown(bot: Bot) -> None:

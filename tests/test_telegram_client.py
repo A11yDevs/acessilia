@@ -11,6 +11,8 @@ from acessilia_core.i18n import get_translations, reset_request_locale, set_requ
 from backend.services.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from acessilia_core.i18n.log_messages import LOG_PDF_UA_GENERATION_FAILED
 from frontend.telegram import user_context
+from frontend.telegram import state_store
+from frontend.telegram.middlewares import pause_middleware
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEARED,
@@ -175,6 +177,9 @@ class _FakePhoto:
 @pytest.fixture()
 def doc_module_isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "temp_dir", tmp_path)
+    monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    state_store.reset_state_store(tmp_path / "data" / "telegram_state.db")
+    pause_middleware.reset_paused_cache()
     monkeypatch.setattr(doc_module, "client", ApiClient(base_url=BASE))
     monkeypatch.setattr(start_module, "client", ApiClient(base_url=BASE))
     monkeypatch.setattr(doc_module, "POLL_INTERVAL_SECONDS", 0.01)
@@ -185,6 +190,8 @@ def doc_module_isolated(monkeypatch, tmp_path):
     user_context.user_modes.clear()
     user_context.user_emails.clear()
     user_context.user_task_ids.clear()
+    state_store.reset_state_store()
+    pause_middleware.reset_paused_cache()
 
 
 def _mock_job_api(status_body: dict, task_id: str = "tg12345"):
@@ -226,6 +233,8 @@ def test_document_flow_sends_download_link(doc_module_isolated, pdf_ua_failed):
     assert any("http://localhost:8000/api/v1/download/tok123" in s for s in bot.sent)
     assert any("Não foi possível gerar o PDF/UA" in s for s in bot.sent) == pdf_ua_failed
     assert user_context.user_task_ids[(123, None, 456)] == "tg12345"
+    # #396: a finished task stops being resumed on the next startup.
+    assert state_store.get_state_store().load_tasks() == []
 
 
 def test_document_flow_sends_the_download_link_in_the_user_locale(

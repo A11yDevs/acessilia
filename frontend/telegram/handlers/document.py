@@ -3,6 +3,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 from aiogram import Router, F
 from aiogram.types import Message, Document, PhotoSize
@@ -12,6 +13,7 @@ from frontend.telegram.adapters.file_service import download_file
 from frontend.clients.api_client import ApiError
 from frontend.clients import default_client
 from frontend.telegram import user_context
+from frontend.telegram.state_store import TrackedTask, get_state_store
 
 from acessilia_core.logger import logger
 from acessilia_core.i18n import SUPPORTED_LOCALES, get_translations, t
@@ -51,6 +53,9 @@ router = Router()
 client = default_client
 
 POLL_INTERVAL_SECONDS = 3.0
+
+#: Keep strong references to resumed pollers; the loop only holds weak ones.
+_resumed_tasks: set[asyncio.Task] = set()
 
 #: The public Bot API only serves getFile for files up to this size.
 TELEGRAM_MAX_DOWNLOAD_MB = 20
@@ -218,6 +223,14 @@ async def process_file(
         task_id = result["task_id"]
         position = result.get("position", 1)
         user_context.user_task_ids[state_key] = task_id
+        get_state_store().save_task(
+            state_key,
+            task_id,
+            filename=filename,
+            job_token=result.get("job_token"),
+            email=email,
+            reply_to_message_id=message.message_id,
+        )
 
         await tracker(t(MSG_TASK_ENQUEUED).format(task_id=task_id))
         if position > 1:
@@ -226,6 +239,7 @@ async def process_file(
             )
 
         await _poll_job(message, tracker, task_id, email)
+        await _forget_finished_task(state_key, task_id)
     except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
         await tracker.finish(success=False)
@@ -353,3 +367,65 @@ async def _poll_job(
         message_thread_id=message_thread_id,
         reply_to_message_id=message.message_id,
     )
+
+
+async def _forget_finished_task(
+    state_key: tuple[int, int | None, int], task_id: str
+) -> None:
+    """Stop persisting a task once the API reports a final state (#396)."""
+    try:
+        status = await client.get_job_status(task_id)
+    except Exception as error:
+        logger.warning(
+            t(LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED).format(
+                task_id=task_id, error=error
+            )
+        )
+        return
+    if status.get("status") in {"done", "error", "cancelled"}:
+        get_state_store().remove_task(state_key)
+
+
+class _ResumedMessage:
+    """The subset of ``Message`` that ``_poll_job`` needs for a resumed task.
+
+    The original message may have been deleted while the bot was down, so the
+    resumed delivery starts a new message instead of replying to it.
+    """
+
+    def __init__(
+        self, bot, chat_id: int, message_thread_id: int | None
+    ) -> None:
+        self.bot = bot
+        self.chat = SimpleNamespace(id=chat_id)
+        self.message_thread_id = message_thread_id
+        self.message_id = None
+
+
+async def _resume_task(bot, task: TrackedTask) -> None:
+    tracker = StatusTracker(
+        bot, task.chat_id, task.filename, message_thread_id=task.message_thread_id
+    )
+    target = _ResumedMessage(bot, task.chat_id, task.message_thread_id)
+    try:
+        await _poll_job(target, tracker, task.task_id, task.email)
+    except Exception:
+        logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
+    finally:
+        await _forget_finished_task(task.state_key, task.task_id)
+
+
+async def resume_tracked_tasks(bot) -> None:
+    """Restore followed tasks from SQLite and keep polling the unfinished ones (#396).
+
+    A task that finished while the process was down still receives its final
+    message on this startup pass; the persisted row is removed once the API
+    reports a final state.
+    """
+    for task in get_state_store().load_tasks():
+        user_context.user_task_ids[task.state_key] = task.task_id
+        if task.job_token:
+            client.remember_job_token(task.task_id, task.job_token)
+        poller = asyncio.create_task(_resume_task(bot, task))
+        _resumed_tasks.add(poller)
+        poller.add_done_callback(_resumed_tasks.discard)

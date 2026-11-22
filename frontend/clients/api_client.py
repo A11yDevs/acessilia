@@ -107,11 +107,15 @@ class ApiClient:
         ):
             raise ApiError(502, "Invalid job receipt from API")
         if result.get("job_token"):
-            self._job_tokens[result["task_id"]] = result["job_token"]
-            self._job_tokens.move_to_end(result["task_id"])
-            while len(self._job_tokens) > 256:
-                self._job_tokens.popitem(last=False)
+            self.remember_job_token(result["task_id"], result["job_token"])
         return result
+
+    def remember_job_token(self, task_id: str, job_token: str) -> None:
+        """Register a job token received earlier, including after a bot restart."""
+        self._job_tokens[task_id] = job_token
+        self._job_tokens.move_to_end(task_id)
+        while len(self._job_tokens) > 256:
+            self._job_tokens.popitem(last=False)
 
     async def get_job_status(self, task_id: str, job_token: str | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
