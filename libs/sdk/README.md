@@ -25,11 +25,12 @@ core (backend)  →  acessilia-sdk  →  Toolbox HTTP contract
 
 ## Installing
 
-The SDK depends on `httpx` and on `acessilia-docstruct`, the repository's
+The SDK depends on `httpx`, Babel and `acessilia-docstruct`, the repository's
 pure algorithms ([ADR-0017](../../docs/adr/0017-operational-sdk-and-agentic-core.md)).
-Neither project is published on a package index: install both from this
-repository, or from their release wheels, **docstruct first**, since pip cannot
-resolve it on its own. Inside the repository, uv resolves it from its path.
+`httpx` and Babel come from a package index. The SDK and docstruct are not
+published on one: install both from this repository, or from their release
+wheels, **docstruct first**, since pip cannot resolve it on its own. Inside the
+repository, uv resolves it from its path.
 
 ```bash
 pip install ./libs/docstruct ./libs/sdk

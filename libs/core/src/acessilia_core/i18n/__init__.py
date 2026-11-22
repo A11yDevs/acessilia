@@ -1,8 +1,10 @@
 """Internationalization module backed by Babel locale strings files.
 
-Generic locale parsing, normalization, negotiation and request context live in
-``acessilia_sdk.i18n``; this module keeps the core's catalogs, policies and
-server-side locale, and re-exports the compatibility facades (#712).
+Generic locale parsing, normalization, negotiation, request context and
+translation live in ``acessilia_sdk.i18n``; this module keeps the core's
+catalogs, message ids, locale policies and server-side locale. The request
+context functions are re-exported for compatibility with existing callers;
+new code should import them from :mod:`acessilia_sdk.i18n.context` (#712).
 """
 
 from collections.abc import Mapping
@@ -11,7 +13,7 @@ from pathlib import Path
 
 from babel.support import NullTranslations, Translations
 
-from acessilia_sdk.i18n import normalize_locale, parse_locales as parse_locales
+from acessilia_sdk.i18n import normalize_locale
 from acessilia_sdk.i18n.context import (
     request_locale as _request_locale,
     reset_request_locale as reset_request_locale,

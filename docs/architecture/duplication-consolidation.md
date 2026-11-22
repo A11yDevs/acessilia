@@ -10,7 +10,7 @@ This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). 
 - A structural group is actionable only when the functions are semantically interchangeable for the same callers. Equal normalized control flow is not enough.
 - Generated code is changed through its generator, never by editing the generated file.
 - Behaviour-sensitive flows (agent selection, frontend startup) need a characterization test before extraction.
-- A cross-component duplicate needs a single owner. Locale parsing is i18n semantics and the generic parser now lives in the SDK (`acessilia_sdk.i18n`); the core keeps catalogs, policies and request context, and the service reads the environment and delegates the parse.
+- A cross-component duplicate needs a single owner. Locale parsing is i18n semantics and the generic parser now lives in the SDK (`acessilia_sdk.i18n`); the core keeps catalogs and policies, the SDK owns request context and translation, and the service reads the environment and delegates the parse.
 
 ## First consolidation: the locale-list parser
 
@@ -22,14 +22,14 @@ Before this PR, two 15-line functions implemented the same rule — split on com
 After:
 
 - `acessilia_sdk.i18n` exposes `parse_locales` and `normalize_locale` as generic infrastructure;
-- `acessilia_core.i18n.parse_locales` remains as a temporary compatibility facade importing the SDK implementation;
+- `acessilia_core.i18n.parse_locales` existed during the migration as a temporary compatibility facade importing the SDK implementation; the final #712 PR removed it;
 - `Settings.i18n_locales_active` calls the SDK directly with `I18N_LOCALES_ACTIVE`;
 - the backend's private copy is removed;
 - `configure_locales` still filters the parsed list against `SUPPORTED_LOCALES`, so an empty or unsupported list keeps the existing “offer every supported locale” fallback.
 
-The behaviour is pinned by `tests/test_i18n_locales.py` (including the core facade) and the SDK's `tests/test_i18n.py`: blank entries, duplicates, ordering, normalization and the `Settings` environment path. The SDK owns generic locale parsing/normalization; the core keeps its catalogs, policies and request context. The remaining i18n infrastructure migration is tracked in [#712](https://github.com/A11yDevs/acessilia/issues/712). This avoids making the core the mandatory owner of a cross-cutting utility and lets the service consume it without importing the core.
+The behaviour is pinned by `tests/test_i18n_locales.py` and the SDK's `tests/test_i18n.py`: blank entries, duplicates, ordering, normalization, the `Settings` environment path and the absence of a core re-export. The SDK owns generic locale parsing/normalization; the core keeps its catalogs and policies. The rest of the i18n infrastructure migration was completed in [#712](https://github.com/A11yDevs/acessilia/issues/712). This avoids making the core the mandatory owner of a cross-cutting utility and lets the service consume it without importing the core.
 
-The core facade is a new compatibility name, not a preserved pre-existing caller: `_locales_from_raw` was dead code before this PR. It exists so the remaining migration can proceed without a flag day; #712 tracks its removal. The SDK release that publishes this API must also relax the core pin `acessilia-sdk>=0.3,<0.4` (new public API normally means 0.4.0).
+The core facade was a new compatibility name, not a preserved pre-existing caller: `_locales_from_raw` was dead code before this PR. It existed so the remaining migration could proceed without a flag day; #712 removed it and moved the core pin to `acessilia-sdk>=0.4,<0.5` when SDK 0.4.0 published the full i18n API.
 
 **Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. The initial [baseline JSON](quality-baseline.json) stays as the historical snapshot; this page records the first change against it.
 

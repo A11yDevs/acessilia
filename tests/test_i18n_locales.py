@@ -2,12 +2,14 @@
 
 Before this consolidation, `backend/config/settings.py::_locales_from_env` and
 `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` implemented
-the same comma-separated, order-preserving parser.
+the same comma-separated, order-preserving parser. The generic parser and
+normalizer now live in the SDK; the core no longer re-exports the parser
+(#712).
 """
 
 from __future__ import annotations
 
-from acessilia_core.i18n import parse_locales as core_parse_locales
+import acessilia_core.i18n as core_i18n
 from acessilia_sdk.i18n import normalize_locale, parse_locales
 from backend.config.settings import Settings
 
@@ -31,8 +33,8 @@ def test_normalize_locale_handles_encodings_and_separators() -> None:
     assert normalize_locale("") == ""
 
 
-def test_the_core_re_exports_the_shared_parser_as_a_temporary_facade() -> None:
-    assert core_parse_locales is parse_locales
+def test_the_core_no_longer_re_exports_the_shared_parser() -> None:
+    assert not hasattr(core_i18n, "parse_locales")
 
 
 def test_settings_defaults_to_the_supported_locales(monkeypatch) -> None:

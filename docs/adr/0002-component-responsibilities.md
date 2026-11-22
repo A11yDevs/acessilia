@@ -76,7 +76,7 @@ provider).
     nothing outside the standard library except guarded optional
     accelerators such as `rapidfuzz`).
   - `libs/sdk/tests/test_purity.py` (the SDK does not import the core or the
-    Toolbox, and its dependencies stay within `httpx` and docstruct).
+    Toolbox, and its dependencies stay within `httpx`, Babel and docstruct).
 - **Planned in #152:**
   - a Toolbox test forbidding `acessilia_sdk` and `backend` imports.
 - **Known deviations, tracked in [#203](https://github.com/A11yDevs/acessilia/issues/203):**

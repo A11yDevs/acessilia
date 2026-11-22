@@ -5,7 +5,7 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
-## Não lançado
+## 0.4.0 (2026-11-22)
 
 - **Adicionado** `acessilia_sdk.i18n.translation` com `compile_catalog`,
   `catalog_for`, `gettext` e `ngettext`: compilação de `.po` em memória,
@@ -21,8 +21,8 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   depende de Babel para essa infraestrutura genérica.
 - **Adicionado** `acessilia_sdk.i18n` com `parse_locales` e `normalize_locale`,
   o parser e o normalizador genéricos de listas de locales compartilhados pelo
-  core e pelo serviço. O core mantém seus catálogos e políticas; a extração
-  completa da infraestrutura restante é a #712.
+  core e pelo serviço. O core mantém seus catálogos e políticas; o restante da
+  infraestrutura mudou no mesmo release (#712).
 - **Corrigido** `extract_dual_fused` rejeita uma resposta de
   `document.structure.extract` cujo `status` não seja `succeeded`, mesmo que
   traga um objeto `document`; ela é registrada como
