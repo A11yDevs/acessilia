@@ -12,7 +12,7 @@ import pytest
 import respx
 
 from acessilia_core.pipeline.fusion import extract_fused
-from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from backend.config.settings import settings
 from tests.core_config_support import toolbox_config
 

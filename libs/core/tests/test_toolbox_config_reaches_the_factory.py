@@ -21,6 +21,22 @@ from acessilia_core.toolbox import toolbox_client
 
 FIXTURE_PDF = Path(__file__).parent / "fixtures" / "tutorials" / "java-oo-3pgs.pdf"
 
+
+def test_the_adapter_exposes_only_its_config_and_factory() -> None:
+    assert set(toolbox_client.__all__) == {
+        "TIMEOUT_KEYS",
+        "endpoints_from",
+        "make_toolbox_client",
+        "toolbox_client_config",
+        "toolbox_endpoints",
+        "toolbox_vlm_endpoint",
+    }
+    assert not hasattr(toolbox_client, "ToolboxError")
+    assert not hasattr(toolbox_client, "ToolboxCapabilityClient")
+    assert not hasattr(toolbox_client, "PROVIDER_DEFAULTS")
+    assert not hasattr(toolbox_client, "execute_capability")
+
+
 #: Modules that bind the factory at import; the others look it up in
 #: ``toolbox_client`` when they call it.
 BOUND_FACTORY_MODULES = (

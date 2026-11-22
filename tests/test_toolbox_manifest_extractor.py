@@ -18,7 +18,7 @@ from acessilia_core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
-from acessilia_core.toolbox.toolbox_client import (
+from acessilia_sdk.toolbox import (
     ToolboxContractViolation,
     ToolboxTimeout,
 )
@@ -369,7 +369,7 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
 def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     mock_client, monkeypatch
 ):
-    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable
     from backend.config.settings import settings
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)

@@ -396,8 +396,8 @@ class TestHandlerMessagesFollowTheLocale:
 
     def test_math_controlled_error_is_localized(self, locale, monkeypatch) -> None:
         from acessilia_core.pipeline.handlers.formula import _handle_mathml_method
-        from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
         from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+        from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
         def unavailable(*_args, **_kwargs):
             raise MathCapabilityUnavailable(

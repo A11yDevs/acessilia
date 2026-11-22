@@ -630,7 +630,7 @@ class TestVlmPairwiseJudge:
         from acessilia_core.pipeline.handlers.judge import (
             _handle_vlm_pairwise_judge_method,
         )
-        from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+        from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 
         manifest = self._manifest(tmp_path)
 
@@ -761,7 +761,7 @@ class TestVlmPairwiseJudge:
         from acessilia_core.pipeline.handlers.judge import (
             _handle_vlm_pairwise_judge_method,
         )
-        from acessilia_core.toolbox.toolbox_client import ToolboxAuthenticationError
+        from acessilia_sdk.toolbox import ToolboxAuthenticationError
 
         manifest = self._manifest(tmp_path)
 

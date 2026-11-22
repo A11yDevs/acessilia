@@ -102,7 +102,7 @@ from acessilia_core.ports import (
     RunPorts,
     region_cache_for,
 )
-from acessilia_core.toolbox.toolbox_client import ToolboxError
+from acessilia_sdk.toolbox import ToolboxError
 
 
 class StructuralExtractionError(RuntimeError):

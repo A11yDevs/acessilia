@@ -103,7 +103,7 @@ def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
 
 def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
     from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
-    from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
+    from acessilia_sdk.toolbox import ToolboxProviderUnavailable
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
     source = tmp_path / "doc.pdf"

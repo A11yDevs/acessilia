@@ -18,7 +18,8 @@ from acessilia_core.config import (
     ToolboxConfig,
     VisionConfig,
 )
-from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
+from acessilia_core.toolbox.toolbox_client import TIMEOUT_KEYS
+from acessilia_sdk.toolbox import PROVIDER_DEFAULTS
 from backend.config.settings import Settings, settings as default_settings
 
 

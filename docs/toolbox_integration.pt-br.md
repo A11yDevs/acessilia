@@ -57,7 +57,7 @@ falha, o core recebe `ToolboxCapabilityError` ou `ToolboxContractViolation`.
 
 ### Hierarquia de exceções
 
-Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e re-exportada por `libs/core/src/acessilia_core/toolbox/toolbox_client.py`):
+Todas herdam de `ToolboxError` (definida no SDK, `acessilia_sdk.toolbox.errors`, e importada diretamente de `acessilia_sdk.toolbox` pelo core):
 
 - `ToolboxProviderUnavailable` — serviço/provedor indisponível (HTTP 502, 503)
 - `ToolboxTimeout` — excedeu `toolbox_timeout_seconds`
@@ -520,7 +520,7 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — registro de capacidades, transporte, classe base dos clientes, failover, artefatos e hierarquia de exceções (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — um cliente por família de capacidades; `layout.py` é o modelo do Cenário B
-- `libs/core/src/acessilia_core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir da `ToolboxConfig` da execução) e os tipos de erro reexportados
+- `libs/core/src/acessilia_core/toolbox/toolbox_client.py` — `make_toolbox_client` (clientes do SDK configurados a partir da `ToolboxConfig` da execução); erros, clientes e transporte são importados diretamente de `acessilia_sdk.toolbox`
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — extração de estrutura, armazenamento de artefatos e as rotas de datasets
 - `libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py` — a política do core sobre o cliente de matemática: uma entrada rejeitada dá resultado vazio, uma capacidade indisponível levanta `MathCapabilityUnavailable` (ADR-0007); ler os dois formatos de documento do `math.recognize@1` é o `clients.math.recognized_formulas` do SDK
 - `libs/core/src/acessilia_core/toolbox/media_inspect.py`, `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py`, `libs/core/src/acessilia_core/export/pandoc_exporter.py` (`_toolbox_export`) — quando chamar `media.inspect`, `pdf.validate.pdf_ua` e as exportações (flags de habilitação, cache remoto), logs e o resumo do e-mail; cada chamada é um método de cliente do SDK

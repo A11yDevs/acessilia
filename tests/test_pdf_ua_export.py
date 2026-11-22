@@ -18,10 +18,8 @@ import httpx
 import pytest
 
 from acessilia_core.export import pandoc_exporter
-from acessilia_core.toolbox.toolbox_client import (
-    ToolboxProviderUnavailable,
-    make_toolbox_client,
-)
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from acessilia_sdk.toolbox.clients import ToolboxPdfUaClient
 from acessilia_sdk.toolbox.clients.pdf_ua import pandoc_payload
 from acessilia_sdk.toolbox.errors import (

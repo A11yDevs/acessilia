@@ -21,7 +21,7 @@ from acessilia_core.config import (
     ToolboxConfig,
     VisionConfig,
 )
-from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS
+from acessilia_sdk.toolbox import PROVIDER_DEFAULTS
 
 #: A process-local scratch directory, so tests that forget ``tmp_path`` do not
 #: share a fixed path with another process or user.

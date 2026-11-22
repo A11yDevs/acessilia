@@ -58,7 +58,7 @@ receives `ToolboxCapabilityError` or `ToolboxContractViolation`.
 
 ### Exception hierarchy
 
-All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.toolbox.errors`, and re-exported by `libs/core/src/acessilia_core/toolbox/toolbox_client.py`):
+All exceptions inherit from `ToolboxError` (defined in the SDK, `acessilia_sdk.toolbox.errors`, and imported directly from `acessilia_sdk.toolbox` by the core):
 
 - `ToolboxProviderUnavailable` — service/provider unavailable (HTTP 502, 503)
 - `ToolboxTimeout` — exceeded `toolbox_timeout_seconds`
@@ -519,7 +519,7 @@ service.py: _build_orchestrator()
 
 - `libs/sdk/src/acessilia_sdk/toolbox/` — capability registry, transport, client base class, failover, artifacts and exception hierarchy (SDK)
 - `libs/sdk/src/acessilia_sdk/toolbox/clients/` — one client per capability family; `layout.py` is the Scenario B template
-- `libs/core/src/acessilia_core/toolbox/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the run's `ToolboxConfig`) and the re-exported error types
+- `libs/core/src/acessilia_core/toolbox/toolbox_client.py` — `make_toolbox_client` (SDK clients configured from the run's `ToolboxConfig`); errors, clients and transport are imported directly from `acessilia_sdk.toolbox`
 - `clients/structure.py`, `clients/artifact.py`, `clients/dataset.py` — structure extraction, the artifact store and the dataset routes
 - `libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py` — the core's policy over the math client: a rejected input gives an empty result, an unavailable capability raises `MathCapabilityUnavailable` (ADR-0007); reading the two `math.recognize@1` document shapes is the SDK's `clients.math.recognized_formulas`
 - `libs/core/src/acessilia_core/toolbox/media_inspect.py`, `libs/core/src/acessilia_core/toolbox/pdf_ua_audit.py`, `libs/core/src/acessilia_core/export/pandoc_exporter.py` (`_toolbox_export`) — when to call `media.inspect`, `pdf.validate.pdf_ua` and the exports (enable flags, remote cache), logging and the e-mail summary; each call is one SDK client method
