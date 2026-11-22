@@ -7,6 +7,10 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `acessilia_sdk.i18n.translation` with `compile_catalog`,
+  `catalog_for`, `gettext` and `ngettext`: in-memory `.po` compilation, the
+  default-locale/English fallback and gettext/plural lookup. The owner supplies
+  the catalog directory and locale policy (#712).
 - **Added** `acessilia_sdk.i18n.context` with the per-task locale override
   (`request_locale`, `set_request_locale`, `reset_request_locale`); the core
   keeps the server-side policy and composes the two (#712).

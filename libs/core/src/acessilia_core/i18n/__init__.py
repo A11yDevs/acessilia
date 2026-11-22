@@ -7,7 +7,6 @@ server-side locale, and re-exports the compatibility facades (#712).
 
 from collections.abc import Mapping
 from functools import lru_cache
-from io import BytesIO
 from pathlib import Path
 
 from babel.support import NullTranslations, Translations
@@ -21,6 +20,11 @@ from acessilia_sdk.i18n.context import (
 from acessilia_sdk.i18n.negotiation import (
     expand_locale_candidates,
     negotiate_server_locale as _negotiate_server_locale,
+)
+from acessilia_sdk.i18n.translation import (
+    catalog_for as _sdk_catalog_for,
+    gettext as _sdk_gettext,
+    ngettext as _sdk_ngettext,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -148,37 +152,14 @@ def locale_for_user(raw_locale: str | None) -> str:
     return _active_locale()
 
 
-def _compiled_catalog(locale: str) -> Translations | None:
-    """Compile ``locale``'s ``.po`` source in memory, or ``None`` without one.
-
-    The catalogs ship as ``.po`` sources only. They used to be compiled to
-    ``messages.mo`` next to the sources, at import; an installed package may
-    be read-only, and a failed write silently left every message in English.
-    Compiling in memory needs no write and no build step (ADR-0016, step 6).
-    A source that cannot be read or compiled is skipped, so the runtime
-    degrades to the English-identity path instead of crashing.
-    """
-    po_path = LOCALE_CATALOGS_DIR / locale / "LC_MESSAGES" / "messages.po"
-    if not po_path.is_file():
-        return None
-    try:
-        from babel.messages.mofile import write_mo
-        from babel.messages.pofile import read_po
-
-        with open(po_path, "rb") as source:
-            catalog = read_po(source, locale=locale)
-        compiled = BytesIO()
-        write_mo(compiled, catalog)
-        compiled.seek(0)
-        return Translations(fp=compiled, domain=Translations.DEFAULT_DOMAIN)
-    except Exception:  # noqa: BLE001 - a broken catalog degrades to English
-        return None
-
-
 @lru_cache(maxsize=None)
 def _catalog_for(locale: str) -> Translations | NullTranslations:
     """The catalog of ``locale``, else of :data:`DEFAULT_LOCALE`, else the
     English identity (``NullTranslations``), like ``Translations.load``.
+
+    The catalog compiler and fallback live in
+    :mod:`acessilia_sdk.i18n.translation`; this wrapper keeps the core's lru
+    cache and supplies its catalog directory and default policy.
 
     Args:
         locale (str): Candidate locale name.
@@ -186,13 +167,7 @@ def _catalog_for(locale: str) -> Translations | NullTranslations:
     Returns:
         Translations | NullTranslations: The first catalog found.
     """
-    # Normalized like ``Translations.load`` did: ``pt_BR.UTF-8``, ``pt_br``
-    # and ``pt-BR`` find the ``pt_BR`` catalog (review of #569).
-    for candidate in (normalize_locale(locale) or locale, DEFAULT_LOCALE):
-        catalog = _compiled_catalog(candidate)
-        if catalog is not None:
-            return catalog
-    return NullTranslations()
+    return _sdk_catalog_for(LOCALE_CATALOGS_DIR, locale, DEFAULT_LOCALE)
 
 
 def get_translations(locale: str | None = None) -> Translations | NullTranslations:
@@ -214,13 +189,7 @@ def t(message_id: str) -> str:
             Falls back to returning the original English msgid unchanged when this locale's strings file does not hold that translation yet.
     """
     trans = get_translations()
-    result = trans.gettext(message_id)
-    if isinstance(result, (bytes, bytearray)):
-        try:
-            result = result.decode("utf-8")
-        except UnicodeDecodeError:
-            pass
-    return str(result)
+    return _sdk_gettext(trans, message_id)
 
 
 def n(singular_msgid: str, plural_msgid: str, count: int) -> str:
@@ -235,10 +204,4 @@ def n(singular_msgid: str, plural_msgid: str, count: int) -> str:
         str: Chosen localized string via Babel ngettext(); identity/fallback to the original English strings when the message pair has not been translated yet for this locale environment state. Placeholder (%d etc) substitution remains caller-side after text extraction here, as before gettext design intent keeps formatting separate from lookup resolution step in stack-level separation policy (per N-function contract pattern documented by chosen OSS i18n module per project guidelines).
     """
     trans = get_translations()
-    result = trans.ngettext(singular_msgid, plural_msgid, count)
-    if isinstance(result, (bytes, bytearray)):
-        try:
-            result = result.decode("utf-8")
-        except UnicodeDecodeError:
-            pass
-    return str(result)
+    return _sdk_ngettext(trans, singular_msgid, plural_msgid, count)

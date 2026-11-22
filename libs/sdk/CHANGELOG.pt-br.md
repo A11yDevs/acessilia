@@ -7,6 +7,10 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `acessilia_sdk.i18n.translation` com `compile_catalog`,
+  `catalog_for`, `gettext` e `ngettext`: compilação de `.po` em memória,
+  fallback para o locale default/identidade em inglês e lookup gettext/plural.
+  O dono fornece o diretório de catálogos e a política de locale (#712).
 - **Adicionado** `acessilia_sdk.i18n.context` com o override de locale por
   tarefa (`request_locale`, `set_request_locale`, `reset_request_locale`); o
   core mantém a política do locale do servidor e compõe os dois (#712).
