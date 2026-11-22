@@ -51,6 +51,25 @@ test. This removes the `write_*_schema` group from the remaining candidates.
 lines → **23 groups / 55 functions / 672 lines**. Only the `write_*_schema`
 group disappears.
 
+## Third consolidation: the frontend entry point
+
+`frontend/cli/run.py` was a near-copy of `frontend/run.py`: the same PID probe,
+process lock and interface startup, differing only in formatting, the lock file
+location and the presence of a `main()` function. The console-script entry point
+now imports `main` from `frontend.run`, so the runtime has one implementation and
+one lock (`frontend/bot.lock`). Starting either entry point while the other is
+already running is now refused, instead of using two separate lock files.
+
+The startup and lock behaviour is pinned by `tests/test_frontend_startup.py`:
+every enabled interface, the missing-token and empty-interface exits, the lock
+lifecycle (live, stale and malformed files), and the POSIX/Windows PID probes.
+`tests/test_process_setup.py` keeps checking that the runtime sets up the process
+before it takes the lock.
+
+**Measured delta on this PR's code commit:** 23 groups / 55 functions / 672
+lines → **20 groups / 49 functions / 499 lines**. The `_is_process_running`,
+`acquire_lock` and `startup` groups disappear.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -65,9 +84,9 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 5 | SDK result readers in math/media_inspect (3/38) | Candidate: same generic reader. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidated in this PR.** |
 | 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | Trivial; no action. |
-| 8 | Frontend `_is_process_running` (2/26) | Frontend follow-up with the lock/startup group. |
-| 9 | Frontend `acquire_lock` (2/36) | Frontend follow-up with the lock/startup group. |
-| 10 | Frontend `startup` (2/107) | High-value frontend follow-up; needs startup characterization. |
+| 8 | Frontend `_is_process_running` (2/26) | **Consolidated:** one runtime behind both entry points, with PID-probe tests. |
+| 9 | Frontend `acquire_lock` (2/36) | **Consolidated:** the console script shares `frontend.run` and its lock. |
+| 10 | Frontend `startup` (2/107) | **Consolidated:** characterization covers interface composition and shutdown. |
 | 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidate small helper; low priority. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | Defer: user-facing command copy. |
 | 13 | Agent `select_page` in adjudication/page-level (2/56) | Behaviour-sensitive: characterize selection policy first. |
@@ -86,17 +105,17 @@ groups introduced by later PRs: `pause_chat`/`resume_chat` (2/14) and the two
 deprecation `__getattr__` functions in `table_ast`/`validators` (2/20); they are
 tracked separately from the baseline rows.
 
-The next highest-value candidates are the frontend startup/lock trio (groups
-8–10) and the SDK result readers (4, 5, 21). Each should get its own focused PR
-with the relevant characterization tests; the remaining ones were not changed
-here.
+The next highest-value candidate is the SDK result readers (groups 4, 5 and 21).
+The frontend startup/lock trio was consolidated in this PR. Each consolidation
+should keep its own focused PR and characterization tests; the remaining groups
+were not changed here.
 
 ## Reproduction
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

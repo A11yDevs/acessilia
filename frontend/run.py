@@ -127,7 +127,7 @@ async def startup():
         shutdown_model_calls()
 
 
-if __name__ == "__main__":
+def main() -> None:
     # Before the lock: its messages are already translated (review of #568).
     setup_process()
     acquire_lock()
@@ -140,3 +140,7 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         release_lock()
+
+
+if __name__ == "__main__":
+    main()

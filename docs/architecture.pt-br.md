@@ -144,7 +144,7 @@ O domínio PDDL vive em `libs/core/src/acessilia_core/planning/domains/`. Os esq
 - [frontend/web/app.py](../frontend/web/app.py): painel HTML renderizado no servidor. É um cliente fino da API REST — upload, status e download são delegados a `backend/api` via `frontend/clients/api_client.py`.
 
 #### Interface de Linha de Comando (`frontend/cli/`)
-- [frontend/cli/run.py](../frontend/cli/run.py): ponto de entrada da CLI para processamento em lote e execução autônoma.
+- [frontend/cli/run.py](../frontend/cli/run.py): ponto de entrada dos console scripts; delega para `frontend.run`, então os dois comandos iniciam as mesmas interfaces e compartilham o lock de processo.
 
 #### API REST (`backend/api/`)
 - A API JSON autônoma que todas as interfaces consomem: envio e status de jobs, download, histórico e saúde. Ela possui a fila de processamento e o pipeline. O bot Telegram e o painel Web são clientes dela. Referência completa de endpoints em [endpoints.md](endpoints.md).

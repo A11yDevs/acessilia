@@ -139,7 +139,7 @@ The PDDL domain lives under `libs/core/src/acessilia_core/planning/domains/`. Th
 - [frontend/web/app.py](../frontend/web/app.py): server-rendered HTML panel. It is a thin client of the REST API — upload, status, and download are delegated to `backend/api` via `frontend/clients/api_client.py`.
 
 #### Command Line Interface (`frontend/cli/`)
-- [frontend/cli/run.py](../frontend/cli/run.py): CLI entrypoint for batch processing and standalone execution.
+- [frontend/cli/run.py](../frontend/cli/run.py): console-script entry point; it delegates to `frontend.run` so both commands start the same interfaces and share the process lock.
 
 #### REST API (`backend/api/`)
 - The standalone JSON API that all interfaces consume: job submission and status, download, history, and health. It owns the processing queue and the pipeline. The Telegram bot and the Web panel are clients of it. Full endpoint reference in [endpoints.md](endpoints.md).
