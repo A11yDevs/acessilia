@@ -5,6 +5,13 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
+## 0.6.0 (2026-11-22)
+
+- **Adicionado** `resolve_findings` em `acessilia_sdk.i18n.translation`:
+  formata findings estruturados `(msgid, kwargs)` por um lookup de locale
+  fornecido pelo chamador, para localizar resultados de validação sem
+  reconstruir argumentos a partir de strings formatadas (#656).
+
 ## 0.5.0 (2026-11-22)
 
 - **Adicionado** `client_timeout_keys()` em `acessilia_sdk.toolbox.clients`: o

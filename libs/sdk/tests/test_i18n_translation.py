@@ -9,6 +9,7 @@ from acessilia_sdk.i18n.translation import (
     compile_catalog,
     gettext,
     ngettext,
+    resolve_findings,
 )
 
 PO = """\
@@ -74,6 +75,18 @@ def test_gettext_and_ngettext_normalize_bytes_results() -> None:
     assert gettext(_BytesTranslations(b"Bonjour"), "Hello") == "Bonjour"
     assert ngettext(_BytesTranslations(b"Bonjour"), "One", "Many", 2) == "Bonjour"
     assert gettext(_BytesTranslations(b"\xff"), "Hello") == str(b"\xff")
+
+
+def test_resolve_findings_formats_structured_messages() -> None:
+    findings = [
+        ("Missing {field}", {"field": "title"}),
+        ("Duplicate id: {block_id}", {"block_id": "s1"}),
+    ]
+
+    assert resolve_findings(findings, lambda msgid: f"<{msgid}>") == [
+        "<Missing {field}>".format(field="title"),
+        "<Duplicate id: {block_id}>".format(block_id="s1"),
+    ]
 
 
 def test_compile_catalog_returns_none_without_a_source(tmp_path: Path) -> None:

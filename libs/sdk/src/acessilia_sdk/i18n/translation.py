@@ -8,14 +8,22 @@ default locale and active-locale policy.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 from babel.support import NullTranslations, Translations
 
 from acessilia_sdk.i18n.locales import normalize_locale
 
-__all__ = ["catalog_for", "compile_catalog", "gettext", "ngettext"]
+__all__ = [
+    "catalog_for",
+    "compile_catalog",
+    "gettext",
+    "ngettext",
+    "resolve_findings",
+]
 
 
 def compile_catalog(catalog_dir: Path, locale: str) -> Translations | None:
@@ -120,3 +128,25 @@ def ngettext(
         missing.
     """
     return _decode(translations.ngettext(singular_msgid, plural_msgid, count))
+
+
+def resolve_findings(
+    findings: Iterable[tuple[str, Mapping[str, Any]]],
+    translate: Callable[[str], str],
+) -> list[str]:
+    """Render structured ``(msgid, kwargs)`` findings through ``translate``.
+
+    The producer keeps its msgids and arguments structured; the caller supplies
+    the locale-aware lookup (for example the Core's active-locale ``t``). This
+    avoids reconstructing arguments from already formatted strings.
+
+    Args:
+        findings (Iterable[tuple[str, Mapping[str, Any]]]): Message id and
+            format arguments for each finding.
+        translate (Callable[[str], str]): Message-id lookup in the active
+            locale.
+
+    Returns:
+        list[str]: One localized line per finding, in input order.
+    """
+    return [translate(msgid).format(**kwargs) for msgid, kwargs in findings]

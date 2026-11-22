@@ -13,6 +13,7 @@ from typing import Any
 
 import docstruct.validation as _docstruct_validation
 from acessilia_core.i18n import t
+from acessilia_sdk.i18n.translation import resolve_findings
 
 _DEPRECATED_MSGIDS = (
     "MSG_BLOCK_NOT_ALLOWED_IN_PROFILE",
@@ -82,7 +83,7 @@ def __getattr__(name: str) -> Any:
 
 
 def _resolve(findings: list) -> list[str]:
-    return [t(msgid).format(**kwargs) for msgid, kwargs in findings]
+    return resolve_findings(findings, t)
 
 
 def validate_canonical_document(document: dict[str, Any]) -> list[str]:
