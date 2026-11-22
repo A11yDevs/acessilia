@@ -20,7 +20,6 @@ import pytest
 from loguru import logger
 
 from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
-from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from tests.core_config_support import toolbox_config
 from tests.pddl_support import build_element

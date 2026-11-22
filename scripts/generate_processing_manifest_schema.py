@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from acessilia_core.manifest.schema import write_processing_manifest_schema
+from acessilia_core.manifest.schema import write_processing_manifest_schema  # noqa: E402
 
 if __name__ == "__main__":
     path = write_processing_manifest_schema(

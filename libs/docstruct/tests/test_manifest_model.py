@@ -129,9 +129,13 @@ def test_document_invariants():
     assert findings_for(
         lambda p: p["elements"][0]["provenance"][0].update(page_number=2)
     ) == [MSG_PROVENANCE_UNKNOWN_PAGE]
-    mismatched_parent_ref = lambda p: p["elements"][1].update(parent_ref="#/texts/1")
+    def mismatched_parent_ref(p):
+        p["elements"][1].update(parent_ref="#/texts/1")
+
+    def reversed_range(p):
+        p["elements"][0]["provenance"][0].update(char_start=10, char_end=5)
+
     assert findings_for(mismatched_parent_ref) == [MSG_PARENT_REF_MISMATCH]
-    reversed_range = lambda p: p["elements"][0]["provenance"][0].update(char_start=10, char_end=5)
     assert findings_for(reversed_range) == [MSG_CHAR_RANGE_REVERSED]
 
 
@@ -195,7 +199,9 @@ def test_field_constraints():
     assert findings_for(lambda p: p["elements"][0].update(reading_order=0)) == [MSG_FIELD_OUT_OF_RANGE]
     assert findings_for(lambda p: p["pages"][0].update(width=0)) == [MSG_FIELD_OUT_OF_RANGE]
     assert findings_for(lambda p: p.update(language="p")) == [MSG_FIELD_OUT_OF_RANGE]
-    bad_origin = lambda p: p["elements"][0]["provenance"][0]["bbox"].update(coord_origin="X")
+    def bad_origin(p):
+        p["elements"][0]["provenance"][0]["bbox"].update(coord_origin="X")
+
     assert findings_for(bad_origin) == [MSG_FIELD_NOT_ALLOWED]
 
 

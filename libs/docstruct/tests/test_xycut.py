@@ -95,7 +95,9 @@ class TestReorder:
         assert stats["xycut-applied"] == 1
 
     def test_inverted_boxes_are_still_ordered(self):
-        inv = lambda b: (b[2], b[3], b[0], b[1])
+        def inv(b):
+            return (b[2], b[3], b[0], b[1])
+
         assert reorder([(inv(L1), "a"), (inv(R1), "c"), (inv(L2), "b"), (inv(R2), "d")]) == ["a", "b", "c", "d"]
 
     def test_few_boxes_is_a_no_op(self):

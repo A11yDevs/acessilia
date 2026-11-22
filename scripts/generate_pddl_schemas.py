@@ -8,9 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from acessilia_core.execution.schema import write_execution_report_schema
-from acessilia_core.manifest.schema import write_processing_manifest_schema
-from acessilia_core.planning.schema import (
+from acessilia_core.execution.schema import write_execution_report_schema  # noqa: E402
+from acessilia_core.manifest.schema import write_processing_manifest_schema  # noqa: E402
+from acessilia_core.planning.schema import (  # noqa: E402
     write_nominal_plan_schema,
     write_planning_comparison_schema,
 )

@@ -4,7 +4,6 @@ Espelham a semântica de ``vlm_tables.py`` do Dr.DocBench (PR #125). A
 similaridade (TEDS no script) é injetada; aqui usa-se uma similaridade simples
 baseada em igualdade de HTML normalizado.
 """
-from collections import Counter
 
 import pytest
 

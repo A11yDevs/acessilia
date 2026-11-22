@@ -246,13 +246,13 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
     if "minLength" in spec:
         lines += [
             f"    if isinstance(value, str) and len(value) < {spec['minLength']}:",
-            f'        raise ValueError(f"{name}: shorter than {spec["minLength"]}")',
+            f'        raise ValueError("{name}: shorter than {spec["minLength"]}")',
         ]
     if "minimum" in spec:
         lines += [
             "    if isinstance(value, (int, float)) and not isinstance(value, bool)"
             f" and value < {spec['minimum']}:",
-            f'        raise ValueError(f"{name}: below {spec["minimum"]}")',
+            f'        raise ValueError("{name}: below {spec["minimum"]}")',
         ]
     lines.append("    return value")
     default = "" if required else " = None"

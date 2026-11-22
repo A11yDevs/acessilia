@@ -10,7 +10,6 @@ import pytest
 
 from acessilia_core.export.exporters import audio_exporter
 from backend.config import settings as settings_module
-from backend.config.settings import settings
 
 
 class _FakeCommunicate:
