@@ -113,7 +113,7 @@ criam e fecham seu runner explicitamente. Veja a
 - [libs/core/src/acessilia_core/config.py](../libs/core/src/acessilia_core/config.py): o `CoreConfig`, a configuração do core em grupos congelados, que o serviço monta a partir das suas configurações em [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, passo 3).
 - [libs/core/src/acessilia_core/ports.py](../libs/core/src/acessilia_core/ports.py): o `RunPorts`, o estado do serviço que uma execução alcança (o cache de regiões, os checkpoints do job e o seu registro de operações remotas), montado pelo serviço para cada job em [backend/services/run_ports.py](../backend/services/run_ports.py); o `RunPorts.none()` não guarda estado (ADR-0016, passo 4).
 - [libs/core/src/acessilia_core/logger.py](../libs/core/src/acessilia_core/logger.py): configuração centralizada do logger loguru; o nível e o diretório de logs são passados no início do processo por [backend/config/process_setup.py](../backend/config/process_setup.py), junto com os idiomas oferecidos (ADR-0016, passo 3).
-- [libs/core/src/acessilia_core/formula_tools.py](../libs/core/src/acessilia_core/formula_tools.py): normalização de LaTeX e o rótulo da fórmula falada.
+- [libs/core/src/acessilia_core/formula_tools.py](../libs/core/src/acessilia_core/formula_tools.py): `wrap_latex` e o rótulo da fórmula falada; `normalize_latex` e `ensure_math_delimiters` são reexportações depreciadas de `docstruct.text.latex`.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): normalização de texto e parsing de Markdown.
 
 #### 0.5. Camada de Planejamento (`libs/core/src/acessilia_core/`) — motor PDDL

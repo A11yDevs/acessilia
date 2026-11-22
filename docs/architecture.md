@@ -108,7 +108,7 @@ Standalone users own and close their runner explicitly. See
 - [libs/core/src/acessilia_core/config.py](../libs/core/src/acessilia_core/config.py): `CoreConfig`, the core's configuration in frozen groups, which the service builds from its settings in [backend/config/core_config.py](../backend/config/core_config.py) (ADR-0016, step 3).
 - [libs/core/src/acessilia_core/ports.py](../libs/core/src/acessilia_core/ports.py): `RunPorts`, the service state a run reaches (the region cache, the job's checkpoints and its registry of remote operations), built by the service for each job in [backend/services/run_ports.py](../backend/services/run_ports.py); `RunPorts.none()` keeps no state (ADR-0016, step 4).
 - [libs/core/src/acessilia_core/logger.py](../libs/core/src/acessilia_core/logger.py): centralized loguru logger setup; the level and the log directory are passed at process start by [backend/config/process_setup.py](../backend/config/process_setup.py), with the offered locales (ADR-0016, step 3).
-- [libs/core/src/acessilia_core/formula_tools.py](../libs/core/src/acessilia_core/formula_tools.py): LaTeX normalization and the spoken-formula label.
+- [libs/core/src/acessilia_core/formula_tools.py](../libs/core/src/acessilia_core/formula_tools.py): `wrap_latex` and the spoken-formula label; `normalize_latex` and `ensure_math_delimiters` are deprecated re-exports of `docstruct.text.latex`.
 - [docstruct.text.paragraphs](../libs/docstruct/src/docstruct/text/paragraphs.py): text normalization and Markdown parsing.
 
 #### 0.5. Planning Layer (`libs/core/src/acessilia_core/`) — PDDL engine

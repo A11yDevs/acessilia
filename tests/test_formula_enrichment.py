@@ -16,11 +16,12 @@ from acessilia_core.export.renderers.html_renderer import (
 from acessilia_core.export.renderers.txt_renderer import (
     _render_block as render_txt_block,
 )
-from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.formula_tools import label_spoken_formula
 from acessilia_core.pipeline.handlers import formula as formula_handlers
 from acessilia_core.pipeline.validators import validate_canonical_document
 from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
+from docstruct.text.latex import bare_latex as normalize_latex
 from tests.core_config_support import core_config, toolbox_config
 
 FAKE_MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>E</mi></math>'

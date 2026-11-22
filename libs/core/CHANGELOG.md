@@ -2,6 +2,16 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.2 — formula_tools docstruct re-exports deprecated
+
+No behaviour change for migrated callers; the old names now emit a
+`DeprecationWarning`. `acessilia_core.formula_tools` keeps `wrap_latex` and
+`label_spoken_formula`. Import the replacements directly from
+`docstruct.text.latex`: `bare_latex` for `normalize_latex` and
+`ensure_math_delimiters` for the name of the same name. In-repository consumers
+were migrated, and the compatibility names stay until a later breaking version
+removes them (#656).
+
 ## 0.3.1 — docstruct re-exports deprecated in the pipeline bridges
 
 No behaviour change. `acessilia_core.pipeline.table_ast` and

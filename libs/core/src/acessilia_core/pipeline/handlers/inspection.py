@@ -25,7 +25,6 @@ from acessilia_core.agents.output_schemas import PageInspectionOutput, VisionOut
 from acessilia_core.agents.vision_agent import VisionAgent
 from acessilia_core.config import CoreConfig, ModelConfig, ToolboxConfig
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.formula_tools import normalize_latex
 from acessilia_core.manifest.builder import is_unstructured_page_placeholder
 from acessilia_core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.handlers.common import (
@@ -36,6 +35,7 @@ from acessilia_core.pipeline.handlers.common import (
 from acessilia_core.pipeline.toolbox import _source_artifact_id, _toolbox_render
 from acessilia_core.ports import RegionCache, RunPorts, region_cache_for
 from acessilia_sdk.runtime import run_sync
+from docstruct.text.latex import bare_latex as normalize_latex
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin

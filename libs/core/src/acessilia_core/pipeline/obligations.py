@@ -10,7 +10,6 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from acessilia_core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
-from acessilia_core.formula_tools import normalize_latex
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE,
@@ -23,6 +22,7 @@ from acessilia_core.manifest.models import (
     Obligation,
     ProcessingManifest,
 )
+from docstruct.text.latex import bare_latex as normalize_latex
 
 if TYPE_CHECKING:
     pass

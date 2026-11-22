@@ -33,7 +33,6 @@ from acessilia_core.config import (
     ToolboxConfig,
     VisionConfig,
 )
-from acessilia_core.formula_tools import normalize_latex
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_FORMULA_RECOGNIZE_EMPTY,
@@ -62,7 +61,11 @@ from acessilia_core.toolbox.toolbox_math_tools import (
 )
 from acessilia_sdk.toolbox.clients.pdf import RENDER_MEDIA_TYPES
 from docstruct.text.equations import preserve_equation_number, split_equation_number
-from docstruct.text.latex import has_latex_markup, latex_text_agreement
+from docstruct.text.latex import (
+    bare_latex as normalize_latex,
+    has_latex_markup,
+    latex_text_agreement,
+)
 
 
 def _formula_recognition_crop(
