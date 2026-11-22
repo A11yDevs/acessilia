@@ -10,7 +10,11 @@ from __future__ import annotations
 import ast
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
+from typing import cast
+
+import pytest
 
 from scripts import architecture_quality as quality
 
@@ -34,22 +38,25 @@ def test_component_of_maps_every_scanned_root() -> None:
 
 def test_imported_components_maps_absolute_and_relative_imports() -> None:
     tree = ast.parse(
-        "import acessilia_sdk\n"
+        "import acessilia_core as core\n"
         "from docstruct.fusion import payload\n"
-        "from . import sibling\n"
+        "from .. import sibling\n"
         "from backend.api import routes\n"
         "import httpx\n"
     )
 
-    assert quality._imported_components(tree, "core") == {
-        "sdk",
-        "docstruct",
+    assert quality._imported_components(tree, "sdk") == {
         "core",
+        "docstruct",
+        "sdk",
         "backend",
     }
 
 
-def _record(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> quality.FunctionRecord:
+def _record(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    parents: dict[ast.AST, ast.AST],
+) -> quality.FunctionRecord:
     return quality.FunctionRecord(
         component="core",
         path="core/sample.py",
@@ -96,13 +103,85 @@ def test_duplicate_groups_find_structurally_equal_functions() -> None:
     }
 
 
+def test_duplicate_groups_can_span_components() -> None:
+    tree = ast.parse(
+        "def first(values):\n"
+        "    total = 0\n"
+        "    for value in values:\n"
+        "        total += value\n"
+        "    return total\n"
+        "\n"
+        "def second(items):\n"
+        "    count = 0\n"
+        "    for item in items:\n"
+        "        count += item\n"
+        "    return count\n"
+    )
+    parents = quality._parents(tree)
+    records = [
+        replace(record, component=component, path=path)
+        for record, component, path in zip(
+            (
+                _record(node, parents)
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            ),
+            ("core", "sdk"),
+            ("core/sample.py", "sdk/sample.py"),
+        )
+    ]
+
+    groups, totals = quality._duplicate_groups(records)
+
+    assert totals["groups"] == 1
+    assert {function["component"] for function in groups[0]["functions"]} == {
+        "core",
+        "sdk",
+    }
+
+
 def test_a_trivial_function_has_no_duplicate_fingerprint() -> None:
-    node = ast.parse("def tiny(value):\n    return value\n").body[0]
+    node = cast(
+        ast.FunctionDef,
+        ast.parse("def tiny(value):\n    return value\n").body[0],
+    )
     assert quality._fingerprint(node) is None
+
+
+def test_a_docstring_does_not_make_a_one_statement_wrapper_a_duplicate() -> None:
+    node = cast(
+        ast.FunctionDef,
+        ast.parse(
+            'def wrapper(value):\n    """Documented wrapper."""\n    return other(value)\n'
+        ).body[0],
+    )
+    assert quality._fingerprint(node) is None
+
+
+def test_fingerprinting_an_outer_function_keeps_nested_qualnames() -> None:
+    tree = ast.parse(
+        "def outer(values):\n"
+        "    def inner(value):\n"
+        "        return value + 1\n"
+        "    total = sum(values)\n"
+        "    return total + inner(total)\n"
+    )
+    parents = quality._parents(tree)
+    outer = cast(ast.FunctionDef, tree.body[0])
+    inner = cast(ast.FunctionDef, outer.body[0])
+    before = quality._qualname(inner, parents)
+
+    quality._fingerprint(outer)
+
+    assert before == "outer.inner"
+    assert quality._qualname(inner, parents) == "outer.inner"
 
 
 def test_cycles_are_reported_canonically() -> None:
     assert quality._cycles({"core": {"sdk"}, "sdk": {"core"}}) == [["core", "sdk"]]
+    assert quality._cycles(
+        {"core": {"sdk"}, "sdk": {"docstruct"}, "docstruct": {"core"}}
+    ) == [["core", "sdk", "docstruct"]]
     assert quality._cycles({"core": {"sdk"}, "sdk": set()}) == []
 
 
@@ -124,3 +203,23 @@ def test_the_committed_baseline_has_the_expected_shape() -> None:
     assert data["duplication"]["totals"]["groups"] >= len(data["duplication"]["groups"])
     assert data["hotspots"]["functions"]
     assert data["hotspots"]["modules"]
+    assert {"path", "nonblank_lines", "total_lines"} <= set(data["hotspots"]["modules"][0])
+
+    fan_in: dict[str, set[str]] = {component: set() for component in quality.COMPONENTS}
+    fan_out: dict[str, set[str]] = {component: set() for component in quality.COMPONENTS}
+    for edge in data["dependency_edges"]:
+        fan_out[edge["from"]].add(edge["to"])
+        fan_in[edge["to"]].add(edge["from"])
+    assert data["component_coupling"]["fan_in"] == {
+        component: len(sources) for component, sources in fan_in.items()
+    }
+    assert data["component_coupling"]["fan_out"] == {
+        component: len(targets) for component, targets in fan_out.items()
+    }
+
+
+def test_an_unknown_revision_is_a_cli_error() -> None:
+    with pytest.raises(SystemExit) as caught:
+        quality.main(["--rev", "revision-that-does-not-exist"])
+
+    assert caught.value.code == 2

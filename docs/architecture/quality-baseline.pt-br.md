@@ -11,7 +11,7 @@ Esta é a instrumentação e o baseline da [issue #656](https://github.com/A11yD
 
 ## Método
 
-O script lê cada arquivo `.py` rastreado pelo `git` na revisão pedida, então um baseline pode ser reproduzido sem fazer checkout do commit. Ele usa [`scripts/architecture_metrics.py`](../../scripts/architecture_metrics.py) para os nomes de arquivos e para a aproximação de complexidade de McCabe: 1 por função mais 1 por branch, laço, `except`, `with`, expressão condicional, compreensão, `assert`, `match` e operando extra de `and`/`or`; escopos aninhados são medidos separadamente.
+O script lê cada arquivo `.py` rastreado pelo `git` na revisão pedida, então um baseline pode ser reproduzido sem fazer checkout do commit. Ele usa [`scripts/architecture_metrics.py`](../../scripts/architecture_metrics.py) para os nomes de arquivos e para a aproximação de complexidade de McCabe: 1 por função mais 1 por branch, laço, `except`, `with`, expressão condicional, compreensão, `assert`, `match` e operando extra de `and`/`or`; escopos aninhados são medidos separadamente. Um arquivo Python rastreado que não parseia é reportado em stderr e ignorado, em vez de distorcer os totais em silêncio.
 
 | Medida | Definição |
 |---|---|
@@ -20,10 +20,10 @@ O script lê cada arquivo `.py` rastreado pelo `git` na revisão pedida, então 
 | Aresta de dependência | Um arquivo do componente A importa um módulo first-party do componente B (`acessilia_core`, `acessilia_sdk`, `docstruct`, `backend`, `frontend`); cada arquivo conta uma vez por destino, e imports relativos contam como o componente atual |
 | Fan-in / fan-out | Componentes que importam A / componentes que A importa |
 | Ciclo | Um ciclo simples no grafo de componentes |
-| Duplicata estrutural | Funções com pelo menos 20 nós AST e dois comandos cujos corpos normalizados têm o mesmo digest SHA-256; nomes, constantes, atributos e nomes de keyword são normalizados |
+| Duplicata estrutural | Funções com pelo menos 15 nós AST que não são de contexto e dois comandos após um docstring inicial cujos corpos normalizados têm o mesmo digest SHA-256; nomes, constantes, atributos e nomes de keyword são normalizados |
 | Hotspot | As funções mais complexas e os maiores módulos |
 
-Uma duplicata estrutural é uma **candidata**, não um clone semântico. Duas funções podem compartilhar o fluxo de controle e ainda diferir em tipos, efeitos colaterais ou tratamento de erro. O PR 2 decide quais grupos valem consolidar. Coesão (LCOM), fan-in em nível de módulo e duplicação semântica ficam deliberadamente para o PR 3; este baseline expõe as entradas para essas análises.
+Uma duplicata estrutural é uma **candidata**, não um clone semântico. Duas funções podem compartilhar o fluxo de controle e ainda diferir em tipos, efeitos colaterais ou tratamento de erro. O total de linhas reportado é a extensão física dos membros (incluindo docstrings e assinaturas), portanto é um limite superior de lógica duplicada. O PR 2 decide quais grupos valem consolidar. Coesão (LCOM), fan-in em nível de módulo e duplicação semântica ficam deliberadamente para o PR 3; este baseline expõe as entradas para essas análises.
 
 ## Baseline
 
@@ -56,17 +56,19 @@ Nenhum ciclo entre componentes foi encontrado. Fan-in: Core 2, SDK 2, docstruct 
 
 ### Duplicatas estruturais
 
-O baseline contém **50 grupos**, **133 funções** e **1.529 linhas** em grupos duplicados. O JSON guarda os 40 maiores grupos; os totais cobrem todos. Os cinco maiores grupos são:
+O baseline contém **23 grupos**, **57 funções** e **699 linhas** em grupos duplicados. O JSON guarda os 40 maiores grupos; aqui todos os 23 cabem. Os cinco maiores grupos são:
 
 | Grupo | Linhas | Exemplos |
 |---:|---:|---|
-| 9 funções | 99 | wrappers de operações do `FusionAgent` (`move_header_footer_to_end`, `normalize_formula`, `normalize_text`, `refine_reading_order`, …) |
-| 7 funções | 87 | wrappers de `AdjudicationAgent` e `OrderAdjudicationAgent` (`decide_from_transcription`, `complete_order`, `kendall_tau`, `parse_order`, …) |
-| 7 funções | 33 | `FusionAgent.process_*` e `OrderAdjudicationAgent.process_refine_reading_order` |
-| 6 funções | 22 | `OrderAdjudicationAgent.process_*` e `PageLevelAgent.process_decide_orientation` |
-| 5 funções | 15 | leitores de dataset do SDK (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
+| 5 funções | 39 | handlers do Telegram no frontend `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` |
+| 5 funções | 15 | leitores de dataset gerados do SDK (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
+| 4 funções | 33 | escritores de schema do core (`write_execution_report_schema`, `write_processing_manifest_schema`, …) |
+| 3 funções | 17 | helpers de configuração do core (`_tool_config`, `_export_config`, `_toolbox_config`) |
+| 3 funções | 48 | leitores de resultado do SDK (`transcribe_region_result`, `text_spans_result`, `validate_result`) |
 
-Os primeiros grupos são dominados por métodos de processo/wrapper em volta dos agentes Agno. Eles podem ser adaptadores legítimos ou esconder uma operação reutilizável; o PR 2 avalia cada grupo antes de tocar no código. O detector não encontrou grupo entre componentes grande o suficiente para mudar o mapa de responsabilidades sozinho.
+Dois grupos cruzam componentes. O substantivo é `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 funções, 30 linhas) — candidato à questão de responsabilidade do PR 2. O outro é trivial (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 funções, 6 linhas). Os leitores de dataset do SDK vivem em `_dataset_generated.py`, cujo cabeçalho diz “do not edit by hand”; são sinal para o gerador, não para consolidação manual.
+
+Os demais grupos são candidatos, não veredictos: fluxo de controle normalizado igual não é equivalência semântica. O detector ignora docstrings e nós de contexto da AST, então um wrapper documentado de um comando não entra mais em grupo. O PR 2 avalia cada grupo antes de tocar no código.
 
 ### Hotspots
 
@@ -78,7 +80,7 @@ Os primeiros grupos são dominados por métodos de processo/wrapper em volta dos
 | `recover_empty_lettered_list_items` (`blocks/lists.py`) | docstruct | 53 | 131 |
 | `JobExecutor.run` (`api/worker.py`) | backend | 43 | 325 |
 
-Os maiores módulos são o orquestrador do core (808 linhas), o payload do core (801), o vision agent do core (793), o worker do backend (788) e o extrator da Toolbox do core (751). Todos estão abaixo do limite atual de 900 linhas por módulo, mas são os primeiros candidatos à revisão de acoplamento do PR 3.
+Os maiores módulos por linhas totais são o payload do core (899; 801 não vazias), o vision agent do core (885; 793), o worker do backend (871; 788), o orquestrador do core (871; 808) e `tables/ast.py` da docstruct (828; 691). O guard de 900 linhas do D4 cobre apenas `libs/core/src/acessilia_core`, e o payload está uma linha abaixo; backend e docstruct estão fora desse guard. Eles são os primeiros candidatos à revisão de acoplamento do PR 3.
 
 ## Reprodução
 
@@ -94,7 +96,7 @@ python scripts/architecture_quality.py --rev HEAD \
 python -m pytest tests/test_architecture_quality.py
 ```
 
-O JSON versionado registra o commit medido em `rev`. O script é apenas diagnóstico: ele sai com 0 mesmo quando os números crescem. O PR 5 decide quais medidas viram ratchet, com o fluxo de allowlist e atualização dos baselines existentes da #652 e do Ruff.
+O JSON versionado registra o commit medido em `rev` e a versão do Python em `python`. A identidade dos grupos de duplicatas só é comparável na mesma versão minor do Python, porque `ast.dump` pode mudar com a gramática; tamanho, complexidade e arestas de dependência são estáveis. O script é apenas diagnóstico: ele sai com 0 mesmo quando os números crescem. O PR 5 decide quais medidas viram ratchet, com o fluxo de allowlist e atualização dos baselines existentes da #652 e do Ruff.
 
 ## O que este PR não decide
 

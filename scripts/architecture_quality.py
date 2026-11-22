@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import copy
 import hashlib
 import json
 import platform
@@ -40,7 +41,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
+if __package__ in (None, ""):
     sys.path.insert(0, str(ROOT))
 
 from scripts.architecture_metrics import complexity, python_files  # noqa: E402
@@ -63,8 +64,8 @@ COMPONENT_MODULES: dict[str, str] = {
     "frontend": "frontend",
 }
 
-#: A function needs at least this many AST nodes to enter the duplicate report.
-MIN_DUPLICATE_NODES = 20
+#: A function needs at least this many non-context AST nodes to enter the report.
+MIN_DUPLICATE_NODES = 15
 #: The baseline keeps only the largest duplicate groups; totals cover all groups.
 MAX_DUPLICATE_GROUPS = 40
 #: Maximum rows in each hotspot ranking.
@@ -137,6 +138,13 @@ def _parse(source: str) -> ast.Module | None:
             return None
 
 
+def _resolve_revision(rev: str) -> str:
+    try:
+        return _git("rev-parse", f"{rev}^{{commit}}").strip()
+    except subprocess.CalledProcessError as exc:
+        raise ValueError(f"unknown revision: {rev}") from exc
+
+
 def _component_of(path: str) -> str | None:
     """The component that owns ``path``, or ``None`` outside the scanned roots."""
     for component, root in COMPONENTS.items():
@@ -172,8 +180,11 @@ def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
     return parents
 
 
-def _qualname(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
-    names = [node.name]  # type: ignore[attr-defined]
+def _qualname(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    parents: dict[ast.AST, ast.AST],
+) -> str:
+    names = [node.name]
     current = parents.get(node)
     while current is not None:
         if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -182,17 +193,40 @@ def _qualname(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
     return ".".join(reversed(names))
 
 
-def _fingerprint(node: ast.AST) -> str | None:
+def _body_statements(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.stmt]:
+    """The body without a leading docstring, which is not a logical statement."""
+    statements = list(node.body)
+    if (
+        statements
+        and isinstance(statements[0], ast.Expr)
+        and isinstance(statements[0].value, ast.Constant)
+        and isinstance(statements[0].value.value, str)
+    ):
+        return statements[1:]
+    return statements
+
+
+def _node_count(node: ast.AST) -> int:
+    """AST nodes that carry structure, excluding the Load/Store/Del context markers."""
+    return sum(
+        1
+        for child in ast.walk(node)
+        if not isinstance(child, (ast.Load, ast.Store, ast.Del))
+    )
+
+
+def _fingerprint(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
     """A digest of the normalized body, or ``None`` for a trivial function."""
-    if len(node.body) < 2 or sum(1 for _ in ast.walk(node)) < MIN_DUPLICATE_NODES:  # type: ignore[attr-defined]
+    statements = _body_statements(node)
+    if len(statements) < 2 or _node_count(node) < MIN_DUPLICATE_NODES:
         return None
-    body = ast.Module(body=list(node.body), type_ignores=[])  # type: ignore[attr-defined]
+    body = ast.Module(body=copy.deepcopy(statements), type_ignores=[])
     normalized = _Shape().visit(body)
     dumped = ast.dump(normalized, annotate_fields=False, include_attributes=False)
     return hashlib.sha256(dumped.encode("utf-8")).hexdigest()
 
 
-def _scan(sha: str) -> tuple[dict[str, dict[str, Any]], list[FunctionRecord], list[tuple[str, int]], dict[tuple[str, str], int]]:
+def _scan(sha: str) -> tuple[dict[str, dict[str, Any]], list[FunctionRecord], list[tuple[str, int, int]], dict[tuple[str, str], int]]:
     """Read every scanned file once and return component metrics and raw evidence."""
     files = python_files(sha, list(COMPONENTS.values()))
     components: dict[str, dict[str, Any]] = {
@@ -207,7 +241,7 @@ def _scan(sha: str) -> tuple[dict[str, dict[str, Any]], list[FunctionRecord], li
         for component in COMPONENTS
     }
     functions: list[FunctionRecord] = []
-    file_sizes: list[tuple[str, int]] = []
+    file_sizes: list[tuple[str, int, int]] = []
     edges: dict[tuple[str, str], int] = defaultdict(int)
 
     for path in files:
@@ -217,13 +251,14 @@ def _scan(sha: str) -> tuple[dict[str, dict[str, Any]], list[FunctionRecord], li
         source = _git("show", f"{sha}:{path}")
         tree = _parse(source)
         if tree is None:
+            print(f"warning: could not parse {path} at {sha}", file=sys.stderr)
             continue
 
         nonblank = sum(1 for line in source.splitlines() if line.strip())
         metrics = components[component]
         metrics["files"] += 1
         metrics["nonblank_lines"] += nonblank
-        file_sizes.append((path, nonblank))
+        file_sizes.append((path, nonblank, len(source.splitlines())))
 
         for target in _imported_components(tree, component):
             if target != component:
@@ -316,7 +351,7 @@ def _cycles(graph: dict[str, set[str]]) -> list[list[str]]:
     return [list(cycle) for cycle in sorted(found)]
 
 
-def _hotspots(functions: list[FunctionRecord], file_sizes: list[tuple[str, int]]) -> dict[str, list[dict[str, Any]]]:
+def _hotspots(functions: list[FunctionRecord], file_sizes: list[tuple[str, int, int]]) -> dict[str, list[dict[str, Any]]]:
     """The most complex functions and the largest modules."""
     top_functions = sorted(
         functions,
@@ -327,7 +362,7 @@ def _hotspots(functions: list[FunctionRecord], file_sizes: list[tuple[str, int]]
             function.qualname,
         ),
     )[:MAX_HOTSPOTS]
-    top_modules = sorted(file_sizes, key=lambda item: (-item[1], item[0]))[:MAX_HOTSPOTS]
+    top_modules = sorted(file_sizes, key=lambda item: (-item[2], item[0]))[:MAX_HOTSPOTS]
     return {
         "functions": [
             {
@@ -340,14 +375,15 @@ def _hotspots(functions: list[FunctionRecord], file_sizes: list[tuple[str, int]]
             for function in top_functions
         ],
         "modules": [
-            {"path": path, "lines": lines} for path, lines in top_modules
+            {"path": path, "nonblank_lines": nonblank, "total_lines": total}
+            for path, nonblank, total in top_modules
         ],
     }
 
 
 def collect(rev: str = "HEAD") -> dict[str, Any]:
     """Measure the baseline for ``rev`` and return the JSON-ready payload."""
-    sha = _git("rev-parse", rev).strip()
+    sha = _resolve_revision(rev)
     components, functions, file_sizes, edges = _scan(sha)
     targets: dict[str, set[str]] = defaultdict(set)
     sources: dict[str, set[str]] = defaultdict(set)
@@ -397,7 +433,10 @@ def main(argv: list[str] | None = None) -> int:
         help="write the JSON baseline there instead of printing it",
     )
     args = parser.parse_args(argv)
-    payload = collect(args.rev)
+    try:
+        payload = collect(args.rev)
+    except ValueError as exc:
+        parser.error(str(exc))
     text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     if args.output is None:
         sys.stdout.write(text)

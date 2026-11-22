@@ -12,7 +12,7 @@ This is the instrumentation and baseline of [issue #656](https://github.com/A11y
 
 ## Method
 
-The script reads every tracked `.py` file from `git` at the requested revision, so a baseline can be reproduced without checking out the commit. It uses [`scripts/architecture_metrics.py`](../../scripts/architecture_metrics.py) for the filenames and for McCabe's complexity approximation: 1 per function plus 1 per branch, loop, `except`, `with`, conditional expression, comprehension, `assert`, `match` and extra `and`/`or` operand; nested scopes are measured separately.
+The script reads every tracked `.py` file from `git` at the requested revision, so a baseline can be reproduced without checking out the commit. It uses [`scripts/architecture_metrics.py`](../../scripts/architecture_metrics.py) for the filenames and for McCabe's complexity approximation: 1 per function plus 1 per branch, loop, `except`, `with`, conditional expression, comprehension, `assert`, `match` and extra `and`/`or` operand; nested scopes are measured separately. A tracked Python file that does not parse is reported on stderr and skipped rather than silently skewing the totals.
 
 | Measure | Definition |
 |---|---|
@@ -21,10 +21,10 @@ The script reads every tracked `.py` file from `git` at the requested revision, 
 | Dependency edge | A file in component A imports a first-party module of component B (`acessilia_core`, `acessilia_sdk`, `docstruct`, `backend`, `frontend`); each file counts once per target, and relative imports count as the current component |
 | Fan-in / fan-out | Components that import A / components A imports |
 | Cycle | A simple cycle in the component graph |
-| Structural duplicate | Functions with at least 20 AST nodes and two statements whose normalized bodies have the same SHA-256 digest; names, constants, attributes and keyword names are normalized |
+| Structural duplicate | Functions with at least 15 non-context AST nodes and two statements after a leading docstring whose normalized bodies have the same SHA-256 digest; names, constants, attributes and keyword names are normalized |
 | Hotspot | The most complex functions and the largest modules |
 
-A structural duplicate is a **candidate**, not a semantic clone. Two functions can share control flow and still differ in types, side effects or error handling. PR 2 decides which groups are worth consolidating. Cohesion (LCOM), module-level fan-in and semantic duplication are deliberately left to PR 3; this baseline exposes the inputs for those analyses.
+A structural duplicate is a **candidate**, not a semantic clone. Two functions can share control flow and still differ in types, side effects or error handling. The reported line total is the physical span of the members (including docstrings and signatures), so it is an upper bound on duplicated logic. PR 2 decides which groups are worth consolidating. Cohesion (LCOM), module-level fan-in and semantic duplication are deliberately left to PR 3; this baseline exposes the inputs for those analyses.
 
 ## Baseline
 
@@ -57,17 +57,19 @@ No component cycle was found. Fan-in: Core 2, SDK 2, docstruct 3, backend 1, fro
 
 ### Structural duplicates
 
-The baseline contains **50 groups**, **133 functions** and **1,529 lines** in duplicate groups. The JSON keeps the 40 largest groups; totals cover every group. The five largest groups are:
+The baseline contains **23 groups**, **57 functions** and **699 lines** in duplicate groups. The JSON keeps the 40 largest groups; here all 23 fit. The five largest groups are:
 
 | Group | Lines | Examples |
 |---:|---:|---|
-| 9 functions | 99 | `FusionAgent` operation wrappers (`move_header_footer_to_end`, `normalize_formula`, `normalize_text`, `refine_reading_order`, …) |
-| 7 functions | 87 | `AdjudicationAgent` and `OrderAdjudicationAgent` wrappers (`decide_from_transcription`, `complete_order`, `kendall_tau`, `parse_order`, …) |
-| 7 functions | 33 | `FusionAgent.process_*` and `OrderAdjudicationAgent.process_refine_reading_order` |
-| 6 functions | 22 | `OrderAdjudicationAgent.process_*` and `PageLevelAgent.process_decide_orientation` |
-| 5 functions | 15 | SDK dataset readers (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
+| 5 functions | 39 | frontend Telegram handlers `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` |
+| 5 functions | 15 | generated SDK dataset readers (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
+| 4 functions | 33 | core schema writers (`write_execution_report_schema`, `write_processing_manifest_schema`, …) |
+| 3 functions | 17 | core config helpers (`_tool_config`, `_export_config`, `_toolbox_config`) |
+| 3 functions | 48 | SDK result readers (`transcribe_region_result`, `text_spans_result`, `validate_result`) |
 
-The first groups are dominated by process/wrapper methods around the Agno agents. They may be legitimate adapters or may hide a reusable operation; PR 2 evaluates each group before touching it. The detector found no cross-component group large enough to change the ownership map on its own.
+Two groups cross component boundaries. The substantive one is `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 functions, 30 lines) — a candidate for PR 2's ownership question. The other is trivial (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 functions, 6 lines). The SDK dataset readers live in `_dataset_generated.py`, whose header says “do not edit by hand”; they are a signal for the generator, not for manual consolidation.
+
+The remaining groups are candidates, not verdicts: equal normalized control flow is not semantic equivalence. The detector ignores docstrings and AST context nodes, so a documented one-statement wrapper no longer enters a group. PR 2 evaluates each group before touching it.
 
 ### Hotspots
 
@@ -79,7 +81,7 @@ The first groups are dominated by process/wrapper methods around the Agno agents
 | `recover_empty_lettered_list_items` (`blocks/lists.py`) | docstruct | 53 | 131 |
 | `JobExecutor.run` (`api/worker.py`) | backend | 43 | 325 |
 
-The largest modules are the core orchestrator (808 lines), the core payload (801), the core vision agent (793), the backend worker (788) and the core toolbox extractor (751). All are below the current 900-line module limit, but they are the first candidates for PR 3's coupling review.
+The largest modules by total lines are the core payload (899; 801 non-blank), the core vision agent (885; 793), the backend worker (871; 788), the core orchestrator (871; 808) and docstruct's `tables/ast.py` (828; 691). D4's 900-line guard applies only to `libs/core/src/acessilia_core`, and the payload is one line under it; the backend and docstruct modules are outside that guard. They are the first candidates for PR 3's coupling review.
 
 ## Reproduction
 
@@ -95,7 +97,7 @@ python scripts/architecture_quality.py --rev HEAD \
 python -m pytest tests/test_architecture_quality.py
 ```
 
-The committed JSON records the measured commit in `rev`. The script is a diagnostic only: it exits 0 even when the numbers grow. PR 5 decides which measures become a ratchet, with the allowlist and update workflow of the existing #652 and Ruff baselines.
+The committed JSON records the measured commit in `rev` and the Python version in `python`. Duplicate-group identity is comparable only on the same Python minor version, because `ast.dump` can change with the grammar; size, complexity and dependency edges are stable. The script is a diagnostic only: it exits 0 even when the numbers grow. PR 5 decides which measures become a ratchet, with the allowlist and update workflow of the existing #652 and Ruff baselines.
 
 ## What this PR does not decide
 
