@@ -2,6 +2,12 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.5 — one writer for the JSON Schema files
+
+No behaviour change. The four `write_*_schema` functions now delegate to
+`acessilia_core.schema_files.write_schema`, which owns the parent creation and
+the UTF-8 JSON formatting (#656).
+
 ## 0.3.4 — structured findings rendered through the SDK
 
 No behaviour change. `acessilia_core.pipeline.validators` renders its

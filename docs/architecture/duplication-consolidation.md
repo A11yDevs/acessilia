@@ -33,6 +33,19 @@ The core facade was a new compatibility name, not a preserved pre-existing calle
 
 **Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. The initial [baseline JSON](quality-baseline.json) stays as the historical snapshot; this page records the first change against it.
 
+## Second consolidation: the JSON Schema writer
+
+The four `write_*_schema` functions in `execution/schema.py`, `manifest/schema.py`
+and `planning/schema.py` repeated the same parent creation, UTF-8 encoding,
+`json.dumps(ensure_ascii=False, indent=2)` and trailing newline. They now delegate
+to `acessilia_core.schema_files.write_schema`, while each module keeps its own
+schema function and public writer name. The tests compare each writer's output
+with its schema function and cover parent creation and non-ASCII JSON.
+
+The formatting of the committed schema files is unchanged; this PR does not
+regenerate their contents. This removes the `write_*_schema` group from the
+remaining candidates.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -41,7 +54,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 |---:|---|---|
 | 0 | Frontend Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | Defer to a frontend PR: confirm user-facing copy and menu differences before extracting a command helper. |
 | 1 | Generated SDK dataset readers (5/15) | Generated file (`_dataset_generated.py`): fix the generator, not the generated functions. |
-| 2 | Core schema writers `write_*_schema` (4/33) | Candidate: a shared JSON-writer helper with schema-path tests. |
+| 2 | Core schema writers `write_*_schema` (4/33) | **Consolidated:** shared `schema_files.write_schema`, with writer/schema tests. |
 | 3 | Core config helpers `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Defer: the surrounding config dataclasses differ. |
 | 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | Candidate: a generic typed-result reader after the SDK contract tests. |
 | 5 | SDK result readers in math/media_inspect (3/38) | Candidate: same generic reader. |

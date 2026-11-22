@@ -8,6 +8,7 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.schema_files import write_schema
 
 
 def processing_manifest_schema() -> dict[str, Any]:
@@ -18,12 +19,7 @@ def processing_manifest_schema() -> dict[str, Any]:
 
 
 def write_processing_manifest_schema(destination: Path) -> Path:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(processing_manifest_schema(), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return destination
+    return write_schema(processing_manifest_schema(), destination)
 
 
 def validate_manifest(

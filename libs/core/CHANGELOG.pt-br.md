@@ -2,6 +2,12 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.5 — um único writer para os arquivos JSON Schema
+
+Sem mudança de comportamento. As quatro funções `write_*_schema` agora delegam
+para `acessilia_core.schema_files.write_schema`, que concentra a criação do
+diretório pai e a formatação JSON em UTF-8 (#656).
+
 ## 0.3.4 — findings estruturados renderizados pelo SDK
 
 Sem mudança de comportamento. `acessilia_core.pipeline.validators` renderiza

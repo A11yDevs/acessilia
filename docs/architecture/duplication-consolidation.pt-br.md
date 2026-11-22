@@ -32,6 +32,19 @@ A fachada do core era um nome novo de compatibilidade, não um chamador pré-exi
 
 **Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. O [JSON do baseline](quality-baseline.json) inicial permanece como snapshot histórico; esta página registra a primeira mudança contra ele.
 
+## Segunda consolidação: o writer de JSON Schema
+
+As quatro funções `write_*_schema` em `execution/schema.py`, `manifest/schema.py`
+e `planning/schema.py` repetiam a criação do diretório pai, a codificação UTF-8,
+o `json.dumps(ensure_ascii=False, indent=2)` e a quebra de linha final. Agora
+delegam para `acessilia_core.schema_files.write_schema`, enquanto cada módulo
+mantém sua função de schema e seu nome público de writer. Os testes comparam a
+saída de cada writer com sua função de schema e cobrem criação do diretório pai
+e JSON não-ASCII.
+
+A formatação dos arquivos de schema versionados não muda; este PR não regenera
+o conteúdo deles. O grupo `write_*_schema` sai dos candidatos restantes.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -40,7 +53,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 |---:|---|---|
 | 0 | Handlers do Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | Adiar para um PR de frontend: confirmar diferenças de texto e menu antes de extrair um helper de comando. |
 | 1 | Leitores de dataset gerados do SDK (5/15) | Arquivo gerado (`_dataset_generated.py`): corrigir o gerador, não as funções geradas. |
-| 2 | Escritores de schema do core `write_*_schema` (4/33) | Candidato: helper compartilhado de escrita JSON com testes de caminho de schema. |
+| 2 | Escritores de schema do core `write_*_schema` (4/33) | **Consolidado:** `schema_files.write_schema` compartilhado, com testes de writer/schema. |
 | 3 | Helpers de config do core `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Adiar: os dataclasses de configuração ao redor diferem. |
 | 4 | Leitores de resultado do SDK em adjudicate/pdf/pdf_validate (3/48) | Candidato: leitor genérico tipado após os testes de contrato do SDK. |
 | 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | Candidato: o mesmo leitor genérico. |

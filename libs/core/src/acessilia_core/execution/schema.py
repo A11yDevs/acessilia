@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from acessilia_core.execution.models import ExecutionReport
+from acessilia_core.schema_files import write_schema
 
 
 def execution_report_schema() -> dict[str, Any]:
@@ -12,9 +12,4 @@ def execution_report_schema() -> dict[str, Any]:
 
 
 def write_execution_report_schema(destination: Path) -> Path:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(execution_report_schema(), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return destination
+    return write_schema(execution_report_schema(), destination)
