@@ -77,11 +77,11 @@ def build_candidates(
     """
     cands: list[tuple[str, str]] = []
     if record.get("kind_d") == "table":
-        html = extract_table(record.get("md_d"))
+        html = extract_table(str(record.get("md_d") or ""))
         if is_valid_table(html):
             cands.append(("a", html))
     if record.get("kind_m") == "table":
-        html = extract_table(record.get("md_m"))
+        html = extract_table(str(record.get("md_m") or ""))
         if is_valid_table(html):
             cands.append(("b", html))
     gens = [extract_table(g) for g in [greedy] + list(samples or [])]

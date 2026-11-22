@@ -467,14 +467,15 @@ def _value_type_findings(value: Any, spec: dict[str, Any], path: str) -> list[tu
 def _is_json_type(value: Any, json_type: str) -> bool:
     if isinstance(value, bool):
         return json_type == "boolean"
-    expected = {
+    expected_map: dict[str, type[Any] | tuple[type[Any], ...]] = {
         "string": str,
         "integer": int,
         "number": (int, float),
         "boolean": bool,
         "array": list,
         "object": dict,
-    }[json_type]
+    }
+    expected = expected_map[json_type]
     return isinstance(value, expected)
 
 

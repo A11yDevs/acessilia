@@ -98,7 +98,7 @@ make test-all
 ```
 
 - `make lint` executa o **Ruff** (regras `F`, `I` e `E` exceto `E501`) via `scripts/check_ruff_baseline.py` contra a baseline em `tests/fixtures/ruff_baseline.json`, que só pode diminuir. Qualquer violação nova falha a verificação; ao corrigir violações preexistentes em um arquivo, reduza a baseline com `uv run python scripts/check_ruff_baseline.py --update`. A ordenação de imports é aplicada diretamente (`uv run ruff check --select I --fix` corrige um arquivo).
-- `make typecheck` executa o **Mypy** no escopo configurado de `docstruct` e `acessilia_sdk` no `pyproject.toml` (todos os módulos exceto os overrides legados explicitamente listados, além de qualquer módulo novo).
+- `make typecheck` executa o **Mypy** em todos os módulos do escopo configurado de `docstruct` e `acessilia_sdk` no `pyproject.toml`; não há overrides de módulos adiados.
 - Opcional localmente (roda automaticamente no CI): `make coverage` executa as quatro suítes com cobertura de desvios (*branch coverage* via `pytest-cov`) e grava relatórios XML, JSON e HTML separados em `var/coverage/{app,core,sdk,docstruct}/`, sem exigir um percentual mínimo obrigatório nesta etapa.
 
 Durante o desenvolvimento, `make test-file F=tests/test_example.py` executa um

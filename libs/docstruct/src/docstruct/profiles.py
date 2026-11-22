@@ -6,8 +6,9 @@ access — the consumer chooses which profile to apply.
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import Any
 
-OUTPUT_PROFILES = {
+OUTPUT_PROFILES: dict[str, dict[str, Any]] = {
     "html": {
         "verbosity": ["basic", "detailed", "technical"],
         "interactive": True,

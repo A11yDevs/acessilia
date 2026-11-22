@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Sequence
 
 from docstruct.fusion._hungarian import linear_sum_assignment
 from docstruct.fusion.noise import (
@@ -136,7 +137,7 @@ def _pick(
 
 
 def _finalize(
-    items: list[tuple[object, str]],
+    items: list[tuple[Sequence[float] | None, str]],
     policy: FusionPolicy,
     stats: Counter,
 ) -> list[str]:
@@ -301,7 +302,7 @@ def merge_blocks(
     m2d = {j: i for i, j in match_d2m.items()}
 
     # esqueleto: ordem do provider B (MinerU), pares resolvidos
-    seq: list[tuple[float, float, str, object]] = []  # (order key, sub key, md, box)
+    seq: list[tuple[float, float, str, Sequence[float] | None]] = []  # (order key, sub key, md, box)
     emitted_body: list[DiffBlock] = []
     for j, m in enumerate(M):
         md = _pick(D[m2d[j]], m, M, policy, stats) if j in m2d else m.md

@@ -353,7 +353,7 @@ def _box(text: str, origin: str | None) -> _Box:
         edges = []
     if len(edges) != 4:
         raise ValueError(f"--box takes four numbers, LEFT,TOP,RIGHT,BOTTOM: {text!r}")
-    return _Box(*edges, coord_origin=origin)
+    return _Box(edges[0], edges[1], edges[2], edges[3], coord_origin=origin)
 
 
 def formula_document(chain: FormulaChain) -> dict[str, Any]:

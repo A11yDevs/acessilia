@@ -107,7 +107,7 @@ def _safe_mathml(
     if root.tag not in {"math", namespace + "math"}:
         return None
     pending = [(root, 0)]
-    nodes = []
+    nodes: list[Any] = []
     while pending:
         node, depth = pending.pop()
         if depth > 100 or len(nodes) >= 2000:
@@ -332,14 +332,14 @@ def _callout(block: dict[str, Any], reserved_ids: set[str] | None) -> str:
     has_title = isinstance(title, str) and bool(title.strip())
     content = _prose_html(block.get("text", ""), block)
     if block_type == "quote":
-        title_html = f"<p><strong>{escape(title)}</strong></p>" if has_title else ""
+        title_html = f"<p><strong>{escape(str(title))}</strong></p>" if has_title else ""
         return f'<blockquote id="{block_id}" class="quote">{title_html}<p>{content}</p></blockquote>'
     # role="note": several unnamed complementary landmarks inside <main>
     # would be indistinguishable; a callout is a note, not a landmark.
     title_html, name = "", ""
     if has_title:
         title_id = _allocate_id(f"{block_id or block_type}-title", reserved_ids)
-        title_html = f'<p id="{title_id}"><strong>{escape(title)}</strong></p>'
+        title_html = f'<p id="{title_id}"><strong>{escape(str(title))}</strong></p>'
         name = f' aria-labelledby="{title_id}"'
     return (
         f'<aside id="{block_id}" class="{block_type}" role="note"{name}>'
@@ -349,8 +349,8 @@ def _callout(block: dict[str, Any], reserved_ids: set[str] | None) -> str:
 
 def _details(block: dict[str, Any], profile: dict[str, Any]) -> str:
     block_id = escape(block.get("id", ""))
-    block_type = block.get("type")
-    summary = escape(block.get("title", block_type.title()))
+    block_type = block.get("type") or ""
+    summary = escape(str(block.get("title") or block_type.title()))
     content = _prose_html(block.get("text", ""), block)
     if profile.get("collapsible"):
         return f'<details id="{block_id}"><summary>{summary}</summary><p>{content}</p></details>'
@@ -469,7 +469,7 @@ def document_to_html(
     profile_dict = normalize_profile(profile)
     blocks = apply_output_profile_filter(_all_blocks(document), profile)
 
-    toc = []
+    toc: list[tuple[Any, Any, Any]] = []
     reserved_ids = {escape(str(block["id"])) for block in blocks if block.get("id")}
     reserved_ids |= {escape(str(block["title_alias"])) for block in blocks if block.get("title_alias")}
     body = list(walk({"sections": [{"blocks": blocks}]}, _visitor(

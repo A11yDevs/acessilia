@@ -7,7 +7,7 @@ import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from acessilia_sdk.toolbox.artifacts import ArtifactRef, read_artifact
 from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
@@ -163,7 +163,7 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
             parameters=parameters,
             no_cache=use_remote_cache is False,
         )
-        document = result.get("document")
+        document = cast(dict[str, Any], result.get("document"))
         clip_applied = _checked_render(document, page_number)
         image = await read_artifact(
             http, ArtifactRef.parse(str(document["artifact_id"])), magic=b"\x89PNG"
