@@ -4,7 +4,7 @@ import hashlib
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 from acessilia_core.agents.agno_support import require_workflow_classes
 from acessilia_core.execution.messages import (
@@ -36,10 +36,14 @@ from acessilia_core.execution.models import (
     ExecutionReport,
     ExecutionStepResult,
     MethodResult,
+    ReportMode,
+    ReportStatus,
+    StepStatus,
 )
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
 from acessilia_core.manifest.models import (
+    AttemptStatus,
     Obligation,
     ObligationAttempt,
     ProcessingManifest,
@@ -69,12 +73,6 @@ class ExecutionResume:
     manifest: ProcessingManifest
     results: list[ExecutionStepResult]
     replan_required: bool = False
-
-
-ReportMode = Literal["live", "dry-run"]
-ReportStatus = Literal["completed", "failed", "dry-run-completed", "replan-required"]
-AttemptStatus = Literal["succeeded", "failed", "rejected"]
-StepStatus = Literal["succeeded", "failed", "simulated", "skipped"]
 
 
 class MethodRegistry:

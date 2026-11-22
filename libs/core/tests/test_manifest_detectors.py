@@ -347,6 +347,23 @@ def test_detect_fusion_needs_emits_single_document_fuse_providers_and_respects_b
     assert [e.id for e in fuses[0].targets] == ["el-1", "el-2"]
 
 
+def test_detect_fusion_needs_ignores_evidence_pages_without_an_integer_number() -> None:
+    p1 = _element("el-1", "paragraph", text="Page 1", page_number=1)
+
+    assert detect_fusion_needs(
+        [p1],
+        {1: [p1]},
+        fusion_evidence={
+            "pages": [
+                {
+                    "page_number": 1.0,
+                    "stats": {"provider_divergence": True, "similarity": 0.4},
+                }
+            ]
+        },
+    ) == []
+
+
 def test_detect_fusion_needs_aggregate_stats_fallback() -> None:
     p1 = _element("el-1", "paragraph", text="Some text")
     stats = {"text_divergence": True, "provider_divergence": True}
