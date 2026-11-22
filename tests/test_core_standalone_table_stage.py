@@ -34,7 +34,6 @@ def _by_service(tmp_path: Path) -> dict:
     from acessilia_core.agents.model_calls import model_call_scope
     from acessilia_core.manifest.models import ProcessingManifest
     from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
-
     from backend.config.core_config import core_config_from_settings
     from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
 

@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import pytest
 
+from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.pipeline.enrichment.tables import _backfill_table_from_existing_text
 from docstruct.tables.ast import table_ast_column_count as _table_ast_column_count
 from docstruct.tables.text_rows import (
     rows_from_visual_table_text as _rows_from_visual_table_text,
 )
-from acessilia_core.manifest.models import ManifestElement
 
 
 @pytest.mark.parametrize(

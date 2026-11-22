@@ -13,8 +13,8 @@ from typing import Any
 from uuid import uuid4
 
 from acessilia_core.config import ToolboxConfig
-from acessilia_core.i18n import t
 from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.i18n import t
 from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
@@ -25,9 +25,13 @@ from acessilia_core.toolbox.toolbox_math_tools import (
     toolbox_convert_latex,
     toolbox_verbalize_latex,
 )
-from docstruct.canonical import (  # noqa: F401
+from docstruct.canonical import (
     MathEnricher,
+)
+from docstruct.canonical import (
     build_canonical_document as _lib_build,
+)
+from docstruct.canonical import (
     sanitize_canonical_document as _lib_sanitize,
 )
 

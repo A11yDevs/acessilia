@@ -3,14 +3,13 @@ from secrets import compare_digest
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from backend.config.settings import settings
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     API_OBSERVABILITY_NOT_CONFIGURED,
     API_TOKEN_INVALID,
     API_TOKEN_READ_ONLY,
 )
-
+from backend.config.settings import settings
 
 _bearer = HTTPBearer(auto_error=False, scheme_name="ObservabilityToken")
 

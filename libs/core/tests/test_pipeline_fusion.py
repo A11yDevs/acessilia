@@ -6,12 +6,13 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+from core_config_support import toolbox_config
+
 from acessilia_core.pipeline.fusion import (
     apply_page_routes,
     extract_fused,
 )
 from acessilia_core.toolbox.toolbox_client import ToolboxProviderUnavailable
-from core_config_support import toolbox_config
 from docstruct.fusion.payload import group_payload_by_page as _group_by_page
 
 

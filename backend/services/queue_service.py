@@ -4,7 +4,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Coroutine, Any
+from typing import Any, Callable, Coroutine
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (

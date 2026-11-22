@@ -15,6 +15,35 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from jsonschema import ValidationError, validate
+
+from acessilia_core.config import ExportConfig, ToolboxConfig
+from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
+from acessilia_core.export.messages import (
+    MSG_AUDIT_FAILED,
+    MSG_CANONICAL_SCHEMA_FAILED,
+    MSG_DEFAULT_ACCESSIBLE_TITLE,
+    MSG_DOCX_DISABLED,
+    MSG_PDF_UA_DISABLED,
+    MSG_UNSUPPORTED_EXPORT_FORMAT,
+)
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    LOG_DOCX_TOOLBOX_EXPORTED,
+    LOG_PDF_UA_MATH_DEGRADED,
+    LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED,
+    LOG_PDF_UA_MATH_PARTIALLY_DEGRADED,
+    LOG_PDF_UA_TOOLBOX_EXPORTED,
+)
+from acessilia_core.logger import logger
+from acessilia_core.pipeline.canonical_builder import (
+    build_canonical_document,
+    sanitize_canonical_document,
+)
+from acessilia_core.pipeline.validators import (
+    audit_canonical_document,
+    validate_export_profile,
+)
 from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
 from docstruct.export.filters import strip_internal_audit_blocks
 from docstruct.export.pandoc_ast import (
@@ -24,30 +53,6 @@ from docstruct.export.pandoc_ast import (
     unconverted_math_indices,
 )
 from docstruct.validation import validate_against_schema
-from jsonschema import ValidationError, validate
-
-from acessilia_core.config import ExportConfig, ToolboxConfig
-from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import LOG_DOCX_TOOLBOX_EXPORTED
-from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_DEGRADED
-from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_ISOLATION_EXHAUSTED
-from acessilia_core.i18n.log_messages import LOG_PDF_UA_MATH_PARTIALLY_DEGRADED
-from acessilia_core.i18n.log_messages import LOG_PDF_UA_TOOLBOX_EXPORTED
-from acessilia_core.export.messages import (
-    MSG_AUDIT_FAILED,
-    MSG_CANONICAL_SCHEMA_FAILED,
-    MSG_DEFAULT_ACCESSIBLE_TITLE,
-    MSG_DOCX_DISABLED,
-    MSG_PDF_UA_DISABLED,
-    MSG_UNSUPPORTED_EXPORT_FORMAT,
-)
-from acessilia_core.pipeline.canonical_builder import build_canonical_document
-from acessilia_core.pipeline.canonical_builder import sanitize_canonical_document
-from acessilia_core.pipeline.validators import audit_canonical_document
-from acessilia_core.pipeline.validators import validate_export_profile
-from acessilia_core.logger import logger
-
 
 #: BCP 47 language for the document metadata when the document declares none.
 DEFAULT_EXPORT_LANG = "pt-BR"
@@ -69,9 +74,8 @@ def _toolbox_export(
     created and closed inside the coroutine: ``run_sync`` may run it on a fresh
     event loop, and the HTTP connections must not outlive it.
     """
-    from acessilia_sdk.runtime import run_sync
-
     from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+    from acessilia_sdk.runtime import run_sync
 
     async def export() -> dict[str, Any]:
         client = make_toolbox_client(client_cls, toolbox)

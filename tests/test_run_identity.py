@@ -206,11 +206,13 @@ def test_the_extractor_stores_the_run_fusion_identity(tmp_path, monkeypatch) -> 
     from copy import deepcopy
     from unittest.mock import AsyncMock
 
-    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-
     from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
     from tests.core_config_support import fusion_config, paths_config, toolbox_config
-    from tests.test_toolbox_manifest_extractor import FIXTURE_PDF, SAMPLE_TOOLBOX_RESPONSE
+    from tests.test_toolbox_manifest_extractor import (
+        FIXTURE_PDF,
+        SAMPLE_TOOLBOX_RESPONSE,
+    )
 
     primary = AsyncMock(spec=ToolboxStructureClient)
     primary.provider, primary.base_url = "docling", "http://toolbox.test"

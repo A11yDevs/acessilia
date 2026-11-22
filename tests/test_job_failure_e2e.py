@@ -16,10 +16,10 @@ from pathlib import Path
 
 import httpx
 import pytest
+
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import STAGE_ANALYZING_STRUCTURAL
 from acessilia_core.toolbox.toolbox_client import toolbox_endpoints
-
 from backend.agents.state_manager import trim_stage
 from backend.config.settings import settings
 from tests.core_config_support import toolbox_config

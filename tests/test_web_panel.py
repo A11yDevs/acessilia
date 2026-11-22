@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 pytest.importorskip("fastapi.testclient")
 
 from acessilia_core.i18n import t  # noqa: E402
-
 from backend.services.download_token_service import TOKEN_EXPIRY_DAYS  # noqa: E402
 from backend.services.validators import MSG_FILE_TOO_LARGE  # noqa: E402
 from frontend.clients.api_client import ApiError  # noqa: E402
@@ -395,6 +394,7 @@ def test_receipt_cookie_requires_https_when_served_over_https(web_client):
 @pytest.mark.parametrize("status", ["internal", "experimental"])
 def test_download_page_does_not_offer_unavailable_catalogue_entries(web_client, monkeypatch, status):
     from dataclasses import replace
+
     from acessilia_core.export import catalog
 
     hidden = replace(catalog.TXT, spec=replace(catalog.TXT.spec, id="hidden"), status=status)

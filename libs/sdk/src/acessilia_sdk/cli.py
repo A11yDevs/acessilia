@@ -64,7 +64,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
-from acessilia_sdk.operations.formula import FORMULA_CROP_DPI, FormulaChain, formula_chain
+from acessilia_sdk.operations.formula import (
+    FORMULA_CROP_DPI,
+    FormulaChain,
+    formula_chain,
+)
 from acessilia_sdk.operations.page_judge import (
     JUDGE_PAGE_DPI,
     JUDGE_PAGE_MAX_SIDE,

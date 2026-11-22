@@ -1,6 +1,6 @@
-from backend.services.blocking import offload
-import threading
 import sqlite3
+import threading
+
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_ORPHAN_TASKS_CLEANED,
@@ -9,6 +9,7 @@ from acessilia_core.i18n.log_messages import (
 )
 from acessilia_core.logger import logger
 from backend.config.settings import settings
+from backend.services.blocking import offload
 
 _connection: sqlite3.Connection | None = None
 _connection_lock = threading.RLock()

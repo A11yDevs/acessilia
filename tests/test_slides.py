@@ -6,24 +6,32 @@ assertions hold under any supported server locale.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 import copy
 from datetime import UTC, datetime
 
 import pytest
 
-from tests.core_config_support import core_config, fusion_config, model_config, paths_config, toolbox_config, vision_config
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    MSG_SLIDE_HEADING,
+    MSG_SLIDE_HEADING_WITH_TITLE,
+)
 from acessilia_core.manifest.builder import build_processing_manifest
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.slides import is_slide_heading
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import MSG_SLIDE_HEADING, MSG_SLIDE_HEADING_WITH_TITLE
-from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.ports import RunPorts
+from tests.core_config_support import (
+    core_config,
+    fusion_config,
+    model_config,
+    paths_config,
+    toolbox_config,
+    vision_config,
+)
 
 NOW = datetime(2026, 10, 23, tzinfo=UTC)
 WIDTH, HEIGHT = 960, 540
@@ -324,10 +332,9 @@ def test_a_document_is_not_restructured(source):
 def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
     from unittest.mock import AsyncMock
 
-    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-
-    from backend.config.settings import settings
     from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_sdk.toolbox.clients import ToolboxStructureClient
+    from backend.config.settings import settings
     from tests.test_toolbox_manifest_extractor import (
         FIXTURE_PDF,
         SAMPLE_TOOLBOX_RESPONSE,
@@ -388,10 +395,9 @@ async def test_media_inspection_decides_the_structure_before_extraction(
 ):
     from types import SimpleNamespace
 
-    from docstruct.validation import validate_canonical_document
-
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline.canonical_builder import build_canonical_document
+    from docstruct.validation import validate_canonical_document
     from tests.pddl_support import build_orchestrator
 
     calls = []
@@ -567,8 +573,8 @@ def test_an_undescribed_picture_gives_its_labels_back_as_paragraphs(source):
     006.pdf v5 listed them as the picture's alt text ("Aquecedor para vaporizar
     a; amostra; ..."); they go back to the slide after the picture instead.
     """
-    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
     from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
+    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
 
     manifest = _build_edited(
         source,
@@ -633,8 +639,8 @@ async def test_a_failed_description_gives_the_labels_back_past_the_extractor_alt
 
 def test_an_undescribed_slide_picture_gives_back_the_text_it_replaced(source):
     """A slide read as one picture keeps its text when the picture goes undescribed."""
-    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
     from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT
+    from acessilia_core.pipeline.payload import _manifest_pages_to_payload
 
     manifest = _build(source)
     [picture] = [e for e in manifest.elements if e.metadata.get("slide_visual")]

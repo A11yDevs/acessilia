@@ -6,11 +6,8 @@ default or injected via ``id_factory``.
 """
 
 
-from typing import Any, Callable
-
-
-
 import re
+from typing import Any, Callable
 
 from docstruct.blocks.classify import extract_plain_heading
 from docstruct.text.math_spans import split_inline_math

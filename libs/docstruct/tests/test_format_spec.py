@@ -1,7 +1,9 @@
 """The pure format identity is data that callers can serialize and share."""
 
 from dataclasses import FrozenInstanceError, asdict
+
 import pytest
+
 from docstruct.export.formats import FormatSpec
 
 

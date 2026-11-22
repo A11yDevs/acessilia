@@ -16,7 +16,6 @@ import uuid
 from dataclasses import dataclass, replace
 
 from acessilia_core.ports import OperationKind
-
 from backend.services import operation_journal
 
 

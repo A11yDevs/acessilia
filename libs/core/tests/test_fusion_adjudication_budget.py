@@ -12,6 +12,7 @@ test_noncritical_obligations.py).
 from __future__ import annotations
 
 import pytest
+
 from acessilia_core.manifest.builder import inspect_document_needs
 from acessilia_core.manifest.detectors import (
     MAX_ID_SUFFIX,

@@ -30,7 +30,6 @@ def startup(monkeypatch) -> list[str]:
     warnings it logs, and no process state changed for other tests."""
     from acessilia_core import i18n
     from acessilia_core import logger as core_logger
-
     from backend.config import process_setup
 
     warned: list[str] = []

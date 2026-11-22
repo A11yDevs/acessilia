@@ -7,6 +7,7 @@ from pathlib import Path
 
 import jsonschema
 import pytest
+
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.results.layout import read_layout
 

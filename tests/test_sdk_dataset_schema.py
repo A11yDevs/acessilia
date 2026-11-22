@@ -1,14 +1,14 @@
 """REST readers follow precise published array schemas and shared record sources."""
 
-import copy
 import importlib.util
 import json
 from pathlib import Path
 
 import jsonschema
 import pytest
-from acessilia_sdk.toolbox.results import datasets
+
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
+from acessilia_sdk.toolbox.results import datasets
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMAS = ROOT / "tests/fixtures/toolbox-schemas"

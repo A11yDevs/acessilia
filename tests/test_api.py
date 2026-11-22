@@ -13,11 +13,11 @@ from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
+from acessilia_core.logger import logger
 from backend.api.limiter import limiter
 from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
 from backend.services.access_log_filter import AccessLogFilter
-from acessilia_core.logger import logger
 
 pytest.importorskip("fastapi.testclient")
 
@@ -1320,7 +1320,7 @@ async def test_schema_invalid_job_creates_then_cleans_directory_without_register
     from backend.agents.state_manager import state_manager
     from backend.api import worker
     from backend.api.worker import ApiJob, JobExecutor
-    from backend.services.history_service import registrar_conversao, listar_historico
+    from backend.services.history_service import listar_historico, registrar_conversao
     from docstruct.canonical import build_canonical_document
 
     task_id = 'schema-invalid-job'

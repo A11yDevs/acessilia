@@ -15,7 +15,6 @@ from acessilia_core.planning.schema import (
     write_planning_comparison_schema,
 )
 
-
 if __name__ == "__main__":
     destinations = (
         write_processing_manifest_schema(

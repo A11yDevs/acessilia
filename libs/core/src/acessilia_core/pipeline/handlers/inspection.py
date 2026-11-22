@@ -21,8 +21,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from acessilia_sdk.runtime import run_sync
-
 from acessilia_core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from acessilia_core.agents.vision_agent import VisionAgent
 from acessilia_core.config import CoreConfig, ModelConfig, ToolboxConfig
@@ -46,6 +44,7 @@ from acessilia_core.pipeline.toolbox import (
     _toolbox_render,
 )
 from acessilia_core.ports import RegionCache, RunPorts, region_cache_for
+from acessilia_sdk.runtime import run_sync
 
 if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin

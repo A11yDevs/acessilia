@@ -18,6 +18,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.toolbox import ToolboxCapabilityError
 from acessilia_sdk.toolbox.clients import (
     ToolboxLayoutClient,
@@ -26,7 +27,6 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxPdfClient,
     ToolboxStructureClient,
 )
-from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.toolbox.clients.math import recognized_formulas
 from tests.core_config_support import toolbox_config
 
@@ -69,10 +69,9 @@ def _get_pdf() -> Path:
 
 def _make_formula_image() -> bytes:
     """Create a small PNG image with a formula-like drawing."""
-    try:
-        from PIL import Image, ImageDraw, ImageFont  # type: ignore[import-untyped]
-    except ImportError:
-        pytest.skip("Pillow not available — cannot create test image")
+    Image = pytest.importorskip("PIL.Image")
+    ImageDraw = pytest.importorskip("PIL.ImageDraw")
+    ImageFont = pytest.importorskip("PIL.ImageFont")
     img = Image.new("RGB", (400, 100), color="white")
     draw = ImageDraw.Draw(img)
     draw.text((10, 30), "E = mc", fill="black", font=ImageFont.load_default(size=36))
@@ -288,8 +287,8 @@ class TestMathClientE2E:
     @pytest.mark.asyncio
     async def test_recognize_formula(self, math_client: ToolboxMathClient) -> None:
         image = _make_formula_image()
-        from pathlib import Path as _Path
         import tempfile
+        from pathlib import Path as _Path
 
         tmp = _Path(tempfile.mkdtemp()) / "formula.png"
         tmp.write_bytes(image)
@@ -388,14 +387,14 @@ class TestStructureClientE2E:
     async def test_extract_structure_no_tabs_in_prose_export(self, tmp_path) -> None:
         """Extract the issue's PDF and verify prose in TXT, HTML and DOCX."""
         from datetime import datetime, timezone
-        from zipfile import ZipFile
         from xml.etree import ElementTree
+        from zipfile import ZipFile
 
-        from acessilia_sdk.toolbox.clients import ToolboxDocxClient
-        from acessilia_core.pipeline.payload import _manifest_pages_to_payload
         from acessilia_core.manifest.builder import build_processing_manifest
         from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
         from acessilia_core.pipeline.canonical_builder import build_canonical_document
+        from acessilia_core.pipeline.payload import _manifest_pages_to_payload
+        from acessilia_sdk.toolbox.clients import ToolboxDocxClient
         from docstruct.export.html import document_to_html
         from docstruct.export.pandoc_ast import build_pandoc_ast
         from docstruct.export.txt import document_to_txt_lines

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
-from backend.api.observability_auth import require_observability_token
 
 from backend.api.limiter import limiter
+from backend.api.observability_auth import require_observability_token
 from backend.api.schemas import HistoryItem, StatsResponse
 from backend.services.history_service import estatisticas, listar_historico
 

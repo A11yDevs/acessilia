@@ -1,7 +1,12 @@
 """order_reading_items: the processing manifest's reading order (#203)."""
 import pytest
 
-from docstruct.geometry import OrientedBox, ReadingItem, order_reading_items, reading_role
+from docstruct.geometry import (
+    OrientedBox,
+    ReadingItem,
+    order_reading_items,
+    reading_role,
+)
 
 PAGE_HEIGHT = 800.0
 

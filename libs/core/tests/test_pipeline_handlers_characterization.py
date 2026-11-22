@@ -13,6 +13,9 @@ import json
 from pathlib import Path
 
 import pytest
+from core_config_support import core_config
+from pddl_support import build_element, build_manifest, build_obligation
+
 from acessilia_core.manifest.builder import (
     SECONDARY_EXTRACTION_ARTIFACT_ID,
     SECONDARY_EXTRACTION_KIND,
@@ -37,8 +40,6 @@ from acessilia_core.pipeline.handlers.text import (
     _reattach_negation_overlays,
 )
 from acessilia_core.pipeline.secondary import _load_secondary_extraction
-from core_config_support import core_config
-from pddl_support import build_element, build_manifest, build_obligation
 
 
 def _attach_secondary(

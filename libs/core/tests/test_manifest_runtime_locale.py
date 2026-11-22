@@ -6,13 +6,13 @@ import json
 from pathlib import Path
 
 import pytest
+from test_manifest_characterization import FIXTURES, _build
 
 from acessilia_core import i18n
+from acessilia_core.i18n.log_messages import MSG_OBLIGATION_IMAGE, MSG_OBLIGATION_TABLE
 from acessilia_core.manifest.builder import (
     reconcile_reclassified_element_processing_needs,
 )
-from acessilia_core.i18n.log_messages import MSG_OBLIGATION_IMAGE, MSG_OBLIGATION_TABLE
-from test_manifest_characterization import FIXTURES, _build
 
 
 def test_manifest_messages_change_with_request_locale_without_reimport(

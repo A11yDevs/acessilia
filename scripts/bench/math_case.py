@@ -752,7 +752,6 @@ def run_formula_evaluation(
     results and ``technical_warnings`` are still written.
     """
     from acessilia_sdk.toolbox.errors import ToolboxError, ToolboxInvalidInput
-
     from scripts.bench import toolbox
 
     extracted = toolbox.extract_structure(pdf, provider=provider)
@@ -868,7 +867,6 @@ async def _process(pdf: Path, out: Path, *, pdf_ua: bool) -> tuple[Path, Path, P
     """Run the core on ``pdf`` and write the canonical document, TXT and PDF/UA."""
     from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
     from acessilia_core.export.exporters.txt_exporter import export_txt
-
     from backend.config.core_config import core_config_from_settings
     from backend.service import process
 

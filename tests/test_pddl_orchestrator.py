@@ -7,15 +7,6 @@ from pathlib import Path
 import pytest
 
 from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
-from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
-from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from acessilia_core.pipeline.payload import build_pddl_structured_payload
-from docstruct.tables.text_rows import rows_from_visual_table_text as _rows_from_visual_table_text
-from acessilia_core.pipeline.elements import (
-    _table_ast_from_metadata,
-    _table_element_has_structured_content,
-)
-from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
@@ -26,9 +17,20 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
-from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.elements import (
+    _table_ast_from_metadata,
+    _table_element_has_structured_content,
+)
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
+from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
+from docstruct.tables.text_rows import (
+    rows_from_visual_table_text as _rows_from_visual_table_text,
+)
 from tests.core_config_support import model_config, toolbox_config, vision_config
 
 
@@ -169,9 +171,8 @@ def _sample_manifest_without_page_element_ids() -> ProcessingManifest:
 
 
 def test_degraded_extraction_warns_in_delivered_document_and_is_not_cached():
-    from acessilia_core.i18n import reset_request_locale, set_request_locale
+    from acessilia_core.i18n import reset_request_locale, set_request_locale, t
     from acessilia_core.i18n.log_messages import MSG_STRUCTURAL_EXTRACTION_DEGRADED
-    from acessilia_core.i18n import t
 
     manifest = _sample_manifest()
     manifest.extractor.configuration.update(

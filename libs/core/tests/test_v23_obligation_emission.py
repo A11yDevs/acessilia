@@ -5,11 +5,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from acessilia_core.manifest.builder import build_processing_manifest
-from acessilia_core.manifest.builder import inspect_document_needs
-from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
 from pddl_support import build_orchestrator
 
+from acessilia_core.manifest.builder import (
+    build_processing_manifest,
+    inspect_document_needs,
+)
+from acessilia_core.manifest.models import BoundingBox, ManifestElement, Provenance
 
 #: Pages the VLM judge may adjudicate in these tests: the service's default
 #: (FUSION_JUDGE_MAX_PAGES), given explicitly since the builder takes the

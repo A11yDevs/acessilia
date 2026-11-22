@@ -1,14 +1,20 @@
 """Unavailable adapters and unsuccessful simulations must remain explicit."""
 
 import pytest
-
-from acessilia_core.planning.models import NominalPlan, PlanStep
 from pddl_support import (
     build_element as _element,
+)
+from pddl_support import (
     build_manifest as _manifest,
+)
+from pddl_support import (
     build_obligation as _obligation,
+)
+from pddl_support import (
     build_orchestrator as _orchestrator,
 )
+
+from acessilia_core.planning.models import NominalPlan, PlanStep
 
 
 @pytest.mark.parametrize("kind,method", [

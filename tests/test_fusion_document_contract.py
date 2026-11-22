@@ -3,17 +3,23 @@
 import hashlib
 from pathlib import Path
 
-from tests.core_config_support import core_config, toolbox_config
 import pytest
 
-from backend.config.settings import settings
 from acessilia_core.manifest.models import PageDescriptor, ProcessingManifest
 from acessilia_core.pipeline import payload as pipeline_payload
 from acessilia_core.pipeline.handlers import fusion as fusion_handlers
+from backend.config.settings import settings
+from tests.core_config_support import core_config, toolbox_config
 from tests.pddl_support import (
     build_element as _element,
+)
+from tests.pddl_support import (
     build_manifest as _manifest,
+)
+from tests.pddl_support import (
     build_obligation as _obligation,
+)
+from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 

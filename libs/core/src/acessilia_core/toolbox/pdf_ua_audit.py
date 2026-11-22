@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from acessilia_core.config import ToolboxConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     EMAIL_AUDIT_COMPLIANT,
@@ -20,7 +21,6 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDF_UA_AUDIT_FINISHED,
     LOG_PDF_UA_AUDIT_SKIPPED_DISABLED,
 )
-from acessilia_core.config import ToolboxConfig
 from acessilia_core.logger import logger
 
 #: Validation profile the exported PDF is audited against.
@@ -50,9 +50,8 @@ async def audit_pdf_ua(
         logger.info(t(LOG_PDF_UA_AUDIT_SKIPPED_DISABLED))
         return None
 
-    from acessilia_sdk.toolbox.clients import ToolboxPdfValidateClient
-
     from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+    from acessilia_sdk.toolbox.clients import ToolboxPdfValidateClient
 
     owned_client = client is None
     validate_client = client or make_toolbox_client(ToolboxPdfValidateClient, toolbox)

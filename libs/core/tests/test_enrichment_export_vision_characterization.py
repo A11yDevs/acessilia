@@ -10,6 +10,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from core_config_support import (
+    document_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
+from pddl_support import build_element, build_manifest
+
 from acessilia_core.agents import vision_agent
 from acessilia_core.agents.output_schemas import RunIncompleteError, VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
@@ -27,8 +35,6 @@ from acessilia_core.pipeline.handlers.inspection import (
     _validated_region_clip,
 )
 from acessilia_sdk.toolbox.errors import ToolboxInvalidInput
-from core_config_support import document_config, model_config, toolbox_config, vision_config
-from pddl_support import build_element, build_manifest
 
 
 class TestPdfUaMathBisectorCharacterization:

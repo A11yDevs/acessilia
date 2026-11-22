@@ -9,7 +9,6 @@ from pathlib import Path
 from docstruct.evaluation.holdout import Verdict, evaluate_candidate
 from docstruct.evaluation.markdown import score_markdown_page
 from docstruct.evaluation.metrics import PageScores, overall_score
-
 from scripts.bench.datasets import BenchPage
 
 PAGES_FILE = "pages.jsonl"

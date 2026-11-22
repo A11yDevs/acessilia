@@ -1,6 +1,6 @@
 """C0 removal in code preserves literal syntax, indentation and line breaks."""
-from copy import deepcopy
 import json
+from copy import deepcopy
 
 import pytest
 
@@ -10,7 +10,6 @@ from docstruct.export.markdown import document_to_markdown
 from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.text.sanitize import sanitize_block_text
-
 
 FORBIDDEN_C0 = [chr(n) for n in range(32) if n not in (9, 10, 13)]
 

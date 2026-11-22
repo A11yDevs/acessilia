@@ -18,14 +18,35 @@ silently:
 
 from __future__ import annotations
 
-
 import pytest
-
 from core_config_support import core_config
-from acessilia_core.pipeline.handlers.registry import bind_run
-from acessilia_core.ports import RunPorts
-from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS
-from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from pddl_support import (
+    NOW,
+)
+from pddl_support import (
+    build_element as _element,
+)
+from pddl_support import (
+    build_manifest as _manifest,
+)
+from pddl_support import (
+    build_obligation as _obligation,
+)
+from pddl_support import (
+    build_orchestrator as _orchestrator,
+)
+
+from acessilia_core.execution.models import MethodResult
+from acessilia_core.i18n import reset_request_locale, set_request_locale
+from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
+from acessilia_core.manifest.models import (
+    BoundingBox,
+    ManifestElement,
+    Obligation,
+    ObligationAttempt,
+    ProcessingManifest,
+    Provenance,
+)
 from acessilia_core.pipeline.handlers import content as content_handlers
 from acessilia_core.pipeline.handlers import fusion as fusion_handlers
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
@@ -37,31 +58,15 @@ from acessilia_core.pipeline.handlers.content import (
     _handle_pandoc_table_method,
     _handle_vision_description_method,
 )
+from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS, bind_run
 from acessilia_core.pipeline.handlers.review import _handle_human_review_method
-from acessilia_core.i18n import reset_request_locale, set_request_locale
 from acessilia_core.pipeline.handlers.text import (
     _handle_repetition_guard_method,
     _tailjoin_position,
 )
-from acessilia_core.execution.models import MethodResult
 from acessilia_core.pipeline.obligations import _unsatisfied_obligations
-from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
-from acessilia_core.manifest.models import (
-    BoundingBox,
-    ManifestElement,
-    Obligation,
-    ObligationAttempt,
-    ProcessingManifest,
-    Provenance,
-)
-
-from pddl_support import (
-    NOW,
-    build_element as _element,
-    build_manifest as _manifest,
-    build_obligation as _obligation,
-    build_orchestrator as _orchestrator,
-)
+from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
+from acessilia_core.ports import RunPorts
 
 
 class TestRegistryCoverage:

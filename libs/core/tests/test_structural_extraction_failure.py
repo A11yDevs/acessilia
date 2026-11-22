@@ -9,20 +9,18 @@ stays out of it.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 from types import SimpleNamespace
 
 import pytest
-
-from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
-from acessilia_core import i18n
-from acessilia_core.pipeline import orchestrator as pddl
-from pddl_support import build_orchestrator
-from acessilia_core.pipeline import preflight as pipeline_preflight
 from core_config_support import core_config
+from pddl_support import build_orchestrator
+
+from acessilia_core import i18n
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.ports import RunPorts
+from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
 
 
 def _failing_process(error):

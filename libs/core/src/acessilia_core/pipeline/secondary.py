@@ -21,9 +21,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from docstruct.fusion.similarity import ordered_box, pair_block
-from docstruct.geometry import OrientedBox
-
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
@@ -44,6 +41,8 @@ from acessilia_core.pipeline.handlers.messages import (
     MSG_SECONDARY_UNAVAILABLE,
     MSG_SECONDARY_UNREADABLE,
 )
+from docstruct.fusion.similarity import ordered_box, pair_block
+from docstruct.geometry import OrientedBox
 
 _CALIBRATED_PAIR = ("docling", "mineru")
 

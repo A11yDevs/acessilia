@@ -15,15 +15,15 @@ import math
 from pathlib import Path
 
 import pytest
+from core_config_support import toolbox_config
+from pddl_support import build_element
+
+from acessilia_core.manifest.models import BoundingBox, Provenance
+from acessilia_core.pipeline.enrichment import common as enrichment_common
 from acessilia_sdk.toolbox import ToolboxCapabilityError, ToolboxIncompatibleEndpoint
 from acessilia_sdk.toolbox.clients.pdf import RenderedPage
-
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip
-from acessilia_core.manifest.models import BoundingBox, Provenance
-from pddl_support import build_element
-from acessilia_core.pipeline.enrichment import common as enrichment_common
-from core_config_support import toolbox_config
 
 
 def _picture(box=None, origin="TOPLEFT", page=2, src=None):

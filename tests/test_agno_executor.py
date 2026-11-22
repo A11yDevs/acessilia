@@ -6,9 +6,9 @@ import pytest
 
 from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
 from acessilia_core.execution.models import MethodResult
+from acessilia_core.pipeline.handlers.review import _handle_human_review_method
 from acessilia_core.planning.planner_agent import PlannerAgent
 from tests.test_pddl_planning import make_manifest
-from acessilia_core.pipeline.handlers.review import _handle_human_review_method
 
 
 @pytest.mark.skipif(find_spec("agno") is None, reason="Agno não instalado")

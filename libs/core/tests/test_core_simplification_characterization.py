@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from acessilia_sdk.toolbox import (
-    ToolboxProviderUnavailable,
-    ToolboxTimeout,
-    ToolboxUnavailable,
-)
+from core_config_support import fusion_config, toolbox_config
+from pddl_support import NOW, build_element, build_manifest, build_obligation
 
-from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry, _json_sha256
+from acessilia_core.execution.executor import (
+    ExecutorAgent,
+    MethodRegistry,
+    _json_sha256,
+)
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.manifest import toolbox_extractor as extractor_module
 from acessilia_core.manifest.models import (
@@ -32,9 +33,11 @@ from acessilia_core.manifest.slides import _absorb_near_pictures
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.fusion import apply_page_routes
 from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
-from core_config_support import fusion_config, toolbox_config
-from pddl_support import NOW, build_element, build_manifest, build_obligation
-
+from acessilia_sdk.toolbox import (
+    ToolboxProviderUnavailable,
+    ToolboxTimeout,
+    ToolboxUnavailable,
+)
 
 # ---------------------------------------------------------------------------
 # 1. ToolboxManifestExtractor._extract_with

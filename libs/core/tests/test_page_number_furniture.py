@@ -7,10 +7,11 @@ centered in the bottom margin.
 
 from __future__ import annotations
 
-from acessilia_core.pipeline.payload import _manifest_pages_to_payload
-from acessilia_core.pipeline import payload as pipeline_payload
-from acessilia_core.manifest.models import BoundingBox, Provenance
 from pddl_support import build_element, build_manifest
+
+from acessilia_core.manifest.models import BoundingBox, Provenance
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline.payload import _manifest_pages_to_payload
 
 WIDTH, HEIGHT = 612.0, 792.0
 #: Bottom margin, where case 036 prints its page numbers.

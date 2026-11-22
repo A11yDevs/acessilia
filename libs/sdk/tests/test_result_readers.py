@@ -5,15 +5,16 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
+
 from acessilia_sdk.toolbox import results
-from acessilia_sdk.toolbox.clients.math import ToolboxMathClient, recognized_formulas
 from acessilia_sdk.toolbox.clients.adjudicate import (
     ToolboxAdjudicateClient,
     page_judgement_probability,
 )
+from acessilia_sdk.toolbox.clients.math import ToolboxMathClient, recognized_formulas
 from acessilia_sdk.toolbox.clients.media_inspect import ToolboxMediaInspectClient
+from acessilia_sdk.toolbox.clients.pdf import RenderedPage, ToolboxPdfClient
 from acessilia_sdk.toolbox.clients.pdf_validate import ToolboxPdfValidateClient
-from acessilia_sdk.toolbox.clients.pdf import ToolboxPdfClient, RenderedPage
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation, ToolboxTimeout
 
 EXAMPLES = json.loads(

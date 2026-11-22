@@ -24,13 +24,13 @@ from typing import Any
 import httpx
 
 from acessilia_sdk.toolbox.capabilities import TOOLBOX_CAPABILITIES
+from acessilia_sdk.toolbox.endpoints import ToolboxEndpoint
 from acessilia_sdk.toolbox.errors import (
     ToolboxContractViolation,
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
 )
-from acessilia_sdk.toolbox.endpoints import ToolboxEndpoint
 from acessilia_sdk.toolbox.transport import auth_headers, raise_for_error
 
 

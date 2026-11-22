@@ -6,10 +6,10 @@ import edge_tts
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
-    LOG_AUDIO_EXPORTED,
     LOG_AUDIO_EXPORT_ERROR,
     LOG_AUDIO_EXPORT_PROGRESS,
     LOG_AUDIO_EXPORT_START,
+    LOG_AUDIO_EXPORTED,
 )
 from acessilia_core.logger import logger
 

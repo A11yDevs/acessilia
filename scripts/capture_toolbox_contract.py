@@ -22,8 +22,8 @@ import hashlib
 import json
 import os
 import re
-import tempfile
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path

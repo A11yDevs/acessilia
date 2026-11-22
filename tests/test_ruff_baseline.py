@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
 
 from scripts import check_ruff_baseline
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _diag(filename: str, code: str, row: int = 1, col: int = 1, message: str = "msg") -> dict:
@@ -17,6 +20,18 @@ def _diag(filename: str, code: str, row: int = 1, col: int = 1, message: str = "
         "location": {"row": row, "column": col},
         "message": message,
     }
+
+
+def test_lint_config_selects_import_sorting_at_zero_baseline_violations() -> None:
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    lint = config["tool"]["ruff"]["lint"]
+    baseline = check_ruff_baseline.load_baseline(
+        ROOT / "tests" / "fixtures" / "ruff_baseline.json"
+    )
+
+    assert {"F", "I", "E"} <= set(lint["select"])
+    assert "E501" in lint["ignore"]
+    assert not any(code.startswith("I") for codes in baseline.values() for code in codes)
 
 
 def test_summarize_diagnostics_groups_by_relative_posix_path(tmp_path: Path) -> None:

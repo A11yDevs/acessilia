@@ -2,11 +2,10 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from docstruct.visual_text import bound_surrounding_items
-
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_PROMPT_FILE_NOT_FOUND
 from acessilia_core.logger import logger
+from docstruct.visual_text import bound_surrounding_items
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 

@@ -1,9 +1,10 @@
 import sys
 from pathlib import Path
 
+from loguru import logger
+
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_LOGGER_CONFIGURED
-from loguru import logger
 
 
 def setup_logger(*, level: str, logs_dir: Path) -> None:

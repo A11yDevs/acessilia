@@ -3,7 +3,6 @@
 import hashlib
 from pathlib import Path
 
-
 # Leaves room for export suffixes, including .pdf_ua.verapdf.json, within
 # the common 255-byte filesystem component limit. Count bytes for Unicode.
 MAX_OUTPUT_STEM_BYTES = 160

@@ -9,12 +9,12 @@ the localized table-of-contents and technical-metadata markup.
 import tempfile
 from pathlib import Path
 
-import acessilia_core.i18n as i8n
 import pytest
+from locale_support import use_server_locale
+
+import acessilia_core.i18n as i8n
 from acessilia_core.export.renderers.html_renderer import render_html
 from acessilia_core.export.renderers.txt_renderer import render_txt
-
-from locale_support import use_server_locale
 
 
 @pytest.fixture(autouse=True)

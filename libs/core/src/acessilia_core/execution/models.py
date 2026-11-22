@@ -5,14 +5,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from acessilia_core.manifest.models import Artifact  # noqa: E402
-from acessilia_core.i18n import t  # noqa: E402
 from acessilia_core.execution.messages import (  # noqa: E402
     MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
 )
-
+from acessilia_core.i18n import t  # noqa: E402
+from acessilia_core.manifest.models import Artifact  # noqa: E402
 
 EXECUTION_SCHEMA_VERSION = "1.0.0"
 EXECUTION_SCHEMA_ID = "urn:a11y-devs:schema:execution-report:1.0.0"

@@ -8,7 +8,6 @@ test's monkeypatch).
 
 from __future__ import annotations
 
-from backend.config.settings import Settings, settings as default_settings
 from acessilia_core.config import (
     CoreConfig,
     DocumentConfig,
@@ -20,6 +19,8 @@ from acessilia_core.config import (
     VisionConfig,
 )
 from acessilia_core.toolbox.toolbox_client import PROVIDER_DEFAULTS, TIMEOUT_KEYS
+from backend.config.settings import Settings
+from backend.config.settings import settings as default_settings
 
 
 def core_config_from_settings(settings: Settings | None = None) -> CoreConfig:

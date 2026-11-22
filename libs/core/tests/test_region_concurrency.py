@@ -11,16 +11,16 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
-from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from core_config_support import model_config, toolbox_config, vision_config
 from pddl_support import (
     build_element as _element,
 )
 from pddl_support import (
     build_manifest as _manifest,
 )
-from core_config_support import model_config, toolbox_config, vision_config
+
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 
 
 @pytest.mark.asyncio

@@ -188,7 +188,7 @@ def test_download_size_formatting(tmp_path, size_bytes, expected):
 
 @pytest.mark.parametrize("locale", ["en_US", "pt_BR"])
 def test_catalogue_preserves_existing_token_listing_and_wire_labels(tmp_path, locale):
-    from acessilia_core.i18n import set_request_locale, reset_request_locale
+    from acessilia_core.i18n import reset_request_locale, set_request_locale
 
     # Files from old jobs may include both legacy PDF and the new PDF/UA.
     baseline = [

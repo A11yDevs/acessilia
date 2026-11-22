@@ -11,15 +11,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
-from backend.api.export_plan import AUDIO_STEP, PACKAGE_ORDER, PACKAGE_STEP, SERIAL_EXPORT_STEPS
-from acessilia_core.export.catalog import CATALOG, DOCX, DRBENCH_MD, HTML, PDF_UA, TXT
-from backend.config.core_config import core_config_from_settings
-from acessilia_core.config import ToolboxConfig
-from backend.config.settings import settings
-from backend.services import job_checkpoint, shutdown
-from backend.services.job_store import load_record, save_status, pending_records
 from acessilia_core.blocking import run_blocking
+from acessilia_core.config import ToolboxConfig
+from acessilia_core.export.catalog import CATALOG, DOCX, DRBENCH_MD, HTML, PDF_UA, TXT
+from acessilia_core.export.exporters.audio_exporter import export_mp3
+from acessilia_core.export.exporters.docx_exporter import export_docx
+from acessilia_core.export.exporters.drbench_md_exporter import export_drbench_md
+from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
+from acessilia_core.export.exporters.txt_exporter import export_txt
+from acessilia_core.export.markers import with_object_markers
+from acessilia_core.export.pandoc_exporter import export_accessible_document
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     EMAIL_AUDIT_UNAVAILABLE,
@@ -36,36 +37,40 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDF_UA_SKIPPED_DISABLED,
 )
 from acessilia_core.i18n.stage_messages import (
+    STAGE_AUDITING_PDF_UA,
+    STAGE_CANCELLATION_WAITING,
+    STAGE_CANCELLED_BY_USER,
+    STAGE_CANCELLED_IN_QUEUE,
+    STAGE_PENDING_UPLOAD_MISSING,
+    STAGE_PROCESSING_COMPLETED,
+    STAGE_PROCESSING_FAILURE,
+    STAGE_QUEUE_WAITING_POSITION,
     STAGE_RESTART_CANCELLED,
     STAGE_RESTART_INTERRUPTED,
     STAGE_RESTART_INTERRUPTED_DURING,
     STAGE_RESTART_RESUBMIT,
-    STAGE_PENDING_UPLOAD_MISSING,
-    STAGE_CANCELLED_IN_QUEUE,
-    STAGE_CANCELLATION_WAITING,
-    STAGE_AUDITING_PDF_UA,
-    STAGE_CANCELLED_BY_USER,
-    STAGE_PROCESSING_COMPLETED,
-    STAGE_PROCESSING_FAILURE,
-    STAGE_QUEUE_WAITING_POSITION,
 )
-from acessilia_core.export.exporters.audio_exporter import export_mp3
-from acessilia_core.export.exporters.docx_exporter import export_docx
-from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
-from acessilia_core.export.exporters.txt_exporter import export_txt
-from acessilia_core.export.exporters.drbench_md_exporter import export_drbench_md
-from acessilia_core.export.markers import with_object_markers
-from acessilia_core.export.pandoc_exporter import export_accessible_document
-from backend.services.download_token_service import criar_token
+from acessilia_core.logger import logger
 from acessilia_core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
+from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
+from backend.api.export_plan import (
+    AUDIO_STEP,
+    PACKAGE_ORDER,
+    PACKAGE_STEP,
+    SERIAL_EXPORT_STEPS,
+)
+from backend.config.core_config import core_config_from_settings
+from backend.config.settings import settings
+from backend.services import job_checkpoint, shutdown
+from backend.services.download_token_service import criar_token
 from backend.services.email_service import (
     send_confirmation_email,
     send_failure_email,
     send_result_email,
 )
-from backend.services.history_service import finalizar_conversao, registrar_conversao
-from acessilia_core.logger import logger
 from backend.services.filenames import output_stem
+from backend.services.history_service import finalizar_conversao, registrar_conversao
+from backend.services.job_store import load_record, pending_records, save_status
 
 queued_jobs: dict[str, dict[str, Any]] = {}
 
@@ -766,8 +771,8 @@ def expirar_status_fila(max_age_seconds: int, now: float | None = None) -> int:
 
 
 async def recover_pending_jobs() -> None:
-    from backend.services.queue_service import unified_queue, QueueItem
     from backend.api.routes.jobs import job_executor
+    from backend.services.queue_service import QueueItem, unified_queue
     for record in await run_blocking(pending_records):
         task_id = record["task_id"]
         status = record["status"]

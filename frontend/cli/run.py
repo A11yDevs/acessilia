@@ -5,9 +5,6 @@ import subprocess
 import sys
 
 from acessilia_core.i18n import t
-from backend.config.process_setup import setup_process
-from acessilia_core.logger import logger
-from backend.config.settings import settings
 from acessilia_core.i18n.log_messages import (
     LOG_API_INTERFACE_ENABLED,
     LOG_BOT_ALREADY_RUNNING,
@@ -22,6 +19,9 @@ from acessilia_core.i18n.log_messages import (
     LOG_TELEGRAM_INTERFACE_NO_TOKEN,
     LOG_WEB_INTERFACE_ENABLED,
 )
+from acessilia_core.logger import logger
+from backend.config.process_setup import setup_process
+from backend.config.settings import settings
 
 LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
 
@@ -73,8 +73,9 @@ async def startup():
     tasks = []
 
     if "api" in enabled:
-        from backend.api.app import app as api_app
         import uvicorn
+
+        from backend.api.app import app as api_app
 
         api_config = uvicorn.Config(
             api_app,
@@ -97,8 +98,9 @@ async def startup():
         logger.warning(t(LOG_TELEGRAM_INTERFACE_NO_TOKEN))
 
     if "web" in enabled:
-        from frontend.web.app import app
         import uvicorn
+
+        from frontend.web.app import app
 
         config = uvicorn.Config(
             app,

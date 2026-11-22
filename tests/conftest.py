@@ -13,7 +13,6 @@ from tests.toolbox_render_fake import fake_toolbox_render  # noqa: F401
 def model_calls():
     """Each test explicitly owns execution, independently of its event loops."""
     from acessilia_core.agents.model_calls import model_call_scope
-
     from backend.services.model_calls import ModelCallExecutor, ModelCallLimits
 
     runner = ModelCallExecutor(ModelCallLimits(workers=4, max_pending=4))

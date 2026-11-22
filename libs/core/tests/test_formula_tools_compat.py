@@ -14,6 +14,7 @@ from __future__ import annotations
 import inspect
 
 import pytest
+
 from acessilia_core.formula_tools import (
     ensure_math_delimiters,
     normalize_latex,

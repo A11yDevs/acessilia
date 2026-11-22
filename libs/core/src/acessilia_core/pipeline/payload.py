@@ -12,34 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from docstruct.blocks.callouts import callout_titles
-from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
-from docstruct.blocks.lists import (
-    merge_list_blocks,
-    recover_empty_lettered_list_items,
-)
-from docstruct.export.page_text import blocks_text, pages_text
-from docstruct.fusion.noise import (
-    PAGE_NUMBER_MARGIN,
-    element_role,
-    is_bare_page_number,
-    is_decorated_page_number,
-    is_page_number_in_margin,
-    select_page_numbers,
-)
-from docstruct.geometry import reading_role
-from docstruct.placeholders import has_meaningful_text
-from docstruct.regions.letterhead import PlacedItem, letterhead_groups
-from docstruct.visual_text import (
-    TextOwnership,
-    analyze_visual_text_ownership,
-    collect_picture_context,
-    deduplicate_picture_description,
-    is_confirmed_logo_description,
-    is_document_artifact,
-    scene_text_residue,
-)
-
 from acessilia_core.execution.models import ExecutionReport
 from acessilia_core.i18n import (
     locale_for_user,
@@ -70,6 +42,33 @@ from acessilia_core.pipeline.obligations import (
 )
 from acessilia_core.planning.models import NominalPlan, PlanningComparison
 from acessilia_sdk.i18n.context import reset_request_locale, set_request_locale
+from docstruct.blocks.callouts import callout_titles
+from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
+from docstruct.blocks.lists import (
+    merge_list_blocks,
+    recover_empty_lettered_list_items,
+)
+from docstruct.export.page_text import blocks_text, pages_text
+from docstruct.fusion.noise import (
+    PAGE_NUMBER_MARGIN,
+    element_role,
+    is_bare_page_number,
+    is_decorated_page_number,
+    is_page_number_in_margin,
+    select_page_numbers,
+)
+from docstruct.geometry import reading_role
+from docstruct.placeholders import has_meaningful_text
+from docstruct.regions.letterhead import PlacedItem, letterhead_groups
+from docstruct.visual_text import (
+    TextOwnership,
+    analyze_visual_text_ownership,
+    collect_picture_context,
+    deduplicate_picture_description,
+    is_confirmed_logo_description,
+    is_document_artifact,
+    scene_text_residue,
+)
 
 #: Canonical English msgid for an institutional header read as one paragraph:
 #: the logo, then its header lines; {lines} is substituted by callers after lookup.

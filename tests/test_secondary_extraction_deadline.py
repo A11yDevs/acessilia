@@ -14,12 +14,12 @@ from copy import deepcopy
 from unittest.mock import AsyncMock
 
 import pytest
+
 from acessilia_core.manifest import toolbox_extractor
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.toolbox.toolbox_client import ToolboxTimeout
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from acessilia_sdk.toolbox.errors import ToolboxProviderUnavailable
-
 from tests.core_config_support import fusion_config, paths_config, toolbox_config
 from tests.test_toolbox_manifest_extractor import (
     FIXTURE_PDF,
@@ -156,6 +156,7 @@ def test_a_provider_that_failed_on_the_document_still_falls_back():
     the secondary, as a 500 does, while the SDK no longer retries it.
     """
     import httpx
+
     from acessilia_sdk.toolbox.transport import raise_for_error
 
     response = httpx.Response(

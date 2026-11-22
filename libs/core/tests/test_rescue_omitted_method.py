@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from core_config_support import core_config
+
 from acessilia_core.i18n import reset_request_locale, set_request_locale
 from acessilia_core.manifest.builder import (
     DEFAULT_METHOD_COSTS,
@@ -38,8 +40,6 @@ from acessilia_core.pipeline.handlers.rescue import (
     is_legitimate_text,
 )
 from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
-
-from core_config_support import core_config
 
 NOW = datetime(2026, 11, 18, tzinfo=UTC)
 W, H = 600.0, 800.0

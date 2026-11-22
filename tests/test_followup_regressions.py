@@ -4,9 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from docstruct.tables.ast import linearize_table_for_text
 from docstruct.export.html import document_to_html
-
+from docstruct.tables.ast import linearize_table_for_text
 from tests.core_config_support import core_config
 
 
@@ -155,10 +154,11 @@ def test_audio_failure_or_cancellation_joins_siblings_before_cleanup(monkeypatch
 
 
 def test_drbench_markdown_remains_internal(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from backend.api.app import app
     from backend.config.settings import settings
     from backend.services import download_token_service as tokens
-    from backend.api.app import app
-    from fastapi.testclient import TestClient
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(tokens, "_connection", None)
     output = tmp_path / "output"

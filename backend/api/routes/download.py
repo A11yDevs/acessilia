@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
+
 from acessilia_core.export.catalog import DOWNLOAD_MEDIA_TYPES as MEDIA_TYPES
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
@@ -9,9 +12,6 @@ from acessilia_core.i18n.log_messages import (
     API_FORMAT_INVALID,
     API_LINK_INVALID,
 )
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse
-
 from backend.api.limiter import limiter
 from backend.api.schemas import DownloadFormat, DownloadInfo
 from backend.services.download_token_service import obter_info_token

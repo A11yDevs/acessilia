@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from acessilia_core.manifest.detectors.types import NeedCandidate, VLM_JUDGE_METHODS
+from acessilia_core.manifest.detectors.types import VLM_JUDGE_METHODS, NeedCandidate
 from acessilia_core.manifest.models import ManifestElement
 
 

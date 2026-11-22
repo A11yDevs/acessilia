@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     EMAIL_AUDIT_COMPLIANT,
@@ -21,7 +22,6 @@ from acessilia_core.i18n.log_messages import (
     EMAIL_RESULT_AUDIT_HEADER,
 )
 from acessilia_core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
-
 from backend.config.settings import settings
 from tests.conftest import COMPLIANT_PDF_UA_REPORT
 from tests.core_config_support import toolbox_config

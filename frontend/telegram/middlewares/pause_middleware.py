@@ -1,8 +1,8 @@
 import sqlite3
+from typing import Any, Awaitable, Callable, Dict
 
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
-from typing import Any, Awaitable, Callable, Dict
 
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger

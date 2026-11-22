@@ -12,6 +12,9 @@ from __future__ import annotations
 from contextlib import AsyncExitStack
 from typing import Any
 
+from acessilia_core.config import ToolboxConfig
+from acessilia_core.logger import logger
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.operations.fusion import DualFusionUnavailable, extract_dual_fused
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from docstruct.fusion.payload import (
@@ -19,10 +22,6 @@ from docstruct.fusion.payload import (
 )
 from docstruct.fusion.payload import route_pages as _docstruct_route_pages
 from docstruct.policy import FusionPolicy
-
-from acessilia_core.config import ToolboxConfig
-from acessilia_core.logger import logger
-from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 
 
 def _structure_client(provider: str, toolbox: ToolboxConfig) -> ToolboxStructureClient:

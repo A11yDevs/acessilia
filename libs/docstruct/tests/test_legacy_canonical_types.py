@@ -1,11 +1,11 @@
 """E1.3 deprecates legacy dataclasses without changing their public behavior."""
 
 import base64
-from dataclasses import asdict, fields
 import inspect
 import pickle
 import subprocess
 import sys
+from dataclasses import asdict, fields
 
 import pytest
 

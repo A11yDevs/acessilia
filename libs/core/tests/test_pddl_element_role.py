@@ -8,9 +8,9 @@ the furniture tests read it.
 from __future__ import annotations
 
 import pytest
+from pddl_support import build_element
 
 from docstruct.fusion.noise import element_role as _element_role
-from pddl_support import build_element
 
 
 @pytest.mark.parametrize(

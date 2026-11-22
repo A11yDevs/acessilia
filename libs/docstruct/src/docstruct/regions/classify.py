@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from docstruct.types import Region
 
-
 TEXT_CLEAN_MIN_DENSITY = 0.015
 TEXT_CLEAN_MIN_CHARS = 20
 SCANNED_MAX_DENSITY = 0.005

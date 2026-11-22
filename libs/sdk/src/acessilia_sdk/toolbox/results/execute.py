@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
 from acessilia_sdk.toolbox.results._model import ResultModel
 
 

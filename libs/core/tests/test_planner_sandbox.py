@@ -6,10 +6,10 @@ from __future__ import annotations
 import json
 
 import pytest
-from acessilia_core.planning.planner_agent import SANDBOX_DIRNAME, PlannerAgent
-
 from core_config_support import paths_config
 from pddl_support import build_element, build_manifest, build_obligation
+
+from acessilia_core.planning.planner_agent import SANDBOX_DIRNAME, PlannerAgent
 
 
 def _manifest_file(directory):

@@ -5,8 +5,8 @@ and are covered by E2E tests (pytest -m e2e).
 """
 from __future__ import annotations
 
-import asyncio
 import ast
+import asyncio
 import json
 import sys
 from pathlib import Path

@@ -9,8 +9,6 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.api.limiter import limiter
-from backend.api.routes import download, health, history, jobs, logs, operations
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     API_INTERNAL_ERROR_DETAIL,
@@ -18,12 +16,14 @@ from acessilia_core.i18n.log_messages import (
     LOG_API_ERROR,
     LOG_API_STARTED,
 )
+from acessilia_core.logger import logger
+from backend.api.limiter import limiter
+from backend.api.routes import download, health, history, jobs, logs, operations
+from backend.config.process_setup import setup_process
+from backend.services.access_log_filter import AccessLogFilter
 from backend.services.cleanup_service import periodic_cleanup
 from backend.services.download_token_service import limpar_tokens_expirados
 from backend.services.queue_service import unified_queue
-from backend.services.access_log_filter import AccessLogFilter
-from backend.config.process_setup import setup_process
-from acessilia_core.logger import logger
 
 
 @asynccontextmanager

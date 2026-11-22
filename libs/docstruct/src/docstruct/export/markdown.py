@@ -13,8 +13,8 @@ from typing import Any
 from docstruct.blocks.lists import list_start
 from docstruct.export.walk import BlockContext, SectionContext, Visitor, walk
 from docstruct.tables.ast import table_ast_from_block
-from docstruct.text.latex import bare_latex
 from docstruct.text.equations import numbered_latex
+from docstruct.text.latex import bare_latex
 
 _HEADER_SCOPES = {"row", "col", "rowgroup", "colgroup"}
 

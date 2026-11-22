@@ -1,8 +1,8 @@
 """Upload validation helpers plus their localized user-facing reason messages."""
 
-from pathlib import Path
-from email.headerregistry import Address
 from email.errors import HeaderParseError
+from email.headerregistry import Address
+from pathlib import Path
 
 from acessilia_core.i18n import t
 from backend.config.settings import settings

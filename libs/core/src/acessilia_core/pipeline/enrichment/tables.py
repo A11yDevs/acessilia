@@ -18,20 +18,21 @@ from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
 
-from docstruct.tables.ast import (
-    raw_rows_from_table_ast as _rows_from_table_ast,
-)
-from docstruct.tables.ast import (
-    table_ast_column_count,
-    table_ast_from_rows,
-)
-from docstruct.tables.garble import table_garble_reason
-from docstruct.tables.text_rows import rows_from_visual_table_text
-
 from acessilia_core.agents.data_agent import DataAgent
 from acessilia_core.agents.output_schemas import DataOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.blocking import run_blocking
 from acessilia_core.config import ModelConfig, ToolboxConfig, VisionConfig
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import (
+    LOG_PDDL_TABLE_REREAD_ACCEPTED,
+    LOG_PDDL_TABLE_REREAD_REJECTED,
+    LOG_PDDL_TABLES_ENRICHED,
+)
+from acessilia_core.i18n.stage_messages import (
+    STAGE_RECOGNIZING_TABLE,
+)
+from acessilia_core.logger import logger
 from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -49,17 +50,15 @@ from acessilia_core.pipeline.obligations import (
 from acessilia_core.pipeline.toolbox import (
     _source_artifact_id,
 )
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import (
-    LOG_PDDL_TABLE_REREAD_ACCEPTED,
-    LOG_PDDL_TABLE_REREAD_REJECTED,
-    LOG_PDDL_TABLES_ENRICHED,
+from docstruct.tables.ast import (
+    raw_rows_from_table_ast as _rows_from_table_ast,
 )
-from acessilia_core.blocking import run_blocking
-from acessilia_core.i18n.stage_messages import (
-    STAGE_RECOGNIZING_TABLE,
+from docstruct.tables.ast import (
+    table_ast_column_count,
+    table_ast_from_rows,
 )
-from acessilia_core.logger import logger
+from docstruct.tables.garble import table_garble_reason
+from docstruct.tables.text_rows import rows_from_visual_table_text
 
 
 class _TableReader:

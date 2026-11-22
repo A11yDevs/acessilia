@@ -10,13 +10,17 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from acessilia_core.export.renderers.html_renderer import _render_block as render_html_block
-from acessilia_core.export.renderers.txt_renderer import _render_block as render_txt_block
-from acessilia_core.pipeline.validators import validate_canonical_document
+from acessilia_core.export.renderers.html_renderer import (
+    _render_block as render_html_block,
+)
+from acessilia_core.export.renderers.txt_renderer import (
+    _render_block as render_txt_block,
+)
 from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.pipeline.handlers import formula as formula_handlers
+from acessilia_core.pipeline.validators import validate_canonical_document
 from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
-from acessilia_core.pipeline.handlers import formula as formula_handlers
 from tests.core_config_support import core_config, toolbox_config
 
 FAKE_MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>E</mi></math>'
@@ -618,8 +622,12 @@ def test_canonical_build_names_the_domain_operator(toolbox_math, monkeypatch):
 ])
 def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, handler, capability):
     from copy import deepcopy
+
     from acessilia_core.manifest.models import ManifestElement
-    from acessilia_core.pipeline.elements import _element_to_block, _text_kept_by_picture
+    from acessilia_core.pipeline.elements import (
+        _element_to_block,
+        _text_kept_by_picture,
+    )
     from docstruct.canonical import _math_sources
     from docstruct.text.implicit_products import implicit_product_variables
 

@@ -3,8 +3,6 @@ from typing import Any
 from acessilia_core.config import ModelConfig, ToolboxConfig
 
 
-
-
 def _toolbox_model(
     models: ModelConfig,
     toolbox: ToolboxConfig,
@@ -15,8 +13,8 @@ def _toolbox_model(
 ) -> Any:
     from agno.models.openai.like import OpenAILike
 
-    from acessilia_sdk.toolbox import vlm_gateway_base_url
     from acessilia_core.toolbox.toolbox_client import toolbox_vlm_endpoint
+    from acessilia_sdk.toolbox import vlm_gateway_base_url
 
     # The model id is the Toolbox provider id and the key the Toolbox's own:
     # the VLM server's key stays with the Toolbox. The timeout also covers

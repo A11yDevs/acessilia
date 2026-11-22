@@ -9,12 +9,7 @@ accepted and left out of the document, and any failure fails the method.
 
 from __future__ import annotations
 
-from acessilia_core.ports import NoRegionCache, RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 import base64
-from acessilia_core.pipeline import payload as pipeline_payload
 import hashlib
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -24,10 +19,8 @@ import httpx
 import pytest
 import respx
 
-from acessilia_core.pipeline.enrichment import pictures as picture_stage
-from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.output_schemas import PageInspectionOutput
-from backend.config.settings import settings
 from acessilia_core.manifest.builder import (
     UNSTRUCTURED_PAGE_OBLIGATION_KIND,
     UNSTRUCTURED_PAGE_OBSERVATION_KIND,
@@ -37,13 +30,18 @@ from acessilia_core.manifest.builder import (
 )
 from acessilia_core.manifest.models import PageDescriptor
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
-from acessilia_core.planning import toolbox_gate
+from acessilia_core.pipeline import payload as pipeline_payload
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
+from acessilia_core.planning import toolbox_gate
+from acessilia_core.ports import NoRegionCache, RunPorts
+from backend.config.settings import settings
 from docstruct.placeholders import is_placeholder_visual
+from tests.core_config_support import core_config, model_config, toolbox_config
 from tests.pddl_support import build_element, build_manifest
 from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
-from acessilia_core.pipeline import preflight as pipeline_preflight
-from tests.core_config_support import core_config, model_config, toolbox_config
 
 NOW = datetime(2026, 10, 19, tzinfo=timezone.utc)
 PNG = b"\x89PNG\r\n\x1a\nfake-page"

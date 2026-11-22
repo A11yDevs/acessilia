@@ -2,6 +2,7 @@
 from copy import deepcopy
 
 import pytest
+
 from docstruct.canonical import build_canonical_document, sanitize_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.pandoc_ast import build_pandoc_ast

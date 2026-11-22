@@ -6,11 +6,12 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
-from docstruct.manifest import BoundingBox, StructuredDocument
+
 from acessilia_sdk.toolbox.clients.layout import ToolboxLayoutClient
 from acessilia_sdk.toolbox.clients.structure import ToolboxStructureClient
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation, ToolboxTimeout
 from acessilia_sdk.toolbox.results.layout import read_layout, read_manifest
+from docstruct.manifest import BoundingBox, StructuredDocument
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

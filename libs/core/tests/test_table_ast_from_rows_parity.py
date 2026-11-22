@@ -32,13 +32,13 @@ import random
 from typing import Any
 
 import pytest
+
+from acessilia_core.manifest.models import ManifestElement
+from acessilia_core.pipeline.elements import _element_to_block
 from docstruct.canonical import build_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.tables.ast import table_ast_from_rows
 from docstruct.tables.text_rows import rows_from_visual_table_text
-
-from acessilia_core.manifest.models import ManifestElement
-from acessilia_core.pipeline.elements import _element_to_block
 
 
 def _reference(rows: list[list[str]]) -> dict[str, Any]:

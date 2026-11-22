@@ -9,7 +9,10 @@ from docstruct.blocks.classify import (
     starts_with_list_marker,
 )
 from docstruct.text.code_reflow import normalize_code_text
-from docstruct.text.paragraphs import merge_broken_paragraphs, parse_markdown_and_descriptions
+from docstruct.text.paragraphs import (
+    merge_broken_paragraphs,
+    parse_markdown_and_descriptions,
+)
 from docstruct.text.sanitize import (
     contains_markdown_artifacts,
     contains_prompt_leak,
@@ -202,6 +205,7 @@ def test_sanitize_text_keeps_tabs_for_untyped_source_text():
 
 def test_canonical_tab_sanitization_is_recursive_and_does_not_mutate_input():
     from copy import deepcopy
+
     from docstruct.canonical import sanitize_canonical_document
 
     document = {

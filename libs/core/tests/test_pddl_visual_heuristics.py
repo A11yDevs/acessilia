@@ -9,6 +9,7 @@ the core's models, as the orchestrator calls them.
 from __future__ import annotations
 
 import pytest
+from pddl_support import build_element, build_manifest
 
 from docstruct.placeholders import (
     has_meaningful_text,
@@ -17,7 +18,6 @@ from docstruct.placeholders import (
     is_placeholder_text,
     is_placeholder_visual,
 )
-from pddl_support import build_element, build_manifest
 
 
 @pytest.mark.parametrize(

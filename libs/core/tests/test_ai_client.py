@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from acessilia_core.agents import ai_client
 from agno.models import ollama, openrouter
-
 from core_config_support import model_config, toolbox_config
+
+from acessilia_core.agents import ai_client
 
 
 def test_openrouter_model_receives_configured_max_tokens(monkeypatch) -> None:

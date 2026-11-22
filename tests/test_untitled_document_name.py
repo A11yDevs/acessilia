@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from tests.core_config_support import core_config, toolbox_config
+from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 
 isolated_runtime = runtime_fixture
 
@@ -111,8 +111,8 @@ async def test_without_an_uploaded_name_the_file_name_is_still_the_fallback(
 async def test_the_worker_passes_the_uploaded_name_to_the_pipeline(
     isolated_runtime, tmp_path, monkeypatch
 ):
-    from backend.config.settings import settings
     from backend.api.worker import ApiJob, JobExecutor
+    from backend.config.settings import settings
 
     task_id = "untitled-worker"
     _, manager = isolated_runtime
@@ -153,6 +153,7 @@ async def test_the_worker_passes_the_uploaded_name_to_the_pipeline(
 ])
 async def test_api_keeps_only_the_uploaded_basename(isolated_runtime, filename):
     import httpx
+
     from backend.api.app import create_app
     from backend.services.job_store import load_record
 

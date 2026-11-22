@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from time import perf_counter
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Iterable
 
 from acessilia_core.agents.agno_support import build_agent
@@ -26,7 +26,6 @@ from acessilia_core.planning.pddl_processor import (
     PddlProblemValidator,
     validate_nominal_plan,
 )
-
 
 #: The sandbox's folder under the caller's data directory (ADR-0016, step 6):
 #: ``PathsConfig.data_dir / SANDBOX_DIRNAME``.

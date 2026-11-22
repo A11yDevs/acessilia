@@ -10,21 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from docstruct.geometry.boxes import downward_edges
-from docstruct.tables.ast import TABLE_SECTIONS
-from docstruct.text.latex import has_latex_markup
-from docstruct.text.negation_overlay import (
-    compose_in_grid,
-    compose_in_text,
-    is_detached_overlay,
-)
-from docstruct.text.unicode_repair import (
-    Detection,
-    UnicodeRepairContext,
-    detect_legacy_unicode,
-    repair_legacy_unicode,
-)
-
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
 from acessilia_core.logger import logger
@@ -38,6 +23,20 @@ from acessilia_core.pipeline.handlers.common import (
 from acessilia_core.pipeline.handlers.messages import (
     MSG_UNICODE_REPAIR_APPLIED,
     MSG_UNICODE_REPAIR_NO_TEXT,
+)
+from docstruct.geometry.boxes import downward_edges
+from docstruct.tables.ast import TABLE_SECTIONS
+from docstruct.text.latex import has_latex_markup
+from docstruct.text.negation_overlay import (
+    compose_in_grid,
+    compose_in_text,
+    is_detached_overlay,
+)
+from docstruct.text.unicode_repair import (
+    Detection,
+    UnicodeRepairContext,
+    detect_legacy_unicode,
+    repair_legacy_unicode,
 )
 
 #: Manifest element type -> block type accepted by the Unicode repair. Types

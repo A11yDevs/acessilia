@@ -1,13 +1,19 @@
 """The walker owns traversal and dispatch, while consumers own output policy."""
 
+import json
 from copy import deepcopy
 from dataclasses import FrozenInstanceError, fields
-import json
 from pathlib import Path
 
 import pytest
 
-from docstruct.export.walk import BLOCK_TYPES, BlockContext, SectionContext, Visitor, walk
+from docstruct.export.walk import (
+    BLOCK_TYPES,
+    BlockContext,
+    SectionContext,
+    Visitor,
+    walk,
+)
 
 
 def document():

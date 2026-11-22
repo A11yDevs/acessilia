@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import acessilia_core.i18n as i8n
 import pytest
 
+import acessilia_core.i18n as i8n
 import scripts.gen_locale_catalogs as gen_locales
 from tests.locale_support import use_server_locale
 

@@ -6,8 +6,8 @@ from typing import Optional
 
 from docstruct.fusion.similarity import PAGENUM_RE
 from docstruct.fusion.types import DiffBlock
-from docstruct.types import BBox, CanonicalBlock
 from docstruct.text.math_spans import whole_inline_math
+from docstruct.types import BBox, CanonicalBlock
 
 TABLE_RE = re.compile(r"<table", re.IGNORECASE)
 FORMULA_RE = re.compile(r"\$\$")

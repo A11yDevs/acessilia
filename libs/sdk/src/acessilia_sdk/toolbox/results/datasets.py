@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any, TypeVar
+
 from acessilia_sdk.toolbox.errors import ToolboxContractViolation
 from acessilia_sdk.toolbox.results import _dataset_generated as generated
 from acessilia_sdk.toolbox.results._dataset_generated import (
     DatasetArtifactRef,
     DatasetInfo,
-    SplitInfo,
-    ItemSummary,
     DatasetItem,
     DatasetSyncEntry,
+    ItemSummary,
+    SplitInfo,
 )
 
 T = TypeVar("T")

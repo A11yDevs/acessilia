@@ -20,8 +20,8 @@ import difflib
 import re
 from collections import Counter
 
-from docstruct.text.normalize import norm
 from docstruct.text.math_spans import whole_inline_math
+from docstruct.text.normalize import norm
 
 TABLE_RE = re.compile(r"<table", re.I)
 FORMULA_RE = re.compile(r"\$\$|\\\[")

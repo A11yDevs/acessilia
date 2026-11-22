@@ -3,12 +3,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import API_LOG_FILE_NOT_FOUND
 from backend.api.limiter import limiter
 from backend.api.observability_auth import require_observability_token
 from backend.config.settings import settings
-from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import API_LOG_FILE_NOT_FOUND
-
 
 router = APIRouter(tags=["logs"], dependencies=[Depends(require_observability_token)])
 

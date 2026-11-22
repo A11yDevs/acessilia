@@ -7,9 +7,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from docstruct.geometry import OrientedBox
-
 from acessilia_core.manifest.models import ManifestElement, Obligation, Observation
+from docstruct.geometry import OrientedBox
 
 PageSizes = dict[int, tuple[float | None, float | None]]
 

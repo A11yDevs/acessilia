@@ -7,25 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from docstruct.fusion.payload import normalize_element_ids
-from docstruct.geometry import (
-    ReadingItem,
-    order_reading_items,
-    reading_role,
-)
-from docstruct.placeholders import (
-    UNSTRUCTURED_PAGE_FLAG,
-)
-from docstruct.placeholders import (
-    UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,
-)
-from docstruct.placeholders import (
-    is_unstructured_page_placeholder as _is_placeholder,
-)
-from docstruct.sections import find_heading_gaps
-from docstruct.text.equations import preserve_equation_number
-from docstruct.text.latex import has_latex_markup
-
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
@@ -66,6 +47,24 @@ from acessilia_core.manifest.slides import (
     split_across_slides,
     structure_as_slides,
 )
+from docstruct.fusion.payload import normalize_element_ids
+from docstruct.geometry import (
+    ReadingItem,
+    order_reading_items,
+    reading_role,
+)
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_FLAG,
+)
+from docstruct.placeholders import (
+    UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,
+)
+from docstruct.placeholders import (
+    is_unstructured_page_placeholder as _is_placeholder,
+)
+from docstruct.sections import find_heading_gaps
+from docstruct.text.equations import preserve_equation_number
+from docstruct.text.latex import has_latex_markup
 
 if TYPE_CHECKING:
     from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction

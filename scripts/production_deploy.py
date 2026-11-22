@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 IMAGE = re.compile(r"ghcr\.io/a11ydevs/acessilia@sha256:[0-9a-f]{64}\Z")
 DEPLOYMENT_KEYS = {

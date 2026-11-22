@@ -15,16 +15,7 @@ from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from docstruct.data_uri import decode_data_uri
-from docstruct.geometry.boxes import best_effort_clip
-
 from acessilia_core.config import ToolboxConfig
-from acessilia_core.manifest.models import (
-    ManifestElement,
-)
-from acessilia_core.pipeline.toolbox import (
-    _toolbox_render,
-)
 from acessilia_core.i18n import n, t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
@@ -32,11 +23,18 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDDL_VISION_RETRY_PASS_TABLES,
 )
 from acessilia_core.logger import logger
+from acessilia_core.manifest.models import (
+    ManifestElement,
+)
+from acessilia_core.pipeline.toolbox import (
+    _toolbox_render,
+)
+from docstruct.data_uri import decode_data_uri
+from docstruct.geometry.boxes import best_effort_clip
 
 if TYPE_CHECKING:
-    from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
-
     from acessilia_core.agents.provider_breaker import ProviderBreaker
+    from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
 
 
 #: Picture failures a second try may fix: the provider gave no answer, or an

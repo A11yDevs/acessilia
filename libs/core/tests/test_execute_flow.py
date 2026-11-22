@@ -8,18 +8,16 @@ tests/test_structural_extraction_failure.py cover how a run ends.
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
-
-from acessilia_core.agents.model_calls import current_model_calls
-
 from types import SimpleNamespace
 
 import pytest
-
-from acessilia_core.pipeline import orchestrator as pddl
 from core_config_support import core_config
 from pddl_support import build_element, build_manifest, build_orchestrator
+
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.ports import RunPorts
 
 
 def _recorders(monkeypatch):

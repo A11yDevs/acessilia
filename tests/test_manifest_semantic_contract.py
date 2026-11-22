@@ -279,9 +279,9 @@ MIXED_INTERVALS = {
 
 @pytest.mark.parametrize("case", list(MIXED_INTERVALS))
 def test_mixed_timezones_are_a_validation_error_not_a_type_error(case) -> None:
-    from acessilia_core.manifest.models import ExtractorRun, ObligationAttempt
     from acessilia_core.i18n import t
     from acessilia_core.i18n.log_messages import MSG_TIMESTAMPS_MIXED_TIMEZONES
+    from acessilia_core.manifest.models import ExtractorRun, ObligationAttempt
 
     started_at, completed_at = MIXED_INTERVALS[case]
     expected = re.escape(t(MSG_TIMESTAMPS_MIXED_TIMEZONES))

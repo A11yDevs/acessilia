@@ -15,7 +15,11 @@ from docstruct.evaluation.metrics.cdm import cdm_score
 from docstruct.evaluation.metrics.overall import PageScores, overall_score
 from docstruct.evaluation.metrics.reading_order import reading_order_score
 from docstruct.evaluation.metrics.teds import teds_score
-from docstruct.evaluation.metrics.text_ed import levenshtein, normalized_levenshtein, text_ed
+from docstruct.evaluation.metrics.text_ed import (
+    levenshtein,
+    normalized_levenshtein,
+    text_ed,
+)
 
 __all__ = [
     "PageScores",

@@ -9,13 +9,13 @@ fusion call it; tests/test_provider_choice_methods.py covers them end to end.
 from __future__ import annotations
 
 import pytest
-
-from acessilia_core.pipeline.secondary import (
-    _SecondaryExtraction,
-    _pair_block,
-)
-from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from pddl_support import build_element, build_manifest
+
+from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from acessilia_core.pipeline.secondary import (
+    _pair_block,
+    _SecondaryExtraction,
+)
 
 W, H = 600.0, 800.0
 

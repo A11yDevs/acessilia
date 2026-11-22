@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypeVar
 
-from acessilia_core.agents.run_helpers import RunIncompleteError, run_content
 from agno.run.base import RunStatus
-from docstruct.tables.structured import table_ast_from_structured_rows
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from acessilia_core.agents.run_helpers import RunIncompleteError, run_content
+from docstruct.tables.structured import table_ast_from_structured_rows
 
 VISION_SCHEMA_INSTRUCTION = (
     "Retorne somente o objeto estruturado solicitado: use kind='description' e "

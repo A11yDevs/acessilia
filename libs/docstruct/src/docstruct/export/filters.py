@@ -3,9 +3,6 @@
 
 from copy import deepcopy
 
-
-
-
 from docstruct.profiles import filter_blocks_for_profile
 
 

@@ -8,14 +8,8 @@ the PDDL orchestrator (#402, phase 3, step 6).
 
 from __future__ import annotations
 
-from docstruct.placeholders import has_meaningful_text
-from docstruct.tables.ast import (
-    linearize_table_for_text,
-    raw_rows_from_table_ast as _rows_from_table_ast,
-)
-from docstruct.text.code_reflow import normalize_code_text
-
 from acessilia_core.execution.models import MethodResult
+from acessilia_core.i18n import n, t
 from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
@@ -36,7 +30,14 @@ from acessilia_core.pipeline.handlers.messages import (
     MSG_VISION_UNDESCRIBED,
     MSG_VISION_VALIDATED,
 )
-from acessilia_core.i18n import n, t
+from docstruct.placeholders import has_meaningful_text
+from docstruct.tables.ast import (
+    linearize_table_for_text,
+)
+from docstruct.tables.ast import (
+    raw_rows_from_table_ast as _rows_from_table_ast,
+)
+from docstruct.text.code_reflow import normalize_code_text
 
 
 def _handle_vision_description_method(

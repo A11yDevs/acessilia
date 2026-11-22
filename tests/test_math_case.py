@@ -769,7 +769,10 @@ def test_run_formula_evaluation_degrades_on_invalid_input_and_stops_after_outage
     tmp_path, monkeypatch
 ) -> None:
     from acessilia_sdk.operations.formula import FormulaChain, FormulaCrop
-    from acessilia_sdk.toolbox.errors import ToolboxInvalidInput, ToolboxProviderUnavailable
+    from acessilia_sdk.toolbox.errors import (
+        ToolboxInvalidInput,
+        ToolboxProviderUnavailable,
+    )
     from scripts.bench import toolbox
 
     pdf = tmp_path / "doc.pdf"

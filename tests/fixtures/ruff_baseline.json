@@ -1,11 +1,11 @@
 {
-  "_comment": "Pre-existing Ruff violations (rules F, E excluding E501; #366), counted per file and rule code. Counts may only go down: when you fix violations, run `uv run python scripts/check_ruff_baseline.py --update`.",
+  "_comment": "Pre-existing Ruff violations (rules F, I, E excluding E501; #366, #648), counted per file and rule code. Counts may only go down: when you fix violations, run `uv run python scripts/check_ruff_baseline.py --update`.",
   "files": {
     "libs/core/tests/test_pddl_messages_i18n.py": {
       "F401": 1
     },
     "libs/docstruct/src/docstruct/canonical.py": {
-      "E402": 14
+      "E402": 7
     },
     "libs/docstruct/src/docstruct/fusion/convert.py": {
       "E741": 1
@@ -44,12 +44,6 @@
       "F401": 1
     },
     "tests/test_formula_crop.py": {
-      "F401": 1
-    },
-    "tests/test_formula_recognition.py": {
-      "F401": 2
-    },
-    "tests/test_sdk_dataset_schema.py": {
       "F401": 1
     },
     "tests/test_slides.py": {

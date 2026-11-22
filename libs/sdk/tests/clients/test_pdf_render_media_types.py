@@ -11,6 +11,7 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
+
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable
 from acessilia_sdk.toolbox.clients import pdf
 from acessilia_sdk.toolbox.clients.pdf import (

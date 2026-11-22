@@ -10,8 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
-from backend.service import _normalized_engine, _build_orchestrator
-
+from backend.service import _build_orchestrator, _normalized_engine
 
 # ---------------------------------------------------------------------------
 # Legacy pipeline must be disabled

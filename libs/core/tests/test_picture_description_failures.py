@@ -8,12 +8,7 @@ describe-image warning; the reader gets one neutral alt text.
 from __future__ import annotations
 
 import pytest
-
-from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.pipeline.elements import MSG_UNDESCRIBED_PICTURE_ALT, _element_to_block
-from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
-from acessilia_core.i18n import t
+from core_config_support import model_config, toolbox_config, vision_config
 from pddl_support import (
     build_element as _element,
 )
@@ -23,7 +18,15 @@ from pddl_support import (
 from pddl_support import (
     build_obligation as _obligation,
 )
-from core_config_support import model_config, toolbox_config, vision_config
+
+from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.i18n import t
+from acessilia_core.pipeline.elements import (
+    MSG_UNDESCRIBED_PICTURE_ALT,
+    _element_to_block,
+)
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
 
 _DESCRIPTION = VisionOutput(
     kind="description",

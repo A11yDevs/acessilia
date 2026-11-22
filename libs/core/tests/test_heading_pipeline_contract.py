@@ -1,21 +1,27 @@
 """Heading repair and validation must agree on canonical section headings."""
 
 import pytest
-
-from acessilia_core.pipeline.payload import build_pddl_structured_payload
-from acessilia_core.manifest.builder import _derive_processing_needs
-from acessilia_core.pipeline.canonical_builder import build_canonical_document
-from docstruct.export.html import document_to_html
-from docstruct.validation import (
-    validate_canonical_document, MSG_HEADING_LEVELS_SKIPPED,
-    MSG_MISSING_FIRST_H1, MSG_MULTIPLE_H1,
-)
+from core_config_support import toolbox_config
 from pddl_support import (
     build_element as _element,
+)
+from pddl_support import (
     build_manifest as _manifest,
+)
+from pddl_support import (
     build_orchestrator as _orchestrator,
 )
-from core_config_support import toolbox_config
+
+from acessilia_core.manifest.builder import _derive_processing_needs
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
+from docstruct.export.html import document_to_html
+from docstruct.validation import (
+    MSG_HEADING_LEVELS_SKIPPED,
+    MSG_MISSING_FIRST_H1,
+    MSG_MULTIPLE_H1,
+    validate_canonical_document,
+)
 
 
 @pytest.mark.parametrize("levels", [[1, 4, 5], [1, 3, 4], [1, 4, 5, 6]])

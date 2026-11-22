@@ -2,14 +2,14 @@
 import json
 
 import pytest
+from core_config_support import toolbox_config
 
 from acessilia_core.pipeline import canonical_builder
-from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
 from docstruct.canonical import _enrich_math_blocks, build_canonical_document
 from docstruct.export.html import document_to_html
+from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.text.math_spans import split_inline_math
-from core_config_support import toolbox_config
 
 MATHML = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>t</mi></math>'
 

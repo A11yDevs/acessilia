@@ -2,9 +2,10 @@ import tempfile
 from pathlib import Path
 
 from core_config_support import export_config, toolbox_config
-from acessilia_core.export.exporters.txt_exporter import export_txt
+
 from acessilia_core.export.exporters.docx_exporter import export_docx
 from acessilia_core.export.exporters.pdf_exporter import export_pdf_ua
+from acessilia_core.export.exporters.txt_exporter import export_txt
 
 
 def test_export_txt():

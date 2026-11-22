@@ -8,12 +8,8 @@ XY-cut to the elements' boxes. Moved verbatim from the PDDL orchestrator
 
 from __future__ import annotations
 
-from docstruct.fusion.skeleton import (
-    DEFAULT_MIN_SKELETON_MATCH as _MIN_SKELETON_MATCH,
-    skeleton_reading_order,
-)
-
 from acessilia_core.execution.models import MethodResult
+from acessilia_core.i18n import t
 from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
@@ -37,7 +33,12 @@ from acessilia_core.pipeline.secondary import (
     _pair_block,
     _secondary_or_failure,
 )
-from acessilia_core.i18n import t
+from docstruct.fusion.skeleton import (
+    DEFAULT_MIN_SKELETON_MATCH as _MIN_SKELETON_MATCH,
+)
+from docstruct.fusion.skeleton import (
+    skeleton_reading_order,
+)
 
 
 def _handle_skeleton_order_method(

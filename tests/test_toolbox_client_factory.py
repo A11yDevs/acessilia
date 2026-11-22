@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from acessilia_core.toolbox import toolbox_client
+from acessilia_core.toolbox.toolbox_client import make_toolbox_client, toolbox_endpoints
 from acessilia_sdk.toolbox import ToolboxEndpoint, ToolboxTimeout
 from acessilia_sdk.toolbox.clients import (
     ToolboxMathClient,
@@ -11,8 +13,6 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxPdfUaClient,
 )
 from backend.config.settings import settings
-from acessilia_core.toolbox import toolbox_client
-from acessilia_core.toolbox.toolbox_client import make_toolbox_client, toolbox_endpoints
 from tests.core_config_support import toolbox_config
 
 PRIMARY = "http://toolbox-a.test"

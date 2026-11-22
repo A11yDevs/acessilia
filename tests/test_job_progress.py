@@ -12,11 +12,6 @@ import asyncio
 
 import pytest
 
-from acessilia_core.pipeline.orchestrator import _plan_progress
-from acessilia_core.pipeline.obligations import _pages_label
-from backend.agents.state_manager import describe_failure, state_manager
-from backend.config.settings import settings
-from acessilia_core.planning.models import PlanStep
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import (
     STAGE_DESCRIBING_IMAGE,
@@ -28,6 +23,11 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_RESTART_INTERRUPTED_DURING,
 )
+from acessilia_core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.orchestrator import _plan_progress
+from acessilia_core.planning.models import PlanStep
+from backend.agents.state_manager import describe_failure, state_manager
+from backend.config.settings import settings
 from tests.pddl_support import (
     build_element as _element,
 )

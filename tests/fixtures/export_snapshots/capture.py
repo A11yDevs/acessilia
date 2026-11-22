@@ -8,8 +8,8 @@ snapshot change. The test suite imports this harness but never calls main().
 from __future__ import annotations
 
 import argparse
-from copy import deepcopy
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Iterator
 

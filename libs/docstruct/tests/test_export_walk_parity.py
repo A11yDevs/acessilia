@@ -5,10 +5,10 @@ outputs. This suite checks that those same calls actually use the walker's
 per-type/default dispatch, instead of retaining a private dispatch or traversal.
 """
 
-from copy import deepcopy
-from dataclasses import replace
 import importlib.util
 import json
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest

@@ -11,7 +11,11 @@ from typing import TypeVar
 
 import pytest
 
-from acessilia_core.agents.model_calls import ModelCallRunner, ModelCallTimeout, model_call_scope
+from acessilia_core.agents.model_calls import (
+    ModelCallRunner,
+    ModelCallTimeout,
+    model_call_scope,
+)
 
 T = TypeVar("T")
 

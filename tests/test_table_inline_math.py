@@ -2,9 +2,13 @@
 import json
 import re
 
-from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
-from docstruct.canonical import _enrich_math_blocks, build_canonical_document, sanitize_canonical_document
+from docstruct.canonical import (
+    _enrich_math_blocks,
+    build_canonical_document,
+    sanitize_canonical_document,
+)
 from docstruct.export.html import document_to_html
+from docstruct.export.pandoc_ast import build_pandoc_ast, degrade_math_to_text
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.text.math_spans import block_prose
 

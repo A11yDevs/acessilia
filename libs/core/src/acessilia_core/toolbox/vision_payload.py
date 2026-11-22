@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import math
 
-from acessilia_sdk.toolbox import ToolboxError
-from acessilia_sdk.toolbox.clients import ToolboxPdfClient
-from acessilia_sdk.toolbox.clients.pdf import downscale_image as _sdk_downscale_image
-from docstruct.imaging import image_dimensions
-
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
 from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_client import make_toolbox_client
+from acessilia_sdk.toolbox import ToolboxError
+from acessilia_sdk.toolbox.clients import ToolboxPdfClient
+from acessilia_sdk.toolbox.clients.pdf import downscale_image as _sdk_downscale_image
+from docstruct.imaging import image_dimensions
 
 
 async def downscale_image(

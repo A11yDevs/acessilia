@@ -2,6 +2,7 @@ import asyncio
 import time
 from pathlib import Path
 
+from acessilia_core.blocking import run_blocking
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_CLEANUP_OUTPUT_FAILED,
@@ -10,15 +11,13 @@ from acessilia_core.i18n.log_messages import (
 from acessilia_core.logger import logger
 from backend.agents.state_manager import state_manager
 from backend.config.settings import settings
-from backend.services.queue_service import unified_queue
-from acessilia_core.blocking import run_blocking
 from backend.services.download_token_service import (
     TOKEN_EXPIRY_DAYS,
+    active_download_directories,
     limpar_tokens_expirados,
     remove_unreferenced_output_directory,
-    active_download_directories,
 )
-
+from backend.services.queue_service import unified_queue
 
 CLEANUP_INTERVAL = 3600
 FILE_MAX_AGE = 7200

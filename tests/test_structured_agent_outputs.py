@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from agno.run.base import RunStatus
 import pytest
+from agno.run.base import RunStatus
 from pydantic import ValidationError
 
 from acessilia_core.agents.output_schemas import (
@@ -546,9 +546,9 @@ async def test_context_overflow_retries_full_page_with_smaller_image_and_token_c
     from PIL import Image as PILImage
 
     from acessilia_core.agents.run_helpers import AgentRunError
-    from backend.config.settings import settings
     from acessilia_core.i18n import reset_request_locale, set_request_locale
     from acessilia_core.logger import logger
+    from backend.config.settings import settings
 
     vision_module, calls, budgets = _context_retry_vision(
         monkeypatch,
@@ -750,8 +750,8 @@ async def test_page_inspection_recovers_with_the_whole_page_budget(
 
 @pytest.mark.asyncio
 async def test_a_failed_toolbox_render_lets_the_context_error_stand(monkeypatch):
-    from acessilia_core.toolbox import vision_payload
     from acessilia_core.logger import logger
+    from acessilia_core.toolbox import vision_payload
 
     def unreachable_toolbox(*_args, **_kwargs):
         raise ValueError("Toolbox base_url must be an absolute http(s) URL")
@@ -869,9 +869,9 @@ def test_a_description_over_the_region_budget_is_truncated_and_warns() -> None:
         DESCRIPTION_CHARS_PER_TOKEN,
         _truncate_description,
     )
-    from backend.config.settings import settings
     from acessilia_core.i18n import t
     from acessilia_core.i18n.log_messages import MSG_VISION_TRUNCATION_NOTICE
+    from backend.config.settings import settings
 
     limit_chars = settings.vision_region_max_tokens * DESCRIPTION_CHARS_PER_TOKEN
     output = VisionOutput(
@@ -935,7 +935,7 @@ async def test_a_region_on_the_general_budget_is_never_truncated(monkeypatch) ->
 
 @pytest.mark.asyncio
 async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
-    from acessilia_core.agents.vision_agent import REGION_ATTEMPTS, _RATE_LIMIT_RETRIES
+    from acessilia_core.agents.vision_agent import _RATE_LIMIT_RETRIES, REGION_ATTEMPTS
 
     class RateLimited(Exception):
         status_code = 429
@@ -962,8 +962,8 @@ async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> No
     import asyncio
     import threading
 
-    from acessilia_core.agents import vision_agent as vision_module
     from acessilia_core.agents import model_call_policy
+    from acessilia_core.agents import vision_agent as vision_module
     from backend.config.settings import settings
 
     started, release, finished = threading.Event(), threading.Event(), threading.Event()
@@ -1276,11 +1276,11 @@ async def test_the_token_budget_of_each_vision_call(monkeypatch, call, answer, b
     [
         # Complete, but with an unquoted label inside the description.
         '{"kind": "description", "description": "A bar chart of monthly revenue '
-        'for the whole year, labelled "Revenue" on its axis.", "language": "en", '
+        + 'for the whole year, labelled "Revenue" on its axis.", "language": "en", '
         '"confidence": 0.9}',
         # Complete, but with an invalid escape.
         '{"kind": "description", "description": "A bar chart of monthly revenue '
-        'for the whole year \\q with its axis.", "language": "en", "confidence": 0.9}',
+        + 'for the whole year \\q with its axis.", "language": "en", "confidence": 0.9}',
     ],
     ids=["inner-quote", "invalid-escape"],
 )

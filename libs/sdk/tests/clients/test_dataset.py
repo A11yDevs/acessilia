@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import httpx
-import respx
 import pytest
+import respx
 
 from acessilia_sdk.toolbox import (
     ToolboxCapabilityError,
@@ -13,7 +13,10 @@ from acessilia_sdk.toolbox import (
     ToolboxUnavailable,
 )
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient
-from acessilia_sdk.toolbox.clients.dataset import MAX_PAGE_SIZE, SYNC_MIN_TIMEOUT_SECONDS
+from acessilia_sdk.toolbox.clients.dataset import (
+    MAX_PAGE_SIZE,
+    SYNC_MIN_TIMEOUT_SECONDS,
+)
 
 BASE_URL = "http://localhost:8002"
 SECONDARY = "http://toolbox-b.test"

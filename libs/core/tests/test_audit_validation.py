@@ -7,11 +7,11 @@ to en_US for deterministic canonical-English assertions.
 
 from __future__ import annotations
 
-import acessilia_core.i18n as i8n
 import pytest
-from acessilia_core.pipeline.validators import audit_canonical_document
-
 from locale_support import use_server_locale
+
+import acessilia_core.i18n as i8n
+from acessilia_core.pipeline.validators import audit_canonical_document
 
 
 @pytest.fixture(autouse=True)

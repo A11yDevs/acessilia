@@ -26,16 +26,10 @@ from importlib.util import find_spec
 from pathlib import Path
 
 import httpx
-from tests.core_config_support import core_config, toolbox_config
 import pytest
 
-from acessilia_core.pipeline.handlers.registry import bind_run
-from acessilia_core.ports import RunPorts
-from acessilia_core.i18n import reset_request_locale, set_request_locale
-from acessilia_sdk.toolbox.transport import auth_headers
-
-from acessilia_core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
 from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
+from acessilia_core.i18n import reset_request_locale, set_request_locale
 from acessilia_core.manifest.models import (
     ExtractorRun,
     ManifestElement,
@@ -44,8 +38,12 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     SourceDocument,
 )
+from acessilia_core.pipeline.handlers.fusion import _handle_dual_provider_fusion_method
+from acessilia_core.pipeline.handlers.registry import bind_run
 from acessilia_core.planning.planner_agent import PlannerAgent
-
+from acessilia_core.ports import RunPorts
+from acessilia_sdk.toolbox.transport import auth_headers
+from tests.core_config_support import core_config, toolbox_config
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

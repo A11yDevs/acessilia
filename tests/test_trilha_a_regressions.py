@@ -8,14 +8,18 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
-from tests.core_config_support import core_config, paths_config, toolbox_config
 import pytest
 
-from tests.core_config_support import fusion_config
-from backend.config.settings import settings
-from acessilia_core.pipeline.handlers import fusion as fusion_handlers
 from acessilia_core.cache_keys import options_cache_key
+from acessilia_core.pipeline.handlers import fusion as fusion_handlers
+from backend.config.settings import settings
 from backend.services.cache import processing_cache_configuration
+from tests.core_config_support import (
+    core_config,
+    fusion_config,
+    paths_config,
+    toolbox_config,
+)
 from tests.test_pending_fixes import isolated_runtime as isolated_runtime_fixture
 
 isolated_runtime = isolated_runtime_fixture
@@ -78,8 +82,8 @@ async def test_concurrent_downloads_have_independent_temporary_files(tmp_path):
 
 @pytest.mark.parametrize("kind", ["table", "picture", "formula"])
 def test_empty_structural_elements_contribute_to_fusion_evidence(kind):
-    from docstruct.fusion.payload import group_payload_by_page as _group_by_page
     from acessilia_core.pipeline.fusion import fuse_extraction_payloads
+    from docstruct.fusion.payload import group_payload_by_page as _group_by_page
 
     primary = {"document": {"elements": []}}
     secondary = {
@@ -128,8 +132,8 @@ def test_secondary_failure_reaches_result_configuration(monkeypatch, tmp_path):
 
 
 def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tmp_path):
-    from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
     from tests.test_toolbox_manifest_extractor import SAMPLE_TOOLBOX_RESPONSE
 
@@ -176,8 +180,8 @@ def test_identical_providers_are_skipped_without_disabling_cache(monkeypatch, tm
     ],
 )
 def test_pddl_cache_policy(status, open_kind, last_method, expected):
-    from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from acessilia_core.manifest.models import Obligation, ObligationAttempt
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
 
     manifest = _sample_manifest()
@@ -239,6 +243,7 @@ def _reuse_identity():
 @pytest.mark.parametrize("corrupt", [False, True, "configuration"])
 def test_dual_fusion_reuses_verified_inputs(tmp_path, monkeypatch, corrupt):
     import json
+
     from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
@@ -321,9 +326,9 @@ async def test_pddl_recovery_policy_controls_real_cache_replay(
     isolated_runtime, monkeypatch, tmp_path, status, kind, human_review, expected_calls
 ):
     """A second submission retries technical failures and reuses final results."""
-    from backend import service
-    from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from acessilia_core.manifest.models import Obligation, ObligationAttempt
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
+    from backend import service
     from backend.services import cache
     from tests.test_pddl_orchestrator import _sample_manifest, _sample_plan
 
@@ -396,9 +401,8 @@ def test_route_uses_structure_when_text_agrees(kind):
 def test_reuse_accepts_effective_custom_policy(tmp_path, monkeypatch):
     from dataclasses import asdict
 
-    from docstruct.policy import FusionPolicy
-
     from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from docstruct.policy import FusionPolicy
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)
@@ -419,7 +423,6 @@ def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
     from dataclasses import asdict
 
     from docstruct.policy import FusionPolicy
-
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)
@@ -438,9 +441,8 @@ def test_reextract_uses_effective_custom_policy(tmp_path, monkeypatch):
 def test_handler_reuses_matching_policy_and_reextracts_with_changed_policy(tmp_path, monkeypatch):
     from dataclasses import asdict
 
-    from docstruct.policy import FusionPolicy
-
     from acessilia_core.manifest.toolbox_extractor import _persist_fusion_reuse
+    from docstruct.policy import FusionPolicy
     from tests.test_dual_provider_fusion import _dual_payload, _make_manifest
 
     manifest = _make_manifest(tmp_path)

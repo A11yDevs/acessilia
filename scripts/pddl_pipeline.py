@@ -8,13 +8,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from backend.config.core_config import core_config_from_settings
-from backend.config.process_setup import warn_deprecated_configuration
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 from acessilia_core.execution.executor import ExecutorAgent, MethodRegistry
-from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.schema import validate_manifest
+from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
+from acessilia_core.pipeline.handlers.registry import bind_run
 from acessilia_core.planning.domain_bundle import (
     DEFAULT_DESCRIPTION_PATH,
     DEFAULT_DOMAIN_PATH,
@@ -22,9 +21,9 @@ from acessilia_core.planning.domain_bundle import (
 )
 from acessilia_core.planning.models import NominalPlan
 from acessilia_core.planning.planner_agent import PlannerAgent
-from acessilia_core.pipeline.handlers.registry import bind_run
 from acessilia_core.ports import RunPorts
-
+from backend.config.core_config import core_config_from_settings
+from backend.config.process_setup import warn_deprecated_configuration
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST_SCHEMA = (

@@ -15,11 +15,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.config.core_config import core_config_from_settings
-from acessilia_core.pipeline.canonical_builder import build_canonical_document
-from acessilia_core.pipeline.validators import validate_canonical_document
 from acessilia_core.export.renderers.html_renderer import _render_block as render_html
 from acessilia_core.export.renderers.txt_renderer import _render_block as render_txt
+from acessilia_core.pipeline.canonical_builder import build_canonical_document
+from acessilia_core.pipeline.validators import validate_canonical_document
+from backend.config.core_config import core_config_from_settings
 
 # (nome, LaTeX como sai do pipeline, esperado detectar como math?)
 CASES = [

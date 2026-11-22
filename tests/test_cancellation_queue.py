@@ -5,13 +5,13 @@ import threading
 import httpx
 import pytest
 
+from acessilia_core.blocking import run_blocking
 from backend.api import worker
 from backend.services import job_store
-from acessilia_core.blocking import run_blocking
 from backend.services.queue_service import QueueItem, UnifiedQueue
+from tests.core_config_support import toolbox_config
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture
 from tests.test_pending_fixes import stop_queue
-from tests.core_config_support import toolbox_config
 
 isolated_runtime = runtime_fixture
 
@@ -44,7 +44,9 @@ async def test_cancelled_extraction_advances_queue_and_reports_wait(isolated_run
 
     async def process(*args, **kwargs):
         if kwargs["task_id"] == "next":
-            from acessilia_core.pipeline.canonical_builder import build_canonical_document
+            from acessilia_core.pipeline.canonical_builder import (
+                build_canonical_document,
+            )
             advanced.set()
             return build_canonical_document("Next document.", title="Next", toolbox=toolbox_config())
         await run_blocking(extract)
