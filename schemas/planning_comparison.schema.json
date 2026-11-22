@@ -165,7 +165,7 @@
     },
     "PlannerOutcome": {
       "additionalProperties": false,
-      "description": "Resultado observável de uma execução de backend.",
+      "description": "Observable result of one backend execution.",
       "properties": {
         "backend": {
           "enum": [

@@ -8,8 +8,10 @@ As descrições dos schemas PDDL agora usam as constantes canônicas em inglês 
 vez do lookup do locale ativo, então gerar os schemas é determinístico
 independentemente do locale do servidor. Os schemas de execution report,
 nominal plan e planning comparison foram regenerados com essas descrições; suas
-versões e estruturas não mudam. Um teste na raiz agora confere os quatro
-schemas versionados contra seus geradores (#737).
+versões e estruturas não mudam. Os três msgids de descrição de schema foram
+removidos dos catálogos de tradução porque são texto canônico de schema, não
+strings localizadas. Um teste na raiz agora confere os quatro schemas
+versionados contra seus geradores, nos dois locales suportados (#737).
 
 ## 0.3.5 — um único writer para os arquivos JSON Schema
 

@@ -8,8 +8,10 @@ The PDDL schema descriptions now use the canonical English message constants
 instead of the active-locale lookup, so generating the schemas is deterministic
 regardless of the server locale. The execution-report, nominal-plan and
 planning-comparison schemas were regenerated with those descriptions; their
-versions and structure are unchanged. A root test now checks the four
-committed schemas against their generators (#737).
+versions and structure are unchanged. The three schema-description msgids were
+removed from the translation catalogs because they are canonical schema text,
+not localized strings. A root test now checks the four committed schemas against
+their generators, under both supported locales (#737).
 
 ## 0.3.5 — one writer for the JSON Schema files
 

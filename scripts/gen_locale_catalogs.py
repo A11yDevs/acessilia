@@ -41,7 +41,6 @@ from acessilia_core.execution.messages import (
     EXE_RESULT_REJECTED,
     EXE_START_JOB_INVALID_STATE,
     EXE_UNKNOWN_ACTION,
-    MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
 )
@@ -338,7 +337,6 @@ from acessilia_core.planning.messages import (
     MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
     MSG_EXPECTED_TOTAL_COST_MISMATCH,
     MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB,
-    MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
     MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
     MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION,
@@ -346,7 +344,6 @@ from acessilia_core.planning.messages import (
     MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION,
     MSG_PLANNER_OUTCOME_SOLVED_MUST_NOT_CARRY_ERROR,
     MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS,
-    MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
 )
 from acessilia_core.toolbox.toolbox_math_tools import (
     MSG_MATHML_REJECTED,
@@ -725,12 +722,9 @@ MESSAGES: tuple[str, ...] = (
     MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION,
     MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
     MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
-    MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
-    MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
-    # Execution-model validation/schema strings consumed by libs/core/src/acessilia_core/execution/models.py.
+    # Execution-model validation strings consumed by libs/core/src/acessilia_core/execution/models.py.
     MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION,
     MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS,
-    MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
     # Tracker finish receipts shown when editing the live progress message at job end.
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,
@@ -1578,14 +1572,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "A chave {key} diverge do backend registrado como {backend} "
             "nesse par de resultados"
         ),
-        # Normalized description for the planning-comparison JSON schema document in pt_BR.
-        MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION: (
-            "Comparação normalizada entre as execuções do planejador interno e o Fast Downward de um único problema"
-        ),
-        # Normalized description for the nominal-plan JSON schema document in pt_BR.
-        MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION: (
-            "Plano nominal derivado do manifesto de processamento e do domínio PDDL do Acessilia; os efeitos só são confirmados após a execução por um executor"
-        ),
         # Execution model guard: a result claiming success must have passed validation.
         MSG_METHOD_RESULT_SUCCESS_REQUIRES_VALIDATION: (
             "Um resultado de método reivindicado como bem-sucedido também deve ter passado na sua validação"
@@ -1593,10 +1579,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Duplicate artifact identifier guard on MethodResult artifacts mapping.
         MSG_METHOD_RESULT_DUPLICATE_ARTIFACT_IDS: (
             "O resultado do método contém identificadores de artefatos duplicados"
-        ),
-        # Execution report JSON schema document description in pt_BR.
-        MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION: (
-            "Relatório da execução de um plano nominal sobre um manifesto, com resultados por passo e artefatos coletados"
         ),
         # Tracker finish receipts mirroring the progress message end states edited in status_tracker.
         MSG_STATUS_CONVERSION_DONE: "✅ Conversão concluída!",

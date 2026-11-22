@@ -131,7 +131,7 @@ StatisticValue = int | float | str | bool
 
 
 class PlannerOutcome(StrictModel):
-    """Resultado observável de uma execução de backend."""
+    """Observable result of one backend execution."""
 
     backend: PlannerBackend
     status: Literal["solved", "failed"]
