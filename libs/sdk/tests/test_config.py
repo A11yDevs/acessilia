@@ -21,6 +21,7 @@ from acessilia_sdk.toolbox.clients import (
     ToolboxOcrClient,
     ToolboxPdfUaClient,
     ToolboxStructureClient,
+    client_timeout_keys,
 )
 
 PRIMARY = "http://toolbox-a.test"
@@ -130,6 +131,15 @@ def test_the_math_client_takes_its_transform_provider():
 
     assert (client.provider, client.transform_provider) == ("rapid", "custom")
     _close(client)
+
+
+def test_client_timeout_keys_are_the_exports_with_their_own_timeout():
+    assert client_timeout_keys() == {
+        "toolbox_docx_timeout_seconds",
+        "toolbox_pdf_ua_timeout_seconds",
+        "toolbox_pdf_validate_timeout_seconds",
+        "toolbox_structure_timeout_seconds",
+    }
 
 
 def test_exports_use_their_own_timeout_or_fall_back_to_the_shared_one():

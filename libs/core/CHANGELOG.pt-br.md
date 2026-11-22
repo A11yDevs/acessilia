@@ -2,6 +2,14 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.3 — metadados de timeout da Toolbox pelo SDK
+
+Sem mudança de comportamento. O Core lê os timeout keys próprios dos clientes
+por `acessilia_sdk.toolbox.clients.client_timeout_keys()` em vez de introspectar
+os internos do módulo de clientes do SDK; `TIMEOUT_KEYS` continua o nome público
+do Core usado pela configuração do serviço. O core agora exige
+`acessilia-sdk>=0.5,<0.6` (#656).
+
 ## 0.3.2 — reexportações da docstruct em formula_tools depreciadas
 
 Sem mudança de comportamento para consumidores migrados; os nomes antigos agora

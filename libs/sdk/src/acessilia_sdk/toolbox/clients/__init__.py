@@ -6,6 +6,9 @@ settings and log nothing: the caller passes the configuration and records what
 it needs.
 """
 
+import inspect
+
+from acessilia_sdk.toolbox.client import ToolboxCapabilityClient
 from acessilia_sdk.toolbox.clients.adjudicate import ToolboxAdjudicateClient
 from acessilia_sdk.toolbox.clients.artifact import ToolboxArtifactClient
 from acessilia_sdk.toolbox.clients.dataset import ToolboxDatasetClient
@@ -40,4 +43,25 @@ __all__ = [
     "ToolboxPdfValidateClient",
     "ToolboxStructureClient",
     "ToolboxTableClient",
+    "client_timeout_keys",
 ]
+
+
+def client_timeout_keys() -> frozenset[str]:
+    """The ``timeout_key`` of each exported client that has its own timeout.
+
+    Callers that build a :class:`~acessilia_sdk.toolbox.ToolboxClientConfig`
+    from their own settings use this to know which settings map to the
+    ``timeouts`` field; clients without a ``timeout_key`` use the shared
+    timeout.
+    """
+    keys: set[str] = set()
+    for name in __all__:
+        value = globals()[name]
+        if (
+            inspect.isclass(value)
+            and issubclass(value, ToolboxCapabilityClient)
+            and value.timeout_key
+        ):
+            keys.add(value.timeout_key)
+    return frozenset(keys)
