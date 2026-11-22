@@ -16,7 +16,8 @@ from backend.config.process_setup import setup_process
 from acessilia_core.logger import logger
 from frontend.telegram.middlewares.locale_middleware import LocaleMiddleware
 from frontend.telegram.middlewares.pause_middleware import PauseMiddleware
-from acessilia_core.i18n import t
+from frontend.telegram.commands import bot_commands, telegram_language
+from acessilia_core.i18n import DEFAULT_LOCALE, active_locales, t
 from acessilia_core.i18n.log_messages import (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
@@ -28,13 +29,48 @@ from acessilia_core.i18n.log_messages import (
 from backend.config.settings import settings
 
 
+async def _announce_identity(bot: Bot) -> None:
+    """Log the bot username and warn when privacy mode withholds group files."""
+    me = await bot.get_me()
+    logger.info("Telegram bot @%s connected", me.username)
+    if not getattr(me, "can_read_all_group_messages", True):
+        logger.warning(
+            "Telegram bot @%s has privacy mode enabled: files sent in groups "
+            "only reach it when it is a group administrator; see "
+            "docs/telegram.md section 3.1",
+            me.username,
+        )
+
+
+async def _register_commands(bot: Bot) -> None:
+    """Publish `/help` commands through the Bot API for every active locale."""
+    active = active_locales()
+    default_locale = DEFAULT_LOCALE if DEFAULT_LOCALE in active else active[0]
+    await bot.set_my_commands(bot_commands(default_locale))
+    registered = {telegram_language(default_locale)}
+    for locale in active:
+        language = telegram_language(locale)
+        if language in registered:
+            continue
+        await bot.set_my_commands(bot_commands(locale), language_code=language)
+        registered.add(language)
+
+
 async def on_startup(bot: Bot) -> None:
-    """Log a startup notice marking the bot as an Acessilia API client.
+    """Mark the bot as an Acessilia API client and prepare its Telegram UI.
 
     Args:
         bot (Bot): Aiogram Bot instance that finished starting up; no default (required).
     """
     logger.info(t(LOG_BOT_STARTED))
+    try:
+        await _announce_identity(bot)
+    except Exception as error:
+        logger.warning("Telegram getMe failed: %s", error)
+    try:
+        await _register_commands(bot)
+    except Exception as error:
+        logger.warning("Telegram setMyCommands failed: %s", error)
     await resume_tracked_tasks(bot)
 
 
