@@ -14,11 +14,46 @@ from typing import Any
 import docstruct.validation as _docstruct_validation
 from acessilia_core.i18n import t
 
-_DEPRECATED_MSGIDS = tuple(
-    sorted(name for name in vars(_docstruct_validation) if name.startswith("MSG_"))
+_DEPRECATED_MSGIDS = (
+    "MSG_BLOCK_NOT_ALLOWED_IN_PROFILE",
+    "MSG_CANONICAL_DOC_NOT_OBJECT",
+    "MSG_DOCUMENT_NO_SECTIONS",
+    "MSG_DUPLICATE_ID",
+    "MSG_FIELD_MISSING",
+    "MSG_HEADING_LEVELS_SKIPPED",
+    "MSG_IMAGE_MISSING_ALT",
+    "MSG_INCONSISTENT_CODE_INDENT",
+    "MSG_INTERNAL_LINK_BROKEN",
+    "MSG_MARKDOWN_IN_BLOCK",
+    "MSG_MARKDOWN_IN_OUTPUT",
+    "MSG_MISSING_FIRST_H1",
+    "MSG_MULTIPLE_H1",
+    "MSG_NO_ID_PLACEHOLDER",
+    "MSG_PROMPT_LEAK_IN_BLOCK",
+    "MSG_PROMPT_LEAK_IN_OUTPUT",
+    "MSG_SECTIONS_NOT_LIST",
+    "MSG_TABLE_AST_CELL_INVALID",
+    "MSG_TABLE_AST_CELL_NO_TEXT",
+    "MSG_TABLE_AST_INVALID",
+    "MSG_TABLE_AST_NO_BODY",
+    "MSG_TABLE_AST_ROW_INVALID",
+    "MSG_TABLE_AST_ROW_NO_CELLS",
+    "MSG_TABLE_AST_SECTION_INVALID",
+    "MSG_TABLE_AST_WIDTH_INCONSISTENT",
+    "MSG_TABLE_CELL_EMPTY",
+    "MSG_TABLE_CELL_NOT_TEXT",
+    "MSG_TABLE_COLUMNS_INCONSISTENT",
+    "MSG_TABLE_EMPTY",
+    "MSG_TABLE_LEGACY_FALLBACK",
+    "MSG_TABLE_MISSING_HEADER",
+    "MSG_TABLE_ROW_INVALID",
+    "MSG_TABLE_ROWS_INVALID",
+    "MSG_TECHNICAL_METADATA_IN_TXT",
+    "MSG_UNKNOWN_EXPORT_PROFILE",
 )
-_DEPRECATED: dict[str, str] = {
-    name: getattr(_docstruct_validation, name) for name in _DEPRECATED_MSGIDS
+_DEPRECATED: dict[str, Any] = {
+    name: getattr(_docstruct_validation, name)
+    for name in (*_DEPRECATED_MSGIDS, "Finding")
 }
 
 __all__ = [
@@ -28,6 +63,10 @@ __all__ = [
     "audit_canonical_document",
     *_DEPRECATED_MSGIDS,
 ]
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__) | set(_DEPRECATED))
 
 
 def __getattr__(name: str) -> Any:
@@ -40,10 +79,6 @@ def __getattr__(name: str) -> Any:
         )
         return _DEPRECATED[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def _resolve(findings: list) -> list[str]:
-    return [t(msgid).format(**kwargs) for msgid, kwargs in findings]
 
 
 def _resolve(findings: list) -> list[str]:

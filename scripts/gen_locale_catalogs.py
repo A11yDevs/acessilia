@@ -735,8 +735,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,
     # Canonical-document / export-profile / output-text validation findings
-    # (libs/core/src/acessilia_core/pipeline/validators.py), surfaced in audit reports and ValueError
-    # messages raised by libs/core/src/acessilia_core/export/pandoc_exporter.py.
+    # (docstruct.validation), surfaced in audit reports and ValueError messages
+    # raised by libs/core/src/acessilia_core/export/pandoc_exporter.py.
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_FIELD_MISSING,
     MSG_SECTIONS_NOT_LIST,
@@ -791,7 +791,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_REGION,
-    # TXT table line templates (libs/core/src/acessilia_core/pipeline/table_ast.py).
+    # TXT table line templates (docstruct.tables.ast).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
     MSG_TABLE_TEXT_FOOTER,
@@ -1602,7 +1602,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_STATUS_CONVERSION_DONE: "✅ Conversão concluída!",
         MSG_STATUS_PROCESSING_FAILED: ("❌ Erro durante o processamento."),
         # Canonical-document / export-profile / output-text validation findings
-        # (pt-BR mirrors of the libs/core/src/acessilia_core/pipeline/validators.py ids above).
+        # (pt-BR mirrors of the docstruct.validation ids above).
         MSG_CANONICAL_DOC_NOT_OBJECT: (
             "Documento canônico deve ser um objeto JSON."
         ),

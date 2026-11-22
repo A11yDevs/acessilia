@@ -36,6 +36,10 @@ __all__ = [
 ]
 
 
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__) | set(_DEPRECATED))
+
+
 def __getattr__(name: str) -> Any:
     if name in _DEPRECATED:
         warnings.warn(
