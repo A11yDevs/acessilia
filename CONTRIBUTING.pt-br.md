@@ -372,10 +372,20 @@ responsáveis; não repita os nomes neste documento.
 
 A solicitação é automática, mas a aprovação não é obrigatória: se uma revisão
 bloqueia o merge depende dos rulesets de branch, e este arquivo não adiciona
-essa exigência. Mudanças que alteram responsabilidades, dependências, modo de
-execução ou contrato público continuam exigindo a revisão arquitetural descrita
-acima. Atualize o `CODEOWNERS` por pull request, com concordância dos
-mantenedores, sempre que o time ou a responsabilidade por um componente mudar.
+essa exigência. Mudanças que alteram responsabilidades, dependências,
+configuração de execução ou contrato público continuam exigindo o ADR descrito
+em [Desenvolver](#2-desenvolver). Atualize o `CODEOWNERS` por pull request, com
+concordância dos mantenedores, sempre que o time ou a responsabilidade por um
+componente mudar.
+
+## Atualizações de dependências
+
+O Dependabot lê o `.github/dependabot.yml` da **branch padrão** (`main`), então
+mudanças de configuração passam a valer primeiro nela, pelo fluxo de release ou
+hotfix. Atualizações regulares apontam para `develop`. Atualizações de
+segurança sempre apontam para a branch padrão (`main`), independentemente de
+`target-branch`, e seguem o fluxo de hotfix como qualquer mudança que chega à
+produção fora de uma release.
 
 ## Rulesets (proteção de branches)
 

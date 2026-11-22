@@ -368,10 +368,18 @@ this document.
 
 The request is automatic, but approval is not mandatory: whether a review
 blocks a merge depends on the branch rulesets, and this file adds no such
-requirement. Changes that move responsibilities, dependencies, execution mode
-or a public contract still need the architectural review described above.
-Update `CODEOWNERS` by pull request, with maintainer agreement, whenever the
-team or a component's ownership changes.
+requirement. Changes that move responsibilities, dependencies, execution
+configuration or a public contract still need the ADR described in
+[Developing](#2-developing). Update `CODEOWNERS` by pull request, with
+maintainer agreement, whenever the team or a component's ownership changes.
+
+## Dependency updates
+
+Dependabot reads `.github/dependabot.yml` from the **default branch** (`main`),
+so configuration changes take effect there first, through the release or
+hotfix flow. Regular updates target `develop`. Security updates always target
+the default branch (`main`) regardless of `target-branch`, and follow the
+hotfix flow like any other change that reaches production outside a release.
 
 ## Rulesets (branch protection)
 

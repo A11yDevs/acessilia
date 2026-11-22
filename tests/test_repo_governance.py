@@ -15,10 +15,21 @@ GOVERNANCE_PATHS = frozenset(
     {
         "/.github/",
         "/schemas/",
+        "/libs/",
         "/libs/core/",
         "/libs/sdk/",
         "/libs/docstruct/",
         "/docs/adr/",
+    }
+)
+EXPECTED_UPDATES = frozenset(
+    {
+        ("github-actions", "/"),
+        ("uv", "/"),
+        ("uv", "/libs/core"),
+        ("uv", "/libs/docstruct"),
+        ("uv", "/libs/sdk"),
+        ("docker", "/infra"),
     }
 )
 
@@ -40,7 +51,8 @@ def _codeowners() -> dict[str, list[str]]:
 
 def test_dependabot_targets_develop_and_uses_existing_labels() -> None:
     updates = _dependabot_updates()
-    assert updates
+    entries = {(update["package-ecosystem"], update["directory"]) for update in updates}
+    assert entries == EXPECTED_UPDATES
     for update in updates:
         assert update["target-branch"] == "develop", update["directory"]
         labels = set(update["labels"])
@@ -50,6 +62,12 @@ def test_dependabot_targets_develop_and_uses_existing_labels() -> None:
 
 
 def test_codeowners_covers_the_governance_paths() -> None:
+    patterns = [
+        raw.split("#", 1)[0].strip().split()[0]
+        for raw in CODEOWNERS.read_text(encoding="utf-8").splitlines()
+        if raw.split("#", 1)[0].strip()
+    ]
+    assert len(patterns) == len(set(patterns)), "duplicate CODEOWNERS patterns"
     entries = _codeowners()
     for path in GOVERNANCE_PATHS:
         assert path in entries, path

@@ -48,6 +48,18 @@ updates:
     labels:
       - dependencies
       - security
+  - package-ecosystem: uv
+    directory: /libs/core
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - security
   - package-ecosystem: docker
     directory: /infra
     target-branch: develop
