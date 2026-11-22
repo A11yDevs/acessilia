@@ -32,8 +32,10 @@ def bot_commands(locale: str) -> list[BotCommand]:
         names, description = line.split(" - ", 1)
         description = html.unescape(description.strip())
         for part in _ALIAS_SPLIT.split(names):
-            token = html.unescape(part).strip().split(maxsplit=1)[0]
-            command = token.lstrip("/").lower()
+            part = html.unescape(part).strip()
+            if not part.startswith("/"):
+                continue
+            command = part.split(maxsplit=1)[0].lstrip("/").lower()
             if _COMMAND.fullmatch(command) and command not in commands:
                 commands[command] = BotCommand(
                     command=command, description=description

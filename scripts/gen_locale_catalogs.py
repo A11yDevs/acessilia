@@ -113,6 +113,10 @@ from acessilia_core.i18n.log_messages import (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
     LOG_BOT_STARTED,
+    LOG_TELEGRAM_BOT_CONNECTED,
+    LOG_TELEGRAM_PRIVACY_MODE,
+    LOG_TELEGRAM_GETME_FAILED,
+    LOG_TELEGRAM_SET_COMMANDS_FAILED,
     LOG_BOT_STARTING_POLLING,
     LOG_BOT_TOKEN_NOT_CONFIGURED,
     LOG_CANONICAL_JSON_SAVE_FAILED,
@@ -839,6 +843,10 @@ MESSAGES: tuple[str, ...] = (
     LOG_BOT_INTERRUPTED_BY_USER,
     LOG_BOT_SHUTTING_DOWN,
     LOG_BOT_STARTED,
+    LOG_TELEGRAM_BOT_CONNECTED,
+    LOG_TELEGRAM_PRIVACY_MODE,
+    LOG_TELEGRAM_GETME_FAILED,
+    LOG_TELEGRAM_SET_COMMANDS_FAILED,
     LOG_BOT_STARTING_POLLING,
     LOG_BOT_TOKEN_NOT_CONFIGURED,
     LOG_FATAL_ERROR_IN_BOT,
@@ -1784,6 +1792,17 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_BOT_INTERRUPTED_BY_USER: "Bot interrompido pelo usuário",
         LOG_BOT_SHUTTING_DOWN: "Bot encerrando",
         LOG_BOT_STARTED: "Bot iniciado (cliente da API Acessilia)",
+        LOG_TELEGRAM_BOT_CONNECTED: "Bot do Telegram @{username} conectado",
+        LOG_TELEGRAM_PRIVACY_MODE: (
+            "O bot do Telegram @{username} está com o modo de privacidade ativo: "
+            "arquivos enviados em grupos só chegam quando ele é administrador do "
+            "grupo ou quando são enviados como resposta ao bot; veja "
+            "docs/telegram.md seção 3.1 (BotFather /setprivacy)"
+        ),
+        LOG_TELEGRAM_GETME_FAILED: "Falha no getMe do Telegram: {error}",
+        LOG_TELEGRAM_SET_COMMANDS_FAILED: (
+            "Falha no setMyCommands do Telegram para {scope}: {error}"
+        ),
         LOG_BOT_STARTING_POLLING: "Iniciando polling",
         LOG_BOT_TOKEN_NOT_CONFIGURED: "BOT_TOKEN não configurado",
         LOG_FATAL_ERROR_IN_BOT: "Erro fatal no bot",

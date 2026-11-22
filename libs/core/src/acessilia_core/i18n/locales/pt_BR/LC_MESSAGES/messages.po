@@ -1311,6 +1311,29 @@ msgstr "Bot encerrando"
 msgid "Bot started (Acessilia API client)"
 msgstr "Bot iniciado (cliente da API Acessilia)"
 
+#, python-brace-format
+msgid "Telegram bot @{username} connected"
+msgstr "Bot do Telegram @{username} conectado"
+
+#, python-brace-format
+msgid ""
+"Telegram bot @{username} has privacy mode enabled: files sent in groups "
+"only reach it when it is a group administrator or when sent as a reply to"
+" the bot; see docs/telegram.md section 3.1 (BotFather /setprivacy)"
+msgstr ""
+"O bot do Telegram @{username} está com o modo de privacidade ativo: "
+"arquivos enviados em grupos só chegam quando ele é administrador do grupo"
+" ou quando são enviados como resposta ao bot; veja docs/telegram.md seção"
+" 3.1 (BotFather /setprivacy)"
+
+#, python-brace-format
+msgid "Telegram getMe failed: {error}"
+msgstr "Falha no getMe do Telegram: {error}"
+
+#, python-brace-format
+msgid "Telegram setMyCommands failed for {scope}: {error}"
+msgstr "Falha no setMyCommands do Telegram para {scope}: {error}"
+
 msgid "Starting polling"
 msgstr "Iniciando polling"
 

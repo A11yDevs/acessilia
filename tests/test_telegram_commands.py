@@ -49,6 +49,7 @@ def test_startup_registers_commands_and_warns_about_privacy(monkeypatch) -> None
         return None
 
     monkeypatch.setattr(bot_module, "active_locales", lambda: ("en_US", "pt_BR"))
+    monkeypatch.setattr(bot_module, "active_locale", lambda: "en_US")
     monkeypatch.setattr(bot_module, "resume_tracked_tasks", no_resume)
     monkeypatch.setattr(
         bot_module.logger,
@@ -66,8 +67,11 @@ def test_startup_registers_commands_and_warns_about_privacy(monkeypatch) -> None
 
 
 def test_startup_survives_telegram_metadata_failures(monkeypatch) -> None:
-    async def no_resume(_bot) -> None:
-        return None
+    warnings: list[str] = []
+    resumed: list[object] = []
+
+    async def record_resume(bot) -> None:
+        resumed.append(bot)
 
     class FailingBot:
         async def get_me(self):
@@ -76,6 +80,77 @@ def test_startup_survives_telegram_metadata_failures(monkeypatch) -> None:
         async def set_my_commands(self, commands, language_code=None):
             raise RuntimeError("setMyCommands failed")
 
+    bot = FailingBot()
+    monkeypatch.setattr(bot_module, "active_locales", lambda: ("en_US", "pt_BR"))
+    monkeypatch.setattr(bot_module, "active_locale", lambda: "en_US")
+    monkeypatch.setattr(bot_module, "resume_tracked_tasks", record_resume)
+    monkeypatch.setattr(
+        bot_module.logger,
+        "warning",
+        lambda message, *args: warnings.append(str(message)),
+    )
+
+    asyncio.run(bot_module.on_startup(bot))
+
+    assert resumed == [bot]
+    assert len(warnings) == 3
+    assert any("getMe" in warning for warning in warnings)
+    assert any("default" in warning for warning in warnings)
+    assert any("pt" in warning for warning in warnings)
+
+
+def test_startup_falls_back_to_the_first_active_locale(monkeypatch) -> None:
+    languages: list[str | None] = []
+    calls: list[list[str]] = []
+
+    class FakeBot:
+        async def get_me(self):
+            return SimpleNamespace(
+                username="acessilia_test_bot",
+                can_read_all_group_messages=True,
+            )
+
+        async def set_my_commands(self, commands, language_code=None):
+            calls.append([command.command for command in commands])
+            languages.append(language_code)
+
+    async def no_resume(_bot) -> None:
+        return None
+
+    # The server locale is not offered, so the first active locale becomes the
+    # default scope; there is no second base language to override.
+    monkeypatch.setattr(bot_module, "active_locales", lambda: ("pt_BR",))
+    monkeypatch.setattr(bot_module, "active_locale", lambda: "en_US")
     monkeypatch.setattr(bot_module, "resume_tracked_tasks", no_resume)
 
-    asyncio.run(bot_module.on_startup(FailingBot()))
+    asyncio.run(bot_module.on_startup(FakeBot()))
+
+    assert languages == [None]
+    assert "ajuda" in calls[0]
+
+
+def test_startup_deduplicates_locales_with_the_same_base(monkeypatch) -> None:
+    languages: list[str | None] = []
+
+    class FakeBot:
+        async def get_me(self):
+            return SimpleNamespace(
+                username="acessilia_test_bot",
+                can_read_all_group_messages=True,
+            )
+
+        async def set_my_commands(self, commands, language_code=None):
+            languages.append(language_code)
+
+    async def no_resume(_bot) -> None:
+        return None
+
+    monkeypatch.setattr(
+        bot_module, "active_locales", lambda: ("en_US", "en_GB", "pt_BR")
+    )
+    monkeypatch.setattr(bot_module, "active_locale", lambda: "en_US")
+    monkeypatch.setattr(bot_module, "resume_tracked_tasks", no_resume)
+
+    asyncio.run(bot_module.on_startup(FakeBot()))
+
+    assert languages == [None, "pt"]
