@@ -23,7 +23,7 @@ def runtime_lease():
                 lock.flush()
             lock.seek(0)
             try:
-                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                getattr(msvcrt, "locking")(lock.fileno(), getattr(msvcrt, "LK_NBLCK"), 1)
             except OSError as exc:
                 raise RuntimeError(
                     "Only one API worker may use a data directory"

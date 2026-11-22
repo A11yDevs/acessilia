@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_core.logger import logger
-from acessilia_core.ports import CHECKPOINT_PHASES
+from acessilia_core.ports import CHECKPOINT_PHASES, JobCheckpoints
 from backend.config.settings import settings
 
 #: Version of the checkpoint document. A job never resumes on another version:
@@ -169,7 +169,7 @@ def clear(task_id: str) -> None:
     shutil.rmtree(directory.parent, ignore_errors=True)
 
 
-class FileJobCheckpoints:
+class FileJobCheckpoints(JobCheckpoints):
     """The core's ``JobCheckpoints`` port for one job, on these files
     (ADR-0016, step 4)."""
 

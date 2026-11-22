@@ -437,8 +437,16 @@ jobs:
       - name: Run Ruff against the shrinking baseline
         run: uv run --locked --extra dev python scripts/check_ruff_baseline.py
 
-      - name: Run Mypy on docstruct and SDK
+      - name: Run Mypy on the configured scope
         run: uv run --locked --extra dev mypy --no-incremental
+
+      # The libraries still declare Python >=3.11; keep a static check for
+      # syntax/APIs the 3.12 backend pass would otherwise hide.
+      - name: Run Mypy on the libraries with Python 3.11
+        run: |
+          uv run --locked --extra dev mypy --no-incremental --python-version 3.11 \
+            libs/docstruct/src/docstruct libs/sdk/src/acessilia_sdk \
+            libs/core/src/acessilia_core
 
       # The SDK registry must match the contract the Toolbox publishes on the
       # branch this code is deployed with (#186): main runs against the

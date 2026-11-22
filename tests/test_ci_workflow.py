@@ -60,7 +60,8 @@ def test_ci_jobs_use_python_312() -> None:
 #: They run once because the matrix has a single 3.12 leg.
 INTERPRETER_INDEPENDENT_STEPS = (
     "Run Ruff against the shrinking baseline",
-    "Run Mypy on docstruct and SDK",
+    "Run Mypy on the configured scope",
+    "Run Mypy on the libraries with Python 3.11",
     "Check the Toolbox capability contract",
     "Report the Toolbox's docstruct pin",
     "Summarize per-component coverage",
@@ -81,7 +82,8 @@ def test_quality_gates_run_on_the_single_python_leg() -> None:
         assert "PYTHON_DEFAULT" not in condition, name
     for name in (
         "Run Ruff against the shrinking baseline",
-        "Run Mypy on docstruct and SDK",
+        "Run Mypy on the configured scope",
+    "Run Mypy on the libraries with Python 3.11",
         "Check the Toolbox capability contract",
         "Report the Toolbox's docstruct pin",
     ):

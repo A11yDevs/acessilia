@@ -23,7 +23,7 @@ help:
 		'make test-failed                        rerun the tests that failed last time' \
 		'make test-all                           run the main suite (4 workers), docstruct, SDK and libs/core' \
 		'make lint                               run Ruff against the shrinking baseline (scripts/check_ruff_baseline.py)' \
-		'make typecheck                          run Mypy on the configured docstruct, SDK and core scope' \
+		'make typecheck                          run Mypy on the configured docstruct, SDK, core and backend scope' \
 		'make coverage                           run tests with branch coverage per component (var/coverage/)'
 
 lint:

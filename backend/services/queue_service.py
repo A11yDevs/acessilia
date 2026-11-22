@@ -119,7 +119,12 @@ class UnifiedQueue:
                         self._active_items[item.task_id] = item
                         task = asyncio.create_task(self._process_item(item))
                         self._active_tasks[item.task_id] = task
-                        task.add_done_callback(lambda _task, key=item.task_id: self._finish_item(key))
+                        def on_done(
+                            _task: asyncio.Future, key: str = item.task_id
+                        ) -> None:
+                            self._finish_item(key)
+
+                        task.add_done_callback(on_done)
                 await asyncio.sleep(0.05)
         finally:
             tasks = list(self._active_tasks.values())

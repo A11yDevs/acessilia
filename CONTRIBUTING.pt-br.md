@@ -98,7 +98,7 @@ make test-all
 ```
 
 - `make lint` executa o **Ruff** (regras `F`, `I` e `E` exceto `E501`) via `scripts/check_ruff_baseline.py` contra a baseline em `tests/fixtures/ruff_baseline.json`, que só pode diminuir. Qualquer violação nova falha a verificação; ao corrigir violações preexistentes em um arquivo, reduza a baseline com `uv run python scripts/check_ruff_baseline.py --update`. A ordenação de imports é aplicada diretamente (`uv run ruff check --select I --fix` corrige um arquivo).
-- `make typecheck` executa o **Mypy** em todos os módulos do escopo configurado de `docstruct`, `acessilia_sdk` e `acessilia_core` no `pyproject.toml`; não há overrides de módulos adiados.
+- `make typecheck` executa o **Mypy** em todos os módulos do escopo configurado de `docstruct`, `acessilia_sdk`, `acessilia_core` e `backend` no `pyproject.toml`, incluindo corpos de funções sem anotação; não há overrides de módulos adiados.
 - Opcional localmente (roda automaticamente no CI): `make coverage` executa as quatro suítes com cobertura de desvios (*branch coverage* via `pytest-cov`) e grava relatórios XML, JSON e HTML separados em `var/coverage/{app,core,sdk,docstruct}/`, sem exigir um percentual mínimo obrigatório nesta etapa.
 
 Durante o desenvolvimento, `make test-file F=tests/test_example.py` executa um
@@ -482,7 +482,7 @@ Durante um ciclo de refatoração, `is:open -type:Feature` mostra o backlog do c
 
 A esteira de CI/CD está definida em três workflows:
 
-- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), executa a verificação da baseline do Ruff e o Mypy no escopo configurado de `docstruct`/SDK/core, roda as suítes principal, da docstruct, do SDK e do core no Python 3.12 com relatórios de cobertura de desvios por componente publicados no artefato `coverage-reports-py*`, e rejeita testes pulados inesperados.
+- **`.github/workflows/ci.yml`** — em todo PR para `main`, `develop` ou `release/**`, e após pushes nessas branches, instala o ambiente raiz a partir do `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), executa a verificação da baseline do Ruff e o Mypy no escopo configurado de `docstruct`/SDK/core/backend e um passe 3.11 das bibliotecas, roda as suítes principal, da docstruct, do SDK e do core no Python 3.12 com relatórios de cobertura de desvios por componente publicados no artefato `coverage-reports-py*`, e rejeita testes pulados inesperados.
 - **`.github/workflows/delivery.yml`** — depois que o CI passa num push, constrói a imagem, roda um smoke test de saúde e uma verificação de tamanho, e a publica no GHCR.
 - **`.github/workflows/release.yml`** — quando um mantenedor cria uma tag `v*`, builda, publica e cria a GitHub Release.
 

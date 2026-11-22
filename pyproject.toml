@@ -64,6 +64,8 @@ dev = [
     # trailing pragma comments for line length, which the isort policy relies on.
     "ruff>=0.17,<1",
     "mypy>=1.15,<2",
+    # Stubs for the async file helpers the service uses.
+    "types-aiofiles>=25.1.0.20261107,<26",
 ]
 
 [project.scripts]
@@ -134,12 +136,13 @@ exclude_also = [
 ]
 
 [tool.mypy]
-python_version = "3.11"
-mypy_path = ["libs/docstruct/src", "libs/sdk/src", "libs/core/src"]
+python_version = "3.12"
+mypy_path = [".", "libs/docstruct/src", "libs/sdk/src", "libs/core/src"]
 files = [
     "libs/docstruct/src/docstruct",
     "libs/sdk/src/acessilia_sdk",
     "libs/core/src/acessilia_core",
+    "backend",
 ]
 explicit_package_bases = true
 ignore_missing_imports = true
@@ -147,3 +150,4 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 show_error_codes = true
+check_untyped_defs = true

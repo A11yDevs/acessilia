@@ -9,7 +9,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, cast
 
 from acessilia_core.blocking import run_blocking
 from acessilia_core.config import ToolboxConfig
@@ -58,6 +58,7 @@ from backend.api.export_plan import (
     PACKAGE_ORDER,
     PACKAGE_STEP,
     SERIAL_EXPORT_STEPS,
+    ExportStep,
 )
 from backend.config.core_config import core_config_from_settings
 from backend.config.settings import settings
@@ -257,6 +258,14 @@ def _job_from_record(record: dict[str, Any]) -> ApiJob:
         Path(payload["output_dir"]) if payload.get("output_dir") else None
     )
     return ApiJob(**payload)
+
+
+def _required_export_fields(step: ExportStep) -> tuple[str, str, float]:
+    """The non-optional fields every remote export step must carry."""
+    assert step.requires_flag is not None
+    assert step.stage_msgid is not None
+    assert step.progress is not None
+    return step.requires_flag, step.stage_msgid, step.progress
 
 
 class JobExecutor:
@@ -469,7 +478,7 @@ class JobExecutor:
                     format_name=HTML.spec.id, title=base, profile_name=HTML.spec.id,
                 ),
             }
-            remote_exports = {
+            remote_exports: dict[str, tuple[Callable[..., Path], str, str]] = {
                 DOCX.spec.id: (export_docx, LOG_DOCX_GENERATION_FAILED, LOG_DOCX_SKIPPED_DISABLED),
                 PDF_UA.spec.id: (export_pdf_ua, LOG_PDF_UA_GENERATION_FAILED, LOG_PDF_UA_SKIPPED_DISABLED),
             }
@@ -479,6 +488,7 @@ class JobExecutor:
                 delivery = CATALOG[step.format_id]
                 path = out_dir / delivery.output_filename(base)
                 if delivery.spec.execution == "remote":
+                    requires_flag, stage, progress = _required_export_fields(step)
                     exporter, failed_log, skipped_log = remote_exports[step.format_id]
                     export_kwargs: dict[str, Any] = {"export": export, "toolbox": toolbox}
                     if step.format_id == PDF_UA.spec.id:
@@ -486,8 +496,8 @@ class JobExecutor:
                             state_manager.verificar_cancelamento, task_id
                         )
                     paths[step.format_id] = await self._optional_toolbox_export(
-                        task_id, enabled=getattr(export, step.requires_flag),
-                        stage=step.stage_msgid, progress=step.progress,
+                        task_id, enabled=getattr(export, requires_flag),
+                        stage=stage, progress=progress,
                         export_fn=functools.partial(exporter, **export_kwargs),
                         canonical=delivered, path=path, filename=job.filename,
                         format_name=step.format_id, failed_log=failed_log, skipped_log=skipped_log,
@@ -495,7 +505,7 @@ class JobExecutor:
                         optional=step.optional,
                     )
                 else:
-                    state_manager.atualizar(task_id, etapa=t(step.stage_msgid), progresso=step.progress)
+                    state_manager.atualizar(task_id, etapa=t(cast(str, step.stage_msgid)), progresso=step.progress)
                     if step.format_id == TXT.spec.id:
                         # Internal benchmark output and stored result keep the
                         # original canonical; delivered formats carry markers.
@@ -514,9 +524,8 @@ class JobExecutor:
                             completed_formats.append(step.format_id)
                 state_manager.verificar_cancelamento(task_id)
 
-            txt_path, pdf_ua_path = paths[TXT.spec.id], paths[PDF_UA.spec.id]
+            txt_path, pdf_ua_path = cast(Path, paths[TXT.spec.id]), paths[PDF_UA.spec.id]
             audio_step, package_step = AUDIO_STEP, PACKAGE_STEP
-
             async def audit() -> tuple[list[str], Path | None]:
                 if not isinstance(pdf_ua_path, Path):
                     return [], None
@@ -534,7 +543,7 @@ class JobExecutor:
                 async def audio_progress(percent: int) -> None:
                     state_manager.atualizar(
                         task_id,
-                        etapa=t(audio_step.stage_msgid).format(percent=percent),
+                        etapa=t(cast(str, audio_step.stage_msgid)).format(percent=percent),
                         progresso=audio_step.progress,
                     )
 
