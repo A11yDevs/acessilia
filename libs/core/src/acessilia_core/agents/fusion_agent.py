@@ -41,6 +41,9 @@ from acessilia_core.agents.agno_support import build_agent
 from acessilia_core.config import CoreConfig, ToolboxConfig
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.line_numbers import extract_line_numbers
+
+# Public re-export kept for callers that import it from this module (#648 review).
+from docstruct.fusion.repetition import collapse as collapse
 from docstruct.fusion.repetition import guard_page
 from docstruct.fusion.tailjoin import join_tail, tailjoin3
 from docstruct.fusion.types import DiffBlock

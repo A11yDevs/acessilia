@@ -9,6 +9,13 @@ from acessilia_core.agents.fusion_agent import FusionAgent
 from docstruct.types import Region
 
 
+def test_the_collapse_reexport_is_kept() -> None:
+    from acessilia_core.agents import fusion_agent
+    from docstruct.fusion.repetition import collapse
+
+    assert fusion_agent.collapse is collapse
+
+
 def _region(
     *,
     type_: str = "text",

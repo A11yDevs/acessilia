@@ -35,12 +35,12 @@ class TestNoOverfitting:
         """The lib must NOT ship document-specific callout titles."""
         import inspect
 
-        import docstruct.regions.grouping as g
-
-        src = inspect.getsource(g)
+        grouping = inspect.getmodule(_is_known_callout_title)
+        assert grouping is not None
+        src = inspect.getsource(grouping)
         assert "precisamos mesmo de outra classe" not in src
         assert "super e sub classe" not in src
-        assert not hasattr(g, "KNOWN_CALLOUT_TITLES")
+        assert not hasattr(grouping, "KNOWN_CALLOUT_TITLES")
 
     def test_default_sem_titulos(self):
         assert _is_known_callout_title("qualquer") is False

@@ -14,7 +14,7 @@ libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py and ADR-0007).
 
 from __future__ import annotations
 
-from docstruct.text.latex import (  # noqa: F401
+from docstruct.text.latex import (
     bare_latex as normalize_latex,
 )
 from docstruct.text.latex import (

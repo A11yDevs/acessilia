@@ -17,7 +17,7 @@ from typing import Annotated
 
 import pytest
 
-import acessilia_core.config
+from acessilia_core import config as acessilia_config
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.executor import MethodRegistry
 from acessilia_core.pipeline.handlers import registry as handler_registry
@@ -96,7 +96,7 @@ def _with_both(manifest, obligation_id, *, config: CoreConfig, ports: RunPorts):
     return config, ports
 
 
-def _dotted(manifest, obligation_id, *, config: acessilia_core.config.CoreConfig):
+def _dotted(manifest, obligation_id, *, config: acessilia_config.CoreConfig):
     return config
 
 

@@ -25,7 +25,7 @@ from acessilia_core.toolbox.toolbox_math_tools import (
     toolbox_convert_latex,
     toolbox_verbalize_latex,
 )
-from docstruct.canonical import (  # noqa: F401
+from docstruct.canonical import (
     MathEnricher,
 )
 from docstruct.canonical import (
