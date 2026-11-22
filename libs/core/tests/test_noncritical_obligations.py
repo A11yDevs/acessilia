@@ -25,8 +25,10 @@ from acessilia_core.i18n.stage_messages import (
 from acessilia_core.logger import logger
 from acessilia_core.manifest.builder import _derive_processing_needs
 from acessilia_core.manifest.models import Obligation
-from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    orchestrator as pddl,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.pipeline.obligations import _unsatisfied_summary
 from acessilia_core.ports import RunPorts
 

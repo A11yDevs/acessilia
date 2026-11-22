@@ -228,12 +228,19 @@ async def test_a_restored_block_is_repaired_in_the_same_job(monkeypatch, tmp_pat
 
     from core_config_support import core_config
     from pddl_support import build_orchestrator
-    from test_rescue_omitted_method import LOWER, MIDDLE, _adopted, _row
-    from test_rescue_omitted_method import _manifest as rescue_manifest
+    from test_rescue_omitted_method import (
+        LOWER,
+        MIDDLE,
+        _adopted,
+        _manifest as rescue_manifest,
+        _row,
+    )
 
     from acessilia_core.agents.model_calls import current_model_calls
-    from acessilia_core.pipeline import orchestrator as pddl
-    from acessilia_core.pipeline import preflight as pipeline_preflight
+    from acessilia_core.pipeline import (
+        orchestrator as pddl,
+        preflight as pipeline_preflight,
+    )
     from acessilia_core.ports import RunPorts
 
     legacy = "The capital moved to Bras\u0131\u0301lia in the sixties."

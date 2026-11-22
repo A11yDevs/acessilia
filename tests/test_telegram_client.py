@@ -16,8 +16,7 @@ from backend.config.settings import settings
 from backend.services.validators import MSG_FILE_TOO_LARGE, MSG_UNSUPPORTED_FORMAT
 from frontend.clients.api_client import ApiClient, ApiError
 from frontend.telegram import state_store, user_context
-from frontend.telegram.handlers import document as doc_module
-from frontend.telegram.handlers import start as start_module
+from frontend.telegram.handlers import document as doc_module, start as start_module
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
     MSG_CACHE_CLEAR_FAILED,

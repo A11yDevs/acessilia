@@ -11,8 +11,10 @@ from types import SimpleNamespace
 import pytest
 from core_config_support import toolbox_config
 
-from acessilia_core.pipeline import payload as pipeline_payload
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    payload as pipeline_payload,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.toolbox import media_inspect
 from acessilia_core.toolbox.media_inspect import inspect_source_media
 

@@ -10,8 +10,7 @@ from backend.api import worker
 from backend.services import job_store
 from backend.services.queue_service import QueueItem, UnifiedQueue
 from tests.core_config_support import toolbox_config
-from tests.test_pending_fixes import isolated_runtime as runtime_fixture
-from tests.test_pending_fixes import stop_queue
+from tests.test_pending_fixes import isolated_runtime as runtime_fixture, stop_queue
 
 isolated_runtime = runtime_fixture
 

@@ -138,8 +138,11 @@ def test_retries_come_from_settings(monkeypatch):
 
 import inspect  # noqa: E402
 
-from acessilia_sdk.toolbox import PROVIDER_DEFAULTS, ToolboxCapabilityClient  # noqa: E402
-from acessilia_sdk.toolbox import clients as sdk_clients  # noqa: E402
+from acessilia_sdk.toolbox import (  # noqa: E402
+    PROVIDER_DEFAULTS,
+    ToolboxCapabilityClient,
+    clients as sdk_clients,  # noqa: E402
+)
 
 CLIENT_CLASSES = sorted(
     (

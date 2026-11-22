@@ -19,9 +19,11 @@ from core_config_support import (
     toolbox_config,
     vision_config,
 )
-from pddl_support import build_element as _element
-from pddl_support import build_manifest as _manifest
-from pddl_support import install_formula_recognizer
+from pddl_support import (
+    build_element as _element,
+    build_manifest as _manifest,
+    install_formula_recognizer,
+)
 
 from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker

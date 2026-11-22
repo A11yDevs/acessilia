@@ -35,8 +35,6 @@ from acessilia_core.pipeline.secondary import (
 )
 from docstruct.fusion.skeleton import (
     DEFAULT_MIN_SKELETON_MATCH as _MIN_SKELETON_MATCH,
-)
-from docstruct.fusion.skeleton import (
     skeleton_reading_order,
 )
 

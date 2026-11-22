@@ -19,8 +19,8 @@ from acessilia_sdk.operations.fusion import DualFusionUnavailable, extract_dual_
 from acessilia_sdk.toolbox.clients import ToolboxStructureClient
 from docstruct.fusion.payload import (
     fuse_extraction_payloads as _docstruct_fuse_extraction_payloads,
+    route_pages as _docstruct_route_pages,
 )
-from docstruct.fusion.payload import route_pages as _docstruct_route_pages
 from docstruct.policy import FusionPolicy
 
 

@@ -3,8 +3,6 @@ import pytest
 
 from docstruct.text.implicit_products import (
     INVISIBLE_TIMES as IT,
-)
-from docstruct.text.implicit_products import (
     implicit_product_variables,
     mark_implicit_products,
 )

@@ -20,22 +20,18 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     Provenance,
 )
-from acessilia_core.pipeline import payload as pipeline_payload
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    payload as pipeline_payload,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.pipeline.enrichment import common as enrichment_common
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from acessilia_core.ports import NoRegionCache, RunPorts
 from tests.core_config_support import core_config, model_config, toolbox_config
 from tests.pddl_support import (
     build_element as _element,
-)
-from tests.pddl_support import (
     build_manifest as _manifest,
-)
-from tests.pddl_support import (
     build_obligation as _obligation,
-)
-from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 

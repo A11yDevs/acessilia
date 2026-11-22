@@ -42,8 +42,10 @@ from acessilia_core.pipeline.obligations import (
 )
 from acessilia_core.planning.models import NominalPlan, PlanningComparison
 from acessilia_sdk.i18n.context import reset_request_locale, set_request_locale
-from docstruct.blocks.callouts import callout_titles
-from docstruct.blocks.callouts import dedupe_callout_titles as _dedupe_callout_titles
+from docstruct.blocks.callouts import (
+    callout_titles,
+    dedupe_callout_titles as _dedupe_callout_titles,
+)
 from docstruct.blocks.lists import (
     merge_list_blocks,
     recover_empty_lettered_list_items,

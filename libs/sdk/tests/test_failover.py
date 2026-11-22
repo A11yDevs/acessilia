@@ -20,10 +20,10 @@ from acessilia_sdk.toolbox import (
     ToolboxProviderUnavailable,
     ToolboxTimeout,
     ToolboxUnavailable,
+    client as client_module,
     download_artifact,
     parse_endpoints,
 )
-from acessilia_sdk.toolbox import client as client_module
 
 PRIMARY = "http://toolbox-a.test"
 SECONDARY = "http://toolbox-b.test"

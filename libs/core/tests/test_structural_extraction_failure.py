@@ -17,8 +17,10 @@ from pddl_support import build_orchestrator
 
 from acessilia_core import i18n
 from acessilia_core.agents.model_calls import current_model_calls
-from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    orchestrator as pddl,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.ports import RunPorts
 from acessilia_sdk.toolbox import ToolboxProviderUnavailable, ToolboxUnavailable
 

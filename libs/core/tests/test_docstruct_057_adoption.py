@@ -24,8 +24,6 @@ from acessilia_core.toolbox import vision_payload
 from docstruct.fusion.noise import is_legitimate_text as docstruct_is_legitimate_text
 from docstruct.fusion.skeleton import (
     DEFAULT_MIN_SKELETON_MATCH as docstruct_min_skeleton_match,
-)
-from docstruct.fusion.skeleton import (
     skeleton_reading_order as docstruct_skeleton_reading_order,
 )
 from docstruct.geometry.boxes import (

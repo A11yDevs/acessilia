@@ -26,9 +26,11 @@ from pddl_support import build_element, build_manifest
 
 from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.provider_breaker import ProviderBreaker
-from acessilia_core.pipeline.enrichment import formulas as formula_stage
-from acessilia_core.pipeline.enrichment import pictures as picture_stage
-from acessilia_core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.enrichment import (
+    formulas as formula_stage,
+    pictures as picture_stage,
+    tables as table_stage,
+)
 from acessilia_core.ports import RunPorts
 
 #: The run's Toolbox config: its own object, unlike one built from the settings.
@@ -177,8 +179,7 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
 ) -> None:
     from pddl_support import build_orchestrator
 
-    from acessilia_core.pipeline import orchestrator as pddl
-    from acessilia_core.pipeline import preflight
+    from acessilia_core.pipeline import orchestrator as pddl, preflight
 
     seen: dict[str, object] = {}
 

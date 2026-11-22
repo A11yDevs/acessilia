@@ -27,11 +27,7 @@ from acessilia_core.toolbox.toolbox_math_tools import (
 )
 from docstruct.canonical import (
     MathEnricher,
-)
-from docstruct.canonical import (
     build_canonical_document as _lib_build,
-)
-from docstruct.canonical import (
     sanitize_canonical_document as _lib_sanitize,
 )
 

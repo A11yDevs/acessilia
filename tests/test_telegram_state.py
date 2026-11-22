@@ -9,8 +9,7 @@ import pytest
 from backend.config.settings import settings
 from frontend.clients.api_client import ApiError
 from frontend.telegram import state_store, user_context
-from frontend.telegram.handlers import document as doc_module
-from frontend.telegram.handlers import start as start_module
+from frontend.telegram.handlers import document as doc_module, start as start_module
 from frontend.telegram.middlewares import pause_middleware
 from frontend.telegram.state_store import TelegramStateStore
 from tests.test_telegram_client import _FakeBot, _FakeMessage
