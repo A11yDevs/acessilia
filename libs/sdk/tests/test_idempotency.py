@@ -23,10 +23,10 @@ from acessilia_sdk.toolbox import (
     ToolboxError,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
+    capabilities as registry,
+    client as client_module,
     parse_endpoints,
 )
-from acessilia_sdk.toolbox import capabilities as registry
-from acessilia_sdk.toolbox import client as client_module
 from acessilia_sdk.toolbox.clients import ToolboxDatasetClient
 
 PRIMARY = "http://toolbox-a.test"

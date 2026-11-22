@@ -105,6 +105,8 @@ select = ["F", "I", "E"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
+# Keep aliased re-exports compact when they come from the same module (#722).
+combine-as-imports = true
 known-first-party = [
     "acessilia_core",
     "acessilia_sdk",

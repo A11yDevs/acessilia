@@ -52,8 +52,6 @@ from acessilia_core.pipeline.toolbox import (
 )
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
-)
-from docstruct.tables.ast import (
     table_ast_column_count,
     table_ast_from_rows,
 )

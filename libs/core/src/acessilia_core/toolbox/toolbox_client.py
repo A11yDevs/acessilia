@@ -31,12 +31,12 @@ from acessilia_sdk.toolbox import (
     ToolboxUnavailable,
     ToolboxUnsupportedMediaType,
     auth_headers,
+    clients as _sdk_clients,
     execute_capability,
     make_client,
     parse_endpoints,
     require_capability,
 )
-from acessilia_sdk.toolbox import clients as _sdk_clients
 
 ClientT = TypeVar("ClientT", bound=ToolboxCapabilityClient)
 

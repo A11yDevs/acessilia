@@ -962,8 +962,7 @@ async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> No
     import asyncio
     import threading
 
-    from acessilia_core.agents import model_call_policy
-    from acessilia_core.agents import vision_agent as vision_module
+    from acessilia_core.agents import model_call_policy, vision_agent as vision_module
     from backend.config.settings import settings
 
     started, release, finished = threading.Event(), threading.Event(), threading.Event()

@@ -5,22 +5,18 @@ from types import SimpleNamespace
 import pytest
 
 from acessilia_core.agents.model_calls import current_model_calls
-from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline import payload as pipeline_payload
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    orchestrator as pddl,
+    payload as pipeline_payload,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.pipeline.handlers import content as content_handlers
 from acessilia_core.ports import RunPorts
 from tests.core_config_support import core_config
 from tests.pddl_support import (
     build_element as _element,
-)
-from tests.pddl_support import (
     build_manifest as _manifest,
-)
-from tests.pddl_support import (
     build_obligation as _obligation,
-)
-from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from tests.test_pending_fixes import isolated_runtime as runtime_fixture

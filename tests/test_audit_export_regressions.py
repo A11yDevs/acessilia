@@ -20,11 +20,7 @@ from docstruct.validation import (
 from tests.core_config_support import toolbox_config
 from tests.pddl_support import (
     build_element as _element,
-)
-from tests.pddl_support import (
     build_manifest as _manifest,
-)
-from tests.pddl_support import (
     build_orchestrator as _orchestrator,
 )
 from tests.test_region_inspection import inspection as inspection

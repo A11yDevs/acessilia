@@ -11,8 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.config.settings import settings
-from backend.services import operation_registry as registry_module
-from backend.services import remote_cancellation
+from backend.services import operation_registry as registry_module, remote_cancellation
 from backend.services.operation_registry import (
     OperationRegistry,
     RemoteOperationCancelled,

@@ -22,11 +22,7 @@ from acessilia_core.i18n.log_messages import (
 from acessilia_core.logger import logger
 from acessilia_core.manifest.detectors import (
     inspect_document_needs as _inspect_document_needs,
-)
-from acessilia_core.manifest.detectors import (
     normalized_element_bbox as _normalized_element_bbox,
-)
-from acessilia_core.manifest.detectors import (
     oriented_bbox as _oriented_bbox,
 )
 from acessilia_core.manifest.models import (
@@ -55,11 +51,7 @@ from docstruct.geometry import (
 )
 from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_FLAG,
-)
-from docstruct.placeholders import (
     UNSTRUCTURED_PAGE_LABEL as _UNSTRUCTURED_PAGE_LABEL,
-)
-from docstruct.placeholders import (
     is_unstructured_page_placeholder as _is_placeholder,
 )
 from docstruct.sections import find_heading_gaps

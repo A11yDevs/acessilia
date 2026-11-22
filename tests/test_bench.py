@@ -3,8 +3,7 @@ import zipfile
 
 import pytest
 
-from scripts.bench import __main__ as cli
-from scripts.bench import core
+from scripts.bench import __main__ as cli, core
 from scripts.bench.datasets.drdocbench import DrDocBench
 from scripts.bench.report import compare_runs, score_run
 

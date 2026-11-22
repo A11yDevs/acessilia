@@ -33,8 +33,6 @@ from acessilia_core.pipeline.handlers.messages import (
 from docstruct.placeholders import has_meaningful_text
 from docstruct.tables.ast import (
     linearize_table_for_text,
-)
-from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
 )
 from docstruct.text.code_reflow import normalize_code_text

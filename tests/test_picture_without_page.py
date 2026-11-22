@@ -24,8 +24,10 @@ from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.i18n import t
 from acessilia_core.manifest.models import Obligation
-from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    orchestrator as pddl,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.pipeline.elements import (
     MSG_UNDESCRIBED_PICTURE_ALT,
     _element_to_block,

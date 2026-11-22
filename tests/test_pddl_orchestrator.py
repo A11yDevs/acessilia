@@ -22,8 +22,10 @@ from acessilia_core.pipeline.elements import (
     _table_ast_from_metadata,
     _table_element_has_structured_content,
 )
-from acessilia_core.pipeline.enrichment import pictures as picture_stage
-from acessilia_core.pipeline.enrichment import tables as table_stage
+from acessilia_core.pipeline.enrichment import (
+    pictures as picture_stage,
+    tables as table_stage,
+)
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
 from acessilia_core.pipeline.payload import build_pddl_structured_payload

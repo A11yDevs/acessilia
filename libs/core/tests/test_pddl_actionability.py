@@ -22,17 +22,9 @@ import pytest
 from core_config_support import core_config
 from pddl_support import (
     NOW,
-)
-from pddl_support import (
     build_element as _element,
-)
-from pddl_support import (
     build_manifest as _manifest,
-)
-from pddl_support import (
     build_obligation as _obligation,
-)
-from pddl_support import (
     build_orchestrator as _orchestrator,
 )
 
@@ -47,12 +39,14 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
     Provenance,
 )
-from acessilia_core.pipeline.handlers import content as content_handlers
-from acessilia_core.pipeline.handlers import fusion as fusion_handlers
-from acessilia_core.pipeline.handlers import inspection as inspection_handlers
-from acessilia_core.pipeline.handlers import order as order_handlers
-from acessilia_core.pipeline.handlers import review as review_handlers
-from acessilia_core.pipeline.handlers import text as text_handlers
+from acessilia_core.pipeline.handlers import (
+    content as content_handlers,
+    fusion as fusion_handlers,
+    inspection as inspection_handlers,
+    order as order_handlers,
+    review as review_handlers,
+    text as text_handlers,
+)
 from acessilia_core.pipeline.handlers.content import (
     _handle_pandoc_code_method,
     _handle_pandoc_table_method,

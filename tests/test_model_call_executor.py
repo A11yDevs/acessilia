@@ -282,8 +282,7 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
 
     from acessilia_core.agents.data_agent import DataAgent
     from acessilia_core.agents.vision_agent import VisionAgent
-    from acessilia_core.pipeline import orchestrator as pddl
-    from acessilia_core.pipeline import preflight
+    from acessilia_core.pipeline import orchestrator as pddl, preflight
     from tests.pddl_support import build_element, build_manifest, build_orchestrator
 
     observed = []

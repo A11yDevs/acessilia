@@ -21,8 +21,6 @@ from typing import Any
 from acessilia_sdk.operations.formula import Step
 from acessilia_sdk.toolbox.clients.structure import (
     CAPABILITY as STRUCTURE_CAPABILITY,
-)
-from acessilia_sdk.toolbox.clients.structure import (
     ToolboxStructureClient,
 )
 from acessilia_sdk.toolbox.errors import (

@@ -30,8 +30,10 @@ from acessilia_core.manifest.builder import (
 )
 from acessilia_core.manifest.models import PageDescriptor
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
-from acessilia_core.pipeline import payload as pipeline_payload
-from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline import (
+    payload as pipeline_payload,
+    preflight as pipeline_preflight,
+)
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS

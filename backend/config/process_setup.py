@@ -14,8 +14,11 @@ import locale
 import os
 from collections.abc import Mapping
 
-from backend.config.settings import Settings, deprecated_configuration
-from backend.config.settings import settings as default_settings
+from backend.config.settings import (
+    Settings,
+    deprecated_configuration,
+    settings as default_settings,
+)
 
 
 def setup_process(

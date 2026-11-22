@@ -46,17 +46,9 @@ from docstruct.validation import (  # noqa: F401
     MSG_TECHNICAL_METADATA_IN_TXT,
     MSG_UNKNOWN_EXPORT_PROFILE,
     Finding,
-)
-from docstruct.validation import (
     audit_canonical_document as _lib_audit,
-)
-from docstruct.validation import (
     validate_canonical_document as _lib_validate_doc,
-)
-from docstruct.validation import (
     validate_export_profile as _lib_validate_profile,
-)
-from docstruct.validation import (
     validate_output_text as _lib_validate_output,
 )
 

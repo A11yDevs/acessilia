@@ -25,8 +25,6 @@ from backend.config.settings import settings
 from frontend.telegram.commands import bot_commands, telegram_language
 from frontend.telegram.handlers.document import (
     resume_tracked_tasks,
-)
-from frontend.telegram.handlers.document import (
     router as document_router,
 )
 from frontend.telegram.handlers.errors import router as error_router

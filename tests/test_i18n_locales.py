@@ -10,8 +10,7 @@ normalizer now live in the SDK; the core no longer re-exports the parser
 from __future__ import annotations
 
 import acessilia_core.i18n as core_i18n
-from acessilia_sdk.i18n import context as sdk_context
-from acessilia_sdk.i18n import normalize_locale, parse_locales
+from acessilia_sdk.i18n import context as sdk_context, normalize_locale, parse_locales
 from backend.config.settings import Settings
 
 

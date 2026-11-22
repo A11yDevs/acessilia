@@ -18,8 +18,10 @@ from pddl_support import (
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.elements import _element_to_block
-from acessilia_core.pipeline.enrichment import formulas as formula_stage
-from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.enrichment import (
+    formulas as formula_stage,
+    pictures as picture_stage,
+)
 from acessilia_core.pipeline.handlers import review as review_handlers
 
 
