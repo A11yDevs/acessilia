@@ -24,12 +24,7 @@ from docstruct.fusion.hf_end import (
     move_body_hf_to_tail,
     move_hf_to_end,
 )
-from docstruct.fusion.judge import (
-    debias,
-    decide_pair,
-    p2_from_logprobs,
-    should_judge,
-)
+from docstruct.fusion.judge import debias, decide_pair, p2_from_logprobs, should_judge
 from docstruct.fusion.line_numbers import extract_line_numbers, line_number_chain
 from docstruct.fusion.noise import (
     MIN_LEGITIMATE_QUALITY,
@@ -79,10 +74,7 @@ from docstruct.fusion.repetition import (
     max_run,
     strip_comment,
 )
-from docstruct.fusion.skeleton import (
-    DEFAULT_MIN_SKELETON_MATCH,
-    skeleton_reading_order,
-)
+from docstruct.fusion.skeleton import DEFAULT_MIN_SKELETON_MATCH, skeleton_reading_order
 from docstruct.fusion.table_specialist import (
     build_candidates,
     extract_table,

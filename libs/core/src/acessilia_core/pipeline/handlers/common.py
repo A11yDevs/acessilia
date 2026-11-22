@@ -17,11 +17,7 @@ from pathlib import Path
 from acessilia_core.agents.fusion_agent import FusionAgent
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
-from acessilia_core.manifest.models import (
-    Artifact,
-    ManifestElement,
-    ProcessingManifest,
-)
+from acessilia_core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.handlers.messages import MSG_HANDLER_OBLIGATION_NOT_FOUND
 
 

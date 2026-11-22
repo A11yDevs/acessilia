@@ -10,13 +10,8 @@ from __future__ import annotations
 
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _element_bbox,
-)
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.pipeline.elements import _element_bbox
 from acessilia_core.pipeline.handlers.common import (
     _fusion_agent,
     _missing_obligation,
@@ -29,10 +24,7 @@ from acessilia_core.pipeline.handlers.messages import (
     MSG_XYCUT_APPLIED,
     MSG_XYCUT_NONE,
 )
-from acessilia_core.pipeline.secondary import (
-    _pair_block,
-    _secondary_or_failure,
-)
+from acessilia_core.pipeline.secondary import _pair_block, _secondary_or_failure
 from docstruct.fusion.skeleton import (
     DEFAULT_MIN_SKELETON_MATCH as _MIN_SKELETON_MATCH,
     skeleton_reading_order,

@@ -60,8 +60,9 @@ dev = [
     "pytest-timeout>=2.4,<3",
     # Runs the core suite in parallel; the isolation fixes are in #448.
     "pytest-xdist>=3.8,<4",
-    # Static analysis and formatting checks (#366).
-    "ruff>=0.15,<1",
+    # Static analysis and formatting checks (#366). 0.17 made I001 ignore
+    # trailing pragma comments for line length, which the isort policy relies on.
+    "ruff>=0.17,<1",
     "mypy>=1.15,<2",
 ]
 
@@ -107,6 +108,9 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 # Keep aliased re-exports compact when they come from the same module (#722).
 combine-as-imports = true
+# Collapse imports to one line whenever they fit, regardless of the source's
+# trailing comma, so the style does not depend on how the block was written (#725).
+split-on-trailing-comma = false
 known-first-party = [
     "acessilia_core",
     "acessilia_sdk",

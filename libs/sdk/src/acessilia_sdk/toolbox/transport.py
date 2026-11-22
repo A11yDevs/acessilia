@@ -14,10 +14,7 @@ from typing import Any
 
 import httpx
 
-from acessilia_sdk.toolbox.capabilities import (
-    TOOLBOX_CAPABILITIES,
-    ToolboxCapability,
-)
+from acessilia_sdk.toolbox.capabilities import TOOLBOX_CAPABILITIES, ToolboxCapability
 from acessilia_sdk.toolbox.errors import (
     ToolboxArtifactNotFound,
     ToolboxAuthenticationError,

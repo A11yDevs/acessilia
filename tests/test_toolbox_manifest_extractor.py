@@ -18,10 +18,7 @@ from acessilia_core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
-from acessilia_sdk.toolbox import (
-    ToolboxContractViolation,
-    ToolboxTimeout,
-)
+from acessilia_sdk.toolbox import ToolboxContractViolation, ToolboxTimeout
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from tests.core_config_support import fusion_config, paths_config, toolbox_config
 

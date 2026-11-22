@@ -19,20 +19,11 @@ from acessilia_core.execution.models import MethodResult
 from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
 from acessilia_core.i18n import n, t
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _element_to_block,
-    _text_kept_by_picture,
-)
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.pipeline.elements import _element_to_block, _text_kept_by_picture
 from acessilia_core.pipeline.handlers import messages as step_messages
-from acessilia_core.pipeline.handlers.common import (
-    _target_elements,
-)
-from acessilia_core.pipeline.obligations import (
-    _formula_elements_for_obligation,
-)
+from acessilia_core.pipeline.handlers.common import _target_elements
+from acessilia_core.pipeline.obligations import _formula_elements_for_obligation
 from acessilia_core.toolbox.toolbox_math_tools import (
     MSG_MATHML_UNAVAILABLE,
     MSG_SPEECH_UNAVAILABLE,

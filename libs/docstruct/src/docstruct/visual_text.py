@@ -32,11 +32,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from docstruct.geometry.boxes import box_contains_center
-from docstruct.placeholders import (
-    ExtractedElement,
-    is_ocr_noise,
-    is_placeholder_text,
-)
+from docstruct.placeholders import ExtractedElement, is_ocr_noise, is_placeholder_text
 
 VisualTextRole = Literal[
     "document_text",

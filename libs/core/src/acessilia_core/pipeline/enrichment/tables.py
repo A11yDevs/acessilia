@@ -29,27 +29,16 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDDL_TABLE_REREAD_REJECTED,
     LOG_PDDL_TABLES_ENRICHED,
 )
-from acessilia_core.i18n.stage_messages import (
-    STAGE_RECOGNIZING_TABLE,
-)
+from acessilia_core.i18n.stage_messages import STAGE_RECOGNIZING_TABLE
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _table_element_has_structured_content,
-)
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.pipeline.elements import _table_element_has_structured_content
 from acessilia_core.pipeline.enrichment.common import (
     _extract_picture_bytes,
     _retry_failed,
 )
-from acessilia_core.pipeline.obligations import (
-    _pages_label,
-)
-from acessilia_core.pipeline.toolbox import (
-    _source_artifact_id,
-)
+from acessilia_core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.toolbox import _source_artifact_id
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,
     table_ast_column_count,

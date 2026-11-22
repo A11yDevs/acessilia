@@ -37,9 +37,7 @@ from acessilia_core.execution.executor import (
 )
 from acessilia_core.execution.models import ExecutionReport, ExecutionStepResult
 from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import (
-    LOG_PDDL_PREFERRED_PLAN_MISSING,
-)
+from acessilia_core.i18n.log_messages import LOG_PDDL_PREFERRED_PLAN_MISSING
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
@@ -51,9 +49,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_VALIDATING_PLAN_DRY_RUN,
 )
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
+from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
 from acessilia_core.pipeline.enrichment.formulas import (
@@ -65,12 +61,8 @@ from acessilia_core.pipeline.enrichment.inline_math import (
     _mark_table_inline_math,
     _TextSpanReader,
 )
-from acessilia_core.pipeline.enrichment.pictures import (
-    _enrich_picture_descriptions,
-)
-from acessilia_core.pipeline.enrichment.tables import (
-    _enrich_table_structures,
-)
+from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
@@ -79,9 +71,7 @@ from acessilia_core.pipeline.obligations import (
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
 )
-from acessilia_core.pipeline.payload import (
-    build_pddl_structured_payload,
-)
+from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from acessilia_core.pipeline.preflight import (
     _check_page_limit,
     _check_page_limit_before_extraction,

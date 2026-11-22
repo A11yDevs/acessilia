@@ -24,16 +24,9 @@ from typing import Any
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
-from acessilia_core.manifest.builder import (
-    SECONDARY_EXTRACTION_KIND,
-)
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _element_bbox,
-)
+from acessilia_core.manifest.builder import SECONDARY_EXTRACTION_KIND
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.pipeline.elements import _element_bbox
 from acessilia_core.pipeline.handlers.messages import (
     MSG_PROVIDER_PAIR_UNCALIBRATED,
     MSG_SECONDARY_CHANGED,

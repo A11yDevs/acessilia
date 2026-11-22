@@ -14,13 +14,8 @@ from collections.abc import Callable
 from typing import Any
 
 from acessilia_core.i18n import t
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from docstruct.blocks.lists import (
-    marker_numbering,
-)
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from docstruct.blocks.lists import marker_numbering
 from docstruct.geometry import OrientedBox
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,

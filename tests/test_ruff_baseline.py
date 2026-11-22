@@ -32,6 +32,7 @@ def test_lint_config_selects_import_sorting_at_zero_baseline_violations() -> Non
     assert {"F", "I", "E"} <= set(lint["select"])
     assert "E501" in lint["ignore"]
     assert lint["isort"].get("combine-as-imports") is True
+    assert lint["isort"].get("split-on-trailing-comma") is False
     assert not any(code.startswith("I") for codes in baseline.values() for code in codes)
 
 

@@ -23,12 +23,8 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDDL_VISION_RETRY_PASS_TABLES,
 )
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import (
-    ManifestElement,
-)
-from acessilia_core.pipeline.toolbox import (
-    _toolbox_render,
-)
+from acessilia_core.manifest.models import ManifestElement
+from acessilia_core.pipeline.toolbox import _toolbox_render
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip
 

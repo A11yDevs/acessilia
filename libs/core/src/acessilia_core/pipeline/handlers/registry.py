@@ -44,19 +44,13 @@ from acessilia_core.pipeline.handlers.inspection import (
     _handle_pymupdf_region_method,
     _handle_vision_page_inspection_method,
 )
-from acessilia_core.pipeline.handlers.judge import (
-    _handle_vlm_pairwise_judge_method,
-)
+from acessilia_core.pipeline.handlers.judge import _handle_vlm_pairwise_judge_method
 from acessilia_core.pipeline.handlers.order import (
     _handle_skeleton_order_method,
     _handle_xycut_order_method,
 )
-from acessilia_core.pipeline.handlers.rescue import (
-    _handle_rescue_omitted_method,
-)
-from acessilia_core.pipeline.handlers.review import (
-    _handle_human_review_method,
-)
+from acessilia_core.pipeline.handlers.rescue import _handle_rescue_omitted_method
+from acessilia_core.pipeline.handlers.review import _handle_human_review_method
 from acessilia_core.pipeline.handlers.text import (
     _handle_chunk_verse_method,
     _handle_deterministic_heading_repair_method,

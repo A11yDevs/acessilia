@@ -13,23 +13,14 @@ from pathlib import Path
 from typing import Any
 
 from acessilia_core.execution.models import ExecutionReport
-from acessilia_core.i18n import (
-    locale_for_user,
-    n,
-    t,
-)
+from acessilia_core.i18n import locale_for_user, n, t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED,
     MSG_STRUCTURAL_EXTRACTION_DEGRADED,
 )
 from acessilia_core.logger import logger
-from acessilia_core.manifest.builder import (
-    is_unstructured_page_placeholder,
-)
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
+from acessilia_core.manifest.builder import is_unstructured_page_placeholder
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.elements import (
     MSG_UNDESCRIBED_PICTURE_ALT,
     _element_bbox,
@@ -46,10 +37,7 @@ from docstruct.blocks.callouts import (
     callout_titles,
     dedupe_callout_titles as _dedupe_callout_titles,
 )
-from docstruct.blocks.lists import (
-    merge_list_blocks,
-    recover_empty_lettered_list_items,
-)
+from docstruct.blocks.lists import merge_list_blocks, recover_empty_lettered_list_items
 from docstruct.export.page_text import blocks_text, pages_text
 from docstruct.fusion.noise import (
     PAGE_NUMBER_MARGIN,

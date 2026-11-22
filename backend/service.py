@@ -38,10 +38,7 @@ from backend.services.cache import (
     processing_cache_configuration,
     set_cache,
 )
-from backend.services.history_service import (
-    finalizar_conversao,
-    registrar_conversao,
-)
+from backend.services.history_service import finalizar_conversao, registrar_conversao
 from backend.services.model_calls import get_model_calls
 from backend.services.operation_registry import operation_registry
 from backend.services.run_ports import service_run_ports

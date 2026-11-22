@@ -17,21 +17,11 @@ from typing import Any
 
 from acessilia_core.config import DocumentConfig, ToolboxConfig
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import (
-    ManifestElement,
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.elements import (
-    _OVERLAY_HOST_TOLERANCE,
-    _bbox,
-)
-from acessilia_core.pipeline.toolbox import (
-    _source_artifact_id,
-)
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.pipeline.elements import _OVERLAY_HOST_TOLERANCE, _bbox
+from acessilia_core.pipeline.toolbox import _source_artifact_id
 from docstruct.geometry.boxes import holds_point
-from docstruct.tables.ast import (
-    TABLE_SECTIONS,
-)
+from docstruct.tables.ast import TABLE_SECTIONS
 from docstruct.text.inline_math import (
     Placement,
     assign_runs_to_cells,
@@ -39,9 +29,7 @@ from docstruct.text.inline_math import (
     splice_inline_math,
     top_left_box,
 )
-from docstruct.text.negation_overlay import (
-    is_detached_overlay,
-)
+from docstruct.text.negation_overlay import is_detached_overlay
 
 #: Element types whose text the exporters render as prose with inline math.
 _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "footnote"})

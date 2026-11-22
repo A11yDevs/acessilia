@@ -12,9 +12,7 @@ from typing import Any
 
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
+from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline.handlers.common import (
     _missing_obligation,
     _target_elements,
@@ -24,9 +22,7 @@ from acessilia_core.pipeline.judge import (
     _judge_texts,
     _judgement_result,
 )
-from acessilia_core.pipeline.secondary import (
-    _secondary_or_failure,
-)
+from acessilia_core.pipeline.secondary import _secondary_or_failure
 
 
 def _handle_vlm_pairwise_judge_method(

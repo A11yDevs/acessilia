@@ -7,12 +7,8 @@ from __future__ import annotations
 
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
-from acessilia_core.manifest.models import (
-    ProcessingManifest,
-)
-from acessilia_core.pipeline.handlers.common import (
-    _missing_obligation,
-)
+from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.pipeline.handlers.common import _missing_obligation
 from acessilia_core.pipeline.handlers.messages import MSG_HUMAN_REVIEW
 
 

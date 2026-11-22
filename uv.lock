@@ -75,7 +75,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.32,<0.1" },
     { name = "rapidfuzz", specifier = ">=3.9,<4" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.23.1,<0.24" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15,<1" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.17,<1" },
     { name = "slowapi", specifier = ">=0.1.10,<0.2" },
     { name = "sqlalchemy", specifier = ">=2.0.51,<3" },
     { name = "uvicorn", specifier = ">=0.30,<0.31" },
