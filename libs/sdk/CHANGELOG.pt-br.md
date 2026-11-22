@@ -7,6 +7,11 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `acessilia_sdk.i18n.negotiation` com expansão de candidatos,
+  dicas do shell e negociação via Babel (`negotiate_locale`,
+  `negotiate_server_locale`); quem chama fornece os locales disponíveis e o
+  default, então o SDK não impõe política de aplicação (#712). O SDK agora
+  depende de Babel para essa infraestrutura genérica.
 - **Adicionado** `acessilia_sdk.i18n` com `parse_locales` e `normalize_locale`,
   o parser e o normalizador genéricos de listas de locales compartilhados pelo
   core e pelo serviço. O core mantém seus catálogos, políticas e contexto de

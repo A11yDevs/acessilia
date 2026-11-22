@@ -16,7 +16,11 @@ classifiers = [
 ]
 # docstruct is not on an index: install ./libs/docstruct (or its release wheel)
 # first; uv resolves it from the path below (ADR-0017).
-dependencies = ["httpx>=0.27,<0.28", "acessilia-docstruct>=0.5.8,<0.6"]
+dependencies = [
+    "httpx>=0.27,<0.28",
+    "acessilia-docstruct>=0.5.8,<0.6",
+    "babel>=2.18.0,<3",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=1.4.0,<2", "respx>=0.23.1,<0.24"]

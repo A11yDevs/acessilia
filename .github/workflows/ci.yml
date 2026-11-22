@@ -84,8 +84,9 @@ jobs:
 
       - name: Install the SDK alone from its lock
         run: |
-          # The SDK's only project dependency (ADR-0017): its operations
-          # compose Toolbox capabilities with docstruct's algorithms.
+          # The SDK's project dependencies (ADR-0002): its operations compose
+          # Toolbox capabilities with docstruct's algorithms, and its i18n
+          # infrastructure uses Babel (#712).
           # --locked keeps this extra check reproducible from its own lock, and
           # --no-editable installs the wheel users install.
           uv lock --check --project libs/sdk

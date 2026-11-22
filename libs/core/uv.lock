@@ -68,12 +68,14 @@ version = "0.3.0"
 source = { editable = "../sdk" }
 dependencies = [
     { name = "acessilia-docstruct" },
+    { name = "babel" },
     { name = "httpx" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "acessilia-docstruct", editable = "../docstruct" },
+    { name = "babel", specifier = ">=2.18.0,<3" },
     { name = "httpx", specifier = ">=0.27,<0.28" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0,<2" },

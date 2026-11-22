@@ -7,6 +7,11 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `acessilia_sdk.i18n.negotiation` with candidate expansion, shell
+  hints and Babel-backed negotiation (`negotiate_locale`,
+  `negotiate_server_locale`); the caller supplies the available locales and
+  default, so the SDK imposes no application policy (#712). The SDK now
+  depends on Babel for this generic infrastructure.
 - **Added** `acessilia_sdk.i18n` with `parse_locales` and `normalize_locale`,
   the generic locale-list parser and normalizer shared by the core and the
   service. The core keeps its catalogs, policies and request context; the full

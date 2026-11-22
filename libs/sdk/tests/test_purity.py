@@ -20,8 +20,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 #: The only runtime dependencies the SDK may have (ADR-0002, P2): the HTTP
-#: client, and docstruct for shared pure algorithms.
-ALLOWED_DEPENDENCIES = {"httpx": "httpx", "acessilia-docstruct": "docstruct"}
+#: client, docstruct for shared pure algorithms, and Babel for the generic i18n
+#: infrastructure (#712).
+ALLOWED_DEPENDENCIES = {
+    "httpx": "httpx",
+    "acessilia-docstruct": "docstruct",
+    "babel": "babel",
+}
 FORBIDDEN = ("backend", "acessilia_core", "acessilia_toolbox")
 
 _PROBE = f"""
@@ -82,7 +87,7 @@ def test_capability_registry_is_pure_data() -> None:
     assert imported <= {"__future__", "dataclasses", "typing"}, imported
 
 
-def test_runtime_dependencies_stay_within_httpx_and_docstruct() -> None:
+def test_runtime_dependencies_stay_within_the_allowlist() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     names = (
         re.split(r"[\s<>=!~;\[@]", requirement, maxsplit=1)[0]
@@ -105,7 +110,7 @@ def test_docstruct_is_a_declared_dependency() -> None:
     assert sources["acessilia-docstruct"] == {"path": "../docstruct", "editable": True}
 
 
-def test_imports_stay_within_the_standard_library_httpx_and_docstruct() -> None:
+def test_imports_stay_within_the_allowed_dependencies() -> None:
     allowed = set(sys.stdlib_module_names) | set(ALLOWED_DEPENDENCIES.values()) | {
         "acessilia_sdk"
     }
