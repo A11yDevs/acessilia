@@ -1,0 +1,1206 @@
+{
+  "schema_version": 1,
+  "tool": "scripts/architecture_quality.py",
+  "python": "3.12.13",
+  "rev": "b00636fcc6ce178256951c41331d58e9f1374bac",
+  "components": {
+    "core": {
+      "files": 112,
+      "nonblank_lines": 21367,
+      "functions": 799,
+      "median_function_lines": 16,
+      "functions_over_100_lines": 0,
+      "functions_complexity_over_15": 0
+    },
+    "sdk": {
+      "files": 45,
+      "nonblank_lines": 5783,
+      "functions": 221,
+      "median_function_lines": 14,
+      "functions_over_100_lines": 1,
+      "functions_complexity_over_15": 3
+    },
+    "docstruct": {
+      "files": 89,
+      "nonblank_lines": 13883,
+      "functions": 680,
+      "median_function_lines": 11.0,
+      "functions_over_100_lines": 6,
+      "functions_complexity_over_15": 40
+    },
+    "backend": {
+      "files": 46,
+      "nonblank_lines": 5100,
+      "functions": 238,
+      "median_function_lines": 10.0,
+      "functions_over_100_lines": 3,
+      "functions_complexity_over_15": 5
+    },
+    "frontend": {
+      "files": 24,
+      "nonblank_lines": 2294,
+      "functions": 89,
+      "median_function_lines": 13,
+      "functions_over_100_lines": 1,
+      "functions_complexity_over_15": 1
+    }
+  },
+  "dependency_edges": [
+    {
+      "from": "backend",
+      "to": "core",
+      "files": 27
+    },
+    {
+      "from": "backend",
+      "to": "docstruct",
+      "files": 1
+    },
+    {
+      "from": "backend",
+      "to": "sdk",
+      "files": 3
+    },
+    {
+      "from": "core",
+      "to": "docstruct",
+      "files": 47
+    },
+    {
+      "from": "core",
+      "to": "sdk",
+      "files": 19
+    },
+    {
+      "from": "frontend",
+      "to": "backend",
+      "files": 9
+    },
+    {
+      "from": "frontend",
+      "to": "core",
+      "files": 13
+    },
+    {
+      "from": "sdk",
+      "to": "docstruct",
+      "files": 4
+    }
+  ],
+  "component_coupling": {
+    "fan_in": {
+      "core": 2,
+      "sdk": 2,
+      "docstruct": 3,
+      "backend": 1,
+      "frontend": 0
+    },
+    "fan_out": {
+      "core": 2,
+      "sdk": 1,
+      "docstruct": 0,
+      "backend": 3,
+      "frontend": 2
+    }
+  },
+  "dependency_cycles": [],
+  "duplication": {
+    "min_nodes": 20,
+    "groups": [
+      {
+        "size": 9,
+        "lines": 99,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.move_header_footer_to_end",
+            "lines": 13
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.normalize_formula",
+            "lines": 10
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.normalize_text",
+            "lines": 10
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.refine_reading_order",
+            "lines": 13
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.refine_reading_order",
+            "lines": 10
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.move_header_footer_to_end",
+            "lines": 13
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.extract_table",
+            "lines": 10
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.is_valid_table",
+            "lines": 10
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.normalize_table",
+            "lines": 10
+          }
+        ]
+      },
+      {
+        "size": 7,
+        "lines": 87,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.decide_from_transcription",
+            "lines": 17
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.complete_order",
+            "lines": 11
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.kendall_tau",
+            "lines": 11
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.parse_order",
+            "lines": 11
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.decide_orientation",
+            "lines": 15
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.page_agreement",
+            "lines": 11
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.upscale_factor",
+            "lines": 11
+          }
+        ]
+      },
+      {
+        "size": 7,
+        "lines": 33,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.process_audit_document",
+            "lines": 6
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.process_move_header_footer_to_end",
+            "lines": 6
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.process_refine_reading_order",
+            "lines": 6
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.process_refine_reading_order",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_move_header_footer_to_end",
+            "lines": 6
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/manifest.py",
+            "qualname": "structured_document_to_payload",
+            "lines": 3
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/reference.py",
+            "qualname": "ArtifactReference.to_dict",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 6,
+        "lines": 22,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.process_complete_order",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.process_kendall_tau",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.process_parse_order",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_decide_orientation",
+            "lines": 7
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_page_agreement",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_upscale_factor",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 5,
+        "lines": 15,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py",
+            "qualname": "read_dataset_list",
+            "lines": 3
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py",
+            "qualname": "read_dataset_sample",
+            "lines": 3
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py",
+            "qualname": "read_dataset_splits",
+            "lines": 3
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py",
+            "qualname": "read_item_summaries",
+            "lines": 3
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/results/_dataset_generated.py",
+            "qualname": "read_sync_report",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 4,
+        "lines": 36,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_detailed",
+            "lines": 9
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_low",
+            "lines": 9
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_medium",
+            "lines": 9
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_ocr",
+            "lines": 9
+          }
+        ]
+      },
+      {
+        "size": 4,
+        "lines": 33,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/execution/schema.py",
+            "qualname": "write_execution_report_schema",
+            "lines": 7
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/manifest/schema.py",
+            "qualname": "write_processing_manifest_schema",
+            "lines": 7
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/planning/schema.py",
+            "qualname": "write_nominal_plan_schema",
+            "lines": 7
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/planning/schema.py",
+            "qualname": "write_planning_comparison_schema",
+            "lines": 12
+          }
+        ]
+      },
+      {
+        "size": 3,
+        "lines": 17,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/informational_structural.py",
+            "qualname": "_tool_config",
+            "lines": 7
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/export/pandoc_exporter.py",
+            "qualname": "_export_config",
+            "lines": 5
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/export/pandoc_exporter.py",
+            "qualname": "_toolbox_config",
+            "lines": 5
+          }
+        ]
+      },
+      {
+        "size": 3,
+        "lines": 48,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py",
+            "qualname": "ToolboxAdjudicateClient.transcribe_region_result",
+            "lines": 16
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf.py",
+            "qualname": "ToolboxPdfClient.text_spans_result",
+            "lines": 16
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf_validate.py",
+            "qualname": "ToolboxPdfValidateClient.validate_result",
+            "lines": 16
+          }
+        ]
+      },
+      {
+        "size": 3,
+        "lines": 34,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.get_item_result",
+            "lines": 9
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.sample_dataset_result",
+            "lines": 9
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.sync_dataset_result",
+            "lines": 16
+          }
+        ]
+      },
+      {
+        "size": 3,
+        "lines": 64,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py",
+            "qualname": "ToolboxLayoutClient.analyze",
+            "lines": 20
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py",
+            "qualname": "ToolboxMathClient.recognize",
+            "lines": 23
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/structure.py",
+            "qualname": "ToolboxStructureClient.extract_structure",
+            "lines": 21
+          }
+        ]
+      },
+      {
+        "size": 3,
+        "lines": 38,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py",
+            "qualname": "ToolboxMathClient.convert_result",
+            "lines": 12
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py",
+            "qualname": "ToolboxMathClient.verbalize_result",
+            "lines": 12
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/media_inspect.py",
+            "qualname": "ToolboxMediaInspectClient.inspect_result",
+            "lines": 14
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 30,
+        "functions": [
+          {
+            "component": "backend",
+            "path": "backend/config/settings.py",
+            "qualname": "_locales_from_env",
+            "lines": 15
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/i18n/__init__.py",
+            "qualname": "_locales_from_raw",
+            "lines": 15
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 6,
+        "functions": [
+          {
+            "component": "backend",
+            "path": "backend/services/operation_registry.py",
+            "qualname": "JobOperations.__init__",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/handlers/text.py",
+            "qualname": "_FurnitureView.__init__",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 26,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/cli/run.py",
+            "qualname": "_is_process_running",
+            "lines": 13
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/run.py",
+            "qualname": "_is_process_running",
+            "lines": 13
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 36,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/cli/run.py",
+            "qualname": "acquire_lock",
+            "lines": 16
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/run.py",
+            "qualname": "acquire_lock",
+            "lines": 20
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 107,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/cli/run.py",
+            "qualname": "startup",
+            "lines": 56
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/run.py",
+            "qualname": "startup",
+            "lines": 51
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 10,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/clients/api_client.py",
+            "qualname": "ApiClient._admin_headers",
+            "lines": 5
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/clients/api_client.py",
+            "qualname": "ApiClient._operations_headers",
+            "lines": 5
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 20,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_ativar",
+            "lines": 10
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_desativar",
+            "lines": 10
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 18,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_formats",
+            "lines": 9
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/telegram/handlers/start.py",
+            "qualname": "cmd_start",
+            "lines": 9
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 40,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.oracle_headroom",
+            "lines": 21
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+            "qualname": "OrderAdjudicationAgent.adjudicate_order",
+            "lines": 19
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 18,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.process_judge_pair",
+            "lines": 9
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.process_build_candidates",
+            "lines": 9
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 28,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.process_select_page",
+            "lines": 14
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_select_page",
+            "lines": 14
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 26,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.process_swap_low_agreement",
+            "lines": 13
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_swap_low_agreement",
+            "lines": 13
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 56,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.select_page",
+            "lines": 28
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.select_page",
+            "lines": 28
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 52,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.swap_low_agreement",
+            "lines": 26
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.swap_low_agreement",
+            "lines": 26
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 26,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.audit_document",
+            "lines": 13
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.extract_line_numbers",
+            "lines": 13
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 54,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.join_tail",
+            "lines": 27
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.join_tail",
+            "lines": 27
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 30,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/fusion_agent.py",
+            "qualname": "FusionAgent.process_join_tail",
+            "lines": 17
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.process_join_tail",
+            "lines": 13
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 10,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/output_schemas.py",
+            "qualname": "DataOutput.normalize_empty_optional_strings",
+            "lines": 5
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/output_schemas.py",
+            "qualname": "VisionOutput.normalize_empty_formula_latex",
+            "lines": 5
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 18,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.process_select_greedy",
+            "lines": 9
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.process_select_table",
+            "lines": 9
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 40,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.select_greedy",
+            "lines": 20
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/table_specialist_agent.py",
+            "qualname": "TableSpecialistAgent.select_table",
+            "lines": 20
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 12,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/manifest/builder.py",
+            "qualname": "_sha256",
+            "lines": 6
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/planning/domain_bundle.py",
+            "qualname": "_sha256",
+            "lines": 6
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 6,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/manifest/builder.py",
+            "qualname": "is_unstructured_page_placeholder",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_client.py",
+            "qualname": "toolbox_endpoints",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 6,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/canonical_builder.py",
+            "qualname": "latex_to_mathml",
+            "lines": 3
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/payload.py",
+            "qualname": "_render_text_from_blocks",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 21,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py",
+            "qualname": "_FormulaEnrichment.enrich_and_notify",
+            "lines": 8
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py",
+            "qualname": "_PictureEnrichment.describe_one",
+            "lines": 13
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 9,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/validators.py",
+            "qualname": "validate_export_profile",
+            "lines": 6
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/validators.py",
+            "qualname": "validate_output_text",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 12,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py",
+            "qualname": "_convert_latex_async",
+            "lines": 6
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py",
+            "qualname": "_verbalize_latex_async",
+            "lines": 6
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 47,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py",
+            "qualname": "toolbox_convert_latex",
+            "lines": 24
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py",
+            "qualname": "toolbox_verbalize_latex",
+            "lines": 23
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 10,
+        "functions": [
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/export/pandoc_ast.py",
+            "qualname": "_block_to_ast",
+            "lines": 5
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/export/txt.py",
+            "qualname": "_render_block",
+            "lines": 5
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "groups": 50,
+      "functions_in_groups": 133,
+      "lines_in_groups": 1529
+    }
+  },
+  "hotspots": {
+    "functions": [
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/fusion/differ.py",
+        "qualname": "merge_blocks",
+        "complexity": 89,
+        "lines": 198
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/tables/ast.py",
+        "qualname": "table_ast_from_docling_grid",
+        "complexity": 63,
+        "lines": 147
+      },
+      {
+        "component": "sdk",
+        "path": "libs/sdk/src/acessilia_sdk/toolbox/results/_model.py",
+        "qualname": "decode",
+        "complexity": 56,
+        "lines": 109
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/blocks/lists.py",
+        "qualname": "recover_empty_lettered_list_items",
+        "complexity": 53,
+        "lines": 131
+      },
+      {
+        "component": "backend",
+        "path": "backend/api/worker.py",
+        "qualname": "JobExecutor.run",
+        "complexity": 43,
+        "lines": 325
+      },
+      {
+        "component": "backend",
+        "path": "backend/service.py",
+        "qualname": "process",
+        "complexity": 43,
+        "lines": 238
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/adapters/mineru.py",
+        "qualname": "format_mineru_block_text",
+        "complexity": 43,
+        "lines": 76
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/fusion/noise.py",
+        "qualname": "suppress_in_regions",
+        "complexity": 38,
+        "lines": 90
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/manifest.py",
+        "qualname": "document_invariant_findings",
+        "complexity": 32,
+        "lines": 132
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/geometry/reading_order.py",
+        "qualname": "_order_manifest_body",
+        "complexity": 32,
+        "lines": 114
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/validation.py",
+        "qualname": "_validate_table_block",
+        "complexity": 31,
+        "lines": 135
+      },
+      {
+        "component": "sdk",
+        "path": "libs/sdk/src/acessilia_sdk/cli.py",
+        "qualname": "main",
+        "complexity": 31,
+        "lines": 85
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/regions/grouping.py",
+        "qualname": "_merge_callout_groups",
+        "complexity": 30,
+        "lines": 99
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/fusion/noise.py",
+        "qualname": "group_split_blocks",
+        "complexity": 30,
+        "lines": 72
+      },
+      {
+        "component": "docstruct",
+        "path": "libs/docstruct/src/docstruct/tables/ast.py",
+        "qualname": "normalize_table_ast",
+        "complexity": 29,
+        "lines": 66
+      }
+    ],
+    "modules": [
+      {
+        "path": "libs/core/src/acessilia_core/pipeline/orchestrator.py",
+        "lines": 808
+      },
+      {
+        "path": "libs/core/src/acessilia_core/pipeline/payload.py",
+        "lines": 801
+      },
+      {
+        "path": "libs/core/src/acessilia_core/agents/vision_agent.py",
+        "lines": 793
+      },
+      {
+        "path": "backend/api/worker.py",
+        "lines": 788
+      },
+      {
+        "path": "libs/core/src/acessilia_core/manifest/toolbox_extractor.py",
+        "lines": 751
+      },
+      {
+        "path": "libs/docstruct/src/docstruct/visual_text.py",
+        "lines": 725
+      },
+      {
+        "path": "libs/docstruct/src/docstruct/fusion/payload.py",
+        "lines": 715
+      },
+      {
+        "path": "backend/config/settings.py",
+        "lines": 713
+      },
+      {
+        "path": "libs/core/src/acessilia_core/planning/pddl_processor.py",
+        "lines": 698
+      },
+      {
+        "path": "libs/core/src/acessilia_core/manifest/slides.py",
+        "lines": 693
+      },
+      {
+        "path": "libs/docstruct/src/docstruct/tables/ast.py",
+        "lines": 691
+      },
+      {
+        "path": "libs/core/src/acessilia_core/manifest/builder.py",
+        "lines": 688
+      },
+      {
+        "path": "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py",
+        "lines": 685
+      },
+      {
+        "path": "libs/docstruct/src/docstruct/text/inline_math.py",
+        "lines": 682
+      },
+      {
+        "path": "libs/sdk/src/acessilia_sdk/cli.py",
+        "lines": 661
+      }
+    ]
+  }
+}
