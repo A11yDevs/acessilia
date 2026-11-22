@@ -1,6 +1,5 @@
 """Golden tests for tables/validation/profiles port (Phase 2, slice 2)."""
 from docstruct.profiles import (
-    MODE_TO_VERBOSITY,
     OUTPUT_PROFILES,
     filter_blocks_for_profile,
     normalize_profile,

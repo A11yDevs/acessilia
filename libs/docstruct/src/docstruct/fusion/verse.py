@@ -47,11 +47,11 @@ def record_like(lines: list[str], min_frac: float = 0.6) -> bool:
     A maioria das linhas termina em número (``min_frac``) ou carrega dot leaders
     (>= 0.5). Linhas de verso/diálogo reais terminam em palavras.
     """
-    ls = [l.strip() for l in lines if l.strip()]
+    ls = [line.strip() for line in lines if line.strip()]
     if not ls:
         return False
-    endnum = sum(bool(RECORD_END_RE.search(l)) for l in ls) / len(ls)
-    leaders = sum(bool(LEADER_RE.search(l)) for l in ls) / len(ls)
+    endnum = sum(bool(RECORD_END_RE.search(line)) for line in ls) / len(ls)
+    leaders = sum(bool(LEADER_RE.search(line)) for line in ls) / len(ls)
     return endnum >= min_frac or leaders >= 0.5
 
 
@@ -69,11 +69,11 @@ def verse_lines(
     s = md.strip()
     if "\n" not in s or s.startswith(_STRUCTURE_PREFIXES):
         return None
-    lines = [l.rstrip() for l in s.split("\n")]
-    nonempty = [l for l in lines if l.strip()]
+    lines = [line.rstrip() for line in s.split("\n")]
+    nonempty = [line for line in lines if line.strip()]
     if len(nonempty) < min_lines:
         return None
-    lens = sorted(len(l) for l in nonempty)
+    lens = sorted(len(line) for line in nonempty)
     if lens[len(lens) // 2] > max_median or lens[-1] > max_line:
         return None
     return lines
@@ -96,8 +96,8 @@ def chunk_verse(lines: list[str], max_chars: int, soft: float = 0.6) -> list[str
             chunks.append("\n".join(cur))
         cur, cur_len = [], 0
 
-    for l in lines:
-        s = l.strip()
+    for line in lines:
+        s = line.strip()
         if not s:  # linha em branco = quebra de estrofe
             flush()
             continue

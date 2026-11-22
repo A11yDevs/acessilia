@@ -28,11 +28,11 @@ def normalize_bbox(
     w, h = float(page_size[0]), float(page_size[1])
     if w <= 0 or h <= 0:
         return None
-    l, t, r, b = (float(v) for v in bbox)
+    left, top, right, bottom = (float(v) for v in bbox)
     if coord_origin.upper().startswith("BOTTOM"):
-        t, b = h - t, h - b
-    y0, y1 = sorted((t / h, b / h))
-    x0, x1 = sorted((l / w, r / w))
+        top, bottom = h - top, h - bottom
+    y0, y1 = sorted((top / h, bottom / h))
+    x0, x1 = sorted((left / w, right / w))
     return (max(0.0, x0), max(0.0, y0), min(1.0, x1), min(1.0, y1))
 
 

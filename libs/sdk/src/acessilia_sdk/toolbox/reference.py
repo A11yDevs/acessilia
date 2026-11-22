@@ -40,7 +40,7 @@ def _check_media_type(value: Any) -> str:
     if not (isinstance(value, str)):
         raise ValueError(f"media_type: expected string, got {value!r}")
     if isinstance(value, str) and len(value) < 1:
-        raise ValueError(f"media_type: shorter than 1")
+        raise ValueError("media_type: shorter than 1")
     return value
 
 
@@ -50,7 +50,7 @@ def _check_size(value: Any) -> int:
     if not (isinstance(value, int) and not isinstance(value, bool)):
         raise ValueError(f"size: expected integer, got {value!r}")
     if isinstance(value, (int, float)) and not isinstance(value, bool) and value < 0:
-        raise ValueError(f"size: below 0")
+        raise ValueError("size: below 0")
     return value
 
 
@@ -58,7 +58,7 @@ def _check_store(value: Any) -> str | None:
     if not ((isinstance(value, str)) or (value is None)):
         raise ValueError(f"store: expected string or null, got {value!r}")
     if isinstance(value, str) and len(value) < 1:
-        raise ValueError(f"store: shorter than 1")
+        raise ValueError("store: shorter than 1")
     return value
 
 

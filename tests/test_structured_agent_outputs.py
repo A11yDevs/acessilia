@@ -935,7 +935,7 @@ async def test_a_region_on_the_general_budget_is_never_truncated(monkeypatch) ->
 
 @pytest.mark.asyncio
 async def test_a_rate_limited_region_waits_and_is_retried(monkeypatch) -> None:
-    from acessilia_core.agents.vision_agent import _RATE_LIMIT_RETRIES, REGION_ATTEMPTS
+    from acessilia_core.agents.vision_agent import _RATE_LIMIT_RETRIES
 
     class RateLimited(Exception):
         status_code = 429
@@ -963,7 +963,6 @@ async def test_a_hung_model_call_is_abandoned_at_the_deadline(monkeypatch) -> No
     import threading
 
     from acessilia_core.agents import model_call_policy, vision_agent as vision_module
-    from backend.config.settings import settings
 
     started, release, finished = threading.Event(), threading.Event(), threading.Event()
 
@@ -1337,7 +1336,6 @@ async def test_data_agent_rejects_output_for_the_wrong_region_kind(monkeypatch) 
 
 @pytest.mark.asyncio
 async def test_data_agent_uses_larger_token_budget_for_tables(monkeypatch, model_calls) -> None:
-    import asyncio
 
     from acessilia_core.agents import data_agent as data_module
 

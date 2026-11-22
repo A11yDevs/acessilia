@@ -334,7 +334,6 @@ def test_a_presentation_is_not_fused_with_a_second_provider(monkeypatch):
 
     from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
     from acessilia_sdk.toolbox.clients import ToolboxStructureClient
-    from backend.config.settings import settings
     from tests.test_toolbox_manifest_extractor import (
         FIXTURE_PDF,
         SAMPLE_TOOLBOX_RESPONSE,

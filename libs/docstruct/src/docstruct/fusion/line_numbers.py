@@ -91,7 +91,7 @@ def extract_line_numbers(
             nums.append(h.group(1))
             md = md[: h.start()] + md[h.end() :]
         md = re.sub(r"[ \t]{2,}", " ", md)
-        md = "\n".join(l.rstrip() for l in md.split("\n") if l.strip())
+        md = "\n".join(line.rstrip() for line in md.split("\n") if line.strip())
         nums.reverse()
         if not norm(md):
             out.append(b)

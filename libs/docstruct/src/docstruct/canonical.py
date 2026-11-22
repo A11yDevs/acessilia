@@ -10,6 +10,33 @@ import re
 from copy import deepcopy
 from typing import Any, Callable, Iterator
 
+from docstruct.blocks.parser import parse_text_to_blocks
+from docstruct.tables.ast import raw_rows_from_table_ast
+from docstruct.text.equations import (
+    equation_number,
+    numbered_speech,
+    preserve_equation_number,
+)
+from docstruct.text.implicit_products import (
+    implicit_product_variables,
+    mark_implicit_products,
+)
+from docstruct.text.math_spans import (
+    block_prose,
+    inline_math_entries,
+    inline_math_sources,
+    whole_inline_math,
+)
+from docstruct.text.named_operators import (
+    normalize_named_operators,
+    speak_named_operators,
+)
+from docstruct.text.sanitize import (
+    sanitize_block_text,
+    sanitize_text,
+    sanitize_title_text,
+)
+
 
 class MathEnricher:
     """Protocol for LaTeX enrichment (normalize / MathML / two verbalizations).
@@ -46,34 +73,6 @@ def _source_type(source_path: str) -> str:
     if "." in name:
         return name.rsplit(".", 1)[-1].lower()
     return ""
-
-
-from docstruct.blocks.parser import parse_text_to_blocks
-from docstruct.tables.ast import raw_rows_from_table_ast
-from docstruct.text.equations import (
-    equation_number,
-    numbered_speech,
-    preserve_equation_number,
-)
-from docstruct.text.implicit_products import (
-    implicit_product_variables,
-    mark_implicit_products,
-)
-from docstruct.text.math_spans import (
-    block_prose,
-    inline_math_entries,
-    inline_math_sources,
-    whole_inline_math,
-)
-from docstruct.text.named_operators import (
-    normalize_named_operators,
-    speak_named_operators,
-)
-from docstruct.text.sanitize import (
-    sanitize_block_text,
-    sanitize_text,
-    sanitize_title_text,
-)
 
 
 def build_canonical_document(

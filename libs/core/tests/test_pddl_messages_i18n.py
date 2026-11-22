@@ -29,7 +29,6 @@ from acessilia_core.pipeline.handlers.formula import _handle_latex_normalizer_me
 from acessilia_core.pipeline.handlers.messages import (
     MSG_BLOCK_COUNT,
     MSG_CODE_NORMALIZED,
-    MSG_TABLE_VALIDATED,
     MSG_VISION_VALIDATED,
 )
 from acessilia_core.pipeline.handlers.text import (

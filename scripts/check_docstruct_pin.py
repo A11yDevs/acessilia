@@ -46,7 +46,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.toolbox_contract_ref import _remote_refs, select_ref
+from scripts.toolbox_contract_ref import _remote_refs, select_ref  # noqa: E402
 
 CORE_REPOSITORY = "https://github.com/A11yDevs/acessilia.git"
 TOOLBOX_REPOSITORY = "https://github.com/A11yDevs/acessilia-toolbox.git"

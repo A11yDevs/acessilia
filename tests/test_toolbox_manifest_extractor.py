@@ -186,7 +186,6 @@ def test_dual_mode_attaches_page_evidence_without_replacing_manifest(
     mock_client, monkeypatch
 ):
     """Dual extraction supplies fusion evidence to the PDDL manifest builder."""
-    from backend.config.settings import settings
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_response = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
@@ -244,7 +243,6 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
     """MinerU's page replaces docling's where the deterministic router prefers it."""
     import json
 
-    from backend.config.settings import settings
 
     monkeypatch.setattr(
         "docstruct.fusion.payload.decide_v1",
@@ -300,7 +298,6 @@ def test_dual_mode_takes_the_page_the_router_sends_to_mineru(
 
 
 def test_dual_mode_passes_configured_fusion_policy(mock_client, monkeypatch):
-    from backend.config.settings import settings
     from docstruct.policy import FusionPolicy
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
@@ -336,7 +333,6 @@ def test_matching_dual_providers_do_not_create_fusion_obligations(
     mock_client, monkeypatch
 ):
     from acessilia_core.manifest.builder import build_processing_manifest
-    from backend.config.settings import settings
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -367,7 +363,6 @@ def test_dual_mode_does_not_emit_evidence_when_secondary_provider_fails(
     mock_client, monkeypatch
 ):
     from acessilia_sdk.toolbox import ToolboxProviderUnavailable
-    from backend.config.settings import settings
 
     mock_client.extract_structure = AsyncMock(return_value=SAMPLE_TOOLBOX_RESPONSE)
     secondary_client = AsyncMock(spec=ToolboxStructureClient)
@@ -510,7 +505,6 @@ def test_secondary_on_another_deployment_receives_source_not_primary_artifact(
     mock_client, mock_artifact_client, monkeypatch
 ):
     from acessilia_sdk.toolbox import ToolboxEndpoint
-    from backend.config.settings import settings
 
     mock_client.endpoints = (ToolboxEndpoint("http://toolbox-a.test"),)
     mock_artifact_client.endpoints = mock_client.endpoints
@@ -806,7 +800,6 @@ def test_dual_extraction_handles_each_provider_independently(
         ToolboxProviderUnavailable,
         ToolboxUnavailable,
     )
-    from backend.config.settings import settings
 
     primary = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
     secondary_payload = deepcopy(SAMPLE_TOOLBOX_RESPONSE)
@@ -857,13 +850,14 @@ def test_dual_extraction_handles_each_provider_independently(
 ])
 def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, failure_name):
     from acessilia_sdk.toolbox import errors
-    from backend.config.settings import settings
 
     failure = getattr(errors, failure_name)("permanent rejection")
     mock_client.extract_structure.side_effect = failure
     secondary = AsyncMock(spec=ToolboxStructureClient)
     secondary.extract_structure.side_effect = failure
-    factory = lambda *a, **kw: secondary
+    def factory(*args, **kwargs):
+        return secondary
+
     monkeypatch.setattr("acessilia_core.manifest.toolbox_extractor.make_toolbox_client", factory)
     with pytest.raises(type(failure)) as caught:
         ToolboxManifestExtractor(client=mock_client).extract(FIXTURE_PDF, fusion=fusion_config(mode="dual", secondary_provider="mineru"), toolbox=toolbox_config(use_artifact_store=False), paths=paths_config(), operations=None)
@@ -873,7 +867,6 @@ def test_dual_mode_preserves_permanent_primary_error(mock_client, monkeypatch, f
 
 def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_client, monkeypatch):
     from acessilia_sdk.toolbox.errors import ToolboxTimeout, ToolboxUnsupportedMediaType
-    from backend.config.settings import settings
 
     primary_error = ToolboxTimeout("primary unavailable")
     mock_client.extract_structure.side_effect = primary_error
@@ -895,7 +888,6 @@ def test_dual_mode_preserves_permanent_secondary_error_without_primary(mock_clie
 ])
 def test_permanent_secondary_error_keeps_the_primary_extraction(mock_client, monkeypatch, failure_name):
     from acessilia_sdk.toolbox import errors
-    from backend.config.settings import settings
 
     mock_client.extract_structure.return_value = SAMPLE_TOOLBOX_RESPONSE
     secondary = AsyncMock(spec=ToolboxStructureClient)
@@ -917,7 +909,6 @@ def test_dual_mode_falls_back_on_a_primary_http_500(mock_client, monkeypatch):
 
     from acessilia_sdk.toolbox.errors import ToolboxError
     from acessilia_sdk.toolbox.transport import raise_for_error
-    from backend.config.settings import settings
 
     with pytest.raises(ToolboxError) as server_error:
         raise_for_error(httpx.Response(500, json={"detail": "boom"}), "structure")
