@@ -437,6 +437,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = collect(args.rev)
     except ValueError as exc:
         parser.error(str(exc))
+        return 2
     text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     if args.output is None:
         sys.stdout.write(text)
