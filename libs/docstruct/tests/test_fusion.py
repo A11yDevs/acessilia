@@ -16,6 +16,24 @@ def mk(text, box=None, kind="text", md=None, **kw):
     return DiffBlock(md=md or text, kind=kind, box=box, text=text, type=kw.pop("type", kind), **kw)
 
 
+@pytest.mark.parametrize("kind,text,md,keep", [
+    ("heading", "B", "# B", True),
+    ("formula", "y", "$$y$$", True),
+    ("table", "Q", "<table><tr><td>Q</td></tr></table>", True),
+    ("text", "~", "~", False),
+])
+def test_short_noise_filter_preserves_structured_content(kind, text, md, keep):
+    docling = mk(text, kind=kind, md=md, box=(0.1, 0.6, 0.2, 0.7))
+    mineru = mk("A body paragraph from MinerU", box=(0.1, 0.1, 0.8, 0.3))
+
+    output, stats = merge_blocks(
+        [docling], [mineru], FusionPolicy(formula_text=False), min_len=0,
+    )
+
+    assert (md in output) is keep
+    assert stats["dropped-docling-short-noise"] == (0 if keep else 1)
+
+
 class TestHungarian:
     def test_identidade(self):
         cost = [[0, 1], [1, 0]]
