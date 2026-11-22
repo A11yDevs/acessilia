@@ -28,13 +28,14 @@ def test_write_schema_creates_the_parent_and_adds_a_newline(tmp_path: Path) -> N
     destination = tmp_path / "nested" / "schema.json"
 
     result = write_schema({"description": "日本語", "type": "object"}, destination)
+    text = destination.read_text(encoding="utf-8")
 
     assert result == destination
-    assert destination.read_text(encoding="utf-8").endswith("\n")
-    assert json.loads(destination.read_text(encoding="utf-8")) == {
-        "description": "日本語",
-        "type": "object",
-    }
+    assert text == json.dumps(
+        {"description": "日本語", "type": "object"}, ensure_ascii=False, indent=2
+    ) + "\n"
+    assert "日本語" in text
+    assert json.loads(text) == {"description": "日本語", "type": "object"}
 
 
 @pytest.mark.parametrize(
@@ -49,4 +50,6 @@ def test_write_schema_creates_the_parent_and_adds_a_newline(tmp_path: Path) -> N
 def test_each_writer_uses_the_shared_formatting(tmp_path: Path, writer, schema) -> None:
     destination = writer(tmp_path / "schema.json")
 
-    assert json.loads(destination.read_text(encoding="utf-8")) == schema()
+    assert destination.read_text(encoding="utf-8") == (
+        json.dumps(schema(), ensure_ascii=False, indent=2) + "\n"
+    )
