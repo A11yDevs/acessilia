@@ -42,9 +42,10 @@ to `acessilia_core.schema_files.write_schema`, while each module keeps its own
 schema function and public writer name. The tests compare each writer's output
 with its schema function and cover parent creation and non-ASCII JSON.
 
-The formatting of the committed schema files is unchanged; this PR does not
-regenerate their contents. This removes the `write_*_schema` group from the
-remaining candidates.
+The formatting of the committed schema files is unchanged; the schema writer PR
+did not regenerate their contents. A follow-up (#737) made the descriptions
+canonical English, regenerated the three drifted files and added a freshness
+test. This removes the `write_*_schema` group from the remaining candidates.
 
 **Measured delta on this PR's code commit:** 24 groups / 59 functions / 705
 lines → **23 groups / 55 functions / 672 lines**. Only the `write_*_schema`
