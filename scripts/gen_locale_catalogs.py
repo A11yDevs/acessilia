@@ -331,12 +331,40 @@ from acessilia_core.pipeline.payload import (
     MSG_SCENE_TEXT_IN_PICTURE,
     MSG_TABLES_NOT_READ,
 )
-from acessilia_core.pipeline.table_ast import (
+from acessilia_core.planning.messages import (
+    MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
+    MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
+    MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
+    MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
+    MSG_EXPECTED_TOTAL_COST_MISMATCH,
+    MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB,
+    MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
+    MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION,
+    MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
+    MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION,
+    MSG_PLANNER_OUTCOME_FAILED_REQUIRES_ERROR,
+    MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION,
+    MSG_PLANNER_OUTCOME_SOLVED_MUST_NOT_CARRY_ERROR,
+    MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS,
+    MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
+)
+from acessilia_core.toolbox.toolbox_math_tools import (
+    MSG_MATHML_REJECTED,
+    MSG_MATHML_UNAVAILABLE,
+    MSG_SPEECH_REJECTED,
+    MSG_SPEECH_UNAVAILABLE,
+)
+from backend.services.validators import (
+    MSG_FILE_TOO_LARGE,
+    MSG_INVALID_EMAIL_ADDRESS,
+    MSG_UNSUPPORTED_FORMAT,
+)
+from docstruct.tables.ast import (
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_FOOTER,
     MSG_TABLE_TEXT_ROW,
 )
-from acessilia_core.pipeline.validators import (
+from docstruct.validation import (
     MSG_BLOCK_NOT_ALLOWED_IN_PROFILE,
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_DOCUMENT_NO_SECTIONS,
@@ -372,34 +400,6 @@ from acessilia_core.pipeline.validators import (
     MSG_TABLE_ROWS_INVALID,
     MSG_TECHNICAL_METADATA_IN_TXT,
     MSG_UNKNOWN_EXPORT_PROFILE,
-)
-from acessilia_core.planning.messages import (
-    MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
-    MSG_COMPARISON_OUTCOME_KEY_MISMATCH,
-    MSG_COMPARISON_REQUIRES_BOTH_BACKENDS,
-    MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
-    MSG_EXPECTED_TOTAL_COST_MISMATCH,
-    MSG_NOMINAL_PLAN_MUST_END_COMPLETE_JOB,
-    MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION,
-    MSG_PLAN_CONTAINS_UNSELECTED_OBLIGATION,
-    MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
-    MSG_PLANNER_OUTCOME_FAILED_MUST_NOT_PASS_VALIDATION,
-    MSG_PLANNER_OUTCOME_FAILED_REQUIRES_ERROR,
-    MSG_PLANNER_OUTCOME_MUST_PASS_VALIDATION,
-    MSG_PLANNER_OUTCOME_SOLVED_MUST_NOT_CARRY_ERROR,
-    MSG_PLANNER_OUTCOME_SOLVED_REQUIRES_FIELDS,
-    MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
-)
-from acessilia_core.toolbox.toolbox_math_tools import (
-    MSG_MATHML_REJECTED,
-    MSG_MATHML_UNAVAILABLE,
-    MSG_SPEECH_REJECTED,
-    MSG_SPEECH_UNAVAILABLE,
-)
-from backend.services.validators import (
-    MSG_FILE_TOO_LARGE,
-    MSG_INVALID_EMAIL_ADDRESS,
-    MSG_UNSUPPORTED_FORMAT,
 )
 from frontend.telegram.messages import (
     MSG_ACCESSIBLE_PACKAGE_READY,
@@ -735,8 +735,8 @@ MESSAGES: tuple[str, ...] = (
     MSG_STATUS_CONVERSION_DONE,
     MSG_STATUS_PROCESSING_FAILED,
     # Canonical-document / export-profile / output-text validation findings
-    # (libs/core/src/acessilia_core/pipeline/validators.py), surfaced in audit reports and ValueError
-    # messages raised by libs/core/src/acessilia_core/export/pandoc_exporter.py.
+    # (docstruct.validation), surfaced in audit reports and ValueError messages
+    # raised by libs/core/src/acessilia_core/export/pandoc_exporter.py.
     MSG_CANONICAL_DOC_NOT_OBJECT,
     MSG_FIELD_MISSING,
     MSG_SECTIONS_NOT_LIST,
@@ -791,7 +791,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBJECT_MARKER_FORMULA,
     MSG_HTML_IMAGE_DESCRIPTION,
     MSG_HTML_TABLE_REGION,
-    # TXT table line templates (libs/core/src/acessilia_core/pipeline/table_ast.py).
+    # TXT table line templates (docstruct.tables.ast).
     MSG_TABLE_TEXT_CAPTION,
     MSG_TABLE_TEXT_ROW,
     MSG_TABLE_TEXT_FOOTER,
@@ -1602,7 +1602,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         MSG_STATUS_CONVERSION_DONE: "✅ Conversão concluída!",
         MSG_STATUS_PROCESSING_FAILED: ("❌ Erro durante o processamento."),
         # Canonical-document / export-profile / output-text validation findings
-        # (pt-BR mirrors of the libs/core/src/acessilia_core/pipeline/validators.py ids above).
+        # (pt-BR mirrors of the docstruct.validation ids above).
         MSG_CANONICAL_DOC_NOT_OBJECT: (
             "Documento canônico deve ser um objeto JSON."
         ),

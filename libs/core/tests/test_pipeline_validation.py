@@ -23,6 +23,27 @@ from docstruct.profiles import (
 )
 
 
+def test_docstruct_msgids_are_deprecated_reexports():
+    from acessilia_core.pipeline import validators as bridge
+
+    with pytest.warns(DeprecationWarning, match="docstruct.validation"):
+        from acessilia_core.pipeline.validators import MSG_DUPLICATE_ID as deprecated
+
+    from docstruct.validation import MSG_DUPLICATE_ID
+
+    assert deprecated == MSG_DUPLICATE_ID
+    assert "MSG_DUPLICATE_ID" in dir(bridge)
+
+
+def test_finding_reexport_is_deprecated():
+    with pytest.warns(DeprecationWarning, match="docstruct.validation"):
+        from acessilia_core.pipeline.validators import Finding as deprecated
+
+    from docstruct.validation import Finding
+
+    assert deprecated is Finding
+
+
 @pytest.fixture(autouse=True)
 def _pin_en_us(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the en_US runtime locale for every test in this module.

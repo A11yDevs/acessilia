@@ -2,6 +2,15 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.1 — docstruct re-exports deprecated in the pipeline bridges
+
+No behaviour change. `acessilia_core.pipeline.table_ast` and
+`acessilia_core.pipeline.validators` keep their localized functions, but the
+pure docstruct functions and msgids they used to re-export now emit a
+`DeprecationWarning`; import them from `docstruct.tables.ast` and
+`docstruct.validation` instead. In-repository consumers were migrated, and the
+compatibility names stay until a later breaking version removes them (#656).
+
 ## 0.3.0 — the Toolbox adapter no longer re-exports the SDK
 
 **Breaking change** for callers that imported SDK names from

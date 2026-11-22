@@ -2,6 +2,16 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.1 — reexportações da docstruct depreciadas nas bridges do pipeline
+
+Sem mudança de comportamento. `acessilia_core.pipeline.table_ast` e
+`acessilia_core.pipeline.validators` mantêm suas funções localizadas, mas as
+funções puras e os msgids da docstruct que eles reexportavam agora emitem
+`DeprecationWarning`; importe de `docstruct.tables.ast` e
+`docstruct.validation`. Os consumidores do repositório foram migrados, e os
+nomes de compatibilidade ficam até uma versão incompatível posterior removê-los
+(#656).
+
 ## 0.3.0 — o adaptador da Toolbox não reexporta mais o SDK
 
 **Mudança incompatível** para quem importava nomes do SDK por

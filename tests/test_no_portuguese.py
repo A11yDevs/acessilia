@@ -236,6 +236,8 @@ EXEMPT_STRINGS: list[tuple[str, str]] = [
     ("libs/core/tests/test_letterhead_header.py", "À direita do logotipo"),
     ("libs/core/tests/test_letterhead_header.py", "serifada, seguido abaixo por"),
     ("libs/core/tests/test_letterhead_header.py", "vision_elements"),
+    # Localized table output is the contract under test.
+    ("libs/core/tests/test_table_ast.py", "Tabela: Dados"),
     ("docs/docstruct_algorithms.md", "→ `à`"),
 ]
 
