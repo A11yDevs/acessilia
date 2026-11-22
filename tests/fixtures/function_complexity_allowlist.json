@@ -21,10 +21,6 @@
     "backend/services/model_calls.py::ModelCallExecutor._invoke": {
       "complexity": 20
     },
-    "frontend/telegram/handlers/document.py::_poll_job": {
-      "lines": 104,
-      "complexity": 19
-    },
     "libs/docstruct/src/docstruct/adapters/mineru.py::extract_mineru_blocks": {
       "complexity": 16
     },

@@ -1,4 +1,5 @@
 import shutil
+import sqlite3
 from datetime import datetime
 
 from aiogram import Router
@@ -317,7 +318,10 @@ async def cmd_cancel(message: Message) -> None:
         )
         return
     user_context.user_task_ids.pop(state_key, None)
-    get_state_store().remove_task(state_key)
+    try:
+        get_state_store().remove_task(state_key, task_id)
+    except sqlite3.Error as error:
+        logger.warning("Telegram state store unavailable: %s", error)
     cancelled_id = result.get('task_id', task_id)
     await message.answer(t(MSG_TASK_CANCEL_DONE).format(task_id=cancelled_id))
 

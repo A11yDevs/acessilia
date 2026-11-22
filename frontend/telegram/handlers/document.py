@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 import tempfile
 import time
 import uuid
@@ -41,6 +42,7 @@ from frontend.telegram.messages import (
     MSG_PROCESSING_ERROR_GENERIC,
     MSG_PROCESSING_TIMEOUT,
     MSG_QUEUE_POSITION,
+    MSG_STATUS_TASK_NOT_FOUND,
     MSG_SUBMIT_FAILED,
     MSG_TELEGRAM_FILE_TOO_LARGE,
     MSG_TASK_CANCELLED,
@@ -223,14 +225,16 @@ async def process_file(
         task_id = result["task_id"]
         position = result.get("position", 1)
         user_context.user_task_ids[state_key] = task_id
-        get_state_store().save_task(
-            state_key,
-            task_id,
-            filename=filename,
-            job_token=result.get("job_token"),
-            email=email,
-            reply_to_message_id=message.message_id,
-        )
+        try:
+            get_state_store().save_task(
+                state_key,
+                task_id,
+                filename=filename,
+                job_token=result.get("job_token"),
+                email=email,
+            )
+        except sqlite3.Error as error:
+            logger.warning("Telegram state store unavailable: %s", error)
 
         await tracker(t(MSG_TASK_ENQUEUED).format(task_id=task_id))
         if position > 1:
@@ -238,8 +242,11 @@ async def process_file(
                 t(MSG_QUEUE_POSITION).format(position=position)
             )
 
-        await _poll_job(message, tracker, task_id, email)
-        await _forget_finished_task(state_key, task_id)
+        if await _poll_job(message, tracker, task_id, email):
+            try:
+                get_state_store().remove_task(state_key, task_id)
+            except sqlite3.Error as error:
+                logger.warning("Telegram state store unavailable: %s", error)
     except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
         await tracker.finish(success=False)
@@ -263,21 +270,59 @@ def _pdf_ua_failure_prefixes() -> tuple[str, ...]:
     return tuple(prefixes)
 
 
+async def _finish_job(
+    message: Message, tracker: StatusTracker, success: bool, text: str
+) -> None:
+    """Finish the live status message and send the terminal reply."""
+    await tracker.finish(success=success)
+    await _send_with_retry(
+        message.bot,
+        message.chat.id,
+        text,
+        message_thread_id=message.message_thread_id,
+        reply_to_message_id=message.message_id,
+    )
+
+
+def _download_message(status: dict, email: str | None) -> str:
+    """The success message, including optional PDF/UA and e-mail notes."""
+    url = status.get("download_url")
+    msg = t(MSG_ACCESSIBLE_PACKAGE_READY).format(url=url)
+    pdf_ua_failed = any(
+        erro.startswith(prefix)
+        for erro in status.get("erros", [])
+        for prefix in _pdf_ua_failure_prefixes()
+    )
+    if pdf_ua_failed:
+        msg += "\n\n" + t(MSG_PACKAGE_PDF_UA_MISSING)
+    if email:
+        msg += "\n\n" + t(MSG_PACKAGE_EMAIL_CONFIGURED).format(email=email)
+    return msg
+
+
+def _error_message(status: dict) -> str:
+    """The failure message, naming the fatal error when the worker recorded it."""
+    erros = status.get("erros") or []
+    msg = t(MSG_PROCESS_FAILED_BASE)
+    if erros:
+        # The fatal error is the last one; earlier entries are optional export
+        # warnings recorded before it.
+        msg += f"\n{erros[-1]}"
+    return msg
+
+
 async def _poll_job(
     message: Message,
     tracker: StatusTracker,
     task_id: str,
     email: str | None,
-) -> None:
-    """Poll the API for a task's status until it completes, fails or the request timeout elapses.
+) -> str | None:
+    """Poll the API until the task finishes or the request timeout elapses.
 
-    Args:
-        message (Message): Aiogram Message used to deliver thread-scoped replies; no default (required).
-        tracker (StatusTracker): Status message updater bound to the chat and file already initialized by the caller; no default (required).
-        task_id (str): Task identifier returned by the API at submit time; no default (required).
-        email (str|None): Deliver-to e-mail stored via /email or None when the user has not configured one yet; no default (required at callers).
+    Returns the final status (``done``, ``error``, ``cancelled`` or
+    ``missing``), or ``None`` when the deadline elapsed; the caller uses it to
+    decide whether the persisted task should be removed.
     """
-    message_thread_id = message.message_thread_id
     deadline = time.time() + max(settings.request_timeout, 60)
     last_etapa = ""
     last_pct = -1
@@ -285,9 +330,27 @@ async def _poll_job(
     while time.time() < deadline:
         try:
             status = await client.get_job_status(task_id)
-        except Exception as e:
+        except ApiError as error:
+            if error.status_code == 404:
+                await _finish_job(
+                    message,
+                    tracker,
+                    False,
+                    t(MSG_STATUS_TASK_NOT_FOUND).format(status_code=404),
+                )
+                return "missing"
             logger.warning(
-                t(LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED).format(task_id=task_id, error=e)
+                t(LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED).format(
+                    task_id=task_id, error=error
+                )
+            )
+            await asyncio.sleep(POLL_INTERVAL_SECONDS)
+            continue
+        except Exception as error:
+            logger.warning(
+                t(LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED).format(
+                    task_id=task_id, error=error
+                )
             )
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
             continue
@@ -305,85 +368,26 @@ async def _poll_job(
             last_pct = pct
 
         if st == "done":
-            await tracker.finish(success=True)
-            url = status.get("download_url")
-            if url:
-                msg = t(MSG_ACCESSIBLE_PACKAGE_READY).format(url=url)
-                pdf_ua_failed = any(
-                    erro.startswith(prefix)
-                    for erro in status.get("erros", [])
-                    for prefix in _pdf_ua_failure_prefixes()
+            if status.get("download_url"):
+                await _finish_job(
+                    message, tracker, True, _download_message(status, email)
                 )
-                if pdf_ua_failed:
-                    msg += "\n\n" + t(MSG_PACKAGE_PDF_UA_MISSING)
-                if email:
-                    msg += "\n\n" + t(MSG_PACKAGE_EMAIL_CONFIGURED).format(
-                        email=email
-                    )
-                await _send_with_retry(
-                    message.bot,
-                    message.chat.id,
-                    msg,
-                    message_thread_id=message_thread_id,
-                    reply_to_message_id=message.message_id,
-                )
-            return
+            else:
+                await tracker.finish(success=True)
+            return st
 
         if st == "error":
-            await tracker.finish(success=False)
-            erros = status.get("erros") or []
-            msg = t(MSG_PROCESS_FAILED_BASE)
-            if erros:
-                # The fatal error is the last one; earlier entries are optional
-                # export warnings recorded before it.
-                msg += f"\n{erros[-1]}"
-            await _send_with_retry(
-                message.bot,
-                message.chat.id,
-                msg,
-                message_thread_id=message_thread_id,
-                reply_to_message_id=message.message_id,
-            )
-            return
+            await _finish_job(message, tracker, False, _error_message(status))
+            return st
 
         if st == "cancelled":
-            await tracker.finish(success=False)
-            await _send_with_retry(
-                message.bot,
-                message.chat.id,
-                t(MSG_TASK_CANCELLED),
-                message_thread_id=message_thread_id,
-                reply_to_message_id=message.message_id,
-            )
-            return
+            await _finish_job(message, tracker, False, t(MSG_TASK_CANCELLED))
+            return st
 
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
-    await tracker.finish(success=False)
-    await _send_with_retry(
-        message.bot,
-        message.chat.id,
-        t(MSG_PROCESSING_TIMEOUT),
-        message_thread_id=message_thread_id,
-        reply_to_message_id=message.message_id,
-    )
-
-
-async def _forget_finished_task(
-    state_key: tuple[int, int | None, int], task_id: str
-) -> None:
-    """Stop persisting a task once the API reports a final state (#396)."""
-    try:
-        status = await client.get_job_status(task_id)
-    except Exception as error:
-        logger.warning(
-            t(LOG_TELEGRAM_JOB_STATUS_QUERY_FAILED).format(
-                task_id=task_id, error=error
-            )
-        )
-        return
-    if status.get("status") in {"done", "error", "cancelled"}:
-        get_state_store().remove_task(state_key)
+    await _finish_job(message, tracker, False, t(MSG_PROCESSING_TIMEOUT))
+    return None
 
 
 class _ResumedMessage:
@@ -408,11 +412,13 @@ async def _resume_task(bot, task: TrackedTask) -> None:
     )
     target = _ResumedMessage(bot, task.chat_id, task.message_thread_id)
     try:
-        await _poll_job(target, tracker, task.task_id, task.email)
+        if await _poll_job(target, tracker, task.task_id, task.email):
+            try:
+                get_state_store().remove_task(task.state_key, task.task_id)
+            except sqlite3.Error as error:
+                logger.warning("Telegram state store unavailable: %s", error)
     except Exception:
         logger.exception(t(LOG_TELEGRAM_FILE_PROCESSING_ERROR))
-    finally:
-        await _forget_finished_task(task.state_key, task.task_id)
 
 
 async def resume_tracked_tasks(bot) -> None:
@@ -422,7 +428,12 @@ async def resume_tracked_tasks(bot) -> None:
     message on this startup pass; the persisted row is removed once the API
     reports a final state.
     """
-    for task in get_state_store().load_tasks():
+    try:
+        tasks = get_state_store().load_tasks()
+    except sqlite3.Error as error:
+        logger.warning("Telegram state store unavailable: %s", error)
+        return
+    for task in tasks:
         user_context.user_task_ids[task.state_key] = task.task_id
         if task.job_token:
             client.remember_job_token(task.task_id, task.job_token)

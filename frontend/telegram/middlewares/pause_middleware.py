@@ -1,8 +1,11 @@
+import sqlite3
+
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 from typing import Any, Awaitable, Callable, Dict
 
 from acessilia_core.i18n import t
+from acessilia_core.logger import logger
 from frontend.telegram.messages import MSG_BOT_PAUSED
 from frontend.telegram.state_store import get_state_store
 
@@ -13,20 +16,30 @@ def get_paused_chats() -> set[int]:
     """Return the paused-chat cache, loading it from SQLite once (#396)."""
     global _paused_chats
     if _paused_chats is None:
-        _paused_chats = get_state_store().load_paused_chats()
+        try:
+            _paused_chats = get_state_store().load_paused_chats()
+        except sqlite3.Error as error:
+            logger.warning("Telegram state store unavailable: %s", error)
+            _paused_chats = set()
     return _paused_chats
 
 
 def pause_chat(chat_id: int) -> None:
     """Pause ``chat_id`` in memory and persist it for the next process."""
     get_paused_chats().add(chat_id)
-    get_state_store().pause_chat(chat_id)
+    try:
+        get_state_store().pause_chat(chat_id)
+    except sqlite3.Error as error:
+        logger.warning("Telegram state store unavailable: %s", error)
 
 
 def resume_chat(chat_id: int) -> None:
     """Resume ``chat_id`` in memory and remove the persisted pause."""
     get_paused_chats().discard(chat_id)
-    get_state_store().resume_chat(chat_id)
+    try:
+        get_state_store().resume_chat(chat_id)
+    except sqlite3.Error as error:
+        logger.warning("Telegram state store unavailable: %s", error)
 
 
 def reset_paused_cache() -> None:

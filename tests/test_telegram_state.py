@@ -9,9 +9,11 @@ import pytest
 from backend.config.settings import settings
 from frontend.telegram import state_store, user_context
 from frontend.telegram.handlers import document as doc_module
+from frontend.telegram.handlers import start as start_module
+from frontend.clients.api_client import ApiError
 from frontend.telegram.middlewares import pause_middleware
 from frontend.telegram.state_store import TelegramStateStore
-from tests.test_telegram_client import _FakeBot
+from tests.test_telegram_client import _FakeBot, _FakeMessage
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +48,6 @@ def test_tasks_round_trip_for_top_level_and_topic_chats(tmp_path) -> None:
         filename="top.pdf",
         job_token="top-token",
         email="reader@example.com",
-        reply_to_message_id=5,
     )
     store.save_task(
         (1, 7, 10),
@@ -54,7 +55,6 @@ def test_tasks_round_trip_for_top_level_and_topic_chats(tmp_path) -> None:
         filename="topic.pdf",
         job_token="topic-token",
         email=None,
-        reply_to_message_id=8,
     )
 
     tasks = {task.task_id: task for task in store.load_tasks()}
@@ -70,15 +70,25 @@ def test_tasks_round_trip_for_top_level_and_topic_chats(tmp_path) -> None:
         filename="new.pdf",
         job_token="new-token",
         email=None,
-        reply_to_message_id=9,
     )
     assert {task.task_id for task in store.load_tasks()} == {
         "replacement",
         "topic-task",
     }
 
-    store.remove_task((1, 7, 10))
+    store.remove_task((1, 7, 10), "topic-task")
     assert [task.task_id for task in store.load_tasks()] == ["replacement"]
+
+    # A finishing old task must not delete the newer task in the same key.
+    store.save_task(
+        (1, None, 10),
+        "newer",
+        filename="newer.pdf",
+        job_token=None,
+        email=None,
+    )
+    store.remove_task((1, None, 10), "replacement")
+    assert [task.task_id for task in store.load_tasks()] == ["newer"]
 
 
 def test_resume_delivers_the_finished_task_and_clears_it(monkeypatch) -> None:
@@ -88,7 +98,6 @@ def test_resume_delivers_the_finished_task_and_clears_it(monkeypatch) -> None:
         filename="resumed.pdf",
         job_token="resumed-token",
         email=None,
-        reply_to_message_id=999,
     )
 
     class FinishedClient:
@@ -124,3 +133,59 @@ def test_resume_delivers_the_finished_task_and_clears_it(monkeypatch) -> None:
     assert any("download/resumed" in text for text in bot.sent)
     assert state_store.get_state_store().load_tasks() == []
     assert user_context.user_task_ids[(123, None, 456)] == "resumed-task"
+
+
+def test_resume_treats_a_missing_job_as_final(monkeypatch) -> None:
+    """A 404 removes the persisted row instead of retrying for the full deadline (#396)."""
+    state_store.get_state_store().save_task(
+        (123, None, 456),
+        "gone-task",
+        filename="gone.pdf",
+        job_token=None,
+        email=None,
+    )
+
+    class MissingClient:
+        async def get_job_status(self, task_id: str) -> dict:
+            raise ApiError(404, "Job not found")
+
+    monkeypatch.setattr(doc_module, "client", MissingClient())
+    monkeypatch.setattr(doc_module, "POLL_INTERVAL_SECONDS", 0)
+    bot = _FakeBot(b"")
+
+    async def run() -> None:
+        await doc_module.resume_tracked_tasks(bot)
+        for _ in range(50):
+            if not state_store.get_state_store().load_tasks():
+                return
+            await asyncio.sleep(0.01)
+
+    asyncio.run(run())
+
+    assert state_store.get_state_store().load_tasks() == []
+    assert bot.sent
+
+
+def test_cancel_removes_the_persisted_task(monkeypatch) -> None:
+    """A successful /cancel must not leave a row that is resumed later (#396)."""
+    state_key = (123, None, 456)
+    state_store.get_state_store().save_task(
+        state_key,
+        "cancelled-task",
+        filename="cancel.pdf",
+        job_token=None,
+        email=None,
+    )
+    user_context.user_task_ids[state_key] = "cancelled-task"
+
+    class CancelClient:
+        async def cancel_job(self, task_id: str) -> dict:
+            return {"task_id": task_id}
+
+    monkeypatch.setattr(start_module, "client", CancelClient())
+    message = _FakeMessage(_FakeBot(b""), chat_id=123, user_id=456)
+
+    asyncio.run(start_module.cmd_cancel(message))
+
+    assert state_store.get_state_store().load_tasks() == []
+    assert state_key not in user_context.user_task_ids

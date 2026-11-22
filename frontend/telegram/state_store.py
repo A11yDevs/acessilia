@@ -31,7 +31,6 @@ class TrackedTask:
     filename: str
     job_token: str | None = None
     email: str | None = None
-    reply_to_message_id: int | None = None
 
     @property
     def state_key(self) -> tuple[int, int | None, int]:
@@ -43,10 +42,17 @@ class TelegramStateStore:
 
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or settings.data_dir / "telegram_state.db"
+        self._schema_ready = False
 
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.path, timeout=10)
+        try:
+            self.path.chmod(0o600)
+        except OSError:
+            pass
+        if self._schema_ready:
+            return connection
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute(
             """
@@ -66,13 +72,13 @@ class TelegramStateStore:
                 filename TEXT NOT NULL,
                 job_token TEXT,
                 email TEXT,
-                reply_to_message_id INTEGER,
                 created_at TEXT NOT NULL,
                 PRIMARY KEY (chat_id, message_thread_id, user_id)
             )
             """
         )
         connection.commit()
+        self._schema_ready = True
         return connection
 
     def load_paused_chats(self) -> set[int]:
@@ -84,7 +90,7 @@ class TelegramStateStore:
         with closing(self._connect()) as connection, connection:
             connection.execute(
                 "INSERT OR REPLACE INTO paused_chats (chat_id, paused_at) VALUES (?, ?)",
-                (chat_id, datetime.now(timezone.utc).isoformat()),
+                (chat_id, datetime.now(timezone.utc).isoformat(timespec="microseconds")),
             )
             connection.commit()
 
@@ -101,7 +107,6 @@ class TelegramStateStore:
         filename: str,
         job_token: str | None,
         email: str | None,
-        reply_to_message_id: int | None,
     ) -> None:
         chat_id, message_thread_id, user_id = state_key
         with closing(self._connect()) as connection, connection:
@@ -109,14 +114,13 @@ class TelegramStateStore:
                 """
                 INSERT INTO followed_tasks (
                     chat_id, message_thread_id, user_id, task_id, filename,
-                    job_token, email, reply_to_message_id, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    job_token, email, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (chat_id, message_thread_id, user_id) DO UPDATE SET
                     task_id = excluded.task_id,
                     filename = excluded.filename,
                     job_token = excluded.job_token,
                     email = excluded.email,
-                    reply_to_message_id = excluded.reply_to_message_id,
                     created_at = excluded.created_at
                 """,
                 (
@@ -127,24 +131,25 @@ class TelegramStateStore:
                     filename,
                     job_token,
                     email,
-                    reply_to_message_id,
-                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(timezone.utc).isoformat(timespec="microseconds"),
                 ),
             )
             connection.commit()
 
-    def remove_task(self, state_key: tuple[int, int | None, int]) -> None:
+    def remove_task(self, state_key: tuple[int, int | None, int], task_id: str) -> None:
         chat_id, message_thread_id, user_id = state_key
         with closing(self._connect()) as connection, connection:
             connection.execute(
                 """
                 DELETE FROM followed_tasks
                 WHERE chat_id = ? AND message_thread_id = ? AND user_id = ?
+                  AND task_id = ?
                 """,
                 (
                     chat_id,
                     message_thread_id if message_thread_id is not None else _NO_THREAD,
                     user_id,
+                    task_id,
                 ),
             )
             connection.commit()
@@ -154,7 +159,7 @@ class TelegramStateStore:
             rows = connection.execute(
                 """
                 SELECT chat_id, message_thread_id, user_id, task_id, filename,
-                       job_token, email, reply_to_message_id
+                       job_token, email
                 FROM followed_tasks
                 ORDER BY created_at
                 """
@@ -168,7 +173,6 @@ class TelegramStateStore:
                 filename=str(row[4]),
                 job_token=str(row[5]) if row[5] is not None else None,
                 email=str(row[6]) if row[6] is not None else None,
-                reply_to_message_id=int(row[7]) if row[7] is not None else None,
             )
             for row in rows
         ]

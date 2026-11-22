@@ -270,7 +270,8 @@ If the file sent in the group **does not appear in the log at all**, it never re
 
 ## 5. Known limitations
 
-- **In-memory state:** modes, e-mails, tracked tasks and paused chats live in the process memory. Restarting or recreating the container resets them: paused chats answer again and `/status` no longer finds tasks sent before the restart. The tasks themselves remain in the API ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
+- **Persisted vs in-memory state:** paused chats and followed tasks (including the per-job token) live in `DATA_DIR/telegram_state.db`, so `/status`, `/cancel` and final delivery survive a restart. Modes, e-mails and `/feedback` input remain per-interaction and are lost on restart ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
+- **State database:** the bot needs `DATA_DIR` on a persistent volume; include `telegram_state.db` in backups and keep it private, because it stores job tokens. WAL mode may not be available on some network filesystems ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
 - **Final message in Portuguese:** the message with the download link is in Portuguese whatever the user's language ([#394](https://github.com/A11yDevs/acessilia/issues/394)).
 
 ## References

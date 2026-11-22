@@ -270,7 +270,8 @@ Se o arquivo enviado no grupo **não aparece no log de jeito nenhum**, ele não 
 
 ## 5. Limitações conhecidas
 
-- **Estado em memória:** modos, e-mails, tarefas acompanhadas e chats pausados ficam na memória do processo. Ao reiniciar ou recriar o container, tudo volta ao padrão: chats pausados voltam a responder e `/status` deixa de encontrar tarefas enviadas antes do reinício. As tarefas em si continuam na API ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
+- **Estado persistido vs em memória:** chats pausados e tarefas acompanhadas (incluindo o token por job) ficam em `DATA_DIR/telegram_state.db`, então `/status`, `/cancel` e a entrega final sobrevivem a um reinício. Modos, e-mails e o texto do `/feedback` continuam por interação e são perdidos no reinício ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
+- **Banco de estado:** o bot precisa de `DATA_DIR` em um volume persistente; inclua `telegram_state.db` nos backups e mantenha o arquivo privado, porque ele guarda tokens de jobs. O modo WAL pode não funcionar em alguns sistemas de arquivos de rede ([#396](https://github.com/A11yDevs/acessilia/issues/396)).
 - **Mensagem final em português:** o texto com o link de download sai em português, seja qual for o idioma do usuário ([#394](https://github.com/A11yDevs/acessilia/issues/394)).
 
 ## Referências
