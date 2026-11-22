@@ -34,6 +34,7 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 19. [Interface Telegram](telegram.pt-br.md) — criar e configurar o bot, testá-lo em conversa privada e fazê-lo responder em grupos e tópicos, incluindo o modo de privacidade. (English: [English guide](telegram.md))
 
 20. [Fluxo local de testes](testing.pt-br.md) — os comandos `make` suportados, tempos de linha de base, timeouts e artefatos da CI para o ciclo de editar–testar–corrigir. (English: [English version](testing.md))
+21. [Baseline de qualidade arquitetural, novembro de 2026](architecture/quality-baseline.pt-br.md) — a instrumentação reproduzível e as primeiras medições da #656: tamanho, complexidade, dependências entre componentes, duplicatas estruturais e hotspots do core, SDK, docstruct, backend e frontend, com o snapshot legível por máquina. (English: [English version](architecture/quality-baseline.md))
 
 ---
 

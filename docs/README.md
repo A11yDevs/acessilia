@@ -29,6 +29,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 16. [Core data migration, 0.1.0 to 0.2.0](data-migration-0.1.0-to-0.2.0.md) — completed before the 0.2.0 promotion; kept as a record of how unexpired downloads and their records were migrated. (Brazilian Portuguese: [pt-BR version](data-migration-0.1.0-to-0.2.0.pt-br.md))
 17. [Telegram interface](telegram.md) — create and configure the bot, test it in a private chat and get it to answer in groups and topics, including privacy mode. (Brazilian Portuguese: [pt-BR version](telegram.pt-br.md))
 18. [Local test workflow](testing.md) — the supported `make` commands, baseline timings, timeouts and CI artifacts for the edit–test–fix loop. (Brazilian Portuguese: [pt-BR version](testing.pt-br.md))
+19. [Architectural quality baseline, November 2026](architecture/quality-baseline.md) — the reproducible instrumentation and first measurements of #656: size, complexity, component dependencies, structural duplicates and hotspots for the core, SDK, docstruct, backend and frontend, with the machine-readable snapshot. (Brazilian Portuguese: [pt-BR version](architecture/quality-baseline.pt-br.md))
 
 ---
 
