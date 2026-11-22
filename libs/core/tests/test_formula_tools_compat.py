@@ -15,11 +15,8 @@ import inspect
 
 import pytest
 
-from acessilia_core.formula_tools import (
-    ensure_math_delimiters,
-    normalize_latex,
-    wrap_latex,
-)
+from acessilia_core.formula_tools import wrap_latex
+from docstruct.text.latex import bare_latex as normalize_latex, ensure_math_delimiters
 
 NORMALIZE = [
     ("", ""),
@@ -40,6 +37,23 @@ NORMALIZE = [
     (r"\frac{1}{2}", r"\frac{1}{2}"),
     ("$", ""),
 ]
+
+
+def test_docstruct_reexports_are_deprecated() -> None:
+    from acessilia_core import formula_tools
+    from docstruct.text.latex import bare_latex, ensure_math_delimiters as ensure
+
+    with pytest.warns(DeprecationWarning, match="docstruct.text.latex"):
+        from acessilia_core.formula_tools import normalize_latex as deprecated
+
+    with pytest.warns(DeprecationWarning, match="docstruct.text.latex"):
+        from acessilia_core.formula_tools import (
+            ensure_math_delimiters as deprecated_ensure,
+        )
+
+    assert deprecated is bare_latex
+    assert deprecated_ensure is ensure
+    assert "normalize_latex" in dir(formula_tools)
 
 
 @pytest.mark.parametrize(("latex", "expected"), NORMALIZE)

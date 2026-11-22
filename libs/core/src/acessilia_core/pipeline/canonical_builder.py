@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from acessilia_core.config import ToolboxConfig
-from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.formula_tools import label_spoken_formula
 from acessilia_core.i18n import t
 from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_math_tools import (
@@ -30,6 +30,7 @@ from docstruct.canonical import (
     build_canonical_document as _lib_build,
     sanitize_canonical_document as _lib_sanitize,
 )
+from docstruct.text.latex import bare_latex as normalize_latex
 
 
 def latex_to_mathml(latex: str, toolbox: ToolboxConfig) -> str:

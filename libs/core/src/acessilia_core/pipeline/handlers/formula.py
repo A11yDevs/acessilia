@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.formula_tools import label_spoken_formula, normalize_latex
+from acessilia_core.formula_tools import label_spoken_formula
 from acessilia_core.i18n import n, t
 from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ProcessingManifest
@@ -35,6 +35,7 @@ from docstruct.text.implicit_products import (
     implicit_product_variables,
     mark_implicit_products,
 )
+from docstruct.text.latex import bare_latex as normalize_latex
 from docstruct.text.math_spans import block_prose, inline_math_sources
 from docstruct.text.named_operators import (
     normalize_named_operators,
