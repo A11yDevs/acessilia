@@ -2,62 +2,48 @@
 
 Core migrated to docstruct.validation (pure, returns structured findings);
 this bridge resolves findings through the backend i18n catalog, keeping the
-localized-string contract for existing consumers.
+localized-string contract for existing consumers. The docstruct msgids remain
+here only as deprecated compatibility re-exports: import them from
+``docstruct.validation`` instead.
 """
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
+import docstruct.validation as _docstruct_validation
 from acessilia_core.i18n import t
-from docstruct.validation import (  # noqa: F401
-    MSG_BLOCK_NOT_ALLOWED_IN_PROFILE,
-    MSG_CANONICAL_DOC_NOT_OBJECT,
-    MSG_DOCUMENT_NO_SECTIONS,
-    MSG_DUPLICATE_ID,
-    MSG_FIELD_MISSING,
-    MSG_HEADING_LEVELS_SKIPPED,
-    MSG_IMAGE_MISSING_ALT,
-    MSG_INCONSISTENT_CODE_INDENT,
-    MSG_INTERNAL_LINK_BROKEN,
-    MSG_MARKDOWN_IN_BLOCK,
-    MSG_MARKDOWN_IN_OUTPUT,
-    MSG_MISSING_FIRST_H1,
-    MSG_MULTIPLE_H1,
-    MSG_NO_ID_PLACEHOLDER,
-    MSG_PROMPT_LEAK_IN_BLOCK,
-    MSG_PROMPT_LEAK_IN_OUTPUT,
-    MSG_SECTIONS_NOT_LIST,
-    MSG_TABLE_AST_CELL_INVALID,
-    MSG_TABLE_AST_CELL_NO_TEXT,
-    MSG_TABLE_AST_INVALID,
-    MSG_TABLE_AST_NO_BODY,
-    MSG_TABLE_AST_ROW_INVALID,
-    MSG_TABLE_AST_ROW_NO_CELLS,
-    MSG_TABLE_AST_SECTION_INVALID,
-    MSG_TABLE_AST_WIDTH_INCONSISTENT,
-    MSG_TABLE_CELL_EMPTY,
-    MSG_TABLE_CELL_NOT_TEXT,
-    MSG_TABLE_COLUMNS_INCONSISTENT,
-    MSG_TABLE_EMPTY,
-    MSG_TABLE_LEGACY_FALLBACK,
-    MSG_TABLE_MISSING_HEADER,
-    MSG_TABLE_ROW_INVALID,
-    MSG_TABLE_ROWS_INVALID,
-    MSG_TECHNICAL_METADATA_IN_TXT,
-    MSG_UNKNOWN_EXPORT_PROFILE,
-    Finding,
-    audit_canonical_document as _lib_audit,
-    validate_canonical_document as _lib_validate_doc,
-    validate_export_profile as _lib_validate_profile,
-    validate_output_text as _lib_validate_output,
+
+_DEPRECATED_MSGIDS = tuple(
+    sorted(name for name in vars(_docstruct_validation) if name.startswith("MSG_"))
 )
+_DEPRECATED: dict[str, str] = {
+    name: getattr(_docstruct_validation, name) for name in _DEPRECATED_MSGIDS
+}
 
 __all__ = [
     "validate_canonical_document",
     "validate_export_profile",
     "validate_output_text",
     "audit_canonical_document",
-] + [n for n in dir() if n.startswith("MSG_")]
+    *_DEPRECATED_MSGIDS,
+]
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED:
+        warnings.warn(
+            f"acessilia_core.pipeline.validators.{name} is deprecated; "
+            "import it from docstruct.validation",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _resolve(findings: list) -> list[str]:
+    return [t(msgid).format(**kwargs) for msgid, kwargs in findings]
 
 
 def _resolve(findings: list) -> list[str]:
@@ -66,7 +52,7 @@ def _resolve(findings: list) -> list[str]:
 
 def validate_canonical_document(document: dict[str, Any]) -> list[str]:
     """Validate a canonical document structure; returns localized error messages."""
-    return _resolve(_lib_validate_doc(document))
+    return _resolve(_docstruct_validation.validate_canonical_document(document))
 
 
 def validate_export_profile(
@@ -74,17 +60,19 @@ def validate_export_profile(
     document: dict[str, Any],
 ) -> list[str]:
     """Check block verbosity against the named export profile; localized messages."""
-    return _resolve(_lib_validate_profile(profile_name, document))
+    return _resolve(
+        _docstruct_validation.validate_export_profile(profile_name, document)
+    )
 
 
 def validate_output_text(text: str, profile_name: str) -> list[str]:
     """Scan the final exported text for forbidden artifacts; localized messages."""
-    return _resolve(_lib_validate_output(text, profile_name))
+    return _resolve(_docstruct_validation.validate_output_text(text, profile_name))
 
 
 def audit_canonical_document(document: dict[str, Any]) -> dict[str, list[str]]:
     """Detailed structural audit (BLOCKER/WARNING); localized messages."""
-    report = _lib_audit(document)
+    report = _docstruct_validation.audit_canonical_document(document)
     return {
         severity: _resolve(findings)
         for severity, findings in report.items()

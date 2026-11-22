@@ -18,8 +18,8 @@ from acessilia_core.manifest.builder import build_processing_manifest
 from acessilia_core.manifest.schema import validate_manifest
 from acessilia_core.pipeline.canonical_builder import build_canonical_document
 from acessilia_core.pipeline.payload import _manifest_pages_to_payload
-from acessilia_core.pipeline.table_ast import rows_from_table_ast
 from acessilia_core.pipeline.validators import validate_canonical_document
+from docstruct.tables.ast import rows_from_table_ast
 from tests.core_config_support import export_config, toolbox_config
 
 

@@ -1,27 +1,21 @@
 """Canonical table AST normalization and linearization.
 
-Core migrated to docstruct.tables.ast; re-exported here for compatibility
-with existing imports. ``linearize_table_for_text`` keeps the localized
-contract: the lib returns canonical-English msgid lines, which this bridge
-resolves through the backend i18n catalog (and re-matches msgids back for
-translation).
+Core migrated to docstruct.tables.ast; pure functions and constants remain
+here only as deprecated compatibility re-exports. Import them from
+``docstruct.tables.ast`` instead. ``linearize_table_for_text`` keeps the
+localized contract: the lib returns canonical-English msgid lines, which this
+bridge resolves through the backend i18n catalog (and re-matches msgids back
+for translation).
 """
 from __future__ import annotations
 
-from acessilia_core.i18n import t
-from docstruct.tables.ast import (  # noqa: F401
-    ALLOWED_SCOPES,
-    MSG_TABLE_TEXT_CAPTION,
-    MSG_TABLE_TEXT_FOOTER,
-    MSG_TABLE_TEXT_ROW,
-    normalize_table_ast,
-    rows_from_table_ast,
-    split_header_and_body,
-    table_ast_from_block,
-    table_ast_from_rows,
-)
+import warnings
+from typing import Any
 
-__all__ = [
+import docstruct.tables.ast as _docstruct_ast
+from acessilia_core.i18n import t
+
+_DEPRECATED_NAMES = (
     "ALLOWED_SCOPES",
     "MSG_TABLE_TEXT_CAPTION",
     "MSG_TABLE_TEXT_FOOTER",
@@ -31,13 +25,33 @@ __all__ = [
     "split_header_and_body",
     "table_ast_from_block",
     "table_ast_from_rows",
+)
+_DEPRECATED: dict[str, Any] = {
+    name: getattr(_docstruct_ast, name) for name in _DEPRECATED_NAMES
+}
+
+__all__ = [
+    *_DEPRECATED_NAMES,
     "linearize_table_for_text",
 ]
 
+
+def __getattr__(name: str) -> Any:
+    if name in _DEPRECATED:
+        warnings.warn(
+            f"acessilia_core.pipeline.table_ast.{name} is deprecated; "
+            "import it from docstruct.tables.ast",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _DEPRECATED[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # Reverse map: canonical English line prefix -> (msgid, format kwargs).
 _LINE_TO_MSGID = (
-    (MSG_TABLE_TEXT_CAPTION, "caption"),
-    (MSG_TABLE_TEXT_FOOTER, "footer_text"),
+    (_docstruct_ast.MSG_TABLE_TEXT_CAPTION, "caption"),
+    (_docstruct_ast.MSG_TABLE_TEXT_FOOTER, "footer_text"),
 )
 
 
@@ -58,12 +72,12 @@ def _translate(line: str) -> str:
         head, sep, rest = line.partition(": ")
         if sep:
             row_index = head.removeprefix("Row ").strip()
-            return t(MSG_TABLE_TEXT_ROW).format(row_index=row_index, joined=rest)
+            return t(_docstruct_ast.MSG_TABLE_TEXT_ROW).format(
+                row_index=row_index, joined=rest
+            )
     return line
 
 
 def linearize_table_for_text(block: dict) -> list[str]:
     """Localized linearization: lib (canonical English) -> backend i18n catalog."""
-    from docstruct.tables.ast import linearize_table_for_text as _lib_linearize
-
-    return [_translate(line) for line in _lib_linearize(block)]
+    return [_translate(line) for line in _docstruct_ast.linearize_table_for_text(block)]
