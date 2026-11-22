@@ -23,8 +23,10 @@ def compile_catalog(catalog_dir: Path, locale: str) -> Translations | None:
 
     The catalogs ship as ``.po`` sources only. Compiling them in memory needs no
     write and no build step, so an installed package may be read-only. A source
-    that cannot be read or compiled is skipped, so the caller can fall back to
-    the default locale or to the English identity instead of crashing.
+    that cannot be read or decoded is skipped, so the caller can fall back to
+    the default locale or to the English identity instead of crashing. A source
+    that is decodable but malformed may still compile with entries dropped by
+    Babel; only read/decoding failures return ``None``.
 
     Args:
         catalog_dir (Path): Root holding ``<locale>/LC_MESSAGES/messages.po``.
@@ -55,8 +57,11 @@ def catalog_for(
 ) -> Translations | NullTranslations:
     """The catalog of ``locale``, else of ``default_locale``, else the identity.
 
-    Locale variants are normalized first, like ``Translations.load`` did:
-    ``pt_BR.UTF-8``, ``pt_br`` and ``pt-BR`` find the ``pt_BR`` catalog.
+    Locale variants are normalized first: ``pt_BR.UTF-8``, ``pt_br`` and
+    ``pt-BR`` find the ``pt_BR`` catalog.
+
+    The function itself does not cache; a caller that looks up many messages
+    should cache per locale, as the core's ``_catalog_for`` does.
 
     Args:
         catalog_dir (Path): Root holding ``<locale>/LC_MESSAGES/messages.po``.
@@ -84,7 +89,15 @@ def _decode(result: str | bytes | bytearray) -> str:
 
 
 def gettext(translations: Translations | NullTranslations, message_id: str) -> str:
-    """Translate one canonical message id, leaving placeholders untouched."""
+    """Translate one canonical message id, leaving placeholders untouched.
+
+    Args:
+        translations (Translations | NullTranslations): Catalog to query.
+        message_id (str): Canonical English message id.
+
+    Returns:
+        str: Localized message, or the original msgid when missing.
+    """
     return _decode(translations.gettext(message_id))
 
 
@@ -94,7 +107,16 @@ def ngettext(
     plural_msgid: str,
     count: int,
 ) -> str:
-    """Select the singular or plural form for ``count`` in the catalog grammar."""
-    return _decode(
-        translations.ngettext(singular_msgid, plural_msgid, count)
-    )
+    """Select the singular or plural form for ``count`` in the catalog grammar.
+
+    Args:
+        translations (Translations | NullTranslations): Catalog to query.
+        singular_msgid (str): Canonical singular message id.
+        plural_msgid (str): Canonical plural message id.
+        count (int): Quantity selecting the form.
+
+    Returns:
+        str: Localized singular or plural message, or the original ids when
+        missing.
+    """
+    return _decode(translations.ngettext(singular_msgid, plural_msgid, count))

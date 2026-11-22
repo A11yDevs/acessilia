@@ -63,8 +63,8 @@ O `__all__` de cada módulo é a API pública do SDK ([ADR-0018](../../docs/adr/
 | `acessilia_sdk.runtime` | `run_sync` — executa uma coroutine a partir de código síncrono, dentro ou fora de um event loop, preservando contextvars na worker thread |
 | `acessilia_sdk.i18n` | `parse_locales`, `normalize_locale` — parsing e normalização de listas de locales compartilhados entre componentes; o core mantém catálogos e políticas (#712) |
 | `acessilia_sdk.i18n.context` | `request_locale`, `set_request_locale`, `reset_request_locale` — override de locale por tarefa compartilhado entre componentes; o core o compõe com o locale do servidor (#712) |
-| `acessilia_sdk.i18n.translation` | `compile_catalog`, `catalog_for`, `gettext`, `ngettext` — compila um `.po` em memória, cai para o locale default/identidade em inglês e faz lookup gettext/plural; o dono fornece o diretório de catálogos e a política de locale (#712) |
 | `acessilia_sdk.i18n.negotiation` | `expand_locale_candidates`, `shell_locale_candidates`, `negotiate_locale`, `negotiate_server_locale` — negociação genérica de ambiente/candidatos; quem chama fornece os locales disponíveis e o default (#712) |
+| `acessilia_sdk.i18n.translation` | `compile_catalog`, `catalog_for`, `gettext`, `ngettext` — compila um `.po` em memória, cai para o locale default/identidade em inglês e faz lookup gettext/plural; o dono fornece o diretório de catálogos e a política de locale (#712) |
 | `acessilia_sdk.cli` | `main` — a linha de comando, `python -m acessilia_sdk` (veja [Linha de comando](#linha-de-comando)); `formula_document`, o JSON que o comando formula imprime; `judge_document`, o JSON que o comando judge imprime |
 
 ## Configurar um cliente

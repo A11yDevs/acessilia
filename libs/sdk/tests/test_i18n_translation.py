@@ -53,6 +53,29 @@ def test_catalog_for_falls_back_to_the_default_and_identity(tmp_path: Path) -> N
     assert gettext(catalog_for(root, "de_DE", "en_US"), "Hello") == "Hello"
 
 
+def test_catalog_for_uses_default_when_locale_normalizes_to_empty(tmp_path: Path) -> None:
+    root = _catalog_dir(tmp_path)
+
+    assert gettext(catalog_for(root, "...", "fr_FR"), "Hello") == "Bonjour"
+
+
+class _BytesTranslations:
+    def __init__(self, result: bytes) -> None:
+        self._result = result
+
+    def gettext(self, _message_id: str) -> bytes:
+        return self._result
+
+    def ngettext(self, _singular: str, _plural: str, _count: int) -> bytes:
+        return self._result
+
+
+def test_gettext_and_ngettext_normalize_bytes_results() -> None:
+    assert gettext(_BytesTranslations(b"Bonjour"), "Hello") == "Bonjour"
+    assert ngettext(_BytesTranslations(b"Bonjour"), "One", "Many", 2) == "Bonjour"
+    assert gettext(_BytesTranslations(b"\xff"), "Hello") == str(b"\xff")
+
+
 def test_compile_catalog_returns_none_without_a_source(tmp_path: Path) -> None:
     assert compile_catalog(tmp_path / "missing", "pt_BR") is None
 
