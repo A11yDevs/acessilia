@@ -91,7 +91,7 @@
   "$id": "urn:a11y-devs:schema:execution-report:1.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Relatório da execução confirmada ou simulada de um plano nominal.",
+  "description": "Report of the execution of a nominal plan over one manifest, with per-step method results and collected artifacts",
   "properties": {
     "$schema": {
       "default": "urn:a11y-devs:schema:execution-report:1.0.0",

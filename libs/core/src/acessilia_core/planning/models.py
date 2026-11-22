@@ -119,7 +119,7 @@ class NominalPlan(StrictModel):
             "$id": PLAN_SCHEMA_ID,
             "title": "NominalPlan",
             "description": (
-                t(MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION)
+                MSG_NOMINAL_PLAN_SCHEMA_DESCRIPTION
             ),
         },
     )
@@ -228,7 +228,7 @@ class PlanningComparison(StrictModel):
             "$id": COMPARISON_SCHEMA_ID,
             "title": "PlanningComparison",
             "description": (
-                t(MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION)
+                MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION
             ),
         },
     )

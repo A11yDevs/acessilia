@@ -42,8 +42,10 @@ mantém sua função de schema e seu nome público de writer. Os testes comparam
 saída de cada writer com sua função de schema e cobrem criação do diretório pai
 e JSON não-ASCII.
 
-A formatação dos arquivos de schema versionados não muda; este PR não regenera
-o conteúdo deles. O grupo `write_*_schema` sai dos candidatos restantes.
+A formatação dos arquivos de schema versionados não muda; o PR do writer não
+regenera o conteúdo deles. Um follow-up (#737) tornou as descrições canônicas em
+inglês, regenerou os três arquivos defasados e adicionou um teste de frescor. O
+grupo `write_*_schema` sai dos candidatos restantes.
 
 **Delta medido no commit de código deste PR:** 24 grupos / 59 funções / 705
 linhas → **23 grupos / 55 funções / 672 linhas**. Apenas o grupo

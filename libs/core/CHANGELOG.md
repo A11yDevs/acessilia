@@ -2,6 +2,15 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.6 — canonical descriptions for the PDDL schemas
+
+The PDDL schema descriptions now use the canonical English message constants
+instead of the active-locale lookup, so generating the schemas is deterministic
+regardless of the server locale. The execution-report, nominal-plan and
+planning-comparison schemas were regenerated with those descriptions; their
+versions and structure are unchanged. A root test now checks the four
+committed schemas against their generators (#737).
+
 ## 0.3.5 — one writer for the JSON Schema files
 
 No behaviour change. The four `write_*_schema` functions now delegate to

@@ -104,7 +104,7 @@
   "$id": "urn:a11y-devs:schema:nominal-plan:1.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Plano nominal gerado a partir do manifesto e do domínio PDDL Acessília. Efeitos só são confirmados pelo Executor.",
+  "description": "Nominal plan derived from the processing manifest and PDDL domain of Acessilia; effects are confirmed only after executed by an executor",
   "properties": {
     "$schema": {
       "default": "urn:a11y-devs:schema:nominal-plan:1.0.0",

@@ -318,7 +318,7 @@
   "$id": "urn:a11y-devs:schema:planning-comparison:1.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Comparação normalizada das execuções do planejador interno e do Fast Downward sobre o mesmo domínio e problem.pddl.",
+  "description": "Normalized comparison between the internal planner and Fast Downward executions of one planning problem",
   "properties": {
     "$schema": {
       "default": "urn:a11y-devs:schema:planning-comparison:1.0.0",

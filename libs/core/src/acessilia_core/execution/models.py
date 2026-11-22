@@ -81,6 +81,6 @@ class ExecutionReport(StrictModel):
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": EXECUTION_SCHEMA_ID,
             "title": "ExecutionReport",
-            "description": t(MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION),
+            "description": MSG_EXECUTION_REPORT_SCHEMA_DESCRIPTION,
         },
     )
