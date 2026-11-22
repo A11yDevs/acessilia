@@ -9,7 +9,7 @@ Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656)
 - Um grupo estrutural só é acionável quando as funções são semanticamente intercambiáveis para os mesmos chamadores. Fluxo de controle normalizado igual não basta.
 - Código gerado é alterado pelo gerador, nunca editando o arquivo gerado.
 - Fluxos sensíveis a comportamento (seleção dos agentes, startup do frontend) precisam de teste de caracterização antes da extração.
-- Uma duplicata entre componentes precisa de dono. Parsing de locale é semântica de i18n, então o core é o dono; o serviço lê o ambiente e delega o parse.
+- Uma duplicata entre componentes precisa de um único dono. Parsing de locale é semântica de i18n e o parser genérico agora vive no SDK (`acessilia_sdk.i18n`); o core mantém catálogos, políticas e contexto de requisição, e o serviço lê o ambiente e delega o parse.
 
 ## Primeira consolidação: o parser de lista de locales
 
@@ -27,6 +27,8 @@ Depois:
 - `configure_locales` continua filtrando a lista contra `SUPPORTED_LOCALES`, então uma lista vazia ou sem locale suportado mantém o fallback “oferecer todos os locales suportados”.
 
 O comportamento é fixado por `tests/test_i18n_locales.py` (incluindo a fachada do core) e pelo `tests/test_i18n.py` do SDK: entradas vazias, duplicatas, ordem, normalização e o caminho de ambiente de `Settings`. O SDK é dono do parsing/normalização genéricos; o core mantém catálogos, políticas e contexto de requisição. A migração do restante da infraestrutura de i18n está na [#712](https://github.com/A11yDevs/acessilia/issues/712). Isso evita tornar o core dono obrigatório de um utilitário transversal e permite que o serviço o consuma sem importar o core.
+
+A fachada do core é um nome novo de compatibilidade, não um chamador pré-existente preservado: `_locales_from_raw` era código morto antes deste PR. Ela existe para a migração restante acontecer sem um flag day; a #712 acompanha sua remoção. O release do SDK que publicar esta API também precisa relaxar o pin do core `acessilia-sdk>=0.3,<0.4` (API pública nova normalmente significa 0.4.0).
 
 **Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. O [JSON do baseline](quality-baseline.json) inicial permanece como snapshot histórico; esta página registra a primeira mudança contra ele.
 

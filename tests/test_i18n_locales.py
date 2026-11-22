@@ -26,11 +26,19 @@ def test_normalize_locale_handles_encodings_and_separators() -> None:
     assert normalize_locale("pt_BR.UTF-8") == "pt_BR"
     assert normalize_locale("pt-BR") == "pt_BR"
     assert normalize_locale("pt") == "pt"
+    assert normalize_locale("pt.BR") == "pt"
+    assert normalize_locale("pt-1234") == "pt"
     assert normalize_locale("") == ""
 
 
 def test_the_core_re_exports_the_shared_parser_as_a_temporary_facade() -> None:
     assert core_parse_locales is parse_locales
+
+
+def test_settings_defaults_to_the_supported_locales(monkeypatch) -> None:
+    monkeypatch.delenv("I18N_LOCALES_ACTIVE", raising=False)
+
+    assert Settings().i18n_locales_active == ("en_US", "pt_BR")
 
 
 def test_settings_reads_i18n_locales_active_with_the_shared_parser(monkeypatch) -> None:

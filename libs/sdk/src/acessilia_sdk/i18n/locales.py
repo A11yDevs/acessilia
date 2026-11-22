@@ -32,8 +32,9 @@ def normalize_locale(raw_value: str) -> str:
     if not cleaned:
         return ""
     # Drop the character-set / encoding tail (e.g. ".UTF-8", ".utf8") before
-    # splitting the language and region codes, which may be separated by "_",
-    # "-" or "." (e.g. "pt-BR", "pt_BR.UTF-8", "pt.BR").
+    # splitting the language and region codes, which may be separated by "_"
+    # or "-" (e.g. "pt-BR", "pt_BR.UTF-8"). A dot always starts the tail, so
+    # "pt.BR" normalizes to "pt".
     head = cleaned.split(".", 1)[0]
     parts = [part for part in re.split(r"[-_.]+", head) if part]
     if not parts:

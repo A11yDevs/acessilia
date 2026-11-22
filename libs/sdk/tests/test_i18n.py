@@ -19,4 +19,6 @@ def test_normalize_locale_handles_encodings_and_separators() -> None:
     assert normalize_locale("pt_BR.UTF-8") == "pt_BR"
     assert normalize_locale("pt-BR") == "pt_BR"
     assert normalize_locale("pt") == "pt"
+    assert normalize_locale("pt.BR") == "pt"
+    assert normalize_locale("pt-1234") == "pt"
     assert normalize_locale("") == ""
