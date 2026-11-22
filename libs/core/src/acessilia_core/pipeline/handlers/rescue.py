@@ -33,6 +33,7 @@ executor selects what a handler adds and replans for it.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic import ValidationError
@@ -389,7 +390,7 @@ def _rescue_page(
 
 
 def _omitted(
-    element: ManifestElement, page_text: str, parent_types: dict[str, str]
+    element: ManifestElement, page_text: str, parent_types: Mapping[str, str]
 ) -> bool:
     """Whether an unpaired primary block is legitimate text the page lacks.
 

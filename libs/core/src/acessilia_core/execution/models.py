@@ -13,7 +13,7 @@ from acessilia_core.execution.messages import (  # noqa: E402
 from acessilia_core.i18n import t  # noqa: E402
 from acessilia_core.manifest.models import Artifact  # noqa: E402
 
-EXECUTION_SCHEMA_VERSION = "1.0.0"
+EXECUTION_SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
 EXECUTION_SCHEMA_ID = "urn:a11y-devs:schema:execution-report:1.0.0"
 
 

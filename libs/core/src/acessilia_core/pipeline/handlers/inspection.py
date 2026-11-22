@@ -19,7 +19,7 @@ import math
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from acessilia_core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from acessilia_core.agents.vision_agent import VisionAgent
@@ -65,7 +65,7 @@ def _validated_region_clip(
     # so it requires an explicit origin instead of inferring one.
     if bbox.coord_origin not in {"TOPLEFT", "BOTTOMLEFT"}:
         raise ValueError("Region coordinate origin is unknown")
-    return values, bbox.coord_origin
+    return values, cast("ClipOrigin", bbox.coord_origin)
 
 
 def _render_inspection_region(

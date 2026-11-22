@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jsonschema import ValidationError, validate
 
@@ -487,11 +487,11 @@ def export_accessible_document(
         HTML.spec.id: lambda: render_html(filtered, output_path, profile_name=profile),
         TXT.spec.id: lambda: render_txt(filtered, output_path, profile_name=profile),
         DOCX.spec.id: lambda: _render_docx(
-            ast, output_path, enabled=_export_config(export, format_name).toolbox_docx_enabled,
+            cast(dict[str, Any], ast), output_path, enabled=_export_config(export, format_name).toolbox_docx_enabled,
             toolbox=_toolbox_config(toolbox, format_name), lang=lang,
         ),
         PDF_UA.spec.id: lambda: _render_pdf_ua(
-            ast,
+            cast(dict[str, Any], ast),
             output_path,
             enabled=_export_config(export, format_name).toolbox_pdf_ua_enabled,
             toolbox=_toolbox_config(toolbox, format_name),

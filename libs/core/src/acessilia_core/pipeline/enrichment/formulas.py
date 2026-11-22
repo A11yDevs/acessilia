@@ -217,7 +217,7 @@ async def _classify_formula_regions(
         async with slots:
             output = None
             errors: list[str] = []
-            reason = "provider_blocked"
+            reason: str | None = "provider_blocked"
             if not breaker.open:
                 reason = "crop_unavailable"
                 image, page = await run_blocking(

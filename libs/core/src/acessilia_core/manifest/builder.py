@@ -5,7 +5,7 @@ import mimetypes
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
@@ -463,7 +463,7 @@ def _refine_reading_order(elements: list[ManifestElement]) -> list[ManifestEleme
             for element in elements
         ]
     )
-    refined = [by_id[key] for key in order]
+    refined = [by_id[cast(str, key)] for key in order]
     for index, element in enumerate(refined, start=1):
         element.reading_order = index
     return refined

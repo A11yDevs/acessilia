@@ -31,7 +31,7 @@ async def export_mp3(
     Returns:
         Path: The output file path once the complete MP3 is assembled.
     """
-    chunks = []
+    chunks: list[str] = []
     try:
         logger.debug(
             t(LOG_AUDIO_EXPORT_START).format(
@@ -41,16 +41,15 @@ async def export_mp3(
 
         chunk_size = 1500
         paragraphs = text.split("\n")
-        chunks = []
         current_chunk = ""
 
-        for p in paragraphs:
-            if len(current_chunk) + len(p) < chunk_size:
-                current_chunk += p + "\n"
+        for paragraph in paragraphs:
+            if len(current_chunk) + len(paragraph) < chunk_size:
+                current_chunk += paragraph + "\n"
             else:
                 if current_chunk:
                     chunks.append(current_chunk.strip())
-                current_chunk = p + "\n"
+                current_chunk = paragraph + "\n"
         if current_chunk:
             chunks.append(current_chunk.strip())
 

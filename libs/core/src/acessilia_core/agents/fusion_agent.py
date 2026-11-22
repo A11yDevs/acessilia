@@ -52,7 +52,7 @@ from docstruct.regions.classify import classify_region, region_needs_vision
 from docstruct.text.latex import normalize_latex
 from docstruct.text.norm_fix import norm_fix
 from docstruct.types import Region
-from docstruct.validation import audit_canonical_document
+from docstruct.validation import FindingTuple, audit_canonical_document
 
 
 class FusionAgent:
@@ -127,7 +127,7 @@ class FusionAgent:
     def process_audit_document(
         self,
         document: dict[str, Any],
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[FindingTuple]]:
         """Audit a canonical document and return grouped findings."""
         return audit_canonical_document(document)
 
@@ -292,7 +292,7 @@ class FusionAgent:
     def audit_document(
         self,
         document: dict[str, Any],
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[FindingTuple]]:
         """Audita um documento canônico e retorna achados agrupados.
 
         Args:

@@ -7,7 +7,7 @@ import json
 import re
 import traceback
 from collections.abc import Sequence
-from typing import Any, Generic
+from typing import Any, Generic, cast
 
 from agno.agent import Agent
 from agno.media import Image
@@ -636,7 +636,7 @@ def _rate_limit_delay_seconds(error: BaseException, retry: int) -> int:
     headers = getattr(getattr(error, "response", None), "headers", None) or {}
     retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
     try:
-        return max(1, int(retry_after))
+        return max(1, int(cast(Any, retry_after)))
     except (TypeError, ValueError):
         return _RATE_LIMIT_RETRY_SECONDS * retry
 

@@ -24,9 +24,9 @@ from acessilia_core.planning.messages import (  # noqa: E402
     MSG_PLANNING_COMPARISON_SCHEMA_DESCRIPTION,
 )
 
-PLAN_SCHEMA_VERSION = "1.0.0"
+PLAN_SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
 PLAN_SCHEMA_ID = "urn:a11y-devs:schema:nominal-plan:1.0.0"
-COMPARISON_SCHEMA_VERSION = "1.0.0"
+COMPARISON_SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
 COMPARISON_SCHEMA_ID = (
     "urn:a11y-devs:schema:planning-comparison:1.0.0"
 )

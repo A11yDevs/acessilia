@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 from acessilia_core.agents.agno_support import build_agent
 from acessilia_core.manifest.models import ProcessingManifest
@@ -15,6 +15,7 @@ from acessilia_core.planning.domain_bundle import (
 )
 from acessilia_core.planning.models import (
     NominalPlan,
+    PlannerBackend,
     PlannerOutcome,
     PlanningComparison,
 )
@@ -262,20 +263,21 @@ class PlannerAgent:
             raise ValueError(
                 f"Backend preferido desconhecido: {preferred_backend}"
             )
+        preferred = cast(PlannerBackend, preferred_backend)
         compiled = self.compile_problem(
             manifest,
             selected_roots=selected_roots,
             unavailable_methods=unavailable_methods,
         )
         plans: dict[str, NominalPlan] = {}
-        outcomes: dict[str, PlannerOutcome] = {}
-        configurations = (
+        outcomes: dict[PlannerBackend, PlannerOutcome] = {}
+        configurations: tuple[tuple[PlannerBackend, Path | None], ...] = (
             ("internal", None),
             ("fast-downward", fast_downward),
         )
         for backend, executable in configurations:
             started = perf_counter()
-            planner_name = backend
+            planner_name: str = backend
             try:
                 planner = self._planner(
                     backend=backend,
@@ -327,7 +329,7 @@ class PlannerAgent:
             compiled=compiled,
             outcomes=outcomes,
             plans=plans,
-            preferred_backend=preferred_backend,
+            preferred_backend=preferred,
         )
         return compiled, plans, comparison
 

@@ -4,7 +4,7 @@ import hashlib
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from acessilia_core.agents.agno_support import require_workflow_classes
 from acessilia_core.execution.messages import (
@@ -69,6 +69,12 @@ class ExecutionResume:
     manifest: ProcessingManifest
     results: list[ExecutionStepResult]
     replan_required: bool = False
+
+
+ReportMode = Literal["live", "dry-run"]
+ReportStatus = Literal["completed", "failed", "dry-run-completed", "replan-required"]
+AttemptStatus = Literal["succeeded", "failed", "rejected"]
+StepStatus = Literal["succeeded", "failed", "simulated", "skipped"]
 
 
 class MethodRegistry:
@@ -279,8 +285,9 @@ class ExecutorAgent:
     @staticmethod
     def _conclude(
         manifest: ProcessingManifest, state: _ExecutionState, *, dry_run: bool
-    ) -> tuple[ProcessingManifest, str, int]:
+    ) -> tuple[ProcessingManifest, ReportStatus, int]:
         """The manifest to return, the report status and the revision after the run."""
+        status: ReportStatus
         if dry_run:
             status = "failed" if state.failed_step_index is not None else "dry-run-completed"
             return deepcopy(manifest), status, manifest.revision
@@ -300,12 +307,12 @@ class ExecutorAgent:
         manifest: ProcessingManifest,
         state: _ExecutionState,
         *,
-        status: str,
+        status: ReportStatus,
         revision_after: int,
         started_at: datetime,
         completed_at: datetime,
     ) -> ExecutionReport:
-        mode = "dry-run" if state.dry_run else "live"
+        mode: ReportMode = "dry-run" if state.dry_run else "live"
         execution_seed = (
             f"{plan.plan_id}:{manifest.manifest_id}:"
             f"{started_at.isoformat()}:{'dry' if state.dry_run else 'live'}"
@@ -335,7 +342,7 @@ class ExecutorAgent:
         method: str,
         started_at: datetime,
         completed_at: datetime,
-        status: str,
+        status: AttemptStatus,
         message: str | None,
         artifact_ids: list[str],
     ) -> None:
@@ -404,7 +411,7 @@ class ExecutorAgent:
         state: _ExecutionState,
     ) -> ExecutionStepResult:
         started_at = datetime.now(timezone.utc)
-        status = "simulated" if state.dry_run else "succeeded"
+        status: StepStatus = "simulated" if state.dry_run else "succeeded"
         message: str | None = None
         artifact_ids: list[str] = []
 
