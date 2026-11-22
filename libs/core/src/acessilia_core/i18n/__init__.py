@@ -1,11 +1,10 @@
 """Internationalization module backed by Babel locale strings files.
 
-Generic locale parsing and normalization live in ``acessilia_sdk.i18n``; this
-module keeps the core's catalogs, policies and request context, and re-exports
-``parse_locales`` as a temporary compatibility facade (#712).
+Generic locale parsing, normalization, negotiation and request context live in
+``acessilia_sdk.i18n``; this module keeps the core's catalogs, policies and
+server-side locale, and re-exports the compatibility facades (#712).
 """
 
-import contextvars
 from collections.abc import Mapping
 from functools import lru_cache
 from io import BytesIO
@@ -14,6 +13,11 @@ from pathlib import Path
 from babel.support import NullTranslations, Translations
 
 from acessilia_sdk.i18n import normalize_locale, parse_locales as parse_locales
+from acessilia_sdk.i18n.context import (
+    request_locale,
+    reset_request_locale as reset_request_locale,
+    set_request_locale as set_request_locale,
+)
 from acessilia_sdk.i18n.negotiation import (
     expand_locale_candidates,
     negotiate_server_locale as _negotiate_server_locale,
@@ -27,14 +31,6 @@ SUPPORTED_LOCALES: tuple[str, ...] = ("en_US", "pt_BR")
 
 #: Locale used when environment negotiation yields nothing useful (default en_US).
 DEFAULT_LOCALE: str = "en_US"
-
-#: Per-task override for the locale that t()/n() resolve against. Remote-user
-#: handlers set this before emitting user-facing text so that, within a single
-#: asyncio task (and its child tasks), every lookup honours that user's
-#: detected locale even though the server-wide locale may differ.
-_REQUEST_LOCALE_VAR: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "acessilia_request_locale", default=None
-)
 
 
 #: Locales the process offers remote users, set once at startup by
@@ -104,30 +100,9 @@ def server_locale() -> str:
     return _SERVER_LOCALE if _SERVER_LOCALE is not None else DEFAULT_LOCALE
 
 
-def set_request_locale(locale: str) -> contextvars.Token:
-    """Override the lookup locale for the current task (and its child tasks).
-
-    Args:
-        locale (str): Locale identifier to force for t()/n() lookups in the current task; pass server-side locales from :func:`locale_for_user` so remote users get their own language.
-
-    Returns:
-        contextvars.Token: Reset token returned by ContextVar.set; callers may ignore it for task-scoped use or pass it to :func:`reset_request_locale` when the override must end before the task does.
-    """
-    return _REQUEST_LOCALE_VAR.set(locale)
-
-
-def reset_request_locale(token: contextvars.Token) -> None:
-    """Restore the previously active per-task locale override.
-
-    Args:
-        token (contextvars.Token): Token captured by an earlier :func:`set_request_locale` call in the same task; no default (required).
-    """
-    _REQUEST_LOCALE_VAR.reset(token)
-
-
 def _active_locale() -> str:
     """Return the lookup locale for t()/n(): the per-task override if set, else the server-side locale."""
-    override = _REQUEST_LOCALE_VAR.get()
+    override = request_locale()
     if override:
         return override
     return server_locale()

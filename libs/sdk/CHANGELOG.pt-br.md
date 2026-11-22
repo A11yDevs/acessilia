@@ -7,6 +7,9 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado** `acessilia_sdk.i18n.context` com o override de locale por
+  tarefa (`request_locale`, `set_request_locale`, `reset_request_locale`); o
+  core mantém a política do locale do servidor e compõe os dois (#712).
 - **Adicionado** `acessilia_sdk.i18n.negotiation` com expansão de candidatos,
   dicas do shell e negociação via Babel (`negotiate_locale`,
   `negotiate_server_locale`); quem chama fornece os locales disponíveis e o

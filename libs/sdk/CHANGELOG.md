@@ -7,6 +7,9 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
+- **Added** `acessilia_sdk.i18n.context` with the per-task locale override
+  (`request_locale`, `set_request_locale`, `reset_request_locale`); the core
+  keeps the server-side policy and composes the two (#712).
 - **Added** `acessilia_sdk.i18n.negotiation` with candidate expansion, shell
   hints and Babel-backed negotiation (`negotiate_locale`,
   `negotiate_server_locale`); the caller supplies the available locales and
