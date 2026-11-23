@@ -44,7 +44,7 @@ jobs:
         run: uvx pip-audit --requirement requirements-audit.txt
 
   image-changes:
-    name: detect image changes
+    name: Detect image changes
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -68,14 +68,15 @@ jobs:
               - 'uv.lock'
               - 'libs/**/pyproject.toml'
               - 'libs/**/uv.lock'
+              - '.dockerignore'
+              - '.python-version'
               - '.trivyignore'
               - '.github/workflows/security.yml'
-              - '.github/actions/**'
 
   container-scan:
     name: Container image scan
     needs: image-changes
-    if: always() && (github.event_name != 'pull_request' || needs.image-changes.outputs.image == 'true')
+    if: "!cancelled() && (github.event_name != 'pull_request' || needs.image-changes.outputs.image != 'false')"
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

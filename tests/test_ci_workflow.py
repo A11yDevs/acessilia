@@ -546,16 +546,31 @@ def test_the_container_scan_is_conditional_on_image_paths() -> None:
     scan = workflow["jobs"]["container-scan"]
 
     assert changes["if"] == "github.event_name == 'pull_request'"
-    filter_step = changes["steps"][1]
-    assert filter_step["uses"].startswith("dorny/paths-filter@")
+    steps = {step.get("name"): step for step in changes["steps"]}
+    filter_step = steps["Filter image paths"]
+    assert filter_step["uses"] == (
+        "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d"
+    )
     filters = filter_step["with"]["filters"]
-    for path in ("infra/**", "pyproject.toml", "uv.lock", ".trivyignore"):
+    for path in (
+        "infra/**",
+        "pyproject.toml",
+        "uv.lock",
+        "libs/**/pyproject.toml",
+        "libs/**/uv.lock",
+        ".dockerignore",
+        ".python-version",
+        ".trivyignore",
+        ".github/workflows/security.yml",
+    ):
         assert path in filters
     assert scan["needs"] == "image-changes"
     assert scan["if"] == (
-        "always() && (github.event_name != 'pull_request' || "
-        "needs.image-changes.outputs.image == 'true')"
+        "!cancelled() && (github.event_name != 'pull_request' || "
+        "needs.image-changes.outputs.image != 'false')"
     )
+    audit = workflow["jobs"]["dependency-audit"]
+    assert "if" not in audit
 
 
 def test_the_image_scan_reads_the_recorded_exception() -> None:
