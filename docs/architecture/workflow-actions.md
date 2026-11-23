@@ -77,7 +77,10 @@ they do not redo it.
   - the reading order;
   - OCR;
   - the table structure, with TableFormer `accurate` (the one pipeline option
-    the Toolbox configures, `table_mode`).
+    the Toolbox configures, `table_mode`). ADR-0030 moves table recognition to
+    the specialized capability, `table.recognize`, once Docling and MinerU
+    are its providers
+    ([acessilia-toolbox#170](https://github.com/A11yDevs/acessilia-toolbox/issues/170)).
 - **Docling's optional enrichments stay off by design**: formula enrichment
   (`do_formula_enrichment`), picture description and classification, and code
   enrichment. More specialized providers do that work, and they give better
@@ -100,7 +103,7 @@ doubtful**:
 | 2. Picture descriptions | pictures without a description | the extractor does not describe pictures |
 | 3. Inline math | prose from the text layer | Docling reports no inline formula region for a typeset PDF |
 | 4. Formula LaTeX | formulas without LaTeX markup (`has_latex_markup`) | Docling's formula enrichment is off; a recognition must agree with the text layer when there is one |
-| 5. Table structures | tables without a usable structure, or garbled ones (`TABLE_VISUAL_REVIEW`) | TableFormer's structure is kept when it is usable |
+| 5. Table structures | tables without a usable structure, or garbled ones (`TABLE_VISUAL_REVIEW`) | TableFormer's structure is kept when it is usable. After #170, every detected table goes to `table.recognize`, and this gate becomes "every table" |
 
 The migration must keep these gates: **an obligation exists only where its
 gate holds**. Otherwise the plan would send to a specialized provider an
@@ -125,9 +128,10 @@ yet:
   `develop` moves to MinerU 4.0.12 with `--tier basic`. In dual mode, a fused
   formula that comes from MinerU with LaTeX, or a table that comes with HTML,
   passes the gate, and so skips PP-FormulaNet or the table reader. Under
-  ADR-0030, formula recognition goes off in the structure capability, while
-  table structure is structural and stays
-  ([acessilia-toolbox#169](https://github.com/A11yDevs/acessilia-toolbox/issues/169)).
+  ADR-0030, formula recognition goes off in the structure capability
+  ([acessilia-toolbox#169](https://github.com/A11yDevs/acessilia-toolbox/issues/169)),
+  and so does table recognition, once `table.recognize` has Docling's and
+  MinerU's recognizers as providers (#170).
 
 ## The key observation
 
@@ -212,7 +216,7 @@ and kind names for M3 and M4 are proposals, settled in their pull requests.
 | PR | Step | Obligation and method | Role move | Toolbox requirements | Creates obligations |
 |---|---|---|---|---|---|
 | M1 | Picture descriptions | `describe-image`: `vision-description` produces the description instead of checking it | `validation` → `transitional` (`VisionAgent`) | those `VisionAgent` makes, if any | no |
-| M2 | Table structures and table inline math | `linearize-table`: `pandoc-table` reads the structure (`DataAgent`) and marks the cell math | `validation` → `transitional` (`DataAgent`) | `document.text.spans` | no |
+| M2 | Table structures and table inline math | `linearize-table`: `pandoc-table` reads the structure and marks the cell math. Today through the `DataAgent`; after #170 through `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `validation` → `transitional` (`DataAgent`); declared once it calls `table.recognize` | `document.text.spans`; then `table.recognize` | no |
 | M3 | Formula LaTeX | new kind `recognize-formula`, method `formula-recognizer`, a dependency of `verbalize-formula` and `normalize-formula` | new, declared | `math.recognize`, `pdf.render` | yes: the new kind, per formula |
 | M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`) | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
 | — | Bootstrap | Kept and documented as the 0.3.0 baseline | — | — | — |

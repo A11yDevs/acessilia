@@ -78,7 +78,10 @@ essa saída; não a refazem.
   - a ordem de leitura;
   - OCR;
   - a estrutura das tabelas, com o TableFormer `accurate` (a única opção de
-    pipeline que a Toolbox configura, `table_mode`).
+    pipeline que a Toolbox configura, `table_mode`). A ADR-0030 leva o
+    reconhecimento de tabelas para a capacidade especializada,
+    `table.recognize`, quando Docling e MinerU forem providers dela
+    ([acessilia-toolbox#170](https://github.com/A11yDevs/acessilia-toolbox/issues/170)).
 - **Os enriquecimentos opcionais do Docling ficam desligados por desenho**:
   enriquecimento de fórmulas (`do_formula_enrichment`), descrição e
   classificação de imagens, e enriquecimento de código. Providers mais
@@ -101,7 +104,7 @@ faltando ou duvidoso**:
 | 2. Descrições de imagens | imagens sem descrição | o extrator não descreve imagens |
 | 3. Matemática inline | prosa da camada de texto | o Docling não informa região de fórmula inline num PDF tipografado |
 | 4. LaTeX das fórmulas | fórmulas sem marcação LaTeX (`has_latex_markup`) | o enriquecimento de fórmulas do Docling está desligado; um reconhecimento precisa concordar com a camada de texto, quando houver |
-| 5. Estrutura das tabelas | tabelas sem estrutura utilizável, ou embaralhadas (`TABLE_VISUAL_REVIEW`) | a estrutura do TableFormer é mantida quando é utilizável |
+| 5. Estrutura das tabelas | tabelas sem estrutura utilizável, ou embaralhadas (`TABLE_VISUAL_REVIEW`) | a estrutura do TableFormer é mantida quando é utilizável. Depois da #170, toda tabela detectada vai para `table.recognize`, e esta condição vira "toda tabela" |
 
 A migração precisa manter essas condições: **uma obrigação só existe onde sua
 condição vale**. Do contrário, o plano mandaria para um provider
@@ -128,9 +131,10 @@ correspondem a ela:
   modo dual, uma fórmula fundida que vem do MinerU com LaTeX, ou uma tabela
   que vem com HTML, passa pela condição e assim pula o PP-FormulaNet ou o
   leitor de tabelas. Pela ADR-0030, o reconhecimento de fórmulas sai da
-  capacidade de estrutura, enquanto a estrutura das tabelas é estrutural e
-  fica
-  ([acessilia-toolbox#169](https://github.com/A11yDevs/acessilia-toolbox/issues/169)).
+  capacidade de estrutura
+  ([acessilia-toolbox#169](https://github.com/A11yDevs/acessilia-toolbox/issues/169)),
+  e o de tabelas também, quando `table.recognize` tiver os reconhecedores do
+  Docling e do MinerU como providers (#170).
 
 ## A observação central
 
@@ -221,7 +225,7 @@ requests.
 | PR | Passo | Obrigação e método | Mudança de papel | Requisitos de Toolbox | Cria obrigações |
 |---|---|---|---|---|---|
 | M1 | Descrições de imagens | `describe-image`: `vision-description` produz a descrição em vez de conferi-la | `validation` → `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | não |
-| M2 | Estrutura das tabelas e matemática inline das tabelas | `linearize-table`: `pandoc-table` lê a estrutura (`DataAgent`) e marca a matemática das células | `validation` → `transitional` (`DataAgent`) | `document.text.spans` | não |
+| M2 | Estrutura das tabelas e matemática inline das tabelas | `linearize-table`: `pandoc-table` lê a estrutura e marca a matemática das células. Hoje pelo `DataAgent`; depois da #170 por `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `validation` → `transitional` (`DataAgent`); declarado quando chamar `table.recognize` | `document.text.spans`; depois `table.recognize` | não |
 | M3 | LaTeX das fórmulas | kind novo `recognize-formula`, método `formula-recognizer`, uma dependência de `verbalize-formula` e `normalize-formula` | novo, declarado | `math.recognize`, `pdf.render` | sim: o kind novo, por fórmula |
 | M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`) | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
