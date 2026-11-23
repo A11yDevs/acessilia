@@ -11,6 +11,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from acessilia_core.config import FusionConfig, PathsConfig, ToolboxConfig
+from acessilia_core.hashing import file_sha256
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_ARTIFACT_STORE_DIRECT_INPUT,
@@ -673,12 +674,6 @@ class ToolboxManifestExtractor:
         return config
 
 
-def _source_sha256(source_path: Path) -> str:
-    """The source's SHA-256, read in chunks rather than whole (review of #561)."""
-    with source_path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
 def _persist_fusion_reuse(
     source_path: Path, payload: dict,
     policy: FusionPolicy | None,
@@ -698,7 +693,7 @@ def _persist_fusion_reuse(
     from docstruct.policy import FusionPolicy
 
     content = json.dumps({
-        "source_sha256": _source_sha256(source_path),
+        "source_sha256": file_sha256(source_path),
         "identity": identity,
         "policy": asdict(policy or FusionPolicy()),
         "payload": payload,

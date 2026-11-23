@@ -141,6 +141,19 @@ if [#749](https://github.com/A11yDevs/acessilia/issues/749) changes that floor.
 Unlike the SDK wrapper case, this is a real extraction: both validators share
 `_blank_to_none`.
 
+## Eighth consolidation: the file SHA-256 helper
+
+The manifest builder and the planning domain bundle repeated the same chunked
+SHA-256 implementation. Both now call `acessilia_core.hashing.file_sha256`,
+which uses `hashlib.file_digest`; the toolbox extractor's equivalent
+`_source_sha256` was removed as well. Tests cover empty, small, multi-chunk and
+missing files, and both `Path` and `str` paths.
+
+**Measured delta on this PR's code commit:** 14 groups / 32 functions / 309
+lines → **13 groups / 30 functions / 297 lines**. The `_sha256` group disappears;
+the toolbox extractor copy did not form a group, so it does not change this
+delta.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -165,7 +178,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 15 | `process_join_tail` in fusion/page-level (2/30) | Evaluate with the agent follow-up. |
 | 16 | Output schema normalizers (2/10) | **Consolidated:** shared `_blank_to_none`. |
 | 17 | Table specialist `select_greedy` / `select_table` (2/40) | Behaviour-sensitive: table selection tests first. |
-| 18 | Core `_sha256` in builder/domain bundle (2/12) | Candidate utility consolidation. |
+| 18 | Core `_sha256` in builder/domain bundle (2/12) | **Consolidated:** shared `hashing.file_sha256`. |
 | 19 | Math async wrappers (2/12) | Candidate small wrapper helper. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidate small helper. |
 | 21 | SDK layout/structure result readers (2/32) | **Reclassified:** false positive; the envelope extraction is already shared. |
@@ -188,7 +201,7 @@ changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

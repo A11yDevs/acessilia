@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import hashlib
 import mimetypes
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from acessilia_core.hashing import file_sha256
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_MANIFEST_STRUCTURAL_CONTAINER_SKIPPED,
@@ -230,7 +230,7 @@ def build_processing_manifest(
     return _build_from_toolbox_json(
         source_path,
         extraction,
-        digest=_sha256(source_path),
+        digest=file_sha256(source_path),
         language=language,
         refine_reading_order=refine_reading_order,
         presentation=presentation,
@@ -727,11 +727,3 @@ def reconcile_reclassified_element_processing_needs(
         type_bound_v23_kinds=TYPE_BOUND_V23_KINDS,
         method_costs=DEFAULT_METHOD_COSTS,
     )
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

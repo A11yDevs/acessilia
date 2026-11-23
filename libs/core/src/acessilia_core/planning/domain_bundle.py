@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from acessilia_core.hashing import file_sha256
 
 DEFAULT_DOMAIN_DIR = Path(__file__).resolve().parent / "domains"
 DEFAULT_DOMAIN_PATH = DEFAULT_DOMAIN_DIR / "domain_v2.3.pddl"
@@ -138,14 +139,6 @@ class DomainBundle:
             description_path=description_path,
             name=name_match.group(1),
             version=domain_version.group(1),
-            domain_sha256=_sha256(domain_path),
-            description_sha256=_sha256(description_path),
+            domain_sha256=file_sha256(domain_path),
+            description_sha256=file_sha256(description_path),
         )
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from typing import Any
+
+
+def file_sha256(path: str | Path) -> str:
+    """SHA-256 of the bytes in ``path``."""
+    with Path(path).open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def json_sha256(payload: dict[str, Any]) -> str:
