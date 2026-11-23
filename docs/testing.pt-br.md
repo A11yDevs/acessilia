@@ -84,12 +84,19 @@ o workflow `CI` do GitHub Actions:
   (ADR-0016, passo 6). Ainda não é um check obrigatório, pelo mesmo motivo do
   `docstruct alone`.
 - **`planning backends (Fast Downward)`** roda o planejador interno e o Fast
-  Downward (uma imagem `aibasel/downward` fixada, por meio de
-  `scripts/planning/fast_downward_docker.sh`) sobre o domínio PDDL atual, e
-  falha se eles discordarem ou se algum teste for pulado (#790). Ele alimenta o
-  agregador, então bloqueia `tests (Python 3.12)`. Localmente esses testes
-  ficam fora da seleção; rode-os com `-m fast_downward` e
-  `ACESSILIA_FAST_DOWNWARD`.
+  Downward sobre o domínio PDDL atual, e falha a menos que todo caso listado
+  tenha passado: um caso pulado, com falha ou apagado reprova o job (#790). Ele
+  alimenta o agregador, então bloqueia `tests (Python 3.12)`.
+  - A imagem é fixada pelo digest em `scripts/planning/fast_downward.env`, a
+    fonte única do job e de `scripts/planning/fast_downward_docker.sh`. O job
+    confere a versão que esse arquivo declara.
+  - A imagem (116 MB) vem do Docker Hub. O job a guarda em cache, com uma
+    chave derivada desse arquivo, e repete um pull que falhou, então uma
+    indisponibilidade do Docker Hub só reprova o gate antes de a imagem estar
+    em cache.
+  - Localmente esses testes ficam fora da seleção. Rode-os com
+    `-m fast_downward` e `ACESSILIA_FAST_DOWNWARD` apontando para o script,
+    que exige Docker; numa máquina ARM a imagem amd64 roda sob emulação.
 - A entrega da imagem espera pelo agregador, pelos três jobs de isolamento e pelos jobs de segurança.
 
 O check da suíte principal não tem mais uma etapa separada de coleta: a própria

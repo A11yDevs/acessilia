@@ -624,36 +624,91 @@ jobs:
       - name: Install the core
         run: uv sync --locked --extra dev --project libs/core
 
-      - name: Pull the pinned Fast Downward image
+      # One source for the image: the same file the script reads. Exported
+      # here, it also overrides any FAST_DOWNWARD_IMAGE the runner may carry,
+      # so the steps below pull, check and run the same pinned image.
+      - name: Read the pinned Fast Downward image
+        run: grep -E '^FAST_DOWNWARD_(IMAGE|VERSION)=' scripts/planning/fast_downward.env >> "$GITHUB_ENV"
+
+      # The image is cached under a key derived from the pinned file, so a
+      # Docker Hub outage or rate limit does not fail the gate once it is
+      # cached. A miss pulls by digest and tags the image locally: a saved
+      # image keeps its tag, not its digest reference.
+      - name: Restore the Fast Downward image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/fast-downward-image.tar
+          key: fast-downward-${{ hashFiles('scripts/planning/fast_downward.env') }}
+
+      - name: Load or pull the Fast Downward image
         run: |
-          image=$(sed -n 's/^image="${FAST_DOWNWARD_IMAGE:-\(.*\)}"$/\1/p' scripts/planning/fast_downward_docker.sh)
-          test -n "$image"
-          docker pull --quiet "$image"
-          docker run --rm "$image" --version
+          local_tag="acessilia-ci/fast-downward:${FAST_DOWNWARD_VERSION}"
+          if [ -f ~/fast-downward-image.tar ]; then
+            docker load --input ~/fast-downward-image.tar
+          else
+            for attempt in 1 2 3; do
+              docker pull --quiet "$FAST_DOWNWARD_IMAGE" && break
+              if [ "$attempt" = 3 ]; then exit 1; fi
+              sleep $((attempt * 15))
+            done
+            docker tag "$FAST_DOWNWARD_IMAGE" "$local_tag"
+            docker save --output ~/fast-downward-image.tar "$local_tag"
+          fi
+          echo "FAST_DOWNWARD_IMAGE=$local_tag" >> "$GITHUB_ENV"
+
+      - name: Check the Fast Downward version
+        run: |
+          version=$(docker run --rm "$FAST_DOWNWARD_IMAGE" --version | head -n 1)
+          echo "$version"
+          test "$version" = "Fast Downward ${FAST_DOWNWARD_VERSION}"
 
       - name: Compare the backends on the current domain
         working-directory: libs/core
         env:
           ACESSILIA_FAST_DOWNWARD: ${{ github.workspace }}/scripts/planning/fast_downward_docker.sh
         run: |
+          mkdir -p "$GITHUB_WORKSPACE/var/test-results"
           uv run --locked --extra dev python -m pytest -rs -m fast_downward \
-            --junitxml="$GITHUB_WORKSPACE/var/test-results/fast-downward.xml" \
+            --junitxml="$GITHUB_WORKSPACE/var/test-results/planning-backends.xml" \
             tests/test_fast_downward_domain.py
 
+      # Every situation the projection page lists must have run and passed:
+      # a deleted case fails here, not only a skipped one.
       - name: Reject skipped or missing backend tests
         run: |
           uv run --locked --extra dev --project libs/core python - <<'PY'
           from pathlib import Path
           from xml.etree import ElementTree
 
-          report = Path("var/test-results/fast-downward.xml")
-          suites = list(ElementTree.parse(report).getroot().iter("testsuite"))
-          total = sum(int(suite.attrib.get("tests", "0")) for suite in suites)
-          skipped = sum(int(suite.attrib.get("skipped", "0")) for suite in suites)
-          if not total or skipped:
-              raise SystemExit(f"Fast Downward not verified: {total} test(s), {skipped} skipped.")
-          print(f"Fast Downward verified: {total} test(s), none skipped.")
+          EXPECTED = {
+              "test_fast_downward_plans_like_the_internal_planner[observe-every-requirement-offered]",
+              "test_fast_downward_plans_like_the_internal_planner[enforce-cheaper-method-not-offered]",
+              "test_fast_downward_parses_symbols_shared_across_types",
+              "test_fast_downward_plans_without_a_catalogue",
+          }
+          report = Path("var/test-results/planning-backends.xml")
+          cases = list(ElementTree.parse(report).getroot().iter("testcase"))
+          passed = {
+              case.attrib["name"]
+              for case in cases
+              if not any(child.tag in {"skipped", "failure", "error"} for child in case)
+          }
+          if passed != EXPECTED:
+              raise SystemExit(
+                  "Fast Downward not verified: "
+                  f"missing or not passed {sorted(EXPECTED - passed)}, unexpected {sorted(passed - EXPECTED)}"
+              )
+          print(f"Fast Downward verified: {len(passed)} test(s), all passed.")
           PY
+
+      - name: Upload the backend test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-report-planning-backends
+          path: var/test-results/planning-backends.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   # This aggregator keeps the required check name while the four suites run
   # in parallel. It publishes the evidence even on failure and fails closed at

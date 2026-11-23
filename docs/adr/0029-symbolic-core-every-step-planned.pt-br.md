@@ -86,11 +86,13 @@ e a #640 trata a composição de fragmentos como experimental.
   composição verifica nomes e tipos; não traduz schemas de tools em PDDL (sem
   compilador genérico, #632).
 - O CI deve fazer o parsing do domínio composto e resolver um conjunto de
-  problemas de fixture com o planejador interno. O Fast Downward continua
-  opcional em tempo de execução, como no código, mas o CI também o confere:
-  desde a #790, um job roda os dois backends sobre o domínio atual, com o Fast
-  Downward de uma imagem fixada, então um domínio ou fragmento que só um
-  backend aceita reprova o CI.
+  problemas de fixture com o planejador interno e com o Fast Downward. O Fast
+  Downward continua opcional em tempo de execução, como no código. Conferi-lo
+  no CI ficou em aberto aqui; essa subdecisão está tomada, enquanto esta ADR
+  continua Proposta. Desde a #790, um job roda os dois backends sobre o
+  domínio atual, único (2.4), com o Fast Downward de uma imagem fixada. A
+  parte do domínio composto está **pendente**: suas fixtures chegam com os
+  fragmentos (#640, PR 2), e o mesmo job passa a cobri-las.
 
 ### Estado, disponibilidade e falha
 

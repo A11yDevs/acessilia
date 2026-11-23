@@ -139,10 +139,11 @@ result contracts, the execution journal and the replanning rules of #640
 Both backends are checked against the current domain in CI. The
 `planning backends (Fast Downward)` job runs
 `libs/core/tests/test_fast_downward_domain.py` with Fast Downward 26.6 from a
-pinned image (`scripts/planning/fast_downward_docker.sh`, `astar(blind())`).
+pinned image (`scripts/planning/fast_downward.env`, run through
+`fast_downward_docker.sh`, with `astar(blind())`).
 The two backends must agree with and without a catalogue, under `observe` and
-`enforce`, and with names shared across types. The job fails if a test is
-skipped ([#790](https://github.com/A11yDevs/acessilia/issues/790)). Locally the
+`enforce`, and with names shared across types. The job fails unless each of
+these cases ran and passed ([#790](https://github.com/A11yDevs/acessilia/issues/790)). Locally the
 tests are deselected by default; select them with `-m fast_downward` and point
 `ACESSILIA_FAST_DOWNWARD` to that script or to a Fast Downward build. The
 derived predicates need a search whose heuristics support axioms, such as the
