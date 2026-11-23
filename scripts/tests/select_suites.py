@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SUITES = ("docstruct", "sdk", "core", "app")
 INDICATORS = (
     "docstruct_changed",
@@ -108,7 +108,10 @@ def classify_paths(paths: Sequence[str]) -> Selection:
     ]
     for path in normalized:
         lowered = path.lower()
-        if path in TRANSVERSAL_FILES or lowered.startswith(TRANSVERSAL_PREFIXES):
+        if (
+            lowered in {name.lower() for name in TRANSVERSAL_FILES}
+            or lowered.startswith(TRANSVERSAL_PREFIXES)
+        ):
             infrastructure = True
             selected.update(_all_suites())
             indicators["infrastructure_changed"] = True
@@ -159,13 +162,16 @@ def classify_paths(paths: Sequence[str]) -> Selection:
                 reasons[suite].append(f"contract path: {path}")
 
         if (
-            lowered.startswith(("backend/", "frontend/", "libs/core/"))
+            lowered.startswith(
+                ("backend/", "frontend/", "libs/core/", "libs/sdk/", "libs/docstruct/")
+            )
             or lowered
             in {
                 "tests/test_provider_choice_methods.py",
                 "tests/conftest.py",
                 "tests/judge_support.py",
                 "tests/core_config_support.py",
+                "tests/toolbox_render_fake.py",
                 "pyproject.toml",
                 "uv.lock",
                 ".github/workflows/ci.yml",
@@ -173,6 +179,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
         ):
             integration = True
             indicators["integration_changed"] = True
+            reasons["app"].append(f"integration trigger: {path}")
 
     ordered = _suites(*sorted(selected, key=SUITES.index))
     if not normalized or not ordered:
