@@ -157,6 +157,41 @@ arquivos vazios, pequenos, com múltiplos blocos e ausentes, além de caminhos
 linhas → **13 grupos / 30 funções / 297 linhas**. O grupo `_sha256` desaparece;
 a cópia do extrator da Toolbox não formava grupo, então não altera esse delta.
 
+## Nona consolidação: o helper de headers de autenticação da API
+
+`ApiClient._admin_headers` e `_operations_headers` repetiam a cópia dos headers
+base e a regra do bearer token. Ambos agora delegam para `_auth_headers`; um
+teste fixa o token de observabilidade junto com a API key, e os testes existentes
+do token de operações cobrem o outro ramo. Outro teste configura os dois tokens e
+verifica que rotas admin recebem só o de observabilidade enquanto `/cache/clear`
+recebe só o de operações.
+
+**Delta medido no commit de código deste PR:** 13 grupos / 30 funções / 297
+linhas → **12 grupos / 28 funções / 287 linhas**. O grupo de headers de
+autenticação desaparece.
+
+## Décima consolidação: a caminhada de nós Math do Pandoc
+
+`_count_math_nodes` e `_contains_math` repetiam a mesma travessia de listas e
+dicionários do Pandoc. Ambos agora usam `_math_nodes`, um gerador em pré-ordem;
+a contagem o consome e a verificação para no primeiro match. Testes diretos da
+caminhada, de contagem e de degradação cobrem a travessia compartilhada.
+
+**Delta medido no commit de código deste PR:** 12 grupos / 28 funções / 287
+linhas → **11 grupos / 26 funções / 269 linhas**. O grupo de nós Math do Pandoc
+desaparece.
+
+## Décima primeira consolidação: o ciclo de vida do cliente de math
+
+Reconhecimento, conversão e verbalização criavam um `ToolboxMathClient`,
+aguardavam uma operação do SDK e fechavam o cliente. Os três agora usam
+`_with_math_client`; o callback mantém a mesma chamada ao SDK e o cliente é
+fechado no `finally`.
+
+**Delta medido no commit de código deste PR:** 11 grupos / 26 funções / 269
+linhas → **10 grupos / 24 funções / 257 linhas**. O grupo de wrappers async de
+math desaparece.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -174,7 +209,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 8 | `_is_process_running` do frontend (2/26) | **Consolidado:** um runtime atrás dos dois entry points, com testes da sondagem de PID. |
 | 9 | `acquire_lock` do frontend (2/36) | **Consolidado:** o console script compartilha `frontend.run` e o lock dele. |
 | 10 | `startup` do frontend (2/107) | **Consolidado:** a caracterização cobre composição das interfaces e shutdown. |
-| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidato a helper pequeno; baixa prioridade. |
+| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | **Consolidado:** `_auth_headers` compartilhado. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidado:** `_set_pause` compartilhado; textos não mudam. |
 | 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
 | 14 | `swap_low_agreement` (2/52) | Sensível a comportamento: caracterizar a política de troca primeiro. |
@@ -182,8 +217,8 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 16 | Normalizadores de output schema (2/10) | **Consolidado:** `_blank_to_none` compartilhado. |
 | 17 | `select_greedy` / `select_table` do table specialist (2/40) | Sensível a comportamento: testes de seleção de tabela primeiro. |
 | 18 | `_sha256` do core em builder/domain bundle (2/12) | **Consolidado:** `hashing.file_sha256` compartilhado. |
-| 19 | Wrappers async de math (2/12) | Candidato a helper pequeno. |
-| 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidato a helper pequeno. |
+| 19 | Wrappers async de math (2/12) | **Consolidado:** ciclo de vida `_with_math_client` compartilhado. |
+| 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | **Consolidado:** caminhada `_math_nodes` compartilhada. |
 | 21 | Leitores de layout/structure do SDK (2/32) | **Reclassificado:** falso positivo; a extração do envelope já é compartilhada. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidato a helper pequeno de validação. |
 
@@ -204,7 +239,7 @@ grupos restantes não foram alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

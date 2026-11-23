@@ -328,6 +328,29 @@ def test_the_mutation_documentation_has_a_linked_mirror() -> None:
     assert "(mutation.md)" in portuguese
     assert (docs / "mutation-flood.json").is_file()
     assert (docs / "mutation-equations.json").is_file()
+    for name in mutation.PYTEST_ENV_VARS:
+        assert name in english, name
+        assert name in portuguese, name
+
+
+def test_the_mutant_environment_drops_ambient_pytest_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-k nonexistent")
+    monkeypatch.setenv("PYTEST_PLUGINS", "ambient.plugin")
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "leak")
+    monkeypatch.setenv("PYTHONPATH", "/ambient")
+
+    env = mutation._mutant_env(tmp_path)
+
+    assert "PYTEST_ADDOPTS" not in env
+    assert "PYTEST_PLUGINS" not in env
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD" not in env
+    assert "PYTEST_CURRENT_TEST" not in env
+    assert env["PYTHONPATH"].startswith(str(tmp_path))
+    assert "/ambient" in env["PYTHONPATH"]
+    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
 
 
 def test_load_covered_lines_reads_the_module(tmp_path: Path) -> None:

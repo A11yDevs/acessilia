@@ -93,6 +93,59 @@ async def test_history():
 
 
 @respx.mock
+async def test_history_sends_the_observability_token_and_api_key():
+    route = respx.get(f"{BASE}/api/v1/history?limit=5").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+    client = ApiClient(
+        base_url=BASE,
+        api_key="api-secret",
+        observability_token="obs-secret",
+    )
+
+    assert await client.history(limit=5) == []
+    headers = route.calls[0].request.headers
+    assert headers["Authorization"] == "Bearer obs-secret"
+    assert headers["X-API-Key"] == "api-secret"
+
+
+@respx.mock
+async def test_admin_and_operations_tokens_do_not_leak_into_each_other():
+    history_route = respx.get(f"{BASE}/api/v1/history?limit=5").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+    stats_route = respx.get(f"{BASE}/api/v1/stats").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    cache_route = respx.post(f"{BASE}/api/v1/cache/clear").mock(
+        return_value=httpx.Response(200, json={"removed": 0})
+    )
+    client = ApiClient(
+        base_url=BASE,
+        observability_token="obs-secret",
+        operations_token="ops-secret",
+    )
+
+    await client.history(limit=5)
+    await client.stats()
+    await client.clear_cache()
+
+    assert history_route.calls[0].request.headers["Authorization"] == "Bearer obs-secret"
+    assert stats_route.calls[0].request.headers["Authorization"] == "Bearer obs-secret"
+    assert cache_route.calls[0].request.headers["Authorization"] == "Bearer ops-secret"
+
+
+@respx.mock
+async def test_history_without_a_token_sends_no_authorization():
+    route = respx.get(f"{BASE}/api/v1/history?limit=5").mock(
+        return_value=httpx.Response(200, json=[])
+    )
+
+    assert await ApiClient(base_url=BASE).history(limit=5) == []
+    assert "Authorization" not in route.calls[0].request.headers
+
+
+@respx.mock
 async def test_job_token_retention_is_bounded_and_terminal_jobs_remain_accessible(tmp_path):
     client = ApiClient(base_url=BASE)
     client._job_tokens.update((f"old-{i}", "token") for i in range(256))

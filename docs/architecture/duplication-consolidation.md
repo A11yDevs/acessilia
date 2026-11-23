@@ -154,6 +154,41 @@ lines → **13 groups / 30 functions / 297 lines**. The `_sha256` group disappea
 the toolbox extractor copy did not form a group, so it does not change this
 delta.
 
+## Ninth consolidation: the API auth-header helper
+
+`ApiClient._admin_headers` and `_operations_headers` repeated the same base-header
+copy and bearer-token rule. Both now delegate to `_auth_headers`; a test pins the
+observability token together with the API key, and the existing operations-token
+tests cover the other branch. Another test configures both tokens and checks
+that admin routes receive only the observability token while `/cache/clear`
+receives only the operations token.
+
+**Measured delta on this PR's code commit:** 13 groups / 30 functions / 297
+lines → **12 groups / 28 functions / 287 lines**. The auth-header group
+disappears.
+
+## Tenth consolidation: the Pandoc math-node walk
+
+`_count_math_nodes` and `_contains_math` repeated the same list/dict traversal
+over Pandoc nodes. Both now use `_math_nodes`, a pre-order generator; counting
+consumes it, and containment stops at the first match. Direct walk, count and
+degradation tests cover the shared traversal.
+
+**Measured delta on this PR's code commit:** 12 groups / 28 functions / 287
+lines → **11 groups / 26 functions / 269 lines**. The Pandoc math-node group
+disappears.
+
+## Eleventh consolidation: the math client lifecycle
+
+Recognition, conversion and verbalization each created a `ToolboxMathClient`,
+awaited one SDK operation and closed the client. All three now use
+`_with_math_client`; the operation callback keeps the same SDK call and the
+client is closed in `finally`.
+
+**Measured delta on this PR's code commit:** 11 groups / 26 functions / 269
+lines → **10 groups / 24 functions / 257 lines**. The math async-wrapper group
+disappears.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -171,7 +206,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 8 | Frontend `_is_process_running` (2/26) | **Consolidated:** one runtime behind both entry points, with PID-probe tests. |
 | 9 | Frontend `acquire_lock` (2/36) | **Consolidated:** the console script shares `frontend.run` and its lock. |
 | 10 | Frontend `startup` (2/107) | **Consolidated:** characterization covers interface composition and shutdown. |
-| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidate small helper; low priority. |
+| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | **Consolidated:** shared `_auth_headers`. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidated:** shared `_set_pause`; copy unchanged. |
 | 13 | Agent `select_page` in adjudication/page-level (2/56) | Behaviour-sensitive: characterize selection policy first. |
 | 14 | Agent `swap_low_agreement` (2/52) | Behaviour-sensitive: characterize the swap policy first. |
@@ -179,8 +214,8 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 16 | Output schema normalizers (2/10) | **Consolidated:** shared `_blank_to_none`. |
 | 17 | Table specialist `select_greedy` / `select_table` (2/40) | Behaviour-sensitive: table selection tests first. |
 | 18 | Core `_sha256` in builder/domain bundle (2/12) | **Consolidated:** shared `hashing.file_sha256`. |
-| 19 | Math async wrappers (2/12) | Candidate small wrapper helper. |
-| 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidate small helper. |
+| 19 | Math async wrappers (2/12) | **Consolidated:** shared `_with_math_client` lifecycle. |
+| 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | **Consolidated:** shared `_math_nodes` walk. |
 | 21 | SDK layout/structure result readers (2/32) | **Reclassified:** false positive; the envelope extraction is already shared. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
@@ -201,7 +236,7 @@ changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.
