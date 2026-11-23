@@ -25,6 +25,7 @@ não um benchmark controlado.
 |---|---|---:|---:|---:|
 | A — branch #748 | [45174924436](https://github.com/A11yDevs/acessilia/actions/runs/45174924436) | 3m07s | 3,05m | 7,47 |
 | B — #771 | [45193011145](https://github.com/A11yDevs/acessilia/actions/runs/45193011145) | 2m21s | 0,20m (agregador) | 8,47 |
+| B2 — #787 após setup compartilhado | [45251360702](https://github.com/A11yDevs/acessilia/actions/runs/45251360702) | 2m11s | 0,20m (agregador) | 8,37 |
 
 Os job-minutes incluem os jobs de isolamento e segurança; jobs pulados são
 excluídos porque não consomem runner. Os valores medem o consumo agregado, não
@@ -42,6 +43,10 @@ apenas as suítes.
 - O tempo de parede de ponta a ponta caiu de **3m07s para 2m21s** neste par.
 - O total de job-minutes subiu de **7,47 para 8,47** porque cinco jobs provedores
   repetem checkout/install. O paralelismo reduziu latência, não consumo.
+- Após a action de setup compartilhado e o cache funcional do setup-uv (#788), a
+  execução B2 ficou em **2m11s / 8,37 job-minutes** (perna app 1,87m, scan da
+  imagem 1,80m). A mudança de manutenção não reduziu o total de runner-minutes;
+  o scan da imagem continua sendo o caminho crítico.
 - O **scan da imagem de container (2,28m)** passou a ser o caminho crítico no
   modo B. Um ganho adicional exige atacar esse job, não apenas as suítes.
 - A seleção em observação rodou com sucesso no modo B (PR #771). Seus caminhos
