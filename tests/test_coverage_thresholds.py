@@ -60,7 +60,12 @@ def test_main_reports_success(tmp_path: Path, capsys) -> None:
 
 @pytest.mark.parametrize(
     "payload",
-    [{}, {"totals": {}}, {"totals": {"percent_covered": "n/a"}}],
+    [
+        {},
+        {"totals": {}},
+        {"totals": {"percent_covered": "n/a"}},
+        {"totals": {"percent_covered": float("nan")}},
+    ],
 )
 def test_an_unreadable_report_fails(tmp_path: Path, payload: dict) -> None:
     path = tmp_path / "core" / "coverage.json"

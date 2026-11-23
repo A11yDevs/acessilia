@@ -55,8 +55,8 @@ GitHub Actions workflow `CI`:
   uploading JUnit (`test-reports-py*`) artifacts. The same job runs Ruff against
   the shrinking baseline, Mypy on the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass (#366),
   the Toolbox capability contract, the Toolbox's docstruct pin report (warnings
-  only; see below) enforces the per-component coverage thresholds and publishes the summary with its `coverage-reports-py*`
-  artifact.
+  only; see below), enforces the per-component coverage thresholds and publishes
+  the summary with its `coverage-reports-py*` artifact.
 - **`SDK alone (Python 3.12)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,
   pytest-asyncio, respx), and proves that it works without the core.
@@ -253,6 +253,10 @@ make lint
 make typecheck
 make coverage
 ```
+
+Coverage floors: application **85%**, docstruct **86%**, SDK **96%**, core **82%** (branch coverage).
+
+No `pre-commit` configuration is shipped: `make lint`, `make typecheck` and CI already run the same gates, so a hook would duplicate them without adding coverage. Revisit if a formatter or a new local-only check is introduced.
 
 `make -n test-all` prints the exact commands without running them.
 

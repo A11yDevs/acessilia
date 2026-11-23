@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -41,11 +42,14 @@ def check_coverage(coverage_dir: Path) -> list[str]:
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             failures.append(_failure(component, f"unreadable report: {exc}"))
             continue
+        if not math.isfinite(percent):
+            failures.append(_failure(component, "unreadable report: non-finite coverage value"))
+            continue
         if percent < minimum:
             failures.append(
                 _failure(
                     component,
-                    f"{percent:.1f}% < {minimum:.1f}% required",
+                    f"{percent:.2f}% < {minimum:.1f}% required",
                 )
             )
     return failures
