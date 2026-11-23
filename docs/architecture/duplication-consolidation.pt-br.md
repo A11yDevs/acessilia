@@ -115,6 +115,35 @@ linhas → **15 grupos / 34 funções / 324 linhas**. O grupo dos cinco modos e 
 grupo de comandos pausar/retomar desaparecem; as funções `pause_chat`/`resume_chat`
 do middleware continuam como um grupo separado.
 
+## Sexta consolidação: o middleware de pausa do Telegram
+
+`pause_chat` e `resume_chat` repetiam os mesmos três passos: atualizar o cache
+de chats pausados em memória, persistir a mudança no `TelegramStateStore` e
+registrar um warning quando o SQLite não estava disponível. Agora compartilham
+`_set_paused`, que mantém a atualização do cache antes da chamada ao store e
+preserva o caminho de falha. Os testes de sobrevivência do estado e de falha do
+store cobrem as duas ações.
+
+**Delta medido no commit de código deste PR:** 16 grupos / 36 funções / 333
+linhas → **15 grupos / 34 funções / 319 linhas**. O grupo de pausa/retomada do
+middleware desaparece.
+
+## Sétima consolidação: o normalizador de strings opcionais em branco
+
+`VisionOutput.normalize_empty_formula_latex` e
+`DataOutput.normalize_empty_optional_strings` implementavam a mesma regra: uma
+string opcional em branco vinda do provider significa campo ausente. Os dois
+validadores agora delegam para `_blank_to_none`; os testes existentes cobrem
+`formula_latex`, `latex` e `caption`.
+
+**Delta medido no commit de código deste PR:** 15 grupos / 34 funções / 319
+linhas → **14 grupos / 32 funções / 309 linhas**. O grupo de normalizadores do
+output schema desaparece. Os dois validadores delegadores agora têm uma
+instrução, então a isenção de `< 2 statements` do detector os esconde; eles
+voltariam a formar grupo se a [#749](https://github.com/A11yDevs/acessilia/issues/749)
+mudasse esse piso. Diferente do caso dos wrappers do SDK, esta é uma extração
+real: os dois validadores compartilham `_blank_to_none`.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -137,7 +166,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
 | 14 | `swap_low_agreement` (2/52) | Sensível a comportamento: caracterizar a política de troca primeiro. |
 | 15 | `process_join_tail` em fusion/page-level (2/30) | Avaliar junto com o follow-up dos agentes. |
-| 16 | Normalizadores de output schema (2/10) | Candidato a helper pequeno. |
+| 16 | Normalizadores de output schema (2/10) | **Consolidado:** `_blank_to_none` compartilhado. |
 | 17 | `select_greedy` / `select_table` do table specialist (2/40) | Sensível a comportamento: testes de seleção de tabela primeiro. |
 | 18 | `_sha256` do core em builder/domain bundle (2/12) | Candidato a consolidação de utilitário. |
 | 19 | Wrappers async de math (2/12) | Candidato a helper pequeno. |
@@ -146,9 +175,10 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidato a helper pequeno de validação. |
 
 A tabela é ancorada no baseline de novembro. O tool atual também reporta dois
-grupos introduzidos por PRs posteriores: `pause_chat`/`resume_chat` (2/14) e as
-duas funções de depreciação `__getattr__` em `table_ast`/`validators` (2/20);
-eles são acompanhados separadamente das linhas do baseline.
+grupos fora dele: as duas funções de depreciação `__getattr__` em
+`table_ast`/`validators` (2/20) e a propriedade `planner` compartilhada pelo
+orchestrator e pelo planning engine introduzida pela #632 (2/9); eles são
+acompanhados separadamente das linhas do baseline.
 
 Os grupos restantes são menores ou sensíveis a comportamento. A seleção dos
 agentes e a seleção de tabelas precisa de caracterização antes da extração,
@@ -161,7 +191,7 @@ grupos restantes não foram alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

@@ -4,7 +4,7 @@ Espelham a semântica de ``flood_guard`` do Tree Differ v2 (PR #125).
 """
 from collections import Counter
 
-from docstruct.fusion.flood import flood_guard
+from docstruct.fusion.flood import DEFAULT_MIN_BLOCKS, DEFAULT_SHORT, flood_guard
 from docstruct.fusion.types import DiffBlock
 
 LEXICON = frozenset({"caption", "figure", "table", "results", "chapter"})
@@ -74,3 +74,24 @@ class TestFloodGuard:
     def test_lista_vazia_nao_quebra(self):
         stats = Counter()
         assert flood_guard([], [], stats, ratio=2.0, lexicon=LEXICON) == []
+
+    def test_o_minimo_de_blocos_e_inclusivo(self):
+        a = many(DEFAULT_MIN_BLOCKS, "ab")
+        stats = Counter()
+
+        assert flood_guard(a, many(1), stats, ratio=2.0) == []
+        assert stats["flood-pages"] == 1
+
+    def test_o_comprimento_curto_e_inclusivo(self):
+        a = many(DEFAULT_MIN_BLOCKS, "ab") + [mk("a" * DEFAULT_SHORT)]
+        stats = Counter()
+
+        assert flood_guard(a, many(1), stats, ratio=2.0) == []
+        assert stats["flood-docling-dropped"] == DEFAULT_MIN_BLOCKS + 1
+
+    def test_disparar_sem_descartar_nao_conta_pagina(self):
+        a = many(DEFAULT_MIN_BLOCKS, "a" * 40)
+        stats = Counter()
+
+        assert flood_guard(a, many(1), stats, ratio=2.0) == a
+        assert stats["flood-pages"] == 0

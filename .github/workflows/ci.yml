@@ -540,6 +540,22 @@ jobs:
         if: always()
         run: uv run --locked --extra dev python scripts/check_coverage_thresholds.py --coverage-dir var/coverage
 
+      # The timing baseline is evidence for #644. It must not change the gate:
+      # a missing report from an already failing suite only skips the summary.
+      - name: Summarize test timings
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p var/timings
+          uv run --locked --extra dev python scripts/tests/collect_timings.py collect \
+            --report app=test-results.xml \
+            --report docstruct=libs/docstruct/docstruct-test-results.xml \
+            --report sdk=libs/sdk/sdk-test-results.xml \
+            --report core=libs/core/core-test-results.xml \
+            --coverage-dir var/coverage \
+            --output var/timings/baseline.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+
       - name: Summarize per-component coverage
         if: always()
         run: |
@@ -633,6 +649,15 @@ jobs:
             var/coverage/docstruct/coverage.json
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload timing baseline
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: timing-baseline-py${{ matrix.python-version }}
+          path: var/timings/baseline.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   security:
     name: security checks

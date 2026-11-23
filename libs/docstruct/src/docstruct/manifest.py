@@ -16,13 +16,15 @@ verify their wire models against it in contract tests. ``*_from_payload`` and
 """
 from __future__ import annotations
 
+import copy
 import dataclasses
+import functools
 import types
 import typing
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from docstruct.geometry.boxes import OrientedBox
 from docstruct.validation import Finding
@@ -119,15 +121,8 @@ _CONSTRAINT_KEYWORDS = {
 }
 
 
-def field_specs(cls: type) -> dict[str, dict[str, Any]]:
-    """Each field of ``cls`` as JSON Schema-like constraints.
-
-    A spec has ``type`` (a JSON type, or ``"ref"`` with ``ref`` naming a wire
-    type), ``nullable``, ``required``, ``default`` when the field has a plain
-    default, ``items`` for arrays, ``enum`` for literals and the numeric and
-    length bounds (``minimum``, ``exclusiveMinimum``, ``maximum``,
-    ``minLength``).
-    """
+@functools.cache
+def _build_field_specs(cls: type) -> dict[str, dict[str, Any]]:
     hints = typing.get_type_hints(cls)
     specs: dict[str, dict[str, Any]] = {}
     for item in dataclasses.fields(cls):
@@ -142,6 +137,22 @@ def field_specs(cls: type) -> dict[str, dict[str, Any]]:
                 spec[keyword] = item.metadata[key]
         specs[item.name] = spec
     return specs
+
+
+def field_specs(cls: type) -> dict[str, dict[str, Any]]:
+    """Each field of ``cls`` as JSON Schema-like constraints.
+
+    A spec has ``type`` (a JSON type, or ``"ref"`` with ``ref`` naming a wire
+    type), ``nullable``, ``required``, ``default`` when the field has a plain
+    default, ``items`` for arrays, ``enum`` for literals and the numeric and
+    length bounds (``minimum``, ``exclusiveMinimum``, ``maximum``,
+    ``minLength``).
+
+    The constraints are built once per class: resolving the type hints again
+    for every element dominated validation of large documents. Each caller
+    receives an independent copy, so the cache cannot leak a mutation.
+    """
+    return copy.deepcopy(_build_field_specs(cls))
 
 
 def _type_spec(hint: Any) -> dict[str, Any]:
@@ -437,7 +448,9 @@ def _has_cycle(parent_graph: dict[str, str]) -> bool:
 
 def _type_findings(value: Any, path: str) -> list[tuple[str, dict[str, Any]]]:
     findings: list[tuple[str, dict[str, Any]]] = []
-    specs = field_specs(type(value))
+    # Internal readers never mutate the constraints; skip the defensive copy
+    # that the public boundary performs for external callers.
+    specs = _build_field_specs(cast(Hashable, type(value)))
     for item in dataclasses.fields(value):
         current = getattr(value, item.name)
         where = f"{path}.{item.name}" if path else item.name
@@ -481,7 +494,9 @@ def _is_json_type(value: Any, json_type: str) -> bool:
 
 def _field_findings(value: Any, path: str) -> list[tuple[str, dict[str, Any]]]:
     findings: list[tuple[str, dict[str, Any]]] = []
-    specs = field_specs(type(value))
+    # Internal readers never mutate the constraints; skip the defensive copy
+    # that the public boundary performs for external callers.
+    specs = _build_field_specs(cast(Hashable, type(value)))
     for item in dataclasses.fields(value):
         current = getattr(value, item.name)
         where = f"{path}.{item.name}" if path else item.name

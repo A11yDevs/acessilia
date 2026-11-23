@@ -1,0 +1,3433 @@
+{
+  "schema_version": 1,
+  "kind": "coverage-overlap",
+  "coverage_file": "var/overlap/context/.coverage",
+  "settings": {
+    "threshold": 0.8,
+    "min_shared": 5,
+    "max_element_tests": 50,
+    "top": 100
+  },
+  "summary": {
+    "tests": 3197,
+    "elements": 3559,
+    "pairs": 1995,
+    "identical_pairs": 735,
+    "mean_similarity": 0.9507,
+    "coverage_subsets": 1250,
+    "strict_coverage_subsets": 1151,
+    "equal_coverage_subsets": 99,
+    "tests_with_identical_coverage": 2914,
+    "families": 288,
+    "identical_families": 247,
+    "zero_exclusive_tests": 3085
+  },
+  "pairs": [
+    {
+      "test_a": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-ascii]",
+      "test_b": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-cjk]",
+      "similarity": 1.0,
+      "shared": 605,
+      "union": 605,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-ascii]",
+      "test_b": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-greek]",
+      "similarity": 1.0,
+      "shared": 605,
+      "union": 605,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-cjk]",
+      "test_b": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-greek]",
+      "similarity": 1.0,
+      "shared": 605,
+      "union": 605,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[True]",
+      "test_b": "tests/test_pending_fixes.py::test_result_email_reports_open_obligations_of_a_delivered_document",
+      "similarity": 1.0,
+      "shared": 454,
+      "union": 454,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "test_b": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-recover-formula-True-2]",
+      "similarity": 1.0,
+      "shared": 390,
+      "union": 390,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "test_b": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[failed-None-False-2]",
+      "similarity": 1.0,
+      "shared": 390,
+      "union": 390,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "test_b": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[replan-required-None-False-2]",
+      "similarity": 1.0,
+      "shared": 390,
+      "union": 390,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-recover-formula-True-2]",
+      "test_b": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[failed-None-False-2]",
+      "similarity": 1.0,
+      "shared": 390,
+      "union": 390,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-recover-formula-True-2]",
+      "test_b": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[replan-required-None-False-2]",
+      "similarity": 1.0,
+      "shared": 390,
+      "union": 390,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[failed-None-False-2]",
+      "test_b": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[replan-required-None-False-2]",
+      "similarity": 1.0,
+      "shared": 390,
+      "union": 390,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]",
+      "test_b": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[pt_BR-en_US]",
+      "similarity": 1.0,
+      "shared": 303,
+      "union": 303,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "test_b": "tests/test_telegram_client.py::test_document_submits_with_mode_and_source",
+      "similarity": 1.0,
+      "shared": 293,
+      "union": 293,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[failed]",
+      "test_b": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[replan-required]",
+      "similarity": 1.0,
+      "shared": 286,
+      "union": 286,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "test_b": "tests/test_untitled_document_name.py::test_without_an_uploaded_name_the_file_name_is_still_the_fallback",
+      "similarity": 1.0,
+      "shared": 275,
+      "union": 275,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\etc/relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\etc/relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[processed]",
+      "test_b": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[processed]",
+      "similarity": 1.0,
+      "shared": 274,
+      "union": 274,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[cache-hit]",
+      "test_b": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[cache-hit]",
+      "similarity": 1.0,
+      "shared": 224,
+      "union": 224,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[-0.1]",
+      "test_b": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[0]",
+      "similarity": 1.0,
+      "shared": 212,
+      "union": 212,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[-0.1]",
+      "test_b": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[1.5]",
+      "similarity": 1.0,
+      "shared": 212,
+      "union": 212,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[0]",
+      "test_b": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[1.5]",
+      "similarity": 1.0,
+      "shared": 212,
+      "union": 212,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_page_limit.py::test_a_non_positive_max_pages_is_refused_at_startup[-1]",
+      "test_b": "tests/test_page_limit.py::test_a_non_positive_max_pages_is_refused_at_startup[0]",
+      "similarity": 1.0,
+      "shared": 206,
+      "union": 206,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-failed-False-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_recovers_result_after_refresh[failed]",
+      "similarity": 1.0,
+      "shared": 189,
+      "union": 189,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-sent-False-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_recovers_result_after_refresh[sent]",
+      "similarity": 1.0,
+      "shared": 189,
+      "union": 189,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[error-None-False-False]",
+      "similarity": 1.0,
+      "shared": 185,
+      "union": 185,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-None-True-False]",
+      "similarity": 1.0,
+      "shared": 184,
+      "union": 184,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-pending-True-False]",
+      "similarity": 1.0,
+      "shared": 184,
+      "union": 184,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[queued-None-True-False]",
+      "similarity": 1.0,
+      "shared": 184,
+      "union": 184,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-None-True-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-pending-True-False]",
+      "similarity": 1.0,
+      "shared": 184,
+      "union": 184,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-None-True-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[queued-None-True-False]",
+      "similarity": 1.0,
+      "shared": 184,
+      "union": 184,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-pending-True-False]",
+      "test_b": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[queued-None-True-False]",
+      "similarity": 1.0,
+      "shared": 184,
+      "union": 184,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[ reader@example.test ]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[reader+tag@example.test]",
+      "similarity": 1.0,
+      "shared": 179,
+      "union": 179,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[ reader@example.test ]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[reader@example.test]",
+      "similarity": 1.0,
+      "shared": 179,
+      "union": 179,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[reader+tag@example.test]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[reader@example.test]",
+      "similarity": 1.0,
+      "shared": 179,
+      "union": 179,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 177,
+      "union": 177,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[../../etc/relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 177,
+      "union": 177,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "test_b": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "similarity": 1.0,
+      "shared": 177,
+      "union": 177,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "test_b": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[false-False]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "test_b": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[true-True]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[   ]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[false-False]",
+      "test_b": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[true-True]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[false-False]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[   ]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[false-False]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[true-True]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[   ]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[true-True]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[   ]",
+      "test_b": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[]",
+      "similarity": 1.0,
+      "shared": 175,
+      "union": 175,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result0-requested]",
+      "test_b": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result1-requested]",
+      "similarity": 1.0,
+      "shared": 168,
+      "union": 168,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-False]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-True]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-False]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-False]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-False]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-True]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-False]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[vision-False]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-True]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-False]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-True]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-True]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-True]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[vision-False]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-False]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-True]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-False]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[vision-False]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[region-handler-True]",
+      "test_b": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[vision-False]",
+      "similarity": 1.0,
+      "shared": 157,
+      "union": 157,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[../victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[..\\\\victim.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[../victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[C:\\\\outside\\\\victim.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[../victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[absolute-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[../victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[documento \\xe7.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[..\\\\victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[C:\\\\outside\\\\victim.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[..\\\\victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[absolute-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[..\\\\victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[documento \\xe7.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[C:\\\\outside\\\\victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[absolute-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[C:\\\\outside\\\\victim.pdf-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[documento \\xe7.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[absolute-handler]",
+      "test_b": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[documento \\xe7.pdf-handler]",
+      "similarity": 1.0,
+      "shared": 150,
+      "union": 150,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_salvaged_description_is_not_cached",
+      "test_b": "tests/test_structured_agent_outputs.py::test_a_truncated_description_is_not_cached",
+      "similarity": 1.0,
+      "shared": 145,
+      "union": 145,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_call_that_keeps_timing_out_reports_the_error",
+      "test_b": "tests/test_structured_agent_outputs.py::test_a_provider_timeout_is_not_rewritten_as_the_deadline",
+      "similarity": 1.0,
+      "shared": 139,
+      "union": 139,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_rate_limited_region_waits_and_is_retried",
+      "test_b": "tests/test_structured_agent_outputs.py::test_context_overflow_retries_full_page_with_smaller_image_and_token_cap",
+      "similarity": 1.0,
+      "shared": 139,
+      "union": 139,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_rate_limited_region_waits_and_is_retried",
+      "test_b": "tests/test_structured_agent_outputs.py::test_context_retry_does_not_consume_a_region_answer_attempt",
+      "similarity": 1.0,
+      "shared": 139,
+      "union": 139,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_context_overflow_retries_full_page_with_smaller_image_and_token_cap",
+      "test_b": "tests/test_structured_agent_outputs.py::test_context_retry_does_not_consume_a_region_answer_attempt",
+      "similarity": 1.0,
+      "shared": 139,
+      "union": 139,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_rate_limit_budget_exhausted_degrades_the_region",
+      "test_b": "tests/test_structured_agent_outputs.py::test_context_overflow_is_critical_only_after_the_smaller_request_fails",
+      "similarity": 1.0,
+      "shared": 138,
+      "union": 138,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_rate_limit_budget_exhausted_degrades_the_region",
+      "test_b": "tests/test_structured_agent_outputs.py::test_vision_agent_does_not_retry_a_provider_failure",
+      "similarity": 1.0,
+      "shared": 138,
+      "union": 138,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_context_overflow_is_critical_only_after_the_smaller_request_fails",
+      "test_b": "tests/test_structured_agent_outputs.py::test_vision_agent_does_not_retry_a_provider_failure",
+      "similarity": 1.0,
+      "shared": 138,
+      "union": 138,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_a_failed_toolbox_render_lets_the_context_error_stand",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_a_looping_description_is_salvaged_without_the_loop",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_a_region_on_the_general_budget_is_never_truncated",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_an_answer_malformed_before_its_end_is_not_salvaged[inner-quote]",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_an_answer_malformed_before_its_end_is_not_salvaged[invalid-escape]",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_an_incomplete_run_rejected_as_a_rate_limit_is_retried",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_completed_content_mentioning_429_is_not_mistaken_for_a_rate_limit",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_context_overflow_from_the_run_status_is_recovered[cancelled]",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_context_overflow_from_the_run_status_is_recovered[error]",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_data_agent_rejects_output_for_the_wrong_region_kind",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_data_agent_uses_larger_token_budget_for_tables",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_structured_agent_outputs.py::test_a_description_cut_off_in_a_later_field_is_salvaged",
+      "test_b": "tests/test_structured_agent_outputs.py::test_each_vision_call_takes_its_model_and_deadline_from_the_agent_models[describe_region]",
+      "similarity": 1.0,
+      "shared": 134,
+      "union": 134,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    }
+  ],
+  "coverage_subsets": [
+    {
+      "subsumed": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-ascii]",
+      "subsumer": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-cjk]",
+      "subsumed_tests": 3,
+      "subsumer_tests": 3,
+      "shared": 605,
+      "union": 605,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[False]",
+      "subsumer": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[None]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 455,
+      "union": 458,
+      "similarity": 0.9934,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[True]",
+      "subsumer": "tests/test_pending_fixes.py::test_result_email_reports_open_obligations_of_a_delivered_document",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 454,
+      "union": 454,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[True]",
+      "subsumer": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[None]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 454,
+      "union": 458,
+      "similarity": 0.9913,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[True]",
+      "subsumer": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[False]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 454,
+      "union": 455,
+      "similarity": 0.9978,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_the_worker_marks_what_a_reader_gets_and_stores_the_document_unmarked",
+      "subsumer": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[None]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 438,
+      "union": 458,
+      "similarity": 0.9563,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_the_worker_marks_what_a_reader_gets_and_stores_the_document_unmarked",
+      "subsumer": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[False]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 438,
+      "union": 455,
+      "similarity": 0.9626,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_the_worker_marks_what_a_reader_gets_and_stores_the_document_unmarked",
+      "subsumer": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[True]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 2,
+      "shared": 438,
+      "union": 454,
+      "similarity": 0.9648,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_reports_optional_export_failure[None]",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[DOCX disabled]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 398,
+      "union": 400,
+      "similarity": 0.995,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_reports_optional_export_failure[None]",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[DOCX]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 398,
+      "union": 410,
+      "similarity": 0.9707,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_reports_optional_export_failure[None]",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[benchmark]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 398,
+      "union": 405,
+      "similarity": 0.9827,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "subsumer": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-recover-formula-True-2]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 4,
+      "shared": 390,
+      "union": 390,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-True-1]",
+      "subsumer": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 4,
+      "shared": 384,
+      "union": 390,
+      "similarity": 0.9846,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_keeps_original_filename_in_status",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[DOCX]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 382,
+      "union": 410,
+      "similarity": 0.9317,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_keeps_original_filename_in_status",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[DOCX disabled]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 382,
+      "union": 400,
+      "similarity": 0.955,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_keeps_original_filename_in_status",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[benchmark]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 382,
+      "union": 405,
+      "similarity": 0.9432,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_keeps_original_filename_in_status",
+      "subsumer": "tests/test_api.py::test_job_executor_reports_optional_export_failure[None]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 382,
+      "union": 398,
+      "similarity": 0.9598,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_marks_history_error_when_export_fails[txt]",
+      "subsumer": "tests/test_api.py::test_job_executor_marks_history_error_when_export_fails[html]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 314,
+      "union": 320,
+      "similarity": 0.9812,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_api.py::test_job_executor_marks_history_error_when_export_fails[txt]",
+      "subsumer": "tests/test_api.py::test_schema_invalid_job_creates_then_cleans_directory_without_registering_download",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 314,
+      "union": 344,
+      "similarity": 0.9128,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]",
+      "subsumer": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[pt_BR-en_US]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 303,
+      "union": 303,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_download_link[True]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 303,
+      "union": 309,
+      "similarity": 0.9806,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_the_download_link_in_the_user_locale",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 303,
+      "union": 305,
+      "similarity": 0.9934,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-degraded-rerun]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-degraded-rerun]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 302,
+      "union": 303,
+      "similarity": 0.9967,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-clean-rerun]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-clean-rerun]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 301,
+      "union": 302,
+      "similarity": 0.9967,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_flow_sends_download_link[False]",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_download_link[True]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 299,
+      "union": 309,
+      "similarity": 0.9676,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_cached_entry_with_failed_media_inspection_is_ignored",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-clean-rerun]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 297,
+      "union": 302,
+      "similarity": 0.9834,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_cached_entry_with_failed_media_inspection_is_ignored",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-clean-rerun]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 297,
+      "union": 301,
+      "similarity": 0.9867,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_passes_email_and_notifies",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_the_download_link_in_the_user_locale",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 295,
+      "union": 305,
+      "similarity": 0.9672,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "subsumer": "tests/test_telegram_client.py::test_document_submits_with_mode_and_source",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 293,
+      "union": 293,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "subsumer": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 293,
+      "union": 303,
+      "similarity": 0.967,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "subsumer": "tests/test_telegram_client.py::test_document_passes_email_and_notifies",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 293,
+      "union": 295,
+      "similarity": 0.9932,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_the_download_link_in_the_user_locale",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 293,
+      "union": 305,
+      "similarity": 0.9607,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_download_link[True]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 293,
+      "union": 309,
+      "similarity": 0.9482,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "subsumer": "tests/test_telegram_client.py::test_document_flow_sends_download_link[False]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 293,
+      "union": 299,
+      "similarity": 0.9799,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[failed]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[replan-required]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 286,
+      "union": 286,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[failed]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[dry-run-completed]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 286,
+      "union": 287,
+      "similarity": 0.9965,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[True]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-clean-rerun]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 285,
+      "union": 302,
+      "similarity": 0.9437,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[True]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-clean-rerun]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 285,
+      "union": 301,
+      "similarity": 0.9468,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[True]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_entry_with_failed_media_inspection_is_ignored",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 285,
+      "union": 297,
+      "similarity": 0.9596,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_untitled_document_name.py::test_without_an_uploaded_name_the_file_name_is_still_the_fallback",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 275,
+      "union": 275,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-True-1]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 275,
+      "union": 384,
+      "similarity": 0.7161,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[True]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 275,
+      "union": 285,
+      "similarity": 0.9649,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-clean-rerun]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 275,
+      "union": 302,
+      "similarity": 0.9106,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-clean-rerun]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 275,
+      "union": 301,
+      "similarity": 0.9136,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_entry_with_failed_media_inspection_is_ignored",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 275,
+      "union": 297,
+      "similarity": 0.9259,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumer": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 4,
+      "shared": 275,
+      "union": 390,
+      "similarity": 0.7051,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "subsumed_tests": 6,
+      "subsumer_tests": 6,
+      "shared": 274,
+      "union": 274,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-True-1]",
+      "subsumed_tests": 6,
+      "subsumer_tests": 1,
+      "shared": 274,
+      "union": 384,
+      "similarity": 0.7135,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[True]",
+      "subsumed_tests": 6,
+      "subsumer_tests": 1,
+      "shared": 274,
+      "union": 285,
+      "similarity": 0.9614,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-clean-rerun]",
+      "subsumed_tests": 6,
+      "subsumer_tests": 1,
+      "shared": 274,
+      "union": 302,
+      "similarity": 0.9073,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "subsumed_tests": 6,
+      "subsumer_tests": 2,
+      "shared": 274,
+      "union": 275,
+      "similarity": 0.9964,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-clean-rerun]",
+      "subsumed_tests": 6,
+      "subsumer_tests": 1,
+      "shared": 274,
+      "union": 301,
+      "similarity": 0.9103,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_pddl_cache_contract.py::test_cached_entry_with_failed_media_inspection_is_ignored",
+      "subsumed_tests": 6,
+      "subsumer_tests": 1,
+      "shared": 274,
+      "union": 297,
+      "similarity": 0.9226,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "subsumed_tests": 6,
+      "subsumer_tests": 4,
+      "shared": 274,
+      "union": 390,
+      "similarity": 0.7026,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-budgets]",
+      "subsumer": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-defaults]",
+      "subsumed_tests": 24,
+      "subsumer_tests": 24,
+      "shared": 273,
+      "union": 273,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[cache-hit]",
+      "subsumer": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[cache-hit]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 224,
+      "union": 224,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[0-False]",
+      "subsumer": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[None-True]",
+      "subsumed_tests": 23,
+      "subsumer_tests": 23,
+      "shared": 212,
+      "union": 212,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[0-False]",
+      "subsumer": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-budgets]",
+      "subsumed_tests": 23,
+      "subsumer_tests": 24,
+      "shared": 212,
+      "union": 273,
+      "similarity": 0.7766,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[-0.1]",
+      "subsumer": "tests/test_slides.py::test_a_slide_visual_coverage_out_of_range_is_refused_at_startup[0]",
+      "subsumed_tests": 3,
+      "subsumer_tests": 3,
+      "shared": 212,
+      "union": 212,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_page_limit.py::test_a_non_positive_max_pages_is_refused_at_startup[-1]",
+      "subsumer": "tests/test_page_limit.py::test_a_non_positive_max_pages_is_refused_at_startup[0]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 206,
+      "union": 206,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_settings_runtime_providers.py::test_provider_environment_is_read_at_instantiation[fusion_hybrid_provider-FUSION_HYBRID_PROVIDER-mineru-hyb]",
+      "subsumer": "tests/test_settings_runtime_providers.py::test_provider_environment_is_read_at_instantiation[toolbox_adjudicate_provider-TOOLBOX_ADJUDICATE_PROVIDER-qwen3-vl-8b]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 4,
+      "shared": 203,
+      "union": 203,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_settings_runtime_providers.py::test_provider_environment_is_read_at_instantiation[fusion_hybrid_provider-FUSION_HYBRID_PROVIDER-mineru-hyb]",
+      "subsumer": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-budgets]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 24,
+      "shared": 203,
+      "union": 273,
+      "similarity": 0.7436,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_settings_runtime_providers.py::test_provider_environment_is_read_at_instantiation[fusion_hybrid_provider-FUSION_HYBRID_PROVIDER-mineru-hyb]",
+      "subsumer": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[0-False]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 23,
+      "shared": 203,
+      "union": 212,
+      "similarity": 0.9575,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-failed-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_recovers_result_after_refresh[failed]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 189,
+      "union": 189,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-sent-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_recovers_result_after_refresh[sent]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 189,
+      "union": 189,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[error-None-False-False]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 185,
+      "union": 185,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-sent-False-False]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 185,
+      "union": 189,
+      "similarity": 0.9788,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-unknown-False-False]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 185,
+      "union": 189,
+      "similarity": 0.9788,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-failed-False-False]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 185,
+      "union": 189,
+      "similarity": 0.9788,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelling-None-False-True]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 185,
+      "union": 189,
+      "similarity": 0.9788,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[processing-None-True-False]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 4,
+      "shared": 184,
+      "union": 184,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-sent-False-False]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 2,
+      "shared": 184,
+      "union": 189,
+      "similarity": 0.9735,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelled-None-False-False]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 2,
+      "shared": 184,
+      "union": 185,
+      "similarity": 0.9946,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-unknown-False-False]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 1,
+      "shared": 184,
+      "union": 189,
+      "similarity": 0.9735,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-failed-False-False]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 2,
+      "shared": 184,
+      "union": 189,
+      "similarity": 0.9735,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[done-pending-True-False]",
+      "subsumer": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds[cancelling-None-False-True]",
+      "subsumed_tests": 4,
+      "subsumer_tests": 1,
+      "shared": 184,
+      "union": 189,
+      "similarity": 0.9735,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[ reader@example.test ]",
+      "subsumer": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[reader+tag@example.test]",
+      "subsumed_tests": 3,
+      "subsumer_tests": 3,
+      "shared": 179,
+      "union": 179,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "subsumed_tests": 3,
+      "subsumer_tests": 3,
+      "shared": 177,
+      "union": 177,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-ascii]",
+      "subsumed_tests": 3,
+      "subsumer_tests": 3,
+      "shared": 177,
+      "union": 605,
+      "similarity": 0.2926,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[../../etc/relat\\xf3rio.pdf]",
+      "subsumer": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[short]",
+      "subsumed_tests": 3,
+      "subsumer_tests": 1,
+      "shared": 177,
+      "union": 599,
+      "similarity": 0.2955,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_structured_agent_outputs.py::test_an_agent_without_the_region_cache_neither_reads_nor_writes_it",
+      "subsumer": "tests/test_structured_agent_outputs.py::test_an_identical_region_reuses_the_cached_description",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 177,
+      "union": 184,
+      "similarity": 0.962,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "subsumer": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[false-False]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 5,
+      "shared": 175,
+      "union": 175,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "subsumer": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-ascii]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 3,
+      "shared": 175,
+      "union": 605,
+      "similarity": 0.2893,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "subsumer": "tests/test_untitled_document_name.py::test_api_keeps_only_the_uploaded_basename[../../etc/relat\\xf3rio.pdf]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 3,
+      "shared": 175,
+      "union": 177,
+      "similarity": 0.9887,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "subsumer": "tests/test_v2_security.py::test_job_capability_required_and_not_listed_anonymously",
+      "subsumed_tests": 5,
+      "subsumer_tests": 1,
+      "shared": 175,
+      "union": 270,
+      "similarity": 0.6481,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "subsumer": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted[ reader@example.test ]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 3,
+      "shared": 175,
+      "union": 179,
+      "similarity": 0.9777,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_object_markers.py::test_a_job_can_ask_for_markers_through_the_api[None-None]",
+      "subsumer": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[short]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 1,
+      "shared": 175,
+      "union": 599,
+      "similarity": 0.2922,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result0-requested]",
+      "subsumer": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result1-requested]",
+      "subsumed_tests": 2,
+      "subsumer_tests": 2,
+      "shared": 168,
+      "union": 168,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result0-requested]",
+      "subsumer": "tests/test_api.py::test_cancel_reports_a_requested_remote_cancellation",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 168,
+      "union": 267,
+      "similarity": 0.6292,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result0-requested]",
+      "subsumer": "tests/test_toolbox_manifest_extractor.py::test_cancelling_during_upload_refuses_the_next_operation",
+      "subsumed_tests": 2,
+      "subsumer_tests": 1,
+      "shared": 168,
+      "union": 185,
+      "similarity": 0.9081,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome[result4-failed]",
+      "subsumer": "tests/test_remote_cancellation.py::test_a_failure_is_not_hidden_by_another_operation",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 167,
+      "union": 173,
+      "similarity": 0.9653,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[persist_after]",
+      "subsumer": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[enqueue]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 159,
+      "union": 160,
+      "similarity": 0.9938,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-False]",
+      "subsumer": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-True]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 5,
+      "shared": 157,
+      "union": 157,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[data-False]",
+      "subsumer": "tests/test_structured_agent_outputs.py::test_a_hung_model_call_is_abandoned_at_the_deadline",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 154,
+      "union": 156,
+      "similarity": 0.9872,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[data-False]",
+      "subsumer": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked[page-handler-False]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 5,
+      "shared": 154,
+      "union": 157,
+      "similarity": 0.9809,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[persist_before]",
+      "subsumer": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[enqueue]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 154,
+      "union": 160,
+      "similarity": 0.9625,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[persist_before]",
+      "subsumer": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[persist_after]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 154,
+      "union": 159,
+      "similarity": 0.9686,
+      "strict": true,
+      "same_parameterized_family": true
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_submission_cancellation_does_not_leave_durable_request",
+      "subsumer": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[enqueue]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 153,
+      "union": 160,
+      "similarity": 0.9563,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_pending_fixes.py::test_submission_cancellation_does_not_leave_durable_request",
+      "subsumer": "tests/test_pending_fixes.py::test_failed_enqueue_removes_durable_request_and_upload[persist_after]",
+      "subsumed_tests": 1,
+      "subsumer_tests": 1,
+      "shared": 153,
+      "union": 159,
+      "similarity": 0.9623,
+      "strict": true,
+      "same_parameterized_family": false
+    },
+    {
+      "subsumed": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[../victim.pdf-handler]",
+      "subsumer": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename[..\\\\victim.pdf-handler]",
+      "subsumed_tests": 5,
+      "subsumer_tests": 5,
+      "shared": 150,
+      "union": 150,
+      "similarity": 1.0,
+      "strict": false,
+      "same_parameterized_family": true
+    }
+  ],
+  "families": [
+    {
+      "base": "tests/test_toolbox_client_factory.py::test_the_sdk_factory_builds_the_client_the_core_used_to_build",
+      "variants": 408,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_core_config.py::test_the_run_config_parameters_are_required",
+      "variants": 78,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_manifest_semantic_contract.py::test_core_and_docstruct_reject_the_same_documents",
+      "variants": 46,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_run_identity.py::test_a_field_left_out_does_not_change_the_identity",
+      "variants": 27,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_run_identity.py::test_a_processing_field_changes_the_identity",
+      "variants": 26,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core",
+      "variants": 24,
+      "union": 273,
+      "common": 273,
+      "identical": true
+    },
+    {
+      "base": "tests/test_core_config.py::test_the_internal_run_parameters_have_no_default",
+      "variants": 17,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docs_pr125.py::TestDocumentedModulesExist::test_module_is_importable",
+      "variants": 17,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_judge_probability.py::test_judge_probability",
+      "variants": 17,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pddl_cache_contract.py::test_merged_cache_policy_requires_success_across_all_stages",
+      "variants": 16,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_staging_update.py::test_production_update_accepts_only_verified_healthy_commit_images",
+      "variants": 15,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_readme_sync.py::TestModulesAreListed::test_english_lists_the_module",
+      "variants": 14,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_readme_sync.py::TestModulesAreListed::test_mirror_lists_the_module",
+      "variants": 14,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_manifest_semantic_contract.py::test_core_reports_docstruct_invariants_in_the_active_locale",
+      "variants": 14,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_n11_n14_regressions.py::test_readiness_rejects_invalid_contract_and_tries_next_endpoint",
+      "variants": 14,
+      "union": 90,
+      "common": 88,
+      "identical": false
+    },
+    {
+      "base": "tests/test_sdk_result_schemas.py::test_nested_constraints_agree_with_published_schema",
+      "variants": 13,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_bridges.py::test_adapter_import_check_recognizes_only_absolute_docstruct",
+      "variants": 12,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_formula_enrichment.py::test_plan_and_canonical_use_the_same_variable_sources",
+      "variants": 12,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_math_case.py::test_structure_recall_normalizes_operatorname_named_operators",
+      "variants": 12,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pending_fixes.py::test_status_without_destination_is_rejected",
+      "variants": 12,
+      "union": 56,
+      "common": 56,
+      "identical": true
+    },
+    {
+      "base": "tests/test_production_deploy.py::test_check_rejects_unsafe_configuration",
+      "variants": 12,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_bindings.py::test_the_size_reader_agrees_with_draft_7",
+      "variants": 12,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_dataset_schema.py::test_sync_discriminator_agrees_with_whole_published_array",
+      "variants": 12,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_handler_contract.py::test_the_contract_rejects",
+      "variants": 11,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_bridges.py::test_the_reexport_check_finds_module_imports",
+      "variants": 10,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_manifest_semantic_contract.py::test_core_and_docstruct_keep_the_same_documents",
+      "variants": 10,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_n05_n09_n10_regressions.py::test_artifact_id_rejects_trailing_characters",
+      "variants": 10,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_region_inspection.py::test_invalid_source_or_region_fails_without_model_call",
+      "variants": 10,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_run_identity.py::test_a_processing_provider_changes_the_identity",
+      "variants": 10,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_dataset_schema.py::test_bounds_nullability_and_nested_values",
+      "variants": 10,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_result_schemas.py::test_unsupported_constraints_and_bad_references_fail_explicitly",
+      "variants": 10,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_telegram_upload_paths.py::test_telegram_download_uses_generated_contained_filename",
+      "variants": 10,
+      "union": 150,
+      "common": 128,
+      "identical": false
+    },
+    {
+      "base": "tests/test_toolbox_math_tools.py::TestMathTools::test_an_answer_outside_the_contract_is_an_unavailable_capability",
+      "variants": 10,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_web_panel.py::test_receipt_close_info_only_while_the_email_promise_holds",
+      "variants": 10,
+      "union": 201,
+      "common": 184,
+      "identical": false
+    },
+    {
+      "base": "tests/test_bench_toolbox.py::test_the_guard_sees_every_form_of_a_forbidden_import",
+      "variants": 9,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_followup_regressions.py::test_mathml_is_validated_before_html_rendering",
+      "variants": 9,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_handler_contract.py::test_the_contract_accepts",
+      "variants": 9,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_ops_script.py::test_check_reports_each_problem",
+      "variants": 9,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_result_schemas.py::test_published_examples_and_required_fields",
+      "variants": 9,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_download_token_service.py::test_download_size_formatting",
+      "variants": 8,
+      "union": 92,
+      "common": 88,
+      "identical": false
+    },
+    {
+      "base": "tests/test_region_inspection.py::test_rotated_picture_provenance_renders_only_source_region",
+      "variants": 8,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_api.py::test_job_executor_reports_optional_export_failure",
+      "variants": 7,
+      "union": 427,
+      "common": 382,
+      "identical": false
+    },
+    {
+      "base": "tests/test_bench_toolbox.py::test_the_guard_leaves_other_imports_alone",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_core_test_fixture_parity.py::test_the_core_copy_matches_the_service_fixture",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docs_pr125.py::TestDocPairsExist::test_both_languages_exist",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docs_pr125.py::TestDocPairsExist::test_language_links_are_bidirectional",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docs_pr125.py::TestDomainVersionIsConsistent::test_no_stale_domain_version",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_math_case.py::test_non_item_content_ends_a_list_run",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pddl_cache_contract.py::test_execution_configuration_invalidates_document_cache",
+      "variants": 7,
+      "union": 97,
+      "common": 97,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pdf_ua_export.py::test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment",
+      "variants": 7,
+      "union": 212,
+      "common": 212,
+      "identical": true
+    },
+    {
+      "base": "tests/test_picture_without_page.py::test_only_an_embedded_raster_image_is_decoded",
+      "variants": 7,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_run_identity.py::test_the_fusion_reuse_identity_follows_each_option",
+      "variants": 7,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_layout_schema.py::test_mineru_nested_constraints",
+      "variants": 7,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_toolbox_manifest_extractor.py::test_a_structure_answer_outside_the_contract_is_a_typed_failure",
+      "variants": 7,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_bridges.py::test_adapter_only_wraps",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_bridges.py::test_bridge_imports_from_docstruct",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_followup_regressions.py::test_document_cache_changes_with_model_and_provider",
+      "variants": 6,
+      "union": 97,
+      "common": 97,
+      "identical": true
+    },
+    {
+      "base": "tests/test_formula_crop.py::test_an_unusable_box_is_silent_whatever_the_source",
+      "variants": 6,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_math_case.py::test_structure_recall_equates_trailing_quad_label_with_tag",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_model_call_executor.py::test_sync_call_returns_while_provider_stays_blocked",
+      "variants": 6,
+      "union": 157,
+      "common": 154,
+      "identical": false
+    },
+    {
+      "base": "tests/test_n05_n09_n10_regressions.py::test_observability_auth_handles_untrusted_token",
+      "variants": 6,
+      "union": 27,
+      "common": 19,
+      "identical": false
+    },
+    {
+      "base": "tests/test_page_limit.py::test_unreliable_preflight_does_not_reject",
+      "variants": 6,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pddl_audit_fixes.py::test_unusable_table_does_not_satisfy_obligation",
+      "variants": 6,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pddl_cache_contract.py::test_a_run_the_vision_model_failed_is_not_cacheable",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_pddl_payload_lists_and_callouts.py::test_empty_items_with_incompatible_markers_leave_sibling_text_alone",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_process_setup.py::test_setup_process_negotiates_the_server_locale",
+      "variants": 6,
+      "union": 46,
+      "common": 45,
+      "identical": false
+    },
+    {
+      "base": "tests/test_sdk_dataset_schema.py::test_each_record_matches_its_source_schema",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_slides.py::test_content_on_a_picture_that_is_not_a_label_stays",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_trilha_a_regressions.py::test_pddl_cache_policy",
+      "variants": 6,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay",
+      "variants": 6,
+      "union": 392,
+      "common": 378,
+      "identical": false
+    },
+    {
+      "base": "tests/test_v2_security.py::test_invalid_recipient_is_rejected_before_upload",
+      "variants": 6,
+      "union": 66,
+      "common": 61,
+      "identical": false
+    },
+    {
+      "base": "tests/test_api.py::test_toolbox_model_is_reachable_when_the_toolbox_reports_its_vlm_healthy",
+      "variants": 5,
+      "union": 88,
+      "common": 88,
+      "identical": true
+    },
+    {
+      "base": "tests/test_api.py::test_update_check_staleness",
+      "variants": 5,
+      "union": 31,
+      "common": 18,
+      "identical": false
+    },
+    {
+      "base": "tests/test_api_client.py::test_invalid_submission_receipt_does_not_enter_token_cache",
+      "variants": 5,
+      "union": 57,
+      "common": 49,
+      "identical": false
+    },
+    {
+      "base": "tests/test_docstruct_bridges.py::test_the_reexport_check_keeps_adapters_and_other_imports",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_readme_sync.py::TestPresetsAreListed::test_english_lists_the_preset",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docstruct_readme_sync.py::TestPresetsAreListed::test_mirror_lists_the_preset",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment",
+      "variants": 5,
+      "union": 212,
+      "common": 212,
+      "identical": true
+    },
+    {
+      "base": "tests/test_i18n.py::test_a_locale_variant_finds_its_catalog",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_math_case.py::test_structure_recall_equates_equivalent_commands",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_n11_n14_regressions.py::test_upload_rejects_empty_and_oversized_before_persistence_or_queue",
+      "variants": 5,
+      "union": 120,
+      "common": 42,
+      "identical": false
+    },
+    {
+      "base": "tests/test_pddl_cache_contract.py::test_records_visual_failures",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_process_setup.py::test_the_c_locale_hint_reads_the_composite_getlocale_returns",
+      "variants": 5,
+      "union": 29,
+      "common": 25,
+      "identical": false
+    },
+    {
+      "base": "tests/test_provider_choice_methods.py::TestVlmPairwiseJudge::test_answer_without_valid_pb_fails_instead_of_keeping_the_primary",
+      "variants": 5,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_remote_cancellation.py::test_cancel_summarizes_each_outcome",
+      "variants": 5,
+      "union": 179,
+      "common": 160,
+      "identical": false
+    },
+    {
+      "base": "tests/test_run_identity.py::test_a_run_with_other_options_does_not_reuse_the_fusion",
+      "variants": 5,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_bindings.py::test_a_root_constraint_the_reader_would_not_enforce_is_refused",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_bindings.py::test_the_model_generator_refuses_what_it_cannot_express",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_sdk_dataset_schema.py::test_precise_array_roots_including_empty_and_invalid",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_slide_case.py::test_normalization_reads_scripts_dashes_and_broken_lines_alike",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_slides.py::test_text_across_slides_without_usable_offsets_stays_whole",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_toolbox_snapshot.py::test_live_capture_cannot_overwrite_any_fixture",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_toolbox_snapshot.py::test_non_object_contract_is_a_cli_error_without_partial_writes",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_v2_security.py::test_valid_or_optional_recipient_is_accepted",
+      "variants": 5,
+      "union": 179,
+      "common": 175,
+      "identical": false
+    },
+    {
+      "base": "tests/test_vision_payload.py::test_non_positive_or_invalid_scale_returns_none_without_building_client",
+      "variants": 5,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_api.py::test_cancel_respects_task_state",
+      "variants": 4,
+      "union": 160,
+      "common": 77,
+      "identical": false
+    },
+    {
+      "base": "tests/test_api_client.py::test_non_object_http_error_preserves_api_error_status",
+      "variants": 4,
+      "union": 43,
+      "common": 43,
+      "identical": true
+    },
+    {
+      "base": "tests/test_audit_export_regressions.py::test_complete_plan_repairs_invalid_heading_sequence",
+      "variants": 4,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_checkpoint_identity.py::test_a_partial_or_unreadable_identity_is_not_a_match",
+      "variants": 4,
+      "union": 78,
+      "common": 78,
+      "identical": true
+    },
+    {
+      "base": "tests/test_cleanup_service.py::test_age_cleanup_preserves_valid_download_references",
+      "variants": 4,
+      "union": 124,
+      "common": 124,
+      "identical": true
+    }
+  ],
+  "zero_exclusive": [
+    {
+      "test": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-ascii]",
+      "elements": 605
+    },
+    {
+      "test": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-cjk]",
+      "elements": 605
+    },
+    {
+      "test": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[long-greek]",
+      "elements": 605
+    },
+    {
+      "test": "tests/test_long_output_filenames.py::test_long_filename_can_be_exported_and_downloaded[short]",
+      "elements": 599
+    },
+    {
+      "test": "tests/test_cancellation_queue.py::test_cancelled_extraction_advances_queue_and_reports_wait",
+      "elements": 571
+    },
+    {
+      "test": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[False]",
+      "elements": 455
+    },
+    {
+      "test": "tests/test_pending_fixes.py::test_email_delivery_status_does_not_lose_download[True]",
+      "elements": 454
+    },
+    {
+      "test": "tests/test_pending_fixes.py::test_result_email_reports_open_obligations_of_a_delivered_document",
+      "elements": 454
+    },
+    {
+      "test": "tests/test_object_markers.py::test_the_worker_marks_what_a_reader_gets_and_stores_the_document_unmarked",
+      "elements": 438
+    },
+    {
+      "test": "tests/test_job_progress.py::test_a_broken_failure_email_keeps_the_job_error_and_records_the_failure",
+      "elements": 429
+    },
+    {
+      "test": "tests/test_pddl_audit_fixes.py::test_failed_plan_marks_api_job_error_without_caching_or_download",
+      "elements": 426
+    },
+    {
+      "test": "tests/test_job_progress.py::test_pipeline_failure_names_the_stage_once_and_emails_the_user",
+      "elements": 417
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_reports_optional_export_failure[DOCX]",
+      "elements": 410
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_reports_optional_export_failure[MP3]",
+      "elements": 408
+    },
+    {
+      "test": "tests/test_worker_pipeline_failure.py::test_job_executor_does_not_export_pipeline_failure",
+      "elements": 403
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_reports_optional_export_failure[DOCX disabled]",
+      "elements": 400
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_reports_optional_export_failure[None]",
+      "elements": 398
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_reports_optional_export_failure[PDF/UA]",
+      "elements": 397
+    },
+    {
+      "test": "tests/test_pending_fixes.py::test_active_cancel_interrupts_pipeline_and_advances_queue",
+      "elements": 394
+    },
+    {
+      "test": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-False-2]",
+      "elements": 390
+    },
+    {
+      "test": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-recover-formula-True-2]",
+      "elements": 390
+    },
+    {
+      "test": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[failed-None-False-2]",
+      "elements": 390
+    },
+    {
+      "test": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[replan-required-None-False-2]",
+      "elements": 390
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_reports_optional_export_failure[PDF/UA disabled]",
+      "elements": 387
+    },
+    {
+      "test": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-normalize-text-True-1]",
+      "elements": 384
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_keeps_original_filename_in_status",
+      "elements": 382
+    },
+    {
+      "test": "tests/test_trilha_a_regressions.py::test_pddl_recovery_policy_controls_real_cache_replay[completed-None-False-1]",
+      "elements": 380
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_marks_history_error_when_export_fails[zip]",
+      "elements": 378
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_marks_history_error_when_export_fails[html]",
+      "elements": 320
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_marks_history_error_when_export_fails[txt]",
+      "elements": 314
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_document_flow_sends_download_link[True]",
+      "elements": 309
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_document_flow_sends_the_download_link_in_the_user_locale",
+      "elements": 305
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-degraded-rerun]",
+      "elements": 303
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]",
+      "elements": 303
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_pdf_ua_warning_survives_worker_and_user_locales_differing[pt_BR-en_US]",
+      "elements": 303
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[single-provider-extraction-clean-rerun]",
+      "elements": 302
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-degraded-rerun]",
+      "elements": 302
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_cached_degraded_entry_is_ignored[visual-failures-clean-rerun]",
+      "elements": 301
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[False]",
+      "elements": 299
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_document_flow_sends_download_link[False]",
+      "elements": 299
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_cached_entry_with_failed_media_inspection_is_ignored",
+      "elements": 297
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_document_passes_email_and_notifies",
+      "elements": 295
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_concurrent_group_users_keep_preferences_and_tasks_isolated",
+      "elements": 293
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_document_does_not_consume_another_senders_preferences",
+      "elements": 293
+    },
+    {
+      "test": "tests/test_telegram_client.py::test_document_submits_with_mode_and_source",
+      "elements": 293
+    },
+    {
+      "test": "tests/test_job_resume.py::test_a_resumed_run_restores_progress_and_skips_the_confirmation",
+      "elements": 290
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[dry-run-completed]",
+      "elements": 287
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[failed]",
+      "elements": 286
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_live_processing_rejects_incompatible_cached_execution[replan-required]",
+      "elements": 286
+    },
+    {
+      "test": "tests/test_pddl_cache_contract.py::test_degraded_processing_is_not_cached[True]",
+      "elements": 285
+    },
+    {
+      "test": "tests/test_api.py::test_job_executor_records_early_process_failure",
+      "elements": 277
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_the_processing_cache_is_keyed_by_the_job_config",
+      "elements": 275
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_without_an_uploaded_name_the_file_name_is_still_the_fallback",
+      "elements": 275
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[../../etc/relat\\xf3rio.pdf]",
+      "elements": 274
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\..\\\\etc\\\\relat\\xf3rio.pdf]",
+      "elements": 274
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[..\\\\etc/relat\\xf3rio.pdf]",
+      "elements": 274
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_a_client_path_in_the_uploaded_name_is_reduced_to_the_name[C:\\\\fakepath\\\\relat\\xf3rio.pdf]",
+      "elements": 274
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[processed]",
+      "elements": 274
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[processed]",
+      "elements": 274
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-budgets]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-defaults]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-empty provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-endpoints list wins]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxDatasetClient-single endpoint]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxMathClient-budgets]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxMathClient-defaults]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxMathClient-empty provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxMathClient-endpoints list wins]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxMathClient-provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxMathClient-single endpoint]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxPdfClient-budgets]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxPdfClient-defaults]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxPdfClient-empty provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxPdfClient-endpoints list wins]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxPdfClient-provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxPdfClient-single endpoint]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxStructureClient-budgets]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxStructureClient-defaults]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxStructureClient-empty provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxStructureClient-endpoints list wins]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxStructureClient-provider]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_bench_toolbox.py::test_the_harness_configures_clients_like_the_core[ToolboxStructureClient-single endpoint]",
+      "elements": 273
+    },
+    {
+      "test": "tests/test_api.py::test_cancel_reports_a_requested_remote_cancellation",
+      "elements": 267
+    },
+    {
+      "test": "tests/test_job_resume.py::test_a_graceful_shutdown_keeps_the_operation_journal",
+      "elements": 267
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_the_canonical_build_takes_the_job_toolbox_config[cache-hit]",
+      "elements": 224
+    },
+    {
+      "test": "tests/test_untitled_document_name.py::test_untitled_document_takes_the_uploaded_name[cache-hit]",
+      "elements": 224
+    },
+    {
+      "test": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[0-False]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[None-True]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[SIM-True]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[false-False]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_docx_export.py::test_toolbox_docx_enabled_is_parsed_from_the_environment[true-True]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_i18n_locales.py::test_settings_defaults_to_the_supported_locales",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_i18n_locales.py::test_settings_reads_i18n_locales_active_with_the_shared_parser",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_object_markers.py::test_markers_are_off_by_default",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_page_limit.py::test_max_pages_is_read_from_the_environment",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_pdf_ua_export.py::test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment[0-False]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_pdf_ua_export.py::test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment[1-True]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_pdf_ua_export.py::test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment[None-True]",
+      "elements": 212
+    },
+    {
+      "test": "tests/test_pdf_ua_export.py::test_toolbox_pdf_ua_enabled_is_parsed_from_the_environment[SIM-True]",
+      "elements": 212
+    }
+  ]
+}

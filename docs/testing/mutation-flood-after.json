@@ -1,0 +1,481 @@
+{
+  "schema_version": 1,
+  "kind": "mutation-report",
+  "module": "libs/docstruct/src/docstruct/fusion/flood.py",
+  "tests": [
+    "tests/test_flood.py"
+  ],
+  "settings": {
+    "operators": [
+      "compare",
+      "boolop",
+      "bool-constant",
+      "remove-not",
+      "negate-condition",
+      "augassign"
+    ],
+    "max_mutants": 40,
+    "timeout_seconds": 60
+  },
+  "baseline": {
+    "status": "survived",
+    "seconds": 0.9816116769998189,
+    "exit_code": 0,
+    "killers": [],
+    "error": ""
+  },
+  "summary": {
+    "total": 17,
+    "killed": 17,
+    "survived": 0,
+    "timeout": 0,
+    "uncovered": 0,
+    "invalid": 0,
+    "covered_mutants": 17,
+    "mutation_score": 1.0,
+    "killing_tests": 11,
+    "equivalent_mutants": "not identified automatically"
+  },
+  "mutants": [
+    {
+      "id": "M001",
+      "operator": "compare",
+      "line": 48,
+      "column": 13,
+      "description": "In -> NotIn",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+        "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
+      ],
+      "seconds": 0.951,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M002",
+      "operator": "compare",
+      "line": 49,
+      "column": 13,
+      "description": "In -> NotIn",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado"
+      ],
+      "seconds": 0.926,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M003",
+      "operator": "negate-condition",
+      "line": 50,
+      "column": 4,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+        "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+        "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+        "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
+      ],
+      "seconds": 0.971,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M004",
+      "operator": "boolop",
+      "line": 50,
+      "column": 7,
+      "description": "Or -> And",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+        "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado"
+      ],
+      "seconds": 1.025,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M005",
+      "operator": "compare",
+      "line": 50,
+      "column": 7,
+      "description": "Lt -> LtE",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo"
+      ],
+      "seconds": 0.835,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M006",
+      "operator": "compare",
+      "line": 50,
+      "column": 26,
+      "description": "Lt -> LtE",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado"
+      ],
+      "seconds": 0.921,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M007",
+      "operator": "boolop",
+      "line": 52,
+      "column": 10,
+      "description": "Or -> And",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo"
+      ],
+      "seconds": 0.804,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M008",
+      "operator": "negate-condition",
+      "line": 55,
+      "column": 8,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina",
+        "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+        "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
+      ],
+      "seconds": 0.895,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M009",
+      "operator": "boolop",
+      "line": 56,
+      "column": 12,
+      "description": "And -> Or",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina"
+      ],
+      "seconds": 0.808,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M010",
+      "operator": "compare",
+      "line": 56,
+      "column": 12,
+      "description": "Eq -> NotEq",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+        "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
+      ],
+      "seconds": 0.84,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M011",
+      "operator": "compare",
+      "line": 57,
+      "column": 16,
+      "description": "LtE -> Lt",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo"
+      ],
+      "seconds": 0.83,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M012",
+      "operator": "remove-not",
+      "line": 58,
+      "column": 16,
+      "description": "remove not",
+      "node_type": "UnaryOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+        "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
+      ],
+      "seconds": 0.859,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M013",
+      "operator": "compare",
+      "line": 58,
+      "column": 24,
+      "description": "In -> NotIn",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo"
+      ],
+      "seconds": 0.825,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M014",
+      "operator": "augassign",
+      "line": 60,
+      "column": 12,
+      "description": "Add -> Sub",
+      "node_type": "AugAssign",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+        "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+        "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
+      ],
+      "seconds": 0.79,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M015",
+      "operator": "negate-condition",
+      "line": 63,
+      "column": 4,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo"
+      ],
+      "seconds": 0.855,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M016",
+      "operator": "compare",
+      "line": 63,
+      "column": 7,
+      "description": "Lt -> LtE",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina"
+      ],
+      "seconds": 0.824,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M017",
+      "operator": "augassign",
+      "line": 64,
+      "column": 8,
+      "description": "Add -> Sub",
+      "node_type": "AugAssign",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+        "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo"
+      ],
+      "seconds": 0.839,
+      "exit_code": 1,
+      "error": ""
+    }
+  ],
+  "subsumption": [
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+      "mutants": 3,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+      "mutants": 2,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+      "mutants": 2,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": true,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "subsumed": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "mutants": 6,
+      "exclusive": 0,
+      "equal": true,
+      "coverage_similarity": null
+    }
+  ],
+  "exclusive": [
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina",
+      "mutants": [
+        "M016"
+      ]
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
+      "mutants": [
+        "M011"
+      ]
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo",
+      "mutants": [
+        "M005"
+      ]
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "mutants": [
+        "M006"
+      ]
+    }
+  ]
+}
