@@ -524,10 +524,15 @@ jobs:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
 
-      - name: Report GitHub Action pins
+      - name: Verify GitHub Action pins
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: uv run --locked --extra dev python scripts/check_action_pins.py --report-only
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            uv run --locked --extra dev python scripts/check_action_pins.py --report-only
+          else
+            uv run --locked --extra dev python scripts/check_action_pins.py
+          fi
 
   app-integration:
     name: app integration (Python 3.12)

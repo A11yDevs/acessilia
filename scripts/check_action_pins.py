@@ -30,7 +30,7 @@ from typing import Callable, Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
 GITHUB_API = "https://api.github.com/repos/{repository}/git/commits/{ref}"
-COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
+COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
 USES = re.compile(r"^\s*(?:-\s*)?uses:\s*[\"']?(?P<uses>[^\"'\s#]+)")
 USER_AGENT = "acessilia-action-pin-check"
 
@@ -46,9 +46,13 @@ class ActionPin:
 def iter_uses(root: Path) -> Iterator[tuple[Path, int, str]]:
     """Yield external ``uses`` references from workflows and composite actions."""
     base = root / ".github"
-    for path in sorted(base.rglob("*")):
-        if not path.is_file() or path.suffix not in {".yml", ".yaml"}:
-            continue
+    paths: set[Path] = set()
+    for pattern in ("*.yml", "*.yaml"):
+        paths.update((base / "workflows").rglob(pattern))
+    for path in (base / "actions").rglob("*"):
+        if path.is_file() and path.name in {"action.yml", "action.yaml"}:
+            paths.add(path)
+    for path in sorted(paths):
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             match = USES.search(line)
             if not match:
@@ -59,9 +63,7 @@ def iter_uses(root: Path) -> Iterator[tuple[Path, int, str]]:
             yield path, number, reference
 
 
-def parse_action_pin(
-    reference: str, *, path: Path, line: int
-) -> ActionPin:
+def parse_action_pin(reference: str, *, path: Path, line: int) -> ActionPin:
     """Split ``owner/repository[/subpath]@ref`` into a repository and ref."""
     if "@" not in reference:
         raise ValueError(f"action is not pinned to a SHA: {reference}")
@@ -108,17 +110,22 @@ def is_commit(
     opener: Callable[..., object] = urllib.request.urlopen,
 ) -> bool:
     """Whether ``ref`` is a commit in ``repository``; tag objects are not commits."""
-    if token and _request_commit(
-        repository,
-        ref,
-        token=token,
-        timeout=timeout,
-        opener=opener,
-    ):
-        return True
-    # An installation token may not resolve a different public repository.
-    # Retry without it when the authenticated request did not find a commit;
-    # a tag object is also missing there, so it remains invalid.
+    if token:
+        try:
+            if _request_commit(
+                repository,
+                ref,
+                token=token,
+                timeout=timeout,
+                opener=opener,
+            ):
+                return True
+        except urllib.error.HTTPError as exc:
+            # An installation token may be scoped to this repository or be
+            # rejected for public resources. Retry without it; a tag object is
+            # still missing there, so it remains invalid.
+            if exc.code not in {401, 403}:
+                raise
     return _request_commit(
         repository,
         ref,
@@ -138,7 +145,9 @@ def pin_problem(
     """A finding for one pin, or ``None`` when it is a pinned commit."""
     if not COMMIT_SHA.fullmatch(pin.ref):
         return f"is not pinned to a 40-character commit SHA: {pin.ref}"
-    if not is_commit(pin.repository, pin.ref, token=token, timeout=timeout, opener=opener):
+    if not is_commit(
+        pin.repository, pin.ref, token=token, timeout=timeout, opener=opener
+    ):
         return f"does not resolve to a commit object: {pin.ref}"
     return None
 
@@ -178,9 +187,7 @@ def main(argv: list[str] | None = None) -> int:
         key = (pin.repository, pin.ref)
         if key not in cached:
             try:
-                cached[key] = pin_problem(
-                    pin, token=args.token, timeout=args.timeout
-                )
+                cached[key] = pin_problem(pin, token=args.token, timeout=args.timeout)
             except Exception as exc:  # noqa: BLE001 - reported with its level
                 cached[key] = f"could not verify: {type(exc).__name__}: {exc}"
         problem = cached[key]
