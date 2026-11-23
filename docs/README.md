@@ -31,6 +31,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 18. [Local test workflow](testing.md) — the supported `make` commands, baseline timings, timeouts and CI artifacts for the edit–test–fix loop. (Brazilian Portuguese: [pt-BR version](testing.pt-br.md))
 19. [Architectural quality baseline, November 2026](architecture/quality-baseline.md) — the reproducible instrumentation and first measurements of #656: size, complexity, component dependencies, structural duplicates and hotspots for the core, SDK, docstruct, backend and frontend, with the machine-readable snapshot. (Brazilian Portuguese: [pt-BR version](architecture/quality-baseline.pt-br.md))
 20. [Duplication classification and first consolidation, November 2026](architecture/duplication-consolidation.md) — PR 2 of #656: the triage of the baseline groups, the shared locale parser, and the remaining candidates with their risks. (Brazilian Portuguese: [pt-BR version](architecture/duplication-consolidation.pt-br.md))
+21. [Test suite optimization](testing/optimization.md) — PR 1 of #644: the reproducible baseline of the application, docstruct, SDK and core suites, the parallelism comparison, the slowest tests and the limits of the measurement. (Brazilian Portuguese: [pt-BR version](testing/optimization.pt-br.md))
 
 ---
 
