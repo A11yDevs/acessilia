@@ -92,7 +92,8 @@ addopts = "--strict-config --strict-markers -ra"
 timeout = 180
 markers = [
     "e2e: requires a running Acessilia Toolbox at TOOLBOX_BASE_URL or Core API at CORE_BASE_URL",
-    "slow: expensive test; still part of make test-all and CI",
+    "integration: expensive in-process handler/pipeline test; run in the dedicated integration job",
+    "slow: expensive test; part of make test-all and local full runs",
 ]
 
 [tool.ruff]

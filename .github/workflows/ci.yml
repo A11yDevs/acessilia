@@ -91,6 +91,40 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  changes:
+    name: detect app integration changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      integration: ${{ steps.filter.outputs.integration }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Filter integration paths
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        with:
+          filters: |
+            integration:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'libs/core/**'
+              - 'tests/test_provider_choice_methods.py'
+              - 'tests/conftest.py'
+              - 'tests/judge_support.py'
+              - 'tests/core_config_support.py'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
+
   # The SDK is a public API for scripts and benchmarks (#402): it must install
   # and run with neither the core nor docstruct present.
   sdk-isolated:
@@ -487,6 +521,59 @@ jobs:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
 
+  app-integration:
+    name: app integration (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: changes
+    if: "!cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.integration == 'true')"
+    env:
+      UV_PYTHON: "3.12"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up root environment
+        uses: ./.github/actions/setup-root
+        with:
+          python-version: "3.12"
+          lock-hash: ${{ hashFiles('uv.lock') }}
+
+      - name: Run application integration tests
+        run: |
+          mkdir -p var/test-results
+          uv run --locked --extra dev python -m pytest -m integration --durations=25 \
+            --junitxml=var/test-results/app-integration.xml
+
+      - name: Reject unexpected skipped tests
+        run: |
+          uv run --locked --extra dev python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("var/test-results/app-integration.xml")
+          root = ElementTree.parse(report).getroot()
+          skipped = sum(
+              int(suite.attrib.get("skipped", "0"))
+              for suite in root.iter("testsuite")
+          )
+          if skipped:
+              raise SystemExit(f"CI incomplete: {skipped} integration test(s) skipped.")
+          print("Integration report validated: no test was skipped.")
+          PY
+
+      - name: Upload integration report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-report-app-integration
+          path: var/test-results/app-integration.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
   component-tests:
     name: ${{ matrix.component }} tests (Python 3.12)
     runs-on: ubuntu-latest
@@ -529,7 +616,7 @@ jobs:
           args=()
           coverage=()
           case "$COMPONENT" in
-            app) args=(-m "not e2e" -n 4 --dist worksteal); coverage=(backend frontend) ;;
+            app) args=(-m "not e2e and not integration" -n 4 --dist worksteal); coverage=(backend frontend) ;;
             docstruct) coverage=(docstruct) ;;
             sdk) coverage=(acessilia_sdk) ;;
             core) coverage=(acessilia_core) ;;
@@ -721,6 +808,7 @@ jobs:
       - quality
       - component-tests
       - planning-backends
+      - app-integration
     if: always()
 
     steps:
@@ -851,6 +939,7 @@ jobs:
           QUALITY: ${{ needs.quality.result }}
           COMPONENTS: ${{ needs.component-tests.result }}
           BACKENDS: ${{ needs.planning-backends.result }}
+          APP_INTEGRATION: ${{ needs.app-integration.result }}
         run: |
           failed=0
           for entry in "quality:$QUALITY" "component-tests:$COMPONENTS" "planning-backends:$BACKENDS"; do
@@ -861,6 +950,10 @@ jobs:
               failed=1
             fi
           done
+          if [ "$APP_INTEGRATION" != "success" ] && [ "$APP_INTEGRATION" != "skipped" ]; then
+            echo "::error::app-integration finished as $APP_INTEGRATION"
+            failed=1
+          fi
           exit "$failed"
 
   security:

@@ -97,15 +97,22 @@ def test_the_tests_check_aggregates_all_component_jobs() -> None:
     """The required name stays, but it is green only when every provider succeeded."""
     job = _workflow()["jobs"]["tests"]
 
-    assert set(job["needs"]) == {"quality", "component-tests", "planning-backends"}
+    assert set(job["needs"]) == {
+        "quality",
+        "component-tests",
+        "planning-backends",
+        "app-integration",
+    }
     assert job["if"] == "always()"
     steps = {step.get("name"): step for step in job["steps"]}
     verify = steps["Verify provider jobs"]
     assert "needs.quality.result" in verify["env"]["QUALITY"]
     assert "needs.component-tests.result" in verify["env"]["COMPONENTS"]
     assert "needs.planning-backends.result" in verify["env"]["BACKENDS"]
+    assert "needs.app-integration.result" in verify["env"]["APP_INTEGRATION"]
     # The loop entry is what makes a failed backend job fail the aggregator.
     assert '"planning-backends:$BACKENDS"' in verify["run"]
+    assert "APP_INTEGRATION" in verify["run"]
     assert '!= "success"' in verify["run"]
     assert "scripts/check_coverage_thresholds.py" in steps[
         "Check per-component coverage thresholds"
@@ -164,7 +171,7 @@ def test_component_jobs_keep_the_bounded_app_parallelism() -> None:
     steps = {step.get("name"): step for step in job["steps"]}
     run = steps["Run ${{ matrix.component }} test suite"]["run"]
 
-    assert 'app) args=(-m "not e2e" -n 4 --dist worksteal)' in run
+    assert 'app) args=(-m "not e2e and not integration" -n 4 --dist worksteal)' in run
     assert "coverage=(backend frontend)" in run
     assert '--junitxml="$GITHUB_WORKSPACE/var/test-results/$COMPONENT.xml"' in run
     assert "Collect complete test suite" not in steps
@@ -265,6 +272,41 @@ def test_the_impact_selection_runs_in_shadow_mode_without_touching_the_gate() ->
 
 
 
+def test_app_integration_runs_only_for_relevant_pull_requests() -> None:
+    jobs = _workflow()["jobs"]
+    changes = jobs["changes"]
+    app = jobs["app-integration"]
+
+    assert changes["if"] == "github.event_name == 'pull_request'"
+    assert app["needs"] == "changes"
+    assert app["if"] == (
+        "!cancelled() && (github.event_name != 'pull_request' || "
+        "needs.changes.outputs.integration == 'true')"
+    )
+    filter_step = changes["steps"][1]
+    assert filter_step["uses"].startswith("dorny/paths-filter@")
+    for path in (
+        "backend/**",
+        "frontend/**",
+        "libs/core/**",
+        "tests/test_provider_choice_methods.py",
+        "tests/conftest.py",
+    ):
+        assert path in filter_step["with"]["filters"]
+    steps = {step.get("name"): step for step in app["steps"]}
+    assert steps["Upload integration report"]["with"]["name"] == (
+        "test-report-app-integration"
+    )
+    assert "-m integration" in steps["Run application integration tests"]["run"]
+    assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
+    assert changes["permissions"]["pull-requests"] == "read"
+
+
+def test_the_integration_marker_is_registered() -> None:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"integration: expensive in-process handler/pipeline test' in pyproject
+
+
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
@@ -360,7 +402,7 @@ def test_ci_installs_the_root_environment_from_the_lock() -> None:
     assert "uv sync --locked --extra dev" in install
 
     jobs = _workflow()["jobs"]
-    for job_id in ("quality", "component-tests"):
+    for job_id in ("quality", "component-tests", "app-integration"):
         steps = {step.get("name"): step for step in jobs[job_id]["steps"]}
         setup = steps["Set up root environment"]
         assert setup["uses"] == "./.github/actions/setup-root"
