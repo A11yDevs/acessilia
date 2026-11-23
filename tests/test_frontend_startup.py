@@ -1,8 +1,8 @@
 """Characterization of the shared frontend startup and process lock.
 
 Both ``python -m frontend.run`` and the console-script entry point must start
-the same interfaces and use the same lock. These tests pin that behaviour
-before the duplicate entry point is reduced to a delegation (#656, groups 8–10).
+the same interfaces and use the same lock. These tests pin that behaviour for
+the shared runtime and the delegated entry point (#656, groups 8–10).
 """
 
 from __future__ import annotations
@@ -70,6 +70,17 @@ def _settings(**overrides: object) -> SimpleNamespace:
 
 
 @pytest.fixture
+def lock_files(tmp_path, monkeypatch):
+    current = tmp_path / "bot.lock"
+    legacy = tmp_path / "cli" / "bot.lock"
+    legacy.parent.mkdir()
+    monkeypatch.setattr(runtime, "LOCK_FILE", str(current))
+    monkeypatch.setattr(runtime, "LEGACY_LOCK_FILE", str(legacy))
+    monkeypatch.setattr(runtime, "logger", RecordingLogger())
+    return SimpleNamespace(current=current, legacy=legacy)
+
+
+@pytest.fixture
 def startup_environment(monkeypatch):
     started: list[object] = []
     logger = RecordingLogger()
@@ -132,6 +143,29 @@ def test_startup_launches_every_enabled_interface(startup_environment) -> None:
     assert {level for level, _ in env.logger.calls} == {"info"}
 
 
+def test_startup_shuts_down_when_an_interface_fails(startup_environment) -> None:
+    env = startup_environment
+
+    class FailingServer:
+        def __init__(self, config: FakeConfig) -> None:
+            self.config = config
+
+        async def serve(self) -> None:
+            raise RuntimeError("boom")
+
+    env.monkeypatch.setitem(
+        sys.modules,
+        "uvicorn",
+        _module("uvicorn", Config=FakeConfig, Server=FailingServer),
+    )
+    env.monkeypatch.setattr(runtime, "settings", _settings(enabled_interfaces="api"))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        asyncio.run(runtime.startup())
+
+    assert env.shutdowns == ["shutdown"]
+
+
 def test_startup_without_a_valid_bot_token_does_not_poll(startup_environment) -> None:
     env = startup_environment
     env.monkeypatch.setattr(
@@ -165,53 +199,124 @@ def test_the_console_script_reuses_the_runtime_main() -> None:
     assert console.main is runtime.main
 
 
-def test_the_lock_records_the_process_and_is_released(tmp_path, monkeypatch) -> None:
-    lock_file = tmp_path / "bot.lock"
-    monkeypatch.setattr(runtime, "LOCK_FILE", str(lock_file))
-    monkeypatch.setattr(runtime, "logger", RecordingLogger())
+def _patch_main(monkeypatch, events, logger=None):
+    async def fake_startup() -> None:
+        events.append("startup")
 
+    monkeypatch.setattr(runtime, "setup_process", lambda: events.append("setup"))
+    monkeypatch.setattr(runtime, "acquire_lock", lambda: events.append("acquire"))
+    monkeypatch.setattr(runtime, "release_lock", lambda: events.append("release"))
+    monkeypatch.setattr(runtime, "startup", fake_startup)
+    if logger is not None:
+        monkeypatch.setattr(runtime, "logger", logger)
+
+
+def test_main_sets_up_acquires_starts_and_releases(monkeypatch) -> None:
+    events: list[str] = []
+    _patch_main(monkeypatch, events)
+
+    runtime.main()
+
+    assert events == ["setup", "acquire", "startup", "release"]
+
+
+def test_main_releases_the_lock_after_keyboard_interrupt(monkeypatch) -> None:
+    events: list[str] = []
+    logger = RecordingLogger()
+    _patch_main(monkeypatch, events, logger)
+
+    async def interrupted() -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(runtime, "startup", interrupted)
+    runtime.main()
+
+    assert events == ["setup", "acquire", "release"]
+    assert [level for level, _ in logger.calls] == ["info"]
+
+
+def test_main_releases_the_lock_and_exits_on_startup_failure(monkeypatch) -> None:
+    events: list[str] = []
+    logger = RecordingLogger()
+    _patch_main(monkeypatch, events, logger)
+
+    async def failed() -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(runtime, "startup", failed)
+    with pytest.raises(SystemExit) as raised:
+        runtime.main()
+
+    assert raised.value.code == 1
+    assert events == ["setup", "acquire", "release"]
+    assert [level for level, _ in logger.calls] == ["exception"]
+
+
+def test_the_lock_records_the_process_and_is_released(lock_files) -> None:
     runtime.acquire_lock()
-    assert lock_file.read_text(encoding="utf-8") == str(os.getpid())
+    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
 
     runtime.release_lock()
-    assert not lock_file.exists()
+    assert not lock_files.current.exists()
 
 
-def test_a_live_lock_is_refused(tmp_path, monkeypatch) -> None:
-    lock_file = tmp_path / "bot.lock"
-    lock_file.write_text("1234", encoding="utf-8")
-    monkeypatch.setattr(runtime, "LOCK_FILE", str(lock_file))
-    monkeypatch.setattr(runtime, "logger", RecordingLogger())
+def test_a_live_lock_is_refused(lock_files, monkeypatch) -> None:
+    lock_files.current.write_text("1234", encoding="utf-8")
     monkeypatch.setattr(runtime, "_is_process_running", lambda pid: True)
 
     with pytest.raises(SystemExit) as raised:
         runtime.acquire_lock()
 
     assert raised.value.code == 1
-    assert lock_file.read_text(encoding="utf-8") == "1234"
+    assert lock_files.current.read_text(encoding="utf-8") == "1234"
 
 
-def test_a_stale_lock_is_replaced(tmp_path, monkeypatch) -> None:
-    lock_file = tmp_path / "bot.lock"
-    lock_file.write_text("1234", encoding="utf-8")
-    monkeypatch.setattr(runtime, "LOCK_FILE", str(lock_file))
-    monkeypatch.setattr(runtime, "logger", RecordingLogger())
+def test_a_stale_lock_is_replaced(lock_files, monkeypatch) -> None:
+    lock_files.current.write_text("1234", encoding="utf-8")
     monkeypatch.setattr(runtime, "_is_process_running", lambda pid: False)
 
     runtime.acquire_lock()
 
-    assert lock_file.read_text(encoding="utf-8") == str(os.getpid())
+    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
 
 
-def test_a_malformed_lock_is_replaced(tmp_path, monkeypatch) -> None:
-    lock_file = tmp_path / "bot.lock"
-    lock_file.write_text("not a pid", encoding="utf-8")
-    monkeypatch.setattr(runtime, "LOCK_FILE", str(lock_file))
-    monkeypatch.setattr(runtime, "logger", RecordingLogger())
+def test_a_malformed_lock_is_replaced(lock_files) -> None:
+    lock_files.current.write_text("not a pid", encoding="utf-8")
 
     runtime.acquire_lock()
 
-    assert lock_file.read_text(encoding="utf-8") == str(os.getpid())
+    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+
+
+def test_a_live_legacy_lock_is_refused(lock_files, monkeypatch) -> None:
+    lock_files.legacy.write_text("1234", encoding="utf-8")
+    monkeypatch.setattr(runtime, "_is_process_running", lambda pid: True)
+
+    with pytest.raises(SystemExit) as raised:
+        runtime.acquire_lock()
+
+    assert raised.value.code == 1
+    assert lock_files.legacy.read_text(encoding="utf-8") == "1234"
+    assert not lock_files.current.exists()
+
+
+def test_a_stale_legacy_lock_is_removed(lock_files, monkeypatch) -> None:
+    lock_files.legacy.write_text("1234", encoding="utf-8")
+    monkeypatch.setattr(runtime, "_is_process_running", lambda pid: False)
+
+    runtime.acquire_lock()
+
+    assert not lock_files.legacy.exists()
+    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
+
+
+def test_a_malformed_legacy_lock_is_removed(lock_files) -> None:
+    lock_files.legacy.write_text("not a pid", encoding="utf-8")
+
+    runtime.acquire_lock()
+
+    assert not lock_files.legacy.exists()
+    assert lock_files.current.read_text(encoding="utf-8") == str(os.getpid())
 
 
 def test_posix_pid_probe_treats_a_running_process_as_alive(monkeypatch) -> None:

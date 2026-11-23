@@ -59,7 +59,9 @@ mudando apenas a formatação, o local do arquivo de lock e a presença de uma
 função `main()`. O ponto de entrada dos console scripts agora importa `main` de
 `frontend.run`, então o runtime tem uma única implementação e um único lock
 (`frontend/bot.lock`). Iniciar um dos entry points com o outro já rodando agora é
-recusado, em vez de usar dois locks separados.
+recusado, em vez de usar dois locks separados. O runtime também reconhece o lock
+legado `frontend/cli/bot.lock`: se ele apontar para um processo vivo, o startup é
+recusado; se estiver obsoleto ou malformado, é removido.
 
 O comportamento de startup e lock é fixado por `tests/test_frontend_startup.py`:
 cada interface habilitada, as saídas por token ausente e por nenhuma interface, o

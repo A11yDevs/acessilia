@@ -58,7 +58,9 @@ process lock and interface startup, differing only in formatting, the lock file
 location and the presence of a `main()` function. The console-script entry point
 now imports `main` from `frontend.run`, so the runtime has one implementation and
 one lock (`frontend/bot.lock`). Starting either entry point while the other is
-already running is now refused, instead of using two separate lock files.
+already running is now refused, instead of using two separate lock files. The
+runtime also recognizes the legacy `frontend/cli/bot.lock`: if it names a live
+process, startup is refused; if it is stale or malformed, it is removed.
 
 The startup and lock behaviour is pinned by `tests/test_frontend_startup.py`:
 every enabled interface, the missing-token and empty-interface exits, the lock
