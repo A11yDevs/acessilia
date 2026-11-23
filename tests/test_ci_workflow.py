@@ -88,8 +88,15 @@ def test_quality_gates_run_on_the_single_python_leg() -> None:
         "Report the Toolbox's docstruct pin",
     ):
         assert "if" not in steps[name], name
-    for name in ("Summarize per-component coverage", "Upload coverage reports"):
+    for name in (
+        "Check per-component coverage thresholds",
+        "Summarize per-component coverage",
+        "Upload coverage reports",
+    ):
         assert "always()" in steps[name].get("if", ""), name
+    assert "scripts/check_coverage_thresholds.py" in steps[
+        "Check per-component coverage thresholds"
+    ]["run"]
 
     # The suites themselves run on the only leg, and it keeps its JUnit report.
     assert "if" not in steps["Run main test suite"]

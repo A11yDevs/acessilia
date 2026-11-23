@@ -24,7 +24,7 @@ help:
 		'make test-all                           run the main suite (4 workers), docstruct, SDK and libs/core' \
 		'make lint                               run Ruff against the shrinking baseline (scripts/check_ruff_baseline.py)' \
 		'make typecheck                          run Mypy on the configured docstruct, SDK, core and backend scope' \
-		'make coverage                           run tests with branch coverage per component (var/coverage/)'
+		'make coverage                           run branch coverage per component and enforce the thresholds'
 
 lint:
 	$(UV) run python scripts/check_ruff_baseline.py
@@ -59,6 +59,7 @@ coverage:
 		--cov-report=xml:"$(CURDIR)/$(COVERAGE_DIR)/core/coverage.xml" \
 		--cov-report=json:"$(CURDIR)/$(COVERAGE_DIR)/core/coverage.json" \
 		--cov-report=html:"$(CURDIR)/$(COVERAGE_DIR)/core/htmlcov") || status=$$?; \
+	$(UV) run python scripts/check_coverage_thresholds.py --coverage-dir "$(COVERAGE_DIR)" || status=$$?; \
 	exit $$status
 
 test-file:
