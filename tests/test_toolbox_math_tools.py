@@ -6,6 +6,7 @@ Uses respx for HTTP mocking.
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -261,6 +262,52 @@ class TestSharedMathClient:
         with pytest.raises(RuntimeError, match="boom"):
             asyncio.run(toolbox_math_tools._with_math_client(toolbox_config(), fail))
         assert closed == [True]
+
+    def test_each_operation_closes_the_client_it_used(self, monkeypatch):
+        """The wrappers route through the helper, which closes their own client."""
+        class FakeClient:
+            def __init__(self):
+                self.closed = False
+
+            async def close(self):
+                self.closed = True
+
+        created: list[FakeClient] = []
+        seen: list[tuple[str, FakeClient]] = []
+
+        def factory(*_args, **_kwargs):
+            client = FakeClient()
+            created.append(client)
+            return client
+
+        async def fake_recognize(client, _image_bytes):
+            seen.append(("recognize", client))
+            return SimpleNamespace(candidates=[{"latex": "x"}])
+
+        async def fake_convert(client, _latex, *, direction):
+            seen.append(("convert", client))
+            assert direction == "latex-to-mathml"
+            return SimpleNamespace(text="converted")
+
+        async def fake_verbalize(client, _latex, *, language):
+            seen.append(("verbalize", client))
+            assert language == "pt-BR"
+            return SimpleNamespace(text="spoken")
+
+        monkeypatch.setattr(toolbox_math_tools, "make_toolbox_client", factory)
+        monkeypatch.setattr(toolbox_math_tools, "recognize_formula", fake_recognize)
+        monkeypatch.setattr(toolbox_math_tools, "convert_formula", fake_convert)
+        monkeypatch.setattr(toolbox_math_tools, "verbalize_formula", fake_verbalize)
+
+        assert toolbox_recognize_formula(b"png", toolbox=toolbox_config()) == [
+            {"latex": "x"}
+        ]
+        assert toolbox_convert_latex("x", toolbox=toolbox_config()) == "converted"
+        assert toolbox_verbalize_latex("x", toolbox=toolbox_config()) == "spoken"
+
+        assert [name for name, _client in seen] == ["recognize", "convert", "verbalize"]
+        assert [client for _name, client in seen] == created
+        assert all(client.closed for client in created)
 
 
 if __name__ == "__main__":
