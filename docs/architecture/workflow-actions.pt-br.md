@@ -64,6 +64,69 @@ só conferem esse trabalho: `vision-description` confere as descrições e
 `pandoc-table` confere a AST da tabela. Os dois são `validation` em
 `toolbox_gate.LOCAL_METHODS` (#804).
 
+## O que o bootstrap extrai
+
+A extração do bootstrap é rica. Os providers de estrutura detectam e rotulam
+os objetos da página, e os passos de enriquecimento complementam e conferem
+essa saída; não a refazem.
+
+- **Docling**, o provider primário (`TOOLBOX_PROVIDER=docling`, com
+  `FUSION_MODE=single` por padrão), roda:
+  - a detecção de layout, com um rótulo e uma caixa por objeto: texto,
+    títulos, listas, tabelas, imagens, fórmulas, código, legendas, notas de
+    rodapé, cabeçalhos e rodapés de página;
+  - a ordem de leitura;
+  - OCR;
+  - a estrutura das tabelas, com o TableFormer `accurate` (a única opção de
+    pipeline que a Toolbox configura, `table_mode`).
+- **Os enriquecimentos opcionais do Docling ficam desligados por desenho**:
+  enriquecimento de fórmulas (`do_formula_enrichment`), descrição e
+  classificação de imagens, e enriquecimento de código. Providers mais
+  especializados fazem esse trabalho, com resultado melhor:
+  - LaTeX das fórmulas: `math.recognize` (PP-FormulaNet), com o modelo de
+    visão como alternativa;
+  - descrições de imagens: o modelo de visão;
+  - MathML e matemática falada: `math.convert` e `math.verbalize`
+    (`math-speech`).
+- **MinerU**, o provider secundário em `FUSION_MODE=dual`, detecta fórmulas
+  (em destaque e inline), tabelas (em HTML), gráficos, legendas, código e
+  notas de rodapé.
+
+Então cada passo de enriquecimento é **condicionado ao que o bootstrap deixou
+faltando ou duvidoso**:
+
+| Passo | Roda sobre | Porque |
+|---|---|---|
+| 1. Regiões de fórmula | os rótulos de fórmula do extrator | uma detecção pode rotular um desenho como fórmula: o rótulo é uma observação a conferir |
+| 2. Descrições de imagens | imagens sem descrição | o extrator não descreve imagens |
+| 3. Matemática inline | prosa da camada de texto | o Docling não informa região de fórmula inline num PDF tipografado |
+| 4. LaTeX das fórmulas | fórmulas sem marcação LaTeX (`has_latex_markup`) | o enriquecimento de fórmulas do Docling está desligado; um reconhecimento precisa concordar com a camada de texto, quando houver |
+| 5. Estrutura das tabelas | tabelas sem estrutura utilizável, ou embaralhadas (`TABLE_VISUAL_REVIEW`) | a estrutura do TableFormer é mantida quando é utilizável |
+
+A migração precisa manter essas condições: **uma obrigação só existe onde sua
+condição vale**. Do contrário, o plano mandaria para um provider
+especializado um objeto que o bootstrap já tratou bem. As condições também
+são onde as detecções do bootstrap são conferidas. Conferir um rótulo, a forma
+de uma tabela ou um reconhecimento contra a camada de texto decide o
+workflow, então pertence ao plano.
+
+Dois pontos sobre a configuração do bootstrap, a confirmar com a Toolbox:
+- **A intenção do desenho só é garantida pelos padrões da Toolbox.** O core
+  manda para `document.structure.extract` só o idioma e a flag de cache, e
+  nenhuma opção de pipeline. Os plugins desligados estão desligados por causa
+  do registro de providers da Toolbox e dos padrões dos providers, que nem o
+  core nem o manifesto veem. O adaptador do Docling registra em
+  `extractor.configuration` só os parâmetros da requisição, não os do
+  registro (`table_mode`).
+- **O reconhecimento de fórmulas e tabelas do MinerU está ligado por padrão.**
+  O adaptador do MinerU 2.1 da Toolbox (`main`, release 0.2.0) manda
+  `formula_enable=true` e `table_enable=true`, a menos que se peça o
+  contrário; o `develop` passa para o MinerU 4.0.12 com `--tier basic`. No
+  modo dual, uma fórmula fundida que vem do MinerU com LaTeX, ou uma tabela
+  que vem com HTML, passa pela condição e assim pula o PP-FormulaNet ou o
+  leitor de tabelas. Se isso corresponde à intenção do desenho é decisão da
+  Toolbox.
+
 ## A observação central
 
 O domínio já tem uma ação operacional genérica, `execute-obligation(o, m)`.
@@ -187,6 +250,11 @@ Toolbox não formularia obrigações nem o problema. Planejar o próprio
 bootstrap é a #816 (0.4.0).
 
 ## Questões abertas
+
+- **A configuração do bootstrap:** se o core deve declarar as opções de
+  pipeline das quais depende (os enriquecimentos do Docling desligados, o
+  reconhecimento de fórmulas e tabelas do MinerU) e registrar as efetivas no
+  manifesto, em vez de depender dos padrões da Toolbox.
 
 - **O replanejamento de descoberta:** a comparação no coordenador ou uma flag
   em `MethodResult`, e o seu limite.

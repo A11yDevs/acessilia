@@ -63,6 +63,67 @@ The plan then works on what enrichment produced. Some methods only check that
 work: `vision-description` checks the descriptions and `pandoc-table` checks
 the table AST. Both are `validation` in `toolbox_gate.LOCAL_METHODS` (#804).
 
+## What the bootstrap extracts
+
+The bootstrap's extraction is rich. The structure providers detect and label
+the page's objects, and the enrichment steps complement and check that output;
+they do not redo it.
+
+- **Docling**, the primary provider (`TOOLBOX_PROVIDER=docling`, with
+  `FUSION_MODE=single` by default) runs:
+  - layout detection, with a label and a box per object: text, titles, lists,
+    tables, pictures, formulas, code, captions, footnotes, page headers and
+    footers;
+  - the reading order;
+  - OCR;
+  - the table structure, with TableFormer `accurate` (the one pipeline option
+    the Toolbox configures, `table_mode`).
+- **Docling's optional enrichments stay off by design**: formula enrichment
+  (`do_formula_enrichment`), picture description and classification, and code
+  enrichment. More specialized providers do that work, and they give better
+  results:
+  - formula LaTeX: `math.recognize` (PP-FormulaNet), with the vision model as
+    fallback;
+  - picture descriptions: the vision model;
+  - MathML and spoken math: `math.convert` and `math.verbalize`
+    (`math-speech`).
+- **MinerU**, the secondary provider in `FUSION_MODE=dual`, detects formulas
+  (display and inline), tables (as HTML), charts, captions, code and
+  footnotes.
+
+So each enrichment step is **gated on what the bootstrap left missing or
+doubtful**:
+
+| Step | Runs on | Because |
+|---|---|---|
+| 1. Formula regions | the extractor's formula labels | a detection can label a drawing as a formula: the label is an observation to check |
+| 2. Picture descriptions | pictures without a description | the extractor does not describe pictures |
+| 3. Inline math | prose from the text layer | Docling reports no inline formula region for a typeset PDF |
+| 4. Formula LaTeX | formulas without LaTeX markup (`has_latex_markup`) | Docling's formula enrichment is off; a recognition must agree with the text layer when there is one |
+| 5. Table structures | tables without a usable structure, or garbled ones (`TABLE_VISUAL_REVIEW`) | TableFormer's structure is kept when it is usable |
+
+The migration must keep these gates: **an obligation exists only where its
+gate holds**. Otherwise the plan would send to a specialized provider an
+object the bootstrap already handled well. The gates are also where the
+bootstrap's detections are checked. Checking a label, a table's shape or a
+recognition against the text layer decides the workflow, so it belongs in the
+plan.
+
+Two points about the bootstrap's configuration, to confirm with the Toolbox:
+- **The design intent is enforced only by the Toolbox's defaults.** The core
+  sends `document.structure.extract` only the language and the cache flag,
+  and no pipeline option. The plugins that are off are off because of the
+  Toolbox's provider registry and the providers' defaults, which neither the
+  core nor the manifest sees. The Docling adapter records only the request's
+  parameters in `extractor.configuration`, not the registry's (`table_mode`).
+- **MinerU's formula and table recognition are on by default.** The
+  Toolbox's MinerU 2.1 adapter (`main`, release 0.2.0) sends
+  `formula_enable=true` and `table_enable=true` unless told otherwise;
+  `develop` moves to MinerU 4.0.12 with `--tier basic`. In dual mode, a fused
+  formula that comes from MinerU with LaTeX, or a table that comes with HTML,
+  passes the gate, and so skips PP-FormulaNet or the table reader. Whether
+  that matches the design intent is the Toolbox's decision.
+
 ## The key observation
 
 The domain already has one generic operational action,
@@ -180,6 +241,11 @@ would still not formulate obligations or the problem. Planning the bootstrap
 itself is #816 (0.4.0).
 
 ## Open questions
+
+- **The bootstrap's configuration:** whether the core should state the
+  pipeline options it relies on (Docling's enrichments off, MinerU's formula
+  and table recognition), and record the effective ones in the manifest,
+  instead of relying on the Toolbox's defaults.
 
 - **The discovery replan:** the coordinator comparison or a `MethodResult`
   flag, and its bound.
