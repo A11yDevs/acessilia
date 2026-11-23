@@ -280,17 +280,31 @@ def test_app_integration_runs_only_for_relevant_pull_requests() -> None:
     assert changes["if"] == "github.event_name == 'pull_request'"
     assert app["needs"] == "changes"
     assert app["if"] == (
-        "always() && (github.event_name != 'pull_request' || "
+        "!cancelled() && (github.event_name != 'pull_request' || "
         "needs.changes.outputs.integration == 'true')"
     )
     filter_step = changes["steps"][1]
     assert filter_step["uses"].startswith("dorny/paths-filter@")
-    assert "backend/**" in filter_step["with"]["filters"]
-    assert "tests/test_provider_choice_methods.py" in filter_step["with"]["filters"]
-    run = {step.get("name"): step for step in app["steps"]}[
-        "Run application integration tests"
-    ]["run"]
-    assert "-m integration" in run
+    for path in (
+        "backend/**",
+        "frontend/**",
+        "libs/core/**",
+        "tests/test_provider_choice_methods.py",
+        "tests/conftest.py",
+    ):
+        assert path in filter_step["with"]["filters"]
+    steps = {step.get("name"): step for step in app["steps"]}
+    assert steps["Upload integration report"]["with"]["name"] == (
+        "test-report-app-integration"
+    )
+    assert "-m integration" in steps["Run application integration tests"]["run"]
+    assert "skipped" in steps["Reject unexpected skipped tests"]["run"]
+    assert changes["permissions"]["pull-requests"] == "read"
+
+
+def test_the_integration_marker_is_registered() -> None:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"integration: expensive in-process handler/pipeline test' in pyproject
 
 
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:

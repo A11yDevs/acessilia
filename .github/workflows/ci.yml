@@ -96,6 +96,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       integration: ${{ steps.filter.outputs.integration }}
 
@@ -113,7 +116,14 @@ jobs:
             integration:
               - 'backend/**'
               - 'frontend/**'
+              - 'libs/core/**'
               - 'tests/test_provider_choice_methods.py'
+              - 'tests/conftest.py'
+              - 'tests/judge_support.py'
+              - 'tests/core_config_support.py'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
 
   # The SDK is a public API for scripts and benchmarks (#402): it must install
   # and run with neither the core nor docstruct present.
@@ -516,7 +526,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: changes
-    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.integration == 'true')
+    if: "!cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.integration == 'true')"
     env:
       UV_PYTHON: "3.12"
 
@@ -533,10 +543,8 @@ jobs:
           lock-hash: ${{ hashFiles('uv.lock') }}
 
       - name: Run application integration tests
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/var/coverage-data/app-integration/.coverage
         run: |
-          mkdir -p var/test-results var/coverage-data/app-integration
+          mkdir -p var/test-results
           uv run --locked --extra dev python -m pytest -m integration --durations=25 \
             --junitxml=var/test-results/app-integration.xml
 

@@ -57,11 +57,13 @@ GitHub Actions workflow `CI`:
   unexpected-skip check and its own JUnit/coverage artifacts. The application
   suite keeps the bounded four-worker run and excludes tests marked
   `integration`.
-- **`app integration (Python 3.12)`** runs the in-process API/worker/pipeline
-  tests marked `integration` when `backend/**`, `frontend/**` or the focused
-  provider-choice test changes (and on every push to an integration branch).
-  The marker separates expensive integration coverage without treating it as
-  live E2E; `e2e` remains the external-environment marker.
+- **`app integration (Python 3.12)`** runs the expensive in-process
+  handler/pipeline tests marked `integration` when `backend/**`,
+  `frontend/**`, `libs/core/**`, shared test support or the focused
+  provider-choice test changes. It also runs on every push to `main`,
+  `develop` or a release branch and on `workflow_dispatch`. The marker
+  separates expensive integration coverage without treating it as live E2E;
+  `e2e` remains the external-environment marker.
 - **`quality (Python 3.12)`** runs Ruff against the shrinking baseline, Mypy on
   the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass
   (#366), the Toolbox capability contract and the Toolbox's docstruct pin report
