@@ -37,7 +37,6 @@ from acessilia_core.execution.executor import (
 )
 from acessilia_core.execution.models import ExecutionReport, ExecutionStepResult
 from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import LOG_PDDL_PREFERRED_PLAN_MISSING
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
@@ -80,6 +79,11 @@ from acessilia_core.pipeline.preflight import (
 )
 from acessilia_core.planning import toolbox_gate
 from acessilia_core.planning.domain_bundle import DomainBundle
+from acessilia_core.planning.engine import (
+    PddlPlanningEngine,
+    PlanningEngine,
+    PlanningProblem,
+)
 from acessilia_core.planning.models import NominalPlan, PlanningComparison, PlanStep
 from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.ports import (
@@ -141,6 +145,7 @@ class PddlAccessibilityOrchestrator:
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
             Defaults to "toolbox".
         max_replans (int): How many times a run plans again when the executor reports `replan-required`; negative values count as 0; defaults to 2.
+        planning_engine (PlanningEngine | None): The engine that produces the plans (#632, PR 3). Defaults to None: a `PddlPlanningEngine` built from `planner_backend`, `preferred_plan` and the Fast Downward options at each planning call.
     """
 
     def __init__(
@@ -155,7 +160,9 @@ class PddlAccessibilityOrchestrator:
         enable_ocr: bool = True,
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
+        planning_engine: PlanningEngine | None = None,
     ) -> None:
+        self._planning_engine = planning_engine
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
@@ -182,6 +189,27 @@ class PddlAccessibilityOrchestrator:
         )
         self.planner = PlannerAgent()
         self.executor = self._build_executor()
+
+    @property
+    def planning_engine(self) -> PlanningEngine:
+        """The engine that plans this orchestrator's runs.
+
+        The injected one, or a `PddlPlanningEngine` over ``self.planner`` built
+        from the current backend options, so a change to them after
+        construction still applies. An instance built without ``__init__``
+        (the test helpers do) has no injected engine.
+        """
+        injected = getattr(self, "_planning_engine", None)
+        if injected is not None:
+            return injected
+        return PddlPlanningEngine(
+            self.planner,
+            backend=self.planner_backend,
+            preferred_plan=self.preferred_plan,
+            fast_downward=self.fast_downward,
+            fast_downward_alias=self.fast_downward_alias,
+            fast_downward_search=self.fast_downward_search,
+        )
 
     def _run_executor(self, config: CoreConfig, ports: RunPorts) -> ExecutorAgent:
         """The executor of one run: its handlers get the run's ``config`` and ``ports``.
@@ -720,34 +748,14 @@ class PddlAccessibilityOrchestrator:
         unavailable = sorted(
             set(self._unavailable_methods(manifest)) | set(extra_unavailable)
         )
-        if self.planner_backend == "both":
-            _, plans, comparison = self.planner.compare(
+        result = self.planning_engine.plan(
+            PlanningProblem.of(
                 manifest,
                 selected_roots=selected_roots,
                 unavailable_methods=unavailable,
-                fast_downward=self.fast_downward,
-                fast_downward_alias=self.fast_downward_alias,
-                fast_downward_search=self.fast_downward_search,
-                preferred_backend=self.preferred_plan,
             )
-            if self.preferred_plan not in plans:
-                raise RuntimeError(
-                    t(LOG_PDDL_PREFERRED_PLAN_MISSING).format(
-                        backend=self.preferred_plan
-                    )
-                )
-            return plans[self.preferred_plan], comparison
-
-        _, plan = self.planner.plan(
-            manifest,
-            selected_roots=selected_roots,
-            unavailable_methods=unavailable,
-            backend=self.planner_backend,
-            fast_downward=self.fast_downward,
-            fast_downward_alias=self.fast_downward_alias,
-            fast_downward_search=self.fast_downward_search,
         )
-        return plan, None
+        return result.plan, result.comparison
 
     def _unavailable_methods(self, manifest: ProcessingManifest) -> list[str]:
         """Methods this manifest can ask for that no registered handler implements.

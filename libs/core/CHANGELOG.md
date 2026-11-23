@@ -2,6 +2,22 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.7 — a planning engine seam
+
+No behaviour change. `acessilia_core.planning.engine` adds the seam between
+planning and workflow coordination (#632, PR 3; ADR-0029):
+- `PlanningProblem` (manifest, selected roots, unavailable methods);
+- `PlanningResult` (plan, compiled problem, optional comparison);
+- the `PlanningEngine` protocol;
+- `PddlPlanningEngine`, the adapter over `PlannerAgent`.
+
+The adapter now owns the choice of backend (`internal`, `fast-downward`,
+`both`) that used to live in the orchestrator. `PddlAccessibilityOrchestrator`
+plans through `planning_engine`: an engine passed to its constructor, or by
+default a `PddlPlanningEngine` built from its backend options at each planning
+call. A test can therefore replace the planner with a fake. The plans are
+unchanged.
+
 ## 0.3.6 — canonical descriptions for the PDDL schemas
 
 The PDDL schema descriptions now use the canonical English message constants

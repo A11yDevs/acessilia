@@ -2,6 +2,22 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.7 — uma interface de motor de planejamento
+
+Sem mudança de comportamento. `acessilia_core.planning.engine` cria a interface
+entre o planejamento e a coordenação do workflow (#632, PR 3; ADR-0029):
+- `PlanningProblem` (manifesto, raízes selecionadas, métodos indisponíveis);
+- `PlanningResult` (plano, problema compilado, comparação opcional);
+- o protocolo `PlanningEngine`;
+- `PddlPlanningEngine`, o adaptador sobre o `PlannerAgent`.
+
+O adaptador agora concentra a escolha do backend (`internal`,
+`fast-downward`, `both`), que antes ficava no orquestrador. O
+`PddlAccessibilityOrchestrator` planeja por `planning_engine`: um motor passado
+ao construtor ou, por padrão, um `PddlPlanningEngine` montado a partir das suas
+opções de backend a cada chamada de planejamento. Assim, um teste pode
+substituir o planejador por um fake. Os planos não mudam.
+
 ## 0.3.6 — descrições canônicas para os schemas PDDL
 
 As descrições dos schemas PDDL agora usam as constantes canônicas em inglês em
