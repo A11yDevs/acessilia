@@ -53,7 +53,8 @@ change in a base library always selects its consumers.
   (`conftest.py`, `judge_support.py`, `core_config_support.py`,
   `toolbox_render_fake.py`, `pyproject.toml`, `uv.lock`, the CI workflow).
   This mirrors the `app integration` trigger for pull-request path events; the
-  selector is case-insensitive and its fallbacks are supersets.
+  selector is case-insensitive and its fallbacks are supersets. The globs live
+  in `INTEGRATION_GLOBS`, and a workflow test compares them with the CI filter.
 - Unknown paths, an empty diff or a failed `git diff` → every suite, the
   conservative flag and `integration_required`. Unknown paths set
   `unclassified_changed` rather than pretending to be infrastructure.

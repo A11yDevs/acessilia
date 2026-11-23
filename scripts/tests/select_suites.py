@@ -70,6 +70,35 @@ CONTRACT_MARKERS = (
     "capability_contract",
 )
 
+#: The exact path globs used by the real ``changes`` filter in ci.yml.
+INTEGRATION_GLOBS = (
+    "backend/**",
+    "frontend/**",
+    "libs/core/**",
+    "libs/sdk/**",
+    "libs/docstruct/**",
+    "tests/test_provider_choice_methods.py",
+    "tests/conftest.py",
+    "tests/judge_support.py",
+    "tests/core_config_support.py",
+    "tests/toolbox_render_fake.py",
+    "pyproject.toml",
+    "uv.lock",
+    ".github/workflows/ci.yml",
+)
+
+
+def matches_integration(path: str) -> bool:
+    """Whether a repository-relative path matches one of the CI globs."""
+    normalized = path.replace("\\", "/").strip().lower()
+    for pattern in INTEGRATION_GLOBS:
+        if pattern.endswith("/**"):
+            if normalized.startswith(pattern[:-3]):
+                return True
+        elif normalized == pattern:
+            return True
+    return False
+
 
 @dataclass(frozen=True)
 class Selection:
@@ -161,22 +190,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             for suite in SUITES:
                 reasons[suite].append(f"contract path: {path}")
 
-        if (
-            lowered.startswith(
-                ("backend/", "frontend/", "libs/core/", "libs/sdk/", "libs/docstruct/")
-            )
-            or lowered
-            in {
-                "tests/test_provider_choice_methods.py",
-                "tests/conftest.py",
-                "tests/judge_support.py",
-                "tests/core_config_support.py",
-                "tests/toolbox_render_fake.py",
-                "pyproject.toml",
-                "uv.lock",
-                ".github/workflows/ci.yml",
-            }
-        ):
+        if matches_integration(lowered):
             integration = True
             indicators["integration_changed"] = True
             reasons["app"].append(f"integration trigger: {path}")
