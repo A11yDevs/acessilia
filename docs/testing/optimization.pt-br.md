@@ -35,10 +35,10 @@ atualizado sem repetir as suítes:
 
 ```bash
 uv run --extra dev python scripts/tests/collect_timings.py collect \
-  --report app=test-results.xml \
-  --report docstruct=libs/docstruct/docstruct-test-results.xml \
-  --report sdk=libs/sdk/sdk-test-results.xml \
-  --report core=libs/core/core-test-results.xml \
+  --report app=var/test-results/app.xml \
+  --report docstruct=var/test-results/docstruct.xml \
+  --report sdk=var/test-results/sdk.xml \
+  --report core=var/test-results/core.xml \
   --coverage-dir var/coverage \
   --output var/timings/baseline.json
 ```

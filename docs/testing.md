@@ -51,14 +51,20 @@ make the full suite itself faster.
 Every pull request and push to `develop`, `main` or a release branch runs the
 GitHub Actions workflow `CI`:
 
-- **`tests (Python 3.12)`** installs the project and runs
-  the non-E2E main suite with **four workers**, the docstruct, SDK and core
-  library suites with branch coverage, and rejects unexpected skipped tests,
-  uploading JUnit (`test-reports-py*`) artifacts. The same job runs Ruff against
-  the shrinking baseline, Mypy on the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass (#366),
-  the Toolbox capability contract, the Toolbox's docstruct pin report (warnings
-  only; see below), enforces the per-component coverage thresholds and publishes
-  the summary with its `coverage-reports-py*` artifact.
+- **`app tests (Python 3.12)`, `docstruct tests (Python 3.12)`,
+  `sdk tests (Python 3.12)` and `core tests (Python 3.12)`** run the four suites
+  in parallel, each with branch coverage, its own threshold check, its own
+  unexpected-skip check and its own JUnit/coverage artifacts. The application
+  suite keeps the bounded four-worker run.
+- **`quality (Python 3.12)`** runs Ruff against the shrinking baseline, Mypy on
+  the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass
+  (#366), the Toolbox capability contract and the Toolbox's docstruct pin report
+  (warnings only; see below), in parallel with the suites.
+- **`tests (Python 3.12)`** is the required aggregator. It fails if any provider
+  job failed or was skipped, then downloads the four coverage and JUnit
+  artifacts, enforces the global thresholds and publishes the timing/coverage
+  summaries (`test-reports-py3.12`, `coverage-reports-py3.12`,
+  `timing-baseline-py3.12`).
 - **`SDK alone (Python 3.12)`** installs only the SDK, docstruct (its one
   project dependency, ADR-0017) and the SDK's test tools (pytest,
   pytest-asyncio, respx), and proves that it works without the core.
@@ -75,12 +81,12 @@ GitHub Actions workflow `CI`:
   from the wheel, the smoke test from a folder outside the checkout, and the
   table stage from `libs/core/examples/table_stage.py` (ADR-0016, step 6). It is not
   a required check yet, for the same reason as `docstruct alone`.
-- Image delivery waits for all four jobs.
+- Image delivery waits for the aggregator, the three isolation jobs and the security jobs.
 
-The main suite check does not have a separate collection step: the test run collects
-the suite itself. The job name template `tests (Python ${{ matrix.python-version }})`
-renders the single matrix leg as `tests (Python 3.12)`, and `UV_PYTHON` pins that
-interpreter.
+The main suite check does not have a separate collection step: the test run
+collects the suite itself. The required name is the literal `tests (Python
+3.12)` on the aggregator; the component jobs carry their component in the name,
+and `UV_PYTHON` pins the interpreter.
 
 ### Locally
 
@@ -179,12 +185,13 @@ marker will be introduced together with the mechanism that makes it run alone.
 
 ### 5. Put the same wins in CI
 
-CI uses the same bounded parallel main-suite run as `make test-all`. Removing the
-standalone `--collect-only` step and parallelizing the main suite took the `tests` job
-from **1m59s** to **59s–1m26s** in the validation runs; one validation run on
-develop took **1m11s**, with the main step at **32s**. The other jobs stay unchanged:
-docstruct and SDK are still tested, skips are still rejected, the contract
-check still runs and the JUnit artifacts are still uploaded even on failure.
+CI now splits the four suites into parallel component jobs and keeps
+`tests (Python 3.12)` as the required aggregator. The application job uses the
+same bounded four-worker run as `make test-all`; docstruct, SDK and core run
+alongside it. The quality job (lint, types, contract, pin report) runs in
+parallel as well. The aggregator fails if any provider failed or was skipped,
+then combines the JUnit and coverage artifacts and publishes the timing and
+coverage summaries.
 
 ### 6. Monitor order-dependent and flaky behaviour
 
@@ -404,10 +411,12 @@ The test run collects the suite itself, so the separate `--collect-only` step
 was redundant.
 
 **Where are the slow-test reports?**
-`make` and CI pass `--durations=25`. CI also uploads JUnit reports per matrix leg
-as `test-reports-py*`, coverage reports once per run as `coverage-reports-py*`,
-and the isolation reports as `sdk-isolated-report-py*` and
-`docstruct-isolated-report-py*`, with 7-day retention.
+`make` and CI pass `--durations=25`. The component jobs upload
+`test-report-<component>` and `coverage-<component>`; the aggregator combines
+them once as `test-reports-py3.12` and `coverage-reports-py3.12`, and uploads
+`timing-baseline-py3.12`. The isolation reports are
+`sdk-isolated-report-py*` and `docstruct-isolated-report-py*`, with 7-day
+retention.
 
 **Where do I see the scheduled comparison?**
 After the workflow reaches the default branch, open Actions →
@@ -422,11 +431,12 @@ is sharing a runtime path. Check `tests/test_api.py`'s worker paths and use
 
 ## Where to see the results
 
-- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.12)` →
-  step `Run main test suite`. The log shows `created: 4/4 workers` and
-  `--durations=25`.
-- **Artifacts:** `test-reports-py*` (main, docstruct, SDK and core library),
-  `coverage-reports-py*`, `sdk-isolated-report-py*` and
+- **CI:** GitHub Actions → workflow `CI` → job `app tests (Python 3.12)` →
+  step `Run app test suite`. The log shows `created: 4/4 workers` and
+  `--durations=25`; the required `tests (Python 3.12)` job is the aggregator.
+- **Artifacts:** `test-reports-py3.12` and `coverage-reports-py3.12` (combined),
+  the per-component `test-report-*`/`coverage-*` artifacts,
+  `timing-baseline-py3.12`, `sdk-isolated-report-py*` and
   `docstruct-isolated-report-py*`.
 - **Scheduled:** workflow `Scheduled test monitoring`, with artifacts retained
   for 30 days and a tracking issue on scheduled failures.

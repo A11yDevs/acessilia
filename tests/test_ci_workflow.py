@@ -50,9 +50,11 @@ def _rendered_job_names(job: dict) -> set[str]:
 
 def test_ci_jobs_use_python_312() -> None:
     jobs = _workflow()["jobs"]
-    for job_id in ("tests", "sdk-isolated", "core-isolated", "docstruct-isolated"):
+    for job_id in ("sdk-isolated", "core-isolated", "docstruct-isolated"):
         assert jobs[job_id]["strategy"]["matrix"]["python-version"] == ["3.12"]
         assert jobs[job_id]["env"]["UV_PYTHON"] == "${{ matrix.python-version }}"
+    assert jobs["quality"]["env"]["UV_PYTHON"] == "3.12"
+    assert jobs["component-tests"]["env"]["UV_PYTHON"] == "3.12"
     assert _rendered_job_names(jobs["tests"]) == {"tests (Python 3.12)"}
     assert _rendered_job_names(jobs["sdk-isolated"]) == {"SDK alone (Python 3.12)"}
 
@@ -68,70 +70,52 @@ def test_the_container_scan_builds_without_layer_cache() -> None:
     assert steps["Build the production image"]["with"]["no-cache"] is True
 
 
-#: Steps of the ``tests`` job that do not depend on the interpreter (#170).
-#: They run once because the matrix has a single 3.12 leg.
-INTERPRETER_INDEPENDENT_STEPS = (
-    "Run Ruff against the shrinking baseline",
-    "Run Mypy on the configured scope",
-    "Run Mypy on the libraries with Python 3.11",
-    "Check the Toolbox capability contract",
-    "Report the Toolbox's docstruct pin",
-    "Summarize test timings",
-    "Summarize per-component coverage",
-    "Upload coverage reports",
-)
+def test_quality_gates_run_once_in_the_quality_job() -> None:
+    """Lint, types and contracts run once, independently of the four suites."""
+    quality = _workflow()["jobs"]["quality"]
+    steps = {step.get("name"): step for step in quality["steps"]}
 
-
-def test_quality_gates_run_on_the_single_python_leg() -> None:
-    """The single 3.12 leg runs every quality gate, and no gate is conditional on the matrix."""
-    job = _workflow()["jobs"]["tests"]
-    assert job["strategy"]["matrix"]["python-version"] == ["3.12"]
-    assert "PYTHON_DEFAULT" not in job.get("env", {})
-    steps = {step.get("name"): step for step in job["steps"]}
-
-    for name in INTERPRETER_INDEPENDENT_STEPS:
-        condition = steps[name].get("if", "")
-        assert "matrix.python-version" not in condition, name
-        assert "PYTHON_DEFAULT" not in condition, name
     for name in (
         "Run Ruff against the shrinking baseline",
         "Run Mypy on the configured scope",
-    "Run Mypy on the libraries with Python 3.11",
+        "Run Mypy on the libraries with Python 3.11",
         "Check the Toolbox capability contract",
         "Report the Toolbox's docstruct pin",
     ):
         assert "if" not in steps[name], name
-    for name in (
-        "Check per-component coverage thresholds",
-        "Summarize test timings",
-        "Summarize per-component coverage",
-        "Upload coverage reports",
-        "Upload timing baseline",
-    ):
-        assert "always()" in steps[name].get("if", ""), name
+    assert "scripts/check_ruff_baseline.py" in steps[
+        "Run Ruff against the shrinking baseline"
+    ]["run"]
+    assert "scripts/check_docstruct_pin.py" in steps[
+        "Report the Toolbox's docstruct pin"
+    ]["run"]
+
+
+def test_the_tests_check_aggregates_all_component_jobs() -> None:
+    """The required name stays, but it is green only when every provider succeeded."""
+    job = _workflow()["jobs"]["tests"]
+
+    assert set(job["needs"]) == {"quality", "component-tests"}
+    assert job["if"] == "always()"
+    steps = {step.get("name"): step for step in job["steps"]}
+    verify = steps["Verify provider jobs"]
+    assert "needs.quality.result" in verify["env"]["QUALITY"]
+    assert "needs.component-tests.result" in verify["env"]["COMPONENTS"]
+    assert '!= "success"' in verify["run"]
     assert "scripts/check_coverage_thresholds.py" in steps[
         "Check per-component coverage thresholds"
     ]["run"]
 
-    # The suites themselves run on the only leg, and it keeps its JUnit report.
-    assert "if" not in steps["Run main test suite"]
-    assert "if" not in steps["Run docstruct library test suite"]
-    assert "if" not in steps["Run SDK library test suite"]
-    assert "if" not in steps["Run core library test suite"]
-    assert "PYTHON_DEFAULT" not in steps["Upload test reports"].get("if", "")
 
+def test_component_jobs_keep_the_bounded_app_parallelism() -> None:
+    job = _workflow()["jobs"]["component-tests"]
+    steps = {step.get("name"): step for step in job["steps"]}
+    run = steps["Run ${{ matrix.component }} test suite"]["run"]
 
-def test_core_suite_runs_with_bounded_parallelism() -> None:
-    steps = _workflow()["jobs"]["tests"]["steps"]
-    names = [step.get("name") for step in steps]
-    run = next(
-        step["run"] for step in steps if step.get("name") == "Run main test suite"
-    )
-
-    assert "-n 4" in run
-    assert "--dist worksteal" in run
-    assert "--junitxml=test-results.xml" in run
-    assert "Collect complete test suite" not in names
+    assert 'app) args=(-m "not e2e" -n 4 --dist worksteal)' in run
+    assert "coverage=(backend frontend)" in run
+    assert '--junitxml="$GITHUB_WORKSPACE/var/test-results/$COMPONENT.xml"' in run
+    assert "Collect complete test suite" not in steps
 
 
 def test_ci_publishes_the_test_timing_baseline_without_changing_the_gate() -> None:
@@ -143,12 +127,69 @@ def test_ci_publishes_the_test_timing_baseline_without_changing_the_gate() -> No
     assert timing["continue-on-error"] is True
     assert "scripts/tests/collect_timings.py" in timing["run"]
     for label in ("app", "docstruct", "sdk", "core"):
-        assert f"--report {label}=" in timing["run"]
+        assert f"--report {label}=var/test-results/" in timing["run"]
     assert "--coverage-dir var/coverage" in timing["run"]
     assert "--output var/timings/baseline.json" in timing["run"]
 
     upload = steps["Upload timing baseline"]
     assert upload["with"]["path"] == "var/timings/baseline.json"
+
+
+def test_component_jobs_pin_the_matrix_thresholds_and_artifacts() -> None:
+    jobs = _workflow()["jobs"]
+    component = jobs["component-tests"]
+    include = component["strategy"]["matrix"]["include"]
+    assert {(item["component"], item["directory"]) for item in include} == {
+        ("app", "."),
+        ("docstruct", "libs/docstruct"),
+        ("sdk", "libs/sdk"),
+        ("core", "libs/core"),
+    }
+    steps = {step.get("name"): step for step in component["steps"]}
+    assert '--components "$COMPONENT"' in steps[
+        "Check ${{ matrix.component }} coverage threshold"
+    ]["run"]
+    assert steps["Upload component test report"]["with"]["name"] == (
+        "test-report-${{ matrix.component }}"
+    )
+    assert steps["Upload component coverage report"]["with"]["name"] == (
+        "coverage-${{ matrix.component }}"
+    )
+    assert steps["Upload component test report"]["if"] == "always()"
+    assert steps["Upload component coverage report"]["if"] == "always()"
+
+    aggregate = {step.get("name"): step for step in jobs["tests"]["steps"]}
+    assert "--components" not in aggregate[
+        "Check per-component coverage thresholds"
+    ]["run"]
+    assert aggregate["Download component coverage reports"]["with"]["pattern"] == (
+        "coverage-*"
+    )
+    assert aggregate["Download component test reports"]["with"]["pattern"] == (
+        "test-report-*"
+    )
+    assert aggregate["Download component coverage reports"]["with"][
+        "merge-multiple"
+    ] is True
+
+
+def test_the_aggregator_publishes_evidence_even_when_a_provider_fails() -> None:
+    steps = _workflow()["jobs"]["tests"]["steps"]
+    names = [step.get("name") for step in steps]
+    assert names[-1] == "Verify provider jobs"
+    by_name = {step.get("name"): step for step in steps}
+    for name in (
+        "Download component coverage reports",
+        "Download component test reports",
+        "Check per-component coverage thresholds",
+        "Summarize test timings",
+        "Summarize per-component coverage",
+        "Upload combined reports",
+        "Upload combined coverage reports",
+        "Upload timing baseline",
+        "Verify provider jobs",
+    ):
+        assert by_name[name]["if"] == "always()", name
 
 
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
@@ -229,39 +270,31 @@ def test_core_runs_alone_from_its_wheel() -> None:
 
 
 def test_ci_installs_the_root_environment_from_the_lock() -> None:
-    """The CI gate is the root uv.lock environment (#405)."""
-    job = _workflow()["jobs"]["tests"]
-    steps = {step.get("name"): step for step in job["steps"]}
+    """The component and quality jobs use the root uv.lock environment (#405)."""
+    jobs = _workflow()["jobs"]
+    for job_id in ("quality", "component-tests"):
+        job = jobs[job_id]
+        steps = {step.get("name"): step for step in job["steps"]}
+        uv = steps["Set up uv"]
+        assert uv["uses"].startswith("astral-sh/setup-uv@")
+        assert uv["with"]["version"] == "0.11.17"
+        cache = steps["Restore uv cache"]
+        assert cache["with"]["path"] == "~/.cache/uv"
+        assert "hashFiles('uv.lock')" in cache["with"]["key"]
+        install = steps["Check the lock and install from it"]["run"]
+        assert "uv lock --check" in install
+        assert "uv sync --locked --extra dev" in install
+        assert not any("pip install" in (step.get("run") or "") for step in job["steps"])
 
-    uv = steps["Set up uv"]
-    assert uv["uses"].startswith("astral-sh/setup-uv@")
-    assert uv["with"]["version"] == "0.11.17"
+    component = jobs["component-tests"]
+    steps = {step.get("name"): step for step in component["steps"]}
+    run = steps["Run ${{ matrix.component }} test suite"]["run"]
+    assert "uv run --locked --extra dev" in run
+    assert '--project "$GITHUB_WORKSPACE"' in run
 
-    cache = steps["Restore uv cache"]
-    assert cache["with"]["path"] == "~/.cache/uv"
-    assert "hashFiles('uv.lock')" in cache["with"]["key"]
-
-    install = steps["Check the lock and install from it"]["run"]
-    assert "uv lock --check" in install
-    assert "uv sync --locked --extra dev" in install
-
-    for name in (
-        "Run main test suite",
-        "Run docstruct library test suite",
-        "Run SDK library test suite",
-        "Run core library test suite",
-    ):
-        assert "uv run --locked" in steps[name]["run"]
-    for name in (
-        "Run docstruct library test suite",
-        "Run SDK library test suite",
-        "Run core library test suite",
-    ):
-        assert '--project "$GITHUB_WORKSPACE"' in steps[name]["run"]
-
-    assert not any(
-        "pip install" in (step.get("run") or "") for step in job["steps"]
-    )
+    aggregate = {step.get("name"): step for step in jobs["tests"]["steps"]}
+    assert "Set up uv" not in aggregate
+    assert "Check the lock and install from it" not in aggregate
 
 
 def test_production_container_installs_dev_deps_into_the_uv_venv() -> None:
@@ -445,7 +478,7 @@ def test_develop_template_keeps_parallel_pull_requests_mergeable() -> None:
 
 def test_docstruct_pin_is_reported_in_pull_requests_and_enforced_on_schedule() -> None:
     """Only the Toolbox can move its docstruct pin (#470, P8): warn, then enforce weekly."""
-    steps = _workflow()["jobs"]["tests"]["steps"]
+    steps = _workflow()["jobs"]["quality"]["steps"]
     report = next(step for step in steps if step.get("name") == "Report the Toolbox's docstruct pin")
     assert "scripts/check_docstruct_pin.py" in report["run"]
     assert "--report-only" in report["run"]

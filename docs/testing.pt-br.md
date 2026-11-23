@@ -51,14 +51,21 @@ própria suíte completa mais rápida.
 Todo pull request e push para `develop`, `main` ou uma branch de release executa
 o workflow `CI` do GitHub Actions:
 
-- **`tests (Python 3.12)`** instala o projeto e roda a
-  suíte principal non-E2E com **quatro workers**, as suítes do docstruct, do
-  SDK e da biblioteca do core com cobertura de desvios, e recusa skips
-  inesperados, publicando os artefatos JUnit (`test-reports-py*`). O mesmo job
-  roda o Ruff contra a baseline que só diminui, o Mypy no escopo configurado de
-  `docstruct`/SDK/core/backend e um passe 3.11 das bibliotecas (#366), o contrato de capacidades da Toolbox, o relatório da
-  versão do docstruct fixada pela Toolbox (só avisos; veja abaixo) e o resumo de
-  cobertura com o artefato `coverage-reports-py*`.
+- **`app tests (Python 3.12)`, `docstruct tests (Python 3.12)`,
+  `sdk tests (Python 3.12)` e `core tests (Python 3.12)`** executam as quatro
+  suítes em paralelo, cada uma com cobertura de desvios, seu próprio limite, sua
+  própria recusa de skips e seus artefatos JUnit/cobertura. A suíte da aplicação
+  mantém a execução limitada com quatro workers.
+- **`quality (Python 3.12)`** executa o Ruff contra a baseline que só diminui, o
+  Mypy no escopo configurado de `docstruct`/SDK/core/backend e um passe 3.11 das
+  bibliotecas (#366), o contrato de capacidades da Toolbox e o relatório da
+  versão do docstruct fixada pela Toolbox (só avisos; veja abaixo), em paralelo
+  com as suítes.
+- **`tests (Python 3.12)`** é o agregador obrigatório. Ele falha se qualquer job
+  provedor falhou ou foi pulado, baixa os quatro artefatos de cobertura e JUnit,
+  aplica os limites globais e publica os resumos de tempo/cobertura
+  (`test-reports-py3.12`, `coverage-reports-py3.12`,
+  `timing-baseline-py3.12`).
 - **`SDK alone (Python 3.12)`** instala apenas o SDK, o docstruct (a única
   dependência de projeto dele, ADR-0017) e as ferramentas de teste do SDK
   (pytest, pytest-asyncio, respx), e prova que ele funciona sem o core.
@@ -76,12 +83,12 @@ o workflow `CI` do GitHub Actions:
   fora do checkout e a etapa de tabelas pelo `libs/core/examples/table_stage.py`
   (ADR-0016, passo 6). Ainda não é um check obrigatório, pelo mesmo motivo do
   `docstruct alone`.
-- A entrega da imagem espera pelos quatro jobs.
+- A entrega da imagem espera pelo agregador, pelos três jobs de isolamento e pelos jobs de segurança.
 
-O check da suíte principal não tem mais uma etapa separada de coleta: a própria execução
-coleta a suíte. O template do nome do job `tests (Python ${{ matrix.python-version }})`
-renderiza a única perna da matriz como `tests (Python 3.12)`, e o `UV_PYTHON` fixa
-esse interpretador.
+O check da suíte principal não tem mais uma etapa separada de coleta: a própria
+execução coleta a suíte. O nome obrigatório é o literal `tests (Python 3.12)` no
+agregador; os jobs de componente carregam o componente no nome, e o `UV_PYTHON`
+fixa o interpretador.
 
 ### Localmente
 
@@ -182,13 +189,13 @@ Nenhum teste precisa ser marcado como serial hoje. Se um precisar, o marcador
 
 ### 5. Leve os mesmos ganhos para a CI
 
-A CI usa a mesma execução paralela limitada da suíte principal que o `make test-all`.
-Remover a etapa separada de `--collect-only` e paralelizar a suíte principal levou o job
-`tests` de **1m59s** para **59s–1m26s** nas execuções de validação; uma execução de
-validação na develop levou **1m11s**, com a suíte principal em **32s**. Os outros jobs
-continuam iguais: docstruct e SDK ainda são testados, skips ainda são recusados,
-o contrato ainda é conferido e os artefatos JUnit ainda são publicados mesmo em
-falha.
+A CI agora separa as quatro suítes em jobs de componente paralelos e mantém
+`tests (Python 3.12)` como agregador obrigatório. O job da aplicação usa a mesma
+execução limitada com quatro workers que o `make test-all`; docstruct, SDK e core
+rodam ao lado. O job de qualidade (lint, tipos, contrato, relatório de pin) também
+roda em paralelo. O agregador falha se qualquer provedor falhou ou foi pulado,
+combina os artefatos JUnit e de cobertura e publica os resumos de tempo e
+cobertura.
 
 ### 6. Monitore dependências de ordem e testes intermitentes
 
@@ -413,9 +420,10 @@ A execução de testes coleta a suíte sozinha, então a etapa separada de
 `--collect-only` era redundante.
 
 **Onde estão os relatórios de testes lentos?**
-O `make` e a CI passam `--durations=25`. A CI também publica os relatórios JUnit
-por perna da matriz como `test-reports-py*`, os relatórios de cobertura uma vez
-por execução como `coverage-reports-py*`, e os relatórios de isolamento como
+O `make` e a CI passam `--durations=25`. Os jobs de componente publicam
+`test-report-<component>` e `coverage-<component>`; o agregador combina os dois
+uma vez como `test-reports-py3.12` e `coverage-reports-py3.12`, e publica
+`timing-baseline-py3.12`. Os relatórios de isolamento são
 `sdk-isolated-report-py*` e `docstruct-isolated-report-py*`, com retenção de 7
 dias.
 
@@ -432,11 +440,12 @@ compartilhando um caminho de execução. Confira os caminhos por worker em
 
 ## Onde ver os resultados
 
-- **CI:** GitHub Actions → workflow `CI` → job `tests (Python 3.12)` →
-  step `Run main test suite`. O log mostra `created: 4/4 workers` e
-  `--durations=25`.
-- **Artefatos:** `test-reports-py*` (principal, docstruct, SDK e biblioteca do
-  core), `coverage-reports-py*`, `sdk-isolated-report-py*` e
+- **CI:** GitHub Actions → workflow `CI` → job `app tests (Python 3.12)` →
+  step `Run app test suite`. O log mostra `created: 4/4 workers` e
+  `--durations=25`; o job obrigatório `tests (Python 3.12)` é o agregador.
+- **Artefatos:** `test-reports-py3.12` e `coverage-reports-py3.12`
+  (combinados), os artefatos por componente `test-report-*`/`coverage-*`,
+  `timing-baseline-py3.12`, `sdk-isolated-report-py*` e
   `docstruct-isolated-report-py*`.
 - **Agendado:** workflow `Scheduled test monitoring`, com artefatos retidos por
   30 dias e uma issue de acompanhamento em falhas agendadas.

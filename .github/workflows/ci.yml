@@ -391,16 +391,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  tests:
-    name: tests (Python ${{ matrix.python-version }})
+  quality:
+    name: quality (Python 3.12)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12"]
+    timeout-minutes: 20
     env:
-      UV_PYTHON: ${{ matrix.python-version }}
+      UV_PYTHON: "3.12"
 
     steps:
       - name: Check out repository
@@ -408,10 +404,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -422,15 +418,12 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/uv
-          key: uv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
+          key: uv-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}
           restore-keys: |
-            uv-${{ runner.os }}-py${{ matrix.python-version }}-
+            uv-${{ runner.os }}-py3.12-
 
       - name: Check the lock and install from it
         run: |
-          # --locked fails when pyproject.toml needs a new lock, so a dependency
-          # change always arrives with its uv.lock. The cache above is only an
-          # optimization: the install still comes from the lock after a hit.
           uv lock --check
           uv sync --locked --extra dev
 
@@ -440,28 +433,17 @@ jobs:
       - name: Run Mypy on the configured scope
         run: uv run --locked --extra dev mypy --no-incremental
 
-      # The libraries still declare Python >=3.11; keep a static check for
-      # syntax/APIs the 3.12 backend pass would otherwise hide.
       - name: Run Mypy on the libraries with Python 3.11
         run: |
           uv run --locked --extra dev mypy --no-incremental --python-version 3.11 \
             libs/docstruct/src/docstruct libs/sdk/src/acessilia_sdk \
             libs/core/src/acessilia_core
 
-      # The SDK registry must match the contract the Toolbox publishes on the
-      # branch this code is deployed with (#186): main runs against the
-      # Toolbox's main, release/x.y.z against the Toolbox's release/x.y.z
-      # while its BHS is open and its vx.y.z tag once the Toolbox closed the
-      # cycle (both are cut together, the Toolbox first), and everything else
-      # against its develop. See scripts/toolbox_contract_ref.py.
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
-          # Fails (bash -e) when a release has neither ref: no fallback.
           TOOLBOX_REF=$(uv run --locked --extra dev python scripts/toolbox_contract_ref.py "$TARGET_BRANCH")
-          # Same URL as PUBLISHED_URL in scripts/capture_toolbox_contract.py.
-          # curl stays here for --retry, which the script's urllib fetch lacks.
           url="https://raw.githubusercontent.com/A11yDevs/acessilia-toolbox/${TOOLBOX_REF}/contract/toolbox-contract.json"
           echo "Toolbox contract: $url"
           if ! curl --fail --silent --show-error --location --retry 3 \
@@ -471,95 +453,193 @@ jobs:
           fi
           uv run --locked --extra dev python scripts/check_capability_contract.py --snapshot "$RUNNER_TEMP/toolbox-contract.json"
 
-      # The Toolbox pins a docstruct release by URL and sha256 (#470, P8). Only
-      # the Toolbox can move that pin, so a pull request is not blocked by it:
-      # findings are warnings here, and the scheduled monitoring fails on them.
       - name: Report the Toolbox's docstruct pin
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
         run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH" --report-only
 
-      # Four workers match the ubuntu-latest four-vCPU runner and keep the
-      # slowest test from dominating the tail. The run also collects the suite,
-      # so the old standalone `--collect-only` step is redundant.
-      - name: Run main test suite
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/app/.coverage
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/var/coverage/app"
-          uv run --locked --extra dev python -m pytest -m "not e2e" -n 4 --dist worksteal --durations=25 \
-            --junitxml=test-results.xml \
-            --cov=backend --cov=frontend --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
-            --cov-report=term-missing:skip-covered \
-            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/app/coverage.xml" \
-            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/app/coverage.json"
+  component-tests:
+    name: ${{ matrix.component }} tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [app, docstruct, sdk, core]
+        include:
+          - component: app
+            directory: .
+          - component: docstruct
+            directory: libs/docstruct
+          - component: sdk
+            directory: libs/sdk
+          - component: core
+            directory: libs/core
+    env:
+      UV_PYTHON: "3.12"
+      COMPONENT: ${{ matrix.component }}
 
-      # The gate is the root environment (#405). A step inside a library points
-      # at that project explicitly, so `uv run` neither selects the library's
-      # own lock nor updates one.
-      - name: Run docstruct library test suite
-        working-directory: libs/docstruct
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/docstruct/.coverage
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/var/coverage/docstruct"
-          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 \
-            --junitxml=docstruct-test-results.xml \
-            --cov=docstruct --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
-            --cov-report=term-missing:skip-covered \
-            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/docstruct/coverage.xml" \
-            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/docstruct/coverage.json"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - name: Run SDK library test suite
-        working-directory: libs/sdk
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/sdk/.coverage
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/var/coverage/sdk"
-          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 \
-            --junitxml=sdk-test-results.xml \
-            --cov=acessilia_sdk --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
-            --cov-report=term-missing:skip-covered \
-            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/sdk/coverage.xml" \
-            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/sdk/coverage.json"
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
 
-      - name: Run core library test suite
-        working-directory: libs/core
-        env:
-          COVERAGE_FILE: ${{ github.workspace }}/var/coverage/core/.coverage
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.12-
+
+      - name: Check the lock and install from it
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/var/coverage/core"
-          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest --durations=25 \
-            --junitxml=core-test-results.xml \
-            --cov=acessilia_core --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
+          uv lock --check
+          uv sync --locked --extra dev
+
+      - name: Run ${{ matrix.component }} test suite
+        working-directory: ${{ matrix.directory }}
+        env:
+          COVERAGE_FILE: ${{ github.workspace }}/var/coverage-data/${{ matrix.component }}/.coverage
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/var/coverage/$COMPONENT" "$GITHUB_WORKSPACE/var/coverage-data/$COMPONENT" "$GITHUB_WORKSPACE/var/test-results"
+          args=()
+          coverage=()
+          case "$COMPONENT" in
+            app) args=(-m "not e2e" -n 4 --dist worksteal); coverage=(backend frontend) ;;
+            docstruct) coverage=(docstruct) ;;
+            sdk) coverage=(acessilia_sdk) ;;
+            core) coverage=(acessilia_core) ;;
+            *) echo "::error::unknown component $COMPONENT"; exit 1 ;;
+          esac
+          cov_args=()
+          for target in "${coverage[@]}"; do cov_args+=("--cov=$target"); done
+          uv run --locked --extra dev --project "$GITHUB_WORKSPACE" python -m pytest "${args[@]}" --durations=25 \
+            --junitxml="$GITHUB_WORKSPACE/var/test-results/$COMPONENT.xml" \
+            "${cov_args[@]}" --cov-branch --cov-config="$GITHUB_WORKSPACE/pyproject.toml" \
             --cov-report=term-missing:skip-covered \
-            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/core/coverage.xml" \
-            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/core/coverage.json"
+            --cov-report=xml:"$GITHUB_WORKSPACE/var/coverage/$COMPONENT/coverage.xml" \
+            --cov-report=json:"$GITHUB_WORKSPACE/var/coverage/$COMPONENT/coverage.json"
+
+      - name: Check ${{ matrix.component }} coverage threshold
+        run: uv run --locked --extra dev python scripts/check_coverage_thresholds.py --coverage-dir var/coverage --components "$COMPONENT"
+
+      - name: Reject unexpected skipped tests
+        run: |
+          uv run --locked --extra dev python - "$COMPONENT" <<'PY'
+          import sys
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("var/test-results") / f"{sys.argv[1]}.xml"
+          root = ElementTree.parse(report).getroot()
+          skipped = sum(
+              int(suite.attrib.get("skipped", "0"))
+              for suite in root.iter("testsuite")
+          )
+          if skipped:
+              raise SystemExit(
+                  f"CI incompleto: {skipped} teste(s) foram pulado(s) em {report}. "
+                  "Consulte os motivos exibidos pelo pytest."
+              )
+          print(f"Relatorio JUnit validado: {report} sem testes pulados.")
+          PY
+
+      - name: Upload component test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-report-${{ matrix.component }}
+          path: var/test-results/${{ matrix.component }}.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload component coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-${{ matrix.component }}
+          path: var/coverage
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # This aggregator keeps the required check name while the four suites run
+  # in parallel. It publishes the evidence even on failure and fails closed at
+  # the end if any provider failed or was skipped.
+  tests:
+    name: tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - quality
+      - component-tests
+    if: always()
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+
+      # The aggregation scripts are standard-library only; the provider jobs
+      # already installed and exercised the project environment.
+      - name: Download component coverage reports
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+          path: var/coverage
+
+      - name: Download component test reports
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: test-report-*
+          merge-multiple: true
+          path: var/test-results
 
       - name: Check per-component coverage thresholds
         if: always()
-        run: uv run --locked --extra dev python scripts/check_coverage_thresholds.py --coverage-dir var/coverage
+        run: python scripts/check_coverage_thresholds.py --coverage-dir var/coverage
 
-      # The timing baseline is evidence for #644. It must not change the gate:
-      # a missing report from an already failing suite only skips the summary.
       - name: Summarize test timings
         if: always()
         continue-on-error: true
         run: |
           mkdir -p var/timings
-          uv run --locked --extra dev python scripts/tests/collect_timings.py collect \
-            --report app=test-results.xml \
-            --report docstruct=libs/docstruct/docstruct-test-results.xml \
-            --report sdk=libs/sdk/sdk-test-results.xml \
-            --report core=libs/core/core-test-results.xml \
+          python scripts/tests/collect_timings.py collect \
+            --report app=var/test-results/app.xml \
+            --report docstruct=var/test-results/docstruct.xml \
+            --report sdk=var/test-results/sdk.xml \
+            --report core=var/test-results/core.xml \
             --coverage-dir var/coverage \
             --output var/timings/baseline.json \
             --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize per-component coverage
         if: always()
+        continue-on-error: true
         run: |
-          uv run --locked --extra dev python - <<'PY'
+          python - <<'PY'
           import json
           import os
           from pathlib import Path
@@ -593,51 +673,20 @@ jobs:
                   fh.write(summary)
           PY
 
-      - name: Reject unexpected skipped tests
-        run: |
-          uv run --locked --extra dev python - <<'PY'
-          from pathlib import Path
-          from xml.etree import ElementTree
-
-          reports = [
-              Path("test-results.xml"),
-              Path("libs/docstruct/docstruct-test-results.xml"),
-              Path("libs/sdk/sdk-test-results.xml"),
-              Path("libs/core/core-test-results.xml"),
-          ]
-          skipped = 0
-          for report in reports:
-              root = ElementTree.parse(report).getroot()
-              skipped += sum(
-                  int(suite.attrib.get("skipped", "0"))
-                  for suite in root.iter("testsuite")
-              )
-          if skipped:
-              raise SystemExit(
-                  f"CI incompleto: {skipped} teste(s) foram pulado(s). "
-                  "Consulte os motivos exibidos pelo pytest."
-              )
-          print("Relatorio JUnit validado: nenhum teste foi pulado.")
-          PY
-
-      - name: Upload test reports
+      - name: Upload combined reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: test-reports-py${{ matrix.python-version }}
-          path: |
-            test-results.xml
-            libs/docstruct/docstruct-test-results.xml
-            libs/sdk/sdk-test-results.xml
-            libs/core/core-test-results.xml
+          name: test-reports-py3.12
+          path: var/test-results/*.xml
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload coverage reports
+      - name: Upload combined coverage reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: coverage-reports-py${{ matrix.python-version }}
+          name: coverage-reports-py3.12
           path: |
             var/coverage/app/coverage.xml
             var/coverage/app/coverage.json
@@ -654,10 +703,27 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: timing-baseline-py${{ matrix.python-version }}
+          name: timing-baseline-py3.12
           path: var/timings/baseline.json
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Verify provider jobs
+        if: always()
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          COMPONENTS: ${{ needs.component-tests.result }}
+        run: |
+          failed=0
+          for entry in "quality:$QUALITY" "component-tests:$COMPONENTS"; do
+            name=${entry%%:*}
+            result=${entry#*:}
+            if [ "$result" != "success" ]; then
+              echo "::error::$name finished as $result"
+              failed=1
+            fi
+          done
+          exit "$failed"
 
   security:
     name: security checks
