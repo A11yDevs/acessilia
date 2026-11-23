@@ -124,6 +124,16 @@ jobs:
           TARGET_BRANCH: ${{ matrix.ref }}
         run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH"
 
+      # A tag-object SHA looks pinned but is not a commit. Keep this strict on
+      # the schedule; pull requests report the same findings as warnings. The
+      # schedule only exists once this file reaches the default branch, so the
+      # strict push step in ci.yml protects develop immediately.
+      - name: Verify GitHub Action pins
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run --locked --extra dev python scripts/check_action_pins.py
+
       - name: Upload scheduled test reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

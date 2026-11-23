@@ -89,6 +89,7 @@ def test_quality_gates_run_once_in_the_quality_job() -> None:
         "Run Mypy on the libraries with Python 3.11",
         "Check the Toolbox capability contract",
         "Report the Toolbox's docstruct pin",
+        "Verify GitHub Action pins",
     ):
         assert "if" not in steps[name], name
     assert "scripts/check_ruff_baseline.py" in steps[
@@ -97,6 +98,7 @@ def test_quality_gates_run_once_in_the_quality_job() -> None:
     assert "scripts/check_docstruct_pin.py" in steps[
         "Report the Toolbox's docstruct pin"
     ]["run"]
+    assert "scripts/check_action_pins.py" in steps["Verify GitHub Action pins"]["run"]
 
 
 def test_the_tests_check_aggregates_all_component_jobs() -> None:
