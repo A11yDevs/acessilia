@@ -279,12 +279,9 @@ def test_the_integration_filter_matches_the_shadow_selector() -> None:
     workflow = _workflow()
     changes = {step.get("name"): step for step in workflow["jobs"]["changes"]["steps"]}
     filters = changes["Filter integration paths"]["with"]["filters"]
-    workflow_paths = {
-        line.strip()[3:-1]
-        for line in filters.splitlines()
-        if line.strip().startswith("- ")
-    }
-    assert workflow_paths == set(select_suites.INTEGRATION_GLOBS)
+    parsed = yaml.safe_load(filters)
+    assert set(parsed) == {"integration"}
+    assert set(parsed["integration"]) == set(select_suites.INTEGRATION_GLOBS)
 
 
 def test_app_integration_runs_only_for_relevant_pull_requests() -> None:

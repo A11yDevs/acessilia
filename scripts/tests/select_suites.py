@@ -27,6 +27,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Sequence
 
@@ -89,15 +90,17 @@ INTEGRATION_GLOBS = (
 
 
 def matches_integration(path: str) -> bool:
-    """Whether a repository-relative path matches one of the CI globs."""
+    """Whether a repository-relative path matches one of the CI globs.
+
+    Matching is case-insensitive. A trailing ``/**`` also matches the bare
+    directory path, mirroring ``dorny/paths-filter`` for directory entries.
+    """
     normalized = path.replace("\\", "/").strip().lower()
-    for pattern in INTEGRATION_GLOBS:
-        if pattern.endswith("/**"):
-            if normalized.startswith(pattern[:-3]):
-                return True
-        elif normalized == pattern:
-            return True
-    return False
+    return any(
+        fnmatchcase(normalized, pattern)
+        or (pattern.endswith("/**") and normalized == pattern[:-3])
+        for pattern in INTEGRATION_GLOBS
+    )
 
 
 @dataclass(frozen=True)
