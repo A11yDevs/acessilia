@@ -45,6 +45,7 @@ ones here instead of restating them.
 | [0027](0027-mcp-core-toolbox-contract.md) | Versioned capability contracts, invoked over MCP, between the core and the Toolbox | Proposed |
 | [0028](0028-operational-execution-in-the-toolbox.md) | All document computation runs in the Toolbox | Proposed |
 | [0029](0029-symbolic-core-every-step-planned.md) | The core plans and coordinates: every semantic workflow step is planned | Proposed |
+| [0030](0030-providers-compete-per-capability.md) | Providers compete per capability; the structure suites stay structural | Proposed |
 
 ## Process
 
