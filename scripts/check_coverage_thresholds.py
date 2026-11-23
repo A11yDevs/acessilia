@@ -28,10 +28,21 @@ def _failure(component: str, reason: str) -> str:
     return f"{component}: {reason}"
 
 
-def check_coverage(coverage_dir: Path) -> list[str]:
-    """Return one message per missing or below-threshold report."""
+def check_coverage(
+    coverage_dir: Path, components: Sequence[str] | None = None
+) -> list[str]:
+    """Return one message per missing or below-threshold report.
+
+    ``components`` limits the check to one job's component; the default keeps
+    the repository-wide gate over every component.
+    """
     failures: list[str] = []
-    for component, minimum in THRESHOLDS.items():
+    selected = components or tuple(THRESHOLDS)
+    unknown = sorted(set(selected) - set(THRESHOLDS))
+    if unknown:
+        return [f"unknown component: {', '.join(unknown)}"]
+    for component in selected:
+        minimum = THRESHOLDS[component]
         report = coverage_dir / component / "coverage.json"
         if not report.is_file():
             failures.append(_failure(component, f"missing {report}"))
@@ -63,9 +74,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=Path("var/coverage"),
         help="Directory holding <component>/coverage.json",
     )
+    parser.add_argument(
+        "--components",
+        default="",
+        help="comma-separated components to check (default: all four)",
+    )
     args = parser.parse_args(argv)
-
-    failures = check_coverage(args.coverage_dir)
+    components = [name.strip() for name in args.components.split(",") if name.strip()]
+    failures = check_coverage(args.coverage_dir, components or None)
     if failures:
         print("Coverage thresholds failed:", file=sys.stderr)
         for failure in failures:

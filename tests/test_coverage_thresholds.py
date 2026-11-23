@@ -38,6 +38,21 @@ def test_a_component_below_its_floor_fails(tmp_path: Path) -> None:
     assert "required" in failures[0]
 
 
+def test_a_single_component_check_ignores_the_others(tmp_path: Path) -> None:
+    _report(tmp_path, "docstruct", check_coverage_thresholds.THRESHOLDS["docstruct"])
+
+    assert check_coverage_thresholds.check_coverage(tmp_path, ["docstruct"]) == []
+    assert check_coverage_thresholds.main(
+        ["--coverage-dir", str(tmp_path), "--components", "docstruct"]
+    ) == 0
+
+
+def test_an_unknown_component_is_refused(tmp_path: Path) -> None:
+    failures = check_coverage_thresholds.check_coverage(tmp_path, ["frontend"])
+
+    assert failures == ["unknown component: frontend"]
+
+
 def test_a_missing_report_fails(tmp_path: Path) -> None:
     failures = check_coverage_thresholds.check_coverage(tmp_path)
 
