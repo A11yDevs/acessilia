@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 
 import pytest
 
@@ -37,6 +38,33 @@ def test_paused_chats_survive_a_cache_reset() -> None:
     pause_middleware.resume_chat(-100123)
     pause_middleware.reset_paused_cache()
     assert pause_middleware.get_paused_chats() == set()
+
+
+def test_pause_and_resume_update_memory_when_the_store_fails(monkeypatch) -> None:
+    class FailingStore:
+        def load_paused_chats(self) -> set[int]:
+            return set()
+
+        def pause_chat(self, chat_id: int) -> None:
+            raise sqlite3.Error("down")
+
+        def resume_chat(self, chat_id: int) -> None:
+            raise sqlite3.Error("down")
+
+    warnings: list[str] = []
+    monkeypatch.setattr(pause_middleware, "get_state_store", FailingStore)
+    monkeypatch.setattr(
+        pause_middleware.logger,
+        "warning",
+        lambda message, *args: warnings.append(str(message)),
+    )
+
+    pause_middleware.pause_chat(-100123)
+    assert -100123 in pause_middleware.get_paused_chats()
+
+    pause_middleware.resume_chat(-100123)
+    assert -100123 not in pause_middleware.get_paused_chats()
+    assert len(warnings) == 2
 
 
 def test_tasks_round_trip_for_top_level_and_topic_chats(tmp_path) -> None:
