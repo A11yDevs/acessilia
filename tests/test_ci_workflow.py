@@ -76,6 +76,7 @@ INTERPRETER_INDEPENDENT_STEPS = (
     "Run Mypy on the libraries with Python 3.11",
     "Check the Toolbox capability contract",
     "Report the Toolbox's docstruct pin",
+    "Summarize test timings",
     "Summarize per-component coverage",
     "Upload coverage reports",
 )
@@ -102,8 +103,10 @@ def test_quality_gates_run_on_the_single_python_leg() -> None:
         assert "if" not in steps[name], name
     for name in (
         "Check per-component coverage thresholds",
+        "Summarize test timings",
         "Summarize per-component coverage",
         "Upload coverage reports",
+        "Upload timing baseline",
     ):
         assert "always()" in steps[name].get("if", ""), name
     assert "scripts/check_coverage_thresholds.py" in steps[
@@ -129,6 +132,23 @@ def test_core_suite_runs_with_bounded_parallelism() -> None:
     assert "--dist worksteal" in run
     assert "--junitxml=test-results.xml" in run
     assert "Collect complete test suite" not in names
+
+
+def test_ci_publishes_the_test_timing_baseline_without_changing_the_gate() -> None:
+    """#644 instruments the same JUnit reports; the summary never masks a failure."""
+    job = _workflow()["jobs"]["tests"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    timing = steps["Summarize test timings"]
+    assert timing["continue-on-error"] is True
+    assert "scripts/tests/collect_timings.py" in timing["run"]
+    for label in ("app", "docstruct", "sdk", "core"):
+        assert f"--report {label}=" in timing["run"]
+    assert "--coverage-dir var/coverage" in timing["run"]
+    assert "--output var/timings/baseline.json" in timing["run"]
+
+    upload = steps["Upload timing baseline"]
+    assert upload["with"]["path"] == "var/timings/baseline.json"
 
 
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:

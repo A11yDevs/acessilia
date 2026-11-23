@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "run",
+  "environment": {
+    "generated_at": "2026-11-23T01:20:47+00:00",
+    "revision": "cd7003d2877b361709e95ce52d1ed74778a3a348",
+    "python": "3.12.13",
+    "platform": "macOS-15.7.9-x86_64-i386-64bit",
+    "xdist_workers": 0,
+    "packages": {
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0",
+      "coverage": "7.17.3",
+      "pytest-cov": "7.1.0"
+    }
+  },
+  "suites": [
+    {
+      "label": "app",
+      "tests": 3181,
+      "passed": 3181,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_seconds": 884.298,
+      "p50_seconds": 0.03,
+      "p95_seconds": 0.487,
+      "slowest": [
+        {
+          "nodeid": "tests/test_provider_choice_methods.py::TestVlmPairwiseJudge::test_long_page_is_flagged_as_truncated",
+          "outcome": "passed",
+          "seconds": 88.556
+        },
+        {
+          "nodeid": "tests/test_sdk_public_api.py::test_every_exception_is_still_needed",
+          "outcome": "passed",
+          "seconds": 35.589
+        },
+        {
+          "nodeid": "tests/test_sdk_public_api.py::test_the_core_uses_only_the_sdk_public_api",
+          "outcome": "passed",
+          "seconds": 31.355
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra3-is not running]",
+          "outcome": "passed",
+          "seconds": 11.863
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_bhs_cleanup_requires_current_release_ancestry_before_tagging_or_deleting[None]",
+          "outcome": "passed",
+          "seconds": 11.761
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra5-belongs to project 'staging', .env says 'test-staging']",
+          "outcome": "passed",
+          "seconds": 11.115
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra4-expected ghcr.io/a11ydevs/acessilia:release-0.2.0]",
+          "outcome": "passed",
+          "seconds": 10.935
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_bhs_cleanup_requires_current_release_ancestry_before_tagging_or_deleting[recorded-merge]",
+          "outcome": "passed",
+          "seconds": 10.313
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra6-health endpoint does not answer]",
+          "outcome": "passed",
+          "seconds": 10.027
+        },
+        {
+          "nodeid": "tests/test_staging_update.py::test_production_update_accepts_only_verified_healthy_commit_images[cached-wrong-sha]",
+          "outcome": "passed",
+          "seconds": 9.783
+        }
+      ],
+      "wall_seconds": 890.148,
+      "coverage": {
+        "percent_covered": 87.86290322580645,
+        "covered_lines": 3679,
+        "num_statements": 4142,
+        "covered_branches": 679,
+        "num_branches": 818
+      },
+      "log": "var/timings-serial/app/pytest.log",
+      "exit_code": 0
+    }
+  ],
+  "totals": {
+    "tests": 3181,
+    "junit_seconds": 884.298,
+    "wall_seconds": 890.148
+  }
+}

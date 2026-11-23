@@ -226,6 +226,11 @@ Reference machine: macOS, 12 logical cores, 16 GB RAM, Python 3.11.15, pytest
 | Scenario | Before | After |
 |---|---:|---:|
 | Core suite, serial vs four workers | 143s | 74s (~1.9x) |
+
+The 143s → 74s figure is from #448, with the suite as it was then. The larger
+#644 baseline measured later is in [testing/optimization.md](testing/optimization.md)
+(890.15s serial vs 157.23s with four workers); use that guide for current
+numbers.
 | CI main step | 60s + 10s collection | 26–43s |
 | CI `tests` job | 1m59s | 59s–1m26s (one run: 1m11s) |
 
