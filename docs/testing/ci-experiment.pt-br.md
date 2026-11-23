@@ -77,9 +77,9 @@ verdes.
 
 ### Dimensão de integração e mudanças só de CI
 
-Os PRs de acompanhamento após o #802 exercitaram a dimensão `app integration` e
-mudanças majoritariamente em CI/segurança. Reaplicando o seletor atual sobre as
-listas de arquivos:
+Os PRs de acompanhamento na janela da amostra shadow (#788–#808) exercitaram a
+dimensão `app integration` e mudanças majoritariamente em CI/segurança.
+Reaplicando o seletor atual sobre as listas de arquivos:
 
 | PR | Área alterada | Selecionadas | `integration_required` | Conservadora |
 |---|---|---|---|---|
@@ -102,15 +102,15 @@ Para testar a direção de risco — uma falha que a suíte completa pega mas o
 conjunto selecionado pularia — o seletor atual foi reaplicado a pull requests
 com falhas conhecidas:
 
-| PR | Execução | Job com falha | Resultado do seletor | Falso negativo? |
+| PR | Execução | Job / passo com falha | Resultado do seletor | Falso negativo? |
 |---|---|---|---|---|
-| #732 | [45001010971](https://github.com/A11yDevs/acessilia/actions/runs/45001010971) | `quality` / Ruff | todas | não (quality sempre roda) |
+| #732 | [45001010971](https://github.com/A11yDevs/acessilia/actions/runs/45001010971) | `tests (Python 3.12)` / passo Ruff (quality rodava dentro de tests na época) | todas | não |
 | #726 | [44994569632](https://github.com/A11yDevs/acessilia/actions/runs/44994569632) | testes do core | todas | não |
 | #713 | [44977779847](https://github.com/A11yDevs/acessilia/actions/runs/44977779847) | testes da aplicação | todas | não |
 | #711 | [44976566900](https://github.com/A11yDevs/acessilia/actions/runs/44976566900) | testes da aplicação | sdk, core, app | não |
 | #709 | [44972669665](https://github.com/A11yDevs/acessilia/actions/runs/44972669665) | testes da aplicação | todas | não |
 | #621 | [44683419408](https://github.com/A11yDevs/acessilia/actions/runs/44683419408) | testes da aplicação | todas (conservadora) | não |
-| #781 | [45254071576](https://github.com/A11yDevs/acessilia/actions/runs/45254071576) | testes do core | todas (artefato shadow) | não |
+| #781 | [45254071576](https://github.com/A11yDevs/acessilia/actions/runs/45254071576) | testes do core (mais isolado/agregador) | todas (artefato shadow) | não |
 
 O conjunto selecionado continha a suíte que falhou em todas as execuções
 reaplicadas, então esta amostra produziu **zero falsos negativos**. Os replays

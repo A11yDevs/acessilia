@@ -77,9 +77,9 @@ suite, a core change selects core+app, docstruct selects all consumers, and
 
 ### Integration dimension and CI-only changes
 
-The follow-up PRs after #802 exercised the `app integration` dimension and
-changes that were mostly CI/security files. Replaying the current selector over
-their file lists:
+The follow-up PRs in the shadow sample window (#788–#808) exercised the
+`app integration` dimension and changes that were mostly CI/security files.
+Replaying the current selector over their file lists:
 
 | PR | Changed area | Selected | `integration_required` | Conservative |
 |---|---|---|---|---|
@@ -101,15 +101,15 @@ To test the risk direction — a failure the full suite catches but the selected
 set would skip — the current selector was replayed against pull requests with
 known failures:
 
-| PR | Run | Failing job | Selector result | False negative? |
+| PR | Run | Failing job / step | Selector result | False negative? |
 |---|---|---|---|---|
-| #732 | [45001010971](https://github.com/A11yDevs/acessilia/actions/runs/45001010971) | `quality` / Ruff | all | no (quality is always run) |
+| #732 | [45001010971](https://github.com/A11yDevs/acessilia/actions/runs/45001010971) | `tests (Python 3.12)` / Ruff step (quality ran inside tests then) | all | no |
 | #726 | [44994569632](https://github.com/A11yDevs/acessilia/actions/runs/44994569632) | core tests | all | no |
 | #713 | [44977779847](https://github.com/A11yDevs/acessilia/actions/runs/44977779847) | app tests | all | no |
 | #711 | [44976566900](https://github.com/A11yDevs/acessilia/actions/runs/44976566900) | app tests | sdk, core, app | no |
 | #709 | [44972669665](https://github.com/A11yDevs/acessilia/actions/runs/44972669665) | app tests | all | no |
 | #621 | [44683419408](https://github.com/A11yDevs/acessilia/actions/runs/44683419408) | app tests | all (conservative) | no |
-| #781 | [45254071576](https://github.com/A11yDevs/acessilia/actions/runs/45254071576) | core tests | all (shadow artifact) | no |
+| #781 | [45254071576](https://github.com/A11yDevs/acessilia/actions/runs/45254071576) | core tests (plus isolated/aggregator) | all (shadow artifact) | no |
 
 The selected set contained the failing suite in every replayed run, so this
 sample produced **zero false negatives**. The replays use the current selector
