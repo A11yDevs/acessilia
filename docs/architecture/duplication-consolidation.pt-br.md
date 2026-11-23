@@ -144,6 +144,19 @@ voltariam a formar grupo se a [#749](https://github.com/A11yDevs/acessilia/issue
 mudasse esse piso. Diferente do caso dos wrappers do SDK, esta é uma extração
 real: os dois validadores compartilham `_blank_to_none`.
 
+## Oitava consolidação: o helper de SHA-256 de arquivo
+
+O builder de manifesto e o bundle de domínio do planejamento repetiam a mesma
+implementação de SHA-256 em blocos. Ambos agora chamam
+`acessilia_core.hashing.file_sha256`, que usa `hashlib.file_digest`; o equivalente
+`_source_sha256` do extrator da Toolbox também foi removido. Os testes cobrem
+arquivos vazios, pequenos, com múltiplos blocos e ausentes, além de caminhos
+`Path` e `str`.
+
+**Delta medido no commit de código deste PR:** 14 grupos / 32 funções / 309
+linhas → **13 grupos / 30 funções / 297 linhas**. O grupo `_sha256` desaparece;
+a cópia do extrator da Toolbox não formava grupo, então não altera esse delta.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -168,7 +181,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 15 | `process_join_tail` em fusion/page-level (2/30) | Avaliar junto com o follow-up dos agentes. |
 | 16 | Normalizadores de output schema (2/10) | **Consolidado:** `_blank_to_none` compartilhado. |
 | 17 | `select_greedy` / `select_table` do table specialist (2/40) | Sensível a comportamento: testes de seleção de tabela primeiro. |
-| 18 | `_sha256` do core em builder/domain bundle (2/12) | Candidato a consolidação de utilitário. |
+| 18 | `_sha256` do core em builder/domain bundle (2/12) | **Consolidado:** `hashing.file_sha256` compartilhado. |
 | 19 | Wrappers async de math (2/12) | Candidato a helper pequeno. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidato a helper pequeno. |
 | 21 | Leitores de layout/structure do SDK (2/32) | **Reclassificado:** falso positivo; a extração do envelope já é compartilhada. |
@@ -191,7 +204,7 @@ grupos restantes não foram alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.
