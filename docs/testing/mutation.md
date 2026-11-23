@@ -67,7 +67,7 @@ uv run --extra dev python scripts/tests/mutation_report.py \
 ```
 
 The isolated environment drops ambient `PYTEST_ADDOPTS`, `PYTEST_PLUGINS`,
-`PYTEST_DISABLE_PLUGIN_AUTOLOAD` and `PYTEST_CURRENT_TEST`: the first two cannot
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `PYTEST_CURRENT_TEST` and `PYTEST_DEBUG`: the first two cannot
 change test selection, the third cannot disable the timeout plugin, and the
 last cannot leak the outer test identity. Plugin autoload stays enabled so the
 focused target can use pytest-timeout or pytest-asyncio.

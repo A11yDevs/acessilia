@@ -223,9 +223,13 @@ def test_run_suite_without_a_junit_report_is_a_failure(
         stdout = ""
         stderr = "pytest crashed"
 
+    captured = {}
+
     def fake_run(*args, **kwargs):
+        captured.update(kwargs)
         return Completed()
 
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-k nothing")
     monkeypatch.setattr(timings.subprocess, "run", fake_run)
 
     record = timings.run_suite(
@@ -236,6 +240,7 @@ def test_run_suite_without_a_junit_report_is_a_failure(
 
     assert record["failed"] == 1
     assert "without a JUnit report" in record["error"]
+    assert "PYTEST_ADDOPTS" not in captured["env"]
 
 
 def test_render_summary_lists_every_suite_and_total() -> None:

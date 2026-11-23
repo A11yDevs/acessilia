@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import platform
 import statistics
 import subprocess
@@ -41,6 +40,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.test_report import parse_report  # noqa: E402
+from scripts.tests.pytest_env import sanitized_environ  # noqa: E402
 
 SCHEMA_VERSION = 1
 DEFAULT_WORK_DIR = Path("var/timings")
@@ -226,7 +226,7 @@ def run_suite(
     coverage = coverage_dir / "coverage.json"
     log = suite_dir / "pytest.log"
     command = _suite_command(spec, root, report, coverage, xdist=xdist)
-    env = os.environ.copy()
+    env = sanitized_environ()
     env["COVERAGE_FILE"] = str(coverage_dir / ".coverage")
     start = time.monotonic()
     completed = subprocess.run(
