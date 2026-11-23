@@ -290,8 +290,11 @@ def test_app_integration_runs_only_for_relevant_pull_requests() -> None:
         "backend/**",
         "frontend/**",
         "libs/core/**",
+        "libs/sdk/**",
+        "libs/docstruct/**",
         "tests/test_provider_choice_methods.py",
         "tests/conftest.py",
+        "tests/toolbox_render_fake.py",
     ):
         assert path in filter_step["with"]["filters"]
     steps = {step.get("name"): step for step in app["steps"]}

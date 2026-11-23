@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SUITES = ("docstruct", "sdk", "core", "app")
 INDICATORS = (
     "docstruct_changed",
@@ -44,6 +44,7 @@ INDICATORS = (
     "contracts_changed",
     "infrastructure_changed",
     "unclassified_changed",
+    "integration_changed",
 )
 
 #: Paths that make every suite mandatory: shared configuration, schemas,
@@ -77,6 +78,7 @@ class Selection:
     indicators: dict[str, bool]
     contracts_required: bool
     infrastructure_changed: bool
+    integration_required: bool
     conservative: bool
     reasons: dict[str, list[str]]
 
@@ -96,6 +98,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
     reasons: dict[str, list[str]] = {name: [] for name in SUITES}
     contracts = False
     infrastructure = False
+    integration = False
     conservative = False
 
     normalized = [
@@ -105,7 +108,10 @@ def classify_paths(paths: Sequence[str]) -> Selection:
     ]
     for path in normalized:
         lowered = path.lower()
-        if path in TRANSVERSAL_FILES or lowered.startswith(TRANSVERSAL_PREFIXES):
+        if (
+            lowered in {name.lower() for name in TRANSVERSAL_FILES}
+            or lowered.startswith(TRANSVERSAL_PREFIXES)
+        ):
             infrastructure = True
             selected.update(_all_suites())
             indicators["infrastructure_changed"] = True
@@ -140,8 +146,10 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             # Unknown paths are treated conservatively: the selector should
             # never hide a regression because it did not recognize a path.
             conservative = True
+            integration = True
             selected.update(_all_suites())
             indicators["unclassified_changed"] = True
+            indicators["integration_changed"] = True
             for suite in SUITES:
                 reasons[suite].append(f"unknown path, conservative fallback: {path}")
 
@@ -153,12 +161,34 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             for suite in SUITES:
                 reasons[suite].append(f"contract path: {path}")
 
+        if (
+            lowered.startswith(
+                ("backend/", "frontend/", "libs/core/", "libs/sdk/", "libs/docstruct/")
+            )
+            or lowered
+            in {
+                "tests/test_provider_choice_methods.py",
+                "tests/conftest.py",
+                "tests/judge_support.py",
+                "tests/core_config_support.py",
+                "tests/toolbox_render_fake.py",
+                "pyproject.toml",
+                "uv.lock",
+                ".github/workflows/ci.yml",
+            }
+        ):
+            integration = True
+            indicators["integration_changed"] = True
+            reasons["app"].append(f"integration trigger: {path}")
+
     ordered = _suites(*sorted(selected, key=SUITES.index))
     if not normalized or not ordered:
         conservative = True
         ordered = _all_suites()
         infrastructure = True
+        integration = True
         indicators["infrastructure_changed"] = True
+        indicators["integration_changed"] = True
         for suite in SUITES:
             reasons[suite].append("no changed paths: conservative fallback")
 
@@ -168,6 +198,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
         indicators=indicators,
         contracts_required=contracts,
         infrastructure_changed=infrastructure,
+        integration_required=integration,
         conservative=conservative,
         reasons={suite: reasons[suite] for suite in SUITES},
     )
@@ -206,6 +237,7 @@ def build_report(selection: Selection, *, base_ref: str, head_ref: str) -> dict:
         "skipped_suites": [suite for suite in SUITES if suite not in selection.suites],
         "contracts_required": selection.contracts_required,
         "infrastructure_changed": selection.infrastructure_changed,
+        "integration_required": selection.integration_required,
         "conservative_fallback": selection.conservative,
         "reasons": selection.reasons,
     }
@@ -228,6 +260,7 @@ def render_summary(report: dict) -> str:
         f"- Selected suites: {', '.join(selected) if selected else '—'}",
         f"- Not selected: {', '.join(skipped) if skipped else '—'}",
         f"- Contracts required: {'yes' if report['contracts_required'] else 'no'}",
+        f"- Integration required: {'yes' if report['integration_required'] else 'no'}",
         (
             "- Conservative fallback: "
             f"{'yes' if report['conservative_fallback'] else 'no'}"

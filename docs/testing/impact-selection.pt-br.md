@@ -48,14 +48,22 @@ consumidores.
 - Um caminho sob `schemas/` de topo ou um nome de arquivo contendo
   `toolbox-contract`/`capability_contract` define `contracts_required` além da
   seleção de suítes.
-- Caminhos desconhecidos, diff vazio ou falha no `git diff` → todas as suítes e
-  a flag conservadora. Caminhos desconhecidos definem `unclassified_changed` em
-  vez de fingir que são infraestrutura.
+- `integration_required` é definido para `backend/**`, `frontend/**`,
+  `libs/core/**`, `libs/sdk/**`, `libs/docstruct/**`, o teste focado
+  `tests/test_provider_choice_methods.py` e seu suporte compartilhado
+  (`conftest.py`, `judge_support.py`, `core_config_support.py`,
+  `toolbox_render_fake.py`, `pyproject.toml`, `uv.lock`, workflow de CI). Isso
+  espelha o gatilho do job `app integration` para eventos de caminho em pull
+  requests; o seletor é case-insensitive e seus fallbacks são supersets.
+- Caminhos desconhecidos, diff vazio ou falha no `git diff` → todas as suítes,
+  a flag conservadora e `integration_required`. Caminhos desconhecidos definem
+  `unclassified_changed` em vez de fingir que são infraestrutura.
 
 O script reporta indicadores separados
 (`docstruct_changed`, `sdk_changed`, `core_changed`, `app_changed`,
-`contracts_changed`, `infrastructure_changed`, `unclassified_changed`) para que
-as regras possam ser auditadas sem ler a lista de caminhos.
+`contracts_changed`, `infrastructure_changed`, `unclassified_changed`,
+`integration_changed`) para que as regras possam ser auditadas sem ler a lista
+de caminhos.
 
 ## Modo observação
 
