@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from scripts.tests import pytest_env
 
 
@@ -14,6 +16,7 @@ def test_the_sanitized_environment_keeps_unrelated_variables() -> None:
             "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
             "PYTEST_CURRENT_TEST": "outer",
             "PYTEST_DEBUG": "1",
+            "PYTEST_DEBUG_TEMPROOT": "/tmp/pytest",
         }
     )
 
@@ -29,7 +32,15 @@ def test_the_input_mapping_is_not_modified() -> None:
     assert source == {"PATH": "/bin", "PYTEST_ADDOPTS": "-k nothing"}
 
 
-def test_every_documented_variable_is_sanitized() -> None:
+def test_every_listed_variable_is_sanitized() -> None:
     source = {name: "value" for name in pytest_env.PYTEST_ENV_VARS}
 
     assert pytest_env.sanitized_environ(source) == {}
+
+
+def test_the_variability_guides_name_every_variable() -> None:
+    docs = Path(__file__).resolve().parents[1] / "docs" / "testing"
+    for name in ("variability.md", "variability.pt-br.md"):
+        text = (docs / name).read_text(encoding="utf-8")
+        for variable in pytest_env.PYTEST_ENV_VARS:
+            assert variable in text, f"{name}: {variable}"

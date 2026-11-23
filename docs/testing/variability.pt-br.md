@@ -29,7 +29,7 @@ cp var/timings/variability.md docs/testing/variability.md
 
 Cada suíte roda três vezes na mesma invocação. O runner usa o mesmo ambiente
 pytest sanitizado do harness de mutação: `PYTEST_ADDOPTS`, `PYTEST_PLUGINS`,
-`PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `PYTEST_CURRENT_TEST` e `PYTEST_DEBUG` do shell
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `PYTEST_CURRENT_TEST`, `PYTEST_DEBUG` e `PYTEST_DEBUG_TEMPROOT` do shell
 são removidos. O registro da suíte mantém:
 
 - as três execuções cruas (`runs`);

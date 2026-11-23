@@ -348,6 +348,8 @@ def test_the_mutant_environment_drops_ambient_pytest_settings(
     assert "PYTEST_PLUGINS" not in env
     assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD" not in env
     assert "PYTEST_CURRENT_TEST" not in env
+    assert "PYTEST_DEBUG" not in env
+    assert "PYTEST_DEBUG_TEMPROOT" not in env
     assert env["PYTHONPATH"].startswith(str(tmp_path))
     assert "/ambient" in env["PYTHONPATH"]
     assert env["PYTHONDONTWRITEBYTECODE"] == "1"

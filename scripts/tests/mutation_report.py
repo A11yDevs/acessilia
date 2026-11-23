@@ -36,10 +36,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.test_report import parse_report  # noqa: E402
-from scripts.tests import pytest_env  # noqa: E402
-from scripts.tests.pytest_env import sanitized_environ  # noqa: E402
-
-PYTEST_ENV_VARS = pytest_env.PYTEST_ENV_VARS
+from scripts.tests.pytest_env import (  # noqa: E402
+    PYTEST_ENV_VARS as PYTEST_ENV_VARS,
+    sanitized_environ,
+)
 
 SCHEMA_VERSION = 1
 
@@ -252,7 +252,7 @@ def _run_pytest(
     env: dict[str, str] | None = None,
     known_tests: set[str] | None = None,
 ) -> dict[str, Any]:
-    env = sanitized_environ() if env is None else env
+    env = sanitized_environ(env)
     command = [
         sys.executable,
         "-m",

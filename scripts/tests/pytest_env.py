@@ -1,8 +1,9 @@
 """A deterministic pytest environment for the test-infrastructure tools.
 
-The mutation harness and the timing collector spawn pytest from a developer
-shell. Ambient pytest variables can change test selection, plugins or the
-reported identity, so both tools strip them before starting the child process.
+The mutation harness, the timing collector and the test-failed rerunner spawn
+pytest from a developer shell. Ambient pytest variables can change test
+selection, plugins, temporary roots or the reported identity, so these tools
+strip them before starting the child process.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ PYTEST_ENV_VARS = (
     "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
     "PYTEST_CURRENT_TEST",
     "PYTEST_DEBUG",
+    "PYTEST_DEBUG_TEMPROOT",
 )
 
 

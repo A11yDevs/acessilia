@@ -29,8 +29,8 @@ cp var/timings/variability.md docs/testing/variability.md
 
 Each suite runs three times in the same invocation. The runner uses the same
 sanitized pytest environment as the mutation harness: ambient `PYTEST_ADDOPTS`,
-`PYTEST_PLUGINS`, `PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `PYTEST_CURRENT_TEST` and
-`PYTEST_DEBUG` are removed. The suite record keeps:
+`PYTEST_PLUGINS`, `PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `PYTEST_CURRENT_TEST`,
+`PYTEST_DEBUG` and `PYTEST_DEBUG_TEMPROOT` are removed. The suite record keeps:
 
 - the three raw runs (`runs`);
 - the median `junit_seconds`, `wall_seconds`, p50 and p95;

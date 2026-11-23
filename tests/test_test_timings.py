@@ -223,10 +223,10 @@ def test_run_suite_without_a_junit_report_is_a_failure(
         stdout = ""
         stderr = "pytest crashed"
 
-    captured = {}
+    captured = []
 
     def fake_run(*args, **kwargs):
-        captured.update(kwargs)
+        captured.append((args, kwargs))
         return Completed()
 
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k nothing")
@@ -240,7 +240,12 @@ def test_run_suite_without_a_junit_report_is_a_failure(
 
     assert record["failed"] == 1
     assert "without a JUnit report" in record["error"]
-    assert "PYTEST_ADDOPTS" not in captured["env"]
+    pytest_call = next(
+        (args, kwargs)
+        for args, kwargs in captured
+        if isinstance(args[0], list) and "-m" in args[0] and "pytest" in args[0]
+    )
+    assert "PYTEST_ADDOPTS" not in pytest_call[1]["env"]
 
 
 def test_render_summary_lists_every_suite_and_total() -> None:
