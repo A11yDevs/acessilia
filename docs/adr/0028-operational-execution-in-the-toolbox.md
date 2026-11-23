@@ -6,7 +6,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 - **Date:** 2026-11-22
 - **Components:** core, SDK, docstruct, Toolbox
 - **Issues:** [#735](https://github.com/A11yDevs/acessilia/issues/735), [#632](https://github.com/A11yDevs/acessilia/issues/632), [#639](https://github.com/A11yDevs/acessilia/issues/639), related: [#656](https://github.com/A11yDevs/acessilia/issues/656)
-- **Amends, if accepted:** [ADR-0017](0017-operational-sdk-and-agentic-core.md) (operations run by the caller), [ADR-0003](0003-remote-only-operational-capabilities.md) (what "operational" covers), and principles P2, P3 and 5 of the [constitution](../constitution.md)
+- **Amends, if accepted:** [ADR-0002](0002-component-responsibilities.md) (the SDK row, "in-process access to docstruct's pure algorithms", and the dependency chart), [ADR-0017](0017-operational-sdk-and-agentic-core.md) (operations run by the caller), [ADR-0003](0003-remote-only-operational-capabilities.md) (what "operational" covers), and principles P2, P3 and 5 of the [constitution](../constitution.md)
 
 ## Context
 
@@ -18,23 +18,39 @@ deterministic workflows, run in the caller's process. So today pure
 computation over documents runs inside the core. As measured on `develop`
 (`46f2fe7e`):
 
-- **46 files** in the core and `backend/` import docstruct directly, mostly
-  computation: `fusion.xycut`, `fusion.tailjoin`, `fusion.verse`,
-  `fusion.similarity`, `geometry`, `tables.ast`, `text.latex`,
-  `text.norm_fix`, `text.unicode_repair`.
-- Of the **25** plan methods in `METHOD_HANDLERS`, **5** declare Toolbox
-  requirements; about **20** compute locally over docstruct (`xycut-order`,
-  `tailjoin`, `norm-fix`, `unicode-repair`, `verse-chunker`,
-  `latex-normalizer`, `agreement-rule`, `table-smart-fusion`, ...).
+- **46 files** in the core and `backend/` import docstruct directly. **43** of
+  them import computation; the other 3 import only contracts or validation
+  (`manifest/models.py`, `manifest/document_adapter.py`,
+  `pipeline/validators.py`). The computation includes `fusion.xycut`,
+  `fusion.tailjoin`, `fusion.verse`, `fusion.similarity`, `geometry`,
+  `tables.ast`, `text.latex`, `text.norm_fix`, `text.unicode_repair`, and also
+  the export renderers `docstruct.export.*` (txt, html, markdown, page text,
+  formats, filters, Pandoc AST: 7 files, including the accessibility filters),
+  `docstruct.sections`, `docstruct.blocks.lists` and `docstruct.data_uri`.
+- Of the **25** plan methods in `METHOD_HANDLERS`, **14** compute locally,
+  meaning that their handler runs no capability and no model call:
+  `latex-normalizer`, `norm-fix`, `unicode-repair`, `rep-guard`,
+  `line-number-extractor`, `verse-chunker`, `tailjoin`, `tailjoin-positioned`,
+  `xycut-order`, `skeleton-order`, `rescue-omitted`, `table-smart-fusion`,
+  `agreement-rule`, `deterministic-heading-repair`. The rest call the Toolbox
+  (`dual-provider-fusion`, `single-provider`, `vision-page-inspection`,
+  `pymupdf-region`, `vlm-pairwise-judge`, `mathml`, `latex-verbalizer`),
+  verify work that enrichment already did remotely (`vision-description`,
+  `pandoc-table`, `pandoc-code`), or are symbolic (`human-review`). Only the
+  first 5 of these declare requirements to the availability gate
+  (`METHOD_TOOLBOX_REQUIREMENTS`).
 - **3** SDK operations run in the core's process:
   `acessilia_sdk.operations.formula`, `fusion` and `page_judge`. Their only
   consumers are the core, the benchmarks (`scripts/bench`) and tests.
 - The SDK itself imports docstruct computation (`fusion.payload`,
   `geometry.boxes`, `imaging`, `policy`, `text.latex`) besides the
   `manifest` contract.
-- The core's remaining non-computational docstruct imports are contracts
-  (`docstruct.canonical`, `docstruct.manifest`) and validation
-  (`docstruct.validation`).
+- The core's non-computational docstruct imports are contracts
+  (`docstruct.canonical`, `docstruct.manifest`, `docstruct.types`),
+  validation (`docstruct.validation`), shared vocabularies
+  (`docstruct.placeholders`, `docstruct.profiles`) and policy
+  (`docstruct.policy`, for example `verbosity_for_mode` in
+  `backend/service.py`).
 
 [#735](https://github.com/A11yDevs/acessilia/issues/735) asks for a core that
 only plans and coordinates (ADR-0029), with every effect on a document being a
@@ -56,8 +72,9 @@ Options considered:
 
 ## Decision
 
-Three things are decided separately: where document computation **runs**,
-where the **library** lives, and where the **contracts** live.
+Four things are decided separately: where document computation **runs**, who
+**owns** the operational runtime, where the **library** lives, and where the
+**contracts** live.
 
 ### Execution: the Toolbox runs all document computation
 
@@ -66,8 +83,11 @@ where the **library** lives, and where the **contracts** live.
   Unicode repair, math normalization) and compositions of capabilities run as
   Toolbox capabilities, atomic or composite.
 - The migration starts with an inventory of every `docstruct.*` import in the
-  core and `backend/`, classified as contract, algorithm, validation or
-  operation. Each algorithm or operation gets an equivalent capability; the
+  core and `backend/`, classified as contract, algorithm, validation, policy
+  or operation. Policy (decision rules such as `verbosity_for_mode`) belongs to
+  the core (ADR-0029): it moves into the core or is allowlisted explicitly.
+  Export rendering (`docstruct.export.*`) is computation: accessible export is
+  a planned action (ADR-0029) backed by Toolbox capabilities. Each algorithm or operation gets an equivalent capability; the
   call site switches to the generic client (ADR-0027); the import is removed.
 - Migration is per plan method (P8), with a differential test that compares
   the manifest produced before and after.
@@ -85,10 +105,12 @@ where the **library** lives, and where the **contracts** live.
     algorithms, and functions used by the workers. It must not plan, depend on
     the core or the core SDK, or coordinate workflows.
 - The runtime is owned by the Toolbox. By default it is a package inside the
-  Toolbox (`acessilia_toolbox.operations`), released with it, because the
-  operations it receives have no consumer outside the core, the benchmarks and
-  tests. It becomes a separately distributed `acessilia-toolbox-sdk` only when
-  a concrete external consumer needs it.
+  Toolbox (`acessilia_toolbox.operations`), released with it, because no
+  consumer needs to **import** it: the core, the benchmarks and the tests reach
+  it through capability invocation. A benchmark or script in this repository
+  must not import a package shipped inside the Toolbox (P3, P4). The runtime
+  becomes a separately distributed `acessilia-toolbox-sdk` only when a concrete
+  consumer needs to import it.
 - `acessilia-sdk` keeps a temporary compatibility layer over the core SDK, with
   a published deprecation policy.
 
@@ -119,9 +141,24 @@ where the **library** lives, and where the **contracts** live.
 - If accepted, the constitution is amended in a follow-up pull request:
   - P2: the SDK no longer provides "access to reusable libraries" for
     computation, and the Toolbox owns the operational runtime;
-  - P3: core → docstruct becomes "core → docstruct contract modules" (or the
-    contracts package);
+  - P3: core → docstruct becomes "core → docstruct contract modules", and SDK
+    → docstruct becomes "Toolbox runtime → docstruct" (both point at the
+    contracts package instead, if it is extracted);
   - principle 5: deterministic extraction runs as a Toolbox capability.
+
+## Open decisions
+
+This ADR stays `Proposed` until these are closed in review:
+
+- **Contracts package.** Whether the shared interoperability contracts are
+  extracted (and from which modules) is decided by the follow-up ADR. Until
+  then the contract allowlist applies.
+- **Classification.** The inventory pull request classifies every import
+  listed above, including the policy and vocabulary modules. Its review closes
+  which modules stay allowlisted.
+- **Cross-component review.** The Toolbox's and docstruct's owners review the
+  runtime ownership and the dependency changes (ADR process, step 5). After
+  that, a follow-up pull request sets `Accepted`.
 
 ## Consequences
 
@@ -136,8 +173,10 @@ where the **library** lives, and where the **contracts** live.
 - The Toolbox runs pure algorithms too. Its stateless model is unchanged
   (durable queues are a separate decision, #639).
 - Progress indicators, with the baseline above, are tracked in #735: core files
-  importing computational docstruct modules (46), local plan methods (about 20
-  of 25), SDK operations run in the core (3). Each must reach zero.
+  importing computational docstruct modules (43), plan methods that compute
+  locally (14 of 25), SDK operations run in the core (3). Each must reach zero.
+- When this ADR is accepted, ADR-0002's back-reference is updated to "Amended
+  by ADR-0017 and ADR-0028".
 - Compliance: `tests/test_architecture_layers.py` (docstruct contract
   allowlist, shrinking computational allowlist, no core → Toolbox runtime
   dependency), the isolated install jobs of the core SDK and of the Toolbox

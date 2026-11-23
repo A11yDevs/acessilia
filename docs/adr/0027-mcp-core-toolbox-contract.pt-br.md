@@ -23,8 +23,14 @@ endereçado por capacidade. Medido em `develop` (`46f2fe7e`) e
   mas ela só é servida por stdio (`scripts/mcp_server.py`, JSON-RPC escrito à
   mão) e não está montada na API HTTP; um core remoto não consegue usá-la.
 - Suas tools recebem um objeto `parameters` livre e um `file` que é um caminho
-  local ou um `artifact_id`. O schema de parâmetros publicado pela capacidade
-  não é o schema de entrada da tool.
+  local ou um `artifact_id`. Nenhuma capacidade publica schema de parâmetros:
+  `capabilities/*.yaml` declaram `input.schema` e `output.schema` como schemas
+  de artefato (por exemplo `artifact/document@1`), além de `execution`,
+  `semantics` e `providers`, e o `:execute` do REST recebe `parameters` como
+  string JSON.
+- A fachada MCP cria uma tool por manifesto *mais recente*, com nome
+  `id.replace(".", "_")`, sem a versão no nome nem no schema. O REST lista
+  todas as versões, e o `:execute` aceita `version`.
 - Os identificadores de operação da ADR-0019 trafegam só como headers HTTP
   (`X-Acessilia-*`); ainda não há equivalente em MCP.
 
@@ -70,39 +76,76 @@ Opções consideradas:
 
 ### Tools são capacidades
 
-- Toda capacidade do catálogo deve ser exposta como uma tool MCP, e só
-  capacidades catalogadas podem ser expostas. A tool leva o id da capacidade e
-  sua versão exata.
-- O schema de entrada da tool deve ser o schema de parâmetros publicado da
-  capacidade (ADR-0004). Sem objeto `parameters` livre.
-- Entradas que são artefatos devem ser valores `artifact/reference@1`
-  (ADR-0015). Por HTTP, uma tool não pode aceitar caminho de arquivo local.
-- O resultado de uma tool deve trazer, como conteúdo estruturado, o mesmo
-  envelope e a mesma proveniência da resposta REST para a mesma chamada.
+- Toda **versão** de capacidade catalogada deve ser exposta como uma tool MCP,
+  e só capacidades catalogadas podem ser expostas. O nome da tool é
+  `{id}__v{versão}` (por exemplo `document.ocr__v1`): o id é mantido como está,
+  sem trocar os pontos, e o sublinhado duplo não ocorre em ids de capacidade,
+  então os nomes não colidem. A tool também traz o id e a versão nos seus
+  metadados. Uma ação ligada a uma versão anterior continua invocável.
+- O schema de entrada da tool tem duas partes:
+  - os **controles de invocação** que o REST já expõe: `provider` (opcional; a
+    ADR-0029 planeja com a disponibilidade de providers), `language`,
+    `no_cache` e o artefato de entrada como valor `artifact/reference@1`
+    (ADR-0015). Por HTTP, uma tool não pode aceitar caminho de arquivo local.
+  - os **parâmetros** da capacidade, descritos por um JSON Schema publicado no
+    contrato da capacidade. Hoje nenhuma capacidade publica um, então isso é
+    uma mudança de contrato na Toolbox (ADR-0004, P7): cada manifesto ganha um
+    schema de parâmetros, com uma regra para parâmetros específicos de
+    provider (por exemplo, um schema por provider, indexado pelo id do
+    provider). Até a capacidade publicar seu schema, a tool mantém um objeto
+    `parameters` livre, e o teste de paridade o aponta.
+- Um resultado de sucesso traz, como `structuredContent`, o mesmo envelope e a
+  mesma proveniência da resposta REST para a mesma chamada. O `outputSchema`
+  da tool, quando declarado, é esse envelope de sucesso.
 - Um teste de paridade na Toolbox deve verificar que a lista de tools MCP e o
   catálogo REST nomeiam as mesmas capacidades, versões e schemas.
 
 ### Identificadores, progresso, cancelamento e erros
 
 - Os identificadores da ADR-0019 devem trafegar no `_meta` da requisição, nas
-  chaves `acessilia/task_id`, `acessilia/operation_id` e
-  `acessilia/attempt_id`, com o mesmo significado e a mesma validação dos
-  headers.
+  chaves em DNS reverso `io.github.a11ydevs/task-id`,
+  `io.github.a11ydevs/operation-id` e `io.github.a11ydevs/attempt-id`, com o
+  mesmo significado e a mesma validação dos headers. O prefixo é o domínio do
+  GitHub Pages da organização invertido, então não colide com outros
+  fornecedores, e não contém rótulo reservado pelo MCP (`mcp`,
+  `modelcontextprotocol`).
 - Um cliente pode pedir notificações de progresso; a Toolbox informa o
   progresso quando o provider consegue medi-lo.
-- A notificação de cancelamento MCP de uma requisição deve cancelar a operação
-  da mesma forma que o endpoint de cancelamento da ADR-0019.
-- Erros da Toolbox devem chegar ao cliente como erros de tool cujo conteúdo
-  estruturado traz o código de erro da Toolbox (`invalid_input`,
-  `provider_unavailable`, ...), para que o SDK levante os mesmos erros tipados
-  que levanta para REST.
+- O cancelamento tem dois caminhos, porque a notificação MCP é "dispare e
+  esqueça" (o receptor pode ignorá-la, ela nomeia um id de requisição em uma
+  conexão, e pode chegar depois da resposta):
+  - **caminho rápido:** `notifications/cancelled` para uma requisição em
+    andamento. O servidor associa o id da requisição ao `operation_id` que
+    recebeu no `_meta` dessa requisição, enquanto a sessão durar;
+  - **caminho durável:** o endpoint de cancelamento da ADR-0019, por
+    `operation_id`. O cliente deve usá-lo sempre que a sessão que levou a
+    requisição não existir mais (reconexão, failover) ou a notificação não
+    tiver efeito, e para cancelar um job.
+- Erros da Toolbox são resultados de tool com `isError: true`. Eles levam o
+  envelope de erro (código como `invalid_input` ou `provider_unavailable`,
+  mensagem, se é repetível) como JSON em `content` e em
+  `_meta["io.github.a11ydevs/error"]`, nunca em `structuredContent`, que fica
+  reservado ao envelope de sucesso. O SDK lê o código em `_meta` e levanta os
+  mesmos erros tipados que levanta para REST.
 
-### Clientes
+### Clientes e sessões
 
 - O SDK deve oferecer um cliente genérico de capacidades: descobrir o
   catálogo, invocar uma capacidade por id e versão com suas entradas e
-  identificadores, acompanhar o progresso e cancelar. As regras de failover e
-  retry da ADR-0006 se aplicam sem mudança.
+  identificadores, acompanhar o progresso e cancelar.
+- As regras de failover e retry da ADR-0006 se aplicam, com as regras que uma
+  sessão Streamable HTTP acrescenta:
+  - uma sessão (`Mcp-Session-Id`) pertence a um endpoint e não é portável. O
+    failover para outra réplica abre uma sessão nova com `initialize`, e um
+    `404` para uma sessão significa reinicializar;
+  - uma requisição repetida após um stream interrompido ou em outra réplica
+    mantém seu `operation_id`, para que a Toolbox junte a operação conhecida
+    em vez de executá-la duas vezes (ADR-0019, `execution.idempotent`);
+  - antes de repetir num secundário, o cliente verifica que o `tools/list` do
+    secundário contém a `capability@version` vinculada, como os clientes
+    tipados verificam hoje o catálogo do secundário (#429);
+  - o snapshot do catálogo usado no planejamento vem do primário e não faz
+    failover silencioso, como o `toolbox_gate` já faz.
 - O SDK não pode tornar obrigatória uma dependência pesada para isso
   (constituição, P2). Usar o pacote MCP oficial como extra opcional ou um
   cliente mínimo próprio fica a cargo do pull request que implementar.
@@ -116,22 +159,35 @@ Opções consideradas:
   artefatos e operação. Nenhuma capacidade pode estar disponível em só um dos
   dois transportes.
 
+## Decisões em aberto
+
+Esta ADR continua `Proposto` até que estes pontos sejam fechados na revisão:
+
+- **Schemas de parâmetros.** A forma do schema de parâmetros por capacidade e
+  a regra para parâmetros específicos de provider são uma mudança de contrato
+  da Toolbox. Fecha quando os donos da Toolbox a aceitarem no
+  `acessilia-toolbox`.
+- **Revisão entre componentes.** Os donos da Toolbox revisam as regras da
+  fachada MCP acima (processo de ADR, passo 5). Depois disso, um pull request
+  seguinte define `Aceito`.
+
 ## Consequências
 
 - Um único caminho de invocação para o core, benchmarks, scripts e agentes
-  externos. O planejador pode chamar uma capacidade que conhece só pelo id
-  (ADR-0029).
+  externos. O planejador pode chamar uma capacidade que conhece só pelo id e
+  pela versão (ADR-0029).
 - A Toolbox mantém duas fachadas sobre um executor; o teste de paridade as
   mantém iguais.
 - A execução assíncrona e durável (#639: filas e workers) não é decidida aqui.
   A chamada síncrona com progresso definida acima é a base que ela vai
   estender, em uma ADR posterior.
 - Trabalho decorrente, acompanhado na #735:
-  - Toolbox: servir MCP por HTTP, derivar os schemas das tools dos schemas das
-    capacidades, aceitar referências de artefato, mapear identificadores de
-    `_meta` e o cancelamento, adicionar o teste de paridade.
-  - SDK: o cliente MCP genérico, com testes de contrato contra uma fixture da
-    Toolbox.
+  - Toolbox: publicar schemas de parâmetros nos contratos das capacidades;
+    servir MCP por HTTP com uma tool por `(id, versão)`; aceitar referências
+    de artefato; mapear os identificadores de `_meta`, o cancelamento e o
+    envelope de erro; adicionar o teste de paridade.
+  - SDK: o cliente MCP genérico com as regras de sessão e failover acima, com
+    testes de contrato contra uma fixture da Toolbox.
   - core: mover os pontos de chamada para o cliente genérico; um teste de
     arquitetura proíbe novos imports de clientes tipados.
 - Conformidade: o teste de paridade da Toolbox;

@@ -30,11 +30,15 @@ O core já planeja com PDDL em ciclo fechado: `PddlProblemCompiler`,
   em tabelas, nível de página) tomam decisões e chamam modelos a partir do
   core.
 
-A Toolbox já publica o lado semântico das suas capacidades: predicados, ações
-por capacidade e fragmentos de domínio (`/planning/domain-fragments`, recursos
-MCP `acessilia://...`; ver `docs/pddl.md` da Toolbox). Ela não é dona do
-planejamento. A #632 (PR 2) proíbe um compilador genérico MCP → PDDL, e a #640
-trata a composição de fragmentos como experimental.
+A Toolbox já publica parte do lado semântico das suas capacidades:
+`GET /v1/planning/domain` (um domínio monolítico, gerado a partir da versão
+mais recente de cada capacidade), `GET /v1/planning/capabilities/{id}` e
+`GET /v1/planning/predicates`, e os recursos MCP
+`acessilia://planning/domain` e `acessilia://planning/capabilities/{id}`.
+Fragmentos por capacidade (`/planning/domain-fragments`) aparecem no
+`docs/pddl.md` da Toolbox só como algo que ela *pode* expor. A Toolbox não é
+dona do planejamento. A #632 (PR 2) proíbe um compilador genérico MCP → PDDL,
+e a #640 trata a composição de fragmentos como experimental.
 
 ## Decisão
 
@@ -52,10 +56,15 @@ trata a composição de fragmentos como experimental.
 
 - Todo passo **semanticamente relevante** de um job deve ser uma ação do
   domínio de planejamento: passos que mudam o documento ou decidem o workflow,
-  como inspeção, limite de páginas, extração, OCR, fusão de blocos, ordem de
-  leitura, descrição de imagens, adjudicação, normalização matemática e
-  exportação acessível. O orquestrador não pode rodar uma sequência fixa
-  desses passos.
+  como inspeção, extração, OCR, fusão de blocos, ordem de leitura, descrição
+  de imagens, adjudicação, normalização matemática e exportação acessível. O
+  orquestrador não pode rodar uma sequência fixa desses passos.
+- Políticas de configuração continuam políticas do core, não ações. O limite
+  de páginas (`DocumentConfig.max_pages`, verificado antes da extração) é uma
+  delas: é uma verificação de admissão que rejeita o job com
+  `DocumentTooLargeError`. Dos quatro estágios que hoje rodam antes do
+  planejamento, inspeção, extração e enriquecimento viram ações; o limite de
+  páginas continua política.
 - A infraestrutura fica fora do domínio e pertence ao runtime: retries HTTP,
   renovação de credenciais, serialização, persistência operacional,
   confirmação de mensagens em filas, health checks, transporte e recuperação
@@ -69,13 +78,17 @@ trata a composição de fragmentos como experimental.
 ### O domínio é composto de fragmentos versionados
 
 - O domínio efetivo é formado pelas ações de workflow do core mais os
-  fragmentos PDDL que a Toolbox publica para as capacidades do snapshot do
-  catálogo.
+  fragmentos PDDL das capacidades **e versões** do snapshot do catálogo. A
+  Toolbox deve servir fragmentos por capacidade e por versão, gerados a partir
+  de um snapshot; o domínio monolítico gerado das versões mais recentes não
+  consegue atender a um plano que fixa uma versão anterior.
 - Os fragmentos são curados e versionados junto com sua capacidade. A
   composição verifica nomes e tipos; não traduz schemas de tools em PDDL (sem
   compilador genérico, #632).
 - O CI deve fazer o parsing do domínio composto e resolver um conjunto de
-  problemas de fixture com o planejador interno e o Fast Downward.
+  problemas de fixture com o planejador interno. O Fast Downward continua
+  opcional, como no código (o CI não o instala hoje): a comparação roda onde
+  ele estiver instalado. Incluí-lo no CI é uma decisão separada.
 
 ### Estado, disponibilidade e falha
 
@@ -83,11 +96,23 @@ trata a composição de fragmentos como experimental.
   as obrigações, os resultados já registrados e um snapshot do catálogo.
 - A disponibilidade de capacidades e providers são predicados do problema. O
   `toolbox_gate` fica reduzido a relatório.
-- Um problema insolúvel é um resultado explícito: o job falha com a causa, ou
-  uma ação `human-review` é planejada. Nunca é uma degradação silenciosa.
+- Um problema insolúvel é um resultado explícito, nunca uma degradação
+  silenciosa: o job termina **escalado**, com a causa registrada. Hoje o
+  `human-review` faz exatamente isso (seu handler registra a escalada e
+  retorna `success=False`), e continua terminal: o job não pausa à espera de
+  uma pessoa. Pausar e retomar após uma decisão humana exige estado durável de
+  workflow e fica para uma ADR posterior.
 - Um resultado de capacidade atualiza o estado simbólico uma vez por
-  `operation_id`, pelo journal da ADR-0020. Um resultado duplicado ou atrasado
-  é ignorado.
+  `operation_id`. O journal da ADR-0020 guarda só identidade, "(task_id, slot
+  lógico) → operation_id", para os slots de upload e extração. Por isso esta
+  ADR o estende:
+  - os slots do journal passam a cobrir toda chamada de capacidade do plano;
+  - o checkpoint `execution` guarda um **registro de resultados aplicados**, o
+    conjunto de `operation_id`s cujo resultado já foi aplicado ao estado
+    simbólico.
+
+  Um resultado cujo `operation_id` já está nesse registro, ou que não pertence
+  ao passo atual do plano, é ignorado.
 - O replanejamento continua no core e continua limitado.
 
 ### Agentes estratégicos ficam no core; agentes operacionais são capacidades
@@ -101,8 +126,12 @@ trata a composição de fragmentos como experimental.
 - **Agentes operacionais viram capacidades da Toolbox**: OCR e extração
   semântica, classificação documental, descrição de imagens, adjudicação
   visual, extração de tabelas e fórmulas, processamento multimodal.
-- Chamadas a modelos passam pela Toolbox (ADR-0012), inclusive as de um agente
-  estratégico. O core interpreta os resultados no contexto do plano. A Toolbox
+- Com `AI_CLIENT=toolbox` (ADR-0012; as implantações de produção e staging),
+  chamadas a modelos passam pela Toolbox, inclusive as de um agente
+  estratégico. O padrão ainda é `ollama`, e `openrouter` continua suportado.
+  Remover os modos diretos não é decidido aqui: emendaria a ADR-0012 e a
+  configuração. O core interpreta os resultados dos modelos no contexto do
+  plano. A Toolbox
   nunca decide objetivos globais nem replanejamento.
 - Os contratos distinguem um resultado operacional de uma decisão estratégica.
 
@@ -111,6 +140,19 @@ trata a composição de fragmentos como experimental.
 - Uma interface `PlanningEngine` (#632, PR 3) separa o planejador da
   coordenação do workflow. O planejador interno e o Fast Downward continuam
   intercambiáveis atrás dela, e a comparação entre eles continua rodando.
+
+## Decisões em aberto
+
+Esta ADR continua `Proposto` até que estes pontos sejam fechados na revisão:
+
+- **Fragmentos por versão.** Os donos da Toolbox aceitam servir fragmentos
+  por capacidade e por versão a partir de um snapshot do catálogo.
+- **Registro de resultados aplicados.** A extensão do journal da ADR-0020 e do
+  checkpoint `execution` é revisada junto com a versão de schema de checkpoint
+  de que precisa.
+- **Revisão entre componentes.** Os donos da Toolbox revisam o contrato de
+  planejamento (processo de ADR, passo 5). Depois disso, um pull request
+  seguinte define `Aceito`.
 
 ## Consequências
 
@@ -121,12 +163,19 @@ trata a composição de fragmentos como experimental.
 - O domínio cresce com o catálogo. A curadoria dos fragmentos, os custos das
   ações e as fixtures de planejamento no CI o mantêm tratável.
 - A migração é incremental e segue a ADR-0028, método a método. Depois os
-  quatro estágios fixos viram ações, e depois os agentes operacionais viram
+  três estágios semânticos fixos viram ações, e depois os agentes operacionais viram
   capacidades. O ciclo fechado não espera pelas filas duráveis
   (#639): chamadas MCP síncronas bastam.
-- Os indicadores de progresso são acompanhados na #735: estágios fora do plano
-  (4), métodos sem vínculo com capacidade (cerca de 20 de 25), agentes
-  operacionais ainda no core.
+- Os indicadores de progresso são acompanhados na #735: estágios semânticos
+  fora do plano (3: inspeção, extração, enriquecimento), métodos de plano que
+  computam localmente (14 de 25, ADR-0028), agentes operacionais ainda no
+  core.
+- Trabalho decorrente, acompanhado na #735:
+  - Toolbox: servir fragmentos PDDL por capacidade e por versão, gerados a
+    partir de um snapshot do catálogo (REST e recursos MCP).
+  - core: compor o domínio a partir desses fragmentos; a verificação de
+    política do limite de páginas; a extensão do journal e o registro de
+    resultados aplicados.
 - Conformidade: as fixtures de planejamento no CI; um teste do orquestrador
   que verifica que todo passo de um job vem do plano;
   `tests/test_architecture_layers.py` para clientes de modelo no core.
