@@ -26,6 +26,7 @@ indicative, not a controlled benchmark.
 |---|---|---:|---:|---:|
 | A — #748 branch | [45174924436](https://github.com/A11yDevs/acessilia/actions/runs/45174924436) | 3m07s | 3.05m | 7.47 |
 | B — #771 | [45193011145](https://github.com/A11yDevs/acessilia/actions/runs/45193011145) | 2m21s | 0.20m (aggregator) | 8.47 |
+| B2 — #787 after shared setup | [45251360702](https://github.com/A11yDevs/acessilia/actions/runs/45251360702) | 2m11s | 0.20m (aggregator) | 8.37 |
 
 Job-minutes include the isolation and security jobs; skipped jobs are excluded
 because they consume no runner minutes. The figures measure aggregate
@@ -43,6 +44,10 @@ consumption, not only the test suites.
 - End-to-end wall-clock dropped from **3m07s to 2m21s** in this pair.
 - Aggregate job-minutes rose from **7.47 to 8.47** because five provider jobs
   repeat checkout/install. Parallelism reduced latency but not consumption.
+- After the shared setup action and the working setup-uv cache (#788), run B2
+  was **2m11s / 8.37 job-minutes** (app leg 1.87m, image scan 1.80m). The
+  maintainability change did not reduce aggregate runner-minutes; the image
+  scan is still the critical path.
 - The **container image scan (2.28m)** is now the critical path in mode B. A
   further gain requires attacking that job, not only the test suites.
 - The shadow selection ran successfully in mode B (PR #771). Its changed
