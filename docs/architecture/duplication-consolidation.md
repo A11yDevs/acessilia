@@ -113,6 +113,18 @@ lines → **15 groups / 34 functions / 324 lines**. The five-mode group and the
 pause/resume **command** group disappear; the `pause_chat`/`resume_chat`
 middleware functions remain a separate group.
 
+## Sixth consolidation: the Telegram pause middleware
+
+`pause_chat` and `resume_chat` repeated the same three steps: update the
+in-memory paused-chat cache, persist the change through `TelegramStateStore`,
+and log a warning when SQLite is unavailable. They now share `_set_paused`,
+which keeps the cache update before the store call and preserves the failure
+path. The state-survival and store-failure tests cover both actions.
+
+**Measured delta on this PR's code commit:** 16 groups / 36 functions / 333
+lines → **15 groups / 34 functions / 319 lines**. The pause/resume middleware
+group disappears.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -143,10 +155,11 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 21 | SDK layout/structure result readers (2/32) | **Reclassified:** false positive; the envelope extraction is already shared. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
-The table is anchored to the November baseline. The current tool also reports two
-groups introduced by later PRs: `pause_chat`/`resume_chat` (2/14) and the two
-deprecation `__getattr__` functions in `table_ast`/`validators` (2/20); they are
-tracked separately from the baseline rows.
+The table is anchored to the November baseline. The current tool also reports
+two groups outside it: the two deprecation `__getattr__` functions in
+`table_ast`/`validators` (2/20) and the planner property shared by the
+orchestrator and the planning engine introduced by #632 (2/9); they are tracked
+separately from the baseline rows.
 
 The remaining groups are smaller or behaviour-sensitive. Agent selection and
 table selection need characterization before extraction, while the config
@@ -159,7 +172,7 @@ changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.
