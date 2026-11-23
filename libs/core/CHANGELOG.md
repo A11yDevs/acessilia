@@ -16,7 +16,7 @@ document with Toolbox methods names the versions, so its `problem_sha256` and
 checkpoint's unversioned requirements stay as they are for its replans.
 
 `observe` stays the default; removing it is a later step, once production logs
-show no false "would remove".
+show no false "would remove" (#809).
 
 ## 0.3.10 — the formula methods declare their Toolbox requirements
 

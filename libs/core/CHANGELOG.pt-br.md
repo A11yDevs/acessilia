@@ -17,7 +17,7 @@ que tem, e os requisitos sem versão desse checkpoint continuam como estão nos
 seus replanejamentos.
 
 O `observe` continua o padrão; tirá-lo é um passo posterior, depois que os logs
-de produção mostrarem que não há falsos "would remove".
+de produção mostrarem que não há falsos "would remove" (#809).
 
 ## 0.3.10 — os métodos de fórmula declaram seus requisitos de Toolbox
 

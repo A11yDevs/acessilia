@@ -158,7 +158,7 @@ axiomas, como o padrão `astar(blind())`.
 | ADR-0029 | Hoje | Próximo |
 |---|---|---|
 | A disponibilidade de capacidades e providers é predicado do problema | Feito no domínio 2.4: `requires`, `offered` e o derivado `runnable` | — |
-| O `toolbox_gate` vira só relatório | Ele ainda decide o que é oferecido no `enforce`, e o `observe` é o padrão | #640, PR 2: o snapshot em si é a entrada, e o `observe` sai depois que os logs de produção mostrarem que não há falsos "would remove" |
+| O `toolbox_gate` vira só relatório | Ele ainda decide o que é oferecido no `enforce`, e o `observe` é o padrão | #640, PR 2: o snapshot em si é a entrada, e o `observe` sai depois que os logs de produção mostrarem que não há falsos "would remove" ([#809](https://github.com/A11yDevs/acessilia/issues/809)) |
 | Ações operacionais ligadas a um id de capacidade e versão exata | Os fatos de requisito nomeiam `capability_id@versão`; os métodos ainda nomeiam handlers locais | #640, PR 2: as próprias ações, com os fragmentos de domínio |
 | Um resultado atualiza o estado uma vez por `operation_id` | Os status e as tentativas do manifesto | #640, PR 3, com o journal da ADR-0020 |
 | Inspeção, extração e enriquecimento são ações | Rodam antes do planejamento | #640, PR 2 |
