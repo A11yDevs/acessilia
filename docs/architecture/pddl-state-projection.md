@@ -71,10 +71,10 @@ The compiler refuses a problem it cannot plan, before the planner runs:
   outside it, or a method without a cost.
 - **Unknown unavailable methods.** An unavailable method that the manifest
   does not declare: a typo, not a capability gap.
-- **Not yet: cycles and unknown dependencies.** The manifest model refuses
-  them, but one introduced by a replan compiles: the internal planner refuses
-  a cycle when ordering, Fast Downward finds no plan, and an unknown
-  dependency raises a bare `KeyError`. The compiler should refuse both
+- **Dependencies.** A dependency on an unknown obligation, or a cycle in the
+  selected closure, naming the obligations. The manifest model refuses both
+  too; the compiler checks again because a replan changes the manifest in
+  place, and so every planner backend fails the same way
   ([#783](https://github.com/A11yDevs/acessilia/issues/783)).
 - **The rendered problem.** `PddlProblemValidator` checks it against the
   projection.

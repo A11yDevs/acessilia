@@ -2,6 +2,18 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.8 — o compilador PDDL recusa dependências cíclicas e desconhecidas
+
+O modelo do manifesto recusa dependências cíclicas e desconhecidas entre
+obrigações, mas um replanejamento altera o manifesto no lugar. Antes, o
+compilador deixava as duas passarem:
+- um ciclo compilava, e só o planejador interno o recusava, ao ordenar; o
+  Fast Downward apenas não encontrava plano;
+- uma dependência desconhecida levantava um `KeyError` cru.
+
+O `PddlProblemCompiler` agora recusa as duas antes de qualquer planejador
+rodar, com um `ValueError` que nomeia o ciclo ou a obrigação ausente (#783).
+
 ## 0.3.7 — uma interface de motor de planejamento
 
 Os planos padrão não mudam. `acessilia_core.planning.engine` cria a interface

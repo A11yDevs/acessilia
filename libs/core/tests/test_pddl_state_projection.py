@@ -264,12 +264,32 @@ def test_a_method_outside_the_v23_catalogue_for_its_kind_is_refused():
         _compile(_manifest(_obligation("o-1", kind="normalize-text", methods=("not-a-method",))))
 
 
-def test_a_dependency_cycle_is_refused_by_the_planner():
-    """The manifest model refuses a cycle; one introduced afterwards compiles,
-    and the internal planner refuses it when ordering. Refusing it in the
-    compiler is tracked separately (see the projection page)."""
-    manifest = _manifest(_obligation("o-1"), _obligation("o-2"))
+def test_a_dependency_cycle_is_refused_by_the_compiler():
+    """The manifest model refuses a cycle; one a replan introduces afterwards
+    is refused before any planner runs, naming the cycle (#783)."""
+    manifest = _manifest(_obligation("o-1"), _obligation("o-2"), _obligation("o-3"))
     manifest.obligations[0].dependencies = ["o-2"]
-    manifest.obligations[1].dependencies = ["o-1"]
-    with pytest.raises(ValueError):
-        PlannerAgent().plan(manifest)
+    manifest.obligations[1].dependencies = ["o-3"]
+    manifest.obligations[2].dependencies = ["o-1"]
+    with pytest.raises(ValueError, match="o-1 -> o-2 -> o-3 -> o-1"):
+        _compile(manifest)
+
+
+def test_an_unknown_dependency_is_refused_by_the_compiler():
+    manifest = _manifest(_obligation("o-1"))
+    manifest.obligations[0].dependencies = ["o-9"]
+    with pytest.raises(ValueError, match="o-1 depends on an unknown obligation: o-9"):
+        _compile(manifest)
+
+
+def test_a_diamond_is_not_a_cycle():
+    compiled = _compile(
+        _manifest(
+            _obligation("o-1"),
+            _obligation("o-2", dependencies=("o-1",)),
+            _obligation("o-3", dependencies=("o-1",)),
+            _obligation("o-4", dependencies=("o-2", "o-3")),
+        ),
+        selected_roots=["o-4"],
+    )
+    assert _objects(compiled, "obligation") == {"o-1", "o-2", "o-3", "o-4"}

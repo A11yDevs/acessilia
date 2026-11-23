@@ -72,11 +72,11 @@ planejador rodar:
   dele, ou um método sem custo.
 - **Métodos indisponíveis desconhecidos.** Um método indisponível que o
   manifesto não declara: um erro de digitação, não uma lacuna de capacidade.
-- **Ainda não: ciclos e dependências desconhecidas.** O modelo do manifesto
-  os recusa, mas um introduzido por replanejamento compila: o planejador
-  interno recusa um ciclo ao ordenar, o Fast Downward não encontra plano, e
-  uma dependência desconhecida levanta um `KeyError` cru. O compilador
-  deveria recusar os dois
+- **Dependências.** Uma dependência de uma obrigação desconhecida, ou um
+  ciclo no fecho selecionado, nomeando as obrigações. O modelo do manifesto
+  também recusa os dois; o compilador verifica de novo porque um
+  replanejamento altera o manifesto no lugar, e assim todo backend de
+  planejamento falha do mesmo jeito
   ([#783](https://github.com/A11yDevs/acessilia/issues/783)).
 - **O problema renderizado.** O `PddlProblemValidator` o confere contra a
   projeção.
