@@ -157,6 +157,19 @@ arquivos vazios, pequenos, com múltiplos blocos e ausentes, além de caminhos
 linhas → **13 grupos / 30 funções / 297 linhas**. O grupo `_sha256` desaparece;
 a cópia do extrator da Toolbox não formava grupo, então não altera esse delta.
 
+## Nona consolidação: o helper de headers de autenticação da API
+
+`ApiClient._admin_headers` e `_operations_headers` repetiam a cópia dos headers
+base e a regra do bearer token. Ambos agora delegam para `_auth_headers`; um
+teste fixa o token de observabilidade junto com a API key, e os testes existentes
+do token de operações cobrem o outro ramo. Outro teste configura os dois tokens e
+verifica que rotas admin recebem só o de observabilidade enquanto `/cache/clear`
+recebe só o de operações.
+
+**Delta medido no commit de código deste PR:** 13 grupos / 30 funções / 297
+linhas → **12 grupos / 28 funções / 287 linhas**. O grupo de headers de
+autenticação desaparece.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -174,7 +187,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 8 | `_is_process_running` do frontend (2/26) | **Consolidado:** um runtime atrás dos dois entry points, com testes da sondagem de PID. |
 | 9 | `acquire_lock` do frontend (2/36) | **Consolidado:** o console script compartilha `frontend.run` e o lock dele. |
 | 10 | `startup` do frontend (2/107) | **Consolidado:** a caracterização cobre composição das interfaces e shutdown. |
-| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidato a helper pequeno; baixa prioridade. |
+| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | **Consolidado:** `_auth_headers` compartilhado. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidado:** `_set_pause` compartilhado; textos não mudam. |
 | 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
 | 14 | `swap_low_agreement` (2/52) | Sensível a comportamento: caracterizar a política de troca primeiro. |
@@ -204,7 +217,7 @@ grupos restantes não foram alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.
