@@ -55,7 +55,13 @@ GitHub Actions workflow `CI`:
   `sdk tests (Python 3.12)` and `core tests (Python 3.12)`** run the four suites
   in parallel, each with branch coverage, its own threshold check, its own
   unexpected-skip check and its own JUnit/coverage artifacts. The application
-  suite keeps the bounded four-worker run.
+  suite keeps the bounded four-worker run and excludes tests marked
+  `integration`.
+- **`app integration (Python 3.12)`** runs the in-process API/worker/pipeline
+  tests marked `integration` when `backend/**`, `frontend/**` or the focused
+  provider-choice test changes (and on every push to an integration branch).
+  The marker separates expensive integration coverage without treating it as
+  live E2E; `e2e` remains the external-environment marker.
 - **`quality (Python 3.12)`** runs Ruff against the shrinking baseline, Mypy on
   the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass
   (#366), the Toolbox capability contract and the Toolbox's docstruct pin report

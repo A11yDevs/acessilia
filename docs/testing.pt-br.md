@@ -55,7 +55,14 @@ o workflow `CI` do GitHub Actions:
   `sdk tests (Python 3.12)` e `core tests (Python 3.12)`** executam as quatro
   suítes em paralelo, cada uma com cobertura de desvios, seu próprio limite, sua
   própria recusa de skips e seus artefatos JUnit/cobertura. A suíte da aplicação
-  mantém a execução limitada com quatro workers.
+  mantém a execução limitada com quatro workers e exclui testes marcados como
+  `integration`.
+- **`app integration (Python 3.12)`** executa os testes in-process de
+  API/worker/pipeline marcados como `integration` quando `backend/**`,
+  `frontend/**` ou o teste focado de escolha de provider muda (e em todo push
+  para uma branch de integração). O marker separa a cobertura de integração
+  cara sem tratá-la como E2E real; `e2e` continua sendo o marker de ambiente
+  externo.
 - **`quality (Python 3.12)`** executa o Ruff contra a baseline que só diminui, o
   Mypy no escopo configurado de `docstruct`/SDK/core/backend e um passe 3.11 das
   bibliotecas (#366), o contrato de capacidades da Toolbox e o relatório da
