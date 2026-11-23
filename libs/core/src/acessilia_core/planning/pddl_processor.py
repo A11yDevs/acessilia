@@ -19,6 +19,11 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDDL_SELECTED_CLOSURE_MISMATCH,
 )
 from acessilia_core.manifest.builder import V23_OBLIGATION_BY_KIND
+from acessilia_core.manifest.dependencies import (
+    DependencyCycleError,
+    UnknownDependencyError,
+    dependency_closure,
+)
 from acessilia_core.manifest.models import Obligation, ProcessingManifest
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
@@ -195,18 +200,23 @@ class PddlProblemCompiler:
         obligations: dict[str, Obligation],
         roots: set[str],
     ) -> list[str]:
-        selected: set[str] = set()
+        """The roots and their transitive predecessors.
 
-        def visit(obligation_id: str) -> None:
-            if obligation_id in selected:
-                return
-            selected.add(obligation_id)
-            for dependency in obligations[obligation_id].dependencies:
-                visit(dependency)
-
-        for root in sorted(roots):
-            visit(root)
-        return sorted(selected)
+        The manifest model refuses unknown and cyclic dependencies, but a
+        replan changes the manifest in place, so they are checked again here,
+        over the selected closure, before any planner runs (#783). The walk is
+        the model's own (``manifest.dependencies``).
+        """
+        graph = {key: item.dependencies for key, item in obligations.items()}
+        try:
+            return dependency_closure(graph, roots)
+        except DependencyCycleError as error:
+            raise ValueError(f"Dependency cycle between obligations: {error}") from error
+        except UnknownDependencyError as error:
+            raise ValueError(
+                f"Obligation {error.obligation_id} depends on an unknown "
+                f"obligation: {error.dependency}"
+            ) from error
 
     @staticmethod
     def _validate_causal_state(

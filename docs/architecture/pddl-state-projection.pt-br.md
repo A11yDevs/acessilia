@@ -60,26 +60,33 @@ nenhuma obrigação: o plano é `start-job`, `complete-job`.
 ## Verificações
 
 O compilador recusa um problema que não consegue planejar, antes de o
-planejador rodar:
+planejador rodar. As verificações rodam nesta ordem, e a primeira que falha é
+a reportada:
 
-- **Estado causal.** Uma obrigação satisfeita com uma predecessora
-  insatisfeita. O modelo do manifesto também recusa esse estado; o
-  compilador verifica de novo porque um replanejamento altera o manifesto no
-  lugar.
-- **Métodos.** Uma obrigação pendente sem método admissível, disponível e
-  não tentado.
-- **Catálogo v2.3.** Para um kind do catálogo v2.3, métodos admissíveis fora
-  dele, ou um método sem custo.
-- **Métodos indisponíveis desconhecidos.** Um método indisponível que o
-  manifesto não declara: um erro de digitação, não uma lacuna de capacidade.
-- **Ainda não: ciclos e dependências desconhecidas.** O modelo do manifesto
-  os recusa, mas um introduzido por replanejamento compila: o planejador
-  interno recusa um ciclo ao ordenar, o Fast Downward não encontra plano, e
-  uma dependência desconhecida levanta um `KeyError` cru. O compilador
-  deveria recusar os dois
-  ([#783](https://github.com/A11yDevs/acessilia/issues/783)).
-- **O problema renderizado.** O `PddlProblemValidator` o confere contra a
-  projeção.
+1. **Raízes.** Uma raiz desconhecida (veja a tabela de regras).
+2. **Dependências.** Uma dependência de uma obrigação desconhecida, nomeando a
+   obrigação que a tem, ou um ciclo no fecho selecionado, nomeando só o ciclo
+   (`a -> b -> a`). Um ciclo entre obrigações não selecionadas não impede o
+   problema. O modelo do manifesto também recusa os dois; o compilador
+   verifica de novo porque um replanejamento altera o manifesto no lugar, e
+   assim todo backend de planejamento falha do mesmo jeito
+   ([#783](https://github.com/A11yDevs/acessilia/issues/783)). Os dois usam o
+   mesmo percurso (`manifest/dependencies.py`), então encontram o mesmo
+   ciclo; cada um redige sua mensagem (a do modelo em português, a do
+   compilador em inglês).
+3. **Métodos indisponíveis desconhecidos.** Um método indisponível que o
+   manifesto não declara: um erro de digitação, não uma lacuna de capacidade.
+4. **Estado causal.** Uma obrigação satisfeita com uma predecessora
+   insatisfeita. O modelo do manifesto também recusa esse estado; o
+   compilador verifica de novo porque um replanejamento altera o manifesto no
+   lugar.
+5. **Catálogo v2.3.** Para um kind do catálogo v2.3, métodos admissíveis fora
+   dele, ou um método sem custo.
+6. **Métodos.** Uma obrigação pendente sem método admissível, disponível e
+   não tentado.
+7. **Status do job.** Um manifesto `completed`.
+8. **O problema renderizado.** O `PddlProblemValidator` o confere contra a
+   projeção.
 
 ## Identidade
 

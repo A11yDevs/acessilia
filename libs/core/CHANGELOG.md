@@ -2,6 +2,21 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.8 — the PDDL compiler refuses cyclic and unknown dependencies
+
+The manifest model refuses cyclic and unknown obligation dependencies, but a
+replan changes the manifest in place. Before, the compiler let both through:
+- a cycle compiled, and only the internal planner refused it, when ordering;
+  Fast Downward just found no plan;
+- an unknown dependency raised a bare `KeyError`.
+
+`PddlProblemCompiler` now refuses both before any planner runs, with a
+`ValueError` that names the cycle or the missing obligation (#783).
+The check covers the selected closure: a cycle reached below a root names only
+the cycle, and an unknown dependency names the obligation that has it. The
+model and the compiler share one walk (`acessilia_core.manifest.dependencies`),
+so they report the same cycle; the model's message now names it too.
+
 ## 0.3.7 — a planning engine seam
 
 The default plans are unchanged. `acessilia_core.planning.engine` adds the seam between

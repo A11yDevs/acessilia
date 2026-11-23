@@ -264,12 +264,75 @@ def test_a_method_outside_the_v23_catalogue_for_its_kind_is_refused():
         _compile(_manifest(_obligation("o-1", kind="normalize-text", methods=("not-a-method",))))
 
 
-def test_a_dependency_cycle_is_refused_by_the_planner():
-    """The manifest model refuses a cycle; one introduced afterwards compiles,
-    and the internal planner refuses it when ordering. Refusing it in the
-    compiler is tracked separately (see the projection page)."""
+def test_a_dependency_cycle_is_refused_by_the_compiler():
+    """The manifest model refuses a cycle; one a replan introduces afterwards
+    is refused before any planner runs, naming the cycle (#783)."""
+    manifest = _manifest(_obligation("o-1"), _obligation("o-2"), _obligation("o-3"))
+    manifest.obligations[0].dependencies = ["o-2"]
+    manifest.obligations[1].dependencies = ["o-3"]
+    manifest.obligations[2].dependencies = ["o-1"]
+    with pytest.raises(ValueError, match="o-1 -> o-2 -> o-3 -> o-1"):
+        _compile(manifest)
+
+
+def test_an_unknown_dependency_is_refused_by_the_compiler():
+    manifest = _manifest(_obligation("o-1"))
+    manifest.obligations[0].dependencies = ["o-9"]
+    with pytest.raises(ValueError, match="o-1 depends on an unknown obligation: o-9"):
+        _compile(manifest)
+
+
+def test_a_cycle_below_the_root_names_only_the_cycle():
+    manifest = _manifest(_obligation("r"), _obligation("a"), _obligation("b"))
+    manifest.obligations[0].dependencies = ["a"]
+    manifest.obligations[1].dependencies = ["b"]
+    manifest.obligations[2].dependencies = ["a"]
+    with pytest.raises(ValueError, match="obligations: a -> b -> a$"):
+        _compile(manifest, selected_roots=["r"])
+
+
+def test_a_self_dependency_is_a_cycle():
+    manifest = _manifest(_obligation("s"))
+    manifest.obligations[0].dependencies = ["s"]
+    with pytest.raises(ValueError, match="obligations: s -> s$"):
+        _compile(manifest)
+
+
+def test_a_transitive_unknown_dependency_names_its_parent():
+    manifest = _manifest(_obligation("r", dependencies=("a",)), _obligation("a"))
+    manifest.obligations[1].dependencies = ["nope"]
+    with pytest.raises(ValueError, match="Obligation a depends on an unknown obligation: nope"):
+        _compile(manifest, selected_roots=["r"])
+
+
+def test_a_cycle_outside_the_selected_closure_compiles():
+    """The check covers the selected closure only: an unselected cycle is not
+    planned, so it does not stop this problem."""
+    manifest = _manifest(_obligation("o-1"), _obligation("x"), _obligation("y"))
+    manifest.obligations[1].dependencies = ["y"]
+    manifest.obligations[2].dependencies = ["x"]
+    assert _objects(_compile(manifest, selected_roots=["o-1"]), "obligation") == {"o-1"}
+
+
+@pytest.mark.parametrize("call", ["plan", "compare"])
+def test_the_planner_surfaces_the_compiler_refusal(call):
+    """Every backend compiles first, so every one refuses the same way; a
+    planner that swallowed the error would fail here."""
     manifest = _manifest(_obligation("o-1"), _obligation("o-2"))
     manifest.obligations[0].dependencies = ["o-2"]
     manifest.obligations[1].dependencies = ["o-1"]
-    with pytest.raises(ValueError):
-        PlannerAgent().plan(manifest)
+    with pytest.raises(ValueError, match="Dependency cycle between obligations"):
+        getattr(PlannerAgent(), call)(manifest)
+
+
+def test_a_diamond_is_not_a_cycle():
+    compiled = _compile(
+        _manifest(
+            _obligation("o-1"),
+            _obligation("o-2", dependencies=("o-1",)),
+            _obligation("o-3", dependencies=("o-1",)),
+            _obligation("o-4", dependencies=("o-2", "o-3")),
+        ),
+        selected_roots=["o-4"],
+    )
+    assert _objects(compiled, "obligation") == {"o-1", "o-2", "o-3", "o-4"}
