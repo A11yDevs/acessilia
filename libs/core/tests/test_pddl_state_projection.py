@@ -278,3 +278,87 @@ def test_requirements_of_methods_outside_the_problem_are_ignored():
     catalogue = CatalogueFacts(requirements={"m-z": frozenset({_RENDER})}, offered=frozenset())
     compiled = _compile(_manifest(_obligation("o-1")), catalogue=catalogue)
     assert "requires" not in compiled.text
+
+
+# Edge cases (review of #775).
+
+
+def test_distinct_ids_that_normalize_alike_get_distinct_symbols():
+    compiled = _compile(_manifest(_obligation("o_1"), _obligation("o-1")))
+    symbols = compiled.projection.obligation_symbols
+    assert len(set(symbols.values())) == 2
+    assert {compiled.projection.reverse_obligations[s] for s in symbols.values()} == {"o_1", "o-1"}
+
+
+def test_obligations_sharing_a_method_emit_its_shared_facts_once():
+    compiled = _compile(_manifest(_obligation("o-1"), _obligation("o-2")))
+    lines = [line.strip() for line in compiled.text.splitlines()]
+    assert lines.count("(available m-a)") == 1
+    assert lines.count("(supports m-a test-kind)") == 1
+    assert {"(admissible m-a o-1)", "(admissible m-a o-2)"} <= _facts(compiled)
+
+
+def test_the_order_of_obligations_and_methods_does_not_change_the_problem():
+    first = _compile(_manifest(_obligation("o-1", methods=("m-a", "m-b")), _obligation("o-2")))
+    second = _compile(_manifest(_obligation("o-2"), _obligation("o-1", methods=("m-b", "m-a"))))
+    assert first.text == second.text
+    assert first.sha256 == second.sha256
+
+
+def test_a_change_outside_the_projection_keeps_the_problem_identity():
+    """The problem hash is not the identity of the document: two manifests can
+    project to the same problem."""
+    manifest = _manifest(_obligation("o-1"))
+    changed = manifest.model_copy(deep=True)
+    changed.elements[0].text = "another text"
+    first, second = _compile(manifest), _compile(changed)
+    assert first.sha256 == second.sha256
+    assert first.manifest_sha256 != second.manifest_sha256
+
+
+def test_an_empty_root_set_plans_only_the_job_lifecycle():
+    compiled = _compile(_manifest(_obligation("o-1")), selected_roots=[])
+    assert _objects(compiled, "obligation") == set()
+    _, plan = PlannerAgent().plan(_manifest(_obligation("o-1")), selected_roots=[])
+    assert [step.action for step in plan.steps] == ["start-job", "complete-job"]
+
+
+def test_a_manifest_without_obligations_plans_only_the_job_lifecycle():
+    _, plan = PlannerAgent().plan(_manifest())
+    assert [step.action for step in plan.steps] == ["start-job", "complete-job"]
+
+
+def test_a_method_outside_the_v23_catalogue_for_its_kind_is_refused():
+    with pytest.raises(ValueError):
+        _compile(_manifest(_obligation("o-1", kind="normalize-text", methods=("not-a-method",))))
+
+
+def test_a_dependency_cycle_is_refused_by_the_compiler():
+    """The manifest model refuses a cycle; one a replan introduces afterwards
+    is refused before any planner runs, naming the cycle (#783)."""
+    manifest = _manifest(_obligation("o-1"), _obligation("o-2"), _obligation("o-3"))
+    manifest.obligations[0].dependencies = ["o-2"]
+    manifest.obligations[1].dependencies = ["o-3"]
+    manifest.obligations[2].dependencies = ["o-1"]
+    with pytest.raises(ValueError, match="o-1 -> o-2 -> o-3 -> o-1"):
+        _compile(manifest)
+
+
+def test_an_unknown_dependency_is_refused_by_the_compiler():
+    manifest = _manifest(_obligation("o-1"))
+    manifest.obligations[0].dependencies = ["o-9"]
+    with pytest.raises(ValueError, match="o-1 depends on an unknown obligation: o-9"):
+        _compile(manifest)
+
+
+def test_a_diamond_is_not_a_cycle():
+    compiled = _compile(
+        _manifest(
+            _obligation("o-1"),
+            _obligation("o-2", dependencies=("o-1",)),
+            _obligation("o-3", dependencies=("o-1",)),
+            _obligation("o-4", dependencies=("o-2", "o-3")),
+        ),
+        selected_roots=["o-4"],
+    )
+    assert _objects(compiled, "obligation") == {"o-1", "o-2", "o-3", "o-4"}

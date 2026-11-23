@@ -229,14 +229,30 @@ class PddlProblemCompiler:
         obligations: dict[str, Obligation],
         roots: set[str],
     ) -> list[str]:
+        """The roots and their transitive predecessors.
+
+        The manifest model refuses unknown and cyclic dependencies, but a
+        replan changes the manifest in place, so they are checked again here,
+        before any planner runs (#783).
+        """
         selected: set[str] = set()
+        path: list[str] = []
 
         def visit(obligation_id: str) -> None:
+            if obligation_id in path:
+                cycle = path[path.index(obligation_id):] + [obligation_id]
+                raise ValueError(f"Dependency cycle between obligations: {' -> '.join(cycle)}")
             if obligation_id in selected:
                 return
-            selected.add(obligation_id)
+            path.append(obligation_id)
             for dependency in obligations[obligation_id].dependencies:
+                if dependency not in obligations:
+                    raise ValueError(
+                        f"Obligation {obligation_id} depends on an unknown obligation: {dependency}"
+                    )
                 visit(dependency)
+            path.pop()
+            selected.add(obligation_id)
 
         for root in sorted(roots):
             visit(root)

@@ -44,10 +44,15 @@ orquestrador o chama pelo `PlanningEngine` (#744), com um `PlanningProblem`:
 | Os requisitos de catálogo de um método | `(requires m c p)`, objetos `capability` e `provider` | Só para os métodos deste problema; um método sem requisitos não tem nenhum |
 | Os pares exigidos que o snapshot oferece | `(offered c p)` | Gate em `observe` ou `off`: todo requisito é oferecido, então o plano não muda. `enforce`: o que o snapshot publica numa versão compatível; nada sem snapshot (falha fechada) |
 | — | `(runnable m)`, derivado pelo domínio | `available` e todo requisito oferecido. `execute-obligation` o exige |
-| Uma tentativa `failed` ou `rejected` | `(tried o m)` | Uma tentativa `succeeded` não é projetada; seu resultado é o status da obrigação |
+| Uma tentativa `failed` ou `rejected` | `(tried o m)` | Uma tentativa `succeeded` não é projetada; seu resultado é o status da obrigação. Uma tentativa `failed` descarta o método para aquela obrigação, qualquer que seja a causa (veja abaixo) |
 | Ids, kinds e nomes de métodos | símbolos PDDL (`[a-z][a-z0-9-]*`) | A projeção guarda o mapeamento nos dois sentidos |
 
-Fatos duplicados são emitidos uma única vez.
+Fatos duplicados são emitidos uma única vez. O problema não depende da ordem
+das obrigações nem dos seus métodos no manifesto, e ids distintos que se
+normalizam no mesmo símbolo recebem símbolos distintos (um sufixo de hash).
+
+Um conjunto vazio de raízes, ou um manifesto sem obrigações, não projeta
+nenhuma obrigação: o plano é `start-job`, `complete-job`.
 
 ## O que não é projetado
 
@@ -72,6 +77,12 @@ planejador rodar:
   dele, ou um método sem custo.
 - **Métodos indisponíveis desconhecidos.** Um método indisponível que o
   manifesto não declara: um erro de digitação, não uma lacuna de capacidade.
+- **Dependências.** Uma dependência de uma obrigação desconhecida, ou um
+  ciclo no fecho selecionado, nomeando as obrigações. O modelo do manifesto
+  também recusa os dois; o compilador verifica de novo porque um
+  replanejamento altera o manifesto no lugar, e assim todo backend de
+  planejamento falha do mesmo jeito
+  ([#783](https://github.com/A11yDevs/acessilia/issues/783)).
 - **O problema renderizado.** O `PddlProblemValidator` o confere contra a
   projeção.
 
@@ -86,6 +97,29 @@ planejador rodar:
   executor recusa um plano feito com outro domínio, então, depois de uma
   mudança de domínio (2.3 → 2.4), um job retomado planeja de novo em vez de
   falhar.
+- São identidades diferentes. Dois manifestos que diferem só fora da
+  projeção (o texto de um elemento, uma observação) produzem o mesmo
+  problema, então `problem_sha256` é a identidade do estado de
+  planejamento, nunca do estado documental. Checkpoints, contratos de
+  delegação e replanejamento guardam as duas.
+
+## Limitação conhecida: o que `tried` significa
+
+`tried` vem de qualquer tentativa `failed` ou `rejected`, então um método que
+falhou por um motivo transitório (timeout, provider fora do ar, erro de
+infraestrutura) é descartado para aquela obrigação como um que não conseguiu
+satisfazê-la. O ciclo fechado precisa distinguir:
+
+- falha semântica: o método rodou e não satisfez a obrigação;
+- rejeição: o resultado não atendeu aos critérios;
+- falha transitória: timeout, provider indisponível, infraestrutura;
+- falha permanente: a capacidade é incompatível ou não pode executar a
+  operação.
+
+Nem todas devem impedir uma nova tentativa do mesmo método. Isso pertence
+aos contratos de resultado, ao journal de execução e às regras de
+replanejamento da #640 (PRs 3 e 4). Esta página documenta o comportamento
+atual.
 
 ## O que a ADR-0029 ainda pede
 

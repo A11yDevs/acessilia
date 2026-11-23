@@ -2,7 +2,7 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
-## 0.3.8 — o catálogo da Toolbox como fatos de planejamento (domínio 2.4)
+## 0.3.9 — o catálogo da Toolbox como fatos de planejamento (domínio 2.4)
 
 A ADR-0029 torna a disponibilidade de capacidades e providers predicado do
 problema de planejamento (#640, PR 1). O domínio PDDL vai para **2.4**:
@@ -33,6 +33,18 @@ lista de métodos excluídos.
 A identidade do checkpoint de planejamento passa a incluir os hashes do
 domínio. O executor recusa um plano feito com outro domínio, então, depois
 deste deploy, um job retomado planeja de novo em vez de falhar.
+
+## 0.3.8 — o compilador PDDL recusa dependências cíclicas e desconhecidas
+
+O modelo do manifesto recusa dependências cíclicas e desconhecidas entre
+obrigações, mas um replanejamento altera o manifesto no lugar. Antes, o
+compilador deixava as duas passarem:
+- um ciclo compilava, e só o planejador interno o recusava, ao ordenar; o
+  Fast Downward apenas não encontrava plano;
+- uma dependência desconhecida levantava um `KeyError` cru.
+
+O `PddlProblemCompiler` agora recusa as duas antes de qualquer planejador
+rodar, com um `ValueError` que nomeia o ciclo ou a obrigação ausente (#783).
 
 ## 0.3.7 — uma interface de motor de planejamento
 
