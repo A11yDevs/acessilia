@@ -4,7 +4,7 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 
 ## 0.3.7 — uma interface de motor de planejamento
 
-Sem mudança de comportamento. `acessilia_core.planning.engine` cria a interface
+Os planos padrão não mudam. `acessilia_core.planning.engine` cria a interface
 entre o planejamento e a coordenação do workflow (#632, PR 3; ADR-0029):
 - `PlanningProblem` (manifesto, raízes selecionadas, métodos indisponíveis);
 - `PlanningResult` (plano, problema compilado, comparação opcional);
@@ -16,7 +16,30 @@ O adaptador agora concentra a escolha do backend (`internal`,
 `PddlAccessibilityOrchestrator` planeja por `planning_engine`: um motor passado
 ao construtor ou, por padrão, um `PddlPlanningEngine` montado a partir das suas
 opções de backend a cada chamada de planejamento. Assim, um teste pode
-substituir o planejador por um fake. Os planos não mudam.
+substituir o planejador por um fake.
+
+O contrato do motor:
+- `plan` é síncrono e o motor não guarda estado entre chamadas; a propriedade
+  aceita atribuição e rejeita um objeto que não segue o protocolo.
+- Um motor tem uma `identity`. O `mode` do relatório é `pddl-<identity>`, que
+  para o motor padrão é `pddl-<backend>`, como antes. A identidade de um motor
+  injetado também entra na identidade do checkpoint de planejamento, então um
+  job retomado com outro motor planeja de novo. Os checkpoints do motor padrão
+  mantêm sua identidade.
+- O coordenador rejeita um resultado cujo plano não confere com o hash do
+  problema compilado.
+- `PlanningProblem` e `PlanningResult` são imutáveis só superficialmente:
+  compartilham o manifesto e o plano (#751).
+
+Duas mudanças menores:
+- O `PlannerAgent` é construído no primeiro uso, então um orquestrador com motor
+  injetado não carrega o domínio PDDL para ele.
+- A regra do plano preferido no modo both agora é `PlannerAgent.preferred`,
+  compartilhada com o caminho da CLI; a mensagem de erro da CLI passa a ser a
+  do catálogo.
+
+Os padrões `DEFAULT_PLANNER_BACKEND` e `DEFAULT_FAST_DOWNWARD_SEARCH` ficam em
+`planning.models`.
 
 ## 0.3.6 — descrições canônicas para os schemas PDDL
 

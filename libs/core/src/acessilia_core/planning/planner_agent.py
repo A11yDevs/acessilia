@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Iterable, cast
+from typing import Any, Iterable, Mapping, cast
 
 from acessilia_core.agents.agno_support import build_agent
+from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import LOG_PDDL_PREFERRED_PLAN_MISSING
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.planning.comparison import build_planning_comparison
 from acessilia_core.planning.domain_bundle import (
@@ -14,6 +16,7 @@ from acessilia_core.planning.domain_bundle import (
     DomainBundle,
 )
 from acessilia_core.planning.models import (
+    DEFAULT_FAST_DOWNWARD_SEARCH,
     NominalPlan,
     PlannerBackend,
     PlannerOutcome,
@@ -181,11 +184,7 @@ class PlannerAgent:
                 encoding="utf-8",
             )
             problem_path.write_text(compiled.text, encoding="utf-8")
-            if preferred_backend not in plans:
-                raise RuntimeError(
-                    f"Backend preferido não gerou plano: {preferred_backend}"
-                )
-            plan = plans[preferred_backend]
+            plan = self.preferred(plans, preferred_backend)
         else:
             compiled, plan = self.plan(
                 manifest,
@@ -226,7 +225,7 @@ class PlannerAgent:
         backend: str = "internal",
         fast_downward: Path | None = None,
         fast_downward_alias: str | None = None,
-        fast_downward_search: str = "astar(blind())",
+        fast_downward_search: str = DEFAULT_FAST_DOWNWARD_SEARCH,
     ) -> tuple[CompiledProblem, NominalPlan]:
         compiled = self.compile_problem(
             manifest,
@@ -251,7 +250,7 @@ class PlannerAgent:
         unavailable_methods: Iterable[str] = (),
         fast_downward: Path | None = None,
         fast_downward_alias: str | None = None,
-        fast_downward_search: str = "astar(blind())",
+        fast_downward_search: str = DEFAULT_FAST_DOWNWARD_SEARCH,
         preferred_backend: str = "internal",
     ) -> tuple[
         CompiledProblem,
@@ -332,6 +331,19 @@ class PlannerAgent:
             preferred_backend=preferred,
         )
         return compiled, plans, comparison
+
+    @staticmethod
+    def preferred(plans: Mapping[str, NominalPlan], backend: str) -> NominalPlan:
+        """The ``backend`` plan of a comparison; raises when that backend failed.
+
+        The one rule for both mode, shared by the CLI path and the pipeline's
+        :class:`~acessilia_core.planning.engine.PddlPlanningEngine`.
+        """
+        if backend not in plans:
+            raise RuntimeError(
+                t(LOG_PDDL_PREFERRED_PLAN_MISSING).format(backend=backend)
+            )
+        return plans[backend]
 
     @staticmethod
     def _write_plan(destination: Path, plan: NominalPlan) -> None:

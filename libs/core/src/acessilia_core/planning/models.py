@@ -127,6 +127,10 @@ class NominalPlan(StrictModel):
 
 PlannerBackend = Literal["internal", "fast-downward"]
 PlannerSelection = Literal["internal", "fast-downward", "both"]
+#: The planner a run uses when none is configured.
+DEFAULT_PLANNER_BACKEND: PlannerBackend = "internal"
+#: Fast Downward's search when none is configured.
+DEFAULT_FAST_DOWNWARD_SEARCH = "astar(blind())"
 StatisticValue = int | float | str | bool
 
 

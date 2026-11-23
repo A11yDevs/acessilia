@@ -1,12 +1,19 @@
 """The seam between planning and the coordination of a workflow (#632, PR 3).
 
 The orchestrator asks a :class:`PlanningEngine` for a plan and consumes the
-:class:`PlanningResult`; it does not know which planner produced it.
-:class:`PddlPlanningEngine` is the engine the pipeline uses: it wraps
-:class:`~acessilia_core.planning.planner_agent.PlannerAgent` and owns the choice
-of backend (the internal reference planner, Fast Downward, or both compared),
-which used to live in the orchestrator. A test, or a future planning mechanism
-(#619), passes its own engine to the orchestrator instead.
+:class:`PlanningResult`; its coordination path does not know which planner
+produced it. :class:`PddlPlanningEngine` is the engine the pipeline uses by
+default: it wraps :class:`~acessilia_core.planning.planner_agent.PlannerAgent`
+and owns the choice of backend (the internal reference planner, Fast Downward,
+or both compared), which used to live in the orchestrator. A test, or a future
+planning mechanism (#619), passes its own engine to the orchestrator instead.
+
+Value semantics (#751): :class:`PlanningProblem` and :class:`PlanningResult`
+are frozen, so their fields cannot be rebound, but they hold Pydantic models
+(the manifest, the plan, the comparison) by reference. The immutability is
+shallow and neither is hashable. A problem is meant to be solved in the call
+that builds it; one that outlives the call (a cached problem, an asynchronous
+engine) sees later changes to its manifest.
 """
 
 from __future__ import annotations
@@ -17,9 +24,16 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import LOG_PDDL_PREFERRED_PLAN_MISSING
+from acessilia_core.i18n.log_messages import LOG_PDDL_PROBLEM_HASH_MISMATCH
 from acessilia_core.manifest.models import ProcessingManifest
-from acessilia_core.planning.models import NominalPlan, PlanningComparison
+from acessilia_core.planning.models import (
+    DEFAULT_FAST_DOWNWARD_SEARCH,
+    DEFAULT_PLANNER_BACKEND,
+    NominalPlan,
+    PlannerBackend,
+    PlannerSelection,
+    PlanningComparison,
+)
 from acessilia_core.planning.pddl_processor import CompiledProblem
 from acessilia_core.planning.planner_agent import PlannerAgent
 
@@ -32,6 +46,9 @@ class PlanningProblem:
     (``None`` plans every obligation). ``unavailable_methods`` are methods the
     plan must not use: those without a handler and those the Toolbox
     availability gate rules out.
+
+    The restrictions are copied into tuples; ``manifest`` is shared, not
+    copied (see the module docstring).
     """
 
     manifest: ProcessingManifest
@@ -57,20 +74,65 @@ class PlanningProblem:
 class PlanningResult:
     """A validated plan, the problem it solves and, when compared, the comparison.
 
-    ``compiled`` is ``None`` for an engine that does not compile PDDL (a fake in
-    tests, for example).
+    ``compiled`` is the PDDL problem the plan solves; the coordinator checks
+    that ``plan.problem_sha256`` matches it, so an engine cannot return a plan
+    for another problem. It is ``None`` for an engine that does not compile
+    PDDL (a fake in tests, for example), which skips the check.
     """
 
     plan: NominalPlan
     compiled: CompiledProblem | None = None
     comparison: PlanningComparison | None = None
 
+    def verified(self) -> PlanningResult:
+        """This result, after checking that the plan solves ``compiled``."""
+        if self.compiled is not None and self.compiled.sha256 != self.plan.problem_sha256:
+            raise RuntimeError(t(LOG_PDDL_PROBLEM_HASH_MISMATCH))
+        return self
+
 
 @runtime_checkable
 class PlanningEngine(Protocol):
-    """Produces a plan for a problem; raises when it cannot."""
+    """Produces a plan for a problem.
 
-    def plan(self, problem: PlanningProblem) -> PlanningResult: ...
+    The contract an engine keeps with the coordinator:
+
+    - ``plan`` is synchronous. The coordinator calls it in a worker thread
+      (``run_blocking``); an asynchronous engine (an LLM planner, #619) needs
+      an adapter or an asynchronous variant of this protocol.
+    - It is stateless between calls: the same problem gets an equivalent plan
+      whatever was planned before. The coordinator may reuse one engine for
+      the first plan and every replan of a run, or build one per call, so an
+      engine must not rely on either. A cache is allowed only if it keeps that
+      property.
+    - It plans and validates; it runs no document computation, persists
+      nothing and calls no provider (ADR-0029).
+    """
+
+    @property
+    def identity(self) -> str:
+        """A stable name for the engine and the configuration that changes its plans.
+
+        The run reports it as ``mode: pddl-<identity>``, and an injected
+        engine's identity is part of the planning checkpoint's identity, so a
+        job resumed with another engine plans again.
+        """
+
+    def plan(self, problem: PlanningProblem) -> PlanningResult:
+        """The validated plan for ``problem``; raises when there is none."""
+
+
+def require_engine(engine: object) -> PlanningEngine:
+    """``engine``, or :class:`TypeError` if it does not implement the protocol.
+
+    Lets a coordinator reject an engine when it is injected, rather than in
+    the worker thread of the first planning call.
+    """
+    if not isinstance(engine, PlanningEngine):
+        raise TypeError(
+            f"planning_engine must implement PlanningEngine, got {type(engine).__name__}"
+        )
+    return engine
 
 
 class PddlPlanningEngine:
@@ -79,25 +141,37 @@ class PddlPlanningEngine:
     ``backend`` is ``"internal"``, ``"fast-downward"`` or ``"both"``. With
     ``"both"`` the two planners solve the same compiled problem, the result
     carries their comparison, and the plan is the ``preferred_plan`` backend's;
-    if that backend failed, planning fails.
+    if that backend failed, planning fails. The :class:`PlannerAgent`, which
+    loads the PDDL domain, is built on the first plan unless one is given.
     """
 
     def __init__(
         self,
         planner: PlannerAgent | None = None,
         *,
-        backend: str = "internal",
-        preferred_plan: str = "internal",
+        backend: PlannerSelection = DEFAULT_PLANNER_BACKEND,
+        preferred_plan: PlannerBackend = DEFAULT_PLANNER_BACKEND,
         fast_downward: Path | None = None,
         fast_downward_alias: str | None = None,
-        fast_downward_search: str = "astar(blind())",
+        fast_downward_search: str = DEFAULT_FAST_DOWNWARD_SEARCH,
     ) -> None:
-        self.planner = planner if planner is not None else PlannerAgent()
+        self._planner = planner
         self.backend = backend
         self.preferred_plan = preferred_plan
         self.fast_downward = fast_downward
         self.fast_downward_alias = fast_downward_alias
         self.fast_downward_search = fast_downward_search
+
+    @property
+    def planner(self) -> PlannerAgent:
+        if self._planner is None:
+            self._planner = PlannerAgent()
+        return self._planner
+
+    @property
+    def identity(self) -> str:
+        """The backend, as the run has always reported it (``pddl-internal``…)."""
+        return self.backend
 
     def plan(self, problem: PlanningProblem) -> PlanningResult:
         if self.backend == "both":
@@ -123,12 +197,10 @@ class PddlPlanningEngine:
             fast_downward_search=self.fast_downward_search,
             preferred_backend=self.preferred_plan,
         )
-        if self.preferred_plan not in plans:
-            raise RuntimeError(
-                t(LOG_PDDL_PREFERRED_PLAN_MISSING).format(backend=self.preferred_plan)
-            )
         return PlanningResult(
-            plan=plans[self.preferred_plan], compiled=compiled, comparison=comparison
+            plan=PlannerAgent.preferred(plans, self.preferred_plan),
+            compiled=compiled,
+            comparison=comparison,
         )
 
 
@@ -137,4 +209,5 @@ __all__ = [
     "PlanningEngine",
     "PlanningProblem",
     "PlanningResult",
+    "require_engine",
 ]

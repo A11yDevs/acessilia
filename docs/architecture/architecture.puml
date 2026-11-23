@@ -20,7 +20,7 @@ package "Core (Docker container)" {
   package "PDDL engine" {
     component "PddlAccessibilityOrchestrator\nlibs/core/src/acessilia_core/pipeline/orchestrator.py" as Orchestrator
     component "ToolboxManifestExtractor\nlibs/core/src/acessilia_core/manifest" as Manifest
-    component "PlannerAgent\n(PDDL problem + plan validation)\nlibs/core/src/acessilia_core/planning" as Planner
+    component "PlanningEngine → PddlPlanningEngine\nover PlannerAgent\n(PDDL problem + plan validation)\nlibs/core/src/acessilia_core/planning" as Planner
     component "ExecutorAgent\n(Agno Workflow)\nlibs/core/src/acessilia_core/execution" as Executor
 
     package "Method handlers" {

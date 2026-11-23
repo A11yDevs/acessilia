@@ -4,7 +4,7 @@ Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
 ## 0.3.7 — a planning engine seam
 
-No behaviour change. `acessilia_core.planning.engine` adds the seam between
+The default plans are unchanged. `acessilia_core.planning.engine` adds the seam between
 planning and workflow coordination (#632, PR 3; ADR-0029):
 - `PlanningProblem` (manifest, selected roots, unavailable methods);
 - `PlanningResult` (plan, compiled problem, optional comparison);
@@ -15,8 +15,29 @@ The adapter now owns the choice of backend (`internal`, `fast-downward`,
 `both`) that used to live in the orchestrator. `PddlAccessibilityOrchestrator`
 plans through `planning_engine`: an engine passed to its constructor, or by
 default a `PddlPlanningEngine` built from its backend options at each planning
-call. A test can therefore replace the planner with a fake. The plans are
-unchanged.
+call. A test can therefore replace the planner with a fake.
+
+The engine contract:
+- `plan` is synchronous and the engine is stateless between calls; the
+  property is settable and rejects an object without the protocol.
+- An engine has an `identity`. The report's `mode` is `pddl-<identity>`, which
+  is `pddl-<backend>` for the default engine, as before. An injected engine's
+  identity also enters the planning checkpoint identity, so a job resumed with
+  another engine plans again. The default engine's checkpoints keep their
+  identity.
+- The coordinator rejects a result whose plan does not match its compiled
+  problem's hash.
+- `PlanningProblem` and `PlanningResult` are only shallowly immutable: they
+  share the manifest and the plan (#751).
+
+Two smaller changes:
+- `PlannerAgent` is built on first use, so an orchestrator with an injected
+  engine does not load the PDDL domain for it.
+- The both-mode preferred-plan rule is now `PlannerAgent.preferred`, shared
+  with the CLI path; the CLI error message is now the catalogued one.
+
+The defaults `DEFAULT_PLANNER_BACKEND` and `DEFAULT_FAST_DOWNWARD_SEARCH` live
+in `planning.models`.
 
 ## 0.3.6 — canonical descriptions for the PDDL schemas
 

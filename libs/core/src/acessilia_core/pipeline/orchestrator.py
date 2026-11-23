@@ -17,7 +17,7 @@ import asyncio
 from collections.abc import Callable, Coroutine, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 from acessilia_core.agents.model_calls import ModelCallRunner, model_call_scope
@@ -83,8 +83,17 @@ from acessilia_core.planning.engine import (
     PddlPlanningEngine,
     PlanningEngine,
     PlanningProblem,
+    require_engine,
 )
-from acessilia_core.planning.models import NominalPlan, PlanningComparison, PlanStep
+from acessilia_core.planning.models import (
+    DEFAULT_FAST_DOWNWARD_SEARCH,
+    DEFAULT_PLANNER_BACKEND,
+    NominalPlan,
+    PlannerBackend,
+    PlannerSelection,
+    PlanningComparison,
+    PlanStep,
+)
 from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.ports import (
     PHASE_ENRICHED,
@@ -145,24 +154,29 @@ class PddlAccessibilityOrchestrator:
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
             Defaults to "toolbox".
         max_replans (int): How many times a run plans again when the executor reports `replan-required`; negative values count as 0; defaults to 2.
-        planning_engine (PlanningEngine | None): The engine that produces the plans (#632, PR 3). Defaults to None: a `PddlPlanningEngine` built from `planner_backend`, `preferred_plan` and the Fast Downward options at each planning call.
+        planning_engine (PlanningEngine | None): The engine that produces the plans (#632, PR 3). Defaults to None: a `PddlPlanningEngine` built from `planner_backend`, `preferred_plan` and the Fast Downward options at each planning call. Can also be set later through the `planning_engine` property.
     """
+
+    # Class defaults, so an instance built without ``__init__`` (the test
+    # helpers do) has no planner yet and no injected engine.
+    _planner: PlannerAgent | None = None
+    _planning_engine: PlanningEngine | None = None
 
     def __init__(
         self,
         *,
-        planner_backend: str = "internal",
-        preferred_plan: str = "internal",
+        planner_backend: str = DEFAULT_PLANNER_BACKEND,
+        preferred_plan: str = DEFAULT_PLANNER_BACKEND,
         execute_dry_run: bool = True,
         fast_downward: Path | None = None,
         fast_downward_alias: str | None = None,
-        fast_downward_search: str = "astar(blind())",
+        fast_downward_search: str = DEFAULT_FAST_DOWNWARD_SEARCH,
         enable_ocr: bool = True,
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
         planning_engine: PlanningEngine | None = None,
     ) -> None:
-        self._planning_engine = planning_engine
+        self.planning_engine = planning_engine
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
@@ -187,29 +201,44 @@ class PddlAccessibilityOrchestrator:
         self.information_structural = InformationalStructuralAgent(
             extractor
         )
-        self.planner = PlannerAgent()
         self.executor = self._build_executor()
+
+    @property
+    def planner(self) -> PlannerAgent:
+        """The default engine's `PlannerAgent`, built (loading the domain) on first use."""
+        if self._planner is None:
+            self._planner = PlannerAgent()
+        return self._planner
+
+    @planner.setter
+    def planner(self, planner: PlannerAgent | None) -> None:
+        self._planner = planner
 
     @property
     def planning_engine(self) -> PlanningEngine:
         """The engine that plans this orchestrator's runs.
 
-        The injected one, or a `PddlPlanningEngine` over ``self.planner`` built
-        from the current backend options, so a change to them after
+        The injected one, reused for every plan and replan; otherwise a new
+        `PddlPlanningEngine` over ``self.planner`` per planning call, built
+        from the current backend options so a change to them after
         construction still applies. An instance built without ``__init__``
-        (the test helpers do) has no injected engine.
+        (the test helpers do) must set the backend options itself.
         """
-        injected = getattr(self, "_planning_engine", None)
-        if injected is not None:
-            return injected
+        if self._planning_engine is not None:
+            return self._planning_engine
         return PddlPlanningEngine(
             self.planner,
-            backend=self.planner_backend,
-            preferred_plan=self.preferred_plan,
+            backend=cast(PlannerSelection, self.planner_backend),
+            preferred_plan=cast(PlannerBackend, self.preferred_plan),
             fast_downward=self.fast_downward,
             fast_downward_alias=self.fast_downward_alias,
             fast_downward_search=self.fast_downward_search,
         )
+
+    @planning_engine.setter
+    def planning_engine(self, engine: PlanningEngine | None) -> None:
+        """Inject ``engine`` (checked now), or ``None`` for the default engine."""
+        self._planning_engine = None if engine is None else require_engine(engine)
 
     def _run_executor(self, config: CoreConfig, ports: RunPorts) -> ExecutorAgent:
         """The executor of one run: its handlers get the run's ``config`` and ``ports``.
@@ -229,6 +258,10 @@ class PddlAccessibilityOrchestrator:
             "fast_downward_alias": self.fast_downward_alias or "",
             "fast_downward_search": self.fast_downward_search,
         }
+        # Only an injected engine adds its identity, so the default engine's
+        # checkpoints keep the identity they had before the seam existed.
+        if self._planning_engine is not None:
+            planner["planning_engine"] = self._planning_engine.identity
         return {"planning": planner, "execution": {**planner, "dry_run": self.execute_dry_run}}
 
     @staticmethod
@@ -353,7 +386,7 @@ class PddlAccessibilityOrchestrator:
             file_path=file_path,
             manifest=manifest,
             plan=plan,
-            planner_backend=self.planner_backend,
+            planner_backend=self.planning_engine.identity,
             execution_report=execution_report,
             comparison=comparison,
             toolbox_availability=planning.availability.to_metadata(),
@@ -748,13 +781,10 @@ class PddlAccessibilityOrchestrator:
         unavailable = sorted(
             set(self._unavailable_methods(manifest)) | set(extra_unavailable)
         )
-        result = self.planning_engine.plan(
-            PlanningProblem.of(
-                manifest,
-                selected_roots=selected_roots,
-                unavailable_methods=unavailable,
-            )
+        problem = PlanningProblem.of(
+            manifest, selected_roots=selected_roots, unavailable_methods=unavailable
         )
+        result = self.planning_engine.plan(problem).verified()
         return result.plan, result.comparison
 
     def _unavailable_methods(self, manifest: ProcessingManifest) -> list[str]:

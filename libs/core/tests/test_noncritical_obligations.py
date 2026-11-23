@@ -480,3 +480,43 @@ async def test_replan_skips_exhausted_refinement_and_rescues_another_one(
         "describe-image" in warning for warning in payload["technical_warnings"]
     )
     assert _open_ids(payload) == ["o-refine"]
+
+
+@pytest.mark.asyncio
+async def test_the_first_plan_and_the_replan_go_through_an_injected_engine(
+    monkeypatch, tmp_path
+):
+    """The planning seam (#632): the coordinator plans and replans only through
+    the injected engine, and the run reports that engine's identity."""
+    from acessilia_core.planning.engine import PddlPlanningEngine
+
+    class CountingEngine:
+        identity = "counting"
+
+        def __init__(self) -> None:
+            self.inner = PddlPlanningEngine()
+            self.problems = []
+
+        def plan(self, problem):
+            self.problems.append(problem)
+            return self.inner.plan(problem)
+
+    manifest = _headings_manifest(
+        _describe_image(
+            ["vision-description", "pymupdf-region"],
+            {"vision-description": 1, "pymupdf-region": 2},
+        ),
+        extra_elements=[build_element("image", "picture", reading_order=10)],
+    )
+    orchestrator = _orchestrator(max_replans=1)
+    orchestrator.executor.registry.register("vision-description", _failing)
+    orchestrator.executor.registry.register("pymupdf-region", _succeeding)
+    engine = CountingEngine()
+    orchestrator.planning_engine = engine
+
+    payload = await _run(orchestrator, manifest, monkeypatch, tmp_path)
+
+    assert len(engine.problems) == 2
+    assert engine.problems[1].selected_roots is not None
+    assert payload["mode"] == "pddl-counting"
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"

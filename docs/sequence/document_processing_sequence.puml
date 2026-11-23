@@ -7,7 +7,7 @@ actor User
 participant "Frontend\n(Web/Telegram/CLI, via REST API)" as Front
 participant "PddlAccessibilityOrchestrator\nlibs/core/src/acessilia_core/pipeline/orchestrator.py" as Orchestrator
 participant "ToolboxManifestExtractor\nlibs/core/src/acessilia_core/manifest" as Manifest
-participant "PlannerAgent\nlibs/core/src/acessilia_core/planning" as Planner
+participant "PlanningEngine\n(default: PddlPlanningEngine over PlannerAgent)\nlibs/core/src/acessilia_core/planning" as Planner
 participant "ExecutorAgent\n(Agno Workflow)" as Executor
 participant "VisionAgent / DataAgent\n(Agno LLM)" as Agents
 participant "Acessilia Toolbox\n(via acessilia-sdk)" as Toolbox
@@ -24,7 +24,7 @@ Manifest -> Toolbox: structure extraction (regions, tables, OCR)
 Toolbox --> Manifest: structure
 Manifest --> Orchestrator: processing manifest (elements + obligations)
 
-Orchestrator -> Planner: plan(manifest)
+Orchestrator -> Planner: plan(PlanningProblem)
 Planner --> Orchestrator: validated PDDL plan
 
 Orchestrator -> Executor: run(plan, manifest)
