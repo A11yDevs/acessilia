@@ -158,7 +158,9 @@ Esta ADR continua `Proposto` até que estes pontos sejam fechados na revisão:
   posterior. Até lá vale a allowlist de contratos.
 - **Classificação.** O pull request do inventário classifica todos os imports
   listados acima, incluindo os módulos de política e de vocabulário. Sua
-  revisão fecha quais módulos ficam na allowlist.
+  revisão fecha quais módulos ficam na allowlist. O inventário é
+  [docstruct-import-inventory.pt-br.md](../architecture/docstruct-import-inventory.pt-br.md)
+  (#758).
 - **Revisão entre componentes.** Os donos da Toolbox e do docstruct revisam o
   ownership do runtime e as mudanças de dependência (processo de ADR, passo
   5). Depois disso, um pull request seguinte define `Aceito`.

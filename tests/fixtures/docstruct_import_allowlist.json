@@ -1,0 +1,744 @@
+{
+  "docstruct.blocks.callouts": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "callout_titles",
+        "dedupe_callout_titles"
+      ]
+    }
+  },
+  "docstruct.blocks.lists": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/elements.py": [
+        "marker_numbering"
+      ],
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "merge_list_blocks",
+        "recover_empty_lettered_list_items"
+      ]
+    }
+  },
+  "docstruct.canonical": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/canonical_builder.py": [
+        "MathEnricher",
+        "_enrich_math_blocks",
+        "build_canonical_document",
+        "sanitize_canonical_document"
+      ]
+    }
+  },
+  "docstruct.data_uri": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/enrichment/common.py": [
+        "decode_data_uri"
+      ]
+    }
+  },
+  "docstruct.export.filters": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py": [
+        "strip_internal_audit_blocks"
+      ]
+    }
+  },
+  "docstruct.export.formats": {
+    "class": "contract"
+  },
+  "docstruct.export.html": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/export/renderers/html_renderer.py": [
+        "HtmlLabels",
+        "_all_blocks",
+        "_collect_section",
+        "_render_block",
+        "_render_html_table_row",
+        "document_to_html"
+      ]
+    }
+  },
+  "docstruct.export.markdown": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/export/exporters/drbench_md_exporter.py": [
+        "document_to_markdown"
+      ]
+    }
+  },
+  "docstruct.export.markers": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/export/markers.py": [
+        "wrap_object_markers"
+      ]
+    }
+  },
+  "docstruct.export.page_text": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "blocks_text",
+        "pages_text"
+      ]
+    }
+  },
+  "docstruct.export.pandoc_ast": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py": [
+        "build_pandoc_ast",
+        "count_math_nodes",
+        "degrade_math_to_text",
+        "unconverted_math_indices"
+      ]
+    }
+  },
+  "docstruct.export.txt": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/export/renderers/txt_renderer.py": [
+        "_render_block",
+        "_render_section",
+        "document_to_txt_lines"
+      ]
+    }
+  },
+  "docstruct.fusion.adjudication": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py": [
+        "clean_transcription",
+        "decide",
+        "decide_v0",
+        "decide_v1",
+        "filter_decision"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/fusion.py": [
+        "decide_v1"
+      ]
+    }
+  },
+  "docstruct.fusion.hf_end": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "move_hf_to_end"
+      ],
+      "libs/core/src/acessilia_core/agents/page_level_agent.py": [
+        "move_hf_to_end"
+      ]
+    }
+  },
+  "docstruct.fusion.judge": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py": [
+        "decide_pair",
+        "should_judge"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/judge.py": [
+        "should_judge"
+      ],
+      "libs/core/src/acessilia_core/pipeline/judge.py": [
+        "DEFAULT_NEW_THR"
+      ]
+    }
+  },
+  "docstruct.fusion.line_numbers": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "extract_line_numbers"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py": [
+        "extract_line_numbers"
+      ]
+    }
+  },
+  "docstruct.fusion.noise": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/handlers/rescue.py": [
+        "is_legitimate_text"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py": [
+        "element_role"
+      ],
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "PAGE_NUMBER_MARGIN",
+        "element_role",
+        "is_bare_page_number",
+        "is_decorated_page_number",
+        "is_page_number_in_margin",
+        "select_page_numbers"
+      ]
+    }
+  },
+  "docstruct.fusion.oracle": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py": [
+        "oracle_page"
+      ]
+    }
+  },
+  "docstruct.fusion.page_select": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py": [
+        "page_norm",
+        "select_by_agreement",
+        "swap_low_agreement_pages"
+      ],
+      "libs/core/src/acessilia_core/agents/page_level_agent.py": [
+        "fuse",
+        "page_agreement",
+        "select_by_agreement",
+        "swap_low_agreement_pages"
+      ]
+    }
+  },
+  "docstruct.fusion.payload": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/builder.py": [
+        "normalize_element_ids"
+      ],
+      "libs/core/src/acessilia_core/pipeline/fusion.py": [
+        "fuse_extraction_payloads",
+        "route_pages"
+      ]
+    }
+  },
+  "docstruct.fusion.repetition": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "collapse",
+        "guard_page"
+      ],
+      "libs/core/src/acessilia_core/agents/vision_agent.py": [
+        "collapse"
+      ]
+    }
+  },
+  "docstruct.fusion.similarity": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/slides.py": [
+        "area"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/rescue.py": [
+        "is_duplicate",
+        "pair_block"
+      ],
+      "libs/core/src/acessilia_core/pipeline/secondary.py": [
+        "ordered_box",
+        "pair_block"
+      ]
+    }
+  },
+  "docstruct.fusion.skeleton": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/handlers/order.py": [
+        "DEFAULT_MIN_SKELETON_MATCH",
+        "skeleton_reading_order"
+      ]
+    }
+  },
+  "docstruct.fusion.table_specialist": {
+    "class": "operation",
+    "files": {
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py": [
+        "build_candidates",
+        "extract_table",
+        "is_valid_table",
+        "medoid_index",
+        "norm_table",
+        "select_greedy",
+        "select_table"
+      ]
+    }
+  },
+  "docstruct.fusion.tailjoin": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "join_tail",
+        "tailjoin3"
+      ],
+      "libs/core/src/acessilia_core/agents/page_level_agent.py": [
+        "join_tail",
+        "tailjoin3"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py": [
+        "join_tail",
+        "page_number_position",
+        "tailjoin3"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py": [
+        "page_number_position"
+      ]
+    }
+  },
+  "docstruct.fusion.types": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "DiffBlock"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py": [
+        "DiffBlock"
+      ]
+    }
+  },
+  "docstruct.fusion.verse": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "verse_blocks"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py": [
+        "verse_blocks"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/structure.py": [
+        "split_box_rows"
+      ]
+    }
+  },
+  "docstruct.fusion.xycut": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "xycut_order"
+      ],
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py": [
+        "xycut_order"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py": [
+        "xycut_order"
+      ]
+    }
+  },
+  "docstruct.geometry": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/builder.py": [
+        "ReadingItem",
+        "order_reading_items",
+        "reading_role"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/types.py": [
+        "OrientedBox"
+      ],
+      "libs/core/src/acessilia_core/manifest/slides.py": [
+        "is_bottom_left",
+        "union"
+      ],
+      "libs/core/src/acessilia_core/pipeline/elements.py": [
+        "OrientedBox"
+      ],
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "reading_role"
+      ],
+      "libs/core/src/acessilia_core/pipeline/secondary.py": [
+        "OrientedBox"
+      ]
+    }
+  },
+  "docstruct.geometry.boxes": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/slides.py": [
+        "box_contains_center",
+        "box_distance",
+        "boxes_overlap",
+        "boxes_side_by_side",
+        "expand_box",
+        "spans_horizontally",
+        "union_area"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/common.py": [
+        "best_effort_clip"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py": [
+        "holds_point"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py": [
+        "downward_edges"
+      ],
+      "libs/core/src/acessilia_core/pipeline/toolbox.py": [
+        "PageBox",
+        "best_effort_clip"
+      ]
+    }
+  },
+  "docstruct.imaging": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/toolbox/vision_payload.py": [
+        "image_dimensions"
+      ]
+    }
+  },
+  "docstruct.imaging.policy": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/page_level_agent.py": [
+        "decide_orientation",
+        "upscale_factor"
+      ]
+    }
+  },
+  "docstruct.manifest": {
+    "class": "contract"
+  },
+  "docstruct.placeholders": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/builder.py": [
+        "UNSTRUCTURED_PAGE_FLAG",
+        "UNSTRUCTURED_PAGE_LABEL",
+        "is_unstructured_page_placeholder"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py": [
+        "has_meaningful_text",
+        "is_mostly_visual",
+        "is_placeholder_visual"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/content.py": [
+        "has_meaningful_text"
+      ],
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "has_meaningful_text"
+      ]
+    }
+  },
+  "docstruct.policy": {
+    "class": "policy",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/toolbox_extractor.py": [
+        "FusionPolicy"
+      ],
+      "libs/core/src/acessilia_core/pipeline/fusion.py": [
+        "FusionPolicy"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/fusion.py": [
+        "FusionPolicy"
+      ]
+    }
+  },
+  "docstruct.profiles": {
+    "class": "policy",
+    "files": {
+      "backend/service.py": [
+        "verbosity_for_mode"
+      ]
+    }
+  },
+  "docstruct.regions.classify": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "classify_region",
+        "region_needs_vision"
+      ],
+      "libs/core/src/acessilia_core/agents/vision_agent.py": [
+        "region_prompt_key"
+      ]
+    }
+  },
+  "docstruct.regions.letterhead": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "PlacedItem",
+        "letterhead_groups"
+      ]
+    }
+  },
+  "docstruct.sections": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/builder.py": [
+        "find_heading_gaps"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py": [
+        "repair_heading_levels"
+      ]
+    }
+  },
+  "docstruct.tables.ast": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/detectors/text.py": [
+        "raw_rows_from_table_ast"
+      ],
+      "libs/core/src/acessilia_core/pipeline/elements.py": [
+        "raw_rows_from_table_ast",
+        "table_ast_from_rows"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py": [
+        "TABLE_SECTIONS"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/tables.py": [
+        "raw_rows_from_table_ast",
+        "table_ast_column_count",
+        "table_ast_from_rows"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/content.py": [
+        "linearize_table_for_text",
+        "raw_rows_from_table_ast"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/fusion.py": [
+        "analyze_table_complexity"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py": [
+        "TABLE_SECTIONS"
+      ],
+      "libs/core/src/acessilia_core/pipeline/table_ast.py": [
+        "*",
+        "MSG_TABLE_TEXT_CAPTION",
+        "MSG_TABLE_TEXT_FOOTER",
+        "MSG_TABLE_TEXT_ROW",
+        "linearize_table_for_text"
+      ]
+    }
+  },
+  "docstruct.tables.garble": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/enrichment/tables.py": [
+        "table_garble_reason"
+      ]
+    }
+  },
+  "docstruct.tables.structured": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/output_schemas.py": [
+        "table_ast_from_structured_rows"
+      ],
+      "libs/core/src/acessilia_core/pipeline/elements.py": [
+        "normalize_strict_table_ast",
+        "table_ast_has_structured_content"
+      ]
+    }
+  },
+  "docstruct.tables.text_rows": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/enrichment/tables.py": [
+        "rows_from_visual_table_text"
+      ]
+    }
+  },
+  "docstruct.text.code_reflow": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/elements.py": [
+        "normalize_code_text"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/content.py": [
+        "normalize_code_text"
+      ]
+    }
+  },
+  "docstruct.text.equations": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/builder.py": [
+        "preserve_equation_number"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py": [
+        "preserve_equation_number",
+        "split_equation_number"
+      ]
+    }
+  },
+  "docstruct.text.implicit_products": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py": [
+        "implicit_product_variables",
+        "mark_implicit_products"
+      ]
+    }
+  },
+  "docstruct.text.inline_math": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py": [
+        "Placement",
+        "assign_runs_to_cells",
+        "detect_inline_math_by_page",
+        "splice_inline_math",
+        "top_left_box"
+      ]
+    }
+  },
+  "docstruct.text.latex": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "normalize_latex"
+      ],
+      "libs/core/src/acessilia_core/formula_tools.py": [
+        "bare_latex",
+        "ensure_math_delimiters"
+      ],
+      "libs/core/src/acessilia_core/manifest/builder.py": [
+        "has_latex_markup"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/text.py": [
+        "normalize_latex"
+      ],
+      "libs/core/src/acessilia_core/pipeline/canonical_builder.py": [
+        "bare_latex"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py": [
+        "bare_latex",
+        "has_latex_markup",
+        "latex_text_agreement"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py": [
+        "bare_latex"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/inspection.py": [
+        "bare_latex"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py": [
+        "has_latex_markup"
+      ],
+      "libs/core/src/acessilia_core/pipeline/obligations.py": [
+        "bare_latex"
+      ]
+    }
+  },
+  "docstruct.text.math_spans": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py": [
+        "block_prose",
+        "inline_math_sources"
+      ]
+    }
+  },
+  "docstruct.text.named_operators": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py": [
+        "normalize_named_operators",
+        "speak_named_operators"
+      ]
+    }
+  },
+  "docstruct.text.negation_overlay": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py": [
+        "is_detached_overlay"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py": [
+        "compose_in_grid",
+        "compose_in_text",
+        "is_detached_overlay"
+      ]
+    }
+  },
+  "docstruct.text.norm_fix": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "norm_fix"
+      ],
+      "libs/core/src/acessilia_core/manifest/detectors/text.py": [
+        "norm_fix"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py": [
+        "norm_fix"
+      ]
+    }
+  },
+  "docstruct.text.paragraphs": {
+    "class": "algorithm",
+    "files": {
+      "backend/service.py": [
+        "merge_broken_paragraphs"
+      ]
+    }
+  },
+  "docstruct.text.unicode_repair": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/manifest/detectors/text.py": [
+        "detect_legacy_unicode"
+      ],
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py": [
+        "Detection",
+        "UnicodeRepairContext",
+        "detect_legacy_unicode",
+        "repair_legacy_unicode"
+      ]
+    }
+  },
+  "docstruct.types": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "Region"
+      ]
+    }
+  },
+  "docstruct.validation": {
+    "class": "validation",
+    "files": {
+      "libs/core/src/acessilia_core/agents/fusion_agent.py": [
+        "FindingTuple",
+        "audit_canonical_document"
+      ],
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py": [
+        "validate_against_schema"
+      ],
+      "libs/core/src/acessilia_core/pipeline/validators.py": [
+        "*",
+        "audit_canonical_document",
+        "validate_canonical_document",
+        "validate_export_profile",
+        "validate_output_text"
+      ]
+    }
+  },
+  "docstruct.visual_text": {
+    "class": "algorithm",
+    "files": {
+      "libs/core/src/acessilia_core/agents/prompt_tools.py": [
+        "bound_surrounding_items"
+      ],
+      "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py": [
+        "TextOwnership",
+        "analyze_visual_text_ownership",
+        "collect_picture_context",
+        "deduplicate_picture_description",
+        "is_document_artifact",
+        "is_scene_artifact"
+      ],
+      "libs/core/src/acessilia_core/pipeline/payload.py": [
+        "TextOwnership",
+        "analyze_visual_text_ownership",
+        "collect_picture_context",
+        "deduplicate_picture_description",
+        "is_confirmed_logo_description",
+        "is_document_artifact",
+        "scene_text_residue"
+      ]
+    }
+  }
+}

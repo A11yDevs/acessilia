@@ -155,7 +155,9 @@ This ADR stays `Proposed` until these are closed in review:
   then the contract allowlist applies.
 - **Classification.** The inventory pull request classifies every import
   listed above, including the policy and vocabulary modules. Its review closes
-  which modules stay allowlisted.
+  which modules stay allowlisted. The inventory is
+  [docstruct-import-inventory.md](../architecture/docstruct-import-inventory.md)
+  (#758).
 - **Cross-component review.** The Toolbox's and docstruct's owners review the
   runtime ownership and the dependency changes (ADR process, step 5). After
   that, a follow-up pull request sets `Accepted`.
