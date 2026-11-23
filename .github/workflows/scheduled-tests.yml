@@ -125,7 +125,9 @@ jobs:
         run: uv run --locked --extra dev python scripts/check_docstruct_pin.py "$TARGET_BRANCH"
 
       # A tag-object SHA looks pinned but is not a commit. Keep this strict on
-      # the schedule; pull requests report the same findings as warnings.
+      # the schedule; pull requests report the same findings as warnings. The
+      # schedule only exists once this file reaches the default branch, so the
+      # strict push step in ci.yml protects develop immediately.
       - name: Verify GitHub Action pins
         if: always()
         env:
