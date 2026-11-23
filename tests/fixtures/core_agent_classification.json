@@ -1,0 +1,66 @@
+{
+  "adjudication_agent": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "agno_support": {
+    "kind": "support",
+    "class": "infrastructure"
+  },
+  "ai_client": {
+    "kind": "support",
+    "class": "infrastructure"
+  },
+  "data_agent": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "fusion_agent": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "informational_structural": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "model_call_policy": {
+    "kind": "support",
+    "class": "operational"
+  },
+  "model_calls": {
+    "kind": "support",
+    "class": "infrastructure"
+  },
+  "order_adjudication_agent": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "output_schemas": {
+    "kind": "support",
+    "class": "operational"
+  },
+  "page_level_agent": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "prompt_tools": {
+    "kind": "support",
+    "class": "operational"
+  },
+  "provider_breaker": {
+    "kind": "support",
+    "class": "infrastructure"
+  },
+  "run_helpers": {
+    "kind": "support",
+    "class": "operational"
+  },
+  "table_specialist_agent": {
+    "kind": "agent",
+    "class": "operational"
+  },
+  "vision_agent": {
+    "kind": "agent",
+    "class": "operational"
+  }
+}

@@ -118,7 +118,9 @@ e a #640 trata a composição de fragmentos como experimental.
 ### Agentes estratégicos ficam no core; agentes operacionais são capacidades
 
 - Os agentes de `acessilia_core.agents` são classificados como estratégicos ou
-  operacionais.
+  operacionais; a classificação está em
+  [core-agent-classification.pt-br.md](../architecture/core-agent-classification.pt-br.md)
+  (#768).
 - **Agentes estratégicos ficam no core**: interpretar objetivos, decompor
   tarefas, escolher estratégias, coordenar subplanos, avaliar estado e
   objetivos, decidir replanejar e a futura integração LLM + planejamento da

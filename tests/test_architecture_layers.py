@@ -315,6 +315,43 @@ def test_the_docstruct_inventory_lists_the_allowlist() -> None:
         )
 
 
+#: Every module in acessilia_core.agents, classified (ADR-0029, #768): an
+#: agent is strategic (stays in the core) or operational (becomes a Toolbox
+#: capability); a support module is operational (moves with those agents) or
+#: infrastructure (stays while the core makes model calls).
+AGENT_CLASSIFICATION = REPO_ROOT / "tests" / "fixtures" / "core_agent_classification.json"
+AGENT_CLASSES = {"agent": {"strategic", "operational"}, "support": {"operational", "infrastructure"}}
+AGENT_CLASSIFICATION_DOCS = (
+    REPO_ROOT / "docs" / "architecture" / "core-agent-classification.md",
+    REPO_ROOT / "docs" / "architecture" / "core-agent-classification.pt-br.md",
+)
+
+
+def test_every_core_agent_module_is_classified() -> None:
+    classification = json.loads(AGENT_CLASSIFICATION.read_text(encoding="utf-8"))
+    modules = {path.stem for path in (CORE_DIR / "agents").glob("*.py")} - {"__init__"}
+    assert set(classification) == modules, (
+        "classify the new agent modules in tests/fixtures/core_agent_classification.json "
+        f"(ADR-0029): missing {sorted(modules - set(classification))}, "
+        f"stale {sorted(set(classification) - modules)}"
+    )
+    wrong = sorted(
+        module for module, entry in classification.items()
+        if entry["class"] not in AGENT_CLASSES.get(entry["kind"], set())
+    )
+    assert not wrong, f"unknown kind or class: {wrong}"
+
+
+def test_the_agent_classification_lists_the_fixture() -> None:
+    expected = set(json.loads(AGENT_CLASSIFICATION.read_text(encoding="utf-8")))
+    for document in AGENT_CLASSIFICATION_DOCS:
+        listed = set(re.findall(r"^\| `agents/(\w+)` \|", document.read_text(encoding="utf-8"), re.M))
+        assert listed == expected, (
+            f"{document.relative_to(REPO_ROOT)}: missing {sorted(expected - listed)}, "
+            f"extra {sorted(listed - expected)}"
+        )
+
+
 def test_the_scanned_directories_exist() -> None:
     """A directory that moved would make every scan above pass on nothing."""
     for directory in (*SERVER_DIRS, *APPLICATION_DIRS):

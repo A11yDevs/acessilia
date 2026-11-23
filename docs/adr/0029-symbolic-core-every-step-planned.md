@@ -114,7 +114,9 @@ experimental.
 ### Strategic agents stay in the core; operational agents are capabilities
 
 - The agents in `acessilia_core.agents` are classified as strategic or
-  operational.
+  operational; the classification is
+  [core-agent-classification.md](../architecture/core-agent-classification.md)
+  (#768).
 - **Strategic agents stay in the core**: interpreting goals, decomposing
   tasks, choosing strategies, coordinating subplans, evaluating state and
   goals, deciding to replan, and the future LLM + planning integration of
