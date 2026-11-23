@@ -125,7 +125,7 @@ def test_the_backend_builds_no_http_client_for_the_toolbox() -> None:
 #: Every docstruct module the core and backend/ import, classified (ADR-0028,
 #: #758). Contract modules may be imported anywhere. Every other module is
 #: pinned to the files that import it today and to the names each file
-#: imports (``*`` for ``import docstruct.x``); the pins can only shrink as each
+#: imports or reads (``*`` for a dynamic use); the pins can only shrink as each
 #: algorithm, operation, policy or validation leaves the core's process.
 DOCSTRUCT_ALLOWLIST = REPO_ROOT / "tests" / "fixtures" / "docstruct_import_allowlist.json"
 DOCSTRUCT_CLASSES = {"contract", "algorithm", "validation", "policy", "operation"}
@@ -142,22 +142,46 @@ DOCSTRUCT_INVENTORY_DOCS = (
 DocstructImports = dict[str, dict[str, set[str]]]
 
 
+def _docstruct_names(tree: ast.AST) -> list[tuple[str, str]]:
+    """``(module, name)`` for each docstruct name a module imports or uses.
+
+    ``from docstruct.x import a`` gives ``a``. ``import docstruct.x as m`` gives
+    each ``m.attr`` the module reads, and ``*`` when it uses ``m`` any other
+    way (``getattr(m, name)``, passing ``m`` along): a transitional exception
+    the inventory lists.
+    """
+    found: list[tuple[str, str]] = []
+    aliases: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            found.extend((node.module, alias.name) for alias in node.names)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname:
+                    aliases[alias.asname] = alias.name
+                else:
+                    found.append((alias.name, "*"))
+    read = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            if node.value.id in aliases:
+                found.append((aliases[node.value.id], node.attr))
+                read.add(id(node.value))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in aliases and id(node) not in read:
+            found.append((aliases[node.id], "*"))
+    return [(module, name) for module, name in found if module.split(".")[0] == "docstruct"]
+
+
 def _docstruct_imports() -> DocstructImports:
-    """Each imported ``docstruct`` module, the files that import it and the names they import."""
+    """Each docstruct module, the files that import it and the names they use, in the core and backend/."""
     imports: DocstructImports = {}
     for directory in SERVER_DIRS:
         for path in directory.rglob("*.py"):
             relative = str(path.relative_to(REPO_ROOT))
-            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-                if isinstance(node, ast.ImportFrom) and node.module and not node.level:
-                    found = [(node.module, alias.name) for alias in node.names]
-                elif isinstance(node, ast.Import):
-                    found = [(alias.name, "*") for alias in node.names]
-                else:
-                    continue
-                for module, name in found:
-                    if module.split(".")[0] == "docstruct":
-                        imports.setdefault(module, {}).setdefault(relative, set()).add(name)
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for module, name in _docstruct_names(tree):
+                imports.setdefault(module, {}).setdefault(relative, set()).add(name)
     return imports
 
 
@@ -262,6 +286,23 @@ def test_the_docstruct_guard_reports_obsolete_pins() -> None:
     assert unclassified == []
     assert unpinned == ["b.py: docstruct.fusion.judge.should_judge"]
     assert stale == ["a.py: docstruct.fusion.judge.should_judge", "docstruct.manifest"]
+
+
+def test_the_docstruct_scan_resolves_module_aliases() -> None:
+    tree = ast.parse(
+        "import docstruct.text.latex as latex\n"
+        "import docstruct.tables.ast as tables\n"
+        "import docstruct.geometry\n"
+        "from docstruct.manifest import StructuredDocument\n"
+        "latex.bare_latex(x)\n"
+        "y = getattr(tables, name)\n"
+    )
+    assert sorted(_docstruct_names(tree)) == [
+        ("docstruct.geometry", "*"),
+        ("docstruct.manifest", "StructuredDocument"),
+        ("docstruct.tables.ast", "*"),
+        ("docstruct.text.latex", "bare_latex"),
+    ]
 
 
 def test_the_docstruct_inventory_lists_the_allowlist() -> None:

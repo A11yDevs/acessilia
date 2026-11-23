@@ -242,7 +242,8 @@ The tests in `tests/test_architecture_layers.py` read the fixture:
 - **Classified and pinned.** Every docstruct module the core or `backend/`
   imports must be in the fixture. A contract module may be imported by any
   file. Every other module lists the files that import it and the names each
-  file imports (`*` for `import docstruct.x`). A new file, or a new name in
+  file imports. For `import docstruct.x as m`, the names are the `m.attr` the
+  file reads, and `*` marks any other use of `m`. A new file, or a new name in
   an existing import, fails: it calls a Toolbox capability instead.
 - **Only shrinks.** A module, file or name no longer imported fails until it
   is removed, so each migration removes its lines from the fixture, and a
@@ -251,9 +252,61 @@ The tests in `tests/test_architecture_layers.py` read the fixture:
   contract modules is fixed in the test: reclassifying a computational module
   as contract changes the test, not only the fixture.
 - **The guard's own cases.** Synthetic tests check a new name in an existing
-  import, a new importer, an unclassified module and obsolete pins.
+  import, a new importer, an unclassified module, obsolete pins and the
+  resolution of module aliases.
 - **In step with this page.** The module rows in the table above, in both
   languages, must be the fixture's modules.
+
+### Transitional exceptions: `*`
+
+Two compatibility shims read their docstruct module dynamically, with
+`getattr(module, name)` over a tuple of deprecated names, so their pins carry
+`*` and do not restrict which attributes they read:
+
+- `pipeline/table_ast` (`docstruct.tables.ast`, `_DEPRECATED_NAMES`);
+- `pipeline/validators` (`docstruct.validation`).
+
+They are transitional: each goes when its deprecated names have no caller
+left, or when the calls behind it become Toolbox capabilities. A new `*` is a
+new pin, so the guard refuses it like any other.
+
+### What the guard does not do yet
+
+The guard compares the code with the fixture. A pull request that changes
+both together still passes, so between commits the allowlist only shrinks
+through review. [#764](https://github.com/A11yDevs/acessilia/issues/764)
+compares the fixture with the base branch's in CI, and makes a new exception
+an explicit architectural decision.
+
+## Indicators
+
+The baseline of this inventory, for #735 to follow as the migration
+progresses:
+
+| Indicator | Baseline (`82424b34`) | Target |
+|---|---|---|
+| docstruct modules imported directly | 57 | only the contract modules |
+| Files importing computation (algorithm or operation) | 45 | 0 |
+| Pinned `*` exceptions | 2 | 0 |
+| Imports outside the allowlist | 0 | 0 |
+| New exceptions without an architectural decision | 0 | 0 |
+
+## How a migration shrinks the allowlist
+
+Each migration, per plan method or agent (ADR-0028):
+
+1. provides an equivalent Toolbox capability;
+2. replaces the local computation with a call through the core SDK;
+3. keeps the contracts and the functional equivalence;
+4. adds a differential regression test;
+5. removes the obsolete files and names from the fixture, and a module's row
+   from this page when its last importer goes;
+6. updates the indicators above.
+
+A capability follows the semantics of the plan methods and agents. Not every
+utility function becomes a remote call: low-level algorithms are composed
+inside the Toolbox runtime, which keeps latency down and the PDDL planning
+simple.
 
 ## Still open
 

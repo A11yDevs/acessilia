@@ -504,7 +504,11 @@
         "TABLE_SECTIONS"
       ],
       "libs/core/src/acessilia_core/pipeline/table_ast.py": [
-        "*"
+        "*",
+        "MSG_TABLE_TEXT_CAPTION",
+        "MSG_TABLE_TEXT_FOOTER",
+        "MSG_TABLE_TEXT_ROW",
+        "linearize_table_for_text"
       ]
     }
   },
@@ -587,7 +591,8 @@
         "normalize_latex"
       ],
       "libs/core/src/acessilia_core/formula_tools.py": [
-        "*"
+        "bare_latex",
+        "ensure_math_delimiters"
       ],
       "libs/core/src/acessilia_core/manifest/builder.py": [
         "has_latex_markup"
@@ -703,7 +708,11 @@
         "validate_against_schema"
       ],
       "libs/core/src/acessilia_core/pipeline/validators.py": [
-        "*"
+        "*",
+        "audit_canonical_document",
+        "validate_canonical_document",
+        "validate_export_profile",
+        "validate_output_text"
       ]
     }
   },

@@ -248,9 +248,10 @@ Os testes em `tests/test_architecture_layers.py` leem o fixture:
 - **Classificado e fixado.** Todo módulo do Docstruct que o Core ou
   `backend/` importam precisa estar no fixture. Um módulo de contrato pode
   ser importado por qualquer arquivo. Os demais listam os arquivos que os
-  importam e os nomes que cada arquivo importa (`*` para
-  `import docstruct.x`). Um arquivo novo, ou um nome novo num import
-  existente, falha: ele deve chamar uma capacidade da Toolbox.
+  importam e os nomes que cada arquivo importa. Para
+  `import docstruct.x as m`, os nomes são os `m.attr` que o arquivo lê, e `*`
+  marca qualquer outro uso de `m`. Um arquivo novo, ou um nome novo num
+  import existente, falha: ele deve chamar uma capacidade da Toolbox.
 - **Só diminui.** Um módulo, arquivo ou nome que não é mais importado falha
   até ser removido, então cada migração tira suas linhas do fixture, e o
   último importador de um módulo tira sua linha desta página.
@@ -258,10 +259,62 @@ Os testes em `tests/test_architecture_layers.py` leem o fixture:
   módulos de contrato fica fixado no teste: reclassificar um módulo
   computacional como contrato muda o teste, não só o fixture.
 - **Os casos da própria guarda.** Testes sintéticos verificam um nome novo
-  num import existente, um importador novo, um módulo sem classificação e
-  fixações obsoletas.
+  num import existente, um importador novo, um módulo sem classificação,
+  fixações obsoletas e a resolução de aliases de módulo.
 - **Alinhado com esta página.** As linhas de módulos da tabela acima, nos
   dois idiomas, precisam ser os módulos do fixture.
+
+### Exceções transitórias: `*`
+
+Dois shims de compatibilidade leem seu módulo do Docstruct dinamicamente, com
+`getattr(module, name)` sobre uma tupla de nomes depreciados, então suas
+fixações têm `*` e não restringem quais atributos eles leem:
+
+- `pipeline/table_ast` (`docstruct.tables.ast`, `_DEPRECATED_NAMES`);
+- `pipeline/validators` (`docstruct.validation`).
+
+São transitórias: cada uma sai quando seus nomes depreciados não tiverem mais
+chamadores, ou quando as chamadas por trás dela virarem capacidades da
+Toolbox. Um `*` novo é uma fixação nova, então a guarda o recusa como
+qualquer outra.
+
+### O que a guarda ainda não faz
+
+A guarda compara o código com o fixture. Um pull request que muda os dois
+juntos ainda passa, então, entre commits, a allowlist só diminui pela
+revisão. A [#764](https://github.com/A11yDevs/acessilia/issues/764) compara o
+fixture com o da branch base no CI e torna uma exceção nova uma decisão
+arquitetural explícita.
+
+## Indicadores
+
+A baseline deste inventário, para a #735 acompanhar enquanto a migração
+avança:
+
+| Indicador | Baseline (`82424b34`) | Meta |
+|---|---|---|
+| Módulos do Docstruct importados diretamente | 57 | só os módulos de contrato |
+| Arquivos que importam computação (algoritmo ou operação) | 45 | 0 |
+| Exceções `*` fixadas | 2 | 0 |
+| Imports fora da allowlist | 0 | 0 |
+| Exceções novas sem decisão arquitetural | 0 | 0 |
+
+## Como uma migração diminui a allowlist
+
+Cada migração, por método do plano ou por agente (ADR-0028):
+
+1. disponibiliza uma capacidade equivalente na Toolbox;
+2. troca a computação local por uma chamada pelo Core SDK;
+3. preserva os contratos e a equivalência funcional;
+4. acrescenta um teste diferencial de regressão;
+5. remove do fixture os arquivos e nomes obsoletos e, quando o último
+   importador de um módulo sai, sua linha desta página;
+6. atualiza os indicadores acima.
+
+Uma capacidade segue a semântica dos métodos do plano e dos agentes. Nem
+toda função utilitária vira uma chamada remota: algoritmos de baixo nível
+são compostos dentro do runtime da Toolbox, o que reduz a latência e mantém
+o planejamento PDDL simples.
 
 ## Ainda em aberto
 
