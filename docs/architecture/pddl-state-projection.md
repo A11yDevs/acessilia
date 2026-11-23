@@ -157,4 +157,4 @@ default `astar(blind())`.
 | `toolbox_gate` is reduced to reporting | It still decides what is offered in `enforce`, and `observe` is the default | #640, PR 2: the snapshot itself is the input, and `observe` goes once production logs show no false "would remove" ([#809](https://github.com/A11yDevs/acessilia/issues/809)) |
 | Operational actions are bound to a capability id and exact version | The requirement facts name `capability_id@version`; the methods still name local handlers | #640, PR 2: the actions themselves, with the domain fragments |
 | A result updates the state once per `operation_id` | The manifest's statuses and attempts | #640, PR 3, with the journal of ADR-0020 |
-| Inspection, extraction and enrichment are actions | They run before planning | #640, PR 2 |
+| Inspection, extraction and enrichment are actions | They run before planning | #640, PR 2: designed in [workflow-actions.md](workflow-actions.md) |
