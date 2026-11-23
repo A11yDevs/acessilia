@@ -31,6 +31,8 @@ def test_a_core_change_selects_the_core_and_the_service() -> None:
 
     assert result.suites == ("core", "app")
     assert result.indicators["core_changed"] is True
+    assert result.integration_required is True
+    assert result.indicators["integration_changed"] is True
 
 
 def test_a_backend_change_selects_only_the_application_suite() -> None:
@@ -44,6 +46,7 @@ def test_documentation_is_checked_by_the_application_suite() -> None:
     result = selection.classify_paths(["docs/testing.md"])
 
     assert result.suites == ("app",)
+    assert result.integration_required is False
     assert "documentation path" in result.reasons["app"][0]
 
 
@@ -54,6 +57,14 @@ def test_a_transversal_path_selects_every_suite_and_contracts() -> None:
     assert result.infrastructure_changed is True
     assert result.contracts_required is True
     assert result.indicators["contracts_changed"] is True
+
+
+def test_the_focused_integration_test_selects_the_integration_dimension() -> None:
+    result = selection.classify_paths(["tests/test_provider_choice_methods.py"])
+
+    assert result.suites == ("app",)
+    assert result.integration_required is True
+    assert result.indicators["integration_changed"] is True
 
 
 def test_a_contract_fixture_does_not_override_the_component_rules() -> None:
@@ -79,6 +90,7 @@ def test_an_unknown_path_falls_back_conservatively() -> None:
     assert result.suites == ("docstruct", "sdk", "core", "app")
     assert result.conservative is True
     assert result.infrastructure_changed is False
+    assert result.integration_required is True
     assert result.indicators["unclassified_changed"] is True
 
 
@@ -134,6 +146,7 @@ def test_a_docs_only_selector_does_not_hide_the_application_checks() -> None:
     assert report["mode"] == "shadow"
     assert report["selected_suites"] == ["app"]
     assert report["skipped_suites"] == ["docstruct", "sdk", "core"]
+    assert report["integration_required"] is False
 
 
 def test_main_writes_json_and_markdown_for_explicit_paths(

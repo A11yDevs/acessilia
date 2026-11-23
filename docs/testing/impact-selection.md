@@ -47,14 +47,20 @@ change in a base library always selects its consumers.
 - A path under top-level `schemas/` or a filename containing
   `toolbox-contract`/`capability_contract` sets `contracts_required` in addition
   to the suite selection.
+- `integration_required` is set for `backend/**`, `frontend/**`,
+  `libs/core/**`, the focused `tests/test_provider_choice_methods.py` and its
+  shared support (`conftest.py`, `judge_support.py`,
+  `core_config_support.py`, `pyproject.toml`, `uv.lock`, the CI workflow).
+  This mirrors the `app integration` trigger.
 - Unknown paths, an empty diff or a failed `git diff` → every suite and the
   conservative flag. Unknown paths set `unclassified_changed` rather than
   pretending to be infrastructure.
 
 The script reports separate indicators
 (`docstruct_changed`, `sdk_changed`, `core_changed`, `app_changed`,
-`contracts_changed`, `infrastructure_changed`, `unclassified_changed`) so the
-rules can be audited without reading the path list.
+`contracts_changed`, `infrastructure_changed`, `unclassified_changed`,
+`integration_changed`) so the rules can be audited without reading the path
+list.
 
 ## Shadow mode
 
