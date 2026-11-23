@@ -1,4 +1,4 @@
-# 0029. A symbolic core: every processing step is planned
+# 0029. The core plans and coordinates: every semantic workflow step is planned
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0029-symbolic-core-every-step-planned.pt-br.md)
 
@@ -38,11 +38,28 @@ experimental.
 
 ## Decision
 
-### Every step is an action
+### What the core is
 
-- Every step of a job (inspection, page limit, extraction, enrichment, fusion,
-  ordering, judging, export) must be an action of the planning domain. The
-  orchestrator must not run a fixed sequence of stages.
+- The core is responsible for planning, reasoning, coordination and the
+  logical state of workflows. It does not run operational capabilities or
+  document-processing algorithms (ADR-0028).
+- It still computes what planning and coordination need: compiling problems,
+  composing and validating domains, keeping the logical state and the
+  journal, checking observed effects, applying policies, correlating results
+  and replanning. That is not document computation.
+
+### Every semantic step is an action
+
+- Every **semantically relevant** step of a job must be an action of the
+  planning domain: steps that change the document or decide the workflow, such
+  as inspection, the page limit, extraction, OCR, block fusion, reading order,
+  image description, adjudication, math normalization and accessible export.
+  The orchestrator must not run a fixed sequence of such steps.
+- Infrastructure stays out of the domain and belongs to the runtime: HTTP
+  retries, credential renewal, serialization, operational persistence, queue
+  acknowledgements, health checks, artifact transport and retrieval.
+- A composite capability may run several internal operations as one action.
+  Its internal steps are not PDDL actions.
 - An operational action must be bound to one Toolbox capability, by id and
   exact version, invoked through the generic client (ADR-0027). Other actions
   are symbolic only: recording state, `human-review`, completing the job.
@@ -69,13 +86,21 @@ experimental.
   through the journal of ADR-0020. A duplicate or late result is ignored.
 - Replanning stays in the core and stays bounded.
 
-### Decisions are symbolic; models are capabilities
+### Strategic agents stay in the core; operational agents are capabilities
 
-- The core decides only through planning and symbolic policies.
-- Model calls are capabilities (the VLM already goes through the Toolbox,
-  ADR-0012). Their outputs are observations that the plan reacts to.
-- The agents in `acessilia_core.agents` are migrated to Toolbox capabilities or
-  to adjudication actions whose result is observed.
+- The agents in `acessilia_core.agents` are classified as strategic or
+  operational.
+- **Strategic agents stay in the core**: interpreting goals, decomposing
+  tasks, choosing strategies, coordinating subplans, evaluating state and
+  goals, deciding to replan, and the future LLM + planning integration of
+  #619.
+- **Operational agents become Toolbox capabilities**: OCR and semantic
+  extraction, document classification, image description, visual
+  adjudication, table and formula extraction, multimodal processing.
+- Model calls go through the Toolbox (ADR-0012), including those a strategic
+  agent makes. The core interprets their results in the context of the plan.
+  The Toolbox never decides global goals or replanning.
+- Contracts distinguish an operational result from a strategic decision.
 
 ### Planner and coordination are separate
 
@@ -85,17 +110,19 @@ experimental.
 
 ## Consequences
 
-- The plan explains the whole job; availability, alternatives and dead ends
-  come from the domain instead of code paths. This is the symbolic baseline
+- The plan explains every semantic step of the job; availability,
+  alternatives and dead ends come from the domain instead of code paths.
+  Keeping infrastructure out of the domain keeps it small. This is the symbolic baseline
   for #619.
 - The domain grows with the catalogue. Fragment curation, action costs and the
   CI planning fixtures keep it tractable.
 - Migration is incremental and follows ADR-0028, method by method. Then the
-  four fixed stages become actions, and then the agents become capabilities or
-  adjudication actions. The closed loop does not wait for durable queues
+  four fixed stages become actions, and then the operational agents become
+  capabilities. The closed loop does not wait for durable queues
   (#639): synchronous MCP calls are enough.
 - Progress indicators are tracked in #735: stages outside the plan (4), methods
-  without a capability binding (about 20 of 25), agents in the core.
+  without a capability binding (about 20 of 25), operational agents still in
+  the core.
 - Compliance: the CI planning fixtures; an orchestrator test that every step of
   a job comes from the plan; `tests/test_architecture_layers.py` for model
   clients in the core.

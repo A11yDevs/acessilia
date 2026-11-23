@@ -1,4 +1,4 @@
-# 0029. Um core simbólico: todo passo do processamento é planejado
+# 0029. O core planeja e coordena: todo passo semântico do workflow é planejado
 
 Também disponível em **inglês (EUA)**: [English version](0029-symbolic-core-every-step-planned.md)
 
@@ -38,11 +38,30 @@ trata a composição de fragmentos como experimental.
 
 ## Decisão
 
-### Todo passo é uma ação
+### O que é o core
 
-- Todo passo de um job (inspeção, limite de páginas, extração, enriquecimento,
-  fusão, ordenação, julgamento, exportação) deve ser uma ação do domínio de
-  planejamento. O orquestrador não pode rodar uma sequência fixa de estágios.
+- O core é responsável pelo planejamento, pelo raciocínio, pela coordenação e
+  pelo estado lógico dos workflows. Não executa capacidades operacionais nem
+  algoritmos de processamento documental (ADR-0028).
+- Ele continua computando o que o planejamento e a coordenação exigem:
+  compilar problemas, compor e validar domínios, manter o estado lógico e o
+  journal, verificar efeitos observados, aplicar políticas, correlacionar
+  resultados e replanejar. Isso não é computação documental.
+
+### Todo passo semântico é uma ação
+
+- Todo passo **semanticamente relevante** de um job deve ser uma ação do
+  domínio de planejamento: passos que mudam o documento ou decidem o workflow,
+  como inspeção, limite de páginas, extração, OCR, fusão de blocos, ordem de
+  leitura, descrição de imagens, adjudicação, normalização matemática e
+  exportação acessível. O orquestrador não pode rodar uma sequência fixa
+  desses passos.
+- A infraestrutura fica fora do domínio e pertence ao runtime: retries HTTP,
+  renovação de credenciais, serialização, persistência operacional,
+  confirmação de mensagens em filas, health checks, transporte e recuperação
+  de artefatos.
+- Uma capacidade composta pode executar várias operações internas como uma só
+  ação. Seus passos internos não são ações PDDL.
 - Uma ação operacional deve estar ligada a uma capacidade da Toolbox, por id e
   versão exata, invocada pelo cliente genérico (ADR-0027). As demais ações são
   só simbólicas: registrar estado, `human-review`, concluir o job.
@@ -71,13 +90,21 @@ trata a composição de fragmentos como experimental.
   é ignorado.
 - O replanejamento continua no core e continua limitado.
 
-### Decisões são simbólicas; modelos são capacidades
+### Agentes estratégicos ficam no core; agentes operacionais são capacidades
 
-- O core decide só por planejamento e políticas simbólicas.
-- Chamadas a modelos são capacidades (o VLM já passa pela Toolbox, ADR-0012).
-  Suas saídas são observações às quais o plano reage.
-- Os agentes de `acessilia_core.agents` são migrados para capacidades da
-  Toolbox ou para ações de adjudicação cujo resultado é observado.
+- Os agentes de `acessilia_core.agents` são classificados como estratégicos ou
+  operacionais.
+- **Agentes estratégicos ficam no core**: interpretar objetivos, decompor
+  tarefas, escolher estratégias, coordenar subplanos, avaliar estado e
+  objetivos, decidir replanejar e a futura integração LLM + planejamento da
+  #619.
+- **Agentes operacionais viram capacidades da Toolbox**: OCR e extração
+  semântica, classificação documental, descrição de imagens, adjudicação
+  visual, extração de tabelas e fórmulas, processamento multimodal.
+- Chamadas a modelos passam pela Toolbox (ADR-0012), inclusive as de um agente
+  estratégico. O core interpreta os resultados no contexto do plano. A Toolbox
+  nunca decide objetivos globais nem replanejamento.
+- Os contratos distinguem um resultado operacional de uma decisão estratégica.
 
 ### Planejador e coordenação são separados
 
@@ -87,17 +114,19 @@ trata a composição de fragmentos como experimental.
 
 ## Consequências
 
-- O plano explica o job inteiro; disponibilidade, alternativas e becos sem
-  saída vêm do domínio, e não de caminhos no código. Esse é o baseline
+- O plano explica todo passo semântico do job; disponibilidade, alternativas e
+  becos sem saída vêm do domínio, e não de caminhos no código. Manter a
+  infraestrutura fora do domínio o mantém pequeno. Esse é o baseline
   simbólico para a #619.
 - O domínio cresce com o catálogo. A curadoria dos fragmentos, os custos das
   ações e as fixtures de planejamento no CI o mantêm tratável.
 - A migração é incremental e segue a ADR-0028, método a método. Depois os
-  quatro estágios fixos viram ações, e depois os agentes viram capacidades ou
-  ações de adjudicação. O ciclo fechado não espera pelas filas duráveis
+  quatro estágios fixos viram ações, e depois os agentes operacionais viram
+  capacidades. O ciclo fechado não espera pelas filas duráveis
   (#639): chamadas MCP síncronas bastam.
 - Os indicadores de progresso são acompanhados na #735: estágios fora do plano
-  (4), métodos sem vínculo com capacidade (cerca de 20 de 25), agentes no core.
+  (4), métodos sem vínculo com capacidade (cerca de 20 de 25), agentes
+  operacionais ainda no core.
 - Conformidade: as fixtures de planejamento no CI; um teste do orquestrador
   que verifica que todo passo de um job vem do plano;
   `tests/test_architecture_layers.py` para clientes de modelo no core.

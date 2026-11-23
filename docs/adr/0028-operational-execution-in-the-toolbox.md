@@ -27,7 +27,14 @@ computation over documents runs inside the core. As measured on `develop`
   `tailjoin`, `norm-fix`, `unicode-repair`, `verse-chunker`,
   `latex-normalizer`, `agreement-rule`, `table-smart-fusion`, ...).
 - **3** SDK operations run in the core's process:
-  `acessilia_sdk.operations.formula`, `fusion` and `page_judge`.
+  `acessilia_sdk.operations.formula`, `fusion` and `page_judge`. Their only
+  consumers are the core, the benchmarks (`scripts/bench`) and tests.
+- The SDK itself imports docstruct computation (`fusion.payload`,
+  `geometry.boxes`, `imaging`, `policy`, `text.latex`) besides the
+  `manifest` contract.
+- The core's remaining non-computational docstruct imports are contracts
+  (`docstruct.canonical`, `docstruct.manifest`) and validation
+  (`docstruct.validation`).
 
 [#735](https://github.com/A11yDevs/acessilia/issues/735) asks for a core that
 only plans and coordinates (ADR-0029), with every effect on a document being a
@@ -49,28 +56,71 @@ Options considered:
 
 ## Decision
 
+Three things are decided separately: where document computation **runs**,
+where the **library** lives, and where the **contracts** live.
+
+### Execution: the Toolbox runs all document computation
+
 - The core must not run document computation in its own process. Structural
   algorithms (fusion, ordering, geometry, normalization, tables, text and
   Unicode repair, math normalization) and compositions of capabilities run as
   Toolbox capabilities, atomic or composite.
-- The core may import from docstruct only its contract modules: the canonical
-  document models and schemas it reads and writes (for example
-  `docstruct.manifest`). The list is kept in `tests/test_architecture_layers.py`.
+- The migration starts with an inventory of every `docstruct.*` import in the
+  core and `backend/`, classified as contract, algorithm, validation or
+  operation. Each algorithm or operation gets an equivalent capability; the
+  call site switches to the generic client (ADR-0027); the import is removed.
+- Migration is per plan method (P8), with a differential test that compares
+  the manifest produced before and after.
+
+### Ownership: the operational runtime belongs to the Toolbox
+
+- The SDK is split physically (#639):
+  - **`acessilia-core-sdk`**: the generic capability client, contracts as
+    consumed, transport, authentication, typed errors, artifact references.
+    It must not run document operations, depend on docstruct algorithms,
+    import Toolbox internals, carry provider dependencies (OCR, VLM,
+    renderers) or plan.
+  - **Toolbox operational runtime**: reusable operations, compositions of
+    capabilities, input and output adaptation, the integration with docstruct
+    algorithms, and functions used by the workers. It must not plan, depend on
+    the core or the core SDK, or coordinate workflows.
+- The runtime is owned by the Toolbox. By default it is a package inside the
+  Toolbox (`acessilia_toolbox.operations`), released with it, because the
+  operations it receives have no consumer outside the core, the benchmarks and
+  tests. It becomes a separately distributed `acessilia-toolbox-sdk` only when
+  a concrete external consumer needs it.
+- `acessilia-sdk` keeps a temporary compatibility layer over the core SDK, with
+  a published deprecation policy.
+
+### Library: docstruct stays independent
+
+- Docstruct stays a pure, deterministic, independent library with no heavy
+  operational dependency and no dependency on the core or the Toolbox. The
+  Toolbox installs it at a pinned version (P3). It is not moved into the
+  Toolbox's source. A repository of its own may be considered later; it is not
+  required for 0.3.0.
+
+### Contracts: the core should not need docstruct for them
+
+- Until a contracts decision is taken, the core may import only docstruct's
+  contract modules, kept as an allowlist in `tests/test_architecture_layers.py`.
   The allowlist of computational modules still imported during the migration
   can only shrink.
-- The operations in `acessilia_sdk.operations` become composite Toolbox
-  capabilities. The SDK keeps contracts, clients, artifact references and
-  helpers that do not compute over documents (for example localization of
-  structured findings).
-- Docstruct stays an independent package, with no move of repository. The
-  Toolbox depends on it at a pinned version (P3, unchanged).
-- Migration is per plan method (P8). Each step publishes the capability,
-  switches the handler to invoke it and passes a differential test that
-  compares the manifest produced before and after.
+- Target: the core does not install a library of document algorithms only to
+  read interoperability contracts. Extracting the shared interoperability
+  models and schemas (canonical document, manifest, envelopes) into a
+  contracts package, for example `acessilia-contracts`, is to be evaluated in a
+  follow-up ADR. That ADR amends ADR-0004 and P7 (docstruct currently owns the
+  canonical models), keeps one source of truth, and leaves the internal
+  structures of algorithms in docstruct.
+
+### Constitution
+
 - If accepted, the constitution is amended in a follow-up pull request:
   - P2: the SDK no longer provides "access to reusable libraries" for
-    computation;
-  - P3: core → docstruct becomes "core → docstruct contract modules";
+    computation, and the Toolbox owns the operational runtime;
+  - P3: core → docstruct becomes "core → docstruct contract modules" (or the
+    contracts package);
   - principle 5: deterministic extraction runs as a Toolbox capability.
 
 ## Consequences
@@ -89,5 +139,6 @@ Options considered:
   importing computational docstruct modules (46), local plan methods (about 20
   of 25), SDK operations run in the core (3). Each must reach zero.
 - Compliance: `tests/test_architecture_layers.py` (docstruct contract
-  allowlist, shrinking computational allowlist) and the differential tests of
-  each migrated method.
+  allowlist, shrinking computational allowlist, no core → Toolbox runtime
+  dependency), the isolated install jobs of the core SDK and of the Toolbox
+  runtime, and the differential tests of each migrated method.

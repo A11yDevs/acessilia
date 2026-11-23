@@ -1,4 +1,4 @@
-# 0027. MCP is the contract between the core and the Toolbox
+# 0027. Versioned capability contracts, invoked over MCP, between the core and the Toolbox
 
 You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](0027-mcp-core-toolbox-contract.pt-br.md)
 
@@ -11,7 +11,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 ## Context
 
 [#735](https://github.com/A11yDevs/acessilia/issues/735) sets the direction for
-the refactoring stages #632, #639 and #640: the core plans symbolically, the
+the refactoring stages #632, #639 and #640: the core plans and coordinates, the
 Toolbox executes every capability, and the two talk through MCP, addressed by
 capability. As measured on `develop` (`46f2fe7e`) and `acessilia-toolbox@main`:
 
@@ -45,6 +45,18 @@ Options considered:
    agents. Chosen.
 
 ## Decision
+
+### Source of truth
+
+- The versioned capability contracts the Toolbox publishes are the semantic
+  source of truth (ADR-0004), independent of transport: identity and version,
+  inputs and outputs, errors, idempotency, artifact references, operational
+  states and cancellation semantics.
+- MCP is the primary protocol for discovering and invoking capabilities
+  between the core and the Toolbox. REST is a compatible interface derived from
+  the same contracts. PDDL fragments add the semantics planning needs
+  (preconditions, effects) without redefining the operational contract
+  (ADR-0029).
 
 ### Transport
 

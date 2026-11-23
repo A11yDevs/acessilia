@@ -27,7 +27,14 @@ em `develop` (`46f2fe7e`):
   (`xycut-order`, `tailjoin`, `norm-fix`, `unicode-repair`, `verse-chunker`,
   `latex-normalizer`, `agreement-rule`, `table-smart-fusion`, ...).
 - **3** operações do SDK rodam no processo do core:
-  `acessilia_sdk.operations.formula`, `fusion` e `page_judge`.
+  `acessilia_sdk.operations.formula`, `fusion` e `page_judge`. Seus únicos
+  consumidores são o core, os benchmarks (`scripts/bench`) e testes.
+- O próprio SDK importa computação do docstruct (`fusion.payload`,
+  `geometry.boxes`, `imaging`, `policy`, `text.latex`), além do contrato
+  `manifest`.
+- Os imports não computacionais restantes do core no docstruct são contratos
+  (`docstruct.canonical`, `docstruct.manifest`) e validação
+  (`docstruct.validation`).
 
 A [#735](https://github.com/A11yDevs/acessilia/issues/735) pede um core que só
 planeja e coordena (ADR-0029). Todo efeito sobre um documento deve ser uma
@@ -49,28 +56,71 @@ Opções consideradas:
 
 ## Decisão
 
+Três coisas são decididas separadamente: onde a computação documental
+**roda**, onde fica a **biblioteca** e onde ficam os **contratos**.
+
+### Execução: a Toolbox roda toda a computação documental
+
 - O core não pode executar computação documental no próprio processo.
   Algoritmos estruturais (fusão, ordenação, geometria, normalização, tabelas,
   reparo de texto e de Unicode, normalização matemática) e composições de
   capacidades rodam como capacidades da Toolbox, atômicas ou compostas.
-- O core pode importar do docstruct só os módulos de contrato: os modelos e
-  schemas do documento canônico que ele lê e escreve (por exemplo
-  `docstruct.manifest`). A lista fica em `tests/test_architecture_layers.py`. A
-  allowlist dos módulos computacionais ainda importados durante a migração só
-  pode diminuir.
-- As operações de `acessilia_sdk.operations` viram capacidades compostas da
-  Toolbox. O SDK mantém contratos, clientes, referências de artefato e helpers
-  que não computam sobre documentos (por exemplo, a localização de findings
-  estruturados).
-- O docstruct continua um pacote independente, sem mudança de repositório. A
-  Toolbox depende dele em versão fixada (P3, sem mudança).
-- A migração é feita por método de plano (P8). Cada passo publica a capacidade,
-  troca o handler para invocá-la e passa num teste diferencial que compara o
-  manifesto produzido antes e depois.
+- A migração começa por um inventário de todos os imports `docstruct.*` do
+  core e de `backend/`, classificados como contrato, algoritmo, validação ou
+  operação. Cada algoritmo ou operação ganha uma capacidade equivalente; o
+  ponto de chamada passa ao cliente genérico (ADR-0027); o import é removido.
+- A migração é feita por método de plano (P8), com um teste diferencial que
+  compara o manifesto produzido antes e depois.
+
+### Ownership: o runtime operacional pertence à Toolbox
+
+- O SDK é separado fisicamente (#639):
+  - **`acessilia-core-sdk`**: o cliente genérico de capacidades, os contratos
+    como consumidos, transporte, autenticação, erros tipados e referências de
+    artefato. Não pode executar operações documentais, depender de algoritmos
+    do docstruct, importar internos da Toolbox, carregar dependências de
+    providers (OCR, VLM, renderizadores) nem planejar.
+  - **Runtime operacional da Toolbox**: operações reutilizáveis, composições
+    de capacidades, adaptação de entradas e saídas, a integração com os
+    algoritmos do docstruct e as funções usadas pelos workers. Não pode
+    planejar, depender do core ou do core SDK, nem coordenar workflows.
+- O runtime pertence à Toolbox. Por padrão, é um pacote dentro da Toolbox
+  (`acessilia_toolbox.operations`), publicado junto com ela, porque as
+  operações que recebe não têm consumidor fora do core, dos benchmarks e dos
+  testes. Ele passa a ser um `acessilia-toolbox-sdk` distribuído
+  separadamente só quando um consumidor externo concreto precisar.
+- O `acessilia-sdk` mantém uma camada temporária de compatibilidade sobre o
+  core SDK, com política de depreciação publicada.
+
+### Biblioteca: o docstruct continua independente
+
+- O docstruct continua uma biblioteca pura, determinística e independente,
+  sem dependência operacional pesada e sem dependência do core ou da Toolbox.
+  A Toolbox o instala em versão fixada (P3). Ele não é movido para dentro do
+  código da Toolbox. Um repositório próprio pode ser considerado depois; não é
+  requisito da 0.3.0.
+
+### Contratos: o core não deveria precisar do docstruct para eles
+
+- Até que se decida sobre os contratos, o core pode importar só os módulos de
+  contrato do docstruct, mantidos como allowlist em
+  `tests/test_architecture_layers.py`. A allowlist dos módulos computacionais
+  ainda importados durante a migração só pode diminuir.
+- Meta: o core não instalar uma biblioteca de algoritmos documentais só para
+  ler contratos de interoperabilidade. Extrair os modelos e schemas
+  compartilhados (documento canônico, manifesto, envelopes) para um pacote de
+  contratos, por exemplo `acessilia-contracts`, será avaliado em uma ADR
+  posterior. Essa ADR emenda a ADR-0004 e o P7 (hoje o docstruct é dono dos
+  modelos canônicos), mantém uma única fonte de verdade e deixa no docstruct
+  as estruturas internas dos algoritmos.
+
+### Constituição
+
 - Se aceita, a constituição é emendada em um pull request seguinte:
   - P2: o SDK deixa de oferecer "acesso a bibliotecas reutilizáveis" para
-    computação;
-  - P3: core → docstruct passa a ser "core → módulos de contrato do docstruct";
+    computação, e a Toolbox passa a ser dona do runtime operacional;
+  - P3: core → docstruct passa a ser "core → módulos de contrato do docstruct"
+    (ou o pacote de contratos);
   - princípio 5: a extração determinística roda como capacidade da Toolbox.
 
 ## Consequências
@@ -90,5 +140,6 @@ Opções consideradas:
   métodos de plano locais (cerca de 20 de 25), operações do SDK executadas no
   core (3). Todos devem chegar a zero.
 - Conformidade: `tests/test_architecture_layers.py` (allowlist de contrato do
-  docstruct e allowlist computacional que só diminui) e os testes diferenciais
-  de cada método migrado.
+  docstruct, allowlist computacional que só diminui, nenhuma dependência do
+  core no runtime da Toolbox), os jobs de instalação isolada do core SDK e do
+  runtime da Toolbox, e os testes diferenciais de cada método migrado.

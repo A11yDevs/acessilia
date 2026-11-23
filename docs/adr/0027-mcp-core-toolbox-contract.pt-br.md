@@ -1,4 +1,4 @@
-# 0027. MCP é o contrato entre o core e a Toolbox
+# 0027. Contratos versionados de capacidades, invocados por MCP, entre o core e a Toolbox
 
 Também disponível em **inglês (EUA)**: [English version](0027-mcp-core-toolbox-contract.md)
 
@@ -11,7 +11,7 @@ Também disponível em **inglês (EUA)**: [English version](0027-mcp-core-toolbo
 ## Contexto
 
 A [#735](https://github.com/A11yDevs/acessilia/issues/735) define a direção das
-etapas de refatoração #632, #639 e #640: o core planeja simbolicamente, a
+etapas de refatoração #632, #639 e #640: o core planeja e coordena, a
 Toolbox executa todas as capacidades, e os dois se comunicam por MCP,
 endereçado por capacidade. Medido em `develop` (`46f2fe7e`) e
 `acessilia-toolbox@main`:
@@ -47,6 +47,18 @@ Opções consideradas:
    externos. Escolhida.
 
 ## Decisão
+
+### Fonte de verdade
+
+- Os contratos versionados de capacidades publicados pela Toolbox são a fonte
+  de verdade semântica (ADR-0004), independente do transporte: identidade e
+  versão, entradas e saídas, erros, idempotência, referências de artefato,
+  estados operacionais e semântica de cancelamento.
+- MCP é o protocolo primário de descoberta e invocação de capacidades entre o
+  core e a Toolbox. REST é uma interface compatível, derivada dos mesmos
+  contratos. Os fragmentos PDDL acrescentam a semântica de que o planejamento
+  precisa (pré-condições, efeitos) sem redefinir o contrato operacional
+  (ADR-0029).
 
 ### Transporte
 
