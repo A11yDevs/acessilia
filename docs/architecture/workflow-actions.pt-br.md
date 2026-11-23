@@ -104,7 +104,7 @@ faltando ou duvidoso**:
 | 2. Descrições de imagens | imagens sem descrição | o extrator não descreve imagens |
 | 3. Matemática inline | prosa da camada de texto | o Docling não informa região de fórmula inline num PDF tipografado |
 | 4. LaTeX das fórmulas | fórmulas sem marcação LaTeX (`has_latex_markup`) | o enriquecimento de fórmulas do Docling está desligado; um reconhecimento precisa concordar com a camada de texto, quando houver |
-| 5. Estrutura das tabelas | tabelas sem estrutura utilizável, ou embaralhadas (`TABLE_VISUAL_REVIEW`) | a estrutura do TableFormer é mantida quando é utilizável. Depois da #170, toda tabela detectada vai para `table.recognize`, e esta condição vira "toda tabela" |
+| 5. Estrutura das tabelas | tabelas sem estrutura utilizável, ou embaralhadas (`TABLE_VISUAL_REVIEW`) | a estrutura do TableFormer é mantida quando é utilizável. Depois da #170 a extração entrega as tabelas como regiões, e a condição vira "toda tabela sem estrutura reconhecida válida": uma região, uma estrutura suspeita ou uma leitura que falhou. Uma estrutura válida é reaproveitada, também na retomada (ADR-0030) |
 
 A migração precisa manter essas condições: **uma obrigação só existe onde sua
 condição vale**. Do contrário, o plano mandaria para um provider

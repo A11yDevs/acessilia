@@ -103,7 +103,7 @@ doubtful**:
 | 2. Picture descriptions | pictures without a description | the extractor does not describe pictures |
 | 3. Inline math | prose from the text layer | Docling reports no inline formula region for a typeset PDF |
 | 4. Formula LaTeX | formulas without LaTeX markup (`has_latex_markup`) | Docling's formula enrichment is off; a recognition must agree with the text layer when there is one |
-| 5. Table structures | tables without a usable structure, or garbled ones (`TABLE_VISUAL_REVIEW`) | TableFormer's structure is kept when it is usable. After #170, every detected table goes to `table.recognize`, and this gate becomes "every table" |
+| 5. Table structures | tables without a usable structure, or garbled ones (`TABLE_VISUAL_REVIEW`) | TableFormer's structure is kept when it is usable. After #170 the extraction delivers tables as regions, and the gate becomes "every table without a valid recognized structure": a region, a suspect structure or a failed read. A valid structure is reused, on resume too (ADR-0030) |
 
 The migration must keep these gates: **an obligation exists only where its
 gate holds**. Otherwise the plan would send to a specialized provider an
