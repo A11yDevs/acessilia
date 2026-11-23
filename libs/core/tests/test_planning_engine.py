@@ -69,6 +69,23 @@ def test_the_pddl_engine_builds_its_planner_on_first_use():
     assert engine.planner is engine.planner
 
 
+def test_the_orchestrator_builds_its_planner_on_first_use(monkeypatch):
+    from acessilia_core.pipeline import orchestrator as orchestrator_module
+
+    built = []
+
+    class FakePlanner:
+        def __init__(self):
+            built.append(self)
+
+    monkeypatch.setattr(orchestrator_module, "PlannerAgent", FakePlanner)
+    orchestrator = _orchestrator()
+    orchestrator.planner = None
+
+    assert orchestrator.planner is orchestrator.planner
+    assert built == [orchestrator.planner]
+
+
 def test_planning_problem_materializes_its_inputs():
     manifest = _text_manifest()
     problem = PlanningProblem.of(

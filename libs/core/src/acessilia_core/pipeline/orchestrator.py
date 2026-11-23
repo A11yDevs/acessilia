@@ -208,7 +208,7 @@ class PddlAccessibilityOrchestrator:
     @property
     def planner(self) -> PlannerAgent:
         """The default planner, built (loading the domain) on first use."""
-        return _lazy_planner(self)
+        return _lazy_planner(self, PlannerAgent)
 
     @planner.setter
     def planner(self, planner: PlannerAgent | None) -> None:
