@@ -43,4 +43,4 @@ The Toolbox is a separate repository; report its issues there, or here if the pr
 - We keep the reporter informed while a fix is prepared and coordinate disclosure after a release.
 - We credit reporters in the advisory unless they prefer to stay anonymous.
 
-CI runs a dependency audit, CodeQL and a container image scan on pull requests, pushes, the weekly schedule and tag releases. Release images are scanned before publication; a new high-severity finding fails the build unless a reviewed exception is recorded. Secret scanning and push protection are expected to be enabled in the repository settings.
+CI runs a dependency audit, CodeQL and a container image scan on pull requests, pushes and the weekly schedule. Release images are built fresh, scanned and then published; a new high-severity finding with an available fix fails the build unless a reviewed exception is recorded. Secret scanning and push protection are expected to be enabled in the repository settings.

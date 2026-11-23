@@ -426,11 +426,27 @@ def test_the_release_image_is_scanned_before_publishing() -> None:
     workflow = yaml.safe_load(RELEASE.read_text(encoding="utf-8"))
     assert workflow["permissions"]["security-events"] == "write"
     steps = {step.get("name"): step for step in workflow["jobs"]["publish"]["steps"]}
+    build = steps["Build production image for verification"]
+    assert build["with"]["no-cache"] is True
+    assert build["with"]["labels"] == "${{ steps.meta.outputs.labels }}"
+    table = steps["List the release image findings for the log"]
+    assert table["with"]["trivyignores"] == ".trivyignore"
+    assert table["with"]["severity"] == "HIGH,CRITICAL"
     scan = steps["Scan the release image for high and critical vulnerabilities"]
     assert scan["with"]["image-ref"] == "acessilia:release"
     assert scan["with"]["exit-code"] == "1"
+    assert scan["with"]["severity"] == "HIGH,CRITICAL"
+    assert scan["with"]["ignore-unfixed"] is True
+    assert scan["with"]["format"] == "sarif"
+    assert scan["with"]["limit-severities-for-sarif"] is True
     assert scan["with"]["trivyignores"] == ".trivyignore"
-    assert steps["Upload the release image scan report"]["with"]["category"] == "release"
+    upload = steps["Upload the release image scan report"]
+    assert upload["with"]["category"] == "release"
+    assert upload["if"] == "!cancelled()"
+    publish = steps["Publish verified release image"]
+    assert "uses" not in publish
+    assert "docker push" in publish["run"]
+    assert publish["env"]["TAGS"] == "${{ steps.meta.outputs.tags }}"
     names = [step.get("name") for step in workflow["jobs"]["publish"]["steps"]]
     assert names.index(scan["name"]) < names.index("Publish verified release image")
 
