@@ -281,6 +281,12 @@ result. Do not add a local implementation behind it (see 2.3).
   The availability gate then checks it against the live catalogue before each
   document is planned (see below).
 
+  A method left out of the table is never checked: under `enforce` it stays
+  runnable whatever the catalogue says. So every method in
+  `DEFAULT_METHOD_COSTS` is either declared there or listed as local, with the
+  reason, in `LOCAL_METHODS` (`libs/core/tests/test_toolbox_availability_gate.py`),
+  and a test fails for a method that is neither (#789).
+
 #### Availability gate
 
 Before planning a document the orchestrator takes one catalogue snapshot

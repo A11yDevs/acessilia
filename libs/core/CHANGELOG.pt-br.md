@@ -2,6 +2,21 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.10 — os métodos de fórmula declaram seus requisitos de Toolbox
+
+`mathml` e `latex-verbalizer` chamam a Toolbox (`math.convert` e
+`math.verbalize`, pelo provider de transformação de fórmulas), mas não estavam
+em `METHOD_TOOLBOX_REQUIREMENTS`, então o gate de disponibilidade nunca os
+conferia (#789). Agora estão declarados:
+- em `observe` os planos não mudam;
+- em `enforce`, um catálogo sem eles descarta os dois métodos, e uma obrigação
+  `verbalize-formula` cai para `human-review`.
+
+Uma auditoria dos outros 19 métodos não declarados não encontrou nenhum que
+chame a Toolbox. Eles estão listados, cada um com o motivo, em `LOCAL_METHODS`
+(`tests/test_toolbox_availability_gate.py`), e um teste falha para um método
+que não esteja declarado nem listado.
+
 ## 0.3.9 — o catálogo da Toolbox como fatos de planejamento (domínio 2.4)
 
 A ADR-0029 torna a disponibilidade de capacidades e providers predicado do

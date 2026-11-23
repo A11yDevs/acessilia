@@ -2,6 +2,21 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.10 — the formula methods declare their Toolbox requirements
+
+`mathml` and `latex-verbalizer` call the Toolbox (`math.convert` and
+`math.verbalize`, through the math transform provider), but they were missing
+from `METHOD_TOOLBOX_REQUIREMENTS`, so the availability gate never checked them
+(#789). They are declared now:
+- in `observe` the plans do not change;
+- in `enforce`, a catalogue without them rules both methods out, and a
+  `verbalize-formula` obligation falls back to `human-review`.
+
+An audit of the other 19 undeclared methods found no Toolbox caller. They are
+listed, each with its reason, in `LOCAL_METHODS`
+(`tests/test_toolbox_availability_gate.py`), and a test fails for a method that
+is neither declared nor listed.
+
 ## 0.3.9 — the Toolbox catalogue as planning facts (domain 2.4)
 
 ADR-0029 makes capability and provider availability predicates of the

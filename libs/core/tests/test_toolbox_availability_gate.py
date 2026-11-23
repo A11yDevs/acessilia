@@ -410,26 +410,86 @@ async def test_a_resumed_plan_keeps_the_snapshot_it_was_built_under(monkeypatch)
     assert restored.availability.catalog_revision == built_under.catalog_revision
 
 
-#: Methods with no entry in METHOD_TOOLBOX_REQUIREMENTS, so the gate never
-#: rules them out. Not all of them are local: the formula handler calls the
-#: Toolbox for ``mathml`` and ``latex-verbalizer``, and the others are not yet
-#: audited (review of #781, #789). This list only shrinks: a method moves out
-#: when it is declared in the table or confirmed local, and a new method must be
-#: declared there, or added here with a reason in the review.
-UNDECLARED_METHODS = frozenset({
-    "agreement-rule", "deterministic-heading-repair", "human-review", "latex-normalizer",
-    "latex-verbalizer", "line-number-extractor", "mathml", "norm-fix", "pandoc-code",
-    "pandoc-table", "rep-guard", "rescue-omitted", "skeleton-order", "table-smart-fusion",
-    "table-specialist", "tailjoin", "tailjoin-positioned", "unicode-repair", "verse-chunker",
-    "vision-description", "xycut-order",
-})
+#: Methods with no entry in METHOD_TOOLBOX_REQUIREMENTS, and why: their
+#: handlers do not call the Toolbox, so the catalogue cannot rule them out
+#: (audit of #789). A new method must be declared in the table, or listed here
+#: with the reason its handler is local.
+LOCAL_METHODS: dict[str, str] = {
+    # docstruct or deterministic rules over the manifest.
+    "deterministic-heading-repair": "docstruct heading repair",
+    "latex-normalizer": "delimiter and symbol normalization",
+    "line-number-extractor": "deterministic text rule",
+    "norm-fix": "docstruct norm_fix",
+    "pandoc-code": "docstruct code reflow",
+    "pandoc-table": "docstruct table AST",
+    "rep-guard": "deterministic text rule",
+    "tailjoin": "docstruct tailjoin",
+    "tailjoin-positioned": "docstruct tailjoin",
+    "unicode-repair": "deterministic text rule",
+    "verse-chunker": "deterministic text rule",
+    "xycut-order": "deterministic layout rule",
+    # Read the secondary extraction the structure extractor already recorded.
+    "agreement-rule": "reads the recorded secondary extraction",
+    "rescue-omitted": "reads the recorded secondary extraction",
+    "skeleton-order": "reads the recorded secondary extraction",
+    "table-smart-fusion": "reads the recorded secondary extraction",
+    # Validates work done before planning (the picture descriptions); the
+    # work itself becomes a planned action in #640, PR 2.
+    "vision-description": "validates the pre-planning vision descriptions",
+    "human-review": "the terminal escalation",
+    "table-specialist": "no handler registered, so never available",
+}
 
 
-def test_every_method_is_declared_or_known_undeclared() -> None:
+def test_every_method_is_declared_or_local() -> None:
     """A method missing from the requirements table is runnable under
-    ``enforce`` whatever the catalogue says, so an omission must be visible."""
+    ``enforce`` whatever the catalogue says, so each one must be known local."""
     methods = set(DEFAULT_METHOD_COSTS)
     undeclared = methods - set(toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS)
 
-    assert undeclared <= UNDECLARED_METHODS, f"declare or list: {sorted(undeclared - UNDECLARED_METHODS)}"
-    assert UNDECLARED_METHODS <= undeclared, f"shrink the list: {sorted(UNDECLARED_METHODS - undeclared)}"
+    assert undeclared == set(LOCAL_METHODS), (
+        f"declare or list as local: {sorted(undeclared - set(LOCAL_METHODS))}; "
+        f"no longer local: {sorted(set(LOCAL_METHODS) - undeclared)}"
+    )
+
+
+def test_methods_without_a_handler_are_the_listed_ones() -> None:
+    from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS
+
+    assert set(DEFAULT_METHOD_COSTS) - set(METHOD_HANDLERS) == {"table-specialist"}
+
+
+@pytest.mark.parametrize(
+    ("method", "capability"),
+    [("mathml", "math.convert"), ("latex-verbalizer", "math.verbalize")],
+)
+def test_the_formula_methods_need_the_math_transform_provider(method, capability) -> None:
+    """#789: the formula handler calls the Toolbox, so enforce rules the
+    methods out when the math provider does not offer the capability."""
+    config = replace(
+        _config(), toolbox=toolbox_config(providers={"toolbox_math_provider": "not-registered"})
+    )
+
+    offered = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=_config())
+    missing = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=config)
+
+    assert offered.requirements[method] == [(capability, "math-speech")]
+    assert method not in offered.blocked
+    assert "not-registered" in " ".join(missing.blocked[method])
+
+
+def test_enforce_without_the_math_provider_escalates_formulas_to_review() -> None:
+    """Both formula methods need math-speech, so without it the plan falls back
+    to human-review instead of becoming unplannable."""
+    from acessilia_core.planning.planner_agent import PlannerAgent
+
+    methods = ["mathml", "latex-verbalizer", "human-review"]
+    obligation = _obligation("verbalize-formula-1", ["el-1"], methods)
+    obligation.kind = "verbalize-formula"
+    obligation.method_costs = {m: DEFAULT_METHOD_COSTS[m] for m in methods}
+    manifest = _manifest([_element("el-1", "formula", text="x^2")], [obligation])
+    decision = toolbox_gate.evaluate(methods, None, mode="enforce", config=_config())
+
+    _, plan = PlannerAgent().plan(manifest, catalogue=decision.catalogue_facts())
+
+    assert [step.method for step in plan.steps if step.method] == ["human-review"]

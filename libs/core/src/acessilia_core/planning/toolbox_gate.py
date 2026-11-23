@@ -60,8 +60,9 @@ def _provider(config: CoreConfig, key: str) -> str:
 
 
 #: Method -> Toolbox requirements, resolved from the run's config when
-#: evaluated, so the providers checked are the ones the run calls. Methods not
-#: listed run locally.
+#: evaluated, so the providers checked are the ones the run calls. Every
+#: method whose handler calls the Toolbox is listed (#789); the others run
+#: locally, and ``tests/test_toolbox_availability_gate.py`` names each one.
 METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
     "dual-provider-fusion": lambda config: [
         Requirement(_EXTRACT, _provider(config, "toolbox_provider")),
@@ -77,6 +78,14 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]
     ],
     "pymupdf-region": lambda config: [
         Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
+    ],
+    # The formula handler converts and verbalizes LaTeX through the Toolbox
+    # (#789); both use the math transform provider.
+    "mathml": lambda config: [
+        Requirement("math.convert", _provider(config, "toolbox_math_provider"))
+    ],
+    "latex-verbalizer": lambda config: [
+        Requirement("math.verbalize", _provider(config, "toolbox_math_provider"))
     ],
     "vlm-pairwise-judge": lambda config: [
         Requirement(

@@ -281,6 +281,12 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
   O gate de disponibilidade passa a conferi-la contra o catálogo vivo antes de
   cada documento ser planejado (veja abaixo).
 
+  Um método fora da tabela nunca é conferido: no `enforce` ele continua
+  executável qualquer que seja o catálogo. Por isso todo método de
+  `DEFAULT_METHOD_COSTS` está declarado ali ou listado como local, com o motivo,
+  em `LOCAL_METHODS` (`libs/core/tests/test_toolbox_availability_gate.py`), e um
+  teste falha para um método que não está em nenhum dos dois (#789).
+
 #### Gate de disponibilidade
 
 Antes de planejar um documento, o orquestrador tira um snapshot do catálogo
