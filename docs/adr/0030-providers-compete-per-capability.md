@@ -88,19 +88,60 @@ Three facts do not match that intent yet:
   recognizer returns one table, not generations at a temperature. The output
   carries the table as the canonical table AST (cells, spans, headers), which
   the core already reads as `table_ast`, and its provenance. The generations
-  stay optional, for the VLM.
+  stay optional, for the VLM. The criteria for that contract are in
+  acessilia-toolbox#170:
+  - a canonical core of cells, row and column indices, spans and headers, with
+    no field that only a VLM can fill;
+  - provenance: the provider, the contract and model versions, the options it
+    ran with, and where the cells' text came from (text layer or OCR);
+  - geometry and confidence as optional, so that no provider invents values;
+  - a region input: a versioned artifact reference, the page, the box and its
+    coordinate system (orientation and units), with the image input kept for
+    scanned pages;
+  - an explicit migration from `@1`, with no silent break for its consumers.
 - The input should keep the PDF's text layer when there is one: a region of
   the source page, not only an image. In a born-digital PDF, TableFormer
   takes the cells' text from the page's own text. On a crop image it falls
   back to OCR, which is worse.
-- Order, so that quality does not drop:
+- **The bootstrap keeps delivering tables, as regions.** With cell recognition
+  out of `document.structure.extract`, the manifest still knows each table's
+  existence and location. A table is in one of four states, which the
+  manifest's existing fields express:
+  - **region detected:** a table element with no `table_ast`;
+  - **structure recognized:** a `table_ast`, with its provenance;
+  - **structure suspect or invalid:** a `table_ast` that needs validation,
+    repair or another recognition. `table_garble_reason` detects it, and
+    `table_review` records its review;
+  - **recognition unavailable or failed:** `table_read_failure`. It is not an
+    empty table.
+
+  The invariant: **a table region without recognized cells produces a
+  plannable obligation**. It is never treated as a table already processed.
+- **What is already recognized is reused.** The core reuses, validates,
+  repairs or recognizes a table's structure according to its observed state,
+  its provenance and the pending obligations. A valid structure with a
+  compatible provenance is not recognized again: not in every run, and not on
+  resume. Today `_enrich_table_structures` reads a table only when it lacks a
+  usable structure or looks garbled, and that rule carries over. Manifests and
+  checkpoints with structures recognized inside the extraction stay valid;
+  their provenance is the extraction.
+- Order, so that quality and cost do not regress:
   1. Docling and MinerU become providers of `table.recognize` (contract
      version 2);
-  2. the benchmark compares them per table, against the VLM and against
-     today's in-extraction tables;
+  2. the validation compares them per table, against the VLM and against
+     today's in-extraction tables. It measures TEDS, and also:
+     - the preservation of text, headers, spans and merged cells;
+     - the latency per document, not only per table;
+     - CPU, GPU and memory, and the number of remote calls;
+     - the cost of repeating layout detection and OCR on tables already
+       located;
+     - the reuse of intermediate artifacts and regions, and batching;
   3. only then is table recognition turned off in
-     `document.structure.extract`, and every detected table goes to
-     `table.recognize`.
+     `document.structure.extract`. From then on, the tables that are not yet
+     recognized go to `table.recognize`.
+
+  If one call per table costs too much, the Toolbox can offer a composite or
+  batched capability. The planning stays in the core.
 
 ### Providers compete per capability
 
@@ -131,12 +172,23 @@ Three facts do not match that intent yet:
 - **acessilia-toolbox#170:** `table.recognize@2`, provider-neutral, with
   `docling-table` and `mineru-table` as providers and an input that keeps the
   text layer.
-- **The core reads tables through the capability.** Today the core reads a
-  table with a model call (`DataAgent`) and the table specialist chooses among
-  candidates (`TableSpecialistAgent`, the medoid by similarity). Both become
-  the consumers of `table.recognize`'s competing providers. Choosing among
-  candidates per table is the first concrete form of competition per
-  capability.
+- **Responsibilities around a table** (ADR-0028, ADR-0029):
+  - **The core decides:** whether and when to recognize a table again, which
+    providers to ask, whether to compare their candidates, and whether a
+    result satisfies the obligation. It keeps the symbolic state and
+    coordinates the replanning.
+  - **The Toolbox executes:** the recognition, and the comparison of
+    candidates when the core asks for it.
+  - **Docstruct provides** the pure, deterministic algorithms that the Toolbox
+    reuses: normalization, comparison and evaluation of table structures.
+
+  Today the core reads a table with a model call (`DataAgent`), and the table
+  specialist picks the medoid of the candidates by similarity
+  (`TableSpecialistAgent`). Picking the medoid is document computation. The
+  policy of asking for an adjudication stays in the core, but the algorithm
+  does not stay there because it is attached to that agent today. It migrates
+  with #804 and #640, and comparing candidates per table becomes the first
+  concrete form of competition per capability.
 - **Cost:** one call per table, each running its own detection, costs more
   than a table recognized inside the extraction. The benchmark weighs that
   against the quality.
