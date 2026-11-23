@@ -189,6 +189,20 @@ client is closed in `finally`.
 lines → **10 groups / 24 functions / 257 lines**. The math async-wrapper group
 disappears.
 
+## Twelfth consolidation: the generated dataset readers
+
+The five dataset collection readers in `_dataset_generated.py` repeated the
+local `decode` import and call. The generator now emits a shared `_read` helper;
+each public reader keeps its precise rule and name and becomes one line. The
+generated-file freshness test pins the output, and the dataset reader/schema
+tests cover valid, empty and malformed documents.
+
+**Measured delta on this PR's code commit:** 10 groups / 24 functions / 257
+lines → **9 groups / 19 functions / 242 lines**. The generated dataset-reader
+group disappears. Each reader is now one statement, so the detector's
+one-statement floor also applies; the shared helper is the actual extraction,
+not the floor.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -196,7 +210,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | # | Group | Disposition |
 |---:|---|---|
 | 0 | Frontend Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | **Consolidated:** shared `_set_mode`; copy and aliases unchanged. |
-| 1 | Generated SDK dataset readers (5/15) | Generated file (`_dataset_generated.py`): fix the generator, not the generated functions. |
+| 1 | Generated SDK dataset readers (5/15) | **Consolidated:** the generator emits shared `_read`; readers keep their rules. |
 | 2 | Core schema writers `write_*_schema` (4/33) | **Consolidated:** shared `schema_files.write_schema`, with writer/schema tests. |
 | 3 | Core config helpers `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Defer: the surrounding config dataclasses differ. |
 | 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | **Reclassified:** false positive; the shared reader already owns validation. |
@@ -227,16 +241,15 @@ separately from the baseline rows.
 
 The remaining groups are smaller or behaviour-sensitive. Agent selection and
 table selection need characterization before extraction, while the config
-helpers and generated readers stay deferred for the reasons in the table. Each
-consolidation should keep its own focused PR; the remaining groups were not
-changed here.
+helpers stay deferred for the reasons in the table. Each consolidation should
+keep its own focused PR; the remaining groups were not changed here.
 
 ## Reproduction
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

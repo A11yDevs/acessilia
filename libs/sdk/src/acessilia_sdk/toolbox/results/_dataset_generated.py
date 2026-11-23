@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from acessilia_sdk.toolbox.results._model import ResultModel
+from acessilia_sdk.toolbox.results._model import ResultModel, decode
 
 
 @dataclass(frozen=True)
@@ -87,35 +87,36 @@ DatasetItem._rule = {'type': ['object'], 'properties': {'id': {'type': ['string'
 DatasetItem._models = _MODELS
 DatasetSyncEntry._rule = {'type': ['object'], 'properties': {'status': {'type': ['string'], 'enum': ['mirrored', 'skipped']}, 'item': {'type': ['string']}, 'split': {'type': ['string']}, 'artifact': {'type': ['string']}, 'reason': {'type': ['string']}}, 'required': ['status'], 'status_required': {'mirrored': ['item', 'split', 'artifact'], 'skipped': ['reason']}, 'model': 'DatasetSyncEntry'}
 DatasetSyncEntry._models = _MODELS
+
+
+def _read(data: Any, rule: dict, name: str) -> Any:
+    return decode(data, rule, _MODELS, name)
+
+
 _READ_DATASET_LIST_RULE = {'type': ['array'], 'items': {'type': ['object'], 'properties': {'id': {'type': ['string'], 'minLength': 1}, 'name': {'type': ['string'], 'minLength': 1}, 'description': {'type': ['string']}, 'source': {'type': ['string'], 'minLength': 1}, 'source_type': {'type': ['string'], 'enum': ['github', 'huggingface']}, 'default_revision': {'type': ['string']}, 'revisions': {'type': ['array'], 'items': {'type': ['string']}}, 'splits': {'type': ['array'], 'items': {'type': ['string']}}, 'item_count': {'type': ['integer', 'null'], 'minimum': 0}, 'license': {'type': ['string', 'null']}, 'citation': {'type': ['string', 'null']}}, 'required': ['id', 'name', 'source', 'source_type'], 'model': 'DatasetInfo'}}
 
 def read_dataset_list(data: Any) -> list[DatasetInfo]:
-    from acessilia_sdk.toolbox.results._model import decode
-    return decode(data, _READ_DATASET_LIST_RULE, _MODELS, 'read_dataset_list')
+    return _read(data, _READ_DATASET_LIST_RULE, 'read_dataset_list')
 
 _READ_DATASET_SPLITS_RULE = {'type': ['array'], 'items': {'type': ['object'], 'properties': {'id': {'type': ['string'], 'minLength': 1}, 'name': {'type': ['string']}, 'description': {'type': ['string']}, 'item_count': {'type': ['integer'], 'minimum': 0}, 'has_ground_truth': {'type': ['boolean']}, 'artifact_types': {'type': ['array'], 'items': {'type': ['string']}}}, 'required': ['id', 'item_count', 'has_ground_truth'], 'model': 'SplitInfo'}}
 
 def read_dataset_splits(data: Any) -> list[SplitInfo]:
-    from acessilia_sdk.toolbox.results._model import decode
-    return decode(data, _READ_DATASET_SPLITS_RULE, _MODELS, 'read_dataset_splits')
+    return _read(data, _READ_DATASET_SPLITS_RULE, 'read_dataset_splits')
 
 _READ_ITEM_SUMMARIES_RULE = {'type': ['array'], 'items': {'type': ['object'], 'properties': {'id': {'type': ['string'], 'minLength': 1}, 'dataset': {'type': ['string']}, 'split': {'type': ['string']}, 'revision': {'type': ['string']}, 'artifact_count': {'type': ['integer'], 'minimum': 0}, 'has_annotations': {'type': ['boolean']}, 'metadata': {'type': ['object'], 'properties': {}}}, 'required': ['id', 'artifact_count', 'has_annotations'], 'model': 'ItemSummary'}}
 
 def read_item_summaries(data: Any) -> list[ItemSummary]:
-    from acessilia_sdk.toolbox.results._model import decode
-    return decode(data, _READ_ITEM_SUMMARIES_RULE, _MODELS, 'read_item_summaries')
+    return _read(data, _READ_ITEM_SUMMARIES_RULE, 'read_item_summaries')
 
 _READ_DATASET_SAMPLE_RULE = {'type': ['array'], 'items': {'type': ['object'], 'properties': {'id': {'type': ['string'], 'minLength': 1}, 'dataset': {'type': ['string']}, 'split': {'type': ['string']}, 'revision': {'type': ['string']}, 'artifacts': {'type': ['array'], 'items': {'type': ['object'], 'properties': {'path': {'type': ['string'], 'minLength': 1}, 'media_type': {'type': ['string']}, 'size': {'type': ['integer'], 'minimum': 0}, 'sha256': {'type': ['string', 'null']}, 'mirrored': {'type': ['boolean']}, 'artifact_id': {'type': ['string', 'null']}}, 'required': ['path'], 'model': 'DatasetArtifactRef'}}, 'annotations': {'type': ['array'], 'items': {'type': ['object'], 'properties': {'path': {'type': ['string'], 'minLength': 1}, 'media_type': {'type': ['string']}, 'size': {'type': ['integer'], 'minimum': 0}, 'sha256': {'type': ['string', 'null']}, 'mirrored': {'type': ['boolean']}, 'artifact_id': {'type': ['string', 'null']}}, 'required': ['path'], 'model': 'DatasetArtifactRef'}}, 'metadata': {'type': ['object'], 'properties': {}}}, 'required': ['id'], 'model': 'DatasetItem'}}
 
 def read_dataset_sample(data: Any) -> list[DatasetItem]:
-    from acessilia_sdk.toolbox.results._model import decode
-    return decode(data, _READ_DATASET_SAMPLE_RULE, _MODELS, 'read_dataset_sample')
+    return _read(data, _READ_DATASET_SAMPLE_RULE, 'read_dataset_sample')
 
 _READ_SYNC_REPORT_RULE = {'type': ['array'], 'items': {'type': ['object'], 'properties': {'status': {'type': ['string'], 'enum': ['mirrored', 'skipped']}, 'item': {'type': ['string']}, 'split': {'type': ['string']}, 'artifact': {'type': ['string']}, 'reason': {'type': ['string']}}, 'required': ['status'], 'status_required': {'mirrored': ['item', 'split', 'artifact'], 'skipped': ['reason']}, 'model': 'DatasetSyncEntry'}}
 
 def read_sync_report(data: Any) -> list[DatasetSyncEntry]:
-    from acessilia_sdk.toolbox.results._model import decode
-    return decode(data, _READ_SYNC_REPORT_RULE, _MODELS, 'read_sync_report')
+    return _read(data, _READ_SYNC_REPORT_RULE, 'read_sync_report')
 
 
 __all__ = ['DatasetArtifactRef', 'DatasetInfo', 'SplitInfo', 'ItemSummary', 'DatasetItem', 'DatasetSyncEntry', 'read_dataset_list', 'read_dataset_splits', 'read_item_summaries', 'read_dataset_sample', 'read_sync_report']
