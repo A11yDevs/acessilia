@@ -154,6 +154,38 @@ def test_unsupported_constraints_and_bad_references_fail_explicitly(change):
         module.Compiler().compile({"type": "object", **change}, "Test")
 
 
+def test_render_emits_the_reader_helper_only_for_reader_roots():
+    """The generated module imports decode and defines _read only when needed."""
+    module = compiler()
+
+    reader = module.Compiler()
+    reader.compile({"type": "array", "items": {"type": "string"}}, "read_labels")
+    rendered_reader = reader.render("reader schema")
+    assert (
+        "from acessilia_sdk.toolbox.results._model import ResultModel, decode"
+        in rendered_reader
+    )
+    assert "def _read(data: Any, rule: dict, name: str) -> Any:" in rendered_reader
+    assert "return _read(data, _READ_LABELS_RULE, 'read_labels')" in rendered_reader
+
+    model = module.Compiler()
+    model.compile(
+        {
+            "type": "object",
+            "properties": {"id": {"type": "string"}},
+            "required": ["id"],
+        },
+        "Record",
+    )
+    rendered_model = model.render("model schema")
+    assert (
+        "from acessilia_sdk.toolbox.results._model import ResultModel\n"
+        in rendered_model
+    )
+    assert "ResultModel, decode" not in rendered_model
+    assert "def _read(" not in rendered_model
+
+
 def test_published_layout_union_is_not_flattened():
     module = compiler()
     schema = json.loads(
