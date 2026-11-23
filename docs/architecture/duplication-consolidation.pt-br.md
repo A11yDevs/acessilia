@@ -138,7 +138,11 @@ validadores agora delegam para `_blank_to_none`; os testes existentes cobrem
 
 **Delta medido no commit de código deste PR:** 15 grupos / 34 funções / 319
 linhas → **14 grupos / 32 funções / 309 linhas**. O grupo de normalizadores do
-output schema desaparece.
+output schema desaparece. Os dois validadores delegadores agora têm uma
+instrução, então a isenção de `< 2 statements` do detector os esconde; eles
+voltariam a formar grupo se a [#749](https://github.com/A11yDevs/acessilia/issues/749)
+mudasse esse piso. Diferente do caso dos wrappers do SDK, esta é uma extração
+real: os dois validadores compartilham `_blank_to_none`.
 
 ## Classificação dos grupos restantes
 

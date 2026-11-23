@@ -135,7 +135,11 @@ and `caption`.
 
 **Measured delta on this PR's code commit:** 15 groups / 34 functions / 319
 lines → **14 groups / 32 functions / 309 lines**. The output-schema normalizer
-group disappears.
+group disappears. Both delegating validators now have one statement, so the
+detector's `< 2 statements` exemption hides them; they would be grouped again
+if [#749](https://github.com/A11yDevs/acessilia/issues/749) changes that floor.
+Unlike the SDK wrapper case, this is a real extraction: both validators share
+`_blank_to_none`.
 
 ## Classification of the remaining groups
 
