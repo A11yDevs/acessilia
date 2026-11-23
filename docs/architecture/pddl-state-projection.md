@@ -40,10 +40,15 @@ orchestrator calls it through the `PlanningEngine` (#744) with a
 | Each admissible method | `(supports m k)`, `(admissible m o)` | `supports` comes from the manifest's admissible methods, not from a catalogue |
 | `method_costs[m]` | `(= (execution-cost m o) cost)` | 50 when the manifest declares no cost |
 | A method not in `unavailable_methods` | `(available m)` | Per method, not per capability or provider |
-| An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status |
+| An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status. A `failed` attempt rules the method out for that obligation whatever the cause (see below) |
 | Ids, kinds and method names | PDDL symbols (`[a-z][a-z0-9-]*`) | The projection keeps both directions of the mapping |
 
-Duplicated facts are emitted once.
+Duplicated facts are emitted once. The problem does not depend on the order
+of the obligations or of their methods in the manifest, and distinct ids that
+normalize to the same symbol get distinct symbols (a hash suffix).
+
+An empty root set, or a manifest without obligations, projects no obligation:
+the plan is `start-job`, `complete-job`.
 
 ## What is not projected
 
@@ -66,6 +71,11 @@ The compiler refuses a problem it cannot plan, before the planner runs:
   outside it, or a method without a cost.
 - **Unknown unavailable methods.** An unavailable method that the manifest
   does not declare: a typo, not a capability gap.
+- **Not yet: cycles and unknown dependencies.** The manifest model refuses
+  them, but one introduced by a replan compiles: the internal planner refuses
+  a cycle when ordering, Fast Downward finds no plan, and an unknown
+  dependency raises a bare `KeyError`. The compiler should refuse both
+  ([#783](https://github.com/A11yDevs/acessilia/issues/783)).
 - **The rendered problem.** `PddlProblemValidator` checks it against the
   projection.
 
@@ -76,6 +86,28 @@ The compiler refuses a problem it cannot plan, before the planner runs:
   (`problem_sha256`). The coordinator checks it since #744.
 - `manifest_sha256` is the hash of the whole manifest, including what is not
   projected.
+- The two are different identities. Two manifests that differ only outside
+  the projection (an element's text, an observation) produce the same
+  problem, so `problem_sha256` is the identity of the planning state, never
+  of the document state. Checkpoints, delegation contracts and replanning
+  keep both.
+
+## Known limitation: what `tried` means
+
+`tried` comes from any `failed` or `rejected` attempt, so a method that
+failed for a transient reason (a timeout, a provider down, an infrastructure
+error) is ruled out for that obligation like one that could not satisfy it.
+The closed loop needs to tell apart:
+
+- a semantic failure: the method ran and did not satisfy the obligation;
+- a rejection: the result did not meet the criteria;
+- a transient failure: timeout, unavailable provider, infrastructure;
+- a permanent failure: the capability is incompatible or cannot run the
+  operation.
+
+Not all of them should stop a retry of the same method. This belongs to the
+result contracts, the execution journal and the replanning rules of #640
+(PRs 3 and 4). This page documents today's behaviour.
 
 ## What ADR-0029 still asks for
 

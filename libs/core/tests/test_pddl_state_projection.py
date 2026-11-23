@@ -16,6 +16,7 @@ from pddl_support import build_element, build_manifest
 from acessilia_core.manifest.models import Obligation, ObligationAttempt
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.pddl_processor import PddlProblemCompiler
+from acessilia_core.planning.planner_agent import PlannerAgent
 
 NOW = datetime(2026, 11, 23, tzinfo=timezone.utc)
 
@@ -208,3 +209,67 @@ def test_the_document_content_is_not_projected():
     assert "e-1" not in compiled.text
     assert "(:goal (completed))" in compiled.text
     assert "(:metric minimize (total-cost))" in compiled.text
+
+
+# Edge cases (review of #775).
+
+
+def test_distinct_ids_that_normalize_alike_get_distinct_symbols():
+    compiled = _compile(_manifest(_obligation("o_1"), _obligation("o-1")))
+    symbols = compiled.projection.obligation_symbols
+    assert len(set(symbols.values())) == 2
+    assert {compiled.projection.reverse_obligations[s] for s in symbols.values()} == {"o_1", "o-1"}
+
+
+def test_obligations_sharing_a_method_emit_its_shared_facts_once():
+    compiled = _compile(_manifest(_obligation("o-1"), _obligation("o-2")))
+    lines = [line.strip() for line in compiled.text.splitlines()]
+    assert lines.count("(available m-a)") == 1
+    assert lines.count("(supports m-a test-kind)") == 1
+    assert {"(admissible m-a o-1)", "(admissible m-a o-2)"} <= _facts(compiled)
+
+
+def test_the_order_of_obligations_and_methods_does_not_change_the_problem():
+    first = _compile(_manifest(_obligation("o-1", methods=("m-a", "m-b")), _obligation("o-2")))
+    second = _compile(_manifest(_obligation("o-2"), _obligation("o-1", methods=("m-b", "m-a"))))
+    assert first.text == second.text
+    assert first.sha256 == second.sha256
+
+
+def test_a_change_outside_the_projection_keeps_the_problem_identity():
+    """The problem hash is not the identity of the document: two manifests can
+    project to the same problem."""
+    manifest = _manifest(_obligation("o-1"))
+    changed = manifest.model_copy(deep=True)
+    changed.elements[0].text = "another text"
+    first, second = _compile(manifest), _compile(changed)
+    assert first.sha256 == second.sha256
+    assert first.manifest_sha256 != second.manifest_sha256
+
+
+def test_an_empty_root_set_plans_only_the_job_lifecycle():
+    compiled = _compile(_manifest(_obligation("o-1")), selected_roots=[])
+    assert _objects(compiled, "obligation") == set()
+    _, plan = PlannerAgent().plan(_manifest(_obligation("o-1")), selected_roots=[])
+    assert [step.action for step in plan.steps] == ["start-job", "complete-job"]
+
+
+def test_a_manifest_without_obligations_plans_only_the_job_lifecycle():
+    _, plan = PlannerAgent().plan(_manifest())
+    assert [step.action for step in plan.steps] == ["start-job", "complete-job"]
+
+
+def test_a_method_outside_the_v23_catalogue_for_its_kind_is_refused():
+    with pytest.raises(ValueError):
+        _compile(_manifest(_obligation("o-1", kind="normalize-text", methods=("not-a-method",))))
+
+
+def test_a_dependency_cycle_is_refused_by_the_planner():
+    """The manifest model refuses a cycle; one introduced afterwards compiles,
+    and the internal planner refuses it when ordering. Refusing it in the
+    compiler is tracked separately (see the projection page)."""
+    manifest = _manifest(_obligation("o-1"), _obligation("o-2"))
+    manifest.obligations[0].dependencies = ["o-2"]
+    manifest.obligations[1].dependencies = ["o-1"]
+    with pytest.raises(ValueError):
+        PlannerAgent().plan(manifest)
