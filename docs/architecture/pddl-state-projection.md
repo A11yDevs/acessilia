@@ -6,22 +6,24 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 planning problem from observed state: the manifest's facts, the obligations,
 the results already recorded and one catalogue snapshot. This page documents
 what `PddlProblemCompiler.compile` (`planning/pddl_processor.py`) projects
-today, for domain v2.3, and what is still missing.
+today, for domain v2.4, and what is still missing.
 `libs/core/tests/test_pddl_state_projection.py` has one test per rule, so a
 change to the projection is a visible diff.
 
 ## Inputs
 
-`compile(manifest, *, selected_roots=None, unavailable_methods=())`. The
+`compile(manifest, *, selected_roots=None, unavailable_methods=(), catalogue=None)`. The
 orchestrator calls it through the `PlanningEngine` (#744) with a
 `PlanningProblem`:
 
 - `manifest`: the processing manifest, as observed so far;
 - `selected_roots`: the obligations to plan, or `None` (see below);
-- `unavailable_methods`: the methods the plan must not use. These are the
-  methods without a registered handler, plus, when the availability gate
-  enforces, the methods whose Toolbox capability or provider is missing from
-  the catalogue snapshot.
+- `unavailable_methods`: the methods the plan must not use: those without a
+  registered handler. A plan checkpoint from before domain 2.4 also carries
+  the methods the gate excluded by name;
+- `catalogue` (`CatalogueFacts`, domain 2.4): the Toolbox catalogue snapshot,
+  as each method's requirements (capability, provider) and what the snapshot
+  offers. The availability gate builds it (`catalogue_facts()`).
 
 ## Rules
 
@@ -39,7 +41,10 @@ orchestrator calls it through the `PlanningEngine` (#744) with a
 | `dependencies` | `(depends-on o predecessor)` | |
 | Each admissible method | `(supports m k)`, `(admissible m o)` | `supports` comes from the manifest's admissible methods, not from a catalogue |
 | `method_costs[m]` | `(= (execution-cost m o) cost)` | 50 when the manifest declares no cost |
-| A method not in `unavailable_methods` | `(available m)` | Per method, not per capability or provider |
+| A method not in `unavailable_methods` | `(available m)` | The core has a handler for it |
+| A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | Only for methods of this problem; a method without requirements has none |
+| The required pairs the snapshot offers | `(offered c p)` | Gate in `observe` or `off`: every requirement is offered, so the plan does not change. `enforce`: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed) |
+| — | `(runnable m)`, derived by the domain | `available` and every requirement offered. `execute-obligation` needs it |
 | An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status |
 | Ids, kinds and method names | PDDL symbols (`[a-z][a-z0-9-]*`) | The projection keeps both directions of the mapping |
 
@@ -61,7 +66,7 @@ The compiler refuses a problem it cannot plan, before the planner runs:
   The manifest model refuses this state too; the compiler checks again
   because a replan changes the manifest in place.
 - **Methods.** A pending obligation with no method that is admissible,
-  available and not tried.
+  runnable and not tried.
 - **Catalogue v2.3.** For a kind in the v2.3 catalogue, admissible methods
   outside it, or a method without a cost.
 - **Unknown unavailable methods.** An unavailable method that the manifest
@@ -76,13 +81,16 @@ The compiler refuses a problem it cannot plan, before the planner runs:
   (`problem_sha256`). The coordinator checks it since #744.
 - `manifest_sha256` is the hash of the whole manifest, including what is not
   projected.
+- The planning checkpoint's identity includes the domain's hashes. The
+  executor refuses a plan built under another domain, so after a domain
+  change (2.3 → 2.4) a resumed job plans again instead of failing.
 
 ## What ADR-0029 still asks for
 
 | ADR-0029 | Today | Next |
 |---|---|---|
-| Capability and provider availability are predicates of the problem | The gate turns them into `unavailable_methods`, outside the problem, and only in `enforce` mode | PR 1, second part: the catalogue snapshot as facts (requirements per method, offered capabilities and providers), and availability derived in the domain. This needs a new domain version |
-| `toolbox_gate` is reduced to reporting | It decides `unavailable_methods` | #640, PR 2, after the predicates |
+| Capability and provider availability are predicates of the problem | Done in domain 2.4: `requires`, `offered` and the derived `runnable` | — |
+| `toolbox_gate` is reduced to reporting | It still decides what is offered in `enforce` | #640, PR 2: the snapshot itself is the input, and `observe` goes |
 | Operational actions are bound to a capability id and exact version | Methods name local handlers | #640, PR 2, with the domain fragments |
 | A result updates the state once per `operation_id` | The manifest's statuses and attempts | #640, PR 3, with the journal of ADR-0020 |
 | Inspection, extraction and enrichment are actions | They run before planning | #640, PR 2 |

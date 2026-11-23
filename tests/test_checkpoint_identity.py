@@ -350,6 +350,22 @@ async def test_an_injected_planning_engine_plans_again(monkeypatch, tmp_path) ->
 
 
 @pytest.mark.asyncio
+async def test_a_new_domain_version_plans_again(monkeypatch, tmp_path) -> None:
+    """A saved plan is bound to its domain, which the executor checks; after a
+    domain change the job plans again instead of failing on resume (#640)."""
+    from acessilia_core.planning.domain_bundle import DEFAULT_DOMAIN_DIR, DomainBundle
+
+    def older_domain(orchestrator, _checkpoints):
+        orchestrator.executor.domain = DomainBundle.load(
+            DEFAULT_DOMAIN_DIR / "domain_v2.3.pddl", DEFAULT_DOMAIN_DIR / "domain_description_v2.3.md"
+        )
+
+    counts = await _resume_counts(monkeypatch, tmp_path, lambda c: c, between=older_domain, with_execution=True)
+
+    assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 1, "execution": 1}
+
+
+@pytest.mark.asyncio
 async def test_a_new_model_revision_enriches_again(monkeypatch, tmp_path) -> None:
     """The service's model revision, declared on its checkpoint port, is part
     of the enrichment's and the execution's identity."""

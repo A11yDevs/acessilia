@@ -7,8 +7,8 @@ from pathlib import Path
 from acessilia_core.hashing import file_sha256
 
 DEFAULT_DOMAIN_DIR = Path(__file__).resolve().parent / "domains"
-DEFAULT_DOMAIN_PATH = DEFAULT_DOMAIN_DIR / "domain_v2.3.pddl"
-DEFAULT_DESCRIPTION_PATH = DEFAULT_DOMAIN_DIR / "domain_description_v2.3.md"
+DEFAULT_DOMAIN_PATH = DEFAULT_DOMAIN_DIR / "domain_v2.4.pddl"
+DEFAULT_DESCRIPTION_PATH = DEFAULT_DOMAIN_DIR / "domain_description_v2.4.md"
 
 # Obrigações introduzidas na versão 2.3 (Dr.DocBench PR #125). O domínio PDDL
 # não muda de estrutura: são símbolos de `obligationkind` emitidos pelo

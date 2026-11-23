@@ -23,6 +23,8 @@ PINNED = {
     "domain_description_v2.2.md": "453e4b0ea783d61c",
     "domain_v2.3.pddl": "07d0910eafa32624",
     "domain_description_v2.3.md": "c4135d29749ebf92",
+    "domain_v2.4.pddl": "7ea452a92cb09389",
+    "domain_description_v2.4.md": "bf262feca0030876",
 }
 
 
@@ -45,5 +47,5 @@ def test_every_shipped_domain_file_is_pinned() -> None:
 def test_the_default_bundle_is_the_pinned_one() -> None:
     bundle = DomainBundle.load()
 
-    assert bundle.domain_sha256.startswith(PINNED["domain_v2.3.pddl"])
-    assert bundle.description_sha256.startswith(PINNED["domain_description_v2.3.md"])
+    assert bundle.domain_sha256.startswith(PINNED["domain_v2.4.pddl"])
+    assert bundle.description_sha256.startswith(PINNED["domain_description_v2.4.md"])

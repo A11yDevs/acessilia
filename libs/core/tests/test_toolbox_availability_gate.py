@@ -101,7 +101,11 @@ def test_enforce_without_a_catalogue_fails_closed() -> None:
         catalog_error="ToolboxTimeout: slow",
     )
 
-    assert decision.unavailable_methods == ["dual-provider-fusion", "single-provider"]
+    # Since domain 2.4 the restriction is a problem fact: nothing is offered.
+    assert decision.unavailable_methods == []
+    assert sorted(decision.blocked) == ["dual-provider-fusion", "single-provider"]
+    assert set(decision.requirements) == {"dual-provider-fusion", "single-provider"}
+    assert decision.offered == []
     metadata = decision.to_metadata()
     assert metadata["applied"] is True
     assert metadata["catalog_revision"] is None
@@ -266,9 +270,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
 
 
 def test_a_checkpoint_without_the_mode_gets_the_mode_of_the_run() -> None:
-    from acessilia_core.pipeline.orchestrator import _availability_from
-
-    decision = _availability_from({}, toolbox_config(availability_gate="enforce"))
+    decision = toolbox_gate.AvailabilityDecision.from_metadata({}, toolbox_config(availability_gate="enforce"))
 
     assert decision.mode == "enforce"
 
@@ -327,3 +329,33 @@ def test_the_least_recently_used_cache_goes_past_the_bound(monkeypatch) -> None:
     assert len(toolbox_gate._caches) == 2
     assert cache("a") is a
     assert cache("b") is not b
+
+
+def test_observe_offers_every_requirement_so_the_plan_does_not_change() -> None:
+    """Option (a) of #640: the catalogue is visible in the problem, not applied."""
+    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
+
+    assert decision.requirements
+    assert decision.offered is None
+    facts = decision.catalogue_facts()
+    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
+
+
+def test_the_catalogue_facts_survive_the_checkpoint() -> None:
+    decision = toolbox_gate.evaluate(
+        FUSE_METHODS, None, mode="enforce", config=_config(), catalog_error="down"
+    )
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(
+        json.loads(json.dumps(decision.to_metadata())), toolbox_config()
+    )
+
+    assert restored.catalogue_facts() == decision.catalogue_facts()
+
+
+def test_a_checkpoint_from_before_the_catalogue_facts_adds_none() -> None:
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(
+        {"mode": "enforce", "blocked_methods": {"single-provider": ["x"]}}, toolbox_config()
+    )
+
+    assert restored.requirements == {}
+    assert restored.catalogue_facts().requirements == {}

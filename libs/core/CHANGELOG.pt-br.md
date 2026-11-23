@@ -2,6 +2,38 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.8 — o catálogo da Toolbox como fatos de planejamento (domínio 2.4)
+
+A ADR-0029 torna a disponibilidade de capacidades e providers predicado do
+problema de planejamento (#640, PR 1). O domínio PDDL vai para **2.4**:
+- tipos `capability` e `provider`;
+- fatos `(requires m c p)` e `(offered c p)`;
+- um `(runnable m)` derivado: o método está `available` (o Core tem um
+  handler) e o catálogo oferece todo requisito.
+
+`execute-obligation` passa a exigir `runnable` no lugar de `available`. O
+domínio 2.3 continua distribuído.
+
+`PddlProblemCompiler.compile`, `PlannerAgent` e `PlanningProblem` recebem um
+`catalogue` (`CatalogueFacts`). O gate de disponibilidade o monta a partir do
+snapshot do catálogo (`AvailabilityDecision.catalogue_facts()`):
+- em `observe` ou `off`, todo requisito é oferecido, então o catálogo fica
+  visível no problema e os planos não mudam;
+- em `enforce`, o snapshot decide o que é oferecido, e sem snapshot nada é
+  (falha fechada). O gate não exclui mais métodos pelo nome
+  (`unavailable_methods` fica vazio), e os mesmos métodos são excluídos pelos
+  fatos.
+
+Os requisitos e os pares oferecidos da decisão são salvos com o checkpoint
+do plano (`AvailabilityDecision.from_metadata`, que substitui o
+`_availability_from` do orquestrador), então um replanejamento depois de um
+reinício vê o mesmo catálogo. Um checkpoint anterior à 2.4 mantém sua própria
+lista de métodos excluídos.
+
+A identidade do checkpoint de planejamento passa a incluir os hashes do
+domínio. O executor recusa um plano feito com outro domínio, então, depois
+deste deploy, um job retomado planeja de novo em vez de falhar.
+
 ## 0.3.7 — uma interface de motor de planejamento
 
 Os planos padrão não mudam. `acessilia_core.planning.engine` cria a interface

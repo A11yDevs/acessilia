@@ -73,8 +73,8 @@ Schema Draft 2020-12.
 
 `PlannerAgent` carrega um par inseparável:
 
-- `core/planning/domains/domain_v2.3.pddl`;
-- `core/planning/domains/domain_description_v2.3.md`.
+- `core/planning/domains/domain_v2.4.pddl`;
+- `core/planning/domains/domain_description_v2.4.md`.
 
 O carregador verifica versão, nome, hashes e cláusulas obrigatórias. O
 compilador:
@@ -145,7 +145,7 @@ uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
 ```
 
 O domínio é carregado uma vez e o manifesto é compilado uma vez. Portanto,
-ambos os backends recebem os mesmos bytes de `domain_v2.3.pddl` e
+ambos os backends recebem os mesmos bytes de `domain_v2.4.pddl` e
 `problem.pddl`, identificados por SHA-256.
 
 As saídas são:
@@ -384,8 +384,8 @@ output/job-001/
 | `nominal_plan.schema.json` | plano nominal auditável |
 | `planning_comparison.schema.json` | resultados e comparação normalizada dos dois planners |
 | `execution_report.schema.json` | passos observados e decisão de replanejamento |
-| `domain_v2.3.pddl` | semântica geral das ações e custos |
-| `domain_description_v2.3.md` | contrato humano e regras do compilador |
+| `domain_v2.4.pddl` | semântica geral das ações e custos |
+| `domain_description_v2.4.md` | contrato humano e regras do compilador |
 
 Os três JSON Schemas são gerados dos modelos Pydantic:
 

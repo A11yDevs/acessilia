@@ -2,6 +2,38 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.8 — the Toolbox catalogue as planning facts (domain 2.4)
+
+ADR-0029 makes capability and provider availability predicates of the
+planning problem (#640, PR 1). The PDDL domain goes to **2.4**:
+- `capability` and `provider` types;
+- `(requires m c p)` and `(offered c p)` facts;
+- a derived `(runnable m)`: the method is `available` (the core has a
+  handler) and the catalogue offers every requirement.
+
+`execute-obligation` now needs `runnable` instead of `available`. Domain 2.3
+stays shipped.
+
+`PddlProblemCompiler.compile`, `PlannerAgent` and `PlanningProblem` take a
+`catalogue` (`CatalogueFacts`). The availability gate builds it from the
+catalogue snapshot (`AvailabilityDecision.catalogue_facts()`):
+- in `observe` or `off`, every requirement is offered, so the catalogue is
+  visible in the problem and the plans do not change;
+- in `enforce`, the snapshot decides what is offered, and without a snapshot
+  nothing is (fail closed). The gate no longer excludes methods by name
+  (`unavailable_methods` is empty), and the same methods are excluded through
+  the facts.
+
+The decision's requirements and offered pairs are saved with the plan
+checkpoint (`AvailabilityDecision.from_metadata`, which replaces the
+orchestrator's `_availability_from`), so a replan after a restart sees the
+same catalogue. A checkpoint from before 2.4 keeps its own list of excluded
+methods.
+
+The planning checkpoint's identity now includes the domain's hashes. The
+executor refuses a plan built under another domain, so after this deploy a
+resumed job plans again instead of failing.
+
 ## 0.3.7 — a planning engine seam
 
 The default plans are unchanged. `acessilia_core.planning.engine` adds the seam between

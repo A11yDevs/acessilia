@@ -94,7 +94,7 @@ def test_the_pddl_domain_loads() -> None:
     bundle = DomainBundle.load()
 
     assert bundle.name == "acessilia-obligations"
-    assert bundle.version == "2.3"
+    assert bundle.version == "2.4"
     assert bundle.description_path.is_file()
 
 
