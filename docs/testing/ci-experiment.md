@@ -51,12 +51,32 @@ consumption, not only the test suites.
   `scripts/**`. No false negative was observable because mode C is not used to
   skip anything.
 
+## Shadow selections observed
+
+The `test-selection-shadow` artifact is produced for every follow-up PR. These
+five merged PRs illustrate each rule; all five CI runs passed, so this does not
+prove the selector would have caught a regression (mode C is not used to skip
+anything).
+
+| PR | Changed area | Selected | Not selected | Conservative |
+|---|---|---|---|---|
+| #766 | core | core, app | docstruct, SDK | no |
+| #769 | `tests/**` only | app | docstruct, SDK, core | no |
+| #771 | `scripts/**`, docs, tests | all | — | no |
+| #772 | docs | app | docstruct, SDK, core | no |
+| #776 | docstruct | all | — | no |
+
+This matches the documented rules: `tests/**` and docs keep the application
+suite, a core change selects core+app, docstruct selects all consumers, and
+`scripts/**` is transversal. The sample still contains only green PRs.
+
 ## Decision
 
 No selective gate is adopted. The full suite remains mandatory while the
-shadow artifacts accumulate. A gate decision needs a representative set of PRs,
-observed false negatives, and repeated runs that separate the code change from
-machine load.
+shadow artifacts accumulate. Provider setup duplication and the image-scan
+critical path are tracked in [#778](https://github.com/A11yDevs/acessilia/issues/778).
+A gate decision needs a representative set of PRs, observed false negatives,
+and repeated runs that separate the code change from machine load.
 
 ## Limitations
 

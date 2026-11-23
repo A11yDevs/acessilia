@@ -50,12 +50,34 @@ apenas as suítes.
   `.github/**` e `scripts/**`. Nenhum falso negativo foi observável porque o
   modo C não pula nada.
 
+## Seleções em observação
+
+O artefato `test-selection-shadow` é produzido para todo PR de acompanhamento.
+Estes cinco PRs mesclados ilustram cada regra; as cinco execuções de CI
+passaram, então isso não prova que o seletor teria capturado uma regressão (o
+modo C não é usado para pular nada).
+
+| PR | Área alterada | Selecionadas | Não selecionadas | Conservadora |
+|---|---|---|---|---|
+| #766 | core | core, app | docstruct, SDK | não |
+| #769 | somente `tests/**` | app | docstruct, SDK, core | não |
+| #771 | `scripts/**`, docs, tests | todas | — | não |
+| #772 | docs | app | docstruct, SDK, core | não |
+| #776 | docstruct | todas | — | não |
+
+Isso corresponde às regras documentadas: `tests/**` e docs mantêm a suíte da
+aplicação, uma mudança no core seleciona core+app, docstruct seleciona todos os
+consumidores e `scripts/**` é transversal. A amostra ainda contém apenas PRs
+verdes.
+
 ## Decisão
 
 Nenhum gate seletivo foi adotado. A suíte completa continua obrigatória
-enquanto os artefatos de observação se acumulam. A decisão de gate precisa de um
-conjunto representativo de PRs, falsos negativos observados e execuções repetidas
-que separem a mudança de código da carga da máquina.
+enquanto os artefatos de observação se acumulam. A duplicação de setup dos
+provedores e o caminho crítico do scan da imagem estão na
+[#778](https://github.com/A11yDevs/acessilia/issues/778). A decisão de gate
+precisa de um conjunto representativo de PRs, falsos negativos observados e
+execuções repetidas que separem a mudança de código da carga da máquina.
 
 ## Limitações
 
