@@ -69,7 +69,9 @@ negativo foi observável, mas a amostra contém apenas PRs verdes.
 ## Decisão
 
 Nenhum gate seletivo foi adotado. A suíte completa continua obrigatória
-enquanto os artefatos de observação se acumulam. A decisão de gate precisa de um
+enquanto os artefatos de observação se acumulam. A duplicação de setup dos
+provedores e o caminho crítico do scan da imagem estão na
+[#778](https://github.com/A11yDevs/acessilia/issues/778). A decisão de gate precisa de um
 conjunto representativo de PRs, falsos negativos observados e execuções repetidas
 que separem a mudança de código da carga da máquina.
 

@@ -70,7 +70,8 @@ negative was observable, but the sample contains only green PRs.
 ## Decision
 
 No selective gate is adopted. The full suite remains mandatory while the
-shadow artifacts accumulate. A gate decision needs a representative set of PRs,
+shadow artifacts accumulate. Provider setup duplication and the image-scan
+critical path are tracked in [#778](https://github.com/A11yDevs/acessilia/issues/778). A gate decision needs a representative set of PRs,
 observed false negatives, and repeated runs that separate the code change from
 machine load.
 
