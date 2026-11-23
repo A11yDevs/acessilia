@@ -8,6 +8,8 @@ import pytest
 
 from docstruct.export.pandoc_ast import (
     FORMULA_ALT_CLASS,
+    _contains_math,
+    _math_nodes,
     build_pandoc_ast,
     count_math_nodes,
     degrade_math_to_text,
@@ -169,6 +171,25 @@ def _multi_formula_document() -> dict:
             }
         ],
     }
+
+
+def test_math_nodes_walks_preorder_and_treats_math_as_terminal():
+    first = {"t": "Math", "c": ["InlineMath", "x", []]}
+    nested = {"t": "Math", "c": ["InlineMath", "y", []]}
+    tree = {"t": "Para", "c": [first, {"t": "Span", "c": [nested]}]}
+
+    assert list(_math_nodes(tree)) == [first, nested]
+    assert _contains_math(tree) is True
+    assert _contains_math({"t": "Str", "c": "x"}) is False
+
+
+@pytest.mark.parametrize(
+    "node",
+    [None, 1, "text", {"t": "Str", "c": "not a list"}, {"c": None}],
+)
+def test_math_nodes_ignores_malformed_nodes(node):
+    assert list(_math_nodes(node)) == []
+    assert _contains_math(node) is False
 
 
 def test_count_math_nodes_covers_all_block_types():
