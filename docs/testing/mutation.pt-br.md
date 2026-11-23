@@ -65,10 +65,11 @@ uv run --extra dev python scripts/tests/mutation_report.py \
   --output var/mutation/equations.json
 ```
 
-O ambiente isolado remove `PYTEST_ADDOPTS`, `PYTEST_PLUGINS` e
-`PYTEST_CURRENT_TEST` do shell, então o ambiente do desenvolvedor não pode mudar
-os testes ou plugins selecionados. O autoload de plugins permanece ativo porque
-o alvo focado pode precisar de pytest-timeout ou pytest-asyncio.
+O ambiente isolado remove `PYTEST_ADDOPTS`, `PYTEST_PLUGINS`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD` e `PYTEST_CURRENT_TEST`: os dois primeiros não
+podem mudar a seleção de testes, o terceiro não pode desativar o plugin de
+timeout, e o último não vaza a identidade do teste externo. O autoload de
+plugins permanece ativo para o alvo usar pytest-timeout ou pytest-asyncio.
 
 Operadores: trocas de comparação (`==`/`!=`, `<`/`<=`, `>`/`>=`, `in`/`not in`,
 `is`/`is not`), `and`/`or` booleano, inversão de constante booleana, remoção de

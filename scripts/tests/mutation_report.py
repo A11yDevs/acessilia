@@ -322,8 +322,13 @@ def _copy_package(source_root: Path, destination: Path) -> Path:
     return target
 
 
-#: Ambient pytest settings that could change the selected tests or plugins.
-PYTEST_ENV_VARS = ("PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_CURRENT_TEST")
+#: Ambient pytest settings that could change selection, plugins or identity.
+PYTEST_ENV_VARS = (
+    "PYTEST_ADDOPTS",
+    "PYTEST_PLUGINS",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
+    "PYTEST_CURRENT_TEST",
+)
 
 
 def _mutant_env(temp_src: Path) -> dict[str, str]:

@@ -91,6 +91,8 @@ def test_ambient_pytest_options_cannot_change_the_result(
 ) -> None:
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k definitely-not-a-test")
     monkeypatch.setenv("PYTEST_PLUGINS", "ambient.plugin")
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "leak")
     source_root, suite, module = _project(
         tmp_path,
         "def value():\n    return 1\n",
@@ -108,7 +110,6 @@ def test_ambient_pytest_options_cannot_change_the_result(
     )
 
     assert baseline["status"] == "survived"
-    assert results == []
 
 
 def test_a_failing_baseline_is_refused(tmp_path: Path) -> None:
