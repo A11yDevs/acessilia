@@ -453,6 +453,7 @@ jobs:
       - name: Set up root environment
         uses: ./.github/actions/setup-root
         with:
+          python-version: "3.12"
           lock-hash: ${{ hashFiles('uv.lock') }}
 
       - name: Run Ruff against the shrinking baseline
@@ -516,6 +517,7 @@ jobs:
       - name: Set up root environment
         uses: ./.github/actions/setup-root
         with:
+          python-version: "3.12"
           lock-hash: ${{ hashFiles('uv.lock') }}
 
       - name: Run ${{ matrix.component }} test suite

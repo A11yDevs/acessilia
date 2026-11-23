@@ -1,5 +1,5 @@
 name: Set up root environment
-description: Set up Python and uv, restore the lock cache and install the root dev environment.
+description: Set up Python and uv with the uv cache, then install the root dev environment from the lock.
 inputs:
   python-version:
     description: Python version for the job
@@ -20,17 +20,14 @@ runs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       with:
         version: "0.11.17"
-
-    - name: Restore uv cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-      with:
-        path: ~/.cache/uv
-        key: uv-${{ runner.os }}-py${{ inputs.python-version }}-${{ inputs.lock-hash }}
-        restore-keys: |
-          uv-${{ runner.os }}-py${{ inputs.python-version }}-
+        enable-cache: true
 
     - name: Check the lock and install from it
       shell: bash
       run: |
+        if [ -z "${{ inputs.lock-hash }}" ]; then
+          echo "::error::lock-hash is empty; pass hashFiles('uv.lock')"
+          exit 1
+        fi
         uv lock --check
         uv sync --locked --extra dev

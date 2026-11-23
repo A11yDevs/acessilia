@@ -294,14 +294,17 @@ def test_core_runs_alone_from_its_wheel() -> None:
 def test_ci_installs_the_root_environment_from_the_lock() -> None:
     """The component and quality jobs use the shared root environment (#405)."""
     action = yaml.safe_load(SETUP_ACTION.read_text(encoding="utf-8"))
+    assert action["runs"]["using"] == "composite"
+    assert action["inputs"]["lock-hash"]["required"] is True
     steps = {step.get("name"): step for step in action["runs"]["steps"]}
+    assert "Set up Python ${{ inputs.python-version }}" in steps
     uv = steps["Set up uv"]
     assert uv["uses"].startswith("astral-sh/setup-uv@")
     assert uv["with"]["version"] == "0.11.17"
-    cache = steps["Restore uv cache"]
-    assert cache["with"]["path"] == "~/.cache/uv"
-    assert "inputs.lock-hash" in cache["with"]["key"]
+    assert uv["with"]["enable-cache"] is True
+    assert "Restore uv cache" not in steps
     install = steps["Check the lock and install from it"]["run"]
+    assert "lock-hash is empty" in install
     assert "uv lock --check" in install
     assert "uv sync --locked --extra dev" in install
 
@@ -310,6 +313,7 @@ def test_ci_installs_the_root_environment_from_the_lock() -> None:
         steps = {step.get("name"): step for step in jobs[job_id]["steps"]}
         setup = steps["Set up root environment"]
         assert setup["uses"] == "./.github/actions/setup-root"
+        assert setup["with"]["python-version"] == "3.12"
         assert setup["with"]["lock-hash"] == "${{ hashFiles('uv.lock') }}"
         assert not any("pip install" in (step.get("run") or "") for step in jobs[job_id]["steps"])
 
@@ -359,15 +363,16 @@ def test_ruleset_templates_require_the_full_gate() -> None:
 
 
 def test_scheduled_workflow_installs_from_the_lock() -> None:
-    """The weekly monitor runs the same root environment as the gate (#405)."""
+    """The weekly monitor uses the same shared root environment as the gate (#405)."""
     workflow = yaml.safe_load(SCHEDULED.read_text(encoding="utf-8"))
     for name in ("monitor", "e2e"):
+        steps = {step.get("name"): step for step in workflow["jobs"][name]["steps"]}
+        setup = steps["Set up root environment"]
+        assert setup["uses"] == "./.github/actions/setup-root"
+        assert setup["with"]["python-version"] == "3.12"
+        assert setup["with"]["lock-hash"] == "${{ hashFiles('uv.lock') }}"
         runs = [step.get("run", "") for step in workflow["jobs"][name]["steps"]]
         assert not any("pip install" in run for run in runs)
-        assert any(
-            "uv lock --check" in run and "uv sync --locked --extra dev" in run
-            for run in runs
-        )
         assert all("uv run --locked" in run for run in runs if "pytest" in run)
 
 
