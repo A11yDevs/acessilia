@@ -60,7 +60,12 @@ RUN set -eux \
 # Toolbox, not here (docs/adr/0003), and so do the DOCX and PDF/UA exports.
 # curl serves the compose healthcheck. Every Python dependency ships a
 # linux/amd64 wheel, so no compiler is needed.
-RUN apt-get update \
+# APT_REFRESH (the CI passes the UTC date) changes this layer's cache key, so a
+# build from the GitHub Actions cache still applies Debian security updates
+# published since the layer was cached (#753).
+ARG APT_REFRESH=
+RUN echo "apt refresh: ${APT_REFRESH:-none}" \
+    && apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         ca-certificates \

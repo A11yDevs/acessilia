@@ -55,6 +55,11 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: false
 
+      - name: Date the apt security refresh
+        id: apt-refresh
+        # The image's apt layer is rebuilt once a day from the GHA cache (#753).
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -93,6 +98,7 @@ jobs:
           push: false
           tags: acessilia:delivery
           build-args: |
+            APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
             GIT_COMMIT=${{ inputs.sha }}
             IMAGE_TAG=${{ steps.tags.outputs.branch }}
           cache-from: type=gha,scope=production
@@ -127,6 +133,7 @@ jobs:
           # verified with; otherwise /api/v1/health reports an empty
           # git_commit/image_tag and the running commit cannot be proven.
           build-args: |
+            APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
             GIT_COMMIT=${{ inputs.sha }}
             IMAGE_TAG=${{ steps.tags.outputs.branch }}
           labels: |
