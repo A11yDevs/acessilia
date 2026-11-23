@@ -129,19 +129,45 @@ e a #640 trata a composição de fragmentos como experimental.
   agentes autônomos, planejadores de objetivos ou subobjetivos, coordenação
   agêntica de workflows, replanejamento semântico nem decisões estratégicas
   ou gerenciais.
-- Os agentes do core são classificados em três camadas, todas no core:
-  - **estratégica**: objetivos globais, o plano principal, políticas,
-    coordenação global, avaliação de resultados, a decisão de replanejar e a
-    futura integração LLM + planejamento da #619;
-  - **gerencial**: subagentes especializados que recebem um objetivo
-    delegado, o decompõem, planejam e coordenam um subplano de domínio com as
-    capacidades autorizadas, o avaliam e replanejam localmente, e escalam o
-    que excede sua autoridade;
-  - **operacional**: classe transitória para componentes legados que
-    executam ou encapsulam operações destinadas à Toolbox (OCR e extração
-    semântica, classificação documental, descrição de imagens, adjudicação
-    visual, extração de tabelas e fórmulas, processamento multimodal).
-- **Nenhum agente vai para a Toolbox.** Um agente operacional é decomposto
+- **Toda autonomia agêntica está no core.** Seus agentes assumem um de três
+  papéis permanentes, distinguidos pelo escopo da sua autoridade, não pela
+  tecnologia que usam (um LLM, um planejador simbólico ou regras
+  determinísticas):
+
+  | Papel | Especializado em | Responsabilidade | Escopo de planejamento |
+  |---|---|---|---|
+  | estratégico | objetivos globais | Objetivos, políticas e prioridades; coordenação global; avaliação dos resultados globais; a decisão de replanejar; a futura integração LLM + planejamento da #619 | o plano global |
+  | gerencial | domínio | Decompor um objetivo delegado; um subplano de domínio; delegar tarefas a agentes operacionais ou invocar capacidades diretamente; avaliar resultados; replanejar dentro do domínio; escalar o que excede sua autoridade | um subplano de domínio |
+  | operacional | tarefa | Concluir uma tarefa logicamente atômica com as capacidades autorizadas: escolher entre alternativas, observar resultados, recuperar falhas locais, escalar ao seu gerente | um plano local delimitado |
+
+- **Uma tarefa operacional é atômica logicamente, não computacionalmente.**
+  Tem um objetivo verificável, entradas e saídas contratadas, capacidades
+  autorizadas, autonomia delimitada, orçamento de recursos, critérios de
+  conclusão e condições de escalada. O agente pode usar várias capacidades.
+  Ele não redefine objetivos de domínio, não muda políticas, não coordena
+  outros subplanos, não cria agentes nem delega subplanos (uma primeira
+  fronteira, que a #774 pode rever).
+- **Não há um agente por capacidade.** Uma tarefa que uma capacidade executa
+  sem decisões adaptativas relevantes é invocada diretamente pelo agente
+  gerencial. Um agente operacional se justifica pela necessidade de
+  autonomia: escolher entre alternativas, avaliar resultados ou recuperar
+  falhas. Nem todo workflow usa os três níveis; a hierarquia efetiva segue a
+  complexidade da tarefa.
+- **Evidência não é autoridade.** Agentes gerenciais e operacionais podem
+  usar capacidades de apoio (comparar candidatos, ordenar estratégias,
+  estimar custos, verificar restrições, reunir evidências de consistência ou
+  de conclusão). Elas calculam evidências; a decisão de aceitar uma
+  alternativa, mudar um subplano ou considerar um objetivo satisfeito fica
+  com o agente responsável no core. Uma capacidade de apoio fica numa
+  biblioteca pura do core quando é um mecanismo de planejamento ou
+  coordenação, e na Toolbox quando é processamento operacional.
+- **Papel e ciclo de vida são separados.** Um agente operacional genuíno
+  pode ser parte permanente do core. Os módulos existentes de
+  `acessilia_core.agents` são componentes operacionais **legados**: executam
+  ou encapsulam operações destinadas à Toolbox (OCR e extração semântica,
+  classificação documental, descrição de imagens, adjudicação visual,
+  extração de tabelas e fórmulas, processamento multimodal).
+- **Nenhum agente vai para a Toolbox.** Um componente legado é decomposto
   por responsabilidade antes de migrar. Inferência de modelos, algoritmos
   determinísticos, validação técnica e transformação de resultados viram
   capacidades não agênticas. Definir objetivos e planejar fica com o core
@@ -159,8 +185,12 @@ e a #640 trata a composição de fragmentos como experimental.
   planejamento hierárquico e monolítico (HTN incluída) são direções de
   pesquisa acompanhadas na
   [#774](https://github.com/A11yDevs/acessilia/issues/774) e na #619, não
-  decisões tomadas aqui. Todo passo semântico continua planejado, em algum
-  nível da hierarquia, e o core estratégico mantém o estado lógico global.
+  decisões tomadas aqui. A #774 compara um nível (o agente estratégico
+  invoca capacidades), dois níveis (estratégico e gerencial) e três níveis
+  (com agentes operacionais). Todo passo semântico continua planejado, em
+  algum nível da hierarquia, e o core estratégico mantém o estado lógico
+  global; os demais agentes relatam resultados e evidências, sem atualizá-lo
+  de forma conflitante.
 - A classificação dos agentes existentes está em
   [core-agent-classification.pt-br.md](../architecture/core-agent-classification.pt-br.md)
   (#768).
@@ -171,8 +201,8 @@ e a #640 trata a composição de fragmentos como experimental.
   configuração. O core interpreta os resultados dos modelos no contexto do
   plano. A Toolbox
   nunca decide objetivos globais nem replanejamento.
-- Os contratos distinguem um resultado operacional de uma decisão
-  estratégica ou gerencial.
+- Os contratos distinguem o resultado de uma capacidade, e a evidência que ele
+  traz, da decisão de um agente.
 
 ### Planejador e coordenação são separados
 
@@ -220,5 +250,5 @@ Esta ADR continua `Proposto` até que estes pontos sejam fechados na revisão:
 - Conformidade: as fixtures de planejamento no CI; um teste do orquestrador
   que verifica que todo passo de um job vem do plano;
   `tests/test_architecture_layers.py` para clientes de modelo no core e para
-  a classificação de todo módulo de `acessilia_core.agents` (estratégico,
-  gerencial ou operacional).
+  a classificação de todo módulo de `acessilia_core.agents` (papel e ciclo de
+  vida).

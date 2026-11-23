@@ -124,19 +124,43 @@ experimental.
   internal operational control. The Toolbox holds no autonomous agent, no
   planner of goals or subgoals, no agentic workflow coordination, no semantic
   replanning and no strategic or managerial decision.
-- The core's agents are classified in three layers, all of them in the core:
-  - **strategic**: global goals, the main plan, policies, global
-    coordination, evaluation of results, the decision to replan, and the
-    future LLM + planning integration of #619;
-  - **managerial**: specialized subagents that take a delegated goal,
-    decompose it, plan and coordinate a domain subplan with the capabilities
-    they are allowed, evaluate it and replan locally, and escalate what
-    exceeds their authority;
-  - **operational**: a transitional class for legacy components that run or
-    wrap operations meant for the Toolbox (OCR and semantic extraction,
-    document classification, image description, visual adjudication, table
-    and formula extraction, multimodal processing).
-- **No agent moves to the Toolbox.** An operational agent is decomposed by
+- **All agency is in the core.** Its agents take one of three permanent
+  roles, distinguished by the scope of their authority, not by the
+  technology they use (an LLM, a symbolic planner or deterministic rules):
+
+  | Role | Specialized by | Responsibility | Planning scope |
+  |---|---|---|---|
+  | strategic | global goals | Goals, policies and priorities; global coordination; evaluating global results; the decision to replan; the future LLM + planning integration of #619 | the global plan |
+  | managerial | domain | Decomposing a delegated goal; a domain subplan; delegating tasks to operational agents or invoking capabilities directly; evaluating results; replanning within the domain; escalating what exceeds its authority | a domain subplan |
+  | operational | task | Completing a logically atomic task with the capabilities it is allowed: choosing among alternatives, observing results, recovering local failures, escalating to its manager | a bounded local plan |
+
+- **An operational task is logically atomic, not computationally.** It has
+  one verifiable goal, contracted inputs and outputs, allowed capabilities,
+  bounded autonomy, a resource budget, completion criteria and escalation
+  conditions. The agent may use several capabilities. It does not redefine
+  domain goals, change policies, coordinate other subplans, create agents or
+  delegate subplans (a first boundary, which #774 may revisit).
+- **There is no agent per capability.** A task that a capability performs
+  without relevant adaptive decisions is invoked directly by the managerial
+  agent. An operational agent is justified by the need for autonomy: choosing
+  among alternatives, evaluating results or recovering from failures. Not
+  every workflow uses the three levels; the effective hierarchy follows the
+  task's complexity.
+- **Evidence is not authority.** Managerial and operational agents may use
+  support capabilities (comparing candidates, ranking strategies, estimating
+  costs, checking constraints, gathering evidence of consistency or
+  completion). They compute evidence; the decision to accept an alternative,
+  change a subplan or consider a goal satisfied stays with the responsible
+  agent in the core. A support capability lives in a pure core library when
+  it is a planning or coordination mechanism, and in the Toolbox when it is
+  operational processing.
+- **Role and lifecycle are separate.** A genuine operational agent can be a
+  permanent part of the core. The existing modules of
+  `acessilia_core.agents` are operational **legacy** components: they run or
+  wrap operations meant for the Toolbox (OCR and semantic extraction,
+  document classification, image description, visual adjudication, table
+  and formula extraction, multimodal processing).
+- **No agent moves to the Toolbox.** A legacy component is decomposed by
   responsibility before it migrates. Model inference, deterministic
   algorithms, technical validation and result transformation become
   non-agentic capabilities. Goal setting and planning stay with the strategic
@@ -153,8 +177,12 @@ experimental.
   comparison of hierarchical with monolithic planning (HTN included) are
   research directions tracked in
   [#774](https://github.com/A11yDevs/acessilia/issues/774) and #619, not
-  decisions taken here. Every semantic step is still planned, at some level
-  of the hierarchy, and the strategic core keeps the global logical state.
+  decisions taken here. #774 compares one level (the strategic agent invokes
+  capabilities), two levels (strategic and managerial) and three levels
+  (with operational agents). Every semantic step is still planned, at some
+  level of the hierarchy, and the strategic core keeps the global logical
+  state; the other agents report results and evidence, and do not update it
+  in conflicting ways.
 - The classification of the existing agents is
   [core-agent-classification.md](../architecture/core-agent-classification.md)
   (#768).
@@ -165,8 +193,8 @@ experimental.
   ADR-0012 and the configuration. The core interprets model results in the
   context of the plan.
   The Toolbox never decides global goals or replanning.
-- Contracts distinguish an operational result from a strategic or managerial
-  decision.
+- Contracts distinguish a capability's result, and the evidence it carries,
+  from an agent's decision.
 
 ### Planner and coordination are separate
 
@@ -212,4 +240,4 @@ This ADR stays `Proposed` until these are closed in review:
 - Compliance: the CI planning fixtures; an orchestrator test that every step of
   a job comes from the plan; `tests/test_architecture_layers.py` for model
   clients in the core, and for the classification of every module in
-  `acessilia_core.agents` (strategic, managerial or operational).
+  `acessilia_core.agents` (role and lifecycle).

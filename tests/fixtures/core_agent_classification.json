@@ -1,66 +1,82 @@
 {
   "adjudication_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "agno_support": {
     "kind": "support",
-    "class": "infrastructure"
+    "class": "infrastructure",
+    "lifecycle": "active"
   },
   "ai_client": {
     "kind": "support",
-    "class": "infrastructure"
+    "class": "infrastructure",
+    "lifecycle": "active"
   },
   "data_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "fusion_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "informational_structural": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "model_call_policy": {
     "kind": "support",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "model_calls": {
     "kind": "support",
-    "class": "infrastructure"
+    "class": "infrastructure",
+    "lifecycle": "active"
   },
   "order_adjudication_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "output_schemas": {
     "kind": "support",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "page_level_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "prompt_tools": {
     "kind": "support",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "provider_breaker": {
     "kind": "support",
-    "class": "infrastructure"
+    "class": "infrastructure",
+    "lifecycle": "active"
   },
   "run_helpers": {
     "kind": "support",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "table_specialist_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   },
   "vision_agent": {
     "kind": "agent",
-    "class": "operational"
+    "class": "operational",
+    "lifecycle": "legacy"
   }
 }

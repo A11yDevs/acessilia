@@ -315,18 +315,20 @@ def test_the_docstruct_inventory_lists_the_allowlist() -> None:
         )
 
 
-#: Every module in acessilia_core.agents, classified (ADR-0029, #768). An
-#: agent is strategic (global goals and coordination) or managerial (a
-#: delegated goal and its subplan, #774), both in the core, or operational: a
-#: transitional class for legacy code whose operations are decomposed into
-#: non-agentic Toolbox capabilities. No agent moves to the Toolbox, which stays
-#: passive. A support module is operational (decomposed with those agents) or
-#: infrastructure (stays while the core makes model calls).
+#: Every module in acessilia_core.agents, classified (ADR-0029, #768) by role
+#: and lifecycle. All agency is in the core: an agent is strategic (global
+#: goals), managerial (a domain subplan, #774) or operational (a logically
+#: atomic task), and no agent moves to the Toolbox, which stays passive. A
+#: support module is operational (decomposed with the operational code) or
+#: infrastructure (stays while the core makes model calls). The lifecycle
+#: separates a permanent component (active) from one being decomposed into
+#: non-agentic Toolbox capabilities (legacy) or retired (deprecated).
 AGENT_CLASSIFICATION = REPO_ROOT / "tests" / "fixtures" / "core_agent_classification.json"
 AGENT_CLASSES = {
     "agent": {"strategic", "managerial", "operational"},
     "support": {"operational", "infrastructure"},
 }
+AGENT_LIFECYCLES = {"active", "legacy", "deprecated"}
 AGENT_CLASSIFICATION_DOCS = (
     REPO_ROOT / "docs" / "architecture" / "core-agent-classification.md",
     REPO_ROOT / "docs" / "architecture" / "core-agent-classification.pt-br.md",
@@ -344,8 +346,9 @@ def test_every_core_agent_module_is_classified() -> None:
     wrong = sorted(
         module for module, entry in classification.items()
         if entry["class"] not in AGENT_CLASSES.get(entry["kind"], set())
+        or entry.get("lifecycle") not in AGENT_LIFECYCLES
     )
-    assert not wrong, f"unknown kind or class: {wrong}"
+    assert not wrong, f"unknown kind, class or lifecycle: {wrong}"
 
 
 def test_the_agent_classification_lists_the_fixture() -> None:
