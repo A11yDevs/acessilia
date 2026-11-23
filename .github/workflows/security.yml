@@ -75,6 +75,9 @@ jobs:
             APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
             GIT_COMMIT=${{ github.sha }}
             IMAGE_TAG=security-scan
+          # A cached apt layer can hide Debian security updates (krb5 in
+          # #750), so the gate must build and scan a fresh image.
+          no-cache: true
           cache-from: type=gha,scope=production
           cache-to: type=gha,mode=max,scope=production
 

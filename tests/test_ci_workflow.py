@@ -10,6 +10,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
+SECURITY = ROOT / ".github/workflows/security.yml"
 SCHEDULED = ROOT / ".github/workflows/scheduled-tests.yml"
 PRODUCTION = ROOT / ".github/workflows/production-deployment.yml"
 RULESETS = ROOT / ".github/rulesets"
@@ -54,6 +55,17 @@ def test_ci_jobs_use_python_312() -> None:
         assert jobs[job_id]["env"]["UV_PYTHON"] == "${{ matrix.python-version }}"
     assert _rendered_job_names(jobs["tests"]) == {"tests (Python 3.12)"}
     assert _rendered_job_names(jobs["sdk-isolated"]) == {"SDK alone (Python 3.12)"}
+
+
+def test_the_container_scan_builds_without_layer_cache() -> None:
+    """A cached apt layer can hide Debian security updates (#750)."""
+    workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
+    steps = {
+        step["name"]: step
+        for step in workflow["jobs"]["container-scan"]["steps"]
+    }
+
+    assert steps["Build the production image"]["with"]["no-cache"] is True
 
 
 #: Steps of the ``tests`` job that do not depend on the interpreter (#170).

@@ -19,11 +19,18 @@ from frontend.telegram import state_store, user_context
 from frontend.telegram.handlers import document as doc_module, start as start_module
 from frontend.telegram.messages import (
     MSG_ADMIN_ONLY,
+    MSG_BOT_PAUSED,
+    MSG_BOT_RESUMED,
     MSG_CACHE_CLEAR_FAILED,
     MSG_CACHE_CLEARED,
     MSG_CONTACT_SERVER_FAILED,
     MSG_FILE_RECEIVED,
     MSG_HELP_TEXT,
+    MSG_MODE_BAIXO_ON,
+    MSG_MODE_DETAILED_ON,
+    MSG_MODE_MEDIO_ON,
+    MSG_MODE_NORMAL_ON,
+    MSG_MODE_OCR_ON,
     MSG_PACKAGE_PDF_UA_MISSING,
     MSG_TELEGRAM_FILE_TOO_LARGE,
 )
@@ -460,6 +467,54 @@ def test_user_preferences_are_stored_per_sender(doc_module_isolated):
     assert user_context.user_emails[(123, None, 202)] == "second@example.com"
     assert user_context.user_modes[(123, None, 101)] == "detalhado"
     assert user_context.user_modes[(123, None, 202)] == "baixo"
+
+
+@pytest.mark.parametrize(
+    ("handler", "mode", "reply"),
+    [
+        ("cmd_ocr", "ocr", MSG_MODE_OCR_ON),
+        ("cmd_detailed", "detalhado", MSG_MODE_DETAILED_ON),
+        ("cmd_medium", "medio", MSG_MODE_MEDIO_ON),
+        ("cmd_low", "baixo", MSG_MODE_BAIXO_ON),
+        ("cmd_normal", "medio", MSG_MODE_NORMAL_ON),
+    ],
+)
+def test_mode_commands_store_the_mode_and_reply(
+    handler, mode, reply, doc_module_isolated
+):
+    bot = _FakeBot(b"")
+    message = _FakeMessage(bot)
+
+    asyncio.run(getattr(start_module, handler)(message))
+
+    assert user_context.user_modes[(123, None, 456)] == mode
+    assert message.answers == [t(reply)]
+
+
+@pytest.mark.parametrize(
+    ("handler", "action", "reply"),
+    [
+        ("cmd_desativar", "pause", MSG_BOT_PAUSED),
+        ("cmd_ativar", "resume", MSG_BOT_RESUMED),
+    ],
+)
+def test_pause_commands_apply_the_action_and_reply(
+    handler, action, reply, monkeypatch, doc_module_isolated
+):
+    calls = []
+    monkeypatch.setattr(
+        start_module, "pause_chat", lambda chat_id: calls.append(("pause", chat_id))
+    )
+    monkeypatch.setattr(
+        start_module, "resume_chat", lambda chat_id: calls.append(("resume", chat_id))
+    )
+    bot = _FakeBot(b"")
+    message = _FakeMessage(bot, chat_id=-100123)
+
+    asyncio.run(getattr(start_module, handler)(message))
+
+    assert calls == [(action, -100123)]
+    assert message.answers == [t(reply)]
 
 
 def test_document_does_not_consume_another_senders_preferences(doc_module_isolated):
