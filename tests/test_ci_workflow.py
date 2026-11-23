@@ -699,6 +699,16 @@ def test_the_container_scan_is_conditional_on_image_paths() -> None:
     assert "if" not in audit
 
 
+def test_codeql_actions_are_pinned_to_commit_shas() -> None:
+    import re
+
+    pattern = re.compile(r"github/codeql-action/[a-z-]+@([0-9a-f]+)")
+    for workflow in sorted((ROOT / ".github/workflows").glob("*.yml")):
+        text = workflow.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
+            assert len(match.group(1)) == 40, f"{workflow.name}: {match.group(0)}"
+
+
 def test_the_image_scan_reads_the_recorded_exception() -> None:
     workflow = yaml.safe_load(
         (ROOT / ".github/workflows/security.yml").read_text(encoding="utf-8")
