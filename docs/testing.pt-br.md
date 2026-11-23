@@ -83,6 +83,13 @@ o workflow `CI` do GitHub Actions:
   fora do checkout e a etapa de tabelas pelo `libs/core/examples/table_stage.py`
   (ADR-0016, passo 6). Ainda não é um check obrigatório, pelo mesmo motivo do
   `docstruct alone`.
+- **`planning backends (Fast Downward)`** roda o planejador interno e o Fast
+  Downward (uma imagem `aibasel/downward` fixada, por meio de
+  `scripts/planning/fast_downward_docker.sh`) sobre o domínio PDDL atual, e
+  falha se eles discordarem ou se algum teste for pulado (#790). Ele alimenta o
+  agregador, então bloqueia `tests (Python 3.12)`. Localmente esses testes
+  ficam fora da seleção; rode-os com `-m fast_downward` e
+  `ACESSILIA_FAST_DOWNWARD`.
 - A entrega da imagem espera pelo agregador, pelos três jobs de isolamento e pelos jobs de segurança.
 
 O check da suíte principal não tem mais uma etapa separada de coleta: a própria

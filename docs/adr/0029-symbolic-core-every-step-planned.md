@@ -84,9 +84,10 @@ experimental.
   checks names and types; it does not translate tool schemas into PDDL (no
   generic compiler, #632).
 - CI must parse the composed domain and solve a set of fixture problems with
-  the internal planner. Fast Downward stays optional, as it is in the code
-  (CI does not install it today): the comparison runs wherever it is
-  installed. Adding it to CI is a separate decision.
+  the internal planner. Fast Downward stays optional at runtime, as it is in
+  the code, but CI checks it too: since #790 a job runs both backends on the
+  current domain, with Fast Downward from a pinned image, so a domain or
+  fragment that only one backend accepts fails CI.
 
 ### State, availability and failure
 

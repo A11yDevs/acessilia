@@ -96,16 +96,31 @@ def test_the_tests_check_aggregates_all_component_jobs() -> None:
     """The required name stays, but it is green only when every provider succeeded."""
     job = _workflow()["jobs"]["tests"]
 
-    assert set(job["needs"]) == {"quality", "component-tests"}
+    assert set(job["needs"]) == {"quality", "component-tests", "planning-backends"}
     assert job["if"] == "always()"
     steps = {step.get("name"): step for step in job["steps"]}
     verify = steps["Verify provider jobs"]
     assert "needs.quality.result" in verify["env"]["QUALITY"]
     assert "needs.component-tests.result" in verify["env"]["COMPONENTS"]
+    assert "needs.planning-backends.result" in verify["env"]["BACKENDS"]
     assert '!= "success"' in verify["run"]
     assert "scripts/check_coverage_thresholds.py" in steps[
         "Check per-component coverage thresholds"
     ]["run"]
+
+
+def test_both_planning_backends_run_on_the_current_domain() -> None:
+    """#790: Fast Downward from a pinned image, and no skip counts as a pass."""
+    job = _workflow()["jobs"]["planning-backends"]
+    steps = {step.get("name"): step for step in job["steps"]}
+    wrapper = ROOT / "scripts/planning/fast_downward_docker.sh"
+
+    assert "aibasel/downward@sha256:" in wrapper.read_text(encoding="utf-8")
+    assert "fast_downward_docker.sh" in steps["Pull the pinned Fast Downward image"]["run"]
+    compare = steps["Compare the backends on the current domain"]
+    assert "fast_downward_docker.sh" in compare["env"]["ACESSILIA_FAST_DOWNWARD"]
+    assert "-m fast_downward" in compare["run"]
+    assert "skipped" in steps["Reject skipped or missing backend tests"]["run"]
 
 
 def test_component_jobs_keep_the_bounded_app_parallelism() -> None:

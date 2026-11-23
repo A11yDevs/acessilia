@@ -87,8 +87,10 @@ e a #640 trata a composição de fragmentos como experimental.
   compilador genérico, #632).
 - O CI deve fazer o parsing do domínio composto e resolver um conjunto de
   problemas de fixture com o planejador interno. O Fast Downward continua
-  opcional, como no código (o CI não o instala hoje): a comparação roda onde
-  ele estiver instalado. Incluí-lo no CI é uma decisão separada.
+  opcional em tempo de execução, como no código, mas o CI também o confere:
+  desde a #790, um job roda os dois backends sobre o domínio atual, com o Fast
+  Downward de uma imagem fixada, então um domínio ou fragmento que só um
+  backend aceita reprova o CI.
 
 ### Estado, disponibilidade e falha
 

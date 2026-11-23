@@ -81,6 +81,12 @@ GitHub Actions workflow `CI`:
   from the wheel, the smoke test from a folder outside the checkout, and the
   table stage from `libs/core/examples/table_stage.py` (ADR-0016, step 6). It is not
   a required check yet, for the same reason as `docstruct alone`.
+- **`planning backends (Fast Downward)`** runs the internal planner and Fast
+  Downward (a pinned `aibasel/downward` image, through
+  `scripts/planning/fast_downward_docker.sh`) on the current PDDL domain, and
+  fails if they disagree or a test is skipped (#790). It feeds the
+  aggregator, so it gates `tests (Python 3.12)`. Locally these tests are
+  deselected; run them with `-m fast_downward` and `ACESSILIA_FAST_DOWNWARD`.
 - Image delivery waits for the aggregator, the three isolation jobs and the security jobs.
 
 The main suite check does not have a separate collection step: the test run

@@ -586,6 +586,75 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Both planning backends on the current PDDL domain (#790, ADR-0029): the
+  # internal planner and Fast Downward must solve the same fixture problems
+  # with equivalent plans. Fast Downward runs from a pinned image, so a domain
+  # change that only one backend accepts fails here, not in production.
+  planning-backends:
+    name: planning backends (Fast Downward)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UV_PYTHON: "3.12"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.17"
+
+      - name: Restore uv cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-core-py3.12-${{ hashFiles('libs/core/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-core-py3.12-
+
+      - name: Install the core
+        run: uv sync --locked --extra dev --project libs/core
+
+      - name: Pull the pinned Fast Downward image
+        run: |
+          image=$(sed -n 's/^image="${FAST_DOWNWARD_IMAGE:-\(.*\)}"$/\1/p' scripts/planning/fast_downward_docker.sh)
+          test -n "$image"
+          docker pull --quiet "$image"
+          docker run --rm "$image" --version
+
+      - name: Compare the backends on the current domain
+        working-directory: libs/core
+        env:
+          ACESSILIA_FAST_DOWNWARD: ${{ github.workspace }}/scripts/planning/fast_downward_docker.sh
+        run: |
+          uv run --locked --extra dev python -m pytest -rs -m fast_downward \
+            --junitxml="$GITHUB_WORKSPACE/var/test-results/fast-downward.xml" \
+            tests/test_fast_downward_domain.py
+
+      - name: Reject skipped or missing backend tests
+        run: |
+          uv run --locked --extra dev --project libs/core python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("var/test-results/fast-downward.xml")
+          suites = list(ElementTree.parse(report).getroot().iter("testsuite"))
+          total = sum(int(suite.attrib.get("tests", "0")) for suite in suites)
+          skipped = sum(int(suite.attrib.get("skipped", "0")) for suite in suites)
+          if not total or skipped:
+              raise SystemExit(f"Fast Downward not verified: {total} test(s), {skipped} skipped.")
+          print(f"Fast Downward verified: {total} test(s), none skipped.")
+          PY
+
   # This aggregator keeps the required check name while the four suites run
   # in parallel. It publishes the evidence even on failure and fails closed at
   # the end if any provider failed or was skipped.
@@ -596,6 +665,7 @@ jobs:
     needs:
       - quality
       - component-tests
+      - planning-backends
     if: always()
 
     steps:
@@ -725,9 +795,10 @@ jobs:
         env:
           QUALITY: ${{ needs.quality.result }}
           COMPONENTS: ${{ needs.component-tests.result }}
+          BACKENDS: ${{ needs.planning-backends.result }}
         run: |
           failed=0
-          for entry in "quality:$QUALITY" "component-tests:$COMPONENTS"; do
+          for entry in "quality:$QUALITY" "component-tests:$COMPONENTS" "planning-backends:$BACKENDS"; do
             name=${entry%%:*}
             result=${entry#*:}
             if [ "$result" != "success" ]; then
