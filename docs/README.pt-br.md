@@ -37,6 +37,7 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 21. [Baseline de qualidade arquitetural, novembro de 2026](architecture/quality-baseline.pt-br.md) — a instrumentação reproduzível e as primeiras medições da #656: tamanho, complexidade, dependências entre componentes, duplicatas estruturais e hotspots do core, SDK, docstruct, backend e frontend, com o snapshot legível por máquina. (English: [English version](architecture/quality-baseline.md))
 22. [Classificação de duplicatas e primeira consolidação, novembro de 2026](architecture/duplication-consolidation.pt-br.md) — PR 2 da #656: a triagem dos grupos do baseline, o parser de locales compartilhado e os candidatos restantes com seus riscos. (English: [English version](architecture/duplication-consolidation.md))
 23. [Otimização da suíte de testes](testing/optimization.pt-br.md) — PR 1 da #644: o baseline reproduzível das suítes da aplicação, docstruct, SDK e core, a comparação de paralelismo, os testes mais lentos e os limites da medição. (English: [English version](testing/optimization.md))
+24. [Sobreposição de cobertura e candidatos à redundância](testing/overlap.pt-br.md) — PR 2 da #644: os contextos de cobertura por teste, a matriz de Jaccard, a subsunção de cobertura por assinatura e por que nenhum teste é removido apenas com evidência de cobertura. (English: [English version](testing/overlap.md))
 
 ---
 

@@ -13,10 +13,11 @@ CORE_PARALLEL ?= -n $(CORE_JOBS) --dist $(CORE_DIST)
 DURATIONS ?= 25
 COVERAGE_DIR ?= var/coverage
 BASELINE ?= var/timings/baseline.json
+OVERLAP_DIR ?= var/overlap
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test-file test-failed test-all lint typecheck coverage test-baseline test-baseline-compare
+.PHONY: help test-file test-failed test-all lint typecheck coverage test-baseline test-baseline-compare test-overlap
 
 help:
 	@printf '%s\n' \
@@ -27,7 +28,8 @@ help:
 		'make typecheck                          run Mypy on the configured docstruct, SDK, core and backend scope' \
 		'make coverage                           run branch coverage per component and enforce the thresholds' \
 		'make test-baseline                      collect test timings and coverage into $(BASELINE) (#644)' \
-		'make test-baseline-compare              compare $(BASELINE) with docs/testing/baseline.json'
+		'make test-baseline-compare              compare $(BASELINE) with docs/testing/baseline.json' \
+		'make test-overlap                       collect per-test coverage and write the overlap/redundancy reports (#644)'
 
 lint:
 	$(UV) run python scripts/check_ruff_baseline.py
@@ -64,6 +66,20 @@ coverage:
 		--cov-report=html:"$(CURDIR)/$(COVERAGE_DIR)/core/htmlcov") || status=$$?; \
 	$(UV) run python scripts/check_coverage_thresholds.py --coverage-dir "$(COVERAGE_DIR)" || status=$$?; \
 	exit $$status
+
+test-overlap:
+	@mkdir -p "$(OVERLAP_DIR)/context"
+	COVERAGE_FILE="$(CURDIR)/$(OVERLAP_DIR)/context/.coverage" $(UV) run --extra dev pytest $(PYTEST_FLAGS) $(CORE_PARALLEL) \
+		--cov=backend --cov=frontend --cov-branch --cov-context=test \
+		--cov-config="$(CURDIR)/pyproject.toml" --cov-report= \
+		--junitxml="$(CURDIR)/$(OVERLAP_DIR)/app-results.xml"
+	$(UV) run --extra dev python scripts/tests/coverage_overlap.py \
+		--coverage-file "$(CURDIR)/$(OVERLAP_DIR)/context/.coverage" \
+		--include backend --include frontend \
+		--output "$(OVERLAP_DIR)/app.json" --summary "$(OVERLAP_DIR)/app.md"
+	$(UV) run --extra dev python scripts/tests/redundancy_report.py "$(OVERLAP_DIR)/app.json" \
+		--junit "app=$(CURDIR)/$(OVERLAP_DIR)/app-results.xml" \
+		--output "$(OVERLAP_DIR)/redundancy.json" --summary "$(OVERLAP_DIR)/redundancy.md"
 
 test-file:
 	@if [ -z "$(F)" ]; then \

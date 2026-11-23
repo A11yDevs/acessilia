@@ -33,6 +33,7 @@ def test_help_lists_the_supported_commands() -> None:
     assert "make coverage" in completed.stdout
     assert "make test-baseline" in completed.stdout
     assert "make test-baseline-compare" in completed.stdout
+    assert "make test-overlap" in completed.stdout
 
 
 def test_test_file_runs_one_path_without_e2e() -> None:
@@ -107,6 +108,20 @@ def test_test_baseline_runs_all_suites_and_compares_reports() -> None:
     assert "--extra dev" in baseline.stdout
     assert "collect_timings.py compare" in compare.stdout
     assert "docs/testing/baseline.json" in compare.stdout
+
+
+def test_test_overlap_runs_per_test_contexts_and_both_reports() -> None:
+    completed = _dry_run("test-overlap")
+    assert completed.returncode == 0, completed.stderr
+    for expected in (
+        "--cov-context=test",
+        "coverage_overlap.py",
+        "redundancy_report.py",
+        "--junit",
+        "app=",
+        "--extra dev",
+    ):
+        assert expected in completed.stdout
 
 
 def test_coverage_covers_all_four_components_with_branch_reports() -> None:
