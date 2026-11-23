@@ -54,16 +54,21 @@ experimental.
 
 ### Every semantic step is an action
 
-- Every **semantically relevant** step of a job must be an action of the
-  planning domain: steps that change the document or decide the workflow, such
-  as inspection, extraction, OCR, block fusion, reading order, image
-  description, adjudication, math normalization and accessible export. The
-  orchestrator must not run a fixed sequence of such steps.
+- The core plans the semantic steps that transform the document and make it
+  accessible after the initial state is acquired: steps that change the
+  document or decide the workflow, such as OCR, block fusion, reading order,
+  image description, adjudication, math normalization and accessible export.
+  The orchestrator must not run a fixed sequence of such steps.
+- An explicit **bootstrap** phase may run the media inspection and the initial
+  structural extraction that the first PDDL problem needs, under the core's
+  policy and coordination and with operational execution in the Toolbox. It
+  is the 0.3.0 baseline: the enrichment that runs before planning today
+  migrates to planned actions (`docs/architecture/workflow-actions.md`), and
+  whether the bootstrap itself enters planning is a later investigation
+  (#816).
 - Configuration policies stay core policies, not actions. The page limit
-  (`DocumentConfig.max_pages`, checked before extraction) is one: it is an
-  admission check that rejects the job with `DocumentTooLargeError`. Of the
-  four stages that run before planning today, inspection, extraction and
-  enrichment become actions; the page limit stays a policy.
+  (`DocumentConfig.max_pages`, checked before and after extraction) is one: it
+  is an admission check that rejects the job with `DocumentTooLargeError`.
 - Infrastructure stays out of the domain and belongs to the runtime: HTTP
   retries, credential renewal, serialization, operational persistence, queue
   acknowledgements, health checks, artifact transport and retrieval.
@@ -227,11 +232,13 @@ This ADR stays `Proposed` until these are closed in review:
 - The domain grows with the catalogue. Fragment curation, action costs and the
   CI planning fixtures keep it tractable.
 - Migration is incremental and follows ADR-0028, method by method. Then the
-  three fixed semantic stages become actions, and then the operational
+  enrichment steps become actions while the bootstrap stays fixed (#816
+  decides whether it enters the plan), and then the operational
   responsibilities of the legacy agents become non-agentic capabilities. The closed loop does not wait for durable queues
   (#639): synchronous MCP calls are enough.
-- Progress indicators are tracked in #735: semantic stages outside the plan
-  (3: inspection, extraction, enrichment), plan methods that compute locally
+- Progress indicators are tracked in #735: enrichment steps outside the plan
+  (6, `docs/architecture/workflow-actions.md`; the bootstrap is outside by
+  design), plan methods that compute locally
   (14 of 25, ADR-0028), operational agents still in the core.
 - Follow-up work, tracked in #735:
   - Toolbox: serve per-capability, per-version PDDL fragments generated from a

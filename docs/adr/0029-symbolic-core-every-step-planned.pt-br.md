@@ -54,17 +54,23 @@ e a #640 trata a composição de fragmentos como experimental.
 
 ### Todo passo semântico é uma ação
 
-- Todo passo **semanticamente relevante** de um job deve ser uma ação do
-  domínio de planejamento: passos que mudam o documento ou decidem o workflow,
-  como inspeção, extração, OCR, fusão de blocos, ordem de leitura, descrição
-  de imagens, adjudicação, normalização matemática e exportação acessível. O
-  orquestrador não pode rodar uma sequência fixa desses passos.
+- O core planeja os passos semânticos de transformação e acessibilização do
+  documento posteriores à aquisição do estado inicial: passos que mudam o
+  documento ou decidem o workflow, como OCR, fusão de blocos, ordem de
+  leitura, descrição de imagens, adjudicação, normalização matemática e
+  exportação acessível. O orquestrador não pode rodar uma sequência fixa
+  desses passos.
+- Uma fase explícita de **bootstrap** pode realizar a inspeção de mídia e a
+  extração estrutural inicial necessárias à formulação do primeiro problema
+  PDDL, sob política e coordenação do core e com execução operacional na
+  Toolbox. Ela é a baseline da 0.3.0: o enriquecimento que hoje roda antes do
+  planejamento migra para ações planejadas
+  (`docs/architecture/workflow-actions.pt-br.md`), e a eventual incorporação
+  do próprio bootstrap ao planejamento é uma investigação posterior (#816).
 - Políticas de configuração continuam políticas do core, não ações. O limite
-  de páginas (`DocumentConfig.max_pages`, verificado antes da extração) é uma
-  delas: é uma verificação de admissão que rejeita o job com
-  `DocumentTooLargeError`. Dos quatro estágios que hoje rodam antes do
-  planejamento, inspeção, extração e enriquecimento viram ações; o limite de
-  páginas continua política.
+  de páginas (`DocumentConfig.max_pages`, verificado antes e depois da
+  extração) é uma delas: é uma verificação de admissão que rejeita o job com
+  `DocumentTooLargeError`.
 - A infraestrutura fica fora do domínio e pertence ao runtime: retries HTTP,
   renovação de credenciais, serialização, persistência operacional,
   confirmação de mensagens em filas, health checks, transporte e recuperação
@@ -236,11 +242,13 @@ Esta ADR continua `Proposto` até que estes pontos sejam fechados na revisão:
 - O domínio cresce com o catálogo. A curadoria dos fragmentos, os custos das
   ações e as fixtures de planejamento no CI o mantêm tratável.
 - A migração é incremental e segue a ADR-0028, método a método. Depois os
-  três estágios semânticos fixos viram ações, e depois as responsabilidades
+  passos de enriquecimento viram ações enquanto o bootstrap continua fixo (a
+  #816 decide se ele entra no plano), e depois as responsabilidades
   operacionais dos agentes legados viram capacidades não agênticas. O ciclo fechado não espera pelas filas duráveis
   (#639): chamadas MCP síncronas bastam.
-- Os indicadores de progresso são acompanhados na #735: estágios semânticos
-  fora do plano (3: inspeção, extração, enriquecimento), métodos de plano que
+- Os indicadores de progresso são acompanhados na #735: passos de
+  enriquecimento fora do plano (6, `docs/architecture/workflow-actions.pt-br.md`;
+  o bootstrap fica fora por desenho), métodos de plano que
   computam localmente (14 de 25, ADR-0028), agentes operacionais ainda no
   core.
 - Trabalho decorrente, acompanhado na #735:

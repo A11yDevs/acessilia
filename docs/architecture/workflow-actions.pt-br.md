@@ -1,46 +1,68 @@
-# Estágios pré-planejamento como ações planejadas (#640, PR 2)
+# Enriquecimento como ações planejadas, depois do bootstrap (#640, PR 2)
 
 Inglês, versão normativa: [English version](workflow-actions.md)
 
-A [ADR-0029](../adr/0029-symbolic-core-every-step-planned.pt-br.md) torna todo
-passo semanticamente relevante de um job uma ação do domínio de planejamento.
-Hoje o orquestrador roda quatro estágios antes de planejar. Deles, inspeção,
-extração e enriquecimento precisam virar ações; o limite de páginas continua
-uma política de admissão. Esta página é o desenho dessa migração: o que cada
-estágio faz hoje, as restrições que uma migração precisa respeitar e a ordem
-dos pull requests. Ela não muda código. As propostas abaixo estão abertas à
-revisão (veja [Questões abertas](#questões-abertas)).
+A [ADR-0029](../adr/0029-symbolic-core-every-step-planned.pt-br.md) torna os
+passos semânticos de um job ações do domínio de planejamento. Para a baseline
+0.3.0, ela distingue duas fases:
+
+1. **Bootstrap**, que adquire o estado inicial: inspeção de mídia, limite de
+   páginas e a extração estrutural inicial. Juntas, elas produzem o manifesto
+   a partir do qual o Core formula as obrigações e os objetos do primeiro
+   problema. O Core mantém a política de admissão e coordena a fase; a Toolbox
+   executa as operações e devolve observações. Uma extração inicial fixa é uma
+   limitação deliberada da baseline: por exemplo, o plano ainda não escolhe os
+   providers da extração.
+2. **Planejamento em ciclo fechado**, a partir do manifesto. O Core planeja,
+   observa e replaneja. Os passos de enriquecimento, que hoje rodam antes do
+   planejamento, migram para ações planejadas.
+
+Esta página desenha a migração da segunda fase: o que roda hoje, as
+restrições que uma migração precisa respeitar e a ordem dos pull requests.
+Ela não muda código. Se o próprio bootstrap deve ser planejado é uma
+investigação da 0.4.0
+([#816](https://github.com/A11yDevs/acessilia/issues/816)).
 
 ## Hoje
 
 `PddlAccessibilityOrchestrator._execute` (`pipeline/orchestrator.py`) roda, em
 ordem:
 
-| Estágio | O que faz | Chama | Escreve | Checkpoint |
+| Fase | Estágio | O que faz | Chama | Checkpoint |
 |---|---|---|---|---|
-| Inspeção de mídia | Lê os fatos de mídia do arquivo; um deck de slides é estruturado de outro jeito | Toolbox `media.inspect` | a inspeção e a configuração de mídia | `media` |
-| Limite de páginas | Recusa um documento acima de `DocumentConfig.max_pages` (`DocumentTooLargeError`) | — | — | — |
-| Extração | Monta o manifesto: elementos, depois as obrigações derivadas dos seus tipos | Toolbox `document.structure.extract` (um ou dois providers) | o manifesto | `manifest` |
-| Enriquecimento | Seis passos, numa ordem fixa (abaixo) | Toolbox e os agentes de modelo do Core | o manifesto, passo a passo | `enriched`, por objeto |
-| Planejamento | Compila o problema a partir do manifesto enriquecido e planeja | — | o plano | `plan` |
+| Bootstrap | Inspeção de mídia | Lê os fatos de mídia do arquivo; um deck de slides é estruturado de outro jeito | Toolbox `media.inspect` | `media` |
+| Bootstrap | Limite de páginas, antes da extração | Recusa um documento acima de `DocumentConfig.max_pages` pela contagem de páginas da inspeção (`DocumentTooLargeError`) | — | — |
+| Bootstrap | Extração | Monta o manifesto: elementos, depois as obrigações derivadas dos seus tipos | Toolbox `document.structure.extract` (um ou dois providers) | `manifest` |
+| Bootstrap | Limite de páginas, depois da extração | Confere o limite de novo contra a estrutura extraída | — | — |
+| Enriquecimento | Seis passos, numa ordem fixa (abaixo) | | Toolbox e os agentes de modelo do Core | `enriched`, por objeto |
+| Planejamento | | Compila o problema a partir do manifesto enriquecido e planeja | — | `plan` |
 
-Os seis passos de enriquecimento (`_enrich_before_planning`) compartilham um
-breaker de provider, um cache de regiões e um registro de progresso por
-objeto:
+Os passos de enriquecimento (`_enrich_before_planning`):
 
 | Passo | Função | Chama | Efeito no manifesto |
 |---|---|---|---|
-| 1. Regiões de fórmula | `_classify_formula_regions` | Toolbox `pdf.render` (o recorte da fórmula); `VisionAgent` | pode mudar o tipo de um elemento e então reconcilia suas obrigações (`reconcile_reclassified_element`) |
-| 2. Descrições de imagens | `_enrich_picture_descriptions` | `VisionAgent` | uma descrição por imagem |
+| 1. Regiões de fórmula | `_classify_formula_regions` | Toolbox `pdf.render` (o recorte da fórmula); `VisionAgent` | confere os rótulos de fórmula do extrator. Um desenho é descrito uma vez e vira imagem, o que reconcilia suas obrigações (`reconcile_reclassified_element`); um candidato incerto vai para revisão humana |
+| 2. Descrições de imagens | `_enrich_picture_descriptions` | `VisionAgent` | primeiro injeta uma imagem de página inteira para uma imagem raster isolada e anota a posse do texto visual, ambas a partir da inspeção de mídia; depois uma descrição por imagem |
 | 3. Matemática inline | `_mark_inline_math` | Toolbox `document.text.spans` | marca a matemática na prosa |
-| 4. LaTeX das fórmulas | `_enrich_formula_latex` | Toolbox `math.recognize`, `pdf.render` | o LaTeX de cada fórmula |
+| 4. LaTeX das fórmulas | `_enrich_formula_latex` | Toolbox `math.recognize`, `pdf.render` | separa os números de equação, depois o LaTeX de cada fórmula |
 | 5. Estrutura das tabelas | `_enrich_table_structures` | `DataAgent` | uma AST estruturada por tabela |
 | 6. Matemática inline das tabelas | `_mark_table_inline_math` | Toolbox `document.text.spans` | marca a matemática nas células (depois do passo 5, que pode substituir células) |
 
+O que os passos compartilham não é uniforme:
+
+| Recurso | Passos | Onde vive hoje |
+|---|---|---|
+| Breaker de provider | 1, 2, 4, 5 | uma variável local de `_enrich_before_planning` |
+| Progresso por objeto (`on_progress`) | 1, 2, 4, 5 | uma variável local, de `checkpoints.enrichment_progress` |
+| Cache de regiões | 1, 2, 4 | de `RunPorts` (`region_cache_for`) |
+| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | uma variável local |
+| Inspeção de mídia | 2 | uma saída do bootstrap |
+| Arquivo de origem | todos | o contexto da execução; o manifesto registra seu digest |
+
 O plano então trabalha sobre o que o enriquecimento produziu. Alguns métodos
 só conferem esse trabalho: `vision-description` confere as descrições e
-`pandoc-table` confere a AST da tabela. Os dois estão classificados como
-`validation` em `toolbox_gate.LOCAL_METHODS` (#801).
+`pandoc-table` confere a AST da tabela. Os dois são `validation` em
+`toolbox_gate.LOCAL_METHODS` (#804).
 
 ## A observação central
 
@@ -49,93 +71,137 @@ Um método é um jeito de satisfazer uma obrigação, e o executor roda o handle
 do método. Então **um passo vira uma ação ao virar o método de uma
 obrigação**: o planejador passa a escolhê-lo, ordená-lo por `depends-on`,
 contar seu custo, descartá-lo pelos fatos do catálogo (domínio 2.4) e
-replanejar quando ele falha. Nada disso precisa de um novo esquema de ação. A
-migração do enriquecimento **não muda o domínio**. Inspeção e extração
-precisam de uma mudança no manifesto (abaixo), e possivelmente de nenhuma no
-domínio.
+replanejar quando ele falha. Nada disso precisa de um novo esquema de ação, e
+kinds novos de obrigação são objetos que o compilador emite a partir do
+manifesto. **A migração do enriquecimento não muda o domínio.**
 
 ## Restrições
 
-1. **Um plano não cria objetos.** A extração cria os elementos e suas
-   obrigações, e a classificação de fórmulas pode mudar o tipo de um elemento
-   e, com ele, suas obrigações. Depois de uma ação assim, as próximas dependem
-   de objetos que o problema não tinha. O ciclo fechado resolve isso: roda a
-   ação, observa o novo estado, replaneja. O replanejamento é limitado
-   (`max_replans`), então uma ação que cria objetos não pode contar como falha
-   para esse limite.
-2. **A ordem vira dependência.** A ordem fixa do enriquecimento vira
-   `depends-on` entre obrigações do mesmo elemento:
-   - a classificação de fórmulas vem antes da descrição de uma imagem que ela
-     pode reclassificar;
-   - o reconhecimento do LaTeX vem antes de `verbalize-formula` e
+1. **Um plano não cria objetos, e hoje nada replaneja depois de um sucesso.**
+   A classificação de fórmulas pode reclassificar um elemento e reconciliar
+   suas obrigações, então depois dela as próximas ações dependem de obrigações
+   que o problema não tinha. O ciclo atual não trata isso:
+   `_replan_until_done` só itera enquanto `execution_report.replan_required`, e
+   o executor liga essa flag depois de uma falha com alternativas, nunca
+   depois de um passo bem-sucedido. Uma migração que cria obrigações (M3, M4)
+   precisa de um gatilho novo. A proposta é um **replanejamento de
+   descoberta**. Depois que um plano roda, o coordenador compara as obrigações
+   de antes e de depois. As obrigações novas e insatisfeitas viram as raízes de
+   um replanejamento, que:
+   - é contado por um limite próprio, não por `max_replans`, que continua
+     contando falhas;
+   - é salvo com `save_plan`, como qualquer replanejamento;
+   - descarta o checkpoint de execução, como hoje.
+
+   A alternativa é uma flag em `MethodResult` ("o estado mudou, replaneje").
+   Ela é mais explícita, mas muda o contrato do resultado.
+2. **A ordem causal vira dependência, nunca custo.** Custos escolhem entre
+   alternativas; não podem impor uma ordem tecnicamente obrigatória. A ordem
+   fixa vira `depends-on` entre obrigações do mesmo elemento:
+   - a classificação de fórmulas vem antes da descrição de um candidato que
+     ela reclassifica como imagem, e antes do LaTeX de um candidato que ela
+     mantém ou deixa sem classificação. Toda obrigação que sua reconciliação
+     cria também vem depois dela;
+   - o LaTeX da fórmula vem antes de `verbalize-formula` e
      `normalize-formula`;
    - a estrutura da tabela vem antes da matemática inline da tabela.
-3. **A infraestrutura fica fora do domínio.** O breaker de provider, o cache de
-   regiões, o progresso por objeto e os checkpoints são assunto do runtime
-   (ADR-0029). Os handlers chegam a eles pelo contexto da execução
-   (`RunPorts`), não por fatos.
-4. **Os handlers são síncronos.** `MethodHandler` é
-   `(manifest, obligation_id) -> MethodResult`; os passos de enriquecimento são
-   assíncronos. Um handler migrado os chama por
-   `acessilia_sdk.runtime.run_sync`, como o `dual-provider-fusion` já faz.
-5. **Chamadas de modelo ainda não são capacidades.** `VisionAgent` e
+
+   Não se encontrou dependência de dados entre a matemática inline da prosa e
+   os passos de fórmula (eles leem elementos diferentes), entre imagens e
+   tabelas, nem entre o LaTeX das fórmulas e as tabelas. Cada migração
+   confirma isso para o seu passo.
+3. **A infraestrutura fica fora do domínio** (ADR-0029). O cache de regiões já
+   está em `RunPorts`. O breaker, o gancho de progresso e o leitor de spans de
+   texto são variáveis locais hoje. A proposta é torná-los um **serviço de
+   enriquecimento** por execução, no contexto da execução e montado pelo
+   orquestrador, para que o breaker mantenha seu escopo de documento inteiro.
+   Do contrário, uma indisponibilidade de provider viraria uma falha por
+   obrigação.
+4. **As entradas dos estágios vêm do manifesto, não de portas novas.** Os
+   handlers chegam ao arquivo de origem pelo manifesto
+   (`_verify_source_digest`), como o `pymupdf-region` faz. As duas partes do
+   passo 2 que leem a inspeção de mídia, a injeção da imagem de página
+   inteira e a anotação de posse, derivam de fatos do bootstrap e criam
+   objetos, então **ficam no bootstrap**. O método de imagens migrado então
+   não precisa da inspeção como entrada.
+5. **Os handlers são síncronos.** `MethodHandler` é
+   `(manifest, obligation_id) -> MethodResult`; os passos são assíncronos. Um
+   handler migrado os chama por `acessilia_sdk.runtime.run_sync`, como o
+   `dual-provider-fusion` faz. O executor roda numa thread de trabalho
+   (`run_blocking`), onde o `run_sync` inicia seu próprio loop.
+6. **Chamadas de modelo ainda não são capacidades.** `VisionAgent` e
    `DataAgent` são os agentes de modelo do Core
    ([classificação](core-agent-classification.pt-br.md)). Levar um passo para
    um método o torna planejado, mas a chamada de modelo continua no Core. Esse
-   método fica como `transitional` em `LOCAL_METHODS` até a chamada virar uma
-   capacidade (#804, #640 PR 4), e até lá o gate não consegue conferi-lo. As
-   chamadas à Toolbox que um passo faz (`math.recognize`, `pdf.render`,
-   `document.text.spans`) são declaradas em `METHOD_TOOLBOX_REQUIREMENTS`
-   quando o passo vira método.
-6. **A retomada continua idempotente.** Hoje um passo pula os objetos que já
+   método fica `transitional` em `LOCAL_METHODS` até a chamada virar uma
+   capacidade (#804, #640 PR 4). Até lá o gate não consegue conferir a
+   chamada de modelo; as chamadas à Toolbox que o passo faz são declaradas em
+   `METHOD_TOOLBOX_REQUIREMENTS`.
+7. **A retomada continua idempotente.** Hoje um passo pula os objetos que já
    terminou. Como método, o mesmo registro torna barato um passo do plano
    executado de novo, e o checkpoint de execução registra quais passos
    rodaram.
-7. **Equivalência primeiro.** Cada migração mantém um teste diferencial do
+8. **Equivalência primeiro.** Cada migração mantém um teste diferencial do
    manifesto final em documentos de fixture, antes e depois (ADR-0028).
 
 ## Ordem da migração
 
-Cada passo é um pull request, do menos ao mais estrutural:
+Cada passo é um pull request, do menos ao mais estrutural. Os nomes de
+métodos e kinds do M3 e do M4 são propostas, decididas nos seus pull
+requests.
 
-| PR | Passo | Obrigação e método | Domínio | Manifesto |
-|---|---|---|---|---|
-| M1 | Descrições de imagens | `describe-image`: `vision-description` produz a descrição em vez de conferi-la | — | — |
-| M2 | Estrutura das tabelas e matemática inline das tabelas | `linearize-table`: `pandoc-table` lê a estrutura e marca a matemática | — | — |
-| M3 | LaTeX das fórmulas | Um kind novo, `recognize-formula`, antes de `verbalize-formula` e `normalize-formula` | — | kind novo |
-| M4 | Regiões de fórmula e matemática inline | Kinds novos por região candidata e por bloco de prosa. Uma reclassificação cria obrigações, então o ciclo replaneja | — | kinds novos |
-| M5 | Inspeção e extração | Obrigações do job, `inspect-media` e `extract-structure`, sobre um manifesto semente que existe antes da extração | possivelmente nenhuma | um estado semente (versão do schema) |
+| PR | Passo | Obrigação e método | Mudança de papel | Requisitos de Toolbox | Cria obrigações |
+|---|---|---|---|---|---|
+| M1 | Descrições de imagens | `describe-image`: `vision-description` produz a descrição em vez de conferi-la | `validation` → `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | não |
+| M2 | Estrutura das tabelas e matemática inline das tabelas | `linearize-table`: `pandoc-table` lê a estrutura (`DataAgent`) e marca a matemática das células | `validation` → `transitional` (`DataAgent`) | `document.text.spans` | não |
+| M3 | LaTeX das fórmulas | kind novo `recognize-formula`, método `formula-recognizer`, uma dependência de `verbalize-formula` e `normalize-formula` | novo, declarado | `math.recognize`, `pdf.render` | sim: o kind novo, por fórmula |
+| M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`) | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
+| — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
-O M1 é o menor. A obrigação e o método existem, o papel do método passa de
-`validation` para `transitional`, e só a chamada pré-planejamento muda de
-lugar. O M5 é o maior. Ele precisa de um manifesto que exista antes dos seus
-elementos, e é o passo em que o planejamento hierárquico (#774) é a
-alternativa.
+O M1 e o M2 não criam obrigações e não precisam nem do replanejamento de
+descoberta nem de mudança no manifesto, então vêm primeiro. O M3 e o M4
+acrescentam kinds e dependem do replanejamento de descoberta (restrição 1),
+então o gatilho chega com o M3.
 
 Cada PR:
-- tira seu passo de `_enrich_before_planning` (ou de `_execute`, no M5);
+- tira seu passo de `_enrich_before_planning`;
 - atualiza `LOCAL_METHODS` e `METHOD_TOOLBOX_REQUIREMENTS`;
-- acrescenta o teste diferencial e o caso de fixture do Fast Downward (o job
+- acrescenta o teste diferencial e um caso de fixture do Fast Downward (o job
   de CI da #790);
 - atualiza esta página.
 
+## O bootstrap
+
+O bootstrap continua uma fase fixa e auditável na 0.3.0:
+- a inspeção de mídia;
+- o limite de páginas antes e depois da extração;
+- a extração inicial;
+- a injeção de imagem e a anotação de posse que derivam da inspeção.
+
+Encapsulá-lo numa capacidade composta da Toolbox (por exemplo
+`document.bootstrap@1`, que devolveria os fatos de mídia, a contagem de
+páginas e uma referência versionada à estrutura inicial) é uma opção, não uma
+exigência. Só vale a pena se compor `media.inspect` e
+`document.structure.extract` de fato simplificar o fluxo, e mesmo assim a
+Toolbox não formularia obrigações nem o problema. Planejar o próprio
+bootstrap é a #816 (0.4.0).
+
 ## Questões abertas
 
-- **M5: manifesto semente ou um problema separado do job.** Um manifesto
-  semente mantém um problema e um ciclo, mas muda o schema do manifesto. Um
-  problema do job que planeja inspeção e extração e depois passa para o
-  problema do documento é planejamento hierárquico (#774).
-- **Replanejamentos que criam objetos.** Eles devem contar para
-  `max_replans`? A proposta é que não: contar só os replanejamentos que seguem
-  uma falha, e dar aos que criam objetos um limite próprio.
-- **Custos** dos novos métodos e kinds, para que o planejador os ordene como o
-  enriquecimento faz hoje quando nada falha.
-- **O breaker compartilhado** hoje cobre todos os passos de um documento. Como
-  serviço da execução, ele mantém esse escopo; confirmar isso evita que uma
-  indisponibilidade de provider vire uma falha por obrigação.
+- **O replanejamento de descoberta:** a comparação no coordenador ou uma flag
+  em `MethodResult`, e o seu limite.
+- **Custos** dos novos métodos, para que, quando nada falha, o planejador
+  escolha os mesmos métodos que o enriquecimento roda hoje. A ordem em si vem
+  de `depends-on`.
+- **O serviço de enriquecimento:** sua forma no contexto da execução, e a
+  confirmação de que o breaker mantém o escopo de documento inteiro.
+- **Sobreposição entre M1 e M4:** a classificação de fórmulas já descreve um
+  desenho que ela reclassifica. Quando os dois forem métodos, a descrição deve
+  ser feita uma vez só, pelo `vision-description`.
 
 ## Fora do escopo
 
+- Planejar o bootstrap: #816 (0.4.0).
 - Compor o domínio a partir dos fragmentos da Toolbox. Isso espera a decisão
   aberta da ADR-0029, "Fragmentos por versão", que os donos da Toolbox
   precisam aceitar.
