@@ -124,11 +124,13 @@ uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
 `astar(blind())` é o padrão conservador porque preserva custos e suporta
 axiomas/predicados derivados. Um alias pode ser informado explicitamente com
 `--fast-downward-alias`, desde que suas heurísticas suportem os recursos do
-domínio 2.2.
+domínio atual (axiomas e predicados derivados). O Fast Downward ainda não foi
+verificado com o domínio 2.4
+([#790](https://github.com/A11yDevs/acessilia/issues/790)).
 
 O backend interno não pretende substituir um planner geral. Ele explora a
-estrutura específica do domínio 2.2: ordena o DAG de obrigações e escolhe o
-método admissível não tentado de menor custo. É um oráculo simples e
+estrutura específica do domínio: ordena o DAG de obrigações e escolhe o
+método admissível, executável e não tentado de menor custo. É um oráculo simples e
 reprodutível para validar o pipeline.
 
 ### Execução dos dois backends

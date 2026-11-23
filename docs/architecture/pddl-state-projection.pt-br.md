@@ -41,15 +41,19 @@ orquestrador o chama pelo `PlanningEngine` (#744), com um `PlanningProblem`:
 | Cada método admissível | `(supports m k)`, `(admissible m o)` | `supports` vem dos métodos admissíveis do manifesto, não de um catálogo |
 | `method_costs[m]` | `(= (execution-cost m o) custo)` | 50 quando o manifesto não declara custo |
 | Um método fora de `unavailable_methods` | `(available m)` | O Core tem um handler para ele |
-| Os requisitos de catálogo de um método | `(requires m c p)`, objetos `capability` e `provider` | Só para os métodos deste problema; um método sem requisitos não tem nenhum |
-| Os pares exigidos que o snapshot oferece | `(offered c p)` | Gate em `observe` ou `off`: todo requisito é oferecido, então o plano não muda. `enforce`: o que o snapshot publica numa versão compatível; nada sem snapshot (falha fechada) |
+| Os requisitos de catálogo de um método | `(requires m c p)`, objetos `capability` e `provider` | Só para os métodos deste problema. Um método sem requisitos não tem nenhum, então é executável qualquer que seja o catálogo: uma omissão na tabela é um falso positivo no `enforce` (protegida por uma lista que só encolhe; [#789](https://github.com/A11yDevs/acessilia/issues/789)) |
+| Os pares exigidos que o snapshot oferece | `(offered c p)` | Gate em `observe`: todo requisito é oferecido, então o plano não muda. Esses fatos são **presumidos**, não observados: o metadado diz `offered_source: assumed` e lista os métodos que o snapshot descarta (`assumed_runnable_methods`). Gate `off`: sem fatos de catálogo. `enforce`: o que o snapshot publica numa versão compatível; nada sem snapshot (falha fechada) |
 | — | `(runnable m)`, derivado pelo domínio | `available` e todo requisito oferecido. `execute-obligation` o exige |
 | Uma tentativa `failed` ou `rejected` | `(tried o m)` | Uma tentativa `succeeded` não é projetada; seu resultado é o status da obrigação. Uma tentativa `failed` descarta o método para aquela obrigação, qualquer que seja a causa (veja abaixo) |
-| Ids, kinds e nomes de métodos | símbolos PDDL (`[a-z][a-z0-9-]*`) | A projeção guarda o mapeamento nos dois sentidos |
+| Ids, kinds, métodos, capacidades e providers | símbolos PDDL (`[a-z][a-z0-9-]*`), únicos no problema inteiro | Objetos PDDL compartilham um espaço de nomes, qualquer que seja o tipo. A projeção guarda o mapeamento nos dois sentidos |
 
 Fatos duplicados são emitidos uma única vez. O problema não depende da ordem
-das obrigações nem dos seus métodos no manifesto, e ids distintos que se
-normalizam no mesmo símbolo recebem símbolos distintos (um sufixo de hash).
+das obrigações nem dos seus métodos no manifesto. Valores distintos que se
+normalizam no mesmo símbolo recebem símbolos distintos (um sufixo de hash),
+dentro de um tipo e entre tipos: uma obrigação com o nome do seu kind, ou um
+método, uma capacidade e um provider chamados `docling`. Os tipos são nomeados
+numa ordem fixa (obrigação, kind, método, capacidade, provider), e o primeiro
+fica com o símbolo simples. O validador recusa um objeto declarado duas vezes.
 
 Um conjunto vazio de raízes, ou um manifesto sem obrigações, não projeta
 nenhuma obrigação: o plano é `start-job`, `complete-job`.
@@ -104,6 +108,12 @@ a reportada:
   executor recusa um plano feito com outro domínio, então, depois de uma
   mudança de domínio (2.3 → 2.4), um job retomado planeja de novo em vez de
   falhar.
+- Um job retomado reproduz a decisão de catálogo do checkpoint de plano: não
+  lê o catálogo de novo, então seus replanejamentos veem a Toolbox sob a qual
+  o plano foi feito, mesmo que o catálogo tenha mudado. Uma capacidade que
+  sumiu é descoberta quando sua chamada falha na execução, e a tentativa passa
+  a contar como `tried` (veja abaixo). Revalidar o catálogo na retomada é da
+  #640, PR 3.
 - São identidades diferentes. Dois manifestos que diferem só fora da
   projeção (o texto de um elemento, uma observação) produzem o mesmo
   problema, então `problem_sha256` é a identidade do estado de
@@ -127,6 +137,16 @@ Nem todas devem impedir uma nova tentativa do mesmo método. Isso pertence
 aos contratos de resultado, ao journal de execução e às regras de
 replanejamento da #640 (PRs 3 e 4). Esta página documenta o comportamento
 atual.
+
+## Backends
+
+O planejador interno é testado contra o domínio 2.4. O Fast Downward **ainda
+não foi verificado** com ele
+([#790](https://github.com/A11yDevs/acessilia/issues/790)).
+`libs/core/tests/test_fast_downward_domain.py` roda os dois backends sobre os
+mesmos problemas quando `ACESSILIA_FAST_DOWNWARD` aponta para um build do Fast
+Downward. Os predicados derivados exigem uma busca cujas heurísticas suportem
+axiomas, como o padrão `astar(blind())`.
 
 ## O que a ADR-0029 ainda pede
 

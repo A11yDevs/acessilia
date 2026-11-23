@@ -17,8 +17,11 @@ domínio 2.3 continua distribuído.
 `PddlProblemCompiler.compile`, `PlannerAgent` e `PlanningProblem` recebem um
 `catalogue` (`CatalogueFacts`). O gate de disponibilidade o monta a partir do
 snapshot do catálogo (`AvailabilityDecision.catalogue_facts()`):
-- em `observe` ou `off`, todo requisito é oferecido, então o catálogo fica
-  visível no problema e os planos não mudam;
+- em `observe`, todo requisito é oferecido, então o catálogo fica visível no
+  problema e os planos não mudam. Esses fatos são presumidos, não observados:
+  o metadado do gate diz `offered_source: assumed` e lista os métodos que o
+  snapshot descarta (`assumed_runnable_methods`); `off` não acrescenta fatos
+  de catálogo;
 - em `enforce`, o snapshot decide o que é oferecido, e sem snapshot nada é
   (falha fechada). O gate não exclui mais métodos pelo nome
   (`unavailable_methods` fica vazio), e os mesmos métodos são excluídos pelos
@@ -33,6 +36,16 @@ lista de métodos excluídos.
 A identidade do checkpoint de planejamento passa a incluir os hashes do
 domínio. O executor recusa um plano feito com outro domínio, então, depois
 deste deploy, um job retomado planeja de novo em vez de falhar.
+Um job retomado reutiliza a decisão de catálogo do checkpoint de plano e não
+lê o catálogo de novo (revalidação na retomada: #640, PR 3).
+
+Os símbolos PDDL são únicos no problema inteiro: valores de tipos diferentes
+que se normalizam igual (um método e um provider chamados `docling`) recebem
+símbolos distintos, e o validador recusa um objeto declarado duas vezes.
+
+O planejador interno é testado com o domínio 2.4; o Fast Downward ainda não
+foi verificado (#790). `tests/test_fast_downward_domain.py` compara os dois
+backends quando `ACESSILIA_FAST_DOWNWARD` está definido.
 
 ## 0.3.8 — o compilador PDDL recusa dependências cíclicas e desconhecidas
 

@@ -17,8 +17,11 @@ stays shipped.
 `PddlProblemCompiler.compile`, `PlannerAgent` and `PlanningProblem` take a
 `catalogue` (`CatalogueFacts`). The availability gate builds it from the
 catalogue snapshot (`AvailabilityDecision.catalogue_facts()`):
-- in `observe` or `off`, every requirement is offered, so the catalogue is
-  visible in the problem and the plans do not change;
+- in `observe`, every requirement is offered, so the catalogue is visible in
+  the problem and the plans do not change. These facts are assumed, not
+  observed: the gate metadata says `offered_source: assumed` and lists the
+  methods the snapshot rules out (`assumed_runnable_methods`); `off` adds no
+  catalogue facts;
 - in `enforce`, the snapshot decides what is offered, and without a snapshot
   nothing is (fail closed). The gate no longer excludes methods by name
   (`unavailable_methods` is empty), and the same methods are excluded through
@@ -32,7 +35,17 @@ methods.
 
 The planning checkpoint's identity now includes the domain's hashes. The
 executor refuses a plan built under another domain, so after this deploy a
-resumed job plans again instead of failing.
+resumed job plans again instead of failing. A resumed job reuses the plan
+checkpoint's catalogue decision and does not read the catalogue again
+(revalidation on resume: #640, PR 3).
+
+PDDL symbols are unique across the whole problem: values of different types
+that normalize alike (a method and a provider both called `docling`) get
+distinct symbols, and the validator refuses an object declared twice.
+
+The internal planner is tested with domain 2.4; Fast Downward is not verified
+yet (#790). `tests/test_fast_downward_domain.py` compares both backends when
+`ACESSILIA_FAST_DOWNWARD` is set.
 
 ## 0.3.8 — the PDDL compiler refuses cyclic and unknown dependencies
 

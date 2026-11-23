@@ -121,11 +121,13 @@ uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
 
 `astar(blind())` is the conservative default because it preserves costs and supports
 domain axioms/derived predicates. An alias can be given explicitly with
-`--fast-downward-alias`, as long as its heuristics support the features of domain 2.2.
+`--fast-downward-alias`, as long as its heuristics support the features of the current
+domain (axioms and derived predicates). Fast Downward is not yet verified with domain 2.4
+([#790](https://github.com/A11yDevs/acessilia/issues/790)).
 
 The internal backend is not meant to replace a general-purpose planner. It exploits
-the specific structure of domain 2.2: it sorts the obligations DAG and picks the
-cheapest admissible, never-tried method. It is a simple, reproducible oracle for
+the specific structure of the domain: it sorts the obligations DAG and picks the
+cheapest admissible, runnable, never-tried method. It is a simple, reproducible oracle for
 validating the pipeline.
 
 ### Running both backends

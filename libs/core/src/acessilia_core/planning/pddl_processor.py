@@ -104,7 +104,8 @@ class PddlProblemCompiler:
         selected = self._dependency_closure(obligations, roots)
         selected_obligations = {key: obligations[key] for key in selected}
 
-        obligation_symbols = _symbol_table(selected)
+        taken: dict[str, tuple[str, str]] = {}
+        obligation_symbols = _symbol_table(selected, "obligation", taken)
         kinds = sorted({item.kind for item in selected_obligations.values()})
         methods = sorted(
             {
@@ -113,8 +114,8 @@ class PddlProblemCompiler:
                 for method in item.admissible_methods
             }
         )
-        kind_symbols = _symbol_table(kinds)
-        method_symbols = _symbol_table(methods)
+        kind_symbols = _symbol_table(kinds, "obligationkind", taken)
+        method_symbols = _symbol_table(methods, "method", taken)
         available_methods = self._available_methods(
             obligations, methods, unavailable_methods
         )
@@ -410,6 +411,9 @@ class PddlProblemValidator:
                 "problem.pddl não cumpre o contrato do domínio: "
                 + ", ".join(missing)
             )
+        duplicated = _duplicated_objects(problem_text)
+        if duplicated:
+            raise ValueError(f"PDDL objects declared more than once: {duplicated}")
         if projection is None:
             return
         for obligation_id in projection.selected:
@@ -796,8 +800,9 @@ def _catalogue_projection(
 def _render_catalogue(projection: PlanningProjection) -> tuple[list[str], list[str]]:
     """The ``capability`` and ``provider`` object lines, and the catalogue facts."""
     required = sorted({pair for pairs in projection.requirements.values() for pair in pairs})
-    capabilities = _symbol_table(capability for capability, _ in required)
-    providers = _symbol_table(provider for _, provider in required)
+    taken = _taken_symbols(projection)
+    capabilities = _symbol_table((capability for capability, _ in required), "capability", taken)
+    providers = _symbol_table((provider for _, provider in required), "provider", taken)
     objects = [
         f"    {' '.join(sorted(symbols.values()))} - {pddl_type}"
         for symbols, pddl_type in ((capabilities, "capability"), (providers, "provider"))
@@ -817,17 +822,42 @@ def _render_catalogue(projection: PlanningProjection) -> tuple[list[str], list[s
     return objects, facts
 
 
-def _symbol_table(values: Iterable[str]) -> dict[str, str]:
+def _symbol_table(
+    values: Iterable[str],
+    namespace: str,
+    taken: dict[str, tuple[str, str]],
+) -> dict[str, str]:
+    """PDDL symbols for ``values``, unique across the whole problem.
+
+    PDDL objects share one namespace whatever their type, so ``taken`` (symbol
+    -> namespace and value) is shared by every table of a problem. A value
+    whose symbol is already taken gets a hash suffix: within one type from the
+    value alone, as before domain 2.4, and across types from the type too, so
+    a method and a provider both called ``docling`` stay distinct.
+    """
     result: dict[str, str] = {}
-    used: dict[str, str] = {}
     for value in sorted(set(values)):
         symbol = _pddl_symbol(value)
-        if symbol in used and used[symbol] != value:
-            suffix = hashlib.sha256(value.encode()).hexdigest()[:8]
-            symbol = f"{symbol}-{suffix}"
-        used[symbol] = value
+        owner = taken.get(symbol)
+        if owner is not None and owner != (namespace, value):
+            seed = value if owner[0] == namespace else f"{namespace}:{value}"
+            symbol = f"{symbol}-{hashlib.sha256(seed.encode()).hexdigest()[:8]}"
+        taken[symbol] = (namespace, value)
         result[value] = symbol
     return result
+
+
+def _taken_symbols(projection: PlanningProjection) -> dict[str, tuple[str, str]]:
+    """The symbols the projection's obligations, kinds and methods hold."""
+    return {
+        symbol: (namespace, value)
+        for namespace, table in (
+            ("obligation", projection.obligation_symbols),
+            ("obligationkind", projection.kind_symbols),
+            ("method", projection.method_symbols),
+        )
+        for value, symbol in table.items()
+    }
 
 
 def _pddl_symbol(value: str) -> str:
@@ -838,6 +868,20 @@ def _pddl_symbol(value: str) -> str:
     if not PDDL_SYMBOL.fullmatch(normalized):
         raise ValueError(f"Não foi possível gerar símbolo PDDL para: {value!r}")
     return normalized
+
+
+def _duplicated_objects(problem_text: str) -> list[str]:
+    """Object names the ``:objects`` block declares more than once, of any type."""
+    if "(:objects" not in problem_text:
+        return []
+    block = problem_text.split("(:objects", 1)[1].split("(:init", 1)[0]
+    names = [
+        name
+        for line in block.splitlines()
+        if " - " in line
+        for name in line.split(" - ", 1)[0].split()
+    ]
+    return sorted({name for name in names if names.count(name) > 1})
 
 
 def _parenthesis_balance(text: str) -> int:

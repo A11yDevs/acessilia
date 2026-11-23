@@ -42,15 +42,19 @@ orchestrator calls it through the `PlanningEngine` (#744) with a
 | Each admissible method | `(supports m k)`, `(admissible m o)` | `supports` comes from the manifest's admissible methods, not from a catalogue |
 | `method_costs[m]` | `(= (execution-cost m o) cost)` | 50 when the manifest declares no cost |
 | A method not in `unavailable_methods` | `(available m)` | The core has a handler for it |
-| A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | Only for methods of this problem; a method without requirements has none |
-| The required pairs the snapshot offers | `(offered c p)` | Gate in `observe` or `off`: every requirement is offered, so the plan does not change. `enforce`: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed) |
+| A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | Only for methods of this problem. A method without requirements has none, so it is runnable whatever the catalogue says: an omission in the table is a false positive under `enforce` (guarded by a list that only shrinks; [#789](https://github.com/A11yDevs/acessilia/issues/789)) |
+| The required pairs the snapshot offers | `(offered c p)` | Gate in `observe`: every requirement is offered, so the plan does not change. These facts are **assumed**, not observed: the metadata says `offered_source: assumed` and lists the methods the snapshot rules out (`assumed_runnable_methods`). Gate `off`: no catalogue facts. `enforce`: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed) |
 | — | `(runnable m)`, derived by the domain | `available` and every requirement offered. `execute-obligation` needs it |
 | An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status. A `failed` attempt rules the method out for that obligation whatever the cause (see below) |
-| Ids, kinds and method names | PDDL symbols (`[a-z][a-z0-9-]*`) | The projection keeps both directions of the mapping |
+| Ids, kinds, methods, capabilities and providers | PDDL symbols (`[a-z][a-z0-9-]*`), unique across the whole problem | PDDL objects share one namespace whatever their type. The projection keeps both directions of the mapping |
 
 Duplicated facts are emitted once. The problem does not depend on the order
-of the obligations or of their methods in the manifest, and distinct ids that
-normalize to the same symbol get distinct symbols (a hash suffix).
+of the obligations or of their methods in the manifest. Distinct values that
+normalize to the same symbol get distinct symbols (a hash suffix), within a
+type and across types: an obligation named like its kind, or a method, a
+capability and a provider all called `docling`. The types are named in a fixed
+order (obligation, kind, method, capability, provider), and the first keeps
+the plain symbol. The validator refuses an object declared twice.
 
 An empty root set, or a manifest without obligations, projects no obligation:
 the plan is `start-job`, `complete-job`.
@@ -101,6 +105,12 @@ checks run in this order, and the first one that fails is the one reported:
 - The planning checkpoint's identity includes the domain's hashes. The
   executor refuses a plan built under another domain, so after a domain
   change (2.3 → 2.4) a resumed job plans again instead of failing.
+- A resumed run reproduces the plan checkpoint's catalogue decision: it does
+  not read the catalogue again, so its replans see the Toolbox the plan was
+  built under, even if the catalogue changed meanwhile. A capability that
+  disappeared is found when its call fails at execution, and the attempt then
+  counts as `tried` (see below). Revalidating the catalogue on resume belongs
+  to #640, PR 3.
 - The two are different identities. Two manifests that differ only outside
   the projection (an element's text, an observation) produce the same
   problem, so `problem_sha256` is the identity of the planning state, never
@@ -123,6 +133,16 @@ The closed loop needs to tell apart:
 Not all of them should stop a retry of the same method. This belongs to the
 result contracts, the execution journal and the replanning rules of #640
 (PRs 3 and 4). This page documents today's behaviour.
+
+## Backends
+
+The internal planner is tested against domain 2.4. Fast Downward is
+**not verified** with it yet
+([#790](https://github.com/A11yDevs/acessilia/issues/790)).
+`libs/core/tests/test_fast_downward_domain.py` runs both backends on the same
+problems when `ACESSILIA_FAST_DOWNWARD` points to a Fast Downward build. The
+derived predicates need a search whose heuristics support axioms, such as the
+default `astar(blind())`.
 
 ## What ADR-0029 still asks for
 

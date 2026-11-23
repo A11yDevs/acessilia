@@ -112,6 +112,25 @@ class AvailabilityDecision:
         """
         return []
 
+    @property
+    def offered_source(self) -> str:
+        """Where the ``offered`` facts come from (review of #781).
+
+        ``catalogue_snapshot``: what the snapshot publishes (``enforce``).
+        ``assumed``: every requirement is offered whatever the snapshot says
+        (``observe``, option (a) of #640); not evidence of availability.
+        ``none``: no requirement to offer (``off``, or no Toolbox method).
+        """
+        if not self.requirements:
+            return "none"
+        return "assumed" if self.offered is None else "catalogue_snapshot"
+
+    @property
+    def assumed_runnable(self) -> list[str]:
+        """Methods the snapshot rules out that the plan may still use, because
+        the facts are assumed (``observe``)."""
+        return sorted(self.blocked) if self.offered is None else []
+
     def catalogue_facts(self) -> CatalogueFacts:
         """The decision as problem facts (domain 2.4)."""
         return CatalogueFacts(
@@ -128,6 +147,8 @@ class AvailabilityDecision:
             "applied": self.enforced and bool(self.blocked),
             "requirements": {method: [list(pair) for pair in pairs] for method, pairs in self.requirements.items()},
             "offered": None if self.offered is None else [list(pair) for pair in self.offered],
+            "offered_source": self.offered_source,
+            "assumed_runnable_methods": self.assumed_runnable,
         }
 
     @classmethod

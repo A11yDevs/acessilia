@@ -280,6 +280,46 @@ def test_requirements_of_methods_outside_the_problem_are_ignored():
     assert "requires" not in compiled.text
 
 
+def test_the_same_capability_from_another_provider_is_not_an_offer():
+    compiled = _compile(
+        _manifest(_obligation("o-1")),
+        catalogue=_catalogue(offered=frozenset({_EXTRACT, ("pdf.render", "other")})),
+    )
+    assert compiled.projection.runnable_methods == {"m-a"}
+
+
+def _all_objects(compiled) -> list[str]:
+    block = compiled.text.split("(:objects", 1)[1].split("(:init", 1)[0]
+    return [name for line in block.splitlines() if " - " in line for name in line.split(" - ")[0].split()]
+
+
+def test_objects_of_different_types_never_share_a_symbol():
+    """PDDL objects share one namespace whatever their type (review of #781):
+    an obligation named like its kind, and a method, a capability and a
+    provider all called ``docling``, still get distinct symbols."""
+    catalogue = CatalogueFacts(requirements={"docling": frozenset({("docling", "docling")})})
+    manifest = _manifest(_obligation("test-kind", methods=("docling", "m-a")))
+    compiled = _compile(manifest, catalogue=catalogue)
+    names = _all_objects(compiled)
+    assert len(names) == len(set(names))
+    # The first type keeps its plain symbol; the order is obligation, kind,
+    # method, capability, provider.
+    assert compiled.projection.obligation_symbols == {"test-kind": "test-kind"}
+    assert compiled.projection.method_symbols["docling"] == "docling"
+    assert "(requires docling" in compiled.text
+    _, plan = PlannerAgent().plan(manifest, catalogue=catalogue, selected_roots=["test-kind"])
+    assert {step.obligation_id for step in plan.steps if step.method} == {"test-kind"}
+
+
+def test_the_validator_refuses_an_object_declared_twice():
+    from acessilia_core.planning.pddl_processor import PddlProblemValidator
+
+    compiled = _compile(_manifest(_obligation("o-1")))
+    broken = compiled.text.replace("o-1 - obligation", "o-1 - obligation\n    o-1 - provider", 1)
+    with pytest.raises(ValueError, match=r"declared more than once: \['o-1'\]"):
+        PddlProblemValidator(DomainBundle.load()).validate(broken)
+
+
 # Edge cases (review of #775).
 
 
