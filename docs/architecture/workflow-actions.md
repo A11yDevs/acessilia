@@ -109,7 +109,10 @@ bootstrap's detections are checked. Checking a label, a table's shape or a
 recognition against the text layer decides the workflow, so it belongs in the
 plan.
 
-Two points about the bootstrap's configuration, to confirm with the Toolbox:
+The policy is ADR-0030 (proposed in #819): the structure suites stay
+structural, and whatever else they offer is used per capability, as a provider
+competing with the others. Two points of today's configuration do not match it
+yet:
 - **The design intent is enforced only by the Toolbox's defaults.** The core
   sends `document.structure.extract` only the language and the cache flag,
   and no pipeline option. The plugins that are off are off because of the
@@ -121,8 +124,10 @@ Two points about the bootstrap's configuration, to confirm with the Toolbox:
   `formula_enable=true` and `table_enable=true` unless told otherwise;
   `develop` moves to MinerU 4.0.12 with `--tier basic`. In dual mode, a fused
   formula that comes from MinerU with LaTeX, or a table that comes with HTML,
-  passes the gate, and so skips PP-FormulaNet or the table reader. Whether
-  that matches the design intent is the Toolbox's decision.
+  passes the gate, and so skips PP-FormulaNet or the table reader. Under
+  ADR-0030, formula recognition goes off in the structure capability, while
+  table structure is structural and stays
+  ([acessilia-toolbox#169](https://github.com/A11yDevs/acessilia-toolbox/issues/169)).
 
 ## The key observation
 
@@ -242,10 +247,9 @@ itself is #816 (0.4.0).
 
 ## Open questions
 
-- **The bootstrap's configuration:** whether the core should state the
-  pipeline options it relies on (Docling's enrichments off, MinerU's formula
-  and table recognition), and record the effective ones in the manifest,
-  instead of relying on the Toolbox's defaults.
+- **The bootstrap's configuration:** ADR-0030 makes the options the core
+  relies on explicit and recorded. Once the Toolbox reports them (#169), the
+  manifest keeps them as provenance.
 
 - **The discovery replan:** the coordinator comparison or a `MethodResult`
   flag, and its bound.

@@ -110,7 +110,10 @@ são onde as detecções do bootstrap são conferidas. Conferir um rótulo, a fo
 de uma tabela ou um reconhecimento contra a camada de texto decide o
 workflow, então pertence ao plano.
 
-Dois pontos sobre a configuração do bootstrap, a confirmar com a Toolbox:
+A política é a ADR-0030 (proposta no #819): as suítes de estrutura ficam
+estruturais, e o que mais oferecerem é usado por capacidade, como um provider
+que compete com os outros. Dois pontos da configuração atual ainda não
+correspondem a ela:
 - **A intenção do desenho só é garantida pelos padrões da Toolbox.** O core
   manda para `document.structure.extract` só o idioma e a flag de cache, e
   nenhuma opção de pipeline. Os plugins desligados estão desligados por causa
@@ -124,8 +127,10 @@ Dois pontos sobre a configuração do bootstrap, a confirmar com a Toolbox:
   contrário; o `develop` passa para o MinerU 4.0.12 com `--tier basic`. No
   modo dual, uma fórmula fundida que vem do MinerU com LaTeX, ou uma tabela
   que vem com HTML, passa pela condição e assim pula o PP-FormulaNet ou o
-  leitor de tabelas. Se isso corresponde à intenção do desenho é decisão da
-  Toolbox.
+  leitor de tabelas. Pela ADR-0030, o reconhecimento de fórmulas sai da
+  capacidade de estrutura, enquanto a estrutura das tabelas é estrutural e
+  fica
+  ([acessilia-toolbox#169](https://github.com/A11yDevs/acessilia-toolbox/issues/169)).
 
 ## A observação central
 
@@ -251,10 +256,9 @@ bootstrap é a #816 (0.4.0).
 
 ## Questões abertas
 
-- **A configuração do bootstrap:** se o core deve declarar as opções de
-  pipeline das quais depende (os enriquecimentos do Docling desligados, o
-  reconhecimento de fórmulas e tabelas do MinerU) e registrar as efetivas no
-  manifesto, em vez de depender dos padrões da Toolbox.
+- **A configuração do bootstrap:** a ADR-0030 torna explícitas e
+  registradas as opções das quais o core depende. Quando a Toolbox as
+  informar (#169), o manifesto as guarda como proveniência.
 
 - **O replanejamento de descoberta:** a comparação no coordenador ou uma flag
   em `MethodResult`, e o seu limite.
