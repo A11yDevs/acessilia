@@ -76,10 +76,10 @@ test-failed:
 	$(UV) run python scripts/test_failed.py
 
 test-baseline:
-	$(UV) run python scripts/tests/collect_timings.py collect --run --output "$(BASELINE)"
+	$(UV) run --extra dev python scripts/tests/collect_timings.py collect --run --output "$(BASELINE)"
 
 test-baseline-compare:
-	$(UV) run python scripts/tests/collect_timings.py compare \
+	$(UV) run --extra dev python scripts/tests/collect_timings.py compare \
 		docs/testing/baseline.json "$(BASELINE)"
 
 test-all:

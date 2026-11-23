@@ -85,7 +85,7 @@
         "covered_branches": 679,
         "num_branches": 818
       },
-      "log": "/Users/akira/dados/sync/dev/acessilia-tests/acessilia/var/timings-serial/app/pytest.log",
+      "log": "var/timings-serial/app/pytest.log",
       "exit_code": 0
     }
   ],

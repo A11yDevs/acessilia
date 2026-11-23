@@ -232,6 +232,11 @@ dependências.
 | Cenário | Antes | Depois |
 |---|---:|---:|
 | Core, serial vs quatro workers | 143s | 74s (~1,9x) |
+
+O valor 143s → 74s é da #448, com a suíte como era na época. O baseline maior da
+#644, medido depois, está em [testing/optimization.pt-br.md](testing/optimization.pt-br.md)
+(890,15s serial contra 157,23s com quatro workers); use esse guia para os
+números atuais.
 | Etapa da suíte principal na CI | 60s + 10s de coleta | 26–43s |
 | Job `tests` da CI | 1m59s | 59s–1m26s (uma execução: 1m11s) |
 

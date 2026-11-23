@@ -90,6 +90,37 @@ def test_suite_record_summarizes_counts_timings_and_coverage(tmp_path: Path) -> 
     assert record["slowest"][0]["nodeid"].endswith("::test_slow")
 
 
+def test_suite_record_prefixes_nodeids_and_relativizes_the_log(tmp_path: Path) -> None:
+    report = _write_report(tmp_path / "results.xml")
+    log = tmp_path / "var" / "pytest.log"
+    log.parent.mkdir(parents=True)
+    log.write_text("log", encoding="utf-8")
+
+    record = timings.suite_record(
+        report,
+        "sdk",
+        root=tmp_path,
+        log=log,
+        log_root=tmp_path,
+        nodeid_prefix=Path("libs/sdk"),
+    )
+
+    assert record["slowest"][0]["nodeid"] == (
+        "libs/sdk/tests/test_sample.py::test_slow"
+    )
+    assert record["log"] == "var/pytest.log"
+
+
+def test_suite_total_does_not_invent_wall_time(tmp_path: Path) -> None:
+    report = _write_report(tmp_path / "results.xml")
+    record = timings.suite_record(report, "app", root=tmp_path)
+
+    total = timings._suite_total([record])
+
+    assert total["wall_seconds"] is None
+    assert total["junit_seconds"] == 2.5
+
+
 def test_coverage_totals_tolerate_missing_and_broken_reports(tmp_path: Path) -> None:
     assert timings._coverage_totals(tmp_path / "absent.json") is None
 
@@ -115,6 +146,20 @@ def test_render_summary_lists_every_suite_and_total() -> None:
     assert "| app | 10 | 0 | 10.00 | 12.00 |" in summary
     assert "| core | 10 | 0 | 2.00 | 3.00 |" in summary
     assert "20 tests, 12.00s of JUnit time and 15.00s of wall-clock time" in summary
+
+
+def test_render_summary_marks_an_unmeasured_wall_time() -> None:
+    baseline = {
+        "environment": {"revision": "a" * 40, "python": "3.12.13", "xdist_workers": None},
+        "suites": [{**_record("app", 10.0, 0.0, 86.0), "wall_seconds": None}],
+        "totals": {"tests": 10, "junit_seconds": 10.0, "wall_seconds": None},
+    }
+
+    summary = timings.render_summary(baseline)
+
+    assert "xdist workers: unknown" in summary
+    assert "wall-clock time not measured" in summary
+    assert "0.00s of wall-clock time" not in summary
 
 
 def test_compare_reports_signed_deltas() -> None:
@@ -147,6 +192,38 @@ def test_compare_reports_signed_deltas() -> None:
     assert "| app | -1.000 | -2.500 | -3.000 | -1.250 | -0.500 |" in summary
 
 
+def test_compare_does_not_invent_a_wall_delta() -> None:
+    before = {
+        "suites": [_record("app", 10.0, 12.0, 86.0)],
+        "totals": {"tests": 10, "junit_seconds": 10.0, "wall_seconds": 12.0},
+    }
+    after = {
+        "suites": [{**_record("app", 8.0, 0.0, 86.0), "wall_seconds": None}],
+        "totals": {"tests": 10, "junit_seconds": 8.0, "wall_seconds": None},
+    }
+
+    comparison = timings.compare(before, after)
+
+    assert comparison["totals"]["wall_seconds"] is None
+    assert "wall-clock time not measured" in timings.render_comparison(comparison)
+    assert "0.00s of wall-clock time" not in timings.render_comparison(comparison)
+
+
+def test_suite_command_keeps_the_parallel_app_run_and_serial_libraries() -> None:
+    app = timings._suite_command(
+        timings._spec("app"), timings.ROOT, Path("r.xml"), Path("c.json"), xdist=4
+    )
+    sdk = timings._suite_command(
+        timings._spec("sdk"), timings.ROOT, Path("r.xml"), Path("c.json"), xdist=4
+    )
+
+    assert "-n" in app and "4" in app and "--dist" in app and "worksteal" in app
+    assert "-n" not in sdk
+    assert "--cov=backend" in app and "--cov=frontend" in app
+    assert "--cov=acessilia_sdk" in sdk
+    assert "--cov-branch" in app and "--cov-branch" in sdk
+
+
 def test_main_collect_reads_junit_reports_and_writes_the_baseline(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -177,6 +254,7 @@ def test_main_collect_reads_junit_reports_and_writes_the_baseline(
     assert payload["suites"][0]["coverage"]["percent_covered"] == 91.5
     assert summary.read_text(encoding="utf-8").startswith("## Test suite baseline")
     assert "Total: 3 tests" in capsys.readouterr().out
+    assert payload["totals"]["wall_seconds"] is None
 
 
 def test_main_collect_rejects_a_missing_report(
@@ -204,6 +282,46 @@ def test_main_collect_rejects_an_unknown_suite(
             "collect",
             "--report",
             f"unknown={tmp_path / 'results.xml'}",
+            "--output",
+            str(tmp_path / "baseline.json"),
+        ]
+    )
+
+    assert status == 2
+    assert "unknown suite" in capsys.readouterr().err
+
+
+def test_main_collect_rejects_a_truncated_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = tmp_path / "truncated.xml"
+    report.write_text("<testsuites><testsuite><testcase", encoding="utf-8")
+
+    status = timings.main(
+        [
+            "collect",
+            "--report",
+            f"app={report}",
+            "--output",
+            str(tmp_path / "baseline.json"),
+        ]
+    )
+
+    assert status == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_main_collect_rejects_an_unknown_only_label(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    status = timings.main(
+        [
+            "collect",
+            "--run",
+            "--only",
+            "app,bogus",
+            "--work-dir",
+            str(tmp_path),
             "--output",
             str(tmp_path / "baseline.json"),
         ]
@@ -272,3 +390,29 @@ def test_only_known_suite_labels_are_accepted() -> None:
     assert timings._spec("app").label == "app"
     with pytest.raises(ValueError, match="unknown suite"):
         timings._spec("frontend")
+
+
+def test_the_guide_table_matches_the_committed_baseline() -> None:
+    docs = Path(__file__).resolve().parents[1] / "docs" / "testing"
+    baseline = json.loads((docs / "baseline.json").read_text(encoding="utf-8"))
+    text = (docs / "optimization.md").read_text(encoding="utf-8")
+    labels = {
+        "Application (`tests/`)": "app",
+        "docstruct": "docstruct",
+        "SDK": "sdk",
+        "core": "core",
+    }
+    rows = {}
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if cells and cells[0] in labels and len(cells) == 7:
+            rows[labels[cells[0]]] = cells
+    assert set(rows) == set(labels.values())
+    for suite in baseline["suites"]:
+        cells = rows[suite["label"]]
+        assert int(cells[1].replace(",", "")) == suite["tests"]
+        assert float(cells[2]) == pytest.approx(suite["junit_seconds"], abs=0.005)
+        assert float(cells[3]) == pytest.approx(suite["wall_seconds"], abs=0.005)
+        assert float(cells[4]) == pytest.approx(suite["p50_seconds"], abs=0.0005)
+        assert float(cells[5]) == pytest.approx(suite["p95_seconds"], abs=0.0005)
+        assert cells[6] == f"{suite['coverage']['percent_covered']:.1f}%"

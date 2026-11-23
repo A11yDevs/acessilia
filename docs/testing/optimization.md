@@ -24,7 +24,7 @@ environment, with the same coverage configuration the CI gate uses, and keeps:
 
 | Measure | Source |
 |---|---|
-| Test count, failures, errors, skips | JUnit `testsuite` attributes |
+| Test count, failures, errors, skips | JUnit `testcase` elements |
 | Per-test duration, p50/p95, slowest tests | JUnit `testcase@time` |
 | Suite JUnit time | Sum of `testsuite@time` |
 | Suite wall-clock time | `time.monotonic()` around the pytest process |
@@ -35,7 +35,7 @@ A second mode reads reports produced by CI, so a baseline can be refreshed
 without repeating the suites:
 
 ```bash
-uv run python scripts/tests/collect_timings.py collect \
+uv run --extra dev python scripts/tests/collect_timings.py collect \
   --report app=test-results.xml \
   --report docstruct=libs/docstruct/docstruct-test-results.xml \
   --report sdk=libs/sdk/sdk-test-results.xml \
@@ -58,7 +58,7 @@ make test-baseline
 make test-baseline-compare BASELINE=var/timings/baseline.json
 
 # The application suite serially, for the parallelism comparison
-uv run python scripts/tests/collect_timings.py collect --run --only app \
+uv run --extra dev python scripts/tests/collect_timings.py collect --run --only app \
   --xdist 0 --work-dir var/timings-serial \
   --output var/timings-serial/baseline.json
 ```
@@ -74,9 +74,9 @@ same command on the same machine before treating a difference as a regression.
 | Suite | Tests | JUnit (s) | Wall (s) | p50 (s) | p95 (s) | Coverage (branch) |
 |---|---:|---:|---:|---:|---:|---:|
 | Application (`tests/`) | 3,181 | 151.76 | 157.23 | 0.014 | 0.216 | 87.9% |
-| docstruct | 1,859 | 93.09 | 96.48 | 0.005 | 0.080 | 87.0% |
-| SDK | 702 | 28.34 | 31.20 | 0.004 | 0.070 | 97.3% |
-| core | 1,379 | 37.13 | 41.25 | 0.006 | 0.120 | 82.7% |
+| docstruct | 1,859 | 93.09 | 96.48 | 0.006 | 0.076 | 87.0% |
+| SDK | 702 | 28.34 | 31.20 | 0.027 | 0.072 | 97.3% |
+| core | 1,379 | 37.13 | 41.25 | 0.003 | 0.122 | 82.7% |
 | **Total** | **7,121** | **310.32** | **326.17** | — | — | — |
 
 The application suite is 49% of the JUnit time; docstruct is 30%, even though
@@ -131,9 +131,11 @@ prioritize: overlap without duration is only half of the cost question.
 ## Limitations
 
 - **One run per suite.** JUnit time varies with machine load; the slowest test
-  in the serial run took 88.56s versus 52.19s in the parallel run because the
-  same CPU also served the other workers. Compare runs made under the same
-  conditions, ideally more than once.
+  in the serial run took 88.56s versus 52.19s in the parallel run. The serial
+  run is a single process with a much larger resident set and no worker
+  isolation, so GC and memory pressure are plausible causes; this measurement
+  does not establish which one. Compare runs made under the same conditions,
+  ideally more than once.
 - **Collection time is not in JUnit.** pytest reports test call, setup and
   teardown durations, not collection. The wall-clock time includes it.
 - **Fixture attribution is indirect.** A slow setup appears in the `testcase`

@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 from typing import Any, Sequence
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -78,7 +79,7 @@ def _git_revision(root: Path) -> str:
         return "unknown"
 
 
-def environment(root: Path = ROOT, *, xdist: int = 4) -> dict[str, Any]:
+def environment(root: Path = ROOT, *, xdist: int | None = 4) -> dict[str, Any]:
     """The environment that makes a baseline comparable with another run."""
     versions: dict[str, str] = {}
     for package in ("pytest", "pytest-xdist", "coverage", "pytest-cov"):
@@ -116,6 +117,19 @@ def _coverage_totals(path: Path) -> dict[str, Any] | None:
     return {key: totals[key] for key in keys if key in totals}
 
 
+def _nodeid(nodeid: str, prefix: Path | None) -> str:
+    if prefix is None or prefix == Path("."):
+        return nodeid
+    return f"{prefix.as_posix().strip('/')}/{nodeid}"
+
+
+def _display_path(path: Path, root: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except (OSError, ValueError):
+        return path.as_posix()
+
+
 def suite_record(
     report: Path,
     label: str,
@@ -124,8 +138,15 @@ def suite_record(
     coverage_report: Path | None = None,
     wall_seconds: float | None = None,
     log: Path | None = None,
+    nodeid_prefix: Path | None = None,
+    log_root: Path = ROOT,
 ) -> dict[str, Any]:
-    """Summarize one suite's JUnit report, coverage totals and wall time."""
+    """Summarize one suite's JUnit report, coverage totals and wall time.
+
+    ``root`` is the directory the JUnit class names are relative to (the suite
+    directory). ``nodeid_prefix`` turns those node ids into repository-relative
+    ones, so the same test name cannot be confused between suites.
+    """
     result = parse_report(report, label, root=root)
     record: dict[str, Any] = {
         "label": label,
@@ -139,7 +160,7 @@ def suite_record(
         "p95_seconds": round(result.percentile(0.95), 4),
         "slowest": [
             {
-                "nodeid": case.nodeid,
+                "nodeid": _nodeid(case.nodeid, nodeid_prefix),
                 "outcome": case.outcome,
                 "seconds": round(case.seconds, 4),
             }
@@ -151,7 +172,7 @@ def suite_record(
     if coverage_report is not None:
         record["coverage"] = _coverage_totals(coverage_report)
     if log is not None:
-        record["log"] = str(log)
+        record["log"] = _display_path(log, log_root)
     return record
 
 
@@ -226,10 +247,12 @@ def run_suite(
     record = suite_record(
         report,
         spec.label,
-        root=root,
+        root=root / spec.directory,
         coverage_report=coverage,
         wall_seconds=wall_seconds,
         log=log,
+        nodeid_prefix=spec.directory,
+        log_root=root,
     )
     record["exit_code"] = completed.returncode
     return record
@@ -253,27 +276,31 @@ def _parse_reports(values: Sequence[str]) -> dict[str, Path]:
     return reports
 
 
-def _suite_total(records: Sequence[dict[str, Any]]) -> dict[str, float]:
+def _suite_total(records: Sequence[dict[str, Any]]) -> dict[str, float | int | None]:
+    walls = [
+        float(record["wall_seconds"])
+        for record in records
+        if isinstance(record.get("wall_seconds"), (int, float))
+    ]
     return {
         "tests": sum(int(record.get("tests", 0)) for record in records),
         "junit_seconds": round(
             sum(float(record.get("junit_seconds", 0)) for record in records), 3
         ),
-        "wall_seconds": round(
-            sum(float(record.get("wall_seconds", 0)) for record in records), 3
-        ),
+        "wall_seconds": round(sum(walls), 3) if walls else None,
     }
 
 
 def render_summary(baseline: dict[str, Any]) -> str:
     """Markdown summary of one baseline, ready for a pull request body."""
     suites = baseline.get("suites", [])
+    xdist = baseline.get("environment", {}).get("xdist_workers")
     lines = [
         "## Test suite baseline (#644)",
         "",
         f"- Revision: `{baseline.get('environment', {}).get('revision', 'unknown')}`",
         f"- Python: {baseline.get('environment', {}).get('python', 'unknown')}",
-        f"- xdist workers: {baseline.get('environment', {}).get('xdist_workers', 0)}",
+        f"- xdist workers: {xdist if xdist is not None else 'unknown'}",
         "",
         "| Suite | Tests | Failed | JUnit (s) | Wall (s) | p95 (s) | Coverage |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -292,12 +319,17 @@ def render_summary(baseline: dict[str, Any]) -> str:
             f"| {record.get('p95_seconds', 0):.2f} | {coverage_text} |"
         )
     totals = baseline.get("totals", {})
+    wall = totals.get("wall_seconds")
+    wall_text = (
+        f"{wall:.2f}s of wall-clock time"
+        if isinstance(wall, (int, float))
+        else "wall-clock time not measured"
+    )
     lines += [
         "",
         (
             f"Total: {int(totals.get('tests', 0))} tests, "
-            f"{totals.get('junit_seconds', 0):.2f}s of JUnit time and "
-            f"{totals.get('wall_seconds', 0):.2f}s of wall-clock time."
+            f"{totals.get('junit_seconds', 0):.2f}s of JUnit time and {wall_text}."
         ),
         "",
         "### Slowest tests",
@@ -391,12 +423,18 @@ def render_comparison(comparison: dict[str, Any]) -> str:
             return "—"
         return f"{value:+.{digits}f}"
 
+    wall = totals.get("wall_seconds")
+    wall_text = (
+        f"{wall:+.2f}s of wall-clock time"
+        if isinstance(wall, (int, float))
+        else "wall-clock time not measured"
+    )
     lines += [
         "",
         (
             f"Total: {_signed(totals.get('tests'), 0)} tests, "
             f"{_signed(totals.get('junit_seconds'), 2)}s of JUnit time and "
-            f"{_signed(totals.get('wall_seconds'), 2)}s of wall-clock time."
+            f"{wall_text}."
         ),
         "",
     ]
@@ -420,12 +458,14 @@ def _collect_reports(
         if not report.is_file():
             missing.append(str(report))
             continue
+        spec = _spec(label)
         records.append(
             suite_record(
                 report,
                 label,
-                root=ROOT,
+                root=ROOT / spec.directory,
                 coverage_report=args.coverage_dir / label / "coverage.json",
+                nodeid_prefix=spec.directory,
             )
         )
     if missing:
@@ -433,17 +473,21 @@ def _collect_reports(
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "junit",
-        "environment": environment(ROOT, xdist=args.xdist),
+        "environment": environment(ROOT, xdist=None),
         "suites": records,
         "totals": _suite_total(records),
     }
 
 
 def _collect_run(args: argparse.Namespace) -> dict[str, Any]:
-    selected = args.only.split(",") if args.only else list(SUITE_LABELS)
+    selected = [label.strip() for label in args.only.split(",") if label.strip()]
+    if not selected:
+        selected = list(SUITE_LABELS)
+    for label in selected:
+        _spec(label)
     records = [
         run_suite(
-            _spec(label.strip()),
+            _spec(label),
             root=ROOT,
             work_dir=args.work_dir,
             xdist=args.xdist,
@@ -499,22 +543,32 @@ def _compare_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(handler=_handle_compare)
 
 
+def _append_summary(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(text)
+
+
 def _handle_collect(args: argparse.Namespace) -> int:
-    if args.run:
-        baseline = _collect_run(args)
-    else:
-        try:
+    try:
+        if args.run:
+            baseline = _collect_run(args)
+        else:
             reports = _parse_reports(args.report)
             baseline = _collect_reports(args, reports)
-        except (ValueError, FileNotFoundError) as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 2
+    except (
+        ElementTree.ParseError,
+        FileNotFoundError,
+        OSError,
+        ValueError,
+    ) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     summary = render_summary(baseline)
     print(summary)
     _write_json(args.output, baseline)
     if args.summary:
-        args.summary.parent.mkdir(parents=True, exist_ok=True)
-        args.summary.write_text(summary, encoding="utf-8")
+        _append_summary(args.summary, summary)
     return 1 if _failing(baseline["suites"]) else 0
 
 
@@ -531,8 +585,7 @@ def _handle_compare(args: argparse.Namespace) -> int:
     if args.json:
         _write_json(args.json, comparison)
     if args.summary:
-        args.summary.parent.mkdir(parents=True, exist_ok=True)
-        args.summary.write_text(summary, encoding="utf-8")
+        _append_summary(args.summary, summary)
     return 0
 
 
