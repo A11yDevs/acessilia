@@ -133,6 +133,60 @@ def test_coverage_totals_tolerate_missing_and_broken_reports(tmp_path: Path) -> 
     assert timings._coverage_totals(unexpected) is None
 
 
+def test_combine_runs_reports_median_and_range() -> None:
+    runs = [
+        {**_record("app", 9.0, 10.0, 86.0), "p50_seconds": 0.1},
+        {**_record("app", 10.0, 12.0, 86.0), "p50_seconds": 0.2},
+        {**_record("app", 11.0, 14.0, 86.0), "p50_seconds": 0.3},
+    ]
+
+    combined = timings.combine_runs(runs)
+
+    assert combined["junit_seconds"] == 10.0
+    assert combined["wall_seconds"] == 12.0
+    assert combined["wall_seconds_min"] == 10.0
+    assert combined["wall_seconds_max"] == 14.0
+    assert combined["runs_count"] == 3
+    assert combined["runs"] == runs
+
+    summary = timings.render_summary(
+        {
+            "environment": {"revision": "a" * 40, "python": "3.12.13", "xdist_workers": 4},
+            "suites": [combined],
+            "totals": {"tests": 10, "junit_seconds": 10.0, "wall_seconds": 12.0},
+        }
+    )
+    assert "12.00 (10.00–14.00)" in summary
+
+
+def test_combine_runs_rejects_an_empty_list() -> None:
+    with pytest.raises(ValueError, match="at least one run"):
+        timings.combine_runs([])
+
+
+def test_run_suite_without_a_junit_report_is_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Completed:
+        returncode = 1
+        stdout = ""
+        stderr = "pytest crashed"
+
+    def fake_run(*args, **kwargs):
+        return Completed()
+
+    monkeypatch.setattr(timings.subprocess, "run", fake_run)
+
+    record = timings.run_suite(
+        timings._spec("app"),
+        root=tmp_path,
+        work_dir=tmp_path / "work",
+    )
+
+    assert record["failed"] == 1
+    assert "without a JUnit report" in record["error"]
+
+
 def test_render_summary_lists_every_suite_and_total() -> None:
     baseline = {
         "environment": {"revision": "a" * 40, "python": "3.12.13", "xdist_workers": 4},
@@ -309,6 +363,24 @@ def test_main_collect_rejects_a_truncated_report(
 
     assert status == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_main_collect_rejects_a_non_positive_repeat(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    status = timings.main(
+        [
+            "collect",
+            "--run",
+            "--repeat",
+            "0",
+            "--output",
+            str(tmp_path / "baseline.json"),
+        ]
+    )
+
+    assert status == 2
+    assert "--repeat must be at least 1" in capsys.readouterr().err
 
 
 def test_main_collect_rejects_an_unknown_only_label(

@@ -177,6 +177,8 @@ def test_build_report_keeps_the_top_pairs_and_zero_exclusive_tests() -> None:
     assert report["summary"]["tests"] == 2
     assert report["summary"]["pairs"] == 1
     assert report["summary"]["coverage_subsets"] == 1
+    assert report["summary"]["pair_search_complete"] is False
+    assert report["summary"]["pair_search_cap"] == 50
     assert report["pairs"][0]["similarity"] == 1.0
     assert report["coverage_subsets"][0]["subsumed"] == "tests::test_a"
     assert report["zero_exclusive"] == [

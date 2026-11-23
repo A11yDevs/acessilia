@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import platform
+import statistics
 import subprocess
 import sys
 import time
@@ -276,6 +277,38 @@ def _parse_reports(values: Sequence[str]) -> dict[str, Path]:
     return reports
 
 
+def _median(values: Sequence[float]) -> float | None:
+    return round(statistics.median(values), 3) if values else None
+
+
+def combine_runs(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """One suite record from repeated runs: median metrics plus dispersion."""
+    if not runs:
+        raise ValueError("at least one run is required")
+    record = dict(runs[0])
+    for key in ("junit_seconds", "wall_seconds", "p50_seconds", "p95_seconds"):
+        values = [
+            float(run[key]) for run in runs if isinstance(run.get(key), (int, float))
+        ]
+        record[key] = _median(values)
+    walls = [
+        float(run["wall_seconds"])
+        for run in runs
+        if isinstance(run.get("wall_seconds"), (int, float))
+    ]
+    if walls:
+        record["wall_seconds_min"] = round(min(walls), 3)
+        record["wall_seconds_max"] = round(max(walls), 3)
+    record["runs_count"] = len(runs)
+    record["runs"] = list(runs)
+    if any(run.get("exit_code") for run in runs):
+        record["exit_code"] = max(int(run.get("exit_code") or 1) for run in runs)
+    coverage = runs[-1].get("coverage")
+    if coverage is not None:
+        record["coverage"] = coverage
+    return record
+
+
 def _suite_total(records: Sequence[dict[str, Any]]) -> dict[str, float | int | None]:
     walls = [
         float(record["wall_seconds"])
@@ -310,7 +343,13 @@ def render_summary(baseline: dict[str, Any]) -> str:
         percent = coverage.get("percent_covered")
         coverage_text = f"{percent:.1f}%" if isinstance(percent, (int, float)) else "—"
         wall = record.get("wall_seconds")
-        wall_text = f"{wall:.2f}" if isinstance(wall, (int, float)) else "—"
+        if isinstance(wall, (int, float)) and record.get("runs_count", 1) > 1:
+            wall_text = (
+                f"{wall:.2f} ({record.get('wall_seconds_min', wall):.2f}–"
+                f"{record.get('wall_seconds_max', wall):.2f})"
+            )
+        else:
+            wall_text = f"{wall:.2f}" if isinstance(wall, (int, float)) else "—"
         lines.append(
             f"| {record['label']} | {record.get('tests', 0)} "
             f"| {record.get('failed', 0) + record.get('errors', 0)} "
@@ -485,15 +524,19 @@ def _collect_run(args: argparse.Namespace) -> dict[str, Any]:
         selected = list(SUITE_LABELS)
     for label in selected:
         _spec(label)
-    records = [
-        run_suite(
-            _spec(label),
-            root=ROOT,
-            work_dir=args.work_dir,
-            xdist=args.xdist,
-        )
-        for label in selected
-    ]
+    records = []
+    for label in selected:
+        spec = _spec(label)
+        runs = [
+            run_suite(
+                spec,
+                root=ROOT,
+                work_dir=args.work_dir,
+                xdist=args.xdist,
+            )
+            for _ in range(args.repeat)
+        ]
+        records.append(combine_runs(runs) if args.repeat > 1 else runs[0])
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "run",
@@ -527,6 +570,12 @@ def _collect_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--coverage-dir", type=Path, default=DEFAULT_COVERAGE_DIR)
     parser.add_argument("--xdist", type=int, default=4)
     parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="run each selected suite N times and report median/dispersion",
+    )
+    parser.add_argument(
         "--only",
         default="",
         help="comma-separated suites for --run (default: all four)",
@@ -550,6 +599,9 @@ def _append_summary(path: Path, text: str) -> None:
 
 
 def _handle_collect(args: argparse.Namespace) -> int:
+    if args.run and args.repeat < 1:
+        print("error: --repeat must be at least 1", file=sys.stderr)
+        return 2
     try:
         if args.run:
             baseline = _collect_run(args)

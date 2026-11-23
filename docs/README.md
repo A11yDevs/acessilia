@@ -36,6 +36,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 23. [Mutation testing and test subsumption](testing/mutation.md) — PR 3 of #644: the bounded mutation experiment on `flood` and `equations`, the three surviving boundary mutants, the subsumption matrix and its cost/benefit. (Brazilian Portuguese: [pt-BR version](testing/mutation.pt-br.md))
 24. [Test optimization results](testing/optimizations.md) — PR 4 of #644: the cached field specifications that cut the docstruct suite time, the three boundary tests that raised the `flood_guard` mutation score to 100%, and the measured before/after comparison. (Brazilian Portuguese: [pt-BR version](testing/optimizations.pt-br.md))
 25. [Architecture-aware test selection (shadow mode)](testing/impact-selection.md) — the #644 dependency matrix, the path rules and the observation-only CI job that records which suites a change should trigger. (Brazilian Portuguese: [pt-BR version](testing/impact-selection.pt-br.md))
+26. [Baseline variability and exhaustive overlap](testing/variability.md) — the three-run medians and ranges, and the difference between the exhaustive signature subsumption analysis and the capped similarity pair search. (Brazilian Portuguese: [pt-BR version](testing/variability.pt-br.md))
 
 ---
 

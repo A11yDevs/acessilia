@@ -382,6 +382,8 @@ def build_report(
             "families": len(families),
             "identical_families": sum(family.identical for family in families),
             "zero_exclusive_tests": len(zero_exclusive),
+            "pair_search_complete": False,
+            "pair_search_cap": max_element_tests,
         }
     )
     return {
