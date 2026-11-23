@@ -60,24 +60,31 @@ the plan is `start-job`, `complete-job`.
 
 ## Checks
 
-The compiler refuses a problem it cannot plan, before the planner runs:
+The compiler refuses a problem it cannot plan, before the planner runs. The
+checks run in this order, and the first one that fails is the one reported:
 
-- **Causal state.** A satisfied obligation with an unsatisfied predecessor.
-  The manifest model refuses this state too; the compiler checks again
-  because a replan changes the manifest in place.
-- **Methods.** A pending obligation with no method that is admissible,
-  available and not tried.
-- **Catalogue v2.3.** For a kind in the v2.3 catalogue, admissible methods
-  outside it, or a method without a cost.
-- **Unknown unavailable methods.** An unavailable method that the manifest
-  does not declare: a typo, not a capability gap.
-- **Dependencies.** A dependency on an unknown obligation, or a cycle in the
-  selected closure, naming the obligations. The manifest model refuses both
-  too; the compiler checks again because a replan changes the manifest in
-  place, and so every planner backend fails the same way
-  ([#783](https://github.com/A11yDevs/acessilia/issues/783)).
-- **The rendered problem.** `PddlProblemValidator` checks it against the
-  projection.
+1. **Roots.** An unknown root (see the rules table).
+2. **Dependencies.** A dependency on an unknown obligation, naming the
+   obligation that has it, or a cycle in the selected closure, naming only the
+   cycle (`a -> b -> a`). A cycle among unselected obligations does not stop
+   the problem. The manifest model refuses both too; the compiler checks again
+   because a replan changes the manifest in place, and so every planner
+   backend fails the same way
+   ([#783](https://github.com/A11yDevs/acessilia/issues/783)). Both use one
+   walk (`manifest/dependencies.py`), so they find the same cycle; each words
+   its own message (the model's is in Portuguese, the compiler's in English).
+3. **Unknown unavailable methods.** An unavailable method that the manifest
+   does not declare: a typo, not a capability gap.
+4. **Causal state.** A satisfied obligation with an unsatisfied predecessor.
+   The manifest model refuses this state too; the compiler checks again
+   because a replan changes the manifest in place.
+5. **Catalogue v2.3.** For a kind in the v2.3 catalogue, admissible methods
+   outside it, or a method without a cost.
+6. **Methods.** A pending obligation with no method that is admissible,
+   available and not tried.
+7. **Job status.** A `completed` manifest.
+8. **The rendered problem.** `PddlProblemValidator` checks it against the
+   projection.
 
 ## Identity
 

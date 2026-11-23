@@ -13,6 +13,10 @@ compilador deixava as duas passarem:
 
 O `PddlProblemCompiler` agora recusa as duas antes de qualquer planejador
 rodar, com um `ValueError` que nomeia o ciclo ou a obrigação ausente (#783).
+A verificação cobre o fecho selecionado: um ciclo abaixo de uma raiz nomeia só
+o ciclo, e uma dependência desconhecida nomeia a obrigação que a tem. O modelo e
+o compilador compartilham um percurso (`acessilia_core.manifest.dependencies`),
+então reportam o mesmo ciclo; a mensagem do modelo agora também o nomeia.
 
 ## 0.3.7 — uma interface de motor de planejamento
 
