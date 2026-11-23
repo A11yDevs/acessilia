@@ -274,6 +274,10 @@ class Compiler:
         return result + (" | None" if "null" in types else "")
 
     def render(self, source: str) -> str:
+        readers = [
+            (name, rule) for name, rule in self.roots.items() if "model" not in rule
+        ]
+        model_import = "ResultModel, decode" if readers else "ResultModel"
         lines = [
             f'"""Generated from {source}; do not edit by hand."""',
             "from __future__ import annotations",
@@ -281,7 +285,7 @@ class Compiler:
             "from dataclasses import dataclass",
             "from typing import Any",
             "",
-            "from acessilia_sdk.toolbox.results._model import ResultModel",
+            f"from acessilia_sdk.toolbox.results._model import {model_import}",
             "",
             "",
         ]
@@ -307,15 +311,22 @@ class Compiler:
         ]
         for name, rule in self.classes.items():
             lines += [f"{name}._rule = {rule!r}", f"{name}._models = _MODELS"]
-        for name, rule in self.roots.items():
-            if "model" not in rule:
-                lines += [
-                    f"_{name.upper()}_RULE = {rule!r}",
-                    "",
-                    f"def {name}(data: Any) -> {self.annotation(rule)}:",
-                    "    from acessilia_sdk.toolbox.results._model import decode",
-                    f"    return decode(data, _{name.upper()}_RULE, _MODELS, {name!r})",
-                    "",
-                ]
+        if readers:
+            lines += [
+                "",
+                "",
+                "def _read(data: Any, rule: dict, name: str) -> Any:",
+                "    return decode(data, rule, _MODELS, name)",
+                "",
+                "",
+            ]
+        for name, rule in readers:
+            lines += [
+                f"_{name.upper()}_RULE = {rule!r}",
+                "",
+                f"def {name}(data: Any) -> {self.annotation(rule)}:",
+                f"    return _read(data, _{name.upper()}_RULE, {name!r})",
+                "",
+            ]
         lines += ["", "__all__ = " + repr(list(self.roots)), ""]
         return "\n".join(lines)
