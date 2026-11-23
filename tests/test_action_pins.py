@@ -244,9 +244,11 @@ def test_action_pin_check_is_reported_in_prs_and_enforced_on_schedule() -> None:
     )
     quality = {step.get("name"): step for step in workflow["jobs"]["quality"]["steps"]}
     report = quality["Verify GitHub Action pins"]
-    assert "scripts/check_action_pins.py" in report["run"]
+    assert report["run"].count("scripts/check_action_pins.py") == 2
     assert "github.event_name" in report["run"]
     assert "--report-only" in report["run"]
+    push_branch = report["run"].split("else", 1)[1]
+    assert "--report-only" not in push_branch
     assert report["env"]["GITHUB_TOKEN"] == "${{ github.token }}"
 
     scheduled = yaml.safe_load(
