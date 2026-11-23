@@ -21,41 +21,66 @@ Medido em `develop` no `82424b34`, com uma varredura AST que inclui imports
 dentro de funções e instruções `import docstruct.x` (a mesma da guarda).
 
 - **50 arquivos** importam **57 módulos** do Docstruct.
-- **43 arquivos** importam computação (algoritmo ou operação), o número que a
-  ADR-0028 traz.
-- **7 arquivos** importam só contratos, validação ou política:
+- **45 arquivos** importam computação (algoritmo ou operação). A ADR-0028
+  traz 43; a diferença são `pipeline/judge` e `pipeline/handlers/judge`, que
+  importam `docstruct.fusion.judge`, classificado aqui como algoritmo (veja
+  [A regra de classificação](#a-regra-de-classificação)).
+- **5 arquivos** importam só contratos, validação ou política:
   - só contrato: `export/catalog`, `manifest/document_adapter`,
     `manifest/models`;
   - só validação: `pipeline/validators`;
-  - só política: `manifest/toolbox_extractor`, `pipeline/judge`,
-    `pipeline/handlers/judge`.
+  - só política: `manifest/toolbox_extractor`.
 - A ADR-0028 conta 46 arquivos no `46f2fe7e`. A mesma varredura encontra 50
   ali, os mesmos arquivos de hoje: a diferença está na contagem, e nenhum
   arquivo passou a importar o Docstruct desde então.
 
 | Classe | Módulos | O que é | Destino |
 |---|---|---|---|
-| contrato | 3 | Tipos, mensagens e schemas de interoperabilidade | Continua na allowlist, importável em qualquer lugar, até a ADR de contratos decidir onde ficam |
-| validação | 1 | Verificação de um documento contra um schema ou regras | A revisão decide: a validação de schema na fronteira fica; a auditoria de acessibilidade vira capacidade |
-| política | 4 | Regras de decisão que o Core usa para coordenar | Vai para o Core (ADR-0029) ou fica explicitamente na allowlist |
+| contrato | 2 | Modelos, mensagens e schemas de interoperabilidade | Importável em qualquer lugar, até a ADR de contratos decidir onde ficam |
+| validação | 1 | Verificação de um documento contra um schema ou regras | Transitória, fixada: a validação de schema fica perto da camada de interoperabilidade; a auditoria do documento vira capacidade |
+| política | 2 | Regras de decisão que o Core usa para coordenar | Transitória, fixada: a parte estratégica vai para o Core (ADR-0029); os parâmetros dos algoritmos ficam com a Toolbox |
 | operação | 10 | Composições: montagem canônica, renderização de exportação, fusão de payloads, especialista de tabelas | Uma capacidade composta da Toolbox, por trás de uma ação planejada |
-| algoritmo | 39 | Algoritmos estruturais sobre o conteúdo do documento | Uma capacidade atômica da Toolbox, migrada com o método do plano ou o agente que a usa |
+| algoritmo | 42 | Algoritmos estruturais sobre o conteúdo do documento e os tipos internos a eles | Uma capacidade atômica da Toolbox, migrada com o método do plano ou o agente que a usa |
+
+Toda classe, exceto contrato, é fixada: cada importador e cada nome que ele
+importa ficam listados, e a lista só diminui.
+
+## A regra de classificação
+
+> Módulos mistos são classificados pela sua responsabilidade mais
+> operacional. Um módulo não é classificado como contrato ou política só por
+> conter alguns símbolos de contrato ou de política: enquanto também contiver
+> algoritmos documentais, fica fixado até que as partes sejam separadas
+> fisicamente.
+
+Contrato é a única classe não fixada, por isso é mantida estreita: um módulo
+é contrato quando dois componentes o trocam, não por ser uma dataclass pura
+ou não ter dependência externa. A guarda fixa o conjunto de módulos de
+contrato no próprio teste, então ampliá-lo é uma mudança revisada no teste.
 
 ## As classes
 
-- **Contrato.** Tipos, constantes e mensagens que dois componentes trocam:
-  `docstruct.manifest` (o modelo normativo do manifesto, ADR-0007),
-  `docstruct.types.Region` e `docstruct.export.formats.FormatSpec`.
-- **Validação.** `docstruct.validation`. Reúne duas coisas diferentes:
-  `validate_against_schema` verifica um documento numa fronteira, enquanto
-  `audit_canonical_document` audita a acessibilidade, o que é computação
-  sobre o documento.
-- **Política.** Regras de decisão:
+- **Contrato.** Modelos, constantes e mensagens que dois componentes trocam:
+  - `docstruct.export.formats.FormatSpec`, os registros de identidade dos
+    formatos;
+  - `docstruct.manifest`, o modelo normativo do manifesto (ADR-0007). É um
+    contrato **transitório**: também verifica invariantes e adapta payloads,
+    e depende de `docstruct.geometry.boxes` (`OrientedBox`) e de
+    `docstruct.validation` (`Finding`). A ADR de contratos separa os modelos
+    e schemas desses algoritmos e mantém uma única fonte de verdade.
+- **Validação.** `docstruct.validation`, **transitória** e fixada. Reúne duas
+  coisas diferentes:
+  - `validate_against_schema` verifica um documento contra um schema de
+    interoperabilidade; fica perto da camada de interoperabilidade;
+  - `audit_canonical_document` inspeciona a estrutura, a semântica e a
+    acessibilidade do documento processado; vira uma capacidade da Toolbox
+    (por exemplo `document.audit.*`).
+
+  O módulo inteiro não recebe uma allowlist permanente.
+- **Política.** Regras de decisão, **transitórias** e fixadas:
   - `profiles.verbosity_for_mode`, o exemplo da ADR-0028;
-  - `policy.FusionPolicy`;
-  - `fusion.judge.should_judge`, se um par vai para o juiz VLM;
-  - `regions.classify.region_needs_vision` e `region_prompt_key`, que
-    encaminham uma região para um método.
+  - `policy.FusionPolicy`, que mistura política de workflow com os
+    parâmetros dos algoritmos (veja [Política estratégica e configuração operacional](#política-estratégica-e-configuração-operacional)).
 - **Operação.** Uma composição de algoritmos com um resultado no nível do
   documento:
   - `canonical`, o construtor canônico;
@@ -65,11 +90,43 @@ dentro de funções e instruções `import docstruct.x` (a mesma da guarda).
   - `fusion.payload`, a fusão entre provedores e o roteamento de páginas;
   - `fusion.table_specialist`, geração, comparação e adjudicação.
 - **Algoritmo.** Todo o resto: fusão, ordem de leitura, geometria, tabelas,
-  texto, matemática, reparo de Unicode, imagens e texto visual.
+  texto, matemática, reparo de Unicode, imagens e texto visual, e os tipos
+  internos a eles. Pela regra acima, isso inclui três módulos que têm alguma
+  política ou tipos:
+  - `docstruct.types`: `Region` carrega dados de processamento
+    (`image_bytes`), ao lado de `CanonicalBlock`, `BlockPairing`,
+    `OrientationResult` e tipos legados de documento. Só os tipos realmente
+    compartilhados vão depois para o pacote de contratos;
+  - `docstruct.regions.classify`: `region_needs_vision` e
+    `region_prompt_key` encaminham uma região, mas `classify_region` calcula
+    sobre geometria, densidade de texto e confiança;
+  - `docstruct.fusion.judge`: `should_judge` decide se o juiz VLM é
+    consultado, mas `debias`, `p2_from_logprobs` e `decide_pair` normalizam
+    probabilidades, corrigem viés e comparam candidatos.
+
+  Em cada caso, a computação vai para a Toolbox. O Core fica com a decisão
+  de quando pedir uma capacidade, a partir das evidências que a Toolbox
+  devolve.
+
+## Política estratégica e configuração operacional
+
+O `FusionPolicy` reúne os dois tipos de ajuste:
+
+| Tipo | O que decide | Campos, por exemplo |
+|---|---|---|
+| Política de workflow (Core) | Quais passos rodam e que evidência pedir | `page_judge` (consultar o juiz VLM), `text_pick` (de quem preferir o texto), `upscale`, `orientation_reinfer` |
+| Configuração operacional (Toolbox) | Como um algoritmo roda | `align_tau`, `align_lambda`, `xycut_min_balance`, `tailjoin_k`, `rep_max_n`, a calibração `pic_*` e `merge_*` |
+
+Levar a classe inteira para o Core faria o Core depender dos parâmetros
+internos da Toolbox. A política estratégica pertence ao Core (ADR-0029); os
+parâmetros dos algoritmos ficam com a Toolbox, por trás das capacidades.
+Até a classe ser dividida fisicamente, mantendo a compatibilidade durante a
+migração, ela fica fixada aos importadores atuais.
 
 ## Módulos mistos
 
-Um módulo tem uma única classe, a que sua parte computacional exige. Alguns
+Pela regra de classificação, um módulo tem uma única classe: a mais
+operacional das suas partes. Alguns
 módulos também trazem vocabulário ou tipos que, por natureza, são contratos;
 a ADR de contratos decide se eles vão para um pacote de contratos:
 
@@ -82,10 +139,8 @@ a ADR de contratos decide se eles vão para um pacote de contratos:
 - `docstruct.geometry.boxes`: `PageBox` é um tipo; o resto são algoritmos.
 - `docstruct.tables.ast`: `TABLE_SECTIONS` e as mensagens `MSG_TABLE_TEXT_*`
   são vocabulário; os construtores da AST e a linearização são algoritmos.
-- `docstruct.fusion.judge`: `should_judge` é política; `decide_pair` e
-  `DEFAULT_NEW_THR` pertencem ao algoritmo do juiz.
-- `docstruct.regions.classify`: `region_needs_vision` e `region_prompt_key`
-  são política; `classify_region` é uma heurística de layout.
+- `docstruct.fusion.judge` e `docstruct.regions.classify`: veja a classe
+  algoritmo acima.
 - `docstruct.imaging.policy` é classificado como **algoritmo**, apesar do
   nome: `upscale_factor` e `decide_orientation` definem os parâmetros do
   processamento de imagem do agente de página e vão com ele.
@@ -106,7 +161,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | Montagem do payload e do documento canônico | `pipeline/payload`, `pipeline/canonical_builder`, `pipeline/elements`, `pipeline/obligations` | Montagem canônica e texto das páginas: a composição por trás da exportação acessível |
 | Exportação acessível (`export/*`) | renderers, exporters, exportador Pandoc, markers, catalog | Renderização, por trás da capacidade de exportação (`document.export.*`) |
 | Construção do manifesto (`manifest/*`) | builder, detectores de layout e texto, slides | Ordem de leitura, junção final, verso e normalização durante a construção do manifesto |
-| Coordenação e fronteira | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `toolbox/vision_payload`, `manifest/toolbox_extractor` | Fusão de payloads e recorte de regiões; a política de fusão e o limiar do juiz são política |
+| Coordenação e fronteira | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `toolbox/vision_payload`, `manifest/toolbox_extractor` | Fusão de payloads, recorte de regiões e o limiar do juiz; a política de fusão é política |
 | Shims de compatibilidade | `pipeline/table_ast`, `formula_tools`, `pipeline/validators` | Reexportações mantidas para imports antigos (`import docstruct.x`); saem quando seus chamadores saírem |
 | Serviço (`backend/service.py`) | `backend/service` | `merge_broken_paragraphs` (algoritmo) e `verbosity_for_mode` (política) |
 
@@ -115,12 +170,9 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 |---|---|---|---|
 | `docstruct.export.formats` | contrato | `FormatSpec` | `export/catalog` |
 | `docstruct.manifest` | contrato | `MSG_CHAR_RANGE_REVERSED`, `MSG_DUPLICATE_ELEMENT_IDS`, `MSG_DUPLICATE_PAGE_NUMBERS`, `MSG_ELEMENT_UNKNOWN_PAGE`, `MSG_PAGE_DUPLICATE_ELEMENT_IDS`, `MSG_PAGE_UNKNOWN_ELEMENTS`, `MSG_PARENT_CYCLE`, `MSG_PARENT_REF_MISMATCH`, `MSG_PROVENANCE_UNKNOWN_PAGE`, `MSG_SELF_PARENT`, `MSG_UNKNOWN_PARENT`, `StructuredDocument`, `document_invariant_findings`, `structured_document_from_payload`, `structured_document_to_payload` | `manifest/document_adapter`, `manifest/models` |
-| `docstruct.types` | contrato | `Region` | `agents/fusion_agent` |
 | `docstruct.validation` | validação | módulo, `FindingTuple`, `audit_canonical_document`, `validate_against_schema` | `agents/fusion_agent`, `export/pandoc_exporter`, `pipeline/validators` |
-| `docstruct.fusion.judge` | política | `DEFAULT_NEW_THR`, `decide_pair`, `should_judge` | `agents/adjudication_agent`, `pipeline/handlers/judge`, `pipeline/judge` |
 | `docstruct.policy` | política | `FusionPolicy` | `manifest/toolbox_extractor`, `pipeline/fusion`, `pipeline/handlers/fusion` |
 | `docstruct.profiles` | política | `verbosity_for_mode` | `backend/service` |
-| `docstruct.regions.classify` | política | `classify_region`, `region_needs_vision`, `region_prompt_key` | `agents/fusion_agent`, `agents/vision_agent` |
 | `docstruct.canonical` | operação | `MathEnricher`, `_enrich_math_blocks`, `build_canonical_document`, `sanitize_canonical_document` | `pipeline/canonical_builder` |
 | `docstruct.export.filters` | operação | `strip_internal_audit_blocks` | `export/pandoc_exporter` |
 | `docstruct.export.html` | operação | `HtmlLabels`, `_all_blocks`, `_collect_section`, `_render_block`, `_render_html_table_row`, `document_to_html` | `export/renderers/html_renderer` |
@@ -136,6 +188,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | `docstruct.data_uri` | algoritmo | `decode_data_uri` | `pipeline/enrichment/common` |
 | `docstruct.fusion.adjudication` | algoritmo | `clean_transcription`, `decide`, `decide_v0`, `decide_v1`, `filter_decision` | `agents/adjudication_agent`, `pipeline/handlers/fusion` |
 | `docstruct.fusion.hf_end` | algoritmo | `move_hf_to_end` | `agents/fusion_agent`, `agents/page_level_agent` |
+| `docstruct.fusion.judge` | algoritmo | `DEFAULT_NEW_THR`, `decide_pair`, `should_judge` | `agents/adjudication_agent`, `pipeline/handlers/judge`, `pipeline/judge` |
 | `docstruct.fusion.line_numbers` | algoritmo | `extract_line_numbers` | `agents/fusion_agent`, `manifest/detectors/layout` |
 | `docstruct.fusion.noise` | algoritmo | `PAGE_NUMBER_MARGIN`, `element_role`, `is_bare_page_number`, `is_decorated_page_number`, `is_legitimate_text`, `is_page_number_in_margin`, `select_page_numbers` | `pipeline/handlers/rescue`, `pipeline/handlers/text`, `pipeline/payload` |
 | `docstruct.fusion.oracle` | algoritmo | `oracle_page` | `agents/adjudication_agent` |
@@ -152,6 +205,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | `docstruct.imaging` | algoritmo | `image_dimensions` | `toolbox/vision_payload` |
 | `docstruct.imaging.policy` | algoritmo | `decide_orientation`, `upscale_factor` | `agents/page_level_agent` |
 | `docstruct.placeholders` | algoritmo | `UNSTRUCTURED_PAGE_FLAG`, `UNSTRUCTURED_PAGE_LABEL`, `has_meaningful_text`, `is_mostly_visual`, `is_placeholder_visual`, `is_unstructured_page_placeholder` | `manifest/builder`, `pipeline/enrichment/pictures`, `pipeline/handlers/content`, `pipeline/payload` |
+| `docstruct.regions.classify` | algoritmo | `classify_region`, `region_needs_vision`, `region_prompt_key` | `agents/fusion_agent`, `agents/vision_agent` |
 | `docstruct.regions.letterhead` | algoritmo | `PlacedItem`, `letterhead_groups` | `pipeline/payload` |
 | `docstruct.sections` | algoritmo | `find_heading_gaps`, `repair_heading_levels` | `manifest/builder`, `pipeline/handlers/text` |
 | `docstruct.tables.ast` | algoritmo | módulo, `TABLE_SECTIONS`, `analyze_table_complexity`, `linearize_table_for_text`, `raw_rows_from_table_ast`, `table_ast_column_count`, `table_ast_from_rows` | `manifest/detectors/text`, `pipeline/elements`, `pipeline/enrichment/inline_math`, `pipeline/enrichment/tables`, `pipeline/handlers/content`, `pipeline/handlers/fusion`, `pipeline/handlers/unicode_repair`, `pipeline/table_ast` |
@@ -169,6 +223,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | `docstruct.text.norm_fix` | algoritmo | `norm_fix` | `agents/fusion_agent`, `manifest/detectors/text`, `pipeline/handlers/text` |
 | `docstruct.text.paragraphs` | algoritmo | `merge_broken_paragraphs` | `backend/service` |
 | `docstruct.text.unicode_repair` | algoritmo | `Detection`, `UnicodeRepairContext`, `detect_legacy_unicode`, `repair_legacy_unicode` | `manifest/detectors/text`, `pipeline/handlers/unicode_repair` |
+| `docstruct.types` | algoritmo | `Region` | `agents/fusion_agent` |
 | `docstruct.visual_text` | algoritmo | `TextOwnership`, `analyze_visual_text_ownership`, `bound_surrounding_items`, `collect_picture_context`, `deduplicate_picture_description`, `is_confirmed_logo_description`, `is_document_artifact`, `is_scene_artifact`, `scene_text_residue` | `agents/prompt_tools`, `pipeline/enrichment/pictures`, `pipeline/payload` |
 
 ## O SDK, para informação
@@ -188,28 +243,36 @@ então esta página não as fixa.
 
 ## A guarda
 
-Três testes em `tests/test_architecture_layers.py` leem o fixture:
+Os testes em `tests/test_architecture_layers.py` leem o fixture:
 
 - **Classificado e fixado.** Todo módulo do Docstruct que o Core ou
   `backend/` importam precisa estar no fixture. Um módulo de contrato pode
   ser importado por qualquer arquivo. Os demais listam os arquivos que os
-  importam, e um arquivo novo falha: ele deve chamar uma capacidade da
-  Toolbox.
-- **Só diminui.** Uma entrada que não é mais importada falha até ser
-  removida, então cada migração tira suas linhas do fixture e sua linha desta
-  página.
+  importam e os nomes que cada arquivo importa (`*` para
+  `import docstruct.x`). Um arquivo novo, ou um nome novo num import
+  existente, falha: ele deve chamar uma capacidade da Toolbox.
+- **Só diminui.** Um módulo, arquivo ou nome que não é mais importado falha
+  até ser removido, então cada migração tira suas linhas do fixture, e o
+  último importador de um módulo tira sua linha desta página.
+- **Classes fechadas.** As classes são as cinco acima, e o conjunto de
+  módulos de contrato fica fixado no teste: reclassificar um módulo
+  computacional como contrato muda o teste, não só o fixture.
+- **Os casos da própria guarda.** Testes sintéticos verificam um nome novo
+  num import existente, um importador novo, um módulo sem classificação e
+  fixações obsoletas.
 - **Alinhado com esta página.** As linhas de módulos da tabela acima, nos
   dois idiomas, precisam ser os módulos do fixture.
 
-## Em aberto para a revisão
+## Ainda em aberto
 
-- **Validação.** Dividir `docstruct.validation`: a validação de schema na
-  fronteira fica na allowlist, e a auditoria de acessibilidade vira
-  capacidade? Ou o módulo inteiro fica?
-- **Política.** Cada um dos quatro módulos de política vai para o Core ou
-  fica explicitamente na allowlist? Num módulo misto, só a parte de política
-  vai?
-- **Vocabulário.** O vocabulário e os tipos dos módulos mistos vão para o
-  pacote de contratos que a ADR de contratos avalia?
+A classificação em si foi decidida na revisão do #760. Restam:
+
+- **Divisões físicas.** Quando `docstruct.validation` (validação de schema e
+  auditoria do documento), `FusionPolicy` (política de workflow e
+  configuração operacional), `docstruct.fusion.judge` e
+  `docstruct.regions.classify` são divididos, e em quais pull requests.
+- **Vocabulário e o manifesto.** Quais tipos e vocabulário dos módulos
+  mistos e de `docstruct.manifest` vão para o pacote de contratos que a ADR
+  de contratos avalia.
 - **Shims.** Os três shims de compatibilidade saem com o último chamador, ou
   antes?

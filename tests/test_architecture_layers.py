@@ -123,50 +123,79 @@ def test_the_backend_builds_no_http_client_for_the_toolbox() -> None:
 
 
 #: Every docstruct module the core and backend/ import, classified (ADR-0028,
-#: #758): contract modules may be imported anywhere; the others are pinned to
-#: the files that import them today, and the pins can only shrink as each
+#: #758). Contract modules may be imported anywhere. Every other module is
+#: pinned to the files that import it today and to the names each file
+#: imports (``*`` for ``import docstruct.x``); the pins can only shrink as each
 #: algorithm, operation, policy or validation leaves the core's process.
 DOCSTRUCT_ALLOWLIST = REPO_ROOT / "tests" / "fixtures" / "docstruct_import_allowlist.json"
 DOCSTRUCT_CLASSES = {"contract", "algorithm", "validation", "policy", "operation"}
+#: The contract modules, the only unpinned class. A mixed module takes its
+#: most operational class (see the inventory), so adding a module here is a
+#: reviewed change to this test, not only to the fixture.
+DOCSTRUCT_CONTRACT_MODULES = {"docstruct.manifest", "docstruct.export.formats"}
 DOCSTRUCT_INVENTORY_DOCS = (
     REPO_ROOT / "docs" / "architecture" / "docstruct-import-inventory.md",
     REPO_ROOT / "docs" / "architecture" / "docstruct-import-inventory.pt-br.md",
 )
 
+#: ``{module: {file: {names}}}``
+DocstructImports = dict[str, dict[str, set[str]]]
 
-def _docstruct_imports() -> dict[str, set[str]]:
-    """Each imported ``docstruct`` module and the files that import it, in the core and backend/."""
-    importers: dict[str, set[str]] = {}
+
+def _docstruct_imports() -> DocstructImports:
+    """Each imported ``docstruct`` module, the files that import it and the names they import."""
+    imports: DocstructImports = {}
     for directory in SERVER_DIRS:
         for path in directory.rglob("*.py"):
+            relative = str(path.relative_to(REPO_ROOT))
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.ImportFrom) and node.module and not node.level:
-                    modules = [node.module]
+                    found = [(node.module, alias.name) for alias in node.names]
                 elif isinstance(node, ast.Import):
-                    modules = [alias.name for alias in node.names]
+                    found = [(alias.name, "*") for alias in node.names]
                 else:
                     continue
-                for module in modules:
+                for module, name in found:
                     if module.split(".")[0] == "docstruct":
-                        importers.setdefault(module, set()).add(
-                            str(path.relative_to(REPO_ROOT))
-                        )
-    return importers
+                        imports.setdefault(module, {}).setdefault(relative, set()).add(name)
+    return imports
 
 
 def _docstruct_allowlist() -> dict[str, dict]:
     return json.loads(DOCSTRUCT_ALLOWLIST.read_text(encoding="utf-8"))
 
 
+def _docstruct_violations(
+    imports: DocstructImports, allowlist: dict[str, dict]
+) -> tuple[list[str], list[str], list[str]]:
+    """``(unclassified, unpinned, stale)`` for ``imports`` against ``allowlist``.
+
+    Unpinned: a file, or a name, that a non-contract module's pin does not
+    list. Stale: a module, file or name the allowlist lists and the code no
+    longer imports.
+    """
+    unclassified = sorted(set(imports) - set(allowlist))
+    unpinned: list[str] = []
+    stale: list[str] = []
+    for module, entry in sorted(allowlist.items()):
+        importers = imports.get(module, {})
+        if not importers:
+            stale.append(module)
+            continue
+        if entry["class"] == "contract":
+            continue
+        pins = {path: set(names) for path, names in entry["files"].items()}
+        for path, names in sorted(importers.items()):
+            for name in sorted(names - pins.get(path, set())):
+                unpinned.append(f"{path}: {module}.{name}")
+        for path, names in sorted(pins.items()):
+            for name in sorted(names - importers.get(path, set())):
+                stale.append(f"{path}: {module}.{name}")
+    return unclassified, unpinned, stale
+
+
 def test_every_docstruct_import_is_classified_and_pinned() -> None:
-    allowlist = _docstruct_allowlist()
-    unclassified = sorted(set(_docstruct_imports()) - set(allowlist))
-    unpinned = sorted(
-        f"{path}: {module}"
-        for module, paths in _docstruct_imports().items()
-        if module in allowlist and allowlist[module]["class"] != "contract"
-        for path in paths - set(allowlist[module]["files"])
-    )
+    unclassified, unpinned, _ = _docstruct_violations(_docstruct_imports(), _docstruct_allowlist())
     assert not unclassified, (
         "docstruct modules missing from tests/fixtures/docstruct_import_allowlist.json; "
         f"classify them (ADR-0028) and add them to the inventory: {unclassified}"
@@ -178,22 +207,61 @@ def test_every_docstruct_import_is_classified_and_pinned() -> None:
 
 
 def test_the_docstruct_allowlist_only_shrinks() -> None:
-    imports = _docstruct_imports()
-    allowlist = _docstruct_allowlist()
-    stale = sorted(
-        f"{module}: {path}"
-        for module, entry in allowlist.items()
-        for path in (entry.get("files") or ["(module)"])
-        if module not in imports or (path != "(module)" and path not in imports[module])
-    )
+    _, _, stale = _docstruct_violations(_docstruct_imports(), _docstruct_allowlist())
     assert not stale, (
         "remove these entries from tests/fixtures/docstruct_import_allowlist.json "
-        f"and from the inventory, they are no longer imported: {stale}"
+        f"(and a module's row from the inventory), they are no longer imported: {stale}"
     )
+
+
+def test_the_docstruct_classes_are_closed() -> None:
+    allowlist = _docstruct_allowlist()
     assert {entry["class"] for entry in allowlist.values()} <= DOCSTRUCT_CLASSES
+    contracts = {module for module, entry in allowlist.items() if entry["class"] == "contract"}
+    assert contracts == DOCSTRUCT_CONTRACT_MODULES, (
+        "the contract modules changed; a mixed module takes its most operational "
+        "class (docs/architecture/docstruct-import-inventory.md)"
+    )
     assert all(
         ("files" in entry) == (entry["class"] != "contract") for entry in allowlist.values()
     ), "pin every non-contract module to its files, and no contract module"
+
+
+_PINNED = {
+    "docstruct.fusion.judge": {"class": "algorithm", "files": {"a.py": ["should_judge"]}},
+    "docstruct.manifest": {"class": "contract"},
+}
+
+
+def test_the_docstruct_guard_refuses_a_new_name_in_an_existing_import() -> None:
+    imports = {"docstruct.fusion.judge": {"a.py": {"should_judge", "decide_pair"}},
+               "docstruct.manifest": {"a.py": {"StructuredDocument"}}}
+    assert _docstruct_violations(imports, _PINNED) == (
+        [], ["a.py: docstruct.fusion.judge.decide_pair"], []
+    )
+
+
+def test_the_docstruct_guard_refuses_a_new_importer() -> None:
+    imports = {"docstruct.fusion.judge": {"a.py": {"should_judge"}, "b.py": {"should_judge"}},
+               "docstruct.manifest": {"b.py": {"StructuredDocument"}}}
+    assert _docstruct_violations(imports, _PINNED) == (
+        [], ["b.py: docstruct.fusion.judge.should_judge"], []
+    )
+
+
+def test_the_docstruct_guard_refuses_an_unclassified_module() -> None:
+    imports = {"docstruct.fusion.judge": {"a.py": {"should_judge"}},
+               "docstruct.manifest": {"a.py": {"StructuredDocument"}},
+               "docstruct.new": {"a.py": {"thing"}}}
+    assert _docstruct_violations(imports, _PINNED)[0] == ["docstruct.new"]
+
+
+def test_the_docstruct_guard_reports_obsolete_pins() -> None:
+    imports = {"docstruct.fusion.judge": {"b.py": {"should_judge"}}}
+    unclassified, unpinned, stale = _docstruct_violations(imports, _PINNED)
+    assert unclassified == []
+    assert unpinned == ["b.py: docstruct.fusion.judge.should_judge"]
+    assert stale == ["a.py: docstruct.fusion.judge.should_judge", "docstruct.manifest"]
 
 
 def test_the_docstruct_inventory_lists_the_allowlist() -> None:
