@@ -43,4 +43,4 @@ A Toolbox é um repositório separado; relate os problemas dela lá, ou aqui se 
 - Mantemos quem reportou informado enquanto a correção é preparada e coordenamos a divulgação após uma release.
 - Damos crédito nos advisories, a menos que a pessoa prefira anonimato.
 
-A CI executa auditoria de dependências, CodeQL e varredura da imagem do container; um novo achado de severidade alta falha o build, a menos que uma exceção revisada esteja registrada. Espera-se que secret scanning e push protection estejam habilitados nas configurações do repositório.
+A CI executa auditoria de dependências, CodeQL e varredura da imagem do container em pull requests, pushes e no schedule semanal. Imagens de release são construídas do zero, escaneadas e então publicadas; um novo achado de severidade alta com correção disponível falha o build, a menos que uma exceção revisada esteja registrada. Espera-se que secret scanning e push protection estejam habilitados nas configurações do repositório.

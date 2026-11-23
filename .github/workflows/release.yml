@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  security-events: write
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -69,10 +70,14 @@ jobs:
           load: true
           push: false
           tags: acessilia:release
+          # The release image is the security gate's subject: build it fresh,
+          # then scan and push this exact local image (no second build).
+          no-cache: true
           build-args: |
             APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
             GIT_COMMIT=${{ github.sha }}
             IMAGE_TAG=${{ github.ref_name }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=production
           cache-to: type=gha,mode=max,scope=production
 
@@ -92,22 +97,50 @@ jobs:
       - name: Enforce local image size guardrail
         run: python scripts/check_image_size.py local acessilia:release --limit-gb 0.5
 
-      - name: Publish verified release image
-        id: publish
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      - name: List the release image findings for the log
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
-          context: .
-          file: infra/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          # Release images must also carry the build identity; the verification
-          # build above already passes it, so the published image must match.
-          build-args: |
-            APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
-            GIT_COMMIT=${{ github.sha }}
-            IMAGE_TAG=${{ github.ref_name }}
-          labels: ${{ steps.meta.outputs.labels }}
+          image-ref: acessilia:release
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: table
+          output: trivy-results.txt
+
+      - name: Show the release image findings
+        run: cat trivy-results.txt
+
+      - name: Scan the release image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          image-ref: acessilia:release
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: trivy-results.sarif
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload the release image scan report
+        if: "!cancelled()"
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: trivy-results.sarif
+          category: release
+
+      - name: Publish verified release image
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          # Push the image that was built, tested and scanned above.
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            docker tag acessilia:release "$tag"
+            docker push "$tag"
+          done <<< "$TAGS"
 
   release:
     name: create GitHub Release
