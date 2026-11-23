@@ -89,6 +89,11 @@ execuções repetidas que separem a mudança de código da carga da máquina.
   comparada com PRs que tiveram falhas conhecidas.
 - O experimento deve ser repetido quando os jobs de segurança/imagem mudarem; o
   caminho crítico pode voltar para os testes.
+- Em pull requests o scan da imagem agora é condicional a entradas da imagem
+  (`infra/**`, `pyproject.toml`, `uv.lock`, locks das bibliotecas, `.trivyignore`,
+  workflow de segurança); pushes para branches de integração e o schedule semanal
+  continuam escaneando incondicionalmente. A auditoria de dependências permanece
+  incondicional.
 - `docs/testing.pt-br.md` ainda registra os valores da era #448 (1m59s /
   59s–1m26s). O job absorveu Ruff/Mypy em 2026-11-20 e a suíte cresceu; os
   números aqui são a amostra comparável de 2026-11-23, não uma contradição do

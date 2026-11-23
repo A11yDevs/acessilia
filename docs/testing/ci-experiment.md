@@ -88,6 +88,10 @@ and repeated runs that separate the code change from machine load.
   replayed against PRs with known failures.
 - The experiment must be repeated after the security/image jobs change; the
   critical path may move back to the tests.
+- On pull requests the container image scan is now conditional on image inputs
+  (`infra/**`, `pyproject.toml`, `uv.lock`, library locks, `.trivyignore`,
+  security workflow); pushes to integration branches and the weekly schedule
+  still scan unconditionally. The dependency audit remains unconditional.
 - `docs/testing.md` still records the #448-era 1m59s / 59s–1m26s figures. The
   job absorbed Ruff/Mypy on 2026-11-20 and the suite grew; the numbers here are
   the comparable 2026-11-23 sample, not a contradiction of the historical

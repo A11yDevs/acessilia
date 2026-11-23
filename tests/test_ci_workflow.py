@@ -540,6 +540,24 @@ def test_the_security_audit_pins_uv_and_checks_the_lock() -> None:
     assert "uv export --locked" in steps["Export locked dependencies"]["run"]
 
 
+def test_the_container_scan_is_conditional_on_image_paths() -> None:
+    workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
+    changes = workflow["jobs"]["image-changes"]
+    scan = workflow["jobs"]["container-scan"]
+
+    assert changes["if"] == "github.event_name == 'pull_request'"
+    filter_step = changes["steps"][1]
+    assert filter_step["uses"].startswith("dorny/paths-filter@")
+    filters = filter_step["with"]["filters"]
+    for path in ("infra/**", "pyproject.toml", "uv.lock", ".trivyignore"):
+        assert path in filters
+    assert scan["needs"] == "image-changes"
+    assert scan["if"] == (
+        "always() && (github.event_name != 'pull_request' || "
+        "needs.image-changes.outputs.image == 'true')"
+    )
+
+
 def test_the_image_scan_reads_the_recorded_exception() -> None:
     workflow = yaml.safe_load(
         (ROOT / ".github/workflows/security.yml").read_text(encoding="utf-8")
