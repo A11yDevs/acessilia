@@ -51,6 +51,28 @@ grupo `write_*_schema` sai dos candidatos restantes.
 linhas → **23 grupos / 55 funções / 672 linhas**. Apenas o grupo
 `write_*_schema` desaparece.
 
+## Terceira consolidação: o ponto de entrada do frontend
+
+O `frontend/cli/run.py` era uma cópia quase integral do `frontend/run.py`: a
+mesma sondagem de PID, o mesmo lock de processo e o mesmo startup de interfaces,
+mudando apenas a formatação, o local do arquivo de lock e a presença de uma
+função `main()`. O ponto de entrada dos console scripts agora importa `main` de
+`frontend.run`, então o runtime tem uma única implementação e um único lock
+(`frontend/bot.lock`). Iniciar um dos entry points com o outro já rodando agora é
+recusado, em vez de usar dois locks separados. O runtime também reconhece o lock
+legado `frontend/cli/bot.lock`: se ele apontar para um processo vivo, o startup é
+recusado; se estiver obsoleto ou malformado, é removido.
+
+O comportamento de startup e lock é fixado por `tests/test_frontend_startup.py`:
+cada interface habilitada, as saídas por token ausente e por nenhuma interface, o
+ciclo do lock (arquivo vivo, obsoleto e malformado) e as sondagens de PID em
+POSIX/Windows. `tests/test_process_setup.py` continua conferindo que o runtime
+configura o processo antes de obter o lock.
+
+**Delta medido no commit de código deste PR:** 23 grupos / 55 funções / 672
+linhas → **20 grupos / 49 funções / 499 linhas**. Os grupos `_is_process_running`,
+`acquire_lock` e `startup` desaparecem.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -65,9 +87,9 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | Candidato: o mesmo leitor genérico. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidado neste PR.** |
 | 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | Trivial; sem ação. |
-| 8 | `_is_process_running` do frontend (2/26) | Follow-up de frontend junto com lock/startup. |
-| 9 | `acquire_lock` do frontend (2/36) | Follow-up de frontend junto com lock/startup. |
-| 10 | `startup` do frontend (2/107) | Follow-up de alto valor; precisa de caracterização do startup. |
+| 8 | `_is_process_running` do frontend (2/26) | **Consolidado:** um runtime atrás dos dois entry points, com testes da sondagem de PID. |
+| 9 | `acquire_lock` do frontend (2/36) | **Consolidado:** o console script compartilha `frontend.run` e o lock dele. |
+| 10 | `startup` do frontend (2/107) | **Consolidado:** a caracterização cobre composição das interfaces e shutdown. |
 | 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidato a helper pequeno; baixa prioridade. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | Adiar: texto de comando visível ao usuário. |
 | 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
@@ -86,17 +108,17 @@ grupos introduzidos por PRs posteriores: `pause_chat`/`resume_chat` (2/14) e as
 duas funções de depreciação `__getattr__` em `table_ast`/`validators` (2/20);
 eles são acompanhados separadamente das linhas do baseline.
 
-Os próximos candidatos de maior valor são o trio startup/lock do frontend
-(grupos 8–10) e os leitores de resultado do SDK (4, 5, 21). Cada um deve ter seu
-próprio PR focado com os testes de caracterização relevantes; os restantes não
-foram alterados aqui.
+O próximo candidato de maior valor são os leitores de resultado do SDK (grupos
+4, 5 e 21). O trio startup/lock do frontend foi consolidado neste PR. Cada
+consolidação deve manter seu próprio PR focado e testes de caracterização; os
+grupos restantes não foram alterados aqui.
 
 ## Reprodução
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

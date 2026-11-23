@@ -24,6 +24,9 @@ from backend.config.process_setup import setup_process
 from backend.config.settings import settings
 
 LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
+# The console entry point used a separate lock before both entry points shared
+# this runtime. Keep recognizing it during an in-place upgrade.
+LEGACY_LOCK_FILE = os.path.join(os.path.dirname(__file__), "cli", "bot.lock")
 
 
 def _is_process_running(pid: int) -> bool:
@@ -41,23 +44,26 @@ def _is_process_running(pid: int) -> bool:
         return False
 
 
+def _check_existing_lock(path: str) -> None:
+    """Refuse a live lock, and remove a stale or malformed one."""
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r") as f:
+            pid = int(f.read().strip())
+        if _is_process_running(pid):
+            logger.critical(t(LOG_BOT_ALREADY_RUNNING).format(pid=pid))
+            sys.exit(1)
+    except ValueError:
+        pass
+    else:
+        logger.warning(t(LOG_LOCK_FILE_STALE).format(pid=pid))
+    os.remove(path)
+
+
 def acquire_lock() -> None:
-    if os.path.exists(LOCK_FILE):
-        try:
-            with open(LOCK_FILE, "r") as f:
-                pid = int(f.read().strip())
-            if _is_process_running(pid):
-                logger.critical(
-                    t(LOG_BOT_ALREADY_RUNNING).format(pid=pid)
-                )
-                sys.exit(1)
-            else:
-                logger.warning(
-                    t(LOG_LOCK_FILE_STALE).format(pid=pid)
-                )
-                os.remove(LOCK_FILE)
-        except ValueError:
-            os.remove(LOCK_FILE)
+    _check_existing_lock(LOCK_FILE)
+    _check_existing_lock(LEGACY_LOCK_FILE)
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
     logger.info(t(LOG_LOCK_ACQUIRED).format(pid=os.getpid()))
@@ -127,7 +133,7 @@ async def startup():
         shutdown_model_calls()
 
 
-if __name__ == "__main__":
+def main() -> None:
     # Before the lock: its messages are already translated (review of #568).
     setup_process()
     acquire_lock()
@@ -140,3 +146,7 @@ if __name__ == "__main__":
         sys.exit(1)
     finally:
         release_lock()
+
+
+if __name__ == "__main__":
+    main()

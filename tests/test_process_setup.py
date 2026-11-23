@@ -178,13 +178,14 @@ def test_a_composite_c_locale_reaches_the_server_locale(monkeypatch) -> None:
     assert i18n.server_locale() == "pt_BR"
 
 
-@pytest.mark.parametrize("entry", ["frontend/run.py", "frontend/cli/run.py"])
-def test_the_entry_points_set_up_the_process_before_the_lock(entry) -> None:
+def test_the_entry_point_sets_up_the_process_before_the_lock() -> None:
     """The lock's messages are translated, so the setup comes first (review of #568)."""
     import ast
     from pathlib import Path
 
-    source = (Path(__file__).resolve().parents[1] / entry).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "frontend/run.py").read_text(
+        encoding="utf-8"
+    )
     calls = [
         node.func.id
         for node in ast.walk(ast.parse(source))

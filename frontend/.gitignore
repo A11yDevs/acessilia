@@ -1,0 +1,4 @@
+# Process locks written by the shared frontend runtime.
+bot.lock
+# Legacy CLI lock, kept here so an old process cannot be committed.
+cli/bot.lock
