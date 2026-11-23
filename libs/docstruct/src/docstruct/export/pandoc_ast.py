@@ -6,7 +6,7 @@ document dict -> Pandoc JSON AST (in-memory dict), no I/O.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Collection, Iterator
 from typing import Any
 
 from docstruct.blocks.lists import list_numbering, list_start
@@ -362,19 +362,23 @@ _ORDERED_LIST_STYLES = {
 
 
 def count_math_nodes(document_ast: dict[str, Any]) -> int:
-    """Count every ``Math`` inline in ``document_ast`` in pre-order walk order."""
+    """Count every ``Math`` inline in ``document_ast``."""
     return _count_math_nodes(document_ast.get("blocks", []))
 
 
-def _count_math_nodes(node: Any) -> int:
+def _math_nodes(node: Any) -> Iterator[dict[str, Any]]:
     if isinstance(node, list):
-        return sum(_count_math_nodes(item) for item in node)
-    if isinstance(node, dict):
+        for item in node:
+            yield from _math_nodes(item)
+    elif isinstance(node, dict):
         if node.get("t") == "Math":
-            return 1
-        if "c" in node:
-            return _count_math_nodes(node["c"])
-    return 0
+            yield node
+        elif "c" in node:
+            yield from _math_nodes(node["c"])
+
+
+def _count_math_nodes(node: Any) -> int:
+    return sum(1 for _ in _math_nodes(node))
 
 
 def unconverted_math_indices(
@@ -437,15 +441,11 @@ def degrade_math_to_text(
     }
 
 
+_NO_MATH = object()
+
+
 def _contains_math(node: Any) -> bool:
-    if isinstance(node, list):
-        return any(_contains_math(item) for item in node)
-    if isinstance(node, dict):
-        if node.get("t") == "Math":
-            return True
-        if "c" in node:
-            return _contains_math(node["c"])
-    return False
+    return next(_math_nodes(node), _NO_MATH) is not _NO_MATH
 
 
 def _degrade_node(
