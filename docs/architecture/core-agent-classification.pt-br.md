@@ -2,17 +2,27 @@
 
 Inglês, versão normativa: [English version](core-agent-classification.md)
 
-A [ADR-0029](../adr/0029-symbolic-core-every-step-planned.pt-br.md) classifica
-os agentes de `acessilia_core.agents` como estratégicos ou operacionais:
+A [ADR-0029](../adr/0029-symbolic-core-every-step-planned.pt-br.md) separa um
+Core agêntico de uma Toolbox passiva:
 
-- **Agentes estratégicos ficam no Core.** Interpretam objetivos, decompõem
-  tarefas, escolhem estratégias, coordenam subplanos, avaliam estado e
-  objetivos, decidem replanejar e recebem a futura integração LLM +
-  planejamento (#619).
-- **Agentes operacionais viram capacidades da Toolbox.** Fazem OCR e
-  extração semântica, classificação de documentos, descrição de imagens,
-  adjudicação visual, extração de tabelas e fórmulas e processamento
-  multimodal.
+> **O Core é agêntico e ativo**: raciocina, planeja, delega, coordena,
+> avalia e replaneja. **A Toolbox é operacional e passiva**: executa as
+> capacidades que lhe pedem e devolve resultados, sem autonomia agêntica e
+> sem responsabilidade por decisões de workflow.
+
+Seus agentes são classificados em três camadas, **todas no Core**:
+
+| Classe | Responsabilidade |
+|---|---|
+| estratégica | Objetivos globais, o plano principal, políticas, coordenação global, avaliação de resultados, a decisão de replanejar, a futura integração LLM + planejamento (#619) |
+| gerencial | Um objetivo delegado: sua decomposição, um subplano de domínio com as capacidades autorizadas, avaliação e replanejamento locais, escalada do que excede sua autoridade ([#774](https://github.com/A11yDevs/acessilia/issues/774)) |
+| operacional | **Transitória.** Código legado que executa ou encapsula operações destinadas à Toolbox: extração, classificação, descrição de imagens, adjudicação visual, tabelas e fórmulas, processamento multimodal |
+
+**Operacional não significa "um agente para a Toolbox".** Nenhum agente vai
+para a Toolbox. Um agente operacional é decomposto por responsabilidade (veja
+[Decomposição antes da migração](#decomposição-antes-da-migração)), suas
+operações viram capacidades não agênticas, e qualquer decisão que ele tenha
+fica no Core.
 
 Esta página classifica todos os módulos de
 `libs/core/src/acessilia_core/agents/`
@@ -26,8 +36,15 @@ página alinhados.
 
 Medido em `develop` no `a1a68a7b`.
 
-- **8 agentes: 0 estratégicos, 8 operacionais.** Isso fecha o indicador
-  "Agentes do Core classificados" da #735 (8/8).
+- **8 agentes: 0 estratégicos, 0 gerenciais, 8 operacionais.** Isso fecha o
+  indicador "Agentes do Core classificados" da #735 (8/8).
+- **O escopo é o pacote `acessilia_core.agents`, não todos os agentes do
+  Core.** `PlannerAgent` (`planning/`) e `ExecutorAgent` (`execution/`) ficam
+  fora dele. Pela função são estratégicos, e estão listados em
+  [Onde estão as funções estratégicas](#onde-estão-as-funções-estratégicas).
+  A classe gerencial ainda não tem instâncias; ela existe para que
+  subagentes especializados (#774) possam ser introduzidos sem mudar esta
+  política.
 - **As funções estratégicas não estão em `agents/`.** Planejamento,
   coordenação, avaliação de estado e replanejamento ficam em `planning/`,
   `execution/` e `pipeline/` (veja [Onde estão as funções estratégicas](#onde-estão-as-funções-estratégicas)).
@@ -49,10 +66,10 @@ Medido em `develop` no `a1a68a7b`.
 
 | Módulo | Classe | O que faz | Chamado por (pipeline) | Chama modelo | Destino |
 |---|---|---|---|---|---|
-| `agents/vision_agent` | operacional | Descrição de imagens e regiões, inspeção de páginas e regiões, leitura de fórmulas | `pipeline/enrichment/pictures`, `pipeline/enrichment/formulas`, `pipeline/handlers/inspection` | sim | Uma capacidade da Toolbox com modelo para cada uso (descrição de imagem, inspeção de região, leitura de fórmula), com seus prompts, validação, novas tentativas e cache |
-| `agents/data_agent` | operacional | Extração validada de tabelas e fórmulas de uma região | `pipeline/enrichment/tables` | sim | Uma capacidade da Toolbox com modelo para extração de tabelas e fórmulas |
+| `agents/vision_agent` | operacional | Descrição de imagens e regiões, inspeção de páginas e regiões, leitura de fórmulas | `pipeline/enrichment/pictures`, `pipeline/enrichment/formulas`, `pipeline/handlers/inspection` | sim | Sua inferência vira capacidades não agênticas (descrição de imagem, inspeção de região, leitura de fórmula), com prompts, validação, novas tentativas e cache. As decisões sobre o que descrever ou inspecionar, e se inspecionar de novo, ficam no Core |
+| `agents/data_agent` | operacional | Extração validada de tabelas e fórmulas de uma região | `pipeline/enrichment/tables` | sim | Sua inferência vira uma capacidade não agêntica de extração de tabelas e fórmulas. Os orçamentos de releitura e de novas tentativas do estágio de tabelas ficam no Core |
 | `agents/informational_structural` | operacional | Extrai o documento pela Toolbox, funde os provedores e monta o manifesto de processamento | `pipeline/orchestrator` | não (só o envelope Agno) | A extração já é uma chamada à Toolbox. A fusão local e a montagem do manifesto viram uma capacidade composta de extração. Derivar as obrigações fica no Core (veja abaixo) |
-| `agents/fusion_agent` | operacional | Fusão, auditoria, classificação, verso, junção final, guarda contra repetição, normalização e ordem de leitura determinísticas (`process_*`) | `pipeline/handlers/common`, para os handlers dos métodos do plano | não (só o envelope Agno) | Cada `process_*` sai com o método do plano que o usa, como parte da migração do [inventário do Docstruct](docstruct-import-inventory.pt-br.md) |
+| `agents/fusion_agent` | operacional | Fusão, auditoria, classificação, verso, junção final, guarda contra repetição, normalização e ordem de leitura determinísticas (`process_*`) | `pipeline/handlers/common`, para os handlers dos métodos do plano | não (só o envelope Agno) | Cada `process_*` vira uma capacidade com o método do plano que o usa, como parte da migração do [inventário do Docstruct](docstruct-import-inventory.pt-br.md). Qual deles roda continua sendo escolha do plano |
 | `agents/adjudication_agent` | operacional | Roteamento de páginas entre provedores, decisões a partir da transcrição do VLM, o juiz pareado, o oráculo | nenhum | não (só o envelope Agno) | Não migra até um método do plano precisar dele (veja [Ainda em aberto](#ainda-em-aberto)) |
 | `agents/order_adjudication_agent` | operacional | Interpreta e completa uma ordem de leitura do VLM; tau de Kendall | nenhum | não (só o envelope Agno) | Idem |
 | `agents/page_level_agent` | operacional | Fusão e seleção de páginas inteiras, concordância de páginas, upscale e orientação | nenhum | não (só o envelope Agno) | Idem |
@@ -90,12 +107,37 @@ operacionais, enquanto derivar as obrigações define o problema de
 planejamento e fica no Core. A migração do `InformationalStructuralAgent`
 mantém essa linha.
 
+## Decomposição antes da migração
+
+Um agente operacional não migra inteiro. Suas responsabilidades são
+separadas antes:
+
+| Responsabilidade | Destino |
+|---|---|
+| Objetivos e planejamento | Core estratégico |
+| Subplanejamento e escolha de estratégia | Core gerencial |
+| Avaliação semântica e decisão de replanejar | Core estratégico ou gerencial, no escopo que a detém |
+| Inferência de modelos | Toolbox |
+| Algoritmos determinísticos de processamento | Toolbox |
+| Validação técnica e transformação de resultados | Toolbox |
+| Contratos e transporte | Core SDK e contratos compartilhados |
+
+Nos oito agentes de hoje, a separação já está limpa. As decisões ficam nos
+seus chamadores no Core: quais figuras recebem descrição
+(`pipeline/enrichment/pictures`), os orçamentos do estágio de tabelas
+(`pipeline/enrichment/tables`), a inspeção como método do plano
+(`pipeline/handlers/inspection`) e qual `process_*` um método do plano
+executa. O que os agentes contêm é operacional e vira capacidades. Uma
+migração futura verifica isso de novo: uma decisão encontrada dentro de um
+agente fica no Core.
+
 ## A migração, em ordem
 
 1. **`VisionAgent` e `DataAgent`.** São os únicos agentes com modelo, e é
    neles que rodam a "descrição de imagens" e a "extração de tabelas e
-   fórmulas" da ADR-0029. Cada uso vira uma capacidade. O Core fica com a
-   decisão de quando pedir uma e interpreta o resultado no contexto do plano.
+   fórmulas" da ADR-0029. Cada uso vira uma capacidade não agêntica. O Core
+   fica com a decisão de quando pedir uma e interpreta o resultado no
+   contexto do plano.
 2. **Os métodos `process_*` do `FusionAgent`**, por método do plano, com a
    migração do inventário do Docstruct.
 3. **`InformationalStructuralAgent`.** Uma capacidade composta de extração
@@ -113,11 +155,17 @@ remoção das fixações obsoletas.
 
 - todo módulo de `acessilia_core/agents/` está no fixture, e nenhuma entrada
   está obsoleta. Um agente novo chega classificado;
-- um agente é estratégico ou operacional, e um módulo de apoio é operacional
-  ou infraestrutura;
+- um agente é estratégico, gerencial ou operacional, e um módulo de apoio é
+  operacional ou infraestrutura;
 - as duas páginas listam os módulos do fixture.
 
 ## Ainda em aberto
+
+- **A camada gerencial.** Contratos de delegação (objetivo, restrições,
+  capacidades autorizadas, orçamento, critérios de sucesso, resultado,
+  escalada), agentes gerenciais e planejamento hierárquico versus monolítico
+  (HTN incluída) são pesquisa, na
+  [#774](https://github.com/A11yDevs/acessilia/issues/774) e na #619.
 
 - **Os quatro agentes sem chamador no pipeline.** Devem ir para as
   ferramentas de benchmark (Dr.DocBench, #125) fora do Core, ser
