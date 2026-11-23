@@ -1,5 +1,6 @@
 """Additive typed accessors preserve raw APIs and their transport errors."""
 
+import inspect
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -29,24 +30,52 @@ EXAMPLES = json.loads(
             ToolboxMathClient,
             "convert",
             "MathmlResult",
-            {"latex": "x", "direction": "mathml-to-latex"},
+            {
+                "latex": "x",
+                "direction": "mathml-to-latex",
+                "use_remote_cache": False,
+            },
         ),
-        (ToolboxMathClient, "verbalize", "VerbalizedResult", {"latex": "x"}),
+        (
+            ToolboxMathClient,
+            "verbalize",
+            "VerbalizedResult",
+            {"latex": "x", "use_remote_cache": False},
+        ),
         (
             ToolboxAdjudicateClient,
             "judge_page",
             "PageJudgement",
-            {"candidate_a": "a", "candidate_b": "b"},
+            {
+                "candidate_a": "a",
+                "candidate_b": "b",
+                "use_remote_cache": False,
+            },
         ),
         (
             ToolboxAdjudicateClient,
             "transcribe_region",
             "RegionTranscription",
-            {"candidates": []},
+            {"candidates": [], "use_remote_cache": False},
         ),
-        (ToolboxMediaInspectClient, "inspect", "MediaInspection", {}),
-        (ToolboxPdfValidateClient, "validate", "PdfValidationReport", {}),
-        (ToolboxPdfClient, "text_spans", "TextSpansResult", {"pages": [1]}),
+        (
+            ToolboxMediaInspectClient,
+            "inspect",
+            "MediaInspection",
+            {"use_remote_cache": False},
+        ),
+        (
+            ToolboxPdfValidateClient,
+            "validate",
+            "PdfValidationReport",
+            {"use_remote_cache": False},
+        ),
+        (
+            ToolboxPdfClient,
+            "text_spans",
+            "TextSpansResult",
+            {"pages": [1], "use_remote_cache": False},
+        ),
     ],
 )
 @pytest.mark.asyncio
@@ -59,11 +88,13 @@ async def test_typed_client_accessor(cls, method, model, args):
             if method in ("inspect", "validate", "text_spans")
             else {"document": document}
         )
+        raw_parameters = set(inspect.signature(getattr(client, method)).parameters)
         mock = AsyncMock(return_value=payload)
         setattr(client, method, mock)
         typed = await getattr(client, method + "_result")(**args)
         assert isinstance(typed, getattr(results, model))
         assert typed.to_dict() == document
+        assert set(mock.call_args.kwargs) == raw_parameters
         for key, value in args.items():
             assert mock.call_args.kwargs[key] == value
         mock.return_value = []

@@ -8,6 +8,7 @@ Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656)
 
 - Um grupo estrutural só é acionável quando as funções são semanticamente intercambiáveis para os mesmos chamadores. Fluxo de controle normalizado igual não basta.
 - Código gerado é alterado pelo gerador, nunca editando o arquivo gerado.
+- O detector de duplicatas ignora corpos com menos de duas instruções. Um wrapper de uma instrução não é evidência de consolidação; a exceção fica registrada aqui para não baixar a métrica silenciosamente.
 - Fluxos sensíveis a comportamento (seleção dos agentes, startup do frontend) precisam de teste de caracterização antes da extração.
 - Uma duplicata entre componentes precisa de um único dono. Parsing de locale é semântica de i18n e o parser genérico agora vive no SDK (`acessilia_sdk.i18n`); o core mantém catálogos e políticas, o SDK é dono do contexto de requisição e da tradução, e o serviço lê o ambiente e delega o parse.
 
@@ -73,6 +74,32 @@ configura o processo antes de obter o lock.
 linhas → **20 grupos / 49 funções / 499 linhas**. Os grupos `_is_process_running`,
 `acquire_lock` e `startup` desaparecem.
 
+## Quarta triagem: os wrappers tipados do SDK
+
+Os três grupos do SDK são falsos positivos para consolidação. A validação já
+vivia nos leitores compartilhados: `read_result`/`read_document` para resultados
+de execute, `read_layout`/`read_manifest` para os documentos de layout e
+estrutura. A duplicata era só a forma de encaminhamento em duas instruções
+(`await` no método bruto, guardar num temporário e passá-lo ao leitor). Os
+acessadores agora colocam a chamada aguardada dentro do leitor, mantendo
+assinaturas públicas e comportamento de validação, sem o temporário.
+`judge_page_result`, que ficava fora dos grupos, segue o mesmo formato por
+consistência.
+
+Isso cobre `judge_page_result`, `transcribe_region_result`, `text_spans_result`,
+`validate_result`, `convert_result`, `verbalize_result`, `inspect_result`,
+`analyze_result` e `extract_structure_result`. Os testes existentes de result
+readers e de layout readers exercitam saídas válidas e inválidas.
+
+O detector agora reporta 20 grupos / 49 funções / 499 linhas → **17 grupos / 41
+funções / 381 linhas**, mas isso é uma isenção do detector, não extração de
+comportamento compartilhado: cada corpo reescrito tem uma instrução, e
+`_fingerprint` ignora corpos com menos de duas. Os oito wrappers desses grupos
+seriam agrupados novamente se esse piso mudasse. As três linhas ficam registradas
+como reclassificadas, não consolidadas, até a política de uma instrução ser
+decidida para a guarda de CI do PR 5; a
+[#749](https://github.com/A11yDevs/acessilia/issues/749) acompanha essa decisão.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -83,8 +110,8 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 1 | Leitores de dataset gerados do SDK (5/15) | Arquivo gerado (`_dataset_generated.py`): corrigir o gerador, não as funções geradas. |
 | 2 | Escritores de schema do core `write_*_schema` (4/33) | **Consolidado:** `schema_files.write_schema` compartilhado, com testes de writer/schema. |
 | 3 | Helpers de config do core `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Adiar: os dataclasses de configuração ao redor diferem. |
-| 4 | Leitores de resultado do SDK em adjudicate/pdf/pdf_validate (3/48) | Candidato: leitor genérico tipado após os testes de contrato do SDK. |
-| 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | Candidato: o mesmo leitor genérico. |
+| 4 | Leitores de resultado do SDK em adjudicate/pdf/pdf_validate (3/48) | **Reclassificado:** falso positivo; o leitor compartilhado já faz a validação. |
+| 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | **Reclassificado:** falso positivo; o inlining é estilo, não extração. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidado neste PR.** |
 | 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | Trivial; sem ação. |
 | 8 | `_is_process_running` do frontend (2/26) | **Consolidado:** um runtime atrás dos dois entry points, com testes da sondagem de PID. |
@@ -100,7 +127,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 18 | `_sha256` do core em builder/domain bundle (2/12) | Candidato a consolidação de utilitário. |
 | 19 | Wrappers async de math (2/12) | Candidato a helper pequeno. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidato a helper pequeno. |
-| 21 | Leitores de layout/structure do SDK (2/32) | Candidato: mesmo leitor genérico dos grupos 4–5. |
+| 21 | Leitores de layout/structure do SDK (2/32) | **Reclassificado:** falso positivo; a extração do envelope já é compartilhada. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidato a helper pequeno de validação. |
 
 A tabela é ancorada no baseline de novembro. O tool atual também reporta dois
@@ -108,17 +135,18 @@ grupos introduzidos por PRs posteriores: `pause_chat`/`resume_chat` (2/14) e as
 duas funções de depreciação `__getattr__` em `table_ast`/`validators` (2/20);
 eles são acompanhados separadamente das linhas do baseline.
 
-O próximo candidato de maior valor são os leitores de resultado do SDK (grupos
-4, 5 e 21). O trio startup/lock do frontend foi consolidado neste PR. Cada
-consolidação deve manter seu próprio PR focado e testes de caracterização; os
-grupos restantes não foram alterados aqui.
+Os grupos restantes são menores ou sensíveis a comportamento. As cópias de
+comandos do Telegram precisam de revisão do texto visível, enquanto a seleção
+dos agentes e a seleção de tabelas precisa de caracterização antes da extração.
+Cada consolidação deve manter seu próprio PR focado; os grupos restantes não
+foram alterados aqui.
 
 ## Reprodução
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

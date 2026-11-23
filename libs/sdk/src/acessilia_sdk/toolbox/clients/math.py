@@ -175,10 +175,14 @@ class ToolboxMathClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> MathmlResult:
         """Typed published result of :meth:`convert`; raw compatibility is unchanged."""
-        result = await self.convert(
-            latex=latex, direction=direction, use_remote_cache=use_remote_cache
+        return read_document(
+            await self.convert(
+                latex=latex,
+                direction=direction,
+                use_remote_cache=use_remote_cache,
+            ),
+            MathmlResult,
         )
-        return read_document(result, MathmlResult)
 
     async def verbalize_result(
         self,
@@ -188,10 +192,14 @@ class ToolboxMathClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> VerbalizedResult:
         """Typed published result of :meth:`verbalize`; raw compatibility is unchanged."""
-        result = await self.verbalize(
-            latex=latex, language=language, use_remote_cache=use_remote_cache
+        return read_document(
+            await self.verbalize(
+                latex=latex,
+                language=language,
+                use_remote_cache=use_remote_cache,
+            ),
+            VerbalizedResult,
         )
-        return read_document(result, VerbalizedResult)
 
 
 __all__ = [
