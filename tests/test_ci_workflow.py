@@ -278,6 +278,17 @@ def test_the_impact_selection_runs_in_shadow_mode_without_touching_the_gate() ->
 
 
 
+def test_the_integration_filter_matches_the_shadow_selector() -> None:
+    from scripts.tests import select_suites
+
+    workflow = _workflow()
+    changes = {step.get("name"): step for step in workflow["jobs"]["changes"]["steps"]}
+    filters = changes["Filter integration paths"]["with"]["filters"]
+    parsed = yaml.safe_load(filters)
+    assert set(parsed) == {"integration"}
+    assert set(parsed["integration"]) == set(select_suites.INTEGRATION_GLOBS)
+
+
 def test_app_integration_runs_only_for_relevant_pull_requests() -> None:
     jobs = _workflow()["jobs"]
     changes = jobs["changes"]

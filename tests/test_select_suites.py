@@ -78,6 +78,28 @@ def test_the_integration_trigger_paths_match_the_ci_filter() -> None:
         assert result.indicators["integration_changed"] is True, path
 
 
+def test_every_integration_glob_has_a_matching_sample() -> None:
+    for glob in selection.INTEGRATION_GLOBS:
+        sample = glob.replace("**", "nested").replace("*", "sample")
+        assert selection.matches_integration(sample), glob
+
+
+def test_integration_matching_has_no_sibling_prefix_false_positives() -> None:
+    for path in (
+        "backend2/api.py",
+        "frontend-assets/app.js",
+        "libs/core-notes/x.py",
+        "libs/sdk2/x.py",
+        "libs/docstruct-old/x.py",
+    ):
+        assert selection.matches_integration(path) is False, path
+
+
+def test_integration_matching_is_case_insensitive_and_accepts_bare_directories() -> None:
+    assert selection.matches_integration("Backend/API.py") is True
+    assert selection.matches_integration("backend") is True
+
+
 def test_other_tests_and_docs_do_not_select_integration() -> None:
     for path in ("tests/test_flood.py", "docs/testing.md"):
         assert selection.classify_paths([path]).integration_required is False

@@ -27,6 +27,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Sequence
 
@@ -69,6 +70,37 @@ CONTRACT_MARKERS = (
     "toolbox-contract",
     "capability_contract",
 )
+
+#: The exact path globs used by the real ``changes`` filter in ci.yml.
+INTEGRATION_GLOBS = (
+    "backend/**",
+    "frontend/**",
+    "libs/core/**",
+    "libs/sdk/**",
+    "libs/docstruct/**",
+    "tests/test_provider_choice_methods.py",
+    "tests/conftest.py",
+    "tests/judge_support.py",
+    "tests/core_config_support.py",
+    "tests/toolbox_render_fake.py",
+    "pyproject.toml",
+    "uv.lock",
+    ".github/workflows/ci.yml",
+)
+
+
+def matches_integration(path: str) -> bool:
+    """Whether a repository-relative path matches one of the CI globs.
+
+    Matching is case-insensitive. A trailing ``/**`` also matches the bare
+    directory path, mirroring ``dorny/paths-filter`` for directory entries.
+    """
+    normalized = path.replace("\\", "/").strip().lower()
+    return any(
+        fnmatchcase(normalized, pattern)
+        or (pattern.endswith("/**") and normalized == pattern[:-3])
+        for pattern in INTEGRATION_GLOBS
+    )
 
 
 @dataclass(frozen=True)
@@ -161,22 +193,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             for suite in SUITES:
                 reasons[suite].append(f"contract path: {path}")
 
-        if (
-            lowered.startswith(
-                ("backend/", "frontend/", "libs/core/", "libs/sdk/", "libs/docstruct/")
-            )
-            or lowered
-            in {
-                "tests/test_provider_choice_methods.py",
-                "tests/conftest.py",
-                "tests/judge_support.py",
-                "tests/core_config_support.py",
-                "tests/toolbox_render_fake.py",
-                "pyproject.toml",
-                "uv.lock",
-                ".github/workflows/ci.yml",
-            }
-        ):
+        if matches_integration(lowered):
             integration = True
             indicators["integration_changed"] = True
             reasons["app"].append(f"integration trigger: {path}")
