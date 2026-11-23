@@ -172,7 +172,11 @@ async def cmd_low(message: Message) -> None:
 
 @router.message(Command("normal"))
 async def cmd_normal(message: Message) -> None:
-    """Activate medium detail under the historical /normal alias."""
+    """Activate medium detail under the historical /normal alias.
+
+    Args:
+        message (Message): Incoming aiogram /normal command; no default (required).
+    """
     await _set_mode(message, "medio", MSG_MODE_NORMAL_ON)
 
 
