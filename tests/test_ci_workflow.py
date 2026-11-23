@@ -1,6 +1,7 @@
 """The CI gate keeps its required name and runs the main suite in parallel (#448)."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,10 @@ RELEASE = ROOT / ".github/workflows/release.yml"
 RULESETS = ROOT / ".github/rulesets"
 SETUP_ACTION = ROOT / ".github/actions/setup-root/action.yml"
 BYPASS_FILTER = ROOT / "scripts/rulesets-bypass.jq"
+
+# The single CodeQL pin shared by every workflow. Update both values together.
+CODEQL_ACTION_SHA = "33d7b85da1a04171e211befe2c739303b9a4c066"
+CODEQL_ACTION_VERSION = "v4.39.3"
 
 
 def _workflow() -> dict:
@@ -700,13 +705,32 @@ def test_the_container_scan_is_conditional_on_image_paths() -> None:
 
 
 def test_codeql_actions_are_pinned_to_commit_shas() -> None:
-    import re
-
-    pattern = re.compile(r"github/codeql-action/[a-z-]+@([0-9a-f]+)")
-    for workflow in sorted((ROOT / ".github/workflows").glob("*.yml")):
+    pattern = re.compile(
+        r"github/codeql-action/(?P<action>[a-z-]+)@(?P<ref>\S+)"
+        r"(?:\s*#\s*(?P<version>\S+))?"
+    )
+    actions: set[str] = set()
+    files = sorted(
+        path
+        for path in (ROOT / ".github").rglob("*")
+        if path.is_file() and path.suffix in {".yml", ".yaml"}
+    )
+    for workflow in files:
         text = workflow.read_text(encoding="utf-8")
         for match in pattern.finditer(text):
-            assert len(match.group(1)) == 40, f"{workflow.name}: {match.group(0)}"
+            ref = match.group("ref")
+            assert re.fullmatch(r"[0-9a-f]{40}", ref), (
+                f"{workflow.name}: {match.group(0)} does not pin a full SHA"
+            )
+            assert ref == CODEQL_ACTION_SHA, (
+                f"{workflow.name}: {match.group(0)} does not use the shared pin"
+            )
+            assert match.group("version") == CODEQL_ACTION_VERSION, (
+                f"{workflow.name}: {match.group(0)} has a stale version comment"
+            )
+            actions.add(match.group("action"))
+
+    assert actions >= {"init", "autobuild", "analyze", "upload-sarif"}
 
 
 def test_the_image_scan_reads_the_recorded_exception() -> None:
