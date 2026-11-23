@@ -331,6 +331,25 @@ async def test_a_planner_change_plans_again(monkeypatch, tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_an_injected_planning_engine_plans_again(monkeypatch, tmp_path) -> None:
+    """A job resumed with another planning engine (#632) does not reuse the
+    plan of the first one."""
+    from acessilia_core.planning.engine import PddlPlanningEngine
+
+    class OtherEngine(PddlPlanningEngine):
+        @property
+        def identity(self) -> str:
+            return "other"
+
+    def inject(orchestrator, _checkpoints):
+        orchestrator.planning_engine = OtherEngine()
+
+    counts = await _resume_counts(monkeypatch, tmp_path, lambda c: c, between=inject, with_execution=True)
+
+    assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 1, "execution": 1}
+
+
+@pytest.mark.asyncio
 async def test_a_new_model_revision_enriches_again(monkeypatch, tmp_path) -> None:
     """The service's model revision, declared on its checkpoint port, is part
     of the enrichment's and the execution's identity."""

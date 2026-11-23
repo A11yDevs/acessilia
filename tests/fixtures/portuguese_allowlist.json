@@ -37,7 +37,7 @@
     "libs/core/src/acessilia_core/planning/comparison.py": 6,
     "libs/core/src/acessilia_core/planning/domain_bundle.py": 15,
     "libs/core/src/acessilia_core/planning/pddl_processor.py": 29,
-    "libs/core/src/acessilia_core/planning/planner_agent.py": 10,
+    "libs/core/src/acessilia_core/planning/planner_agent.py": 9,
     "libs/core/tests/test_audit_validation.py": 1,
     "libs/core/tests/test_canonical_pipeline.py": 6,
     "libs/core/tests/test_event_loop_responsiveness.py": 2,
