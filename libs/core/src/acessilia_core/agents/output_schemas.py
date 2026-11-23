@@ -38,6 +38,13 @@ DATA_SCHEMA_INSTRUCTION = (
 )
 
 
+def _blank_to_none(value: Any) -> Any:
+    """Treat a provider's blank optional string as an absent value."""
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
 class AgentOutput(BaseModel):
     """Base contract that rejects fields outside the declared agent schema."""
 
@@ -101,9 +108,7 @@ class VisionOutput(AgentOutput):
     @classmethod
     def normalize_empty_formula_latex(cls, value: Any) -> Any:
         """Treat a provider's empty optional string as an absent formula."""
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
+        return _blank_to_none(value)
 
     @model_validator(mode="after")
     def validate_content(self) -> "VisionOutput":
@@ -232,9 +237,7 @@ class DataOutput(AgentOutput):
     @classmethod
     def normalize_empty_optional_strings(cls, value: Any) -> Any:
         """Treat blank optional fields as absent, as some providers emit empty strings."""
-        if isinstance(value, str) and not value.strip():
-            return None
-        return value
+        return _blank_to_none(value)
 
     @model_validator(mode="after")
     def validate_content(self) -> "DataOutput":

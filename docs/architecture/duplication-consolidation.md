@@ -125,6 +125,22 @@ path. The state-survival and store-failure tests cover both actions.
 lines → **15 groups / 34 functions / 319 lines**. The pause/resume middleware
 group disappears.
 
+## Seventh consolidation: the blank optional-string normalizer
+
+`VisionOutput.normalize_empty_formula_latex` and
+`DataOutput.normalize_empty_optional_strings` implemented the same rule: a
+provider's blank optional string means the field is absent. Both validators now
+delegate to `_blank_to_none`; the existing tests cover `formula_latex`, `latex`
+and `caption`.
+
+**Measured delta on this PR's code commit:** 15 groups / 34 functions / 319
+lines → **14 groups / 32 functions / 309 lines**. The output-schema normalizer
+group disappears. Both delegating validators now have one statement, so the
+detector's `< 2 statements` exemption hides them; they would be grouped again
+if [#749](https://github.com/A11yDevs/acessilia/issues/749) changes that floor.
+Unlike the SDK wrapper case, this is a real extraction: both validators share
+`_blank_to_none`.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -147,7 +163,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 13 | Agent `select_page` in adjudication/page-level (2/56) | Behaviour-sensitive: characterize selection policy first. |
 | 14 | Agent `swap_low_agreement` (2/52) | Behaviour-sensitive: characterize the swap policy first. |
 | 15 | `process_join_tail` in fusion/page-level (2/30) | Evaluate with the agent follow-up. |
-| 16 | Output schema normalizers (2/10) | Candidate small helper. |
+| 16 | Output schema normalizers (2/10) | **Consolidated:** shared `_blank_to_none`. |
 | 17 | Table specialist `select_greedy` / `select_table` (2/40) | Behaviour-sensitive: table selection tests first. |
 | 18 | Core `_sha256` in builder/domain bundle (2/12) | Candidate utility consolidation. |
 | 19 | Math async wrappers (2/12) | Candidate small wrapper helper. |
@@ -172,7 +188,7 @@ changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.
