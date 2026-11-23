@@ -32,6 +32,7 @@ própria suíte completa mais rápida.
 | Quero verificar o lint (baseline do Ruff) | `make lint` | Executa o Ruff (`F`, `I`, `E` sem `E501`) via `scripts/check_ruff_baseline.py` |
 | Quero verificar tipos estáticos (Mypy) | `make typecheck` | Executa o Mypy no escopo configurado de `docstruct`, `acessilia_sdk`, `acessilia_core` e `backend` |
 | Quero relatórios de cobertura por componente | `make coverage` | Executa as quatro suítes com cobertura de desvios, grava `var/coverage/{app,core,sdk,docstruct}/` e exige os limites |
+| Quero evidência de sobreposição de cobertura | `make test-overlap` | Executa a suíte da aplicação com contextos por teste e grava os relatórios de sobreposição/redundância em `var/overlap/` (#644) |
 | Quero só a suíte principal, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda a suíte principal non-E2E com quatro workers |
 | Quero só a biblioteca do core | `(cd libs/core && uv run --extra dev pytest)` | Roda a suíte do core, sem o serviço |
 | Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
@@ -232,6 +233,11 @@ dependências.
 | Cenário | Antes | Depois |
 |---|---:|---:|
 | Core, serial vs quatro workers | 143s | 74s (~1,9x) |
+
+O valor 143s → 74s é da #448, com a suíte como era na época. O baseline maior da
+#644, medido depois, está em [testing/optimization.pt-br.md](testing/optimization.pt-br.md)
+(890,15s serial contra 157,23s com quatro workers); use esse guia para os
+números atuais.
 | Etapa da suíte principal na CI | 60s + 10s de coleta | 26–43s |
 | Job `tests` da CI | 1m59s | 59s–1m26s (uma execução: 1m11s) |
 
@@ -258,6 +264,7 @@ make test-all
 make lint
 make typecheck
 make coverage
+make test-overlap
 ```
 
 Pisos de cobertura: aplicação **85%**, docstruct **86%**, SDK **96%**, core **82%** (branch coverage).
