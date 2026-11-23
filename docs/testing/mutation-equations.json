@@ -1,0 +1,1177 @@
+{
+  "schema_version": 1,
+  "kind": "mutation-report",
+  "module": "libs/docstruct/src/docstruct/text/equations.py",
+  "tests": [
+    "tests/test_equation_numbers.py"
+  ],
+  "settings": {
+    "operators": [
+      "compare",
+      "boolop",
+      "bool-constant",
+      "remove-not",
+      "negate-condition",
+      "augassign"
+    ],
+    "max_mutants": 40,
+    "timeout_seconds": 60
+  },
+  "baseline": {
+    "status": "survived",
+    "seconds": 0.7327927840015036,
+    "exit_code": 0,
+    "killers": [],
+    "error": ""
+  },
+  "summary": {
+    "total": 28,
+    "killed": 28,
+    "survived": 0,
+    "timeout": 0,
+    "uncovered": 0,
+    "invalid": 0,
+    "covered_mutants": 28,
+    "mutation_score": 1.0,
+    "killing_tests": 40,
+    "equivalent_mutants": "not identified automatically"
+  },
+  "mutants": [
+    {
+      "id": "M001",
+      "operator": "negate-condition",
+      "line": 40,
+      "column": 8,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[(1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (x + 1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x + (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x < (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y + (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y \\\\times (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\le (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\neq (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x(1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\frac{1}{(2)}]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\sin (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{\\\\input{file}}]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{a}\\\\tag{2}]",
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_invalid_metadata_cannot_inject_export_markup",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 1.172,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M002",
+      "operator": "compare",
+      "line": 40,
+      "column": 11,
+      "description": "Is -> IsNot",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[(1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (x + 1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x + (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x < (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y + (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y \\\\times (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\le (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\neq (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x(1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\frac{1}{(2)}]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\sin (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{\\\\input{file}}]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{a}\\\\tag{2}]",
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_invalid_metadata_cannot_inject_export_markup",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 1.177,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M003",
+      "operator": "negate-condition",
+      "line": 43,
+      "column": 8,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x < (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y + (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y \\\\times (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\le (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\neq (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\sin (1)]",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.867,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M004",
+      "operator": "boolop",
+      "line": 43,
+      "column": 11,
+      "description": "Or -> And",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x < (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y + (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y \\\\times (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\le (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\neq (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\sin (1)]"
+      ],
+      "seconds": 0.792,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M005",
+      "operator": "remove-not",
+      "line": 43,
+      "column": 11,
+      "description": "remove not",
+      "node_type": "UnaryOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.981,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M006",
+      "operator": "negate-condition",
+      "line": 45,
+      "column": 8,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{a}\\\\tag{2}]",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.911,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M007",
+      "operator": "compare",
+      "line": 45,
+      "column": 11,
+      "description": "In -> NotIn",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{a}\\\\tag{2}]",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.895,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M008",
+      "operator": "negate-condition",
+      "line": 47,
+      "column": 8,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+        "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+        "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.85,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M009",
+      "operator": "boolop",
+      "line": 47,
+      "column": 11,
+      "description": "And -> Or",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]"
+      ],
+      "seconds": 0.798,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M010",
+      "operator": "compare",
+      "line": 47,
+      "column": 11,
+      "description": "Is -> IsNot",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]"
+      ],
+      "seconds": 0.863,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M011",
+      "operator": "remove-not",
+      "line": 47,
+      "column": 33,
+      "description": "remove not",
+      "node_type": "UnaryOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
+        "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]",
+        "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+        "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+        "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+        "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+        "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]"
+      ],
+      "seconds": 0.801,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M012",
+      "operator": "negate-condition",
+      "line": 56,
+      "column": 4,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.867,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M013",
+      "operator": "boolop",
+      "line": 56,
+      "column": 7,
+      "description": "And -> Or",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence"
+      ],
+      "seconds": 0.795,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M014",
+      "operator": "compare",
+      "line": 56,
+      "column": 7,
+      "description": "IsNot -> Is",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.78,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M015",
+      "operator": "compare",
+      "line": 56,
+      "column": 30,
+      "description": "Is -> IsNot",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
+      ],
+      "seconds": 0.796,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M016",
+      "operator": "negate-condition",
+      "line": 64,
+      "column": 12,
+      "description": "negate condition",
+      "node_type": "IfExp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.821,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M017",
+      "operator": "compare",
+      "line": 64,
+      "column": 24,
+      "description": "IsNot -> Is",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.823,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M018",
+      "operator": "negate-condition",
+      "line": 65,
+      "column": 11,
+      "description": "negate condition",
+      "node_type": "IfExp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_invalid_metadata_cannot_inject_export_markup",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+        "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.846,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M019",
+      "operator": "bool-constant",
+      "line": 68,
+      "column": 75,
+      "description": "True -> False",
+      "node_type": "Constant",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.829,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M020",
+      "operator": "negate-condition",
+      "line": 72,
+      "column": 4,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.82,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M021",
+      "operator": "compare",
+      "line": 72,
+      "column": 7,
+      "description": "Is -> IsNot",
+      "node_type": "Compare",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.823,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M022",
+      "operator": "negate-condition",
+      "line": 74,
+      "column": 4,
+      "description": "negate condition",
+      "node_type": "If",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_invalid_metadata_cannot_inject_export_markup",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.804,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M023",
+      "operator": "remove-not",
+      "line": 74,
+      "column": 7,
+      "description": "remove not",
+      "node_type": "UnaryOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_invalid_metadata_cannot_inject_export_markup",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+        "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.82,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M024",
+      "operator": "negate-condition",
+      "line": 76,
+      "column": 13,
+      "description": "negate condition",
+      "node_type": "IfExp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+        "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
+      ],
+      "seconds": 0.845,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M025",
+      "operator": "negate-condition",
+      "line": 83,
+      "column": 13,
+      "description": "negate condition",
+      "node_type": "IfExp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
+      ],
+      "seconds": 0.83,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M026",
+      "operator": "negate-condition",
+      "line": 84,
+      "column": 11,
+      "description": "negate condition",
+      "node_type": "IfExp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
+      ],
+      "seconds": 0.849,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M027",
+      "operator": "boolop",
+      "line": 84,
+      "column": 30,
+      "description": "And -> Or",
+      "node_type": "BoolOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
+      ],
+      "seconds": 0.761,
+      "exit_code": 1,
+      "error": ""
+    },
+    {
+      "id": "M028",
+      "operator": "remove-not",
+      "line": 84,
+      "column": 41,
+      "description": "remove not",
+      "node_type": "UnaryOp",
+      "index": 0,
+      "status": "killed",
+      "killers": [
+        "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+        "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+        "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
+      ],
+      "seconds": 0.831,
+      "exit_code": 1,
+      "error": ""
+    }
+  ],
+  "subsumption": [
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "mutants": 17,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "mutants": 17,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": 0.5429
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "mutants": 16,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "mutants": 16,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+      "mutants": 11,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    },
+    {
+      "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+      "mutants": 7,
+      "exclusive": 0,
+      "equal": false,
+      "coverage_similarity": null
+    }
+  ],
+  "exclusive": [
+    {
+      "test": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "mutants": [
+        "M013"
+      ]
+    }
+  ]
+}

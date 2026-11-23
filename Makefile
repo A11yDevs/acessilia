@@ -14,10 +14,17 @@ DURATIONS ?= 25
 COVERAGE_DIR ?= var/coverage
 BASELINE ?= var/timings/baseline.json
 OVERLAP_DIR ?= var/overlap
+MUTATION_MODULE ?= libs/docstruct/src/docstruct/fusion/flood.py
+MUTATION_TESTS ?= tests/test_flood.py
+MUTATION_SUITE ?= libs/docstruct
+MUTATION_SOURCE ?= libs/docstruct/src
+MUTATION_OUTPUT ?= var/mutation/flood.json
+MUTATION_COVERAGE ?= var/coverage/docstruct/.coverage
+MUTATION_OVERLAP ?= docs/testing/overlap-flood.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test-file test-failed test-all lint typecheck coverage test-baseline test-baseline-compare test-overlap
+.PHONY: help test-file test-failed test-all lint typecheck coverage test-baseline test-baseline-compare test-overlap test-mutation
 
 help:
 	@printf '%s\n' \
@@ -29,7 +36,8 @@ help:
 		'make coverage                           run branch coverage per component and enforce the thresholds' \
 		'make test-baseline                      collect test timings and coverage into $(BASELINE) (#644)' \
 		'make test-baseline-compare              compare $(BASELINE) with docs/testing/baseline.json' \
-		'make test-overlap                       collect per-test coverage and write the overlap/redundancy reports (#644)'
+		'make test-overlap                       collect per-test coverage and write the overlap/redundancy reports (#644)' \
+		'make test-mutation                      run the bounded mutation experiment on one module (#644)'
 
 lint:
 	$(UV) run python scripts/check_ruff_baseline.py
@@ -80,6 +88,15 @@ test-overlap:
 	$(UV) run --extra dev python scripts/tests/redundancy_report.py "$(OVERLAP_DIR)/app.json" \
 		--junit "app=$(CURDIR)/$(OVERLAP_DIR)/app-results.xml" \
 		--output "$(OVERLAP_DIR)/redundancy.json" --summary "$(OVERLAP_DIR)/redundancy.md"
+
+test-mutation:
+	@mkdir -p "$(dir $(MUTATION_OUTPUT))"
+	$(UV) run --extra dev python scripts/tests/mutation_report.py \
+		--module "$(MUTATION_MODULE)" --tests "$(MUTATION_TESTS)" \
+		--suite "$(MUTATION_SUITE)" --source-root "$(MUTATION_SOURCE)" \
+		--coverage-file "$(MUTATION_COVERAGE)" \
+		--overlap "$(MUTATION_OVERLAP)" \
+		--output "$(MUTATION_OUTPUT)" --summary "$(MUTATION_OUTPUT:.json=.md)"
 
 test-file:
 	@if [ -z "$(F)" ]; then \

@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "kind": "coverage-overlap",
+  "coverage_file": "var/context/docstruct/.coverage",
+  "settings": {
+    "threshold": 0.5,
+    "min_shared": 2,
+    "max_element_tests": 50,
+    "top": 100
+  },
+  "summary": {
+    "tests": 91,
+    "elements": 32,
+    "pairs": 1,
+    "identical_pairs": 0,
+    "mean_similarity": 0.5429,
+    "families": 5,
+    "identical_families": 1,
+    "zero_exclusive_tests": 90
+  },
+  "pairs": [
+    {
+      "test_a": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "test_b": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "similarity": 0.5429,
+      "shared": 19,
+      "union": 35,
+      "only_a": 8,
+      "only_b": 8,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    }
+  ],
+  "families": [
+    {
+      "base": "tests/test_export_characterization.py::test_export_matches_frozen_baseline",
+      "variants": 20,
+      "union": 20,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch",
+      "variants": 20,
+      "union": 20,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged",
+      "variants": 16,
+      "union": 13,
+      "common": 4,
+      "identical": false
+    },
+    {
+      "base": "tests/test_equation_numbers.py::test_split_label",
+      "variants": 12,
+      "union": 10,
+      "common": 9,
+      "identical": false
+    },
+    {
+      "base": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata",
+      "variants": 3,
+      "union": 16,
+      "common": 16,
+      "identical": true
+    }
+  ],
+  "zero_exclusive": [
+    {
+      "test": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "elements": 27
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "elements": 27
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
+      "elements": 23
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-pandoc-docx.json]",
+      "elements": 20
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-pandoc-pdf-ua.json]",
+      "elements": 20
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-pandoc-docx.json]",
+      "elements": 20
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-pandoc-pdf-ua.json]",
+      "elements": 20
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
+      "elements": 19
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "elements": 19
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_invalid_metadata_cannot_inject_export_markup",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[sections-pandoc-docx.json]",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[sections-pandoc-pdf-ua.json]",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[sections-pandoc-docx.json]",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[sections-pandoc-pdf-ua.json]",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_count_math_nodes_covers_all_block_types",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_degrade_math_to_text_all_indices_matches_full_degradation",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_degrade_math_to_text_empty_indices_keeps_ast_equal",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_degrade_math_to_text_selective_preserves_other_formulas_and_alt_spans",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_unconverted_math_indices_empty_when_all_formulas_have_mathml",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_unconverted_math_indices_empty_when_ast_drifted_from_source",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_unconverted_math_indices_empty_when_no_formula_has_mathml",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_unconverted_math_indices_requires_target_format",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_unconverted_math_indices_tracks_every_block_visitor",
+      "elements": 18
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-markdown.md]",
+      "elements": 17
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-markdown.md]",
+      "elements": 17
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
+      "elements": 16
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
+      "elements": 16
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
+      "elements": 16
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
+      "elements": 15
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number",
+      "elements": 15
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[sections-markdown.md]",
+      "elements": 15
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[sections-markdown.md]",
+      "elements": 15
+    },
+    {
+      "test": "tests/test_markdown_export.py::test_blocks_render_in_reading_order",
+      "elements": 15
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_pure_builder_output_conforms_without_enabling_runtime_validation[source3]",
+      "elements": 12
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[a < b (6)-a < b-6]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[f \\\\propto g (8)-f \\\\propto g-8]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x = 28h.(1)-x = 28h.-1]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x = y (3)-x = y-3]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
+      "elements": 10
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
+      "elements": 9
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
+      "elements": 9
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
+      "elements": 9
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x + (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x < (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y + (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x = y \\\\times (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\le (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\neq (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\sin (1)]",
+      "elements": 8
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[(1)]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[f(x) = (x + 1)]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x(1)]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\frac{1}{(2)}]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=y\\\\tag{\\\\input{file}}]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-docx.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-pdf.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-pdf_ua.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-txt.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-unrecognized.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-docx.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-html.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-pdf.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-pdf_ua.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-unrecognized.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[sections-html.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[sections-txt.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-docx.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-pdf.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-pdf_ua.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-txt.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-unrecognized.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-docx.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-html.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-pdf.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-pdf_ua.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-unrecognized.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt.txt]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[sections-html.html]",
+      "elements": 6
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[sections-txt.txt]",
+      "elements": 6
+    }
+  ]
+}

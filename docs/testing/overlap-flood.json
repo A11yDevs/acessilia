@@ -1,0 +1,278 @@
+{
+  "schema_version": 1,
+  "kind": "coverage-overlap",
+  "coverage_file": "var/context/docstruct/.coverage",
+  "settings": {
+    "threshold": 0.5,
+    "min_shared": 2,
+    "max_element_tests": 50,
+    "top": 100
+  },
+  "summary": {
+    "tests": 9,
+    "elements": 15,
+    "pairs": 18,
+    "identical_pairs": 7,
+    "mean_similarity": 0.9461,
+    "families": 0,
+    "identical_families": 0,
+    "zero_exclusive_tests": 9
+  },
+  "pairs": [
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "similarity": 1.0,
+      "shared": 14,
+      "union": 14,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "similarity": 1.0,
+      "shared": 14,
+      "union": 14,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "similarity": 1.0,
+      "shared": 14,
+      "union": 14,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "similarity": 1.0,
+      "shared": 13,
+      "union": 13,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_lista_vazia_nao_quebra",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+      "similarity": 1.0,
+      "shared": 4,
+      "union": 4,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_lista_vazia_nao_quebra",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+      "similarity": 1.0,
+      "shared": 4,
+      "union": 4,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+      "similarity": 1.0,
+      "shared": 4,
+      "union": 4,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 0,
+      "only_b": 1,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "similarity": 0.9286,
+      "shared": 13,
+      "union": 14,
+      "only_a": 1,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "similarity": 0.8667,
+      "shared": 13,
+      "union": 15,
+      "only_a": 1,
+      "only_b": 1,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "similarity": 0.8667,
+      "shared": 13,
+      "union": 15,
+      "only_a": 1,
+      "only_b": 1,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "test_b": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "similarity": 0.8667,
+      "shared": 13,
+      "union": 15,
+      "only_a": 1,
+      "only_b": 1,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    }
+  ],
+  "families": [],
+  "zero_exclusive": [
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_blocos_longos_sao_preservados",
+      "elements": 14
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_blocos_nao_textuais_sao_preservados",
+      "elements": 14
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
+      "elements": 14
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
+      "elements": 14
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_lexico_vazio_descarta_todos_os_curtos",
+      "elements": 13
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats",
+      "elements": 13
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_lista_vazia_nao_quebra",
+      "elements": 4
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_nao_age_abaixo_do_minimo_de_blocos",
+      "elements": 4
+    },
+    {
+      "test": "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
+      "elements": 4
+    }
+  ]
+}

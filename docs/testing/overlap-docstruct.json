@@ -1,0 +1,2327 @@
+{
+  "schema_version": 1,
+  "kind": "coverage-overlap",
+  "coverage_file": "var/context/docstruct/.coverage",
+  "settings": {
+    "threshold": 0.8,
+    "min_shared": 5,
+    "max_element_tests": 50,
+    "top": 100
+  },
+  "summary": {
+    "tests": 1807,
+    "elements": 6342,
+    "pairs": 1231,
+    "identical_pairs": 509,
+    "mean_similarity": 0.9327,
+    "families": 118,
+    "identical_families": 39,
+    "zero_exclusive_tests": 1519
+  },
+  "pairs": [
+    {
+      "test_a": "tests/test_inline_math_detection.py::test_a_decimal_comma_stays_in_the_run[1.000,50]",
+      "test_b": "tests/test_inline_math_detection.py::test_a_decimal_comma_stays_in_the_run[3,5]",
+      "similarity": 1.0,
+      "shared": 181,
+      "union": 181,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_an_id_less_element_with_a_zero_based_page_is_normalized",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_an_unpaged_id_less_element_gets_an_id_outside_page_membership",
+      "similarity": 1.0,
+      "shared": 171,
+      "union": 171,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_an_id_less_element_joins_a_page_that_already_lists_ids",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id[]",
+      "similarity": 1.0,
+      "shared": 169,
+      "union": 169,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_an_id_less_element_joins_a_page_that_already_lists_ids",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id[absent]",
+      "similarity": 1.0,
+      "shared": 169,
+      "union": 169,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_an_id_less_element_joins_a_page_that_already_lists_ids",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_id_get_a_deterministic_id",
+      "similarity": 1.0,
+      "shared": 169,
+      "union": 169,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id[]",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id[absent]",
+      "similarity": 1.0,
+      "shared": 169,
+      "union": 169,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id[]",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_id_get_a_deterministic_id",
+      "similarity": 1.0,
+      "shared": 169,
+      "union": 169,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id[absent]",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_id_get_a_deterministic_id",
+      "similarity": 1.0,
+      "shared": 169,
+      "union": 169,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_reading_order.py::TestMultiColumnReadingOrder::test_full_width_banner_splits_sections",
+      "test_b": "tests/test_reading_order.py::TestMultiColumnReadingOrder::test_mid_page_banner_splits_column_sections",
+      "similarity": 1.0,
+      "shared": 103,
+      "union": 103,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_blocks_lists.py::test_a_prefix_after_the_first_item_becomes_its_preamble",
+      "test_b": "tests/test_blocks_lists.py::test_the_elements_are_read_and_never_changed",
+      "similarity": 1.0,
+      "shared": 89,
+      "union": 89,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_blocks_lists.py::test_a_sibling_paragraph_fills_the_empty_items_and_keeps_its_prefix",
+      "test_b": "tests/test_blocks_lists.py::test_docstruct_document_elements_are_list_sources",
+      "similarity": 1.0,
+      "shared": 87,
+      "union": 87,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_blocks_lists.py::test_a_sibling_paragraph_fills_the_empty_items_and_keeps_its_prefix",
+      "test_b": "tests/test_blocks_lists.py::test_items_without_markers_and_an_unknown_source_are_recovered",
+      "similarity": 1.0,
+      "shared": 87,
+      "union": 87,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_blocks_lists.py::test_docstruct_document_elements_are_list_sources",
+      "test_b": "tests/test_blocks_lists.py::test_items_without_markers_and_an_unknown_source_are_recovered",
+      "similarity": 1.0,
+      "shared": 87,
+      "union": 87,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_enabled_by_the_caller",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_explicit_enablement_is_the_evidence",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_enabled_by_the_caller",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_spaced_function_and_negation",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_enabled_by_the_caller",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_standalone_accent_with_document_evidence",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_enabled_by_the_caller",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_word_internal_dotless_base",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_explicit_enablement_is_the_evidence",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_spaced_function_and_negation",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_explicit_enablement_is_the_evidence",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_standalone_accent_with_document_evidence",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_explicit_enablement_is_the_evidence",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_word_internal_dotless_base",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_spaced_function_and_negation",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_standalone_accent_with_document_evidence",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_spaced_function_and_negation",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_word_internal_dotless_base",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_standalone_accent_with_document_evidence",
+      "test_b": "tests/test_unicode_repair.py::TestSpacingDiacritics::test_word_internal_dotless_base",
+      "similarity": 1.0,
+      "shared": 79,
+      "union": 79,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_blocks_lists.py::test_nothing_is_recovered_unless_one_source_fits_one_group_exactly[known-mismatch]",
+      "test_b": "tests/test_blocks_lists.py::test_nothing_is_recovered_unless_one_source_fits_one_group_exactly[not-from-a]",
+      "similarity": 1.0,
+      "shared": 71,
+      "union": 71,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_idempotent",
+      "test_b": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_offsets_point_at_the_original_text",
+      "similarity": 1.0,
+      "shared": 71,
+      "union": 71,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_xycut.py::TestReorder::test_inverted_boxes_are_still_ordered",
+      "test_b": "tests/test_xycut.py::TestReorder::test_multicol_reorders_interleaved_columns",
+      "similarity": 1.0,
+      "shared": 71,
+      "union": 71,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_dificil",
+      "test_b": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_dotless_i_before_the_accent",
+      "similarity": 1.0,
+      "shared": 68,
+      "union": 68,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_text_migration.py::TestCodeReflow::test_else_same_line",
+      "test_b": "tests/test_text_migration.py::TestCodeReflow::test_reflow_java",
+      "similarity": 1.0,
+      "shared": 64,
+      "union": 64,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_calculo_in_nfd",
+      "test_b": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_cedilla_and_tilde_in_nfd",
+      "similarity": 1.0,
+      "shared": 63,
+      "union": 63,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_calculo_in_nfd",
+      "test_b": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_nfc_composes_a_decomposed_word",
+      "similarity": 1.0,
+      "shared": 63,
+      "union": 63,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_cedilla_and_tilde_in_nfd",
+      "test_b": "tests/test_unicode_repair.py::TestCombiningAndDotless::test_nfc_composes_a_decomposed_word",
+      "similarity": 1.0,
+      "shared": 63,
+      "union": 63,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_verse.py::TestVerseBlocks::test_metadados_do_bloco_original_sao_preservados",
+      "test_b": "tests/test_verse.py::TestVerseBlocks::test_registros_sao_divididos",
+      "similarity": 1.0,
+      "shared": 60,
+      "union": 60,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_verse.py::TestVerseBlocks::test_metadados_do_bloco_original_sao_preservados",
+      "test_b": "tests/test_verse.py::TestVerseBlocks::test_texto_dos_pedacos_e_normalizado",
+      "similarity": 1.0,
+      "shared": 60,
+      "union": 60,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_verse.py::TestVerseBlocks::test_registros_sao_divididos",
+      "test_b": "tests/test_verse.py::TestVerseBlocks::test_texto_dos_pedacos_e_normalizado",
+      "similarity": 1.0,
+      "shared": 60,
+      "union": 60,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestProtectedContent::test_inline_code_is_protected",
+      "test_b": "tests/test_unicode_repair.py::TestProtectedContent::test_url_is_protected",
+      "similarity": 1.0,
+      "shared": 58,
+      "union": 58,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_blocks_lists.py::test_nothing_is_recovered_unless_one_source_fits_one_group_exactly[count]",
+      "test_b": "tests/test_blocks_lists.py::test_nothing_is_recovered_unless_one_source_fits_one_group_exactly[prose]",
+      "similarity": 1.0,
+      "shared": 57,
+      "union": 57,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_bloco_sem_box_nao_quebra",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_boxes_dos_numeros_derivam_do_bloco",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_bloco_sem_box_nao_quebra",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_metadados_do_bloco_original_sao_preservados",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_bloco_sem_box_nao_quebra",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_inline_sao_extraidos",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_bloco_sem_box_nao_quebra",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_viram_blocos_separados_apos_o_texto",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_boxes_dos_numeros_derivam_do_bloco",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_metadados_do_bloco_original_sao_preservados",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_boxes_dos_numeros_derivam_do_bloco",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_inline_sao_extraidos",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_boxes_dos_numeros_derivam_do_bloco",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_viram_blocos_separados_apos_o_texto",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_metadados_do_bloco_original_sao_preservados",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_inline_sao_extraidos",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_metadados_do_bloco_original_sao_preservados",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_viram_blocos_separados_apos_o_texto",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_inline_sao_extraidos",
+      "test_b": "tests/test_line_numbers.py::TestExtractLineNumbers::test_numeros_viram_blocos_separados_apos_o_texto",
+      "similarity": 1.0,
+      "shared": 51,
+      "union": 51,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_without_a_route_an_id_less_payload_is_returned_unchanged",
+      "test_b": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_without_routed_pages_primary_payload_identity_is_preserved",
+      "similarity": 1.0,
+      "shared": 50,
+      "union": 50,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_3x3",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_identidade",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_3x3",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_otimo_minimo",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_3x3",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_retangular",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_3x3",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_swapped",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_identidade",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_otimo_minimo",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_identidade",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_retangular",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_identidade",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_swapped",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_otimo_minimo",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_retangular",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_otimo_minimo",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_swapped",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion.py::TestHungarian::test_retangular",
+      "test_b": "tests/test_fusion.py::TestHungarian::test_swapped",
+      "similarity": 1.0,
+      "shared": 49,
+      "union": 49,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_metrics.py::TestTEDS::test_identical_tables",
+      "test_b": "tests/test_metrics.py::TestTEDS::test_structural_difference_lower",
+      "similarity": 1.0,
+      "shared": 46,
+      "union": 46,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_table_specialist.py::TestSelectTable::test_provider_medoid_selects_the_provider",
+      "test_b": "tests/test_table_specialist.py::TestSelectTable::test_vlm_medoid_replaces",
+      "similarity": 1.0,
+      "shared": 44,
+      "union": 44,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_greek_letters",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_unicode_math_symbols",
+      "similarity": 1.0,
+      "shared": 42,
+      "union": 42,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_ocr_wrapper_removal",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_spacing_macros",
+      "similarity": 1.0,
+      "shared": 41,
+      "union": 41,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_ocr_wrapper_removal",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_superscript_subscript_normalization",
+      "similarity": 1.0,
+      "shared": 41,
+      "union": 41,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_ocr_wrapper_removal",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_unicode_minus_and_spaces",
+      "similarity": 1.0,
+      "shared": 41,
+      "union": 41,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_spacing_macros",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_superscript_subscript_normalization",
+      "similarity": 1.0,
+      "shared": 41,
+      "union": 41,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_spacing_macros",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_unicode_minus_and_spaces",
+      "similarity": 1.0,
+      "shared": 41,
+      "union": 41,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_latex.py::TestNormalizeLatex::test_superscript_subscript_normalization",
+      "test_b": "tests/test_latex.py::TestNormalizeLatex::test_unicode_minus_and_spaces",
+      "similarity": 1.0,
+      "shared": 41,
+      "union": 41,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_parent_references_follow_a_replaced_non_string_id",
+      "test_b": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_with_duplicate_non_string_ids_children_follow_the_last_one",
+      "similarity": 1.0,
+      "shared": 40,
+      "union": 40,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_a_zero_based_page_is_scoped_to_the_one_based_page",
+      "test_b": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_pages_are_not_added_when_the_document_has_none",
+      "similarity": 1.0,
+      "shared": 38,
+      "union": 38,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject[None]",
+      "test_b": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject[not-a-list]",
+      "similarity": 1.0,
+      "shared": 37,
+      "union": 37,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject[None]",
+      "test_b": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject[pages2]",
+      "similarity": 1.0,
+      "shared": 37,
+      "union": 37,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject[not-a-list]",
+      "test_b": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject[pages2]",
+      "similarity": 1.0,
+      "shared": 37,
+      "union": 37,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_page_select.py::TestFuse::test_modo_swap_toma_o_texto_de_b",
+      "test_b": "tests/test_page_select.py::TestFuse::test_modo_swap_troca_tabelas_quando_habilitado",
+      "similarity": 1.0,
+      "shared": 37,
+      "union": 37,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_xycut.py::TestXYCutOrder::test_three_columns",
+      "test_b": "tests/test_xycut.py::TestXYCutOrder::test_two_columns_read_left_column_first",
+      "similarity": 1.0,
+      "shared": 37,
+      "union": 37,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_xycut.py::TestColumnBalance::test_dominant_main_column_counts_as_single_column",
+      "test_b": "tests/test_xycut.py::TestReorder::test_multicol_keeps_single_column_pages",
+      "similarity": 1.0,
+      "shared": 34,
+      "union": 34,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements[formula]",
+      "test_b": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements[picture]",
+      "similarity": 1.0,
+      "shared": 32,
+      "union": 32,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements[formula]",
+      "test_b": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements[table]",
+      "similarity": 1.0,
+      "shared": 32,
+      "union": 32,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements[picture]",
+      "test_b": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements[table]",
+      "similarity": 1.0,
+      "shared": 32,
+      "union": 32,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_holdout.py::TestEvaluateCandidate::test_improvement_on_both_subsets_is_accepted",
+      "test_b": "tests/test_holdout.py::TestEvaluateCandidate::test_metric_deltas_are_reported",
+      "similarity": 1.0,
+      "shared": 32,
+      "union": 32,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_holdout.py::TestEvaluateCandidate::test_improvement_on_both_subsets_is_accepted",
+      "test_b": "tests/test_holdout.py::TestMissingMetrics::test_metric_without_values_does_not_block_a_real_gain",
+      "similarity": 1.0,
+      "shared": 32,
+      "union": 32,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_holdout.py::TestEvaluateCandidate::test_metric_deltas_are_reported",
+      "test_b": "tests/test_holdout.py::TestMissingMetrics::test_metric_without_values_does_not_block_a_real_gain",
+      "similarity": 1.0,
+      "shared": 32,
+      "union": 32,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_holdout.py::TestMissingMetrics::test_disjoint_metrics_reject_without_crashing",
+      "test_b": "tests/test_holdout.py::TestMissingMetrics::test_metric_that_vanishes_in_the_candidate_is_rejected",
+      "similarity": 1.0,
+      "shared": 31,
+      "union": 31,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_regions_letterhead.py::test_a_logo_and_its_lines_are_one_group_in_reading_order",
+      "test_b": "tests/test_regions_letterhead.py::test_reading_order_ties_keep_the_given_order",
+      "similarity": 1.0,
+      "shared": 30,
+      "union": 30,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_regions_letterhead.py::test_a_logo_and_its_lines_are_one_group_in_reading_order",
+      "test_b": "tests/test_regions_letterhead.py::test_two_institutions_stay_apart",
+      "similarity": 1.0,
+      "shared": 30,
+      "union": 30,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_regions_letterhead.py::test_reading_order_ties_keep_the_given_order",
+      "test_b": "tests/test_regions_letterhead.py::test_two_institutions_stay_apart",
+      "similarity": 1.0,
+      "shared": 30,
+      "union": 30,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_inline_math_placement.py::test_a_span_centre_within_the_tolerance_is_kept",
+      "test_b": "tests/test_inline_math_placement.py::test_only_the_spans_centred_in_the_box_are_the_element_s_lines",
+      "similarity": 1.0,
+      "shared": 28,
+      "union": 28,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_xycut.py::TestColumnBalance::test_equal_columns_are_balanced",
+      "test_b": "tests/test_xycut.py::TestColumnBalance::test_sidebar_is_unbalanced",
+      "similarity": 1.0,
+      "shared": 28,
+      "union": 28,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_xycut.py::TestXYCutOrder::test_inverted_axes_are_normalised",
+      "test_b": "tests/test_xycut.py::TestXYCutOrder::test_single_column_is_top_down",
+      "similarity": 1.0,
+      "shared": 28,
+      "union": 28,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[10]",
+      "test_b": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[125]",
+      "similarity": 1.0,
+      "shared": 27,
+      "union": 27,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[10]",
+      "test_b": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[1]",
+      "similarity": 1.0,
+      "shared": 27,
+      "union": 27,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[10]",
+      "test_b": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[9]",
+      "similarity": 1.0,
+      "shared": 27,
+      "union": 27,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[125]",
+      "test_b": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[1]",
+      "similarity": 1.0,
+      "shared": 27,
+      "union": 27,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[125]",
+      "test_b": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[9]",
+      "similarity": 1.0,
+      "shared": 27,
+      "union": 27,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[1]",
+      "test_b": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps[9]",
+      "similarity": 1.0,
+      "shared": 27,
+      "union": 27,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_region_grouping_regressions.py::test_unknown_gaps_never_overlap_known_content[covered1]",
+      "test_b": "tests/test_region_grouping_regressions.py::test_unknown_gaps_never_overlap_known_content[covered2]",
+      "similarity": 1.0,
+      "shared": 26,
+      "union": 26,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": true
+    },
+    {
+      "test_a": "tests/test_legitimate_text.py::test_accepts_legitimate_prose[This is a legitimate body paragraph extracted from a document.]",
+      "test_b": "tests/test_legitimate_text.py::test_respects_custom_min_quality_threshold",
+      "similarity": 1.0,
+      "shared": 25,
+      "union": 25,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_table_inline_math_detection.py::test_a_cell_that_is_the_run_comes_first",
+      "test_b": "tests/test_table_inline_math_detection.py::test_identical_cells_take_the_occurrences_in_order",
+      "similarity": 1.0,
+      "shared": 24,
+      "union": 24,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_unicode_repair.py::TestProtectedContent::test_code_is_not_touched",
+      "test_b": "tests/test_unicode_repair.py::TestProtectedContent::test_formula_is_not_touched",
+      "similarity": 1.0,
+      "shared": 23,
+      "union": 23,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_metrics.py::TestOverall::test_missing_component_excluded_from_denominator",
+      "test_b": "tests/test_metrics.py::TestOverall::test_overall_means_components",
+      "similarity": 1.0,
+      "shared": 22,
+      "union": 22,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_verse.py::TestVerseBlocks::test_pedaco_unico_e_mantido",
+      "test_b": "tests/test_verse.py::TestVerseBlocks::test_verso_real_fica_inteiro_no_modo_records",
+      "similarity": 1.0,
+      "shared": 22,
+      "union": 22,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    },
+    {
+      "test_a": "tests/test_oracle.py::TestOraclePage::test_differ_no_oraculo_nao_tem_folga",
+      "test_b": "tests/test_oracle.py::TestOraclePage::test_oracle_escolhe_o_melhor_provider",
+      "similarity": 1.0,
+      "shared": 21,
+      "union": 21,
+      "only_a": 0,
+      "only_b": 0,
+      "exclusive_a": 0,
+      "exclusive_b": 0,
+      "same_parameterized_family": false
+    }
+  ],
+  "families": [
+    {
+      "base": "tests/test_manifest_cases.py::test_a_broken_case_breaks_exactly_its_rule",
+      "variants": 92,
+      "union": 310,
+      "common": 67,
+      "identical": false
+    },
+    {
+      "base": "tests/test_visual_text.py::test_every_case_398_fragment_is_recognized_as_scene_text",
+      "variants": 42,
+      "union": 31,
+      "common": 9,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_characterization.py::test_export_matches_frozen_baseline",
+      "variants": 30,
+      "union": 871,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch",
+      "variants": 30,
+      "union": 871,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_implicit_products.py::test_text_commands_are_ignored",
+      "variants": 30,
+      "union": 35,
+      "common": 32,
+      "identical": false
+    },
+    {
+      "base": "tests/test_code_controls.py::test_code_removes_forbidden_controls_and_preserves_literal_content",
+      "variants": 29,
+      "union": 4,
+      "common": 4,
+      "identical": true
+    },
+    {
+      "base": "tests/test_manifest_cases.py::test_a_case_changes_only_the_document_fields",
+      "variants": 28,
+      "union": 98,
+      "common": 42,
+      "identical": false
+    },
+    {
+      "base": "tests/test_visual_text.py::test_is_confirmed_logo_description",
+      "variants": 23,
+      "union": 16,
+      "common": 8,
+      "identical": false
+    },
+    {
+      "base": "tests/test_manifest_cases.py::test_a_supported_case_stays_valid",
+      "variants": 20,
+      "union": 225,
+      "common": 183,
+      "identical": false
+    },
+    {
+      "base": "tests/test_prose_tabs.py::test_block_titles_only_normalize_tabs",
+      "variants": 20,
+      "union": 59,
+      "common": 59,
+      "identical": true
+    },
+    {
+      "base": "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged",
+      "variants": 16,
+      "union": 20,
+      "common": 11,
+      "identical": false
+    },
+    {
+      "base": "tests/test_named_operators.py::test_the_domain_operator_gets_one_canonical_spelling",
+      "variants": 13,
+      "union": 8,
+      "common": 8,
+      "identical": true
+    },
+    {
+      "base": "tests/test_equation_numbers.py::test_split_label",
+      "variants": 12,
+      "union": 18,
+      "common": 13,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion_page_numbers.py::test_a_decorated_page_number",
+      "variants": 12,
+      "union": 7,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk.py::test_each_known_type_has_its_own_callback",
+      "variants": 11,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_imaging_headers.py::test_jpeg_and_unknown_invalid_headers_return_none",
+      "variants": 11,
+      "union": 25,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_blocks_lists.py::test_nothing_is_recovered_unless_one_source_fits_one_group_exactly",
+      "variants": 10,
+      "union": 92,
+      "common": 13,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion_page_numbers.py::test_a_bare_number_in_the_margin",
+      "variants": 10,
+      "union": 7,
+      "common": 4,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion_page_numbers.py::test_a_bare_page_number_needs_no_position",
+      "variants": 10,
+      "union": 3,
+      "common": 3,
+      "identical": true
+    },
+    {
+      "base": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs",
+      "variants": 10,
+      "union": 229,
+      "common": 228,
+      "identical": false
+    },
+    {
+      "base": "tests/test_visual_text.py::test_is_scene_text_garbage_keeps_short_words",
+      "variants": 10,
+      "union": 10,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_legitimate_text.py::test_rejects_noise_and_non_prose",
+      "variants": 9,
+      "union": 27,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_is_bottom_left",
+      "variants": 8,
+      "union": 6,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_data_uri.py::test_anything_else_is_none",
+      "variants": 8,
+      "union": 19,
+      "common": 1,
+      "identical": false
+    },
+    {
+      "base": "tests/test_manifest_model.py::test_unknown_or_missing_fields_are_refused",
+      "variants": 8,
+      "union": 34,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_manifest_model.py::test_wrong_json_types_are_findings_not_errors",
+      "variants": 8,
+      "union": 94,
+      "common": 91,
+      "identical": false
+    },
+    {
+      "base": "tests/test_manifest_reading_order.py::test_reading_role",
+      "variants": 8,
+      "union": 8,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_union_area_counts_overlaps_once",
+      "variants": 7,
+      "union": 13,
+      "common": 4,
+      "identical": false
+    },
+    {
+      "base": "tests/test_named_operators.py::test_unknown_operators_are_left_alone",
+      "variants": 7,
+      "union": 15,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_placeholder_heuristics.py::test_any_text_element_with_content_makes_a_document_not_mostly_visual",
+      "variants": 7,
+      "union": 14,
+      "common": 14,
+      "identical": true
+    },
+    {
+      "base": "tests/test_placeholder_heuristics.py::test_ocr_noise_by_length_and_spaces",
+      "variants": 7,
+      "union": 8,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk_parity.py::test_migration_preserves_type_errors_for_unhashable_block_kinds",
+      "variants": 6,
+      "union": 113,
+      "common": 20,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion.py::test_classify_kind_takes_only_whole_inline_math_as_formula",
+      "variants": 6,
+      "union": 26,
+      "common": 12,
+      "identical": false
+    },
+    {
+      "base": "tests/test_headings.py::test_repair_heading_levels",
+      "variants": 6,
+      "union": 15,
+      "common": 8,
+      "identical": false
+    },
+    {
+      "base": "tests/test_html_accessibility_regressions.py::test_callouts_are_readable_without_expansion",
+      "variants": 6,
+      "union": 68,
+      "common": 56,
+      "identical": false
+    },
+    {
+      "base": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label",
+      "variants": 6,
+      "union": 279,
+      "common": 275,
+      "identical": false
+    },
+    {
+      "base": "tests/test_implicit_products.py::test_variable_evidence",
+      "variants": 6,
+      "union": 14,
+      "common": 13,
+      "identical": false
+    },
+    {
+      "base": "tests/test_inline_math_placement.py::test_a_box_in_the_spans_top_left_frame",
+      "variants": 6,
+      "union": 8,
+      "common": 1,
+      "identical": false
+    },
+    {
+      "base": "tests/test_regions_letterhead.py::test_a_line_beside_a_picture",
+      "variants": 6,
+      "union": 5,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_table_garble.py::test_a_table_read_well_is_not_named",
+      "variants": 6,
+      "union": 15,
+      "common": 9,
+      "identical": false
+    },
+    {
+      "base": "tests/test_visual_text.py::test_artifact_nature_separates_scene_images_from_document_pages",
+      "variants": 6,
+      "union": 7,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_best_effort_clip.py::test_the_box_is_kept_with_its_origin",
+      "variants": 5,
+      "union": 15,
+      "common": 9,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_box_distance",
+      "variants": 5,
+      "union": 3,
+      "common": 3,
+      "identical": true
+    },
+    {
+      "base": "tests/test_boxes.py::test_boxes_overlap_only_when_they_share_an_area",
+      "variants": 5,
+      "union": 3,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_boxes_side_by_side",
+      "variants": 5,
+      "union": 3,
+      "common": 1,
+      "identical": false
+    },
+    {
+      "base": "tests/test_code_controls.py::test_clean_code_reaches_each_export_without_controls",
+      "variants": 5,
+      "union": 242,
+      "common": 59,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk.py::test_unknown_types_use_only_the_explicit_fallback",
+      "variants": 5,
+      "union": 17,
+      "common": 17,
+      "identical": true
+    },
+    {
+      "base": "tests/test_implicit_products.py::test_less_common_relations_alone_do_not_establish_variables",
+      "variants": 5,
+      "union": 12,
+      "common": 12,
+      "identical": true
+    },
+    {
+      "base": "tests/test_inline_math_detection.py::test_math_fonts",
+      "variants": 5,
+      "union": 2,
+      "common": 2,
+      "identical": true
+    },
+    {
+      "base": "tests/test_inline_math_placement.py::test_a_point_held_by_a_box_and_its_margin",
+      "variants": 5,
+      "union": 3,
+      "common": 3,
+      "identical": true
+    },
+    {
+      "base": "tests/test_inline_math_placement.py::test_no_lines_without_a_placed_box_on_an_upright_page",
+      "variants": 5,
+      "union": 14,
+      "common": 4,
+      "identical": false
+    },
+    {
+      "base": "tests/test_latex_candidates.py::test_a_confidence_that_is_not_a_finite_number_is_none",
+      "variants": 5,
+      "union": 20,
+      "common": 18,
+      "identical": false
+    },
+    {
+      "base": "tests/test_named_operators.py::test_the_domain_operator_is_spoken_in_portuguese",
+      "variants": 5,
+      "union": 7,
+      "common": 7,
+      "identical": true
+    },
+    {
+      "base": "tests/test_placeholder_heuristics.py::test_a_visual_placeholder",
+      "variants": 5,
+      "union": 15,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_prose_tabs.py::test_prose_collapses_tab_runs_without_changing_other_spacing",
+      "variants": 5,
+      "union": 34,
+      "common": 34,
+      "identical": true
+    },
+    {
+      "base": "tests/test_schema_validation.py::test_non_none_validator_results_are_not_silently_accepted",
+      "variants": 5,
+      "union": 247,
+      "common": 247,
+      "identical": true
+    },
+    {
+      "base": "tests/test_schema_validation.py::test_pure_builder_output_conforms_without_enabling_runtime_validation",
+      "variants": 5,
+      "union": 481,
+      "common": 65,
+      "identical": false
+    },
+    {
+      "base": "tests/test_similarity.py::test_deduplication_preserves_different_values_even_with_long_shared_context",
+      "variants": 5,
+      "union": 5,
+      "common": 5,
+      "identical": true
+    },
+    {
+      "base": "tests/test_table_cell_sanitize.py::test_table_ast_cell_keeps_leading_marker_before_number",
+      "variants": 5,
+      "union": 121,
+      "common": 121,
+      "identical": true
+    },
+    {
+      "base": "tests/test_table_structured.py::test_normalize_strict_table_ast_returns_none_without_valid_body",
+      "variants": 5,
+      "union": 36,
+      "common": 1,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_page_fractions_agree_in_every_frame",
+      "variants": 4,
+      "union": 12,
+      "common": 7,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_page_fractions_need_a_page_size",
+      "variants": 4,
+      "union": 2,
+      "common": 2,
+      "identical": true
+    },
+    {
+      "base": "tests/test_export_page_text.py::test_the_page_heading_is_the_marker_merge_broken_paragraphs_keeps",
+      "variants": 4,
+      "union": 27,
+      "common": 27,
+      "identical": true
+    },
+    {
+      "base": "tests/test_export_walk.py::test_consumer_exceptions_propagate",
+      "variants": 4,
+      "union": 16,
+      "common": 6,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk.py::test_distinct_headings_are_not_marked_as_legacy",
+      "variants": 4,
+      "union": 14,
+      "common": 8,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk.py::test_legacy_metadata_is_available_but_does_not_omit_blocks",
+      "variants": 4,
+      "union": 32,
+      "common": 30,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_walk_parity.py::test_filtered_unhashable_kinds_do_not_start_failing_validation",
+      "variants": 4,
+      "union": 134,
+      "common": 32,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion.py::test_short_noise_filter_preserves_structured_content",
+      "variants": 4,
+      "union": 260,
+      "common": 224,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion_block_pairing.py::test_no_pair",
+      "variants": 4,
+      "union": 10,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion_element_role.py::test_a_set_metadata_role_wins",
+      "variants": 4,
+      "union": 4,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_imaging_headers.py::test_png_invalid_headers_return_none",
+      "variants": 4,
+      "union": 6,
+      "common": 3,
+      "identical": false
+    },
+    {
+      "base": "tests/test_manifest_cases.py::test_every_base_is_valid",
+      "variants": 4,
+      "union": 207,
+      "common": 195,
+      "identical": false
+    },
+    {
+      "base": "tests/test_placeholder_heuristics.py::test_meaningful_text",
+      "variants": 4,
+      "union": 16,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_regions_letterhead.py::test_no_group_without_a_logo_and_a_line_beside_it",
+      "variants": 4,
+      "union": 18,
+      "common": 7,
+      "identical": false
+    },
+    {
+      "base": "tests/test_similarity.py::test_punctuation_differences_do_not_make_distinct_texts_identical",
+      "variants": 4,
+      "union": 13,
+      "common": 13,
+      "identical": true
+    },
+    {
+      "base": "tests/test_best_effort_clip.py::test_a_non_finite_box_is_the_whole_page",
+      "variants": 3,
+      "union": 5,
+      "common": 5,
+      "identical": true
+    },
+    {
+      "base": "tests/test_blocks_lists.py::test_a_block_in_between_keeps_the_lists_apart",
+      "variants": 3,
+      "union": 11,
+      "common": 9,
+      "identical": false
+    },
+    {
+      "base": "tests/test_boxes.py::test_box_contains_center",
+      "variants": 3,
+      "union": 3,
+      "common": 3,
+      "identical": true
+    },
+    {
+      "base": "tests/test_boxes.py::test_spans_horizontally",
+      "variants": 3,
+      "union": 1,
+      "common": 1,
+      "identical": true
+    },
+    {
+      "base": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata",
+      "variants": 3,
+      "union": 23,
+      "common": 23,
+      "identical": true
+    },
+    {
+      "base": "tests/test_fusion_payload.py::TestBlockConversionAndSignatures::test_group_payload_by_page_keeps_empty_structural_elements",
+      "variants": 3,
+      "union": 32,
+      "common": 32,
+      "identical": true
+    },
+    {
+      "base": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_empty_secondary_structural_element_routes_as_superset_when_text_agrees",
+      "variants": 3,
+      "union": 477,
+      "common": 470,
+      "identical": false
+    },
+    {
+      "base": "tests/test_fusion_payload.py::TestNormalizeElementIds::test_malformed_pages_are_kept_for_the_model_to_reject",
+      "variants": 3,
+      "union": 37,
+      "common": 37,
+      "identical": true
+    },
+    {
+      "base": "tests/test_fusion_payload.py::TestRoutePagesAndApplyPageRoutes::test_primary_elements_without_a_usable_id_get_a_deterministic_id",
+      "variants": 3,
+      "union": 171,
+      "common": 169,
+      "identical": false
+    },
+    {
+      "base": "tests/test_html_accessibility_regressions.py::test_deduplicated_callout_titles_do_not_reappear_as_note",
+      "variants": 3,
+      "union": 133,
+      "common": 133,
+      "identical": true
+    },
+    {
+      "base": "tests/test_html_accessibility_regressions.py::test_scroll_region_uses_available_caption_without_mutating_the_table",
+      "variants": 3,
+      "union": 249,
+      "common": 248,
+      "identical": false
+    },
+    {
+      "base": "tests/test_html_accessibility_regressions.py::test_uncaptioned_scroll_region_uses_a_short_generic_label",
+      "variants": 3,
+      "union": 208,
+      "common": 208,
+      "identical": true
+    },
+    {
+      "base": "tests/test_implicit_products.py::test_a_letter_without_clear_variable_use_is_left_alone",
+      "variants": 3,
+      "union": 22,
+      "common": 13,
+      "identical": false
+    },
+    {
+      "base": "tests/test_legitimate_text.py::test_accepts_legitimate_prose",
+      "variants": 3,
+      "union": 25,
+      "common": 23,
+      "identical": false
+    },
+    {
+      "base": "tests/test_negation_overlay.py::test_compose_in_text_leaves_the_text_when_it_cannot_choose",
+      "variants": 3,
+      "union": 24,
+      "common": 6,
+      "identical": false
+    },
+    {
+      "base": "tests/test_negation_overlay.py::test_downward_edges_reads_the_module_s_own_box",
+      "variants": 3,
+      "union": 3,
+      "common": 1,
+      "identical": false
+    },
+    {
+      "base": "tests/test_negation_overlay.py::test_downward_edges_whatever_the_origin",
+      "variants": 3,
+      "union": 3,
+      "common": 1,
+      "identical": false
+    },
+    {
+      "base": "tests/test_placeholder_heuristics.py::test_a_placeholder_label_makes_a_paragraph_a_visual_placeholder",
+      "variants": 3,
+      "union": 13,
+      "common": 13,
+      "identical": true
+    },
+    {
+      "base": "tests/test_region_grouping_regressions.py::test_unknown_gaps_never_overlap_known_content",
+      "variants": 3,
+      "union": 26,
+      "common": 14,
+      "identical": false
+    },
+    {
+      "base": "tests/test_schema_validation.py::test_schema_rejects_invalid_root_values",
+      "variants": 3,
+      "union": 3,
+      "common": 3,
+      "identical": true
+    },
+    {
+      "base": "tests/test_table_cell_sanitize.py::test_other_blocks_keep_minus_sign",
+      "variants": 3,
+      "union": 77,
+      "common": 70,
+      "identical": false
+    },
+    {
+      "base": "tests/test_tables_text_rows.py::test_a_markdown_separator",
+      "variants": 3,
+      "union": 6,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_tables_text_rows.py::test_no_table_in_plain_text",
+      "variants": 3,
+      "union": 27,
+      "common": 2,
+      "identical": false
+    },
+    {
+      "base": "tests/test_export_page_text.py::test_an_image_reads_its_alt_text_or_the_default",
+      "variants": 2,
+      "union": 9,
+      "common": 9,
+      "identical": true
+    },
+    {
+      "base": "tests/test_export_walk.py::test_empty_documents_have_no_events",
+      "variants": 2,
+      "union": 3,
+      "common": 3,
+      "identical": true
+    }
+  ],
+  "zero_exclusive": [
+    {
+      "test": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
+      "elements": 494
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestPageSimilarity::test_fuse_extraction_payloads_matches_bit_for_bit_without_rapidfuzz",
+      "elements": 491
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_empty_secondary_structural_element_routes_as_superset_when_text_agrees[picture]",
+      "elements": 477
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_empty_secondary_structural_element_routes_as_superset_when_text_agrees[formula]",
+      "elements": 470
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_empty_secondary_structural_element_routes_as_superset_when_text_agrees[table]",
+      "elements": 470
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_primary_only_structure_keeps_primary_without_divergence",
+      "elements": 463
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_fuses_multiple_pages_preserving_page_numbers_and_reading_order",
+      "elements": 459
+    },
+    {
+      "test": "tests/test_fusion_payload.py::TestFuseExtractionPayloads::test_near_empty_decide_v1_route_takes_precedence_over_superset",
+      "elements": 458
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html.html]",
+      "elements": 431
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html.html]",
+      "elements": 431
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-docx.html]",
+      "elements": 428
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-pdf.html]",
+      "elements": 428
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-pdf_ua.html]",
+      "elements": 428
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-docx.html]",
+      "elements": 428
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-pdf.html]",
+      "elements": 428
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-pdf_ua.html]",
+      "elements": 428
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-txt.html]",
+      "elements": 422
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-html-unrecognized.html]",
+      "elements": 422
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-txt.html]",
+      "elements": 422
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-html-unrecognized.html]",
+      "elements": 422
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_degrade_math_to_text_all_indices_matches_full_degradation",
+      "elements": 418
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_degrade_math_to_text_selective_preserves_other_formulas_and_alt_spans",
+      "elements": 412
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_degrade_math_to_text_empty_indices_keeps_ast_equal",
+      "elements": 402
+    },
+    {
+      "test": "tests/test_table_cell_sanitize.py::test_txt_reads_the_negative_cell",
+      "elements": 399
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-pandoc-docx.json]",
+      "elements": 385
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-pandoc-pdf-ua.json]",
+      "elements": 385
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-pandoc-docx.json]",
+      "elements": 385
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-pandoc-pdf-ua.json]",
+      "elements": 385
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_count_math_nodes_covers_all_block_types",
+      "elements": 376
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
+      "elements": 371
+    },
+    {
+      "test": "tests/test_pandoc_ast_degrade.py::test_unconverted_math_indices_requires_target_format",
+      "elements": 367
+    },
+    {
+      "test": "tests/test_xycut.py::TestMergeBlocksOption::test_decor_tail_stays_at_the_end",
+      "elements": 361
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
+      "elements": 328
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-docx.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-html.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-pdf.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-pdf_ua.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt-unrecognized.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_characterization.py::test_export_matches_frozen_baseline[blocks-txt.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-docx.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-html.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-pdf.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-pdf_ua.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt-unrecognized.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_export_walk_parity.py::test_characterized_export_uses_shared_traversal_and_typed_dispatch[blocks-txt.txt]",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_manifest_cases.py::test_a_case_changes_the_document_it_is_given",
+      "elements": 319
+    },
+    {
+      "test": "tests/test_xycut.py::TestMergeBlocksOption::test_multicol_restores_column_order",
+      "elements": 308
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label[Private cell content-Tabela {number}-Tabela 1]",
+      "elements": 279
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label[Private cell content-Tabela-Tabela]",
+      "elements": 279
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label[Private cell content-Tableau n\\xb0 {number} < & \"-Tableau n\\xb0 1 < & \"]",
+      "elements": 279
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label[-Tabela {number}-Tabela 1]",
+      "elements": 275
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label[-Tabela-Tabela]",
+      "elements": 275
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_uncaptioned_table_uses_a_consumer_supplied_region_label[-Tableau n\\xb0 {number} < & \"-Tableau n\\xb0 1 < & \"]",
+      "elements": 275
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_caption_ids_do_not_collide_with_existing_ids",
+      "elements": 272
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_table_numbers_and_caption_references_follow_document_order",
+      "elements": 271
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_a_numbered_caption_id_does_not_collide_with_another_tables_caption_id",
+      "elements": 270
+    },
+    {
+      "test": "tests/test_fusion.py::TestMergeBlocks::test_match_exato",
+      "elements": 267
+    },
+    {
+      "test": "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
+      "elements": 265
+    },
+    {
+      "test": "tests/test_fusion.py::TestMergeBlocks::test_decor_tail",
+      "elements": 257
+    },
+    {
+      "test": "tests/test_fusion.py::TestMergeBlocks::test_stats_retornadas",
+      "elements": 256
+    },
+    {
+      "test": "tests/test_fusion.py::test_mega_block_does_not_merge_separate_paragraphs",
+      "elements": 256
+    },
+    {
+      "test": "tests/test_fusion.py::TestMergeBlocks::test_esqueleto_mineru",
+      "elements": 252
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_scroll_region_uses_available_caption_without_mutating_the_table[ast]",
+      "elements": 249
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_scroll_region_uses_available_caption_without_mutating_the_table[caption]",
+      "elements": 248
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_scroll_region_uses_available_caption_without_mutating_the_table[title]",
+      "elements": 248
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_non_none_validator_results_are_not_silently_accepted[False]",
+      "elements": 247
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_non_none_validator_results_are_not_silently_accepted[True]",
+      "elements": 247
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_non_none_validator_results_are_not_silently_accepted[result2]",
+      "elements": 247
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_non_none_validator_results_are_not_silently_accepted[result3]",
+      "elements": 247
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_non_none_validator_results_are_not_silently_accepted[result4]",
+      "elements": 247
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_builder_contract_includes_multiple_nested_sections",
+      "elements": 246
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_package_resource_does_not_depend_on_the_working_directory",
+      "elements": 246
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_pure_builder_output_conforms_without_enabling_runtime_validation[# Main\\n\\nBody.\\n\\n## Child\\n\\nChild text.\\n\\n### Leaf\\n\\nLeaf text.]",
+      "elements": 246
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_injected_errors_propagate_without_fallback[error0]",
+      "elements": 245
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_injected_errors_propagate_without_fallback[error1]",
+      "elements": 245
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_local_refs_validate_grandchildren_and_preserve_error_paths[level-7]",
+      "elements": 245
+    },
+    {
+      "test": "tests/test_schema_validation.py::test_local_refs_validate_grandchildren_and_preserve_error_paths[type-custom]",
+      "elements": 245
+    },
+    {
+      "test": "tests/test_fusion.py::TestMergeBlocks::test_junk_filter",
+      "elements": 242
+    },
+    {
+      "test": "tests/test_fusion.py::test_short_noise_filter_preserves_structured_content[heading-B-# B-True]",
+      "elements": 239
+    },
+    {
+      "test": "tests/test_fusion.py::test_short_noise_filter_preserves_structured_content[formula-y-$$y$$-True]",
+      "elements": 237
+    },
+    {
+      "test": "tests/test_fusion.py::test_short_noise_filter_preserves_structured_content[table-Q-<table><tr><td>Q</td></tr></table>-True]",
+      "elements": 237
+    },
+    {
+      "test": "tests/test_inline_math_detection.py::test_splice_writes_each_run_where_the_text_aligns",
+      "elements": 236
+    },
+    {
+      "test": "tests/test_xycut.py::TestMergeBlocksOption::test_default_keeps_mineru_skeleton",
+      "elements": 232
+    },
+    {
+      "test": "tests/test_inline_math_detection.py::test_splice_finds_a_single_letter_by_alignment_not_by_search",
+      "elements": 230
+    },
+    {
+      "test": "tests/test_html_accessibility_regressions.py::test_ast_caption_has_precedence_over_block_title_and_caption",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[# Heading-# Heading]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[**Bold** title-**Bold** title]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[**Bold**\\t\\ttitle-**Bold** title]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[1. Introduction-1. Introduction]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[1.\\tIntroduction-1. Introduction]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[2) Methods-2) Methods]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[2) \\t Methods-2) Methods]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[`Code` title-`Code` title]",
+      "elements": 229
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[Title\\t-Title]",
+      "elements": 228
+    },
+    {
+      "test": "tests/test_prose_tabs.py::test_canonical_titles_only_normalize_tabs[\\tTitle-Title]",
+      "elements": 228
+    },
+    {
+      "test": "tests/test_table_inline_math_detection.py::test_the_table_lines_give_each_cells_math",
+      "elements": 228
+    },
+    {
+      "test": "tests/test_manifest_cases.py::test_a_broken_case_breaks_exactly_its_rule[child parent reference disagrees with parent source reference-deeper hierarchy]",
+      "elements": 226
+    },
+    {
+      "test": "tests/test_manifest_cases.py::test_a_broken_case_breaks_exactly_its_rule[child parent reference disagrees with parent source reference-example]",
+      "elements": 226
+    },
+    {
+      "test": "tests/test_manifest_cases.py::test_a_broken_case_breaks_exactly_its_rule[child parent reference disagrees with parent source reference-one page]",
+      "elements": 226
+    },
+    {
+      "test": "tests/test_manifest_cases.py::test_a_broken_case_breaks_exactly_its_rule[child parent reference disagrees with parent source reference-flat]",
+      "elements": 225
+    }
+  ]
+}

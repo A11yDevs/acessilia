@@ -33,6 +33,7 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 20. [Duplication classification and first consolidation, November 2026](architecture/duplication-consolidation.md) — PR 2 of #656: the triage of the baseline groups, the shared locale parser, and the remaining candidates with their risks. (Brazilian Portuguese: [pt-BR version](architecture/duplication-consolidation.pt-br.md))
 21. [Test suite optimization](testing/optimization.md) — PR 1 of #644: the reproducible baseline of the application, docstruct, SDK and core suites, the parallelism comparison, the slowest tests and the limits of the measurement. (Brazilian Portuguese: [pt-BR version](testing/optimization.pt-br.md))
 22. [Coverage overlap and redundancy candidates](testing/overlap.md) — PR 2 of #644: the per-test coverage contexts, the Jaccard matrix, the signature-based coverage subsumption and why no test is removed on coverage evidence alone. (Brazilian Portuguese: [pt-BR version](testing/overlap.pt-br.md))
+23. [Mutation testing and test subsumption](testing/mutation.md) — PR 3 of #644: the bounded mutation experiment on `flood` and `equations`, the three surviving boundary mutants, the subsumption matrix and its cost/benefit. (Brazilian Portuguese: [pt-BR version](testing/mutation.pt-br.md))
 
 ---
 
