@@ -198,17 +198,17 @@ class ApiClient:
         self._raise_for_status(response)
         return int(self._json_object(response).get("removed", 0))
 
-    def _admin_headers(self) -> dict[str, str]:
+    def _auth_headers(self, token: str | None) -> dict[str, str]:
         headers = dict(self._headers)
-        if self._observability_token:
-            headers["Authorization"] = f"Bearer {self._observability_token}"
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         return headers
 
+    def _admin_headers(self) -> dict[str, str]:
+        return self._auth_headers(self._observability_token)
+
     def _operations_headers(self) -> dict[str, str]:
-        headers = dict(self._headers)
-        if self._operations_token:
-            headers["Authorization"] = f"Bearer {self._operations_token}"
-        return headers
+        return self._auth_headers(self._operations_token)
 
 
 def get_default_client() -> ApiClient:

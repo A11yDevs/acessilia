@@ -154,6 +154,19 @@ lines → **13 groups / 30 functions / 297 lines**. The `_sha256` group disappea
 the toolbox extractor copy did not form a group, so it does not change this
 delta.
 
+## Ninth consolidation: the API auth-header helper
+
+`ApiClient._admin_headers` and `_operations_headers` repeated the same base-header
+copy and bearer-token rule. Both now delegate to `_auth_headers`; a test pins the
+observability token together with the API key, and the existing operations-token
+tests cover the other branch. Another test configures both tokens and checks
+that admin routes receive only the observability token while `/cache/clear`
+receives only the operations token.
+
+**Measured delta on this PR's code commit:** 13 groups / 30 functions / 297
+lines → **12 groups / 28 functions / 287 lines**. The auth-header group
+disappears.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -171,7 +184,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 8 | Frontend `_is_process_running` (2/26) | **Consolidated:** one runtime behind both entry points, with PID-probe tests. |
 | 9 | Frontend `acquire_lock` (2/36) | **Consolidated:** the console script shares `frontend.run` and its lock. |
 | 10 | Frontend `startup` (2/107) | **Consolidated:** characterization covers interface composition and shutdown. |
-| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidate small helper; low priority. |
+| 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | **Consolidated:** shared `_auth_headers`. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidated:** shared `_set_pause`; copy unchanged. |
 | 13 | Agent `select_page` in adjudication/page-level (2/56) | Behaviour-sensitive: characterize selection policy first. |
 | 14 | Agent `swap_low_agreement` (2/52) | Behaviour-sensitive: characterize the swap policy first. |
@@ -201,7 +214,7 @@ changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.
