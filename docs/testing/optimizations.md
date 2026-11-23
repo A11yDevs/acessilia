@@ -48,23 +48,30 @@ mutates the first result and asserts the second call is unaffected.
 The same machine, the same coverage flags and the same suite commands as the
 baseline:
 
+The committed after-baseline is one final-tree run. A second final-tree run
+took 271.35s, so the totals have substantial machine-load variance; the
+docstruct result is stable across both.
+
 | Suite | Before wall (s) | After wall (s) | Change |
 |---|---:|---:|---:|
-| Application | 157.23 | 90.91 | −42.2% |
-| docstruct | 96.48 | 14.48 | −85.0% |
-| SDK | 31.20 | 16.83 | −46.1% |
-| core | 41.25 | 44.65 | +8.2% (noise; not on the changed path) |
-| **Total** | **326.17** | **166.87** | **−48.8%** |
+| Application | 157.23 | 116.46 | −25.9% |
+| docstruct | 96.48 | 23.03 | −76.1% |
+| SDK | 31.20 | 31.79 | +1.9% (within run-to-run variation) |
+| core | 41.25 | 67.69 | +64.1% (load; not on the changed path) |
+| **Total** | **326.17** | **238.96** | **−26.7%** |
 
-The JUnit totals moved from 310.32s to 158.75s (−48.8%). The slowest docstruct
-test went from **23.59s to 2.10s** (11.2×). The application, docstruct and SDK
-suites all exercise the manifest adapter; the core change is within run-to-run
-variation and is not attributed to this PR.
+The second final-tree run had docstruct at 19.14s and app at 197.52s, so the
+overall percentage is not a stable constant. The slowest docstruct test went
+from **23.59s to 2.31s** (10.2×) in the committed run and 2.05s in the repeat;
+that is the measured effect the cache explains. The application and docstruct
+suites exercise the manifest adapter. The SDK and core figures are dominated by
+run-to-run variance and are not attributed to this PR.
 
-Test counts differ by the delivered work, not by removal: the PR 1 instrumentation
+Test counts match the delivered tree: 7,118 tests. The PR 1 instrumentation
 tests (10) are not in this branch, and this PR adds four docstruct tests (three
-boundary tests and the cache regression). Coverage stayed at 87.9% (application),
-87.0% (docstruct), 97.3% (SDK) and 82.7% (core).
+boundary tests and the cache regression) plus three root report-consistency
+tests. Coverage stayed at 87.9% (application), 87.0% (docstruct), 97.3% (SDK)
+and 82.7% (core).
 
 ## 2. Close the three surviving `flood_guard` boundary mutants
 
@@ -100,7 +107,7 @@ The same mutation harness and the same 17 mutants:
 | Survived | 3 | 0 |
 | Mutation score | 82.3% | **100%** |
 | Experiment wall time | ~15s | ~17s |
-| Mutants detected by exactly one test | M006, M007, M013, M015, M017 | M005, M006, M011, M013, M015, M016, M017 |
+| Mutants detected by exactly one test | M006, M007, M013, M015, M017 | M005, M006, M011, M016 |
 
 Each new test is the only killer of one previously surviving mutant: M005,
 M011 and M016. The experiment report is
@@ -154,12 +161,19 @@ uv run python scripts/tests/mutation_report.py \
 
 ## Limitations
 
-- **One run per measurement.** The absolute seconds vary with machine load; the
-  direction and the docstruct magnitude are large enough to survive that
-  variance, the core +8% is not.
+- **Machine-load variance is large.** The two final-tree runs took 238.96s and
+  271.35s; the docstruct magnitude survives the variance, the aggregate
+  percentage and the core change do not. Repeat measurements before treating a
+  small delta as causal.
 - **The cache assumes class hints do not change at runtime.** The document types
   are frozen at import; a dynamically redefined class is outside the contract.
+  `functools.cache` also retains a strong reference to every class passed to the
+  public `field_specs`; this is fine for the static types here but not for
+  dynamically generated classes.
 - **The mutation operator set is still limited.** 17/17 means the three
   boundary gaps are closed, not that the module detects every possible defect.
 - **The application suite still has a long tail.** Its slowest test remains the
-  VLM judge case; this PR does not change it.
+  VLM judge case; this PR does not target it, although the committed after-run
+  recorded 35.84s and the repeat 87.22s (the PR 1 baseline recorded 52.19s), so
+  machine variance or the shared manifest path both remain plausible
+  explanations.

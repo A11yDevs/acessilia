@@ -19,7 +19,7 @@
   },
   "baseline": {
     "status": "survived",
-    "seconds": 0.8541128579963697,
+    "seconds": 0.9816116769998189,
     "exit_code": 0,
     "killers": [],
     "error": ""
@@ -56,7 +56,7 @@
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
         "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
       ],
-      "seconds": 0.989,
+      "seconds": 0.951,
       "exit_code": 1,
       "error": ""
     },
@@ -73,7 +73,7 @@
         "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado"
       ],
-      "seconds": 0.921,
+      "seconds": 0.926,
       "exit_code": 1,
       "error": ""
     },
@@ -98,7 +98,7 @@
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
         "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
       ],
-      "seconds": 0.982,
+      "seconds": 0.971,
       "exit_code": 1,
       "error": ""
     },
@@ -116,7 +116,7 @@
         "tests/test_flood.py::TestFloodGuard::test_nao_age_quando_a_nao_inunda_b",
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado"
       ],
-      "seconds": 0.927,
+      "seconds": 1.025,
       "exit_code": 1,
       "error": ""
     },
@@ -132,7 +132,7 @@
       "killers": [
         "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo"
       ],
-      "seconds": 0.955,
+      "seconds": 0.835,
       "exit_code": 1,
       "error": ""
     },
@@ -148,7 +148,7 @@
       "killers": [
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado"
       ],
-      "seconds": 0.925,
+      "seconds": 0.921,
       "exit_code": 1,
       "error": ""
     },
@@ -165,7 +165,7 @@
         "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
         "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo"
       ],
-      "seconds": 0.923,
+      "seconds": 0.804,
       "exit_code": 1,
       "error": ""
     },
@@ -189,7 +189,7 @@
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
         "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
       ],
-      "seconds": 0.977,
+      "seconds": 0.895,
       "exit_code": 1,
       "error": ""
     },
@@ -208,7 +208,7 @@
         "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
         "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina"
       ],
-      "seconds": 0.954,
+      "seconds": 0.808,
       "exit_code": 1,
       "error": ""
     },
@@ -231,7 +231,7 @@
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
         "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
       ],
-      "seconds": 0.956,
+      "seconds": 0.84,
       "exit_code": 1,
       "error": ""
     },
@@ -247,7 +247,7 @@
       "killers": [
         "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo"
       ],
-      "seconds": 0.92,
+      "seconds": 0.83,
       "exit_code": 1,
       "error": ""
     },
@@ -270,7 +270,7 @@
         "tests/test_flood.py::TestFloodGuard::test_ratio_e_respeitado",
         "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
       ],
-      "seconds": 0.927,
+      "seconds": 0.859,
       "exit_code": 1,
       "error": ""
     },
@@ -287,7 +287,7 @@
         "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
         "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo"
       ],
-      "seconds": 0.951,
+      "seconds": 0.825,
       "exit_code": 1,
       "error": ""
     },
@@ -306,7 +306,7 @@
         "tests/test_flood.py::TestFloodGuard::test_o_comprimento_curto_e_inclusivo",
         "tests/test_flood.py::TestFloodGuard::test_tag_entra_nas_stats"
       ],
-      "seconds": 0.919,
+      "seconds": 0.79,
       "exit_code": 1,
       "error": ""
     },
@@ -324,7 +324,7 @@
         "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina",
         "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo"
       ],
-      "seconds": 0.939,
+      "seconds": 0.855,
       "exit_code": 1,
       "error": ""
     },
@@ -340,7 +340,7 @@
       "killers": [
         "tests/test_flood.py::TestFloodGuard::test_disparar_sem_descartar_nao_conta_pagina"
       ],
-      "seconds": 0.909,
+      "seconds": 0.824,
       "exit_code": 1,
       "error": ""
     },
@@ -357,7 +357,7 @@
         "tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico",
         "tests/test_flood.py::TestFloodGuard::test_o_minimo_de_blocos_e_inclusivo"
       ],
-      "seconds": 0.908,
+      "seconds": 0.839,
       "exit_code": 1,
       "error": ""
     }

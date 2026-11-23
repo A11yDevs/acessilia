@@ -49,24 +49,31 @@ afetada.
 A mesma máquina, as mesmas opções de cobertura e os mesmos comandos de suíte do
 baseline:
 
+O baseline posterior versionado é uma execução da árvore final. Uma segunda
+execução da árvore final levou 271,35s, então os totais têm variação substancial
+de carga da máquina; o resultado da docstruct é estável nas duas.
+
 | Suíte | Parede antes (s) | Parede depois (s) | Mudança |
 |---|---:|---:|---:|
-| Aplicação | 157,23 | 90,91 | −42,2% |
-| docstruct | 96,48 | 14,48 | −85,0% |
-| SDK | 31,20 | 16,83 | −46,1% |
-| core | 41,25 | 44,65 | +8,2% (ruído; fora do caminho alterado) |
-| **Total** | **326,17** | **166,87** | **−48,8%** |
+| Aplicação | 157,23 | 116,46 | −25,9% |
+| docstruct | 96,48 | 23,03 | −76,1% |
+| SDK | 31,20 | 31,79 | +1,9% (dentro da variação) |
+| core | 41,25 | 67,69 | +64,1% (carga; fora do caminho alterado) |
+| **Total** | **326,17** | **238,96** | **−26,7%** |
 
-O total JUnit passou de 310,32s para 158,75s (−48,8%). O teste mais lento da
-docstruct foi de **23,59s para 2,10s** (11,2×). As suítes da aplicação, da
-docstruct e do SDK exercitam o adaptador de manifesto; a mudança do core está
-dentro da variação entre execuções e não é atribuída a este PR.
+A segunda execução da árvore final teve docstruct em 19,14s e aplicação em
+197,52s, então o percentual agregado não é uma constante estável. O teste mais
+lento da docstruct foi de **23,59s para 2,31s** (10,2×) na execução versionada e
+2,05s na repetição; esse é o efeito medido que o cache explica. As suítes da
+aplicação e da docstruct exercitam o adaptador de manifesto. Os números do SDK e
+do core são dominados pela variação entre execuções e não são atribuídos a este
+PR.
 
-As contagens de testes diferem pelo trabalho entregue, não por remoção: os
-testes de instrumentação do PR 1 (10) não estão neste branch, e este PR adiciona
-quatro testes à docstruct (três de fronteira e um de regressão do cache). A
-cobertura permaneceu em 87,9% (aplicação), 87,0% (docstruct), 97,3% (SDK) e
-82,7% (core).
+As contagens de testes correspondem à árvore entregue: 7.118 testes. Os testes de
+instrumentação do PR 1 (10) não estão neste branch, e este PR adiciona quatro
+testes à docstruct (três de fronteira e um de regressão do cache) mais três
+testes de consistência dos relatórios na raiz. A cobertura permaneceu em 87,9%
+(aplicação), 87,0% (docstruct), 97,3% (SDK) e 82,7% (core).
 
 ## 2. Fechar os três mutantes de fronteira sobreviventes do `flood_guard`
 
@@ -103,7 +110,7 @@ O mesmo harness de mutação e os mesmos 17 mutantes:
 | Sobreviventes | 3 | 0 |
 | Mutation score | 82,3% | **100%** |
 | Tempo de parede do experimento | ~15s | ~17s |
-| Mutantes detectados por exatamente um teste | M006, M007, M013, M015, M017 | M005, M006, M011, M013, M015, M016, M017 |
+| Mutantes detectados por exatamente um teste | M006, M007, M013, M015, M017 | M005, M006, M011, M016 |
 
 Cada novo teste é o único detector de um mutante que antes sobrevivia: M005,
 M011 e M016. O relatório do experimento é
@@ -158,12 +165,15 @@ uv run python scripts/tests/mutation_report.py \
 
 ## Limitações
 
-- **Uma execução por medição.** Os segundos absolutos variam com a carga da
-  máquina; a direção e a magnitude da docstruct são grandes o suficiente para
-  sobreviver a essa variação, o +8% do core não é.
+- **A variação de carga da máquina é grande.** As duas execuções da árvore final
+  levaram 238,96s e 271,35s; a magnitude da docstruct sobrevive à variação, o
+  percentual agregado e a mudança do core não. Repita medições antes de tratar
+  um delta pequeno como causal.
 - **O cache assume que os hints das classes não mudam em tempo de execução.** Os
   tipos do documento são fixos na importação; uma classe redefinida
-  dinamicamente está fora do contrato.
+  dinamicamente está fora do contrato. `functools.cache` também mantém uma
+  referência forte a toda classe passada à `field_specs` pública; isso é
+  adequado aos tipos estáticos daqui, mas não a classes geradas dinamicamente.
 - **O conjunto de operadores de mutação ainda é limitado.** 17/17 significa que
   as três lacunas de fronteira foram fechadas, não que o módulo detecta todo
   defeito possível.

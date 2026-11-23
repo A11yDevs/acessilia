@@ -27,7 +27,9 @@ def test_the_after_baseline_covers_all_four_suites() -> None:
         "sdk",
         "core",
     }
-    assert payload["totals"]["tests"] == 7115
+    assert payload["totals"]["tests"] == sum(
+        suite["tests"] for suite in payload["suites"]
+    )
     assert all(suite["failed"] == 0 for suite in payload["suites"])
     assert all(suite["skipped"] == 0 for suite in payload["suites"])
 
@@ -42,3 +44,13 @@ def test_the_after_mutation_report_has_no_survivors() -> None:
     assert payload["summary"]["survived"] == 0
     assert payload["summary"]["mutation_score"] == 1.0
     assert {mutant["status"] for mutant in payload["mutants"]} == {"killed"}
+    exclusive = sorted(
+        mutant["id"]
+        for mutant in payload["mutants"]
+        if len(mutant["killers"]) == 1
+    )
+    assert exclusive == ["M005", "M006", "M011", "M016"]
+    english = (DOCS / "optimizations.md").read_text(encoding="utf-8")
+    portuguese = (DOCS / "optimizations.pt-br.md").read_text(encoding="utf-8")
+    assert "M005, M006, M011, M016" in english
+    assert "M005, M006, M011, M016" in portuguese

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "kind": "run",
   "environment": {
-    "generated_at": "2026-11-23T01:46:03+00:00",
-    "revision": "7c9311fd95e69c81c8bafb9594fe33dde0df6e36",
+    "generated_at": "2026-11-23T11:49:27+00:00",
+    "revision": "f7ec4ee8fe07f288ff02d24370a308b578bbce40",
     "python": "3.12.13",
     "platform": "macOS-15.7.9-x86_64-i386-64bit",
     "xdist_workers": 4,
@@ -17,67 +17,67 @@
   "suites": [
     {
       "label": "app",
-      "tests": 3171,
-      "passed": 3171,
+      "tests": 3174,
+      "passed": 3174,
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "junit_seconds": 88.235,
-      "p50_seconds": 0.009,
-      "p95_seconds": 0.143,
+      "junit_seconds": 113.752,
+      "p50_seconds": 0.012,
+      "p95_seconds": 0.205,
       "slowest": [
         {
           "nodeid": "tests/test_provider_choice_methods.py::TestVlmPairwiseJudge::test_long_page_is_flagged_as_truncated",
           "outcome": "passed",
-          "seconds": 27.915
-        },
-        {
-          "nodeid": "tests/test_sdk_public_api.py::test_the_core_uses_only_the_sdk_public_api",
-          "outcome": "passed",
-          "seconds": 7.695
+          "seconds": 35.837
         },
         {
           "nodeid": "tests/test_sdk_public_api.py::test_every_exception_is_still_needed",
           "outcome": "passed",
-          "seconds": 7.355
+          "seconds": 12.683
         },
         {
-          "nodeid": "tests/test_architecture_metrics.py::test_it_counts_test_functions",
+          "nodeid": "tests/test_sdk_public_api.py::test_the_core_uses_only_the_sdk_public_api",
           "outcome": "passed",
-          "seconds": 4.355
+          "seconds": 11.95
         },
         {
           "nodeid": "tests/test_docstruct_bridges.py::test_core_holds_no_copy_of_a_docstruct_function",
           "outcome": "passed",
-          "seconds": 3.831
+          "seconds": 5.101
         },
         {
-          "nodeid": "tests/test_function_complexity.py::test_iter_functions_visits_every_ast_walk_function_across_all_roots",
+          "nodeid": "tests/test_architecture_metrics.py::test_it_counts_test_functions",
           "outcome": "passed",
-          "seconds": 3.38
+          "seconds": 4.961
         },
         {
           "nodeid": "tests/test_ops_script.py::test_bhs_cleanup_requires_current_release_ancestry_before_tagging_or_deleting[None]",
           "outcome": "passed",
-          "seconds": 3.324
+          "seconds": 4.286
         },
         {
-          "nodeid": "tests/test_api.py::test_health",
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra1-timer is disabled/inactive]",
           "outcome": "passed",
-          "seconds": 3.182
+          "seconds": 4.05
         },
         {
-          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra5-belongs to project 'staging', .env says 'test-staging']",
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra0-last run failed at]",
           "outcome": "passed",
-          "seconds": 3.136
+          "seconds": 3.989
         },
         {
-          "nodeid": "tests/test_ops_script.py::test_check_reports_a_stale_last_check",
+          "nodeid": "tests/test_ops_script.py::test_migrate_resumes_after_a_partial_run",
           "outcome": "passed",
-          "seconds": 3.135
+          "seconds": 3.807
+        },
+        {
+          "nodeid": "tests/test_function_complexity.py::test_iter_functions_visits_every_ast_walk_function_across_all_roots",
+          "outcome": "passed",
+          "seconds": 3.668
         }
       ],
-      "wall_seconds": 90.911,
+      "wall_seconds": 116.458,
       "coverage": {
         "percent_covered": 87.86290322580645,
         "covered_lines": 3679,
@@ -95,62 +95,62 @@
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "junit_seconds": 13.257,
-      "p50_seconds": 0.001,
-      "p95_seconds": 0.008,
+      "junit_seconds": 20.931,
+      "p50_seconds": 0.002,
+      "p95_seconds": 0.01,
       "slowest": [
         {
           "nodeid": "tests/test_manifest_model.py::test_long_parent_chains_are_acyclic",
           "outcome": "passed",
-          "seconds": 2.099
+          "seconds": 2.313
         },
         {
           "nodeid": "tests/test_purity.py::test_imports_outside_the_standard_library_are_guarded_accelerators",
           "outcome": "passed",
-          "seconds": 0.664
+          "seconds": 1.052
         },
         {
           "nodeid": "tests/test_infrastructure.py::test_no_module_uses_infrastructure",
           "outcome": "passed",
-          "seconds": 0.561
+          "seconds": 0.818
         },
         {
           "nodeid": "tests/test_infrastructure.py::test_every_exception_is_still_needed",
           "outcome": "passed",
-          "seconds": 0.449
+          "seconds": 0.798
         },
         {
           "nodeid": "tests/test_infrastructure.py::test_importing_every_module_touches_no_infrastructure",
           "outcome": "passed",
-          "seconds": 0.189
-        },
-        {
-          "nodeid": "tests/test_manifest_cases.py::test_a_case_changes_the_document_it_is_given",
-          "outcome": "passed",
-          "seconds": 0.186
+          "seconds": 0.305
         },
         {
           "nodeid": "tests/test_purity.py::test_every_module_imports_with_the_standard_library_only",
           "outcome": "passed",
-          "seconds": 0.164
+          "seconds": 0.294
+        },
+        {
+          "nodeid": "tests/test_manifest_cases.py::test_a_case_changes_the_document_it_is_given",
+          "outcome": "passed",
+          "seconds": 0.257
+        },
+        {
+          "nodeid": "tests/test_manifest_cases.py::test_a_broken_case_breaks_exactly_its_rule[parent cycle-deeper hierarchy]",
+          "outcome": "passed",
+          "seconds": 0.202
         },
         {
           "nodeid": "tests/test_legacy_canonical_types.py::test_cold_import_and_construction_emit_no_warnings",
           "outcome": "passed",
-          "seconds": 0.076
+          "seconds": 0.148
         },
         {
-          "nodeid": "tests/test_schema_validation.py::test_package_resource_does_not_depend_on_the_working_directory",
+          "nodeid": "tests/test_schema_validation.py::test_pure_builder_output_conforms_without_enabling_runtime_validation[source4]",
           "outcome": "passed",
-          "seconds": 0.062
-        },
-        {
-          "nodeid": "tests/test_schema_validation.py::test_local_refs_validate_grandchildren_and_preserve_error_paths[type-custom]",
-          "outcome": "passed",
-          "seconds": 0.061
+          "seconds": 0.136
         }
       ],
-      "wall_seconds": 14.479,
+      "wall_seconds": 23.033,
       "coverage": {
         "percent_covered": 87.00887198986058,
         "covered_lines": 6940,
@@ -168,62 +168,62 @@
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "junit_seconds": 15.98,
-      "p50_seconds": 0.016,
-      "p95_seconds": 0.038,
+      "junit_seconds": 29.908,
+      "p50_seconds": 0.025,
+      "p95_seconds": 0.084,
       "slowest": [
-        {
-          "nodeid": "tests/test_cli.py::test_an_unreachable_toolbox_is_typed_in_a_fresh_interpreter",
-          "outcome": "passed",
-          "seconds": 0.481
-        },
         {
           "nodeid": "tests/test_purity.py::test_every_module_imports_without_core_or_toolbox",
           "outcome": "passed",
-          "seconds": 0.469
+          "seconds": 0.915
         },
         {
           "nodeid": "tests/test_cli.py::test_an_invalid_port_is_a_usage_error_from_the_command_line_too",
           "outcome": "passed",
-          "seconds": 0.443
+          "seconds": 0.866
+        },
+        {
+          "nodeid": "tests/test_cli.py::test_an_unreachable_toolbox_is_typed_in_a_fresh_interpreter",
+          "outcome": "passed",
+          "seconds": 0.848
         },
         {
           "nodeid": "tests/test_cli.py::test_python_m_acessilia_sdk_runs_with_the_core_blocked",
           "outcome": "passed",
-          "seconds": 0.386
+          "seconds": 0.765
         },
         {
           "nodeid": "tests/test_purity.py::test_the_sdk_reads_no_environment",
           "outcome": "passed",
-          "seconds": 0.326
+          "seconds": 0.68
         },
         {
           "nodeid": "tests/test_purity.py::test_imports_stay_within_the_allowed_dependencies",
           "outcome": "passed",
-          "seconds": 0.217
+          "seconds": 0.321
         },
         {
-          "nodeid": "tests/test_cli.py::test_judge_closes_its_clients_on_success_and_on_failure",
+          "nodeid": "tests/test_operations_formula.py::test_the_chain_runs_every_step_in_order",
           "outcome": "passed",
-          "seconds": 0.086
+          "seconds": 0.189
         },
         {
-          "nodeid": "tests/test_cli.py::test_judge_reports_render_and_adjudication_failures_typed",
+          "nodeid": "tests/test_config.py::test_exports_use_their_own_timeout_or_fall_back_to_the_shared_one",
           "outcome": "passed",
-          "seconds": 0.081
+          "seconds": 0.175
         },
         {
-          "nodeid": "tests/clients/test_pdf.py::test_render_rejects_a_result_outside_the_v2_contract[document6-applied clip]",
+          "nodeid": "tests/test_cli.py::test_formula_runs_the_chain_and_prints_every_step",
           "outcome": "passed",
-          "seconds": 0.063
+          "seconds": 0.173
         },
         {
-          "nodeid": "tests/test_cli.py::test_dataset_items_all_reads_every_page_up_to_the_limit",
+          "nodeid": "tests/test_failover.py::test_artifact_download_searches_another_endpoint_after_not_found[404]",
           "outcome": "passed",
-          "seconds": 0.062
+          "seconds": 0.166
         }
       ],
-      "wall_seconds": 16.833,
+      "wall_seconds": 31.786,
       "coverage": {
         "percent_covered": 97.3007303906002,
         "covered_lines": 2544,
@@ -241,62 +241,62 @@
       "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "junit_seconds": 41.278,
-      "p50_seconds": 0.003,
-      "p95_seconds": 0.155,
+      "junit_seconds": 65.444,
+      "p50_seconds": 0.004,
+      "p95_seconds": 0.209,
       "slowest": [
         {
           "nodeid": "tests/test_boundary.py::test_the_core_reads_no_environment_variable",
           "outcome": "passed",
-          "seconds": 1.041
+          "seconds": 1.649
         },
         {
-          "nodeid": "tests/test_function_complexity.py::test_the_scan_sees_the_core_functions",
+          "nodeid": "tests/test_boundary.py::test_the_core_imports_only_the_allowed_libraries",
           "outcome": "passed",
-          "seconds": 0.991
+          "seconds": 1.542
         },
         {
           "nodeid": "tests/test_boundary.py::test_the_scan_sees_the_core",
           "outcome": "passed",
-          "seconds": 0.919
+          "seconds": 1.529
+        },
+        {
+          "nodeid": "tests/test_function_complexity.py::test_the_scan_sees_the_core_functions",
+          "outcome": "passed",
+          "seconds": 1.35
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[docstruct]",
+          "outcome": "passed",
+          "seconds": 1.347
         },
         {
           "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[pydantic]",
           "outcome": "passed",
-          "seconds": 0.719
-        },
-        {
-          "nodeid": "tests/test_table_ast_from_rows_parity.py::test_the_two_agree_unless_a_row_is_all_blank",
-          "outcome": "passed",
-          "seconds": 0.711
-        },
-        {
-          "nodeid": "tests/test_boundary.py::test_the_deviation_stays_where_it_is_recorded",
-          "outcome": "passed",
-          "seconds": 0.639
-        },
-        {
-          "nodeid": "tests/test_boundary.py::test_the_core_imports_nothing_from_the_service_or_the_frontends",
-          "outcome": "passed",
-          "seconds": 0.637
-        },
-        {
-          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[babel]",
-          "outcome": "passed",
-          "seconds": 0.634
+          "seconds": 1.28
         },
         {
           "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[edge_tts]",
           "outcome": "passed",
-          "seconds": 0.626
+          "seconds": 1.219
         },
         {
           "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[jsonschema]",
           "outcome": "passed",
-          "seconds": 0.596
+          "seconds": 1.156
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[acessilia_sdk]",
+          "outcome": "passed",
+          "seconds": 1.122
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[agno]",
+          "outcome": "passed",
+          "seconds": 1.056
         }
       ],
-      "wall_seconds": 44.647,
+      "wall_seconds": 67.685,
       "coverage": {
         "percent_covered": 82.74361400189214,
         "covered_lines": 7111,
@@ -309,8 +309,8 @@
     }
   ],
   "totals": {
-    "tests": 7115,
-    "junit_seconds": 158.75,
-    "wall_seconds": 166.87
+    "tests": 7118,
+    "junit_seconds": 230.035,
+    "wall_seconds": 238.962
   }
 }

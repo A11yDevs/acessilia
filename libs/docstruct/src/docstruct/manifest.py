@@ -22,9 +22,9 @@ import functools
 import types
 import typing
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from docstruct.geometry.boxes import OrientedBox
 from docstruct.validation import Finding
@@ -448,7 +448,9 @@ def _has_cycle(parent_graph: dict[str, str]) -> bool:
 
 def _type_findings(value: Any, path: str) -> list[tuple[str, dict[str, Any]]]:
     findings: list[tuple[str, dict[str, Any]]] = []
-    specs = field_specs(type(value))
+    # Internal readers never mutate the constraints; skip the defensive copy
+    # that the public boundary performs for external callers.
+    specs = _build_field_specs(cast(Hashable, type(value)))
     for item in dataclasses.fields(value):
         current = getattr(value, item.name)
         where = f"{path}.{item.name}" if path else item.name
@@ -492,7 +494,9 @@ def _is_json_type(value: Any, json_type: str) -> bool:
 
 def _field_findings(value: Any, path: str) -> list[tuple[str, dict[str, Any]]]:
     findings: list[tuple[str, dict[str, Any]]] = []
-    specs = field_specs(type(value))
+    # Internal readers never mutate the constraints; skip the defensive copy
+    # that the public boundary performs for external callers.
+    specs = _build_field_specs(cast(Hashable, type(value)))
     for item in dataclasses.fields(value):
         current = getattr(value, item.name)
         where = f"{path}.{item.name}" if path else item.name
