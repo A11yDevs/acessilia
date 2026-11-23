@@ -71,7 +71,8 @@ Operadores: trocas de comparação (`==`/`!=`, `<`/`<=`, `>`/`>=`, `in`/`not in`
 **morto**; um mutante que os deixa passando é **sobrevivente**. Um mutante
 sobrevivente em uma linha que a suíte nunca executa é classificado como **não
 coberto**, não como fraqueza do teste. Timeouts e execuções inválidas são
-relatados separadamente.
+relatados separadamente. Um timeout entra no denominador do mutation score, mas
+não no numerador: um travamento é um resultado separado, não uma morte.
 
 O mutation score é `mortos / (mortos + sobreviventes + timeout)` sobre mutantes
 cobertos. Mutantes equivalentes **não** são identificados automaticamente: um
