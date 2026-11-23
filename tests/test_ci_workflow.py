@@ -135,6 +135,63 @@ def test_ci_publishes_the_test_timing_baseline_without_changing_the_gate() -> No
     assert upload["with"]["path"] == "var/timings/baseline.json"
 
 
+def test_component_jobs_pin_the_matrix_thresholds_and_artifacts() -> None:
+    jobs = _workflow()["jobs"]
+    component = jobs["component-tests"]
+    include = component["strategy"]["matrix"]["include"]
+    assert {(item["component"], item["directory"]) for item in include} == {
+        ("app", "."),
+        ("docstruct", "libs/docstruct"),
+        ("sdk", "libs/sdk"),
+        ("core", "libs/core"),
+    }
+    steps = {step.get("name"): step for step in component["steps"]}
+    assert '--components "$COMPONENT"' in steps[
+        "Check ${{ matrix.component }} coverage threshold"
+    ]["run"]
+    assert steps["Upload component test report"]["with"]["name"] == (
+        "test-report-${{ matrix.component }}"
+    )
+    assert steps["Upload component coverage report"]["with"]["name"] == (
+        "coverage-${{ matrix.component }}"
+    )
+    assert steps["Upload component test report"]["if"] == "always()"
+    assert steps["Upload component coverage report"]["if"] == "always()"
+
+    aggregate = {step.get("name"): step for step in jobs["tests"]["steps"]}
+    assert "--components" not in aggregate[
+        "Check per-component coverage thresholds"
+    ]["run"]
+    assert aggregate["Download component coverage reports"]["with"]["pattern"] == (
+        "coverage-*"
+    )
+    assert aggregate["Download component test reports"]["with"]["pattern"] == (
+        "test-report-*"
+    )
+    assert aggregate["Download component coverage reports"]["with"][
+        "merge-multiple"
+    ] is True
+
+
+def test_the_aggregator_publishes_evidence_even_when_a_provider_fails() -> None:
+    steps = _workflow()["jobs"]["tests"]["steps"]
+    names = [step.get("name") for step in steps]
+    assert names[-1] == "Verify provider jobs"
+    by_name = {step.get("name"): step for step in steps}
+    for name in (
+        "Download component coverage reports",
+        "Download component test reports",
+        "Check per-component coverage thresholds",
+        "Summarize test timings",
+        "Summarize per-component coverage",
+        "Upload combined reports",
+        "Upload combined coverage reports",
+        "Upload timing baseline",
+        "Verify provider jobs",
+    ):
+        assert by_name[name]["if"] == "always()", name
+
+
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
@@ -215,7 +272,7 @@ def test_core_runs_alone_from_its_wheel() -> None:
 def test_ci_installs_the_root_environment_from_the_lock() -> None:
     """The component and quality jobs use the root uv.lock environment (#405)."""
     jobs = _workflow()["jobs"]
-    for job_id in ("quality", "component-tests", "tests"):
+    for job_id in ("quality", "component-tests"):
         job = jobs[job_id]
         steps = {step.get("name"): step for step in job["steps"]}
         uv = steps["Set up uv"]
@@ -234,6 +291,10 @@ def test_ci_installs_the_root_environment_from_the_lock() -> None:
     run = steps["Run ${{ matrix.component }} test suite"]["run"]
     assert "uv run --locked --extra dev" in run
     assert '--project "$GITHUB_WORKSPACE"' in run
+
+    aggregate = {step.get("name"): step for step in jobs["tests"]["steps"]}
+    assert "Set up uv" not in aggregate
+    assert "Check the lock and install from it" not in aggregate
 
 
 def test_production_container_installs_dev_deps_into_the_uv_venv() -> None:

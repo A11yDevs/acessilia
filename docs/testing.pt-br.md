@@ -420,9 +420,10 @@ A execução de testes coleta a suíte sozinha, então a etapa separada de
 `--collect-only` era redundante.
 
 **Onde estão os relatórios de testes lentos?**
-O `make` e a CI passam `--durations=25`. A CI também publica os relatórios JUnit
-por perna da matriz como `test-reports-py*`, os relatórios de cobertura uma vez
-por execução como `coverage-reports-py*`, e os relatórios de isolamento como
+O `make` e a CI passam `--durations=25`. Os jobs de componente publicam
+`test-report-<component>` e `coverage-<component>`; o agregador combina os dois
+uma vez como `test-reports-py3.12` e `coverage-reports-py3.12`, e publica
+`timing-baseline-py3.12`. Os relatórios de isolamento são
 `sdk-isolated-report-py*` e `docstruct-isolated-report-py*`, com retenção de 7
 dias.
 

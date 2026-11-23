@@ -81,6 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     components = [name.strip() for name in args.components.split(",") if name.strip()]
+    selected = components or list(THRESHOLDS)
     failures = check_coverage(args.coverage_dir, components or None)
     if failures:
         print("Coverage thresholds failed:", file=sys.stderr)
@@ -89,7 +90,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     print(
         "Coverage thresholds passed: "
-        + ", ".join(f"{name} >= {minimum:.1f}%" for name, minimum in THRESHOLDS.items())
+        + ", ".join(
+            f"{name} >= {THRESHOLDS[name]:.1f}%" for name in selected
+        )
     )
     return 0
 

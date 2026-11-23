@@ -411,10 +411,12 @@ The test run collects the suite itself, so the separate `--collect-only` step
 was redundant.
 
 **Where are the slow-test reports?**
-`make` and CI pass `--durations=25`. CI also uploads JUnit reports per matrix leg
-as `test-reports-py*`, coverage reports once per run as `coverage-reports-py*`,
-and the isolation reports as `sdk-isolated-report-py*` and
-`docstruct-isolated-report-py*`, with 7-day retention.
+`make` and CI pass `--durations=25`. The component jobs upload
+`test-report-<component>` and `coverage-<component>`; the aggregator combines
+them once as `test-reports-py3.12` and `coverage-reports-py3.12`, and uploads
+`timing-baseline-py3.12`. The isolation reports are
+`sdk-isolated-report-py*` and `docstruct-isolated-report-py*`, with 7-day
+retention.
 
 **Where do I see the scheduled comparison?**
 After the workflow reaches the default branch, open Actions →

@@ -47,6 +47,19 @@ def test_a_single_component_check_ignores_the_others(tmp_path: Path) -> None:
     ) == 0
 
 
+def test_the_success_message_lists_only_the_selected_component(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _report(tmp_path, "docstruct", check_coverage_thresholds.THRESHOLDS["docstruct"])
+
+    assert check_coverage_thresholds.main(
+        ["--coverage-dir", str(tmp_path), "--components", "docstruct"]
+    ) == 0
+    output = capsys.readouterr().out
+    assert "docstruct >= 86.0%" in output
+    assert "app >=" not in output
+
+
 def test_an_unknown_component_is_refused(tmp_path: Path) -> None:
     failures = check_coverage_thresholds.check_coverage(tmp_path, ["frontend"])
 
