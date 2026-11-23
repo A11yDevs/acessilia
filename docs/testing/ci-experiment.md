@@ -75,13 +75,56 @@ This matches the documented rules: `tests/**` and docs keep the application
 suite, a core change selects core+app, docstruct selects all consumers, and
 `scripts/**` is transversal. The sample still contains only green PRs.
 
+### Integration dimension and CI-only changes
+
+The follow-up PRs after #802 exercised the `app integration` dimension and
+changes that were mostly CI/security files. Replaying the current selector over
+their file lists:
+
+| PR | Changed area | Selected | `integration_required` | Conservative |
+|---|---|---|---|---|
+| #788 | shared setup action, workflows, tests | all | yes | no |
+| #793 | CI workflow, docs, `pyproject.toml`, tests | all | yes | no |
+| #795 | security workflow, docs, tests | all | no | no |
+| #800 | release workflow, `SECURITY.md`, tests | all | no | no |
+| #802 | CI workflow, selector, docs, tests | all | yes | no |
+| #807 | CodeQL/security workflows, tests | all | no | no |
+| #808 | selector, docs, tests | all | no | no |
+
+`.github/**` and `scripts/**` are transversal, so CI-only changes still select
+every suite. The integration flag follows the focused list: only the PRs that
+touched `.github/workflows/ci.yml` or its integration support selected it.
+
+### Historical failure replay
+
+To test the risk direction — a failure the full suite catches but the selected
+set would skip — the current selector was replayed against pull requests with
+known failures:
+
+| PR | Run | Failing job | Selector result | False negative? |
+|---|---|---|---|---|
+| #732 | [45001010971](https://github.com/A11yDevs/acessilia/actions/runs/45001010971) | `quality` / Ruff | all | no (quality is always run) |
+| #726 | [44994569632](https://github.com/A11yDevs/acessilia/actions/runs/44994569632) | core tests | all | no |
+| #713 | [44977779847](https://github.com/A11yDevs/acessilia/actions/runs/44977779847) | app tests | all | no |
+| #711 | [44976566900](https://github.com/A11yDevs/acessilia/actions/runs/44976566900) | app tests | sdk, core, app | no |
+| #709 | [44972669665](https://github.com/A11yDevs/acessilia/actions/runs/44972669665) | app tests | all | no |
+| #621 | [44683419408](https://github.com/A11yDevs/acessilia/actions/runs/44683419408) | app tests | all (conservative) | no |
+| #781 | [45254071576](https://github.com/A11yDevs/acessilia/actions/runs/45254071576) | core tests | all (shadow artifact) | no |
+
+The selected set contained the failing suite in every replayed run, so this
+sample produced **zero false negatives**. The replays use the current selector
+over each PR's file list; only #781 has an artifact from the original run, and
+that artifact uses schema v1. This is evidence, not a proof of completeness.
+
 ## Decision
 
-No selective gate is adopted. The full suite remains mandatory while the
-shadow artifacts accumulate. Provider setup duplication and the image-scan
-critical path are tracked in [#778](https://github.com/A11yDevs/acessilia/issues/778).
-A gate decision needs a representative set of PRs, observed false negatives,
-and repeated runs that separate the code change from machine load.
+No selective gate is adopted. The full suite remains mandatory. The failure
+replay adds real regressions to the observation, but the sample is still small,
+most replays are retrospective, and no repeated controlled run separates the
+code change from machine load. Provider setup duplication and the image-scan
+critical path are tracked in
+[#778](https://github.com/A11yDevs/acessilia/issues/778). A gate decision still
+needs a larger representative set and a controlled comparison.
 
 ## Limitations
 
@@ -89,8 +132,10 @@ and repeated runs that separate the code change from machine load.
   controlled measurement.
 - Job-minutes are derived from GitHub start/completion timestamps and include
   download/setup overhead.
-- Selective false negatives cannot be measured until the recommendation is
-  replayed against PRs with known failures.
+- Most failure replays use the current selector over a historical PR file
+  list, not the shadow artifact produced at the time; #781 is the exception.
+  The replay cannot detect a path that was missing from the diff or a failure
+  caused by an environment not represented in the file list.
 - The experiment must be repeated after the security/image jobs change; the
   critical path may move back to the tests.
 - On pull requests the container image scan is now conditional on image inputs
