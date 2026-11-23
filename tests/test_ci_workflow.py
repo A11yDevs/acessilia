@@ -190,6 +190,27 @@ def test_the_aggregator_publishes_evidence_even_when_a_provider_fails() -> None:
         "Verify provider jobs",
     ):
         assert by_name[name]["if"] == "always()", name
+def test_the_impact_selection_runs_in_shadow_mode_without_touching_the_gate() -> None:
+    jobs = _workflow()["jobs"]
+    job = jobs["detect-changes"]
+    steps = {step.get("name"): step for step in job["steps"]}
+
+    assert job["if"] == "github.event_name == 'pull_request'"
+    assert steps["Check out repository"]["with"]["fetch-depth"] == 0
+    assert steps["Fetch the base branch"]["continue-on-error"] is True
+    assert steps["Select impacted suites in shadow mode"]["continue-on-error"] is True
+    assert "scripts/tests/select_suites.py" in steps[
+        "Select impacted suites in shadow mode"
+    ]["run"]
+    assert "--summary" in steps["Select impacted suites in shadow mode"]["run"]
+    assert steps["Upload the shadow selection"]["with"]["name"] == (
+        "test-selection-shadow"
+    )
+    assert "detect-changes" not in jobs["tests"].get("needs", [])
+    assert "detect-changes" not in jobs["delivery"]["needs"]
+
+
+
 
 
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:

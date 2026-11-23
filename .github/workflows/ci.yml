@@ -45,6 +45,52 @@ jobs:
               ;;
           esac
 
+  # Shadow mode for the architecture-aware selection of #644. It records what
+  # an impact-aware CI would run; it does not skip any suite or gate.
+  detect-changes:
+    name: detect changed components (shadow)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Fetch the base branch
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      - name: Select impacted suites in shadow mode
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Standard-library-only tooling; no project install is needed.
+          python scripts/tests/select_suites.py \
+            --base-ref "origin/${BASE_REF}" --head-ref HEAD \
+            --output var/selection.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the shadow selection
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-selection-shadow
+          path: var/selection.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   # The SDK is a public API for scripts and benchmarks (#402): it must install
   # and run with neither the core nor docstruct present.
   sdk-isolated:
