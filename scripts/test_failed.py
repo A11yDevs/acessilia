@@ -22,6 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CACHE_RELATIVE = Path(".pytest_cache") / "v" / "cache" / "lastfailed"
 CACHE = REPO_ROOT / CACHE_RELATIVE
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from scripts.tests.pytest_env import sanitized_environ  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -132,7 +135,12 @@ def _collectable(
     )
     try:
         result = subprocess.run(
-            command, cwd=suite.directory, check=False, capture_output=True, text=True
+            command,
+            cwd=suite.directory,
+            env=sanitized_environ(),
+            check=False,
+            capture_output=True,
+            text=True,
         )
     except OSError as error:
         return set(), [], str(error)
@@ -247,6 +255,7 @@ def rerun(suites: list[Suite] | None = None) -> int:
             result = subprocess.run(
                 suite.command("--durations=25", *run_args),
                 cwd=suite.directory,
+                env=sanitized_environ(),
                 check=False,
             )
         except OSError as error:

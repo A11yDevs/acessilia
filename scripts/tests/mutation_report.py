@@ -36,6 +36,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.test_report import parse_report  # noqa: E402
+from scripts.tests.pytest_env import (  # noqa: E402
+    PYTEST_ENV_VARS as PYTEST_ENV_VARS,
+    sanitized_environ,
+)
 
 SCHEMA_VERSION = 1
 
@@ -248,6 +252,7 @@ def _run_pytest(
     env: dict[str, str] | None = None,
     known_tests: set[str] | None = None,
 ) -> dict[str, Any]:
+    env = sanitized_environ(env)
     command = [
         sys.executable,
         "-m",
@@ -322,22 +327,11 @@ def _copy_package(source_root: Path, destination: Path) -> Path:
     return target
 
 
-#: Ambient pytest settings that could change selection, plugins or identity.
-PYTEST_ENV_VARS = (
-    "PYTEST_ADDOPTS",
-    "PYTEST_PLUGINS",
-    "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
-    "PYTEST_CURRENT_TEST",
-)
-
-
 def _mutant_env(temp_src: Path) -> dict[str, str]:
-    env = os.environ.copy()
+    env = sanitized_environ()
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = str(temp_src) + (os.pathsep + existing if existing else "")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    for name in PYTEST_ENV_VARS:
-        env.pop(name, None)
     return env
 
 

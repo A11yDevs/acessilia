@@ -27,7 +27,10 @@ cp var/timings/variability.json docs/testing/variability.json
 cp var/timings/variability.md docs/testing/variability.md
 ```
 
-Cada suíte roda três vezes na mesma invocação. O registro da suíte mantém:
+Cada suíte roda três vezes na mesma invocação. O runner usa o mesmo ambiente
+pytest sanitizado do harness de mutação: `PYTEST_ADDOPTS`, `PYTEST_PLUGINS`,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD`, `PYTEST_CURRENT_TEST`, `PYTEST_DEBUG` e `PYTEST_DEBUG_TEMPROOT` do shell
+são removidos. O registro da suíte mantém:
 
 - as três execuções cruas (`runs`);
 - a mediana de `junit_seconds`, `wall_seconds`, p50 e p95;
