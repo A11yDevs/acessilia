@@ -98,6 +98,7 @@ _JSON_TYPES = {
     "null": ("None", "value is None"),
 }
 _KEYWORDS = {"description", "type", "pattern", "minLength", "minimum"}
+_FIELD_PLACEHOLDER = "__field__"
 #: Keywords allowed at a schema's root. Anything else, such as allOf, oneOf,
 #: not or if/then/else, is a constraint the generated reader would not
 #: enforce, so it is refused instead of silently dropped. additionalProperties
@@ -208,8 +209,8 @@ def _escape_braces(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
 
-def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
-    """The dataclass field line and the validation function for one property."""
+def _field(name: str, spec: dict, required: bool) -> tuple[str, str, str]:
+    """The dataclass field line, checker template and annotation for a property."""
     unknown = sorted(set(spec) - _KEYWORDS)
     if unknown:
         raise BindingError(f"property {name!r} uses unsupported keywords {unknown}")
@@ -226,7 +227,8 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
         f"({_JSON_TYPES[kind][1]})" if len(types) > 1 else _JSON_TYPES[kind][1]
         for kind in types
     )
-    lines = [f"def _check_{name}(value: Any) -> {annotation}:"]
+    field = _FIELD_PLACEHOLDER
+    lines = [f"def _check_{field}(value: Any) -> {annotation}:"]
     if "integer" in types:
         # Draft-07 (6.1.1): a number with a zero fractional part is an integer,
         # whatever its notation (10.0, 1e3). Normalize it; booleans stay out.
@@ -236,27 +238,27 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str]:
         ]
     lines += [
         f"    if not ({checks}):",
-        f'        raise ValueError(f"{name}: expected {" or ".join(types)}, got {{value!r}}")',
+        f'        raise ValueError(f"{field}: expected {" or ".join(types)}, got {{value!r}}")',
     ]
     if "pattern" in spec:
         lines += [
             f"    if isinstance(value, str) and re.fullmatch({spec['pattern']!r}, value) is None:",
-            f'        raise ValueError(f"{name}: {{value!r}} does not match {_escape_braces(spec["pattern"])}")',
+            f'        raise ValueError(f"{field}: {{value!r}} does not match {_escape_braces(spec["pattern"])}")',
         ]
     if "minLength" in spec:
         lines += [
             f"    if isinstance(value, str) and len(value) < {spec['minLength']}:",
-            f'        raise ValueError("{name}: shorter than {spec["minLength"]}")',
+            f'        raise ValueError("{field}: shorter than {spec["minLength"]}")',
         ]
     if "minimum" in spec:
         lines += [
             "    if isinstance(value, (int, float)) and not isinstance(value, bool)"
             f" and value < {spec['minimum']}:",
-            f'        raise ValueError("{name}: below {spec["minimum"]}")',
+            f'        raise ValueError("{field}: below {spec["minimum"]}")',
         ]
     lines.append("    return value")
     default = "" if required else " = None"
-    return f"    {name}: {annotation}{default}", "\n".join(lines)
+    return f"    {name}: {annotation}{default}", "\n".join(lines), annotation
 
 
 def render_model(schema: dict, class_name: str, schema_file: str) -> str:
@@ -277,13 +279,37 @@ def render_model(schema: dict, class_name: str, schema_file: str) -> str:
     ordered = [n for n in properties if n in required] + [
         n for n in properties if n not in required
     ]
-    fields, checks = [], []
+    fields, checkers = [], []
     for name in ordered:
         if not name.isidentifier():
             raise BindingError(f"{schema_file}: property {name!r} is not an identifier")
-        line, check = _field(name, properties[name], name in required)
+        line, check, annotation = _field(name, properties[name], name in required)
         fields.append(line)
-        checks.append(check)
+        checkers.append((name, check, annotation))
+
+    grouped: dict[str, list[tuple[str, str]]] = {}
+    for name, check, annotation in checkers:
+        grouped.setdefault(check, []).append((name, annotation))
+    checks: list[str] = []
+    for check, group in grouped.items():
+        if len(group) == 1:
+            name, _annotation = group[0]
+            checks.append(check.replace(_FIELD_PLACEHOLDER, name))
+            continue
+        shared = f"_check_shared_{len(checks)}"
+        checks.append(
+            check.replace(
+                f"def _check_{_FIELD_PLACEHOLDER}(value: Any)",
+                f"def {shared}(value: Any, name: str)",
+            )
+            .replace(_FIELD_PLACEHOLDER, "{name}")
+            .replace('raise ValueError("{name}', 'raise ValueError(f"{name}')
+        )
+        for name, annotation in group:
+            checks.append(
+                f"def _check_{name}(value: Any) -> {annotation}:\n"
+                f"    return {shared}(value, {name!r})"
+            )
     description = textwrap.fill(schema.get("description", "").strip(), width=79)
     reads = "\n".join(
         f"            {name!r}: _check_{name}(data[{name!r}])," for name in required

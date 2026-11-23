@@ -165,6 +165,30 @@ def test_the_reference_model_comes_from_the_captured_schema(generator) -> None:
     assert list(ArtifactReference.__dataclass_fields__) == list(schema["properties"])
 
 
+def test_identical_property_constraints_share_one_checker(generator) -> None:
+    schema = {
+        "$id": "urn:test:1",
+        "type": "object",
+        "properties": {
+            "artifact_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        },
+        "required": ["artifact_id", "digest"],
+    }
+
+    module = generator.render_model(schema, "Model", "test@1.json")
+
+    assert module.count("def _check_shared_0") == 1
+    assert (
+        "def _check_artifact_id(value: Any) -> str:\n"
+        "    return _check_shared_0(value, 'artifact_id')"
+    ) in module
+    assert (
+        "def _check_digest(value: Any) -> str:\n"
+        "    return _check_shared_0(value, 'digest')"
+    ) in module
+
+
 def test_a_changed_schema_changes_the_generated_model(generator) -> None:
     schema = _reference_schema(generator)
     schema["properties"]["size"]["minimum"] = 1
