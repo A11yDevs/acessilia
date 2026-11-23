@@ -30,6 +30,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Date the apt security refresh
+        id: apt-refresh
+        # The image's apt layer is rebuilt once a day from the GHA cache (#753).
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -65,6 +70,7 @@ jobs:
           push: false
           tags: acessilia:release
           build-args: |
+            APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
             GIT_COMMIT=${{ github.sha }}
             IMAGE_TAG=${{ github.ref_name }}
           cache-from: type=gha,scope=production
@@ -98,6 +104,7 @@ jobs:
           # Release images must also carry the build identity; the verification
           # build above already passes it, so the published image must match.
           build-args: |
+            APT_REFRESH=${{ steps.apt-refresh.outputs.date }}
             GIT_COMMIT=${{ github.sha }}
             IMAGE_TAG=${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
