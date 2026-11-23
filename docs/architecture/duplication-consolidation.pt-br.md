@@ -128,6 +128,18 @@ store cobrem as duas ações.
 linhas → **15 grupos / 34 funções / 319 linhas**. O grupo de pausa/retomada do
 middleware desaparece.
 
+## Sétima consolidação: o normalizador de strings opcionais em branco
+
+`VisionOutput.normalize_empty_formula_latex` e
+`DataOutput.normalize_empty_optional_strings` implementavam a mesma regra: uma
+string opcional em branco vinda do provider significa campo ausente. Os dois
+validadores agora delegam para `_blank_to_none`; os testes existentes cobrem
+`formula_latex`, `latex` e `caption`.
+
+**Delta medido no commit de código deste PR:** 15 grupos / 34 funções / 319
+linhas → **14 grupos / 32 funções / 309 linhas**. O grupo de normalizadores do
+output schema desaparece.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -150,7 +162,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
 | 14 | `swap_low_agreement` (2/52) | Sensível a comportamento: caracterizar a política de troca primeiro. |
 | 15 | `process_join_tail` em fusion/page-level (2/30) | Avaliar junto com o follow-up dos agentes. |
-| 16 | Normalizadores de output schema (2/10) | Candidato a helper pequeno. |
+| 16 | Normalizadores de output schema (2/10) | **Consolidado:** `_blank_to_none` compartilhado. |
 | 17 | `select_greedy` / `select_table` do table specialist (2/40) | Sensível a comportamento: testes de seleção de tabela primeiro. |
 | 18 | `_sha256` do core em builder/domain bundle (2/12) | Candidato a consolidação de utilitário. |
 | 19 | Wrappers async de math (2/12) | Candidato a helper pequeno. |
@@ -175,7 +187,7 @@ grupos restantes não foram alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.
