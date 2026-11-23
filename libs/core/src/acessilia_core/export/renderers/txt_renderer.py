@@ -8,11 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from docstruct.export.txt import (  # noqa: F401
-    _render_block,
-    _render_section,
-    document_to_txt_lines,
-)
+from docstruct.export.txt import _render_block, _render_section, document_to_txt_lines  # noqa: F401
 
 
 def render_txt(
