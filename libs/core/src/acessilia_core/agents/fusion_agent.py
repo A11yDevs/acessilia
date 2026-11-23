@@ -37,6 +37,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+from acessilia_core.agents._tool_mixins import join_tail_tool
 from acessilia_core.agents.agno_support import build_agent
 from acessilia_core.config import CoreConfig, ToolboxConfig
 from docstruct.fusion.hf_end import move_hf_to_end
@@ -215,9 +216,9 @@ class FusionAgent:
         With ``position`` set, applies the position-conditioned rule ``tj3``;
         otherwise applies the plain ``join_tail`` mode.
         """
-        if position is not None:
-            return tailjoin3(blocks, position, max_len, k, bot)
-        return join_tail(blocks, mode, max_len, k)
+        return join_tail_tool(
+            join_tail, tailjoin3, blocks, mode, max_len, k, position, bot
+        )
 
     def process_guard_repetition(
         self,

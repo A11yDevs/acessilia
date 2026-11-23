@@ -24,6 +24,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from acessilia_core.agents._tool_mixins import (
+    join_tail_tool,
+    select_page_tool,
+    swap_low_agreement_tool,
+)
 from acessilia_core.agents.agno_support import build_agent
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.page_select import (
@@ -122,9 +127,9 @@ class PageLevelAgent:
         bot: str = "keep",
     ) -> list[str]:
         """Join the trailing short blocks, plain mode or the ``tj3`` rule."""
-        if position is not None:
-            return tailjoin3(blocks, position, max_len, k, bot)
-        return join_tail(blocks, mode, max_len, k)
+        return join_tail_tool(
+            join_tail, tailjoin3, blocks, mode, max_len, k, position, bot
+        )
 
     def process_move_header_footer_to_end(
         self,
@@ -193,10 +198,16 @@ class PageLevelAgent:
         Returns:
             dict: ``{"text": str, "swapped": bool}``.
         """
-        text, swapped = self.process_select_page(
-            a_text, vlm_text, docling_text, mineru_text, finish, dm, ab
+        return select_page_tool(
+            self.process_select_page,
+            a_text,
+            vlm_text,
+            docling_text,
+            mineru_text,
+            finish,
+            dm,
+            ab,
         )
-        return {"text": text, "swapped": swapped}
 
     def swap_low_agreement(
         self,
@@ -220,10 +231,15 @@ class PageLevelAgent:
         Returns:
             dict: ``{"text": str, "swapped": bool}``.
         """
-        text, swapped = self.process_swap_low_agreement(
-            base_text, alt_text, docling_text, mineru_text, agree_thr, min_alt_frac
+        return swap_low_agreement_tool(
+            self.process_swap_low_agreement,
+            base_text,
+            alt_text,
+            docling_text,
+            mineru_text,
+            agree_thr,
+            min_alt_frac,
         )
-        return {"text": text, "swapped": swapped}
 
     def page_agreement(self, a_text: str, b_text: str) -> dict[str, Any]:
         """Calcula a concordância entre duas páginas.

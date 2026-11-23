@@ -1,4 +1,9 @@
 {
+  "_tool_mixins": {
+    "kind": "support",
+    "class": "operational",
+    "lifecycle": "legacy"
+  },
   "adjudication_agent": {
     "kind": "agent",
     "class": "operational",

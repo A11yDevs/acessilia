@@ -93,6 +93,7 @@ Measured on `develop` at `a1a68a7b`.
 | `agents/prompt_tools` | operational, legacy | Loads and assembles the vision and region prompts (`agents/prompts/`) | `vision_agent`, `data_agent` | Moves with those agents, with the prompts |
 | `agents/output_schemas` | operational, legacy | Validated output contracts of the vision and data agents | the two agents, enrichment and the inspection handler | Moves with those agents; the result contract the core reads stays as a capability contract |
 | `agents/run_helpers` | operational, legacy | Reads the result of an Agno run | `output_schemas` | Moves with `output_schemas` |
+| `agents/_tool_mixins` | operational, legacy | Shared bodies of the page-selection and tail-join Agno tool envelopes | `adjudication_agent`, `page_level_agent`, `fusion_agent` | Moves with those agents |
 | `agents/agno_support` | infrastructure, active | Builds Agno agents when the optional stack is installed | the agents above, `planning/planner_agent`, `execution/executor` | Stays: the planner and the executor use it |
 | `agents/ai_client` | infrastructure, active | The model client for each `AI_CLIENT` (Ollama, OpenRouter, the Toolbox gateway) | `vision_agent`, `data_agent`, `backend/api/routes/health` | Stays while the core makes model calls (ADR-0012); a strategic LLM (#619) needs it |
 | `agents/model_calls` | infrastructure, active | The application's execution port for synchronous model calls | `pipeline/orchestrator`, the two agents, `backend/services/model_calls` | Stays while the core makes model calls |

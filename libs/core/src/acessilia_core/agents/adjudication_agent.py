@@ -25,6 +25,7 @@ import difflib
 from collections import Counter
 from typing import Any
 
+from acessilia_core.agents._tool_mixins import select_page_tool, swap_low_agreement_tool
 from acessilia_core.agents.agno_support import build_agent
 from docstruct.fusion.adjudication import (
     clean_transcription,
@@ -324,10 +325,16 @@ class AdjudicationAgent:
         Returns:
             dict: ``{"text": str, "swapped": bool}``.
         """
-        text, swapped = self.process_select_page(
-            a_text, vlm_text, docling_text, mineru_text, finish, dm, ab
+        return select_page_tool(
+            self.process_select_page,
+            a_text,
+            vlm_text,
+            docling_text,
+            mineru_text,
+            finish,
+            dm,
+            ab,
         )
-        return {"text": text, "swapped": swapped}
 
     def swap_low_agreement(
         self,
@@ -351,10 +358,15 @@ class AdjudicationAgent:
         Returns:
             dict: ``{"text": str, "swapped": bool}``.
         """
-        text, swapped = self.process_swap_low_agreement(
-            base_text, alt_text, docling_text, mineru_text, agree_thr, min_alt_frac
+        return swap_low_agreement_tool(
+            self.process_swap_low_agreement,
+            base_text,
+            alt_text,
+            docling_text,
+            mineru_text,
+            agree_thr,
+            min_alt_frac,
         )
-        return {"text": text, "swapped": swapped}
 
     def oracle_headroom(
         self,
