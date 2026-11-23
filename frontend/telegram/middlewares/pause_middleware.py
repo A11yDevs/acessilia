@@ -19,7 +19,7 @@ def get_paused_chats() -> set[int]:
         try:
             _paused_chats = get_state_store().load_paused_chats()
         except sqlite3.Error as error:
-            logger.warning("Telegram state store unavailable: %s", error)
+            logger.warning("Telegram state store unavailable: {}", error)
             _paused_chats = set()
     return _paused_chats
 
@@ -38,7 +38,7 @@ def _set_paused(chat_id: int, *, paused: bool) -> None:
         else:
             store.resume_chat(chat_id)
     except sqlite3.Error as error:
-        logger.warning("Telegram state store unavailable: %s", error)
+        logger.warning("Telegram state store unavailable: {}", error)
 
 
 def pause_chat(chat_id: int) -> None:
