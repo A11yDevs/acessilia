@@ -35,7 +35,6 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 22. [Coverage overlap and redundancy candidates](testing/overlap.md) — PR 2 of #644: the per-test coverage contexts, the Jaccard matrix, the signature-based coverage subsumption and why no test is removed on coverage evidence alone. (Brazilian Portuguese: [pt-BR version](testing/overlap.pt-br.md))
 23. [Mutation testing and test subsumption](testing/mutation.md) — PR 3 of #644: the bounded mutation experiment on `flood` and `equations`, the three surviving boundary mutants, the subsumption matrix and its cost/benefit. (Brazilian Portuguese: [pt-BR version](testing/mutation.pt-br.md))
 24. [Test optimization results](testing/optimizations.md) — PR 4 of #644: the cached field specifications that cut the docstruct suite time, the three boundary tests that raised the `flood_guard` mutation score to 100%, and the measured before/after comparison. (Brazilian Portuguese: [pt-BR version](testing/optimizations.pt-br.md))
-24. [Test optimization results](testing/optimizations.md) — PR 4 of #644: the cached field specifications that halved the suite wall time, the three boundary tests that raised the `flood_guard` mutation score to 100%, and the measured before/after comparison. (Brazilian Portuguese: [pt-BR version](testing/optimizations.pt-br.md))
 
 ---
 
