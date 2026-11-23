@@ -100,13 +100,27 @@ como reclassificadas, não consolidadas, até a política de uma instrução ser
 decidida para a guarda de CI do PR 5; a
 [#749](https://github.com/A11yDevs/acessilia/issues/749) acompanha essa decisão.
 
+## Quinta consolidação: os helpers de comandos do Telegram
+
+Os cinco comandos de modo (`/ocr`, `/detalhado`, `/medio`, `/baixo` e `/normal`)
+repetiam os mesmos dois passos: guardar o modo do próximo arquivo para o chat e
+tópico do remetente e enviar a confirmação localizada. Agora compartilham
+`_set_mode`. O par pausar/retomar compartilha `_set_pause`, que recebe a ação
+(`pause_chat` ou `resume_chat`) e o id da resposta. Nomes, aliases e textos
+visíveis não mudam; os testes parametrizados cobrem todos os modos e as duas
+ações de pausa.
+
+**Delta medido no commit de código deste PR:** 17 grupos / 41 funções / 381
+linhas → **15 grupos / 34 funções / 324 linhas**. O grupo dos cinco modos e o
+grupo pausar/retomar desaparecem.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
 
 | # | Grupo | Disposição |
 |---:|---|---|
-| 0 | Handlers do Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | Adiar para um PR de frontend: confirmar diferenças de texto e menu antes de extrair um helper de comando. |
+| 0 | Handlers do Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | **Consolidado:** `_set_mode` compartilhado; textos e aliases não mudam. |
 | 1 | Leitores de dataset gerados do SDK (5/15) | Arquivo gerado (`_dataset_generated.py`): corrigir o gerador, não as funções geradas. |
 | 2 | Escritores de schema do core `write_*_schema` (4/33) | **Consolidado:** `schema_files.write_schema` compartilhado, com testes de writer/schema. |
 | 3 | Helpers de config do core `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Adiar: os dataclasses de configuração ao redor diferem. |
@@ -118,7 +132,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 9 | `acquire_lock` do frontend (2/36) | **Consolidado:** o console script compartilha `frontend.run` e o lock dele. |
 | 10 | `startup` do frontend (2/107) | **Consolidado:** a caracterização cobre composição das interfaces e shutdown. |
 | 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidato a helper pequeno; baixa prioridade. |
-| 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | Adiar: texto de comando visível ao usuário. |
+| 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidado:** `_set_pause` compartilhado; textos não mudam. |
 | 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
 | 14 | `swap_low_agreement` (2/52) | Sensível a comportamento: caracterizar a política de troca primeiro. |
 | 15 | `process_join_tail` em fusion/page-level (2/30) | Avaliar junto com o follow-up dos agentes. |
@@ -135,18 +149,18 @@ grupos introduzidos por PRs posteriores: `pause_chat`/`resume_chat` (2/14) e as
 duas funções de depreciação `__getattr__` em `table_ast`/`validators` (2/20);
 eles são acompanhados separadamente das linhas do baseline.
 
-Os grupos restantes são menores ou sensíveis a comportamento. As cópias de
-comandos do Telegram precisam de revisão do texto visível, enquanto a seleção
-dos agentes e a seleção de tabelas precisa de caracterização antes da extração.
-Cada consolidação deve manter seu próprio PR focado; os grupos restantes não
-foram alterados aqui.
+Os grupos restantes são menores ou sensíveis a comportamento. A seleção dos
+agentes e a seleção de tabelas precisa de caracterização antes da extração,
+enquanto os helpers de config e os leitores gerados continuam adiados pelos
+motivos da tabela. Cada consolidação deve manter seu próprio PR focado; os
+grupos restantes não foram alterados aqui.
 
 ## Reprodução
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

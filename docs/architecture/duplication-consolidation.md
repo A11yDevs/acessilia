@@ -99,13 +99,26 @@ as reclassified rather than consolidated until the detector's one-statement
 policy is decided for the CI guard of PR 5; [#749](https://github.com/A11yDevs/acessilia/issues/749)
 tracks that decision.
 
+## Fifth consolidation: the Telegram command helpers
+
+The five mode commands (`/ocr`, `/detalhado`, `/medio`, `/baixo` and `/normal`)
+repeated the same two steps: store the next-file mode for the sender's chat and
+topic, then send the localized confirmation. They now share `_set_mode`. The
+pause/resume pair shares `_set_pause`, which receives the action (`pause_chat`
+or `resume_chat`) and the reply id. Command names, aliases and user-facing copy
+are unchanged; the parameterized tests cover every mode and both pause actions.
+
+**Measured delta on this PR's code commit:** 17 groups / 41 functions / 381
+lines → **15 groups / 34 functions / 324 lines**. The five-mode group and the
+pause/resume group disappear.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
 
 | # | Group | Disposition |
 |---:|---|---|
-| 0 | Frontend Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | Defer to a frontend PR: confirm user-facing copy and menu differences before extracting a command helper. |
+| 0 | Frontend Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | **Consolidated:** shared `_set_mode`; copy and aliases unchanged. |
 | 1 | Generated SDK dataset readers (5/15) | Generated file (`_dataset_generated.py`): fix the generator, not the generated functions. |
 | 2 | Core schema writers `write_*_schema` (4/33) | **Consolidated:** shared `schema_files.write_schema`, with writer/schema tests. |
 | 3 | Core config helpers `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Defer: the surrounding config dataclasses differ. |
@@ -117,7 +130,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 9 | Frontend `acquire_lock` (2/36) | **Consolidated:** the console script shares `frontend.run` and its lock. |
 | 10 | Frontend `startup` (2/107) | **Consolidated:** characterization covers interface composition and shutdown. |
 | 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | Candidate small helper; low priority. |
-| 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | Defer: user-facing command copy. |
+| 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidated:** shared `_set_pause`; copy unchanged. |
 | 13 | Agent `select_page` in adjudication/page-level (2/56) | Behaviour-sensitive: characterize selection policy first. |
 | 14 | Agent `swap_low_agreement` (2/52) | Behaviour-sensitive: characterize the swap policy first. |
 | 15 | `process_join_tail` in fusion/page-level (2/30) | Evaluate with the agent follow-up. |
@@ -134,17 +147,18 @@ groups introduced by later PRs: `pause_chat`/`resume_chat` (2/14) and the two
 deprecation `__getattr__` functions in `table_ast`/`validators` (2/20); they are
 tracked separately from the baseline rows.
 
-The remaining groups are smaller or behaviour-sensitive. The Telegram command
-copies need user-facing copy review, while agent selection and table selection
-need characterization before extraction. Each consolidation should keep its own
-focused PR; the remaining groups were not changed here.
+The remaining groups are smaller or behaviour-sensitive. Agent selection and
+table selection need characterization before extraction, while the config
+helpers and generated readers stay deferred for the reasons in the table. Each
+consolidation should keep its own focused PR; the remaining groups were not
+changed here.
 
 ## Reproduction
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py tests/test_telegram_client.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

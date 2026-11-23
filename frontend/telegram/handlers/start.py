@@ -1,5 +1,6 @@
 import shutil
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime
 
 from aiogram import Router
@@ -116,6 +117,12 @@ async def cmd_formats(message: Message) -> None:
     )
 
 
+async def _set_mode(message: Message, mode: str, reply: str) -> None:
+    """Store the next-file mode for this chat and topic, then confirm it."""
+    user_context.user_modes[user_context.get_user_state_key(message)] = mode
+    await message.answer(t(reply))
+
+
 @router.message(Command("ocr"))
 async def cmd_ocr(message: Message) -> None:
     """
@@ -124,8 +131,7 @@ async def cmd_ocr(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /ocr command; no default (required).
     """
-    user_context.user_modes[user_context.get_user_state_key(message)] = "ocr"
-    await message.answer(t(MSG_MODE_OCR_ON))
+    await _set_mode(message, "ocr", MSG_MODE_OCR_ON)
 
 
 @router.message(Command("detalhado"))
@@ -137,8 +143,7 @@ async def cmd_detailed(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /detalhado (or /detailed) command; no default (required).
     """
-    user_context.user_modes[user_context.get_user_state_key(message)] = "detalhado"
-    await message.answer(t(MSG_MODE_DETAILED_ON))
+    await _set_mode(message, "detalhado", MSG_MODE_DETAILED_ON)
 
 
 @router.message(Command("medio"))
@@ -150,8 +155,7 @@ async def cmd_medium(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /medio (or /medium) command; no default (required).
     """
-    user_context.user_modes[user_context.get_user_state_key(message)] = "medio"
-    await message.answer(t(MSG_MODE_MEDIO_ON))
+    await _set_mode(message, "medio", MSG_MODE_MEDIO_ON)
 
 
 @router.message(Command("baixo"))
@@ -163,14 +167,13 @@ async def cmd_low(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /baixo (or /low) command; no default (required).
     """
-    user_context.user_modes[user_context.get_user_state_key(message)] = "baixo"
-    await message.answer(t(MSG_MODE_BAIXO_ON))
+    await _set_mode(message, "baixo", MSG_MODE_BAIXO_ON)
 
 
 @router.message(Command("normal"))
 async def cmd_normal(message: Message) -> None:
-    user_context.user_modes[user_context.get_user_state_key(message)] = "medio"
-    await message.answer(t(MSG_MODE_NORMAL_ON))
+    """Activate medium detail under the historical /normal alias."""
+    await _set_mode(message, "medio", MSG_MODE_NORMAL_ON)
 
 
 @router.message(Command("status"))
@@ -326,6 +329,14 @@ async def cmd_cancel(message: Message) -> None:
     await message.answer(t(MSG_TASK_CANCEL_DONE).format(task_id=cancelled_id))
 
 
+async def _set_pause(
+    message: Message, action: Callable[[int], None], reply: str
+) -> None:
+    """Apply the pause/resume action to this chat, then confirm it."""
+    action(message.chat.id)
+    await message.answer(t(reply))
+
+
 @router.message(Command("desativar"))
 @router.message(Command("deactivate"))
 async def cmd_desativar(message: Message) -> None:
@@ -335,8 +346,7 @@ async def cmd_desativar(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /desativar (or its English alias /deactivate) command; no default (required).
     """
-    pause_chat(message.chat.id)
-    await message.answer(t(MSG_BOT_PAUSED))
+    await _set_pause(message, pause_chat, MSG_BOT_PAUSED)
 
 
 @router.message(Command("ativar"))
@@ -348,8 +358,7 @@ async def cmd_ativar(message: Message) -> None:
     Args:
         message (Message): Incoming aiogram /ativar (or its English alias /activate) command; no default (required).
     """
-    resume_chat(message.chat.id)
-    await message.answer(t(MSG_BOT_RESUMED))
+    await _set_pause(message, resume_chat, MSG_BOT_RESUMED)
 
 
 @router.message(Command("feedback"))
