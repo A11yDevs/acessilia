@@ -105,15 +105,17 @@ class ToolboxAdjudicateClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> PageJudgement:
         """Typed published result of :meth:`judge_page`; raw compatibility is unchanged."""
-        result = await self.judge_page(
-            candidate_a=candidate_a,
-            candidate_b=candidate_b,
-            file_path=file_path,
-            artifact_id=artifact_id,
-            prompt=prompt,
-            use_remote_cache=use_remote_cache,
+        return read_document(
+            await self.judge_page(
+                candidate_a=candidate_a,
+                candidate_b=candidate_b,
+                file_path=file_path,
+                artifact_id=artifact_id,
+                prompt=prompt,
+                use_remote_cache=use_remote_cache,
+            ),
+            PageJudgement,
         )
-        return read_document(result, PageJudgement)
 
     async def transcribe_region_result(
         self,

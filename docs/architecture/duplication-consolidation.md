@@ -9,6 +9,7 @@ This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). 
 
 - A structural group is actionable only when the functions are semantically interchangeable for the same callers. Equal normalized control flow is not enough.
 - Generated code is changed through its generator, never by editing the generated file.
+- The duplicate detector ignores bodies with fewer than two statements. A one-statement wrapper is not evidence of consolidation; the exemption is recorded here so it does not silently lower the metric.
 - Behaviour-sensitive flows (agent selection, frontend startup) need a characterization test before extraction.
 - A cross-component duplicate needs a single owner. Locale parsing is i18n semantics and the generic parser now lives in the SDK (`acessilia_sdk.i18n`); the core keeps catalogs and policies, the SDK owns request context and translation, and the service reads the environment and delegates the parse.
 
@@ -72,25 +73,31 @@ before it takes the lock.
 lines → **20 groups / 49 functions / 499 lines**. The `_is_process_running`,
 `acquire_lock` and `startup` groups disappear.
 
-## Fourth consolidation: the SDK typed-result wrappers
+## Fourth triage: the SDK typed-result wrappers
 
-The three SDK groups were not independent validators. Validation already lived
-in the shared readers: `read_result`/`read_document` for execute results,
+The three SDK groups are false positives for consolidation. Validation already
+lived in the shared readers: `read_result`/`read_document` for execute results,
 `read_layout`/`read_manifest` for the layout and structure documents. The
 duplicate was only the two-statement forwarding shape (`await` the raw client
-method into a temporary, then pass it to the reader). Each typed accessor now
-inlines the awaited call into its reader, so the public signatures and the
-reader behaviour stay the same while the forwarding is explicit and the
-temporary disappears.
+method into a temporary, then pass it to the reader). The accessors now inline
+the awaited call into their reader, so the public signatures and the reader
+behaviour stay the same while the forwarding is explicit and the temporary
+disappears. `judge_page_result`, which was outside the groups, follows the same
+shape for consistency.
 
-This covers `transcribe_region_result`, `text_spans_result`, `validate_result`,
-`convert_result`, `verbalize_result`, `inspect_result`, `analyze_result` and
-`extract_structure_result`. The existing result-reader and layout-reader tests
-exercise both valid and invalid outputs.
+This covers `judge_page_result`, `transcribe_region_result`, `text_spans_result`,
+`validate_result`, `convert_result`, `verbalize_result`, `inspect_result`,
+`analyze_result` and `extract_structure_result`. The existing result-reader and
+layout-reader tests exercise both valid and invalid outputs.
 
-**Measured delta on this PR's code commit:** 20 groups / 49 functions / 499
-lines → **17 groups / 41 functions / 381 lines**. The three SDK result-reader
-groups disappear.
+The detector now reports 20 groups / 49 functions / 499 lines → **17 groups / 41
+functions / 381 lines**, but this is a detector exemption, not an extraction of
+shared behaviour: every rewritten body has one statement, and `_fingerprint`
+ignores bodies with fewer than two statements. The eight wrappers in those
+groups would be grouped again if that floor changed. The three rows stay recorded
+as reclassified rather than consolidated until the detector's one-statement
+policy is decided for the CI guard of PR 5; [#749](https://github.com/A11yDevs/acessilia/issues/749)
+tracks that decision.
 
 ## Classification of the remaining groups
 
@@ -102,8 +109,8 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 1 | Generated SDK dataset readers (5/15) | Generated file (`_dataset_generated.py`): fix the generator, not the generated functions. |
 | 2 | Core schema writers `write_*_schema` (4/33) | **Consolidated:** shared `schema_files.write_schema`, with writer/schema tests. |
 | 3 | Core config helpers `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Defer: the surrounding config dataclasses differ. |
-| 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | **Consolidated:** the awaited call is inlined into `read_result`/`read_document`. |
-| 5 | SDK result readers in math/media_inspect (3/38) | **Consolidated:** same reader, with the temporary response removed. |
+| 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | **Reclassified:** false positive; the shared reader already owns validation. |
+| 5 | SDK result readers in math/media_inspect (3/38) | **Reclassified:** false positive; inlining is style-only, not extraction. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidated in this PR.** |
 | 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | Trivial; no action. |
 | 8 | Frontend `_is_process_running` (2/26) | **Consolidated:** one runtime behind both entry points, with PID-probe tests. |
@@ -119,7 +126,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 18 | Core `_sha256` in builder/domain bundle (2/12) | Candidate utility consolidation. |
 | 19 | Math async wrappers (2/12) | Candidate small wrapper helper. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidate small helper. |
-| 21 | SDK layout/structure result readers (2/32) | **Consolidated:** envelope extraction is inlined into `read_layout`/`read_manifest`. |
+| 21 | SDK layout/structure result readers (2/32) | **Reclassified:** false positive; the envelope extraction is already shared. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
 The table is anchored to the November baseline. The current tool also reports two
