@@ -8,11 +8,11 @@ here only as deprecated compatibility re-exports: import them from
 """
 from __future__ import annotations
 
-import warnings
 from typing import Any
 
 import docstruct.validation as _docstruct_validation
 from acessilia_core.i18n import t
+from acessilia_core.pipeline._deprecations import _deprecated_attribute
 from acessilia_sdk.i18n.translation import resolve_findings
 
 _DEPRECATED_MSGIDS = (
@@ -71,15 +71,7 @@ def __dir__() -> list[str]:
 
 
 def __getattr__(name: str) -> Any:
-    if name in _DEPRECATED:
-        warnings.warn(
-            f"acessilia_core.pipeline.validators.{name} is deprecated; "
-            "import it from docstruct.validation",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _DEPRECATED[name]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return _deprecated_attribute(__name__, name, "docstruct.validation", _DEPRECATED)
 
 
 def _resolve(findings: list) -> list[str]:
