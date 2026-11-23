@@ -324,10 +324,20 @@ def parameterized_families(tests: dict[str, frozenset[str]]) -> list[Family]:
     return families
 
 
+def _has_oversized_elements(
+    tests: dict[str, frozenset[str]], max_element_tests: int
+) -> bool:
+    frequency: Counter[str] = Counter()
+    for elements in tests.values():
+        frequency.update(elements)
+    return any(count > max_element_tests for count in frequency.values())
+
+
 def _summary(
     tests: dict[str, frozenset[str]],
     pairs: Sequence[Pair],
     subsets: Sequence[CoverageSubset],
+    max_element_tests: int,
 ) -> dict[str, int | float]:
     all_elements = set().union(*tests.values()) if tests else set()
     return {
@@ -376,13 +386,15 @@ def build_report(
             key=lambda item: (-len(item[1]), item[0]),
         )
     ]
-    summary = _summary(tests, pairs, subsets)
+    summary = _summary(tests, pairs, subsets, max_element_tests)
     summary.update(
         {
             "families": len(families),
             "identical_families": sum(family.identical for family in families),
             "zero_exclusive_tests": len(zero_exclusive),
-            "pair_search_complete": False,
+            "pair_search_complete": not _has_oversized_elements(
+                tests, max_element_tests
+            ),
             "pair_search_cap": max_element_tests,
         }
     )

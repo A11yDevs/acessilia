@@ -95,6 +95,23 @@ def test_similarity_pairs_use_jaccard_and_minimum_shared() -> None:
     assert pairs[0].exclusive_b == 1
 
 
+def test_pair_search_is_marked_incomplete_only_when_a_line_is_capped() -> None:
+    tests = {
+        f"tests::test_{index}": frozenset({"common", f"own:{index}"})
+        for index in range(55)
+    }
+    report = overlap.build_report(
+        tests,
+        coverage_file=Path(".coverage"),
+        threshold=0.8,
+        min_shared=1,
+        max_element_tests=50,
+        top=10,
+    )
+
+    assert report["summary"]["pair_search_complete"] is False
+
+
 def test_a_line_covered_by_too_many_tests_is_ignored() -> None:
     tests = {
         f"tests::test_{index}": frozenset({"common:1", f"own:{index}"})
@@ -177,7 +194,7 @@ def test_build_report_keeps_the_top_pairs_and_zero_exclusive_tests() -> None:
     assert report["summary"]["tests"] == 2
     assert report["summary"]["pairs"] == 1
     assert report["summary"]["coverage_subsets"] == 1
-    assert report["summary"]["pair_search_complete"] is False
+    assert report["summary"]["pair_search_complete"] is True
     assert report["summary"]["pair_search_cap"] == 50
     assert report["pairs"][0]["similarity"] == 1.0
     assert report["coverage_subsets"][0]["subsumed"] == "tests::test_a"

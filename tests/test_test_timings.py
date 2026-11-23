@@ -159,6 +159,57 @@ def test_combine_runs_reports_median_and_range() -> None:
     assert "12.00 (10.00–14.00)" in summary
 
 
+def test_combine_runs_keeps_a_failed_run_visible() -> None:
+    failed = {
+        "label": "app",
+        "tests": 0,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.0,
+        "wall_seconds": 2.0,
+        "error": "pytest crashed",
+    }
+    runs = [
+        {**_record("app", 9.0, 10.0, 86.0), "p50_seconds": 0.1},
+        failed,
+        {**_record("app", 11.0, 14.0, 86.0), "p50_seconds": 0.3},
+    ]
+
+    combined = timings.combine_runs(runs)
+
+    assert combined["failed"] == 1
+    assert combined["error"] == "pytest crashed"
+    assert combined["exit_code"] == 1
+    assert combined["p50_seconds"] == 0.2
+
+
+def test_combine_runs_omits_missing_percentiles_and_renders_safely() -> None:
+    failed = {
+        "label": "app",
+        "tests": 0,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.0,
+        "wall_seconds": 2.0,
+        "error": "pytest crashed",
+    }
+
+    combined = timings.combine_runs([failed])
+
+    assert "p50_seconds" not in combined
+    assert "p95_seconds" not in combined
+    summary = timings.render_summary(
+        {
+            "environment": {"revision": "a" * 40, "python": "3.12.13", "xdist_workers": 4},
+            "suites": [combined],
+            "totals": {"tests": 0, "junit_seconds": 0.0, "wall_seconds": 2.0},
+        }
+    )
+    assert "| app | 0 | 1 | 0.00 | 2.00 | — |" in summary
+
+
 def test_combine_runs_rejects_an_empty_list() -> None:
     with pytest.raises(ValueError, match="at least one run"):
         timings.combine_runs([])
@@ -363,6 +414,25 @@ def test_main_collect_rejects_a_truncated_report(
 
     assert status == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_main_collect_rejects_repeat_with_report_mode(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    status = timings.main(
+        [
+            "collect",
+            "--report",
+            f"app={tmp_path / 'results.xml'}",
+            "--repeat",
+            "2",
+            "--output",
+            str(tmp_path / "baseline.json"),
+        ]
+    )
+
+    assert status == 2
+    assert "--repeat is only valid with --run" in capsys.readouterr().err
 
 
 def test_main_collect_rejects_a_non_positive_repeat(

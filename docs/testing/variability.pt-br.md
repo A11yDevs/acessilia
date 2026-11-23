@@ -19,8 +19,12 @@ prova.
 ```bash
 uv run --extra dev python scripts/tests/collect_timings.py collect \
   --run --repeat 3 \
-  --output docs/testing/variability.json \
-  --summary docs/testing/variability.md
+  --output var/timings/variability.json \
+  --summary var/timings/variability.md
+
+# Copy the machine-readable record and a generated summary when refreshing
+cp var/timings/variability.json docs/testing/variability.json
+cp var/timings/variability.md docs/testing/variability.md
 ```
 
 Cada suíte roda três vezes na mesma invocação. O registro da suíte mantém:
@@ -37,21 +41,22 @@ apresentada como medição estável.
 
 | Suíte | Testes | Parede mediana (s) | Faixa (s) | JUnit mediano (s) |
 |---|---:|---:|---:|---:|
-| Aplicação | 3.298 | 247,39 | 193,14–247,74 | 234,83 |
-| docstruct | 1.863 | 47,54 | 30,79–48,78 | 37,80 |
-| SDK | 702 | 41,88 | 31,91–44,11 | 40,10 |
-| core | 1.397 | 59,50 | 53,74–60,02 | 57,67 |
-| **Total** | **7.260** | **396,31** | — | **370,39** |
+| Aplicação | 3.303 | 254,45 | 249,25–369,78 | 240,99 |
+| docstruct | 1.863 | 74,34 | 62,43–91,27 | 57,55 |
+| SDK | 702 | 34,88 | 28,58–63,61 | 32,62 |
+| core | 1.397 | 116,11 | 88,84–143,81 | 112,83 |
+| **Total** | **7.265** | **479,78** | — | **444,00** |
 
-As faixas são o ponto: a docstruct variou entre 30,8s e 48,8s e a aplicação
-entre 193,1s e 247,7s na mesma sessão. Um atraso observado em uma execução não
+As faixas são o ponto: a docstruct variou entre 62,4s e 91,3s e a aplicação
+entre 249,3s e 369,8s na mesma sessão. Um atraso observado em uma execução não
 deve ser atribuído a uma mudança de código sem medições repetidas e condições de
 máquina comparáveis.
 
 Esta tabela **não** é uma comparação antes/depois. Ela inclui testes e condições
 de carga diferentes dos baselines anteriores; o efeito do cache da docstruct
-continua sendo a observação estável (o teste mais lento fica em torno de 2–3s
-em vez de 23s, não o tempo agregado da suíte).
+continua sendo a observação estável (o teste mais lento fica em torno de 2–6s
+conforme a carga — 6,174s no registro versionado — em vez de 23s, não o tempo
+agregado da suíte).
 
 ## Subsunção de cobertura exaustiva vs. busca de pares
 
@@ -59,11 +64,12 @@ O relatório de sobreposição agora expõe os dois:
 
 - `summary.coverage_subsets` / `coverage_subsets` — relações completas de
   subconjunto entre **assinaturas únicas**, independentes de Jaccard e do limite
-  de apresentação. Esta é a visão exaustiva de subsunção.
+  da busca de pares. As contagens do summary são exaustivas; o array JSON ainda
+  é limitado por `--top`.
 - `summary.pairs` / `pairs` — lista de pares ordenada por Jaccard. Uma linha
-  coberta por mais de `max_element_tests` testes é usada apenas para propor
-  candidatos, então a lista de pares é um **limite inferior**, não um censo
-  completo. O relatório registra `pair_search_complete: false` e
+  coberta por mais de `max_element_tests` testes é removida da geração de
+  candidatos, então pares que compartilham apenas essas linhas ficam de fora; a
+  lista de pares é um **limite inferior**, não um censo completo. O relatório registra `pair_search_complete: false` e
   `pair_search_cap`.
 
 Um par ausente em `pairs` não significa que não existe sobreposição; use

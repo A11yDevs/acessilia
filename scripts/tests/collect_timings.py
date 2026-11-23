@@ -209,14 +209,19 @@ def run_suite(
     root: Path = ROOT,
     work_dir: Path = DEFAULT_WORK_DIR,
     xdist: int = 4,
+    iteration: int | None = None,
 ) -> dict[str, Any]:
     """Run one suite, keeping its JUnit report, coverage JSON and full log."""
     if not work_dir.is_absolute():
         work_dir = root / work_dir
     suite_dir = work_dir / spec.label
+    if iteration is not None:
+        suite_dir /= f"run-{iteration}"
     suite_dir.mkdir(parents=True, exist_ok=True)
     report = suite_dir / "results.xml"
     coverage_dir = work_dir / "coverage" / spec.label
+    if iteration is not None:
+        coverage_dir /= f"run-{iteration}"
     coverage_dir.mkdir(parents=True, exist_ok=True)
     coverage = coverage_dir / "coverage.json"
     log = suite_dir / "pytest.log"
@@ -278,7 +283,7 @@ def _parse_reports(values: Sequence[str]) -> dict[str, Path]:
 
 
 def _median(values: Sequence[float]) -> float | None:
-    return round(statistics.median(values), 3) if values else None
+    return round(statistics.median(values), 4) if values else None
 
 
 def combine_runs(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -290,7 +295,11 @@ def combine_runs(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
         values = [
             float(run[key]) for run in runs if isinstance(run.get(key), (int, float))
         ]
-        record[key] = _median(values)
+        median = _median(values)
+        if median is None:
+            record.pop(key, None)
+        else:
+            record[key] = median
     walls = [
         float(run["wall_seconds"])
         for run in runs
@@ -301,8 +310,22 @@ def combine_runs(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
         record["wall_seconds_max"] = round(max(walls), 3)
     record["runs_count"] = len(runs)
     record["runs"] = list(runs)
-    if any(run.get("exit_code") for run in runs):
-        record["exit_code"] = max(int(run.get("exit_code") or 1) for run in runs)
+    record["failed"] = max(int(run.get("failed", 0)) for run in runs)
+    record["errors"] = max(int(run.get("errors", 0)) for run in runs)
+    errors = [run["error"] for run in runs if run.get("error")]
+    if errors:
+        record["error"] = errors[0]
+    exit_codes = []
+    for run in runs:
+        code = run.get("exit_code")
+        if code is None and (run.get("failed") or run.get("errors")):
+            code = 1
+        if code:
+            exit_codes.append(int(code))
+    if exit_codes:
+        record["exit_code"] = max(exit_codes)
+    else:
+        record.pop("exit_code", None)
     coverage = runs[-1].get("coverage")
     if coverage is not None:
         record["coverage"] = coverage
@@ -350,12 +373,14 @@ def render_summary(baseline: dict[str, Any]) -> str:
             )
         else:
             wall_text = f"{wall:.2f}" if isinstance(wall, (int, float)) else "—"
+        p95 = record.get("p95_seconds")
+        p95_text = f"{p95:.2f}" if isinstance(p95, (int, float)) else "—"
         lines.append(
             f"| {record['label']} | {record.get('tests', 0)} "
             f"| {record.get('failed', 0) + record.get('errors', 0)} "
             f"| {record.get('junit_seconds', 0):.2f} "
             f"| {wall_text} "
-            f"| {record.get('p95_seconds', 0):.2f} | {coverage_text} |"
+            f"| {p95_text} | {coverage_text} |"
         )
     totals = baseline.get("totals", {})
     wall = totals.get("wall_seconds")
@@ -533,8 +558,9 @@ def _collect_run(args: argparse.Namespace) -> dict[str, Any]:
                 root=ROOT,
                 work_dir=args.work_dir,
                 xdist=args.xdist,
+                iteration=index if args.repeat > 1 else None,
             )
-            for _ in range(args.repeat)
+            for index in range(1, args.repeat + 1)
         ]
         records.append(combine_runs(runs) if args.repeat > 1 else runs[0])
     return {
@@ -599,6 +625,9 @@ def _append_summary(path: Path, text: str) -> None:
 
 
 def _handle_collect(args: argparse.Namespace) -> int:
+    if not args.run and args.repeat != 1:
+        print("error: --repeat is only valid with --run", file=sys.stderr)
+        return 2
     if args.run and args.repeat < 1:
         print("error: --repeat must be at least 1", file=sys.stderr)
         return 2

@@ -19,8 +19,12 @@ states exactly what the coverage-overlap pair search does and does not prove.
 ```bash
 uv run --extra dev python scripts/tests/collect_timings.py collect \
   --run --repeat 3 \
-  --output docs/testing/variability.json \
-  --summary docs/testing/variability.md
+  --output var/timings/variability.json \
+  --summary var/timings/variability.md
+
+# Copy the machine-readable record and a generated summary when refreshing
+cp var/timings/variability.json docs/testing/variability.json
+cp var/timings/variability.md docs/testing/variability.md
 ```
 
 Each suite runs three times in the same invocation. The suite record keeps:
@@ -37,21 +41,22 @@ stable measurement.
 
 | Suite | Tests | Wall median (s) | Range (s) | JUnit median (s) |
 |---|---:|---:|---:|---:|
-| Application | 3,298 | 247.39 | 193.14–247.74 | 234.83 |
-| docstruct | 1,863 | 47.54 | 30.79–48.78 | 37.80 |
-| SDK | 702 | 41.88 | 31.91–44.11 | 40.10 |
-| core | 1,397 | 59.50 | 53.74–60.02 | 57.67 |
-| **Total** | **7,260** | **396.31** | — | **370.39** |
+| Application | 3,303 | 254.45 | 249.25–369.78 | 240.99 |
+| docstruct | 1,863 | 74.34 | 62.43–91.27 | 57.55 |
+| SDK | 702 | 34.88 | 28.58–63.61 | 32.62 |
+| core | 1,397 | 116.11 | 88.84–143.81 | 112.83 |
+| **Total** | **7,265** | **479.78** | — | **444.00** |
 
-The ranges are the point: the docstruct suite moved between 30.8s and 48.8s and
-the application between 193.1s and 247.7s in the same session. Delays observed
+The ranges are the point: the docstruct suite moved between 62.4s and 91.3s and
+the application between 249.3s and 369.8s in the same session. Delays observed
 in one run should not be attributed to a code change without repeated
 measurements and comparable machine conditions.
 
 This table is **not** a before/after comparison. It includes tests and load
 conditions different from earlier baselines; the docstruct cache effect remains
-the stable observation (the slowest test stays around 2–3s instead of 23s, not
-the aggregate suite time).
+the stable observation (the slowest test stays around 2–6s depending on load —
+6.174s in the committed record — instead of 23s, not the aggregate suite
+time).
 
 ## Exhaustive coverage subsumption vs. pair search
 
@@ -59,10 +64,12 @@ The overlap report now exposes both:
 
 - `summary.coverage_subsets` / `coverage_subsets` — complete coverage-subset
   relations between **unique signatures**, independent of Jaccard and of the
-  pair-display cap. This is the exhaustive subsumption view.
+  pair-search cap. The summary counts are exhaustive; the JSON array itself is
+  still capped by `--top`.
 - `summary.pairs` / `pairs` — a Jaccard-ranked list of test pairs. A line
-  covered by more than `max_element_tests` tests is used only to propose
-  candidates, so the pair list is a **lower bound**, not a complete pair census.
+  covered by more than `max_element_tests` tests is dropped from candidate
+  generation, so pairs sharing only such lines are missing; the pair list is a
+  **lower bound**, not a complete pair census.
   The report records `pair_search_complete: false` and `pair_search_cap`.
 
 A missing pair in `pairs` does not mean no coverage overlap exists; use
