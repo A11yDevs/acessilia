@@ -235,6 +235,23 @@ linhas → **7 grupos / 15 funções / 213 linhas**. O grupo da propriedade
 uma instrução do detector também se aplica; o helper compartilhado é a extração
 real, não o piso.
 
+## Décima quinta consolidação: os checkers gerados de reference
+
+O modelo gerado `ArtifactReference` tinha dois checkers,
+`_check_artifact_id` e `_check_digest`, idênticos exceto pelo nome do campo. O
+gerador agora agrupa propriedades com o mesmo template de restrições e emite
+um `_check_shared_N(value, name)` mais wrappers de uma linha por campo. As
+mensagens de erro continuam carregando o nome do campo, e a API pública do
+modelo não muda. O teste de atualidade do arquivo gerado e os testes de
+reference cobrem o comportamento; um teste direto do gerador fixa o checker
+compartilhado.
+
+**Delta medido no commit de código deste PR:** 7 grupos / 15 funções / 213
+linhas → **6 grupos / 13 funções / 201 linhas**. O grupo de checkers gerados
+desaparece. Cada wrapper agora tem uma instrução, então o piso de uma instrução
+do detector também se aplica; o checker compartilhado é a extração real, não o
+piso.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -263,7 +280,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 19 | Wrappers async de math (2/12) | **Consolidado:** ciclo de vida `_with_math_client` compartilhado. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | **Consolidado:** caminhada `_math_nodes` compartilhada. |
 | 21 | Leitores de layout/structure do SDK (2/32) | **Reclassificado:** falso positivo; a extração do envelope já é compartilhada. |
-| 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidato a helper pequeno de validação. |
+| 22 | `_check_artifact_id` / `_check_digest` (2/12) | **Consolidado:** o gerador compartilha um checker para restrições idênticas. |
 
 A tabela é ancorada no baseline de novembro. A propriedade `planner`
 compartilhada pelo orchestrator e pelo planning engine introduzida pela #632 e
@@ -282,7 +299,7 @@ alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_reference.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

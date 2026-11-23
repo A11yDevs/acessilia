@@ -20,20 +20,20 @@ SCHEMA_ID = 'urn:a11y-devs:schema:reference:1.0.0'
 REQUIRED: tuple[str, ...] = ('artifact_id', 'digest', 'media_type', 'size', 'store')
 
 
-def _check_artifact_id(value: Any) -> str:
+def _check_shared_0(value: Any, name: str) -> str:
     if not (isinstance(value, str)):
-        raise ValueError(f"artifact_id: expected string, got {value!r}")
+        raise ValueError(f"{name}: expected string, got {value!r}")
     if isinstance(value, str) and re.fullmatch('^sha256:[0-9a-f]{64}$', value) is None:
-        raise ValueError(f"artifact_id: {value!r} does not match ^sha256:[0-9a-f]{{64}}$")
+        raise ValueError(f"{name}: {value!r} does not match ^sha256:[0-9a-f]{{64}}$")
     return value
+
+
+def _check_artifact_id(value: Any) -> str:
+    return _check_shared_0(value, 'artifact_id')
 
 
 def _check_digest(value: Any) -> str:
-    if not (isinstance(value, str)):
-        raise ValueError(f"digest: expected string, got {value!r}")
-    if isinstance(value, str) and re.fullmatch('^sha256:[0-9a-f]{64}$', value) is None:
-        raise ValueError(f"digest: {value!r} does not match ^sha256:[0-9a-f]{{64}}$")
-    return value
+    return _check_shared_0(value, 'digest')
 
 
 def _check_media_type(value: Any) -> str:
