@@ -84,9 +84,12 @@ experimental.
   checks names and types; it does not translate tool schemas into PDDL (no
   generic compiler, #632).
 - CI must parse the composed domain and solve a set of fixture problems with
-  the internal planner. Fast Downward stays optional, as it is in the code
-  (CI does not install it today): the comparison runs wherever it is
-  installed. Adding it to CI is a separate decision.
+  the internal planner and with Fast Downward. Fast Downward stays optional
+  at runtime, as it is in the code. Checking it in CI was left open here; that
+  sub-decision is settled, while this ADR stays Proposed. Since #790, a job
+  runs both backends on the current, single domain (2.4) with Fast Downward
+  from a pinned image. The composed-domain part is **pending**: its fixtures
+  arrive with the fragments (#640, PR 2), and the same job then covers them.
 
 ### State, availability and failure
 

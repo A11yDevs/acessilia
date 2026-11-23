@@ -140,13 +140,17 @@ atual.
 
 ## Backends
 
-O planejador interno é testado contra o domínio 2.4 no CI. O Fast Downward
-26.6 (`aibasel/downward`, `astar(blind())`) foi conferido com ele localmente:
-`libs/core/tests/test_fast_downward_domain.py` roda os dois backends sobre os
-mesmos problemas quando selecionado (`-m fast_downward`; fora da seleção por
-padrão) com `ACESSILIA_FAST_DOWNWARD` apontando para um build do Fast Downward, e eles concordam com e sem catálogo, em `observe` e `enforce`, e com
-nomes repetidos entre tipos. O CI ainda não roda o Fast Downward
-([#790](https://github.com/A11yDevs/acessilia/issues/790)). Os predicados derivados exigem uma busca cujas heurísticas suportem
+Os dois backends são conferidos contra o domínio atual no CI. O job
+`planning backends (Fast Downward)` roda
+`libs/core/tests/test_fast_downward_domain.py` com o Fast Downward 26.6 de uma
+imagem fixada (`scripts/planning/fast_downward.env`, executada por
+`fast_downward_docker.sh`, com `astar(blind())`).
+Os dois backends precisam concordar com e sem catálogo, em `observe` e
+`enforce`, e com nomes repetidos entre tipos. O job falha a menos que cada um desses
+casos tenha rodado e passado ([#790](https://github.com/A11yDevs/acessilia/issues/790)). Localmente
+os testes ficam fora da seleção por padrão; selecione-os com `-m fast_downward`
+e aponte `ACESSILIA_FAST_DOWNWARD` para esse script ou para um build do Fast
+Downward. Os predicados derivados exigem uma busca cujas heurísticas suportem
 axiomas, como o padrão `astar(blind())`.
 
 ## O que a ADR-0029 ainda pede

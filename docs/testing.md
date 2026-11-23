@@ -81,6 +81,19 @@ GitHub Actions workflow `CI`:
   from the wheel, the smoke test from a folder outside the checkout, and the
   table stage from `libs/core/examples/table_stage.py` (ADR-0016, step 6). It is not
   a required check yet, for the same reason as `docstruct alone`.
+- **`planning backends (Fast Downward)`** runs the internal planner and Fast
+  Downward on the current PDDL domain, and fails unless every case it lists
+  passed: a skipped, failed or deleted case fails the job (#790). It feeds the
+  aggregator, so it gates `tests (Python 3.12)`.
+  - The image is pinned by digest in `scripts/planning/fast_downward.env`, the
+    one source for the job and for `scripts/planning/fast_downward_docker.sh`.
+    The job checks the version that file states.
+  - The image (116 MB) comes from Docker Hub. The job caches it under a key
+    derived from that file and retries a failed pull, so a Docker Hub outage
+    fails the gate only before the image is cached.
+  - Locally these tests are deselected. Run them with `-m fast_downward` and
+    `ACESSILIA_FAST_DOWNWARD` pointing to the script, which needs Docker; on
+    an ARM machine the amd64 image runs under emulation.
 - Image delivery waits for the aggregator, the three isolation jobs and the security jobs.
 
 The main suite check does not have a separate collection step: the test run

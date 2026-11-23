@@ -3,6 +3,7 @@
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -96,16 +97,66 @@ def test_the_tests_check_aggregates_all_component_jobs() -> None:
     """The required name stays, but it is green only when every provider succeeded."""
     job = _workflow()["jobs"]["tests"]
 
-    assert set(job["needs"]) == {"quality", "component-tests"}
+    assert set(job["needs"]) == {"quality", "component-tests", "planning-backends"}
     assert job["if"] == "always()"
     steps = {step.get("name"): step for step in job["steps"]}
     verify = steps["Verify provider jobs"]
     assert "needs.quality.result" in verify["env"]["QUALITY"]
     assert "needs.component-tests.result" in verify["env"]["COMPONENTS"]
+    assert "needs.planning-backends.result" in verify["env"]["BACKENDS"]
+    # The loop entry is what makes a failed backend job fail the aggregator.
+    assert '"planning-backends:$BACKENDS"' in verify["run"]
     assert '!= "success"' in verify["run"]
     assert "scripts/check_coverage_thresholds.py" in steps[
         "Check per-component coverage thresholds"
     ]["run"]
+
+
+def test_both_planning_backends_run_on_the_current_domain() -> None:
+    """#790: Fast Downward from one pinned image, and every listed case must pass."""
+    job = _workflow()["jobs"]["planning-backends"]
+    steps = {step.get("name"): step for step in job["steps"]}
+    pinned = (ROOT / "scripts/planning/fast_downward.env").read_text(encoding="utf-8")
+    report = "var/test-results/planning-backends.xml"
+
+    # One source for the image, exported to the job so a runner variable
+    # cannot replace it; the script reads the same file.
+    assert "FAST_DOWNWARD_IMAGE=aibasel/downward@sha256:" in pinned
+    assert "FAST_DOWNWARD_VERSION=" in pinned
+    assert "scripts/planning/fast_downward.env" in steps["Read the pinned Fast Downward image"]["run"]
+    assert "GITHUB_ENV" in steps["Read the pinned Fast Downward image"]["run"]
+    script = (ROOT / "scripts/planning/fast_downward_docker.sh").read_text(encoding="utf-8")
+    assert "fast_downward.env" in script
+
+    cache = steps["Restore the Fast Downward image"]
+    assert "hashFiles('scripts/planning/fast_downward.env')" in cache["with"]["key"]
+    assert 'docker pull --quiet "$FAST_DOWNWARD_IMAGE"' in steps["Load or pull the Fast Downward image"]["run"]
+    assert 'Fast Downward ${FAST_DOWNWARD_VERSION}' in steps["Check the Fast Downward version"]["run"]
+
+    compare = steps["Compare the backends on the current domain"]
+    assert "fast_downward_docker.sh" in compare["env"]["ACESSILIA_FAST_DOWNWARD"]
+    assert "-m fast_downward" in compare["run"]
+    assert 'mkdir -p "$GITHUB_WORKSPACE/var/test-results"' in compare["run"]
+    assert report in compare["run"]
+
+    reject = steps["Reject skipped or missing backend tests"]["run"]
+    assert report in reject
+    assert "raise SystemExit" in reject
+    assert "if passed != EXPECTED" in reject
+    collected = {
+        line.split("::", 1)[1]
+        for line in subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "--collect-only", "-m", "fast_downward",
+             "tests/test_fast_downward_domain.py"],
+            cwd=ROOT / "libs/core", capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
+        if "::" in line
+    }
+    # The job expects exactly the cases the test file has: adding a case
+    # means listing it in the job too.
+    assert collected and all(f'"{name}"' in reject for name in collected)
+    assert reject.count('"test_fast_downward_') == len(collected)
+    assert steps["Upload the backend test report"]["with"]["name"] == "test-report-planning-backends"
 
 
 def test_component_jobs_keep_the_bounded_app_parallelism() -> None:
