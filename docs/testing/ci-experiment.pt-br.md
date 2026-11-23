@@ -75,14 +75,59 @@ aplicação, uma mudança no core seleciona core+app, docstruct seleciona todos 
 consumidores e `scripts/**` é transversal. A amostra ainda contém apenas PRs
 verdes.
 
+### Dimensão de integração e mudanças só de CI
+
+Os PRs de acompanhamento na janela da amostra shadow (#788–#808) exercitaram a
+dimensão `app integration` e mudanças majoritariamente em CI/segurança.
+Reaplicando o seletor atual sobre as listas de arquivos:
+
+| PR | Área alterada | Selecionadas | `integration_required` | Conservadora |
+|---|---|---|---|---|
+| #788 | action de setup compartilhada, workflows, tests | todas | sim | não |
+| #793 | workflow de CI, docs, `pyproject.toml`, tests | todas | sim | não |
+| #795 | workflow de segurança, docs, tests | todas | não | não |
+| #800 | workflow de release, `SECURITY.md`, tests | todas | não | não |
+| #802 | workflow de CI, seletor, docs, tests | todas | sim | não |
+| #807 | workflows CodeQL/segurança, tests | todas | não | não |
+| #808 | seletor, docs, tests | todas | não | não |
+
+`.github/**` e `scripts/**` são transversais, então mudanças só de CI ainda
+selecionam todas as suítes. A flag de integração segue a lista focada: apenas
+os PRs que tocaram `.github/workflows/ci.yml` ou seu suporte de integração a
+selecionaram.
+
+### Replay de falhas históricas
+
+Para testar a direção de risco — uma falha que a suíte completa pega mas o
+conjunto selecionado pularia — o seletor atual foi reaplicado a pull requests
+com falhas conhecidas:
+
+| PR | Execução | Job / passo com falha | Resultado do seletor | Falso negativo? |
+|---|---|---|---|---|
+| #732 | [45001010971](https://github.com/A11yDevs/acessilia/actions/runs/45001010971) | `tests (Python 3.12)` / passo Ruff (quality rodava dentro de tests na época) | todas | não |
+| #726 | [44994569632](https://github.com/A11yDevs/acessilia/actions/runs/44994569632) | testes do core | todas | não |
+| #713 | [44977779847](https://github.com/A11yDevs/acessilia/actions/runs/44977779847) | testes da aplicação | todas | não |
+| #711 | [44976566900](https://github.com/A11yDevs/acessilia/actions/runs/44976566900) | testes da aplicação | sdk, core, app | não |
+| #709 | [44972669665](https://github.com/A11yDevs/acessilia/actions/runs/44972669665) | testes da aplicação | todas | não |
+| #621 | [44683419408](https://github.com/A11yDevs/acessilia/actions/runs/44683419408) | testes da aplicação | todas (conservadora) | não |
+| #781 | [45254071576](https://github.com/A11yDevs/acessilia/actions/runs/45254071576) | testes do core (mais isolado/agregador) | todas (artefato shadow) | não |
+
+O conjunto selecionado continha a suíte que falhou em todas as execuções
+reaplicadas, então esta amostra produziu **zero falsos negativos**. Os replays
+usam o seletor atual sobre a lista de arquivos de cada PR; apenas o #781 tem
+artefato da execução original, e ele usa o schema v1. Isso é evidência, não uma
+prova de completude.
+
 ## Decisão
 
-Nenhum gate seletivo foi adotado. A suíte completa continua obrigatória
-enquanto os artefatos de observação se acumulam. A duplicação de setup dos
-provedores e o caminho crítico do scan da imagem estão na
+Nenhum gate seletivo foi adotado. A suíte completa continua obrigatória. O
+replay de falhas adiciona regressões reais à observação, mas a amostra ainda é
+pequena, a maioria dos replays é retrospectiva e nenhuma execução controlada
+repetida separa a mudança de código da carga da máquina. A duplicação de setup
+dos provedores e o caminho crítico do scan da imagem estão na
 [#778](https://github.com/A11yDevs/acessilia/issues/778). A decisão de gate
-precisa de um conjunto representativo de PRs, falsos negativos observados e
-execuções repetidas que separem a mudança de código da carga da máquina.
+ainda precisa de um conjunto representativo maior e de uma comparação
+controlada.
 
 ## Limitações
 
@@ -90,8 +135,10 @@ execuções repetidas que separem a mudança de código da carga da máquina.
   uma medição controlada.
 - Os job-minutes derivam dos horários de início/fim do GitHub e incluem
   download/setup.
-- Falsos negativos da seleção só podem ser medidos quando a recomendação for
-  comparada com PRs que tiveram falhas conhecidas.
+- A maioria dos replays de falha usa o seletor atual sobre uma lista de
+  arquivos histórica, não o artefato shadow produzido na época; o #781 é a
+  exceção. O replay não detecta um caminho ausente do diff nem uma falha
+  causada por ambiente não representado na lista de arquivos.
 - O experimento deve ser repetido quando os jobs de segurança/imagem mudarem; o
   caminho crítico pode voltar para os testes.
 - Em pull requests o scan da imagem agora é condicional a entradas da imagem
