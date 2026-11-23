@@ -278,13 +278,19 @@ chamadores, ou quando as chamadas por trás dela virarem capacidades da
 Toolbox. Um `*` novo é uma fixação nova, então a guarda o recusa como
 qualquer outra.
 
-### O que a guarda ainda não faz
+### Entre commits
 
-A guarda compara o código com o fixture. Um pull request que muda os dois
-juntos ainda passa, então, entre commits, a allowlist só diminui pela
-revisão. A [#764](https://github.com/A11yDevs/acessilia/issues/764) compara o
-fixture com o da branch base no CI e torna uma exceção nova uma decisão
-arquitetural explícita.
+Os testes comparam o código com o fixture, então um pull request que mude os
+dois juntos ainda passaria por eles. O workflow `docstruct allowlist`
+([#764](https://github.com/A11yDevs/acessilia/issues/764)) também compara o
+fixture com o da branch base (`scripts/check_docstruct_allowlist.py`). Ele
+falha quando um pull request acrescenta um módulo, um importador ou um nome,
+ou reclassifica um módulo como contrato. Trocar um `*` por nomes, remoções e
+mudanças entre classes fixadas passam.
+
+Uma exceção nova é uma decisão arquitetural. O rótulo
+`architecture-exception` transforma a falha num aviso, e o pull request cita
+a ADR ou a issue que a decide.
 
 ## Indicadores
 

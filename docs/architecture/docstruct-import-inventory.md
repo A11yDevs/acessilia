@@ -270,13 +270,19 @@ They are transitional: each goes when its deprecated names have no caller
 left, or when the calls behind it become Toolbox capabilities. A new `*` is a
 new pin, so the guard refuses it like any other.
 
-### What the guard does not do yet
+### Between commits
 
-The guard compares the code with the fixture. A pull request that changes
-both together still passes, so between commits the allowlist only shrinks
-through review. [#764](https://github.com/A11yDevs/acessilia/issues/764)
-compares the fixture with the base branch's in CI, and makes a new exception
-an explicit architectural decision.
+The tests compare the code with the fixture, so a pull request that changes
+both together would still pass them. The `docstruct allowlist` workflow
+([#764](https://github.com/A11yDevs/acessilia/issues/764)) also compares the
+fixture with the base branch's (`scripts/check_docstruct_allowlist.py`). It
+fails when a pull request adds a module, an importer or a name, or
+reclassifies a module as contract. Replacing a `*` with names, removals and
+moves between pinned classes pass.
+
+A new exception is an architectural decision. The `architecture-exception`
+label turns the failure into a warning, and the pull request cites the ADR or
+issue that decides it.
 
 ## Indicators
 

@@ -1,0 +1,41 @@
+name: docstruct allowlist
+
+# The core's docstruct allowlist only shrinks against the base branch (#764,
+# ADR-0028). A separate workflow, so adding or removing the
+# architecture-exception label reruns this check and not the whole CI.
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  shrinks:
+    name: docstruct allowlist only shrinks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Compare the allowlist with the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EXCEPTION: ${{ contains(github.event.pull_request.labels.*.name, 'architecture-exception') }}
+        run: |
+          args=(--base "origin/${BASE_REF}")
+          if [ "${EXCEPTION}" = "true" ]; then args+=(--allow-exceptions); fi
+          python3 scripts/check_docstruct_allowlist.py "${args[@]}"
