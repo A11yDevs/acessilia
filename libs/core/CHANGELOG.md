@@ -8,14 +8,24 @@ Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 `math.verbalize`, through the math transform provider), but they were missing
 from `METHOD_TOOLBOX_REQUIREMENTS`, so the availability gate never checked them
 (#789). They are declared now:
-- in `observe` the plans do not change;
-- in `enforce`, a catalogue without them rules both methods out, and a
-  `verbalize-formula` obligation falls back to `human-review`.
+- in `observe` the plan steps do not change. The problem of a document with
+  formula obligations gains their `requires` facts, so its `problem_sha256` and
+  `plan_id` change; a resumed job keeps the plan checkpoint it has;
+- in `enforce`, a catalogue without them rules both methods out: a
+  `verbalize-formula` obligation falls back to `human-review`, and a
+  `normalize-formula` one to `latex-normalizer`.
 
-An audit of the other 19 undeclared methods found no Toolbox caller. They are
-listed, each with its reason, in `LOCAL_METHODS`
-(`tests/test_toolbox_availability_gate.py`), and a test fails for a method that
-is neither declared nor listed.
+Every other method without Toolbox requirements is classified in
+`planning/toolbox_gate.py`:
+- `LOCAL_METHODS` maps each one to a role and a reason. The roles are
+  `transitional` (document computation still in the core, which ADR-0028 moves
+  to the Toolbox, #804), `validation` (checks work done before planning) and
+  `symbolic` (`human-review`);
+- `NEVER_AVAILABLE_METHODS` holds `table-specialist`, which has a cost but no
+  handler.
+
+Tests fail for a method, with a cost or a handler, that is neither declared nor
+classified, and the transitional set only shrinks.
 
 ## 0.3.9 — the Toolbox catalogue as planning facts (domain 2.4)
 

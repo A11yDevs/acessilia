@@ -282,10 +282,17 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
   cada documento ser planejado (veja abaixo).
 
   Um método fora da tabela nunca é conferido: no `enforce` ele continua
-  executável qualquer que seja o catálogo. Por isso todo método de
-  `DEFAULT_METHOD_COSTS` está declarado ali ou listado como local, com o motivo,
-  em `LOCAL_METHODS` (`libs/core/tests/test_toolbox_availability_gate.py`), e um
-  teste falha para um método que não está em nenhum dos dois (#789).
+  executável qualquer que seja o catálogo. Por isso todo método, com custo ou
+  handler, está declarado ali ou classificado ao lado dela em
+  `planning/toolbox_gate.py`, e um teste falha para um que não esteja em
+  nenhum dos dois (#789):
+  - `LOCAL_METHODS` dá a cada método sem requisitos de Toolbox um papel e um
+    motivo. `transitional` é computação documental ainda no Core: o estado
+    atual, não uma autorização permanente. A ADR-0028 a leva para capacidades
+    da Toolbox (#804), e o conjunto só encolhe. `validation` confere trabalho
+    feito antes do planejamento, que vira uma ação planejada (ADR-0029).
+    `symbolic` é uma decisão do workflow que fica no Core (`human-review`);
+  - `NEVER_AVAILABLE_METHODS` lista métodos com custo mas sem handler.
 
 #### Gate de disponibilidade
 
@@ -307,7 +314,7 @@ do primário não pode ser lido, o `enforce` falha fechado, como descrito abaixo
 
 | `TOOLBOX_AVAILABILITY_GATE` | Efeito |
 |---|---|
-| `observe` (padrão) | Registra no log o que seria removido e grava em `canonical_metadata.pddl_toolbox_availability`; o plano não muda |
+| `observe` (padrão) | Registra no log o que seria removido e grava em `canonical_metadata.pddl_toolbox_availability`; os passos do plano não mudam |
 | `enforce` | Remove esses métodos do plano e de todos os replanejamentos do documento. Quando o catálogo não pode ser lido e o último snapshot válido tem mais de `TOOLBOX_CATALOG_STALE_SECONDS`, todo método com requisitos da Toolbox é removido (fail closed) |
 | `off` | Sem verificação |
 

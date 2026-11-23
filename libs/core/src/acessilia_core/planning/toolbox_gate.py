@@ -61,8 +61,8 @@ def _provider(config: CoreConfig, key: str) -> str:
 
 #: Method -> Toolbox requirements, resolved from the run's config when
 #: evaluated, so the providers checked are the ones the run calls. Every
-#: method whose handler calls the Toolbox is listed (#789); the others run
-#: locally, and ``tests/test_toolbox_availability_gate.py`` names each one.
+#: method whose handler calls the Toolbox is listed (#789); every other one is
+#: in ``LOCAL_METHODS`` or ``NEVER_AVAILABLE_METHODS`` below.
 METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
     "dual-provider-fusion": lambda config: [
         Requirement(_EXTRACT, _provider(config, "toolbox_provider")),
@@ -93,6 +93,45 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]
         ),
         Requirement("pdf.render", _provider(config, "toolbox_pdf_provider")),
     ],
+}
+
+
+#: Roles of the methods that do not call the Toolbox (#789):
+#: - ``transitional``: document computation still running in the core. Not a
+#:   permanent allowance: ADR-0028 moves it to Toolbox capabilities (#804), and
+#:   the method then moves to ``METHOD_TOOLBOX_REQUIREMENTS``;
+#: - ``validation``: checks work done before planning; that work becomes a
+#:   planned action (ADR-0029, #640 PR 2);
+#: - ``symbolic``: a workflow decision that stays in the core.
+LOCAL_ROLES = ("transitional", "validation", "symbolic")
+
+#: Method -> (role, reason) for every method without Toolbox requirements, so
+#: the catalogue cannot rule it out. An inventory of the current state, kept
+#: complete by ``tests/test_toolbox_availability_gate.py``.
+LOCAL_METHODS: dict[str, tuple[str, str]] = {
+    "deterministic-heading-repair": ("transitional", "docstruct heading repair"),
+    "latex-normalizer": ("transitional", "delimiter and symbol normalization"),
+    "line-number-extractor": ("transitional", "deterministic text rule"),
+    "norm-fix": ("transitional", "docstruct norm_fix"),
+    "pandoc-code": ("transitional", "docstruct code reflow, in place"),
+    "rep-guard": ("transitional", "deterministic text rule"),
+    "tailjoin": ("transitional", "docstruct tailjoin"),
+    "tailjoin-positioned": ("transitional", "docstruct tailjoin"),
+    "unicode-repair": ("transitional", "deterministic text rule"),
+    "verse-chunker": ("transitional", "deterministic text rule"),
+    "xycut-order": ("transitional", "deterministic layout rule"),
+    "agreement-rule": ("transitional", "compares the recorded secondary extraction"),
+    "rescue-omitted": ("transitional", "compares the recorded secondary extraction"),
+    "skeleton-order": ("transitional", "compares the recorded secondary extraction"),
+    "table-smart-fusion": ("transitional", "compares the recorded secondary extraction"),
+    "vision-description": ("validation", "the picture descriptions made before planning"),
+    "pandoc-table": ("validation", "the table structure extracted before planning"),
+    "human-review": ("symbolic", "the terminal escalation"),
+}
+
+#: Methods with a cost but no handler: never available, so never planned.
+NEVER_AVAILABLE_METHODS: dict[str, str] = {
+    "table-specialist": "no handler registered (#804)",
 }
 
 
@@ -348,7 +387,10 @@ async def decide(manifest: ProcessingManifest, config: CoreConfig) -> Availabili
 
 
 __all__ = [
+    "LOCAL_METHODS",
+    "LOCAL_ROLES",
     "METHOD_TOOLBOX_REQUIREMENTS",
+    "NEVER_AVAILABLE_METHODS",
     "AvailabilityDecision",
     "catalog_cache",
     "decide",

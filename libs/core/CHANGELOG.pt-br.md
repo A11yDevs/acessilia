@@ -8,14 +8,25 @@ Inglês, versão normativa: [English version](CHANGELOG.md).
 `math.verbalize`, pelo provider de transformação de fórmulas), mas não estavam
 em `METHOD_TOOLBOX_REQUIREMENTS`, então o gate de disponibilidade nunca os
 conferia (#789). Agora estão declarados:
-- em `observe` os planos não mudam;
-- em `enforce`, um catálogo sem eles descarta os dois métodos, e uma obrigação
-  `verbalize-formula` cai para `human-review`.
+- em `observe` os passos do plano não mudam. O problema de um documento com
+  obrigações de fórmula ganha os fatos `requires` delas, então seus
+  `problem_sha256` e `plan_id` mudam; um job retomado mantém o checkpoint de
+  plano que tem;
+- em `enforce`, um catálogo sem eles descarta os dois métodos: uma obrigação
+  `verbalize-formula` cai para `human-review`, e uma `normalize-formula` para
+  `latex-normalizer`.
 
-Uma auditoria dos outros 19 métodos não declarados não encontrou nenhum que
-chame a Toolbox. Eles estão listados, cada um com o motivo, em `LOCAL_METHODS`
-(`tests/test_toolbox_availability_gate.py`), e um teste falha para um método
-que não esteja declarado nem listado.
+Todo outro método sem requisitos de Toolbox está classificado em
+`planning/toolbox_gate.py`:
+- `LOCAL_METHODS` associa cada um a um papel e um motivo. Os papéis são
+  `transitional` (computação documental ainda no Core, que a ADR-0028 leva
+  para a Toolbox, #804), `validation` (confere trabalho feito antes do
+  planejamento) e `symbolic` (`human-review`);
+- `NEVER_AVAILABLE_METHODS` guarda `table-specialist`, que tem custo mas não
+  tem handler.
+
+Testes falham para um método, com custo ou handler, que não esteja declarado
+nem classificado, e o conjunto transitório só encolhe.
 
 ## 0.3.9 — o catálogo da Toolbox como fatos de planejamento (domínio 2.4)
 
