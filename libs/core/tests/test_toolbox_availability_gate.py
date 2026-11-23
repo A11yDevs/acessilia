@@ -485,7 +485,7 @@ def test_the_formula_methods_need_the_math_transform_provider(method, capability
     offered = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=_config())
     missing = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=config)
 
-    assert offered.requirements[method] == [(capability, "math-speech")]
+    assert offered.requirements[method] == [(f"{capability}@1", "math-speech")]
     assert method not in offered.blocked
     assert "not-registered" in " ".join(missing.blocked[method])
 
@@ -511,3 +511,92 @@ def test_enforce_without_the_math_provider_plans_the_fallback(kind, methods, fal
     _, plan = PlannerAgent().plan(manifest, catalogue=decision.catalogue_facts())
 
     assert [step.method for step in plan.steps if step.method] == [fallback]
+
+
+def test_requirements_name_the_exact_capability_version() -> None:
+    """#640 PR 2: each fact binds the capability at the contract version the
+    SDK client calls, the one the catalogue check requires."""
+    from acessilia_sdk.toolbox import TOOLBOX_CAPABILITIES
+
+    decision = toolbox_gate.evaluate(FUSE_METHODS, _staging_snapshot(), mode="enforce", config=_config())
+
+    pairs = {pair for pairs in decision.requirements.values() for pair in pairs}
+    assert pairs
+    for capability, _ in pairs:
+        # Every capability these methods call is in the SDK allowlist; the
+        # bare exception is pinned by the test below.
+        assert "@" in capability, f"{capability} is not versioned"
+        capability_id, version = capability.split("@")
+        assert int(version) == TOOLBOX_CAPABILITIES[capability_id].contract_version
+    assert set(decision.offered) == pairs
+
+
+def test_a_capability_outside_the_allowlist_stays_bare_and_is_never_offered(monkeypatch) -> None:
+    """The catalogue publishing a capability does not authorize the core to
+    call it when the SDK does not know its contract: the requirement stays
+    bare, the method is blocked, nothing is offered, and enforce never makes
+    the method runnable."""
+    from acessilia_core.planning.domain_bundle import DomainBundle
+    from acessilia_core.planning.pddl_processor import PddlProblemCompiler
+    from acessilia_sdk.toolbox import Requirement
+
+    assert toolbox_gate.capability_ref("not.a.capability") == "not.a.capability"
+    monkeypatch.setitem(
+        toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS,
+        "single-provider",
+        lambda config: [Requirement("not.a.capability", "docling")],
+    )
+
+    decision = toolbox_gate.evaluate(FUSE_METHODS, _staging_snapshot(), mode="enforce", config=_config())
+
+    assert decision.requirements["single-provider"] == [("not.a.capability", "docling")]
+    assert "fora da allowlist do SDK" in " ".join(decision.blocked["single-provider"])
+    assert ("not.a.capability", "docling") not in decision.offered
+    compiled = PddlProblemCompiler(DomainBundle.load()).compile(
+        _fuse_manifest(), catalogue=decision.catalogue_facts()
+    )
+    assert "single-provider" not in compiled.projection.runnable_methods
+
+
+def test_versioned_requirements_survive_the_checkpoint() -> None:
+    """A plan made with versioned facts replans with the same facts after a
+    restart: to_metadata and from_metadata keep the version."""
+    decision = toolbox_gate.evaluate(FUSE_METHODS, _staging_snapshot(), mode="enforce", config=_config())
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(
+        json.loads(json.dumps(decision.to_metadata())), toolbox_config()
+    )
+
+    assert restored.requirements == decision.requirements
+    assert restored.offered == decision.offered
+    assert restored.catalogue_facts() == decision.catalogue_facts()
+    assert any("@" in capability for pairs in restored.requirements.values() for capability, _ in pairs)
+
+
+def test_versioned_requirements_reach_the_problem() -> None:
+    from acessilia_core.planning.planner_agent import PlannerAgent
+
+    methods = ["mathml", "latex-verbalizer", "human-review"]
+    obligation = _obligation("verbalize-formula-1", ["el-1"], methods)
+    obligation.kind = "verbalize-formula"
+    obligation.method_costs = {m: DEFAULT_METHOD_COSTS[m] for m in methods}
+    manifest = _manifest([_element("el-1", "formula", text="x^2")], [obligation])
+    decision = toolbox_gate.evaluate(methods, _staging_snapshot(), mode="enforce", config=_config())
+
+    compiled = PlannerAgent().compile_problem(manifest, catalogue=decision.catalogue_facts())
+
+    assert "(requires mathml math-convert-1 math-speech)" in compiled.text
+    assert "(offered math-verbalize-1 math-speech)" in compiled.text
+
+
+def test_a_checkpoint_with_unversioned_requirements_still_restores() -> None:
+    """A 0.3.10 plan checkpoint stores bare ids; its replans keep them, so the
+    restored facts stay consistent with the plan they explain."""
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(
+        {"mode": "enforce", "requirements": {"mathml": [["math.convert", "math-speech"]]},
+         "offered": [["math.convert", "math-speech"]]},
+        toolbox_config(),
+    )
+
+    facts = restored.catalogue_facts()
+    assert facts.requirements == {"mathml": frozenset({("math.convert", "math-speech")})}
+    assert facts.offers(("math.convert", "math-speech"))

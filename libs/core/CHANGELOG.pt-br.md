@@ -2,6 +2,23 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.11 — fatos de catálogo ligados à versão exata da capacidade
+
+Os fatos de requisito nomeiam cada capacidade na versão exata de contrato que o
+cliente do SDK chama, `capability_id@versão` (por exemplo `math.convert@1`,
+símbolo PDDL `math-convert-1`). Essa também é a versão que a conferência do
+catálogo exige (#640, PR 2). `toolbox_gate.capability_ref` monta a referência a
+partir do registro do SDK; uma capacidade fora da allowlist mantém o id simples.
+
+Os passos do plano não mudam, nem em `observe` nem em `enforce`. O problema de
+um documento com métodos da Toolbox nomeia as versões, então seus
+`problem_sha256` e `plan_id` mudam. Um job retomado mantém o checkpoint de plano
+que tem, e os requisitos sem versão desse checkpoint continuam como estão nos
+seus replanejamentos.
+
+O `observe` continua o padrão; tirá-lo é um passo posterior, depois que os logs
+de produção mostrarem que não há falsos "would remove" (#809).
+
 ## 0.3.10 — os métodos de fórmula declaram seus requisitos de Toolbox
 
 `mathml` e `latex-verbalizer` chamam a Toolbox (`math.convert` e

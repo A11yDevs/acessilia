@@ -2,6 +2,22 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.11 — catalogue facts bound to the exact capability version
+
+The requirement facts name each capability at the exact contract version the
+SDK client calls, `capability_id@version` (for example `math.convert@1`, PDDL
+symbol `math-convert-1`). That is also the version the catalogue check requires
+(#640, PR 2). `toolbox_gate.capability_ref` builds the reference from the SDK
+registry; a capability outside the allowlist keeps its bare id.
+
+The plan steps do not change, in `observe` or `enforce`. The problem of a
+document with Toolbox methods names the versions, so its `problem_sha256` and
+`plan_id` change. A resumed job keeps the plan checkpoint it has, and that
+checkpoint's unversioned requirements stay as they are for its replans.
+
+`observe` stays the default; removing it is a later step, once production logs
+show no false "would remove" (#809).
+
 ## 0.3.10 — the formula methods declare their Toolbox requirements
 
 `mathml` and `latex-verbalizer` call the Toolbox (`math.convert` and

@@ -37,6 +37,7 @@ from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.planning.pddl_processor import CatalogueFacts
 from acessilia_core.toolbox.toolbox_client import endpoints_from
 from acessilia_sdk.toolbox import (
+    TOOLBOX_CAPABILITIES,
     CatalogCache,
     CatalogSnapshot,
     Requirement,
@@ -142,7 +143,7 @@ class AvailabilityDecision:
     #: Requested methods the catalogue rules out, with the reasons.
     blocked: dict[str, list[str]] = field(default_factory=dict)
     catalog_error: str | None = None
-    #: Requested method -> the ``(capability, provider)`` pairs it calls.
+    #: Requested method -> the ``(capability@version, provider)`` pairs it calls.
     requirements: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
     #: The required pairs the snapshot offers; ``None`` offers them all.
     offered: list[tuple[str, str]] | None = None
@@ -221,6 +222,17 @@ class AvailabilityDecision:
         )
 
 
+def capability_ref(capability_id: str) -> str:
+    """``capability_id@version``: the capability at the exact contract version
+    the SDK client calls, the version the catalogue check requires (#640).
+
+    A capability outside the SDK allowlist has no version to bind; it keeps its
+    bare id, and the check rules it out anyway.
+    """
+    spec = TOOLBOX_CAPABILITIES.get(capability_id)
+    return capability_id if spec is None else f"{capability_id}@{spec.contract_version}"
+
+
 def gate_mode(toolbox: ToolboxConfig) -> str:
     """``toolbox.availability_gate``, or ``observe`` for a value it does not know."""
     mode = toolbox.availability_gate
@@ -253,9 +265,9 @@ def evaluate(
         if requirements is None:
             continue
         needed = requirements(config)
-        required[method] = sorted({(item.capability_id, item.provider) for item in needed})
+        required[method] = sorted({(capability_ref(item.capability_id), item.provider) for item in needed})
         offered.update(
-            (item.capability_id, item.provider)
+            (capability_ref(item.capability_id), item.provider)
             for item in needed
             if not missing_requirements(snapshot, [item])
         )
@@ -394,6 +406,7 @@ __all__ = [
     "AvailabilityDecision",
     "catalog_cache",
     "decide",
+    "capability_ref",
     "evaluate",
     "gate_mode",
     "requested_methods",
