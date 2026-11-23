@@ -107,6 +107,18 @@ def test_field_specs_describe_bounds_defaults_and_references():
     assert field_specs(StructuredDocument)["language"]["minLength"] == 2
 
 
+def test_field_specs_are_cached_without_sharing_mutable_state():
+    first = field_specs(DocumentElement)
+    first["id"]["minLength"] = 99
+    first["provenance"]["items"]["ref"] = "Changed"
+
+    second = field_specs(DocumentElement)
+
+    assert second["id"]["minLength"] == 1
+    assert second["provenance"]["items"]["ref"] == "Provenance"
+    assert first is not second
+
+
 def findings_for(change):
     data = payload()
     change(data)

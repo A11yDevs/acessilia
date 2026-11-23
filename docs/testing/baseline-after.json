@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "kind": "run",
+  "environment": {
+    "generated_at": "2026-11-23T01:46:03+00:00",
+    "revision": "7c9311fd95e69c81c8bafb9594fe33dde0df6e36",
+    "python": "3.12.13",
+    "platform": "macOS-15.7.9-x86_64-i386-64bit",
+    "xdist_workers": 4,
+    "packages": {
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0",
+      "coverage": "7.17.3",
+      "pytest-cov": "7.1.0"
+    }
+  },
+  "suites": [
+    {
+      "label": "app",
+      "tests": 3171,
+      "passed": 3171,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_seconds": 88.235,
+      "p50_seconds": 0.009,
+      "p95_seconds": 0.143,
+      "slowest": [
+        {
+          "nodeid": "tests/test_provider_choice_methods.py::TestVlmPairwiseJudge::test_long_page_is_flagged_as_truncated",
+          "outcome": "passed",
+          "seconds": 27.915
+        },
+        {
+          "nodeid": "tests/test_sdk_public_api.py::test_the_core_uses_only_the_sdk_public_api",
+          "outcome": "passed",
+          "seconds": 7.695
+        },
+        {
+          "nodeid": "tests/test_sdk_public_api.py::test_every_exception_is_still_needed",
+          "outcome": "passed",
+          "seconds": 7.355
+        },
+        {
+          "nodeid": "tests/test_architecture_metrics.py::test_it_counts_test_functions",
+          "outcome": "passed",
+          "seconds": 4.355
+        },
+        {
+          "nodeid": "tests/test_docstruct_bridges.py::test_core_holds_no_copy_of_a_docstruct_function",
+          "outcome": "passed",
+          "seconds": 3.831
+        },
+        {
+          "nodeid": "tests/test_function_complexity.py::test_iter_functions_visits_every_ast_walk_function_across_all_roots",
+          "outcome": "passed",
+          "seconds": 3.38
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_bhs_cleanup_requires_current_release_ancestry_before_tagging_or_deleting[None]",
+          "outcome": "passed",
+          "seconds": 3.324
+        },
+        {
+          "nodeid": "tests/test_api.py::test_health",
+          "outcome": "passed",
+          "seconds": 3.182
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_check_reports_each_problem[extra5-belongs to project 'staging', .env says 'test-staging']",
+          "outcome": "passed",
+          "seconds": 3.136
+        },
+        {
+          "nodeid": "tests/test_ops_script.py::test_check_reports_a_stale_last_check",
+          "outcome": "passed",
+          "seconds": 3.135
+        }
+      ],
+      "wall_seconds": 90.911,
+      "coverage": {
+        "percent_covered": 87.86290322580645,
+        "covered_lines": 3679,
+        "num_statements": 4142,
+        "covered_branches": 679,
+        "num_branches": 818
+      },
+      "log": "/Users/akira/dados/sync/dev/acessilia-tests/acessilia/var/timings/app/pytest.log",
+      "exit_code": 0
+    },
+    {
+      "label": "docstruct",
+      "tests": 1863,
+      "passed": 1863,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_seconds": 13.257,
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.008,
+      "slowest": [
+        {
+          "nodeid": "tests/test_manifest_model.py::test_long_parent_chains_are_acyclic",
+          "outcome": "passed",
+          "seconds": 2.099
+        },
+        {
+          "nodeid": "tests/test_purity.py::test_imports_outside_the_standard_library_are_guarded_accelerators",
+          "outcome": "passed",
+          "seconds": 0.664
+        },
+        {
+          "nodeid": "tests/test_infrastructure.py::test_no_module_uses_infrastructure",
+          "outcome": "passed",
+          "seconds": 0.561
+        },
+        {
+          "nodeid": "tests/test_infrastructure.py::test_every_exception_is_still_needed",
+          "outcome": "passed",
+          "seconds": 0.449
+        },
+        {
+          "nodeid": "tests/test_infrastructure.py::test_importing_every_module_touches_no_infrastructure",
+          "outcome": "passed",
+          "seconds": 0.189
+        },
+        {
+          "nodeid": "tests/test_manifest_cases.py::test_a_case_changes_the_document_it_is_given",
+          "outcome": "passed",
+          "seconds": 0.186
+        },
+        {
+          "nodeid": "tests/test_purity.py::test_every_module_imports_with_the_standard_library_only",
+          "outcome": "passed",
+          "seconds": 0.164
+        },
+        {
+          "nodeid": "tests/test_legacy_canonical_types.py::test_cold_import_and_construction_emit_no_warnings",
+          "outcome": "passed",
+          "seconds": 0.076
+        },
+        {
+          "nodeid": "tests/test_schema_validation.py::test_package_resource_does_not_depend_on_the_working_directory",
+          "outcome": "passed",
+          "seconds": 0.062
+        },
+        {
+          "nodeid": "tests/test_schema_validation.py::test_local_refs_validate_grandchildren_and_preserve_error_paths[type-custom]",
+          "outcome": "passed",
+          "seconds": 0.061
+        }
+      ],
+      "wall_seconds": 14.479,
+      "coverage": {
+        "percent_covered": 87.00887198986058,
+        "covered_lines": 6940,
+        "num_statements": 7716,
+        "covered_branches": 2671,
+        "num_branches": 3330
+      },
+      "log": "/Users/akira/dados/sync/dev/acessilia-tests/acessilia/var/timings/docstruct/pytest.log",
+      "exit_code": 0
+    },
+    {
+      "label": "sdk",
+      "tests": 702,
+      "passed": 702,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_seconds": 15.98,
+      "p50_seconds": 0.016,
+      "p95_seconds": 0.038,
+      "slowest": [
+        {
+          "nodeid": "tests/test_cli.py::test_an_unreachable_toolbox_is_typed_in_a_fresh_interpreter",
+          "outcome": "passed",
+          "seconds": 0.481
+        },
+        {
+          "nodeid": "tests/test_purity.py::test_every_module_imports_without_core_or_toolbox",
+          "outcome": "passed",
+          "seconds": 0.469
+        },
+        {
+          "nodeid": "tests/test_cli.py::test_an_invalid_port_is_a_usage_error_from_the_command_line_too",
+          "outcome": "passed",
+          "seconds": 0.443
+        },
+        {
+          "nodeid": "tests/test_cli.py::test_python_m_acessilia_sdk_runs_with_the_core_blocked",
+          "outcome": "passed",
+          "seconds": 0.386
+        },
+        {
+          "nodeid": "tests/test_purity.py::test_the_sdk_reads_no_environment",
+          "outcome": "passed",
+          "seconds": 0.326
+        },
+        {
+          "nodeid": "tests/test_purity.py::test_imports_stay_within_the_allowed_dependencies",
+          "outcome": "passed",
+          "seconds": 0.217
+        },
+        {
+          "nodeid": "tests/test_cli.py::test_judge_closes_its_clients_on_success_and_on_failure",
+          "outcome": "passed",
+          "seconds": 0.086
+        },
+        {
+          "nodeid": "tests/test_cli.py::test_judge_reports_render_and_adjudication_failures_typed",
+          "outcome": "passed",
+          "seconds": 0.081
+        },
+        {
+          "nodeid": "tests/clients/test_pdf.py::test_render_rejects_a_result_outside_the_v2_contract[document6-applied clip]",
+          "outcome": "passed",
+          "seconds": 0.063
+        },
+        {
+          "nodeid": "tests/test_cli.py::test_dataset_items_all_reads_every_page_up_to_the_limit",
+          "outcome": "passed",
+          "seconds": 0.062
+        }
+      ],
+      "wall_seconds": 16.833,
+      "coverage": {
+        "percent_covered": 97.3007303906002,
+        "covered_lines": 2544,
+        "num_statements": 2595,
+        "covered_branches": 520,
+        "num_branches": 554
+      },
+      "log": "/Users/akira/dados/sync/dev/acessilia-tests/acessilia/var/timings/sdk/pytest.log",
+      "exit_code": 0
+    },
+    {
+      "label": "core",
+      "tests": 1379,
+      "passed": 1379,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_seconds": 41.278,
+      "p50_seconds": 0.003,
+      "p95_seconds": 0.155,
+      "slowest": [
+        {
+          "nodeid": "tests/test_boundary.py::test_the_core_reads_no_environment_variable",
+          "outcome": "passed",
+          "seconds": 1.041
+        },
+        {
+          "nodeid": "tests/test_function_complexity.py::test_the_scan_sees_the_core_functions",
+          "outcome": "passed",
+          "seconds": 0.991
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_the_scan_sees_the_core",
+          "outcome": "passed",
+          "seconds": 0.919
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[pydantic]",
+          "outcome": "passed",
+          "seconds": 0.719
+        },
+        {
+          "nodeid": "tests/test_table_ast_from_rows_parity.py::test_the_two_agree_unless_a_row_is_all_blank",
+          "outcome": "passed",
+          "seconds": 0.711
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_the_deviation_stays_where_it_is_recorded",
+          "outcome": "passed",
+          "seconds": 0.639
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_the_core_imports_nothing_from_the_service_or_the_frontends",
+          "outcome": "passed",
+          "seconds": 0.637
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[babel]",
+          "outcome": "passed",
+          "seconds": 0.634
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[edge_tts]",
+          "outcome": "passed",
+          "seconds": 0.626
+        },
+        {
+          "nodeid": "tests/test_boundary.py::test_every_allowed_library_is_still_used[jsonschema]",
+          "outcome": "passed",
+          "seconds": 0.596
+        }
+      ],
+      "wall_seconds": 44.647,
+      "coverage": {
+        "percent_covered": 82.74361400189214,
+        "covered_lines": 7111,
+        "num_statements": 8288,
+        "covered_branches": 1635,
+        "num_branches": 2282
+      },
+      "log": "/Users/akira/dados/sync/dev/acessilia-tests/acessilia/var/timings/core/pytest.log",
+      "exit_code": 0
+    }
+  ],
+  "totals": {
+    "tests": 7115,
+    "junit_seconds": 158.75,
+    "wall_seconds": 166.87
+  }
+}
