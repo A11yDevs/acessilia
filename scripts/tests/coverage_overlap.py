@@ -70,6 +70,24 @@ class Family:
     identical: bool
 
 
+@dataclass(frozen=True)
+class CoverageSubset:
+    """A coverage signature is a subset of another, with representative tests."""
+
+    subsumed: str
+    subsumer: str
+    subsumed_tests: int
+    subsumer_tests: int
+    shared: int
+    union: int
+    similarity: float
+    strict: bool
+    same_parameterized_family: bool
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
 def normalize_context(context: str) -> str:
     """A pytest-cov context is ``nodeid|phase``; the phase does not identify a test."""
     return context.split("|", 1)[0].strip()
@@ -170,10 +188,15 @@ def similarity_pairs(
             shared[(first, second)] += 1
 
     pairs: list[Pair] = []
-    for (first, second), count in shared.items():
+    for first, second in shared:
+        # The capped index only proposes candidates. All reported metrics use
+        # the complete uncovered sets, so a capped line cannot inflate the
+        # union or look exclusive to one side.
+        intersection = tests[first] & tests[second]
+        count = len(intersection)
         if count < min_shared:
             continue
-        union = len(tests[first]) + len(tests[second]) - count
+        union = len(tests[first] | tests[second])
         similarity = count / union if union else 0.0
         if similarity < threshold:
             continue
@@ -184,8 +207,8 @@ def similarity_pairs(
                 similarity=round(similarity, 4),
                 shared=count,
                 union=union,
-                only_a=len(tests[first]) - count,
-                only_b=len(tests[second]) - count,
+                only_a=len(tests[first] - tests[second]),
+                only_b=len(tests[second] - tests[first]),
                 exclusive_a=exclusive[first],
                 exclusive_b=exclusive[second],
                 same_parameterized_family=base_nodeid(first) == base_nodeid(second),
@@ -194,6 +217,79 @@ def similarity_pairs(
     pairs.sort(key=lambda pair: (-pair.similarity, -pair.shared, pair.test_a, pair.test_b))
     return pairs
 
+
+def coverage_subsets(tests: dict[str, frozenset[str]]) -> list[CoverageSubset]:
+    """Every ``B ⊆ A`` relation between unique coverage signatures.
+
+    Grouping tests by their complete signature keeps the relation meaningful:
+    thousands of tests can share the same production lines, and listing every
+    pair would hide the signal under quadratic noise. ``subsumed_tests`` and
+    ``subsumer_tests`` carry the group sizes, and the representative node ids
+    come from the first test of each group.
+    """
+    groups: dict[frozenset[str], list[str]] = defaultdict(list)
+    for test, elements in tests.items():
+        if elements:
+            groups[elements].append(test)
+    signatures = list(groups)
+    buckets: dict[str, set[frozenset[str]]] = defaultdict(set)
+    for signature in signatures:
+        for element in signature:
+            buckets[element].add(signature)
+
+    subsets: list[CoverageSubset] = []
+    for signature, group in groups.items():
+        if len(group) < 2:
+            continue
+        ordered_group = sorted(group)
+        subsets.append(
+            CoverageSubset(
+                subsumed=ordered_group[0],
+                subsumer=ordered_group[1],
+                subsumed_tests=len(group),
+                subsumer_tests=len(group),
+                shared=len(signature),
+                union=len(signature),
+                similarity=1.0,
+                strict=False,
+                same_parameterized_family=base_nodeid(ordered_group[0])
+                == base_nodeid(ordered_group[1]),
+            )
+        )
+    for subsumed_signature in signatures:
+        ordered = sorted(
+            subsumed_signature, key=lambda element: len(buckets[element])
+        )
+        candidates = set(buckets[ordered[0]])
+        for element in ordered[1:]:
+            candidates &= buckets[element]
+            if not candidates:
+                break
+        for subsumer_signature in candidates:
+            if not subsumed_signature < subsumer_signature:
+                continue
+            subsumed_group = sorted(groups[subsumed_signature])
+            subsumer_group = sorted(groups[subsumer_signature])
+            subsets.append(
+                CoverageSubset(
+                    subsumed=subsumed_group[0],
+                    subsumer=subsumer_group[0],
+                    subsumed_tests=len(subsumed_group),
+                    subsumer_tests=len(subsumer_group),
+                    shared=len(subsumed_signature),
+                    union=len(subsumer_signature),
+                    similarity=round(
+                        len(subsumed_signature) / len(subsumer_signature), 4
+                    ),
+                    strict=True,
+                    same_parameterized_family=base_nodeid(subsumed_group[0])
+                    == base_nodeid(subsumer_group[0]),
+                )
+            )
+    subsets.sort(
+        key=lambda item: (-item.shared, -item.subsumed_tests, item.subsumed)
+    )
+    return subsets
 
 def base_nodeid(nodeid: str) -> str:
     """The parameterless node id of a parametrized test."""
@@ -229,19 +325,27 @@ def parameterized_families(tests: dict[str, frozenset[str]]) -> list[Family]:
 
 
 def _summary(
-    tests: dict[str, frozenset[str]], pairs: Sequence[Pair]
+    tests: dict[str, frozenset[str]],
+    pairs: Sequence[Pair],
+    subsets: Sequence[CoverageSubset],
 ) -> dict[str, int | float]:
     all_elements = set().union(*tests.values()) if tests else set()
     return {
         "tests": len(tests),
         "elements": len(all_elements),
         "pairs": len(pairs),
-        "identical_pairs": sum(pair.similarity == 1.0 for pair in pairs),
+        "identical_pairs": sum(pair.shared == pair.union for pair in pairs),
         "mean_similarity": round(
             sum(pair.similarity for pair in pairs) / len(pairs), 4
         )
         if pairs
         else 0.0,
+        "coverage_subsets": len(subsets),
+        "strict_coverage_subsets": sum(subset.strict for subset in subsets),
+        "equal_coverage_subsets": sum(not subset.strict for subset in subsets),
+        "tests_with_identical_coverage": sum(
+            subset.subsumed_tests for subset in subsets if not subset.strict
+        ),
     }
 
 
@@ -249,6 +353,7 @@ def build_report(
     tests: dict[str, frozenset[str]],
     *,
     coverage_file: Path,
+    coverage_label: str | None = None,
     threshold: float,
     min_shared: int,
     max_element_tests: int,
@@ -263,6 +368,7 @@ def build_report(
     )
     exclusive = exclusive_counts(tests)
     families = parameterized_families(tests)
+    subsets = coverage_subsets(tests)
     zero_exclusive = [
         {"test": test, "elements": len(elements)}
         for test, elements in sorted(
@@ -270,7 +376,7 @@ def build_report(
             key=lambda item: (-len(item[1]), item[0]),
         )
     ]
-    summary = _summary(tests, pairs)
+    summary = _summary(tests, pairs, subsets)
     summary.update(
         {
             "families": len(families),
@@ -281,7 +387,7 @@ def build_report(
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "coverage-overlap",
-        "coverage_file": str(coverage_file),
+        "coverage_file": coverage_label or str(coverage_file),
         "settings": {
             "threshold": threshold,
             "min_shared": min_shared,
@@ -290,6 +396,7 @@ def build_report(
         },
         "summary": summary,
         "pairs": [pair.to_dict() for pair in pairs[:top]],
+        "coverage_subsets": [subset.to_dict() for subset in subsets[:top]],
         "families": [asdict(family) for family in families[:top]],
         "zero_exclusive": zero_exclusive[:top],
     }
@@ -312,6 +419,12 @@ def render_summary(report: dict) -> str:
             f"identical line coverage; {summary.get('zero_exclusive_tests', 0)} "
             f"tests without an exclusive production line."
         ),
+        (
+            f"Coverage subsumption between unique signatures (independent of "
+            f"the Jaccard threshold): {summary.get('coverage_subsets', 0)} "
+            f"relations ({summary.get('strict_coverage_subsets', 0)} strict, "
+            f"{summary.get('equal_coverage_subsets', 0)} identical)."
+        ),
         "",
         "No test is removed by this report: high overlap is a review candidate.",
         "",
@@ -330,7 +443,28 @@ def render_summary(report: dict) -> str:
 
     lines += [
         "",
-        "### Parametrized families with identical coverage",
+        f"### Coverage subsumption (top {settings['top']} signatures)",
+        "",
+        "`Subsumed` covers no measured line that `Subsumer` does not. This is a "
+        "coverage relation only; contracts and assertions still need review. "
+        "`Tests` is the size of the group sharing that signature.",
+        "",
+        "| Subsumed | Tests | Subsumer | Tests | Lines | Jaccard | Strict |",
+        "|---|---:|---|---:|---:|---:|---|",
+    ]
+    for subset in report.get("coverage_subsets", []):
+        lines.append(
+            f"| `{subset['subsumed']}` | {subset['subsumed_tests']} "
+            f"| `{subset['subsumer']}` | {subset['subsumer_tests']} "
+            f"| {subset['shared']} | {subset['similarity']:.3f} "
+            f"| {'yes' if subset['strict'] else 'no'} |"
+        )
+    if not report.get("coverage_subsets"):
+        lines.append("| — | — | — | — | — | — | — |")
+
+    lines += [
+        "",
+        f"### Parametrized families with identical coverage (top {settings['top']})",
         "",
         "| Family | Variants | Lines |",
         "|---|---:|---:|",
@@ -343,7 +477,7 @@ def render_summary(report: dict) -> str:
 
     lines += [
         "",
-        "### Tests with no exclusive line",
+        f"### Tests with no exclusive line (top {settings['top']} by lines)",
         "",
         (
             "These tests cover no line that another test in the same report does "
@@ -410,6 +544,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = build_report(
         tests,
         coverage_file=args.coverage_file,
+        coverage_label=_relative(str(args.coverage_file), args.root),
         threshold=args.threshold,
         min_shared=args.min_shared,
         max_element_tests=args.max_element_tests,

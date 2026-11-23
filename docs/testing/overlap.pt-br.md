@@ -25,69 +25,78 @@ pytest-cov define esse contexto como o node id do teste com
 `arquivo:linha`:
 
 ```bash
-COVERAGE_FILE="$PWD/var/context/app/.coverage" \
-uv run pytest -m "not e2e" -n 4 --dist worksteal \
-  --cov=backend --cov=frontend --cov-branch --cov-context=test \
-  --cov-config="$PWD/pyproject.toml" --cov-report= \
-  --junitxml=var/context/app/results.xml
+make test-overlap
 
-uv run python scripts/tests/coverage_overlap.py \
-  --coverage-file var/context/app/.coverage \
-  --include backend --include frontend \
-  --output docs/testing/overlap-app.json \
-  --summary docs/testing/overlap-app.md
-
-uv run python scripts/tests/redundancy_report.py \
-  docs/testing/overlap-app.json \
-  --junit app=var/context/app/results.xml \
-  --output docs/testing/redundancy-app.json \
-  --summary docs/testing/redundancy-app.md
+# O alvo grava var/overlap/app.json, app.md, redundancy.json e redundancy.md;
+# o snapshot versionado é a cópia desses arquivos para cá.
+cp var/overlap/app.json docs/testing/overlap-app.json
+cp var/overlap/app.md docs/testing/overlap-app.md
+cp var/overlap/redundancy.json docs/testing/redundancy-app.json
+cp var/overlap/redundancy.md docs/testing/redundancy-app.md
 ```
+
+O alvo executa a suíte da aplicação com `--cov-context=test`, grava
+`var/overlap/context/.coverage` e `var/overlap/app-results.xml` e chama os dois
+scripts de análise com `--extra dev`.
 
 O primeiro script calcula a similaridade de Jaccard
 `|A ∩ B| / |A ∪ B|` para cada par que compartilha pelo menos cinco linhas e
 sinaliza pares a partir de `0,8`. Uma linha coberta por mais de 50 testes é
-ignorada como infraestrutura compartilhada: todos os testes importam a
-aplicação, então essas linhas fariam testes não relacionados parecerem
-idênticos. O limite e o teto são configuráveis.
+usada apenas para *propor* pares candidatos; toda interseção, união, `only_a`,
+`only_b` e Jaccard relatados são recalculados a partir dos conjuntos completos.
+O teto limita a busca, não a métrica.
 
-O segundo script acrescenta durações, identifica se um teste não cobre nenhuma
-linha que o outro não cobre e separa variantes parametrizadas. Ele nunca edita,
-remove ou pula um teste.
+A subsunção de cobertura é calculada separadamente a partir dos conjuntos
+completos e não depende do limiar de Jaccard: um teste pequeno pode estar contido
+em um muito maior com similaridade baixa. Testes com a mesma assinatura de
+cobertura são agrupados, então o relatório mostra relações entre assinaturas e o
+tamanho dos grupos, em vez de milhões de pares duplicados.
+
+O segundo script acrescenta durações, ordena os candidatos de subsunção de
+cobertura, separa variantes parametrizadas e informa quantos exemplos de cada
+tabela são exibidos. `--junit` lê relatórios JUnit completos; `--baseline` é o
+baseline opcional do PR 1 e só é usado pelas listas de testes mais lentos. Ele
+nunca edita, remove ou pula um teste.
 
 ## Resultados
 
-A suíte da aplicação executou 3.192 testes sobre 3.559 linhas medidas.
+A suíte da aplicação executou 3.197 testes sobre 3.559 linhas medidas.
 
 | Medida | Valor |
 |---|---:|
-| Pares com Jaccard >= 0,8 e >= 5 linhas compartilhadas | 83 |
-| Pares exatos (Jaccard = 1,0) | 0 |
-| Similaridade média dos pares relatados | 0,815 |
+| Pares com Jaccard >= 0,8 e >= 5 linhas compartilhadas | 1.995 |
+| Pares exatos (Jaccard = 1,0) | 735 |
+| Similaridade média dos pares relatados | 0,951 |
 | Famílias parametrizadas analisadas | 288 |
-| Famílias com cobertura de linhas idêntica | 246 |
-| Testes sem linha de produção exclusiva | 3.080 de 3.192 |
+| Famílias com cobertura de linhas idêntica | 247 |
+| Relações de subsunção entre assinaturas | 1.250 |
+| · subconjuntos estritos | 1.151 |
+| · grupos com cobertura idêntica | 99 |
+| Testes que compartilham uma assinatura idêntica | 2.914 |
+| Testes sem linha de produção exclusiva | 3.085 de 3.197 |
 
-Com o limite mais frouxo de 0,6 e três linhas compartilhadas, o relatório tem
-234 pares e ainda **nenhum par em que as linhas medidas de um teste sejam
-subconjunto das do outro**. Esse é o resultado central deste PR: a suíte tem
-sobreposição grande, mas não tem um candidato demonstrável de eliminação
-par-a-par.
+A suíte tem sobreposição substancial, mas a conclusão não é uma lista de remoção.
+A análise de subconjuntos encontra **1.250 relações de cobertura entre
+assinaturas únicas**, incluindo 1.151 subconjuntos estritos. Isso contradiz a
+formulação anterior de que nenhum subconjunto existia: um teste pequeno pode
+estar contido em um muito maior com Jaccard baixo, por isso a subsunção precisa
+ser calculada sem o limiar de similaridade. A folha de revisão ordena os
+exemplos pelos segundos medidos; ela não remove nenhum teste.
 
 ### Onde está a sobreposição
 
 | Agrupamento | Exemplo | Jaccard | Compartilhadas | Só A | Só B |
 |---|---|---:|---:|---:|---:|
-| Fluxo de documento do Telegram | `test_document_does_not_consume_another_senders_preferences` ↔ `test_document_submits_with_mode_and_source` | 0,849 | 269 | 24 | 24 |
-| Variantes de locale do Telegram | `test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]` ↔ `[pt_BR-en_US]` | 0,853 | 279 | 24 | 24 |
-| Recibos do painel web | `test_receipt_close_info_only_while_the_email_promise_holds[done-failed-False-False]` ↔ `test_receipt_recovers_result_after_refresh[failed]` | 0,826 | 171 | 18 | 18 |
+| Nomes de saída longos | `test_long_filename_can_be_exported_and_downloaded[long-ascii]` ↔ `[long-cjk]` | 1,000 | 605 | 0 | 0 |
+| Correções pendentes | `test_email_delivery_status_does_not_lose_download[False]` ↔ `[None]` | 0,993 | 455 | 3 | 0 |
+| Executor de chamadas de modelo | `test_pending_calls_are_removed_and_never_start_late[False]` ↔ `test_running_deadline_retains_capacity_and_default_executor_stays_available` | 0,924 | 98 | 8 | 0 |
 | Matriz de clientes do benchmark | variantes de `test_the_harness_configures_clients_like_the_core[...]` | — | 273 | — | — |
 
 Esses agrupamentos compartilham a infraestrutura de requisição/resposta de um
-cenário. Cada teste ainda cobre entre 18 e 30 linhas que o vizinho não cobre,
-normalmente o desvio do estado, locale ou cliente que ele verifica. Remover um
-perderia a cobertura desse desvio, então nenhum é candidato apenas com
-evidência de cobertura.
+cenário. Alguns pares são subconjuntos estritos de cobertura; outros ainda cobrem
+linhas que o vizinho não cobre. A cobertura sozinha não mostra se as asserções,
+contratos ou modos de falha são duplicados, então a folha de revisão é a entrada
+para o experimento de mutação do PR 3.
 
 ### Famílias parametrizadas
 
@@ -98,13 +107,14 @@ esperado: uma parametrização normalmente varia entradas e asserções esperada
 não o caminho de produção. Cobertura de linhas igual não é comportamento
 duplicado; as variantes podem falhar por motivos diferentes.
 
-A folha de revisão lista as famílias e os pares. Ela classifica
+O relatório de sobreposição lista as famílias e seus grupos de assinatura; a
+folha de revisão lista os testes candidatos e os pares. Ela classifica
 `identical-parameterization` separadamente e nunca propõe uma variante como
-subsumida.
+remoção.
 
 ### Testes sem linha de produção exclusiva
 
-3.080 dos 3.192 testes não cobrem nenhuma linha que nenhum outro teste cobre.
+3.085 dos 3.197 testes não cobrem nenhuma linha que nenhum outro teste cobre.
 Esse número não é um defeito: a cobertura omite os próprios arquivos de teste,
 então asserções, valores esperados parametrizados e mensagens de erro são
 invisíveis para ela. Quase todo teste que exercita o mesmo ponto de entrada de
@@ -119,11 +129,12 @@ diferente, e mutation testing é o experimento que consegue distingui-las.
 | Pergunta da #644 | Resultado |
 |---|---|
 | Matriz relacionando testes e código coberto | contextos do `.coverage`, resumidos como conjuntos `arquivo:linha` por teste |
-| Similaridade de cobertura entre testes | Jaccard por par, 83 pares em 0,8 |
-| Conjuntos com alta sobreposição | agrupamentos de Telegram, painel web, clientes do benchmark e recibos |
-| Contribuição exclusiva de cada teste | por par e por suíte; 3.080 testes não têm nenhuma em linhas de produção |
+| Similaridade de cobertura entre testes | Jaccard por par, 1.995 pares em 0,8 |
+| Conjuntos com alta sobreposição | agrupamentos de saída longa, correções pendentes, executor de modelo e benchmark |
+| Contribuição exclusiva de cada teste | por par e por suíte; 3.085 testes não têm nenhuma em linhas de produção |
+| Subsunção de cobertura | 1.250 relações entre assinaturas (1.151 estritas, 99 idênticas), independentes de Jaccard |
 | Casos parametrizados possivelmente equivalentes | 246 famílias com cobertura de linhas idêntica; nenhuma removida automaticamente |
-| Duplicação entre testes unitários, de integração e de contrato | nenhum subconjunto par-a-par em 0,8 ou 0,6; o PR 3 compara detecção |
+| Duplicação entre testes unitários, de integração e de contrato | 1.250 assinaturas de subsunção; o PR 3 compara detecção |
 | Fixtures caras compartilhadas por testes semelhantes | a duração vem do JUnit; o relatório ordena candidatos por segundos |
 | Classificação e risco dos candidatos | nenhum candidato automático; a folha de revisão exige análise de contrato |
 
@@ -135,9 +146,11 @@ diferente, e mutation testing é o experimento que consegue distingui-las.
 - **Os testes ficam fora da cobertura.** Desvios que existem só nas asserções
   não aparecem; é por isso que "nenhuma linha exclusiva" é evidência fraca e
   por isso o PR 3 é necessário.
-- **Linhas comuns têm um teto.** Linhas cobertas por mais de 50 testes são
-  ignoradas para manter a análise significativa e rápida; aumentar o teto
-  adiciona ruído e trabalho quadrático.
+- **Linhas comuns apenas podam a busca de pares.** Linhas cobertas por mais de
+  50 testes não são usadas para propor pares; as métricas relatadas e a análise
+  de subconjuntos usam os conjuntos completos. O conjunto de candidatos ainda
+  pode perder um par cujas todas as linhas sejam infraestrutura compartilhada,
+  o que é documentado pelos totais.
 - **Uma revisão e uma execução.** Os contextos vêm de uma execução que passou
   no commit do snapshot; um refactor posterior pode mudar qual helper um teste
   alcança.
@@ -149,10 +162,10 @@ diferente, e mutation testing é o experimento que consegue distingui-las.
 ```bash
 # docstruct
 COVERAGE_FILE="$PWD/var/context/docstruct/.coverage" \
-  uv run --project "$PWD" python -m pytest libs/docstruct/tests \
+  uv run --extra dev --project "$PWD" python -m pytest libs/docstruct/tests \
   --cov=docstruct --cov-branch --cov-context=test \
   --cov-config="$PWD/pyproject.toml" --cov-report=
-uv run python scripts/tests/coverage_overlap.py \
+uv run --extra dev python scripts/tests/coverage_overlap.py \
   --coverage-file var/context/docstruct/.coverage \
   --include libs/docstruct/src/docstruct \
   --output var/overlap/docstruct.json

@@ -32,6 +32,7 @@ make the full suite itself faster.
 | I want to check linting (Ruff baseline) | `make lint` | Runs Ruff (`F`, `I`, `E` without `E501`) via `scripts/check_ruff_baseline.py` |
 | I want to check static types (Mypy) | `make typecheck` | Runs Mypy on the configured `docstruct`, `acessilia_sdk`, `acessilia_core` and `backend` scope |
 | I want per-component coverage reports | `make coverage` | Runs all four suites with branch coverage, writes `var/coverage/{app,core,sdk,docstruct}/`, and enforces the thresholds |
+| I want coverage-overlap evidence | `make test-overlap` | Runs the app suite with per-test contexts and writes the overlap/redundancy reports under `var/overlap/` (#644) |
 | I want the main suite only, in parallel | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Runs the non-E2E main suite with four workers |
 | I want only the core library | `(cd libs/core && uv run --extra dev pytest)` | Runs the core library suite, without the service |
 | I need the exact commands `make` uses | `make -n test-all` | Prints the commands without running them |
@@ -257,6 +258,7 @@ make test-all
 make lint
 make typecheck
 make coverage
+make test-overlap
 ```
 
 Coverage floors: application **85%**, docstruct **86%**, SDK **96%**, core **82%** (branch coverage).

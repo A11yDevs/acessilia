@@ -33,9 +33,11 @@ class Candidate:
     subsumed_by: str
     similarity: float
     shared: int
-    unshared_lines: int
+    tests: int
     seconds: float
     classification: str
+    strict: bool
+    same_parameterized_family: bool
 
 
 @dataclass(frozen=True)
@@ -48,8 +50,6 @@ class PairReview:
     only_b: int
     same_parameterized_family: bool
     classification: str
-    candidate: str | None
-    saved_seconds: float
 
 
 def load_durations(baseline: Path | None) -> dict[str, float]:
@@ -92,29 +92,9 @@ def classify(similarity: float, same_family: bool) -> str:
     return "high-overlap"
 
 
-def _candidate(
-    pair: Mapping[str, Any],
-    durations: Mapping[str, float],
-    *,
-    same_family: bool,
-) -> tuple[str | None, float]:
-    if same_family:
-        return None, 0.0
-    only_a = int(pair.get("only_a", 0))
-    only_b = int(pair.get("only_b", 0))
-    if only_b == 0 and only_a > 0:
-        return str(pair["test_b"]), durations.get(str(pair["test_b"]), 0.0)
-    if only_a == 0 and only_b > 0:
-        return str(pair["test_a"]), durations.get(str(pair["test_a"]), 0.0)
-    return None, 0.0
-
-
-def review_pair(
-    pair: Mapping[str, Any], durations: Mapping[str, float]
-) -> PairReview:
+def review_pair(pair: Mapping[str, Any]) -> PairReview:
     similarity = float(pair["similarity"])
     same_family = bool(pair.get("same_parameterized_family"))
-    candidate, saved = _candidate(pair, durations, same_family=same_family)
     return PairReview(
         test_a=str(pair["test_a"]),
         test_b=str(pair["test_b"]),
@@ -124,9 +104,16 @@ def review_pair(
         only_b=int(pair.get("only_b", 0)),
         same_parameterized_family=same_family,
         classification=classify(similarity, same_family),
-        candidate=candidate,
-        saved_seconds=round(saved, 4),
     )
+
+
+def subset_classification(subset: Mapping[str, Any]) -> str:
+    same_family = bool(subset.get("same_parameterized_family"))
+    if same_family:
+        return "identical-parameterization"
+    if not subset.get("strict", True):
+        return "identical-coverage"
+    return "coverage-subset"
 
 
 def build_report(
@@ -135,27 +122,32 @@ def build_report(
     *,
     duration_source: str = "unavailable",
 ) -> dict:
-    """Rank pairs and candidates by estimated saving, then by similarity."""
-    reviewed = [review_pair(pair, durations) for pair in overlap.get("pairs", [])]
-    reviewed.sort(key=lambda pair: (-pair.saved_seconds, -pair.similarity, pair.test_a))
+    """Rank coverage-subset candidates by estimated saving, then similarity."""
+    reviewed = [review_pair(pair) for pair in overlap.get("pairs", [])]
+    reviewed.sort(key=lambda pair: (-pair.similarity, pair.test_a, pair.test_b))
 
     candidates: dict[str, Candidate] = {}
-    for pair in reviewed:
-        if pair.candidate is None:
-            continue
-        subsumed_by = pair.test_b if pair.candidate == pair.test_a else pair.test_a
+    for subset in overlap.get("coverage_subsets", []):
+        test = str(subset["subsumed"])
         candidate = Candidate(
-            test=pair.candidate,
-            subsumed_by=subsumed_by,
-            similarity=pair.similarity,
-            shared=pair.shared,
-            unshared_lines=0,
-            seconds=durations.get(pair.candidate, 0.0),
-            classification=pair.classification,
+            test=test,
+            subsumed_by=str(subset["subsumer"]),
+            similarity=float(subset["similarity"]),
+            shared=int(subset["shared"]),
+            tests=int(subset.get("subsumed_tests", 1)),
+            seconds=durations.get(test, 0.0),
+            classification=subset_classification(subset),
+            strict=bool(subset.get("strict", True)),
+            same_parameterized_family=bool(
+                subset.get("same_parameterized_family")
+            ),
         )
-        previous = candidates.get(candidate.test)
-        if previous is None or candidate.seconds > previous.seconds:
-            candidates[candidate.test] = candidate
+        previous = candidates.get(test)
+        if previous is None or (candidate.seconds, candidate.similarity) > (
+            previous.seconds,
+            previous.similarity,
+        ):
+            candidates[test] = candidate
 
     ordered = sorted(candidates.values(), key=lambda item: (-item.seconds, item.test))
     zero_exclusive = [
@@ -167,19 +159,29 @@ def build_report(
         for item in overlap.get("zero_exclusive", [])
     ]
     zero_exclusive.sort(key=lambda item: (-item["seconds"], -item["elements"], item["test"]))
+    summary = {
+        "pairs": len(reviewed),
+        "candidates": len(ordered),
+        "coverage_subset_total": int(
+            (overlap.get("summary") or {}).get("coverage_subsets", len(ordered))
+        ),
+        "zero_exclusive": int(
+            (overlap.get("summary") or {}).get(
+                "zero_exclusive_tests", len(zero_exclusive)
+            )
+        ),
+        "zero_exclusive_examples": len(zero_exclusive),
+        "estimated_savings_seconds": round(
+            sum(candidate.seconds for candidate in ordered), 3
+        ),
+        "estimated_savings_examples": len(ordered),
+        "duration_source": duration_source if durations else "unavailable",
+    }
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "redundancy-report",
         "source": overlap.get("kind", "coverage-overlap"),
-        "summary": {
-            "pairs": len(reviewed),
-            "candidates": len(ordered),
-            "zero_exclusive": len(zero_exclusive),
-            "estimated_savings_seconds": round(
-                sum(candidate.seconds for candidate in ordered), 3
-            ),
-            "duration_source": duration_source if durations else "unavailable",
-        },
+        "summary": summary,
         "candidates": [asdict(candidate) for candidate in ordered],
         "zero_exclusive": zero_exclusive,
         "pairs": [asdict(pair) for pair in reviewed],
@@ -193,35 +195,38 @@ def render_summary(report: dict) -> str:
         "## Redundancy candidates (#644)",
         "",
         (
-            f"{summary['pairs']} overlapping pairs; {summary['candidates']} "
-            f"pairwise coverage-subsumed candidates with about "
-            f"{summary['estimated_savings_seconds']:.2f}s of measured time; "
+            f"{summary['pairs']} overlapping pairs; "
+            f"{summary['coverage_subset_total']} coverage-subset relations in "
+            f"total (showing {summary['candidates']} examples worth about "
+            f"{summary['estimated_savings_seconds']:.2f}s); "
             f"{summary.get('zero_exclusive', 0)} tests without an exclusive "
-            f"production line."
+            f"production line (showing {summary.get('zero_exclusive_examples', 0)})."
         ),
         "",
         (
-            "This is a review sheet, not a deletion list. \"Coverage-subsumed\" "
+            "This is a review sheet, not a deletion list. \"Coverage-subset\" "
             "means only that the other test covers every measured line of the "
             "candidate; contracts, diagnostics and failure modes still have to "
-            "be checked by hand."
+            "be checked by hand. The candidate list is a presentation sample, "
+            "not the complete relation set."
         ),
         "",
-        "| Candidate | Covered by | Similarity | Shared | Seconds | Classification |",
-        "|---|---|---:|---:|---:|---|",
+        "| Candidate | Covered by | Tests | Similarity | Shared | Seconds | Classification |",
+        "|---|---|---:|---:|---:|---:|---|",
     ]
     for candidate in report["candidates"]:
         lines.append(
             f"| `{candidate['test']}` | `{candidate['subsumed_by']}` "
-            f"| {candidate['similarity']:.3f} | {candidate['shared']} "
-            f"| {candidate['seconds']:.3f} | {candidate['classification']} |"
+            f"| {candidate['tests']} | {candidate['similarity']:.3f} "
+            f"| {candidate['shared']} | {candidate['seconds']:.3f} "
+            f"| {candidate['classification']} |"
         )
     if not report["candidates"]:
-        lines.append("| — | — | — | — | — | — |")
+        lines.append("| — | — | — | — | — | — | — |")
 
     lines += [
         "",
-        "### Tests with no exclusive production line",
+        "### Tests with no exclusive production line (examples)",
         "",
         (
             "Every measured line of these tests is also covered by another test. "
@@ -244,15 +249,14 @@ def render_summary(report: dict) -> str:
         "",
         "### Reviewed pairs",
         "",
-        "| Test A | Test B | Similarity | Only A | Only B | Candidate | Saved (s) |",
-        "|---|---|---:|---:|---:|---|---:|",
+        "| Test A | Test B | Similarity | Shared | Only A | Only B | Classification |",
+        "|---|---|---:|---:|---:|---:|---|",
     ]
     for pair in report["pairs"]:
-        candidate = pair["candidate"] or "—"
         lines.append(
             f"| `{pair['test_a']}` | `{pair['test_b']}` | {pair['similarity']:.3f} "
-            f"| {pair['only_a']} | {pair['only_b']} | `{candidate}` "
-            f"| {pair['saved_seconds']:.3f} |"
+            f"| {pair['shared']} | {pair['only_a']} | {pair['only_b']} "
+            f"| {pair['classification']} |"
         )
     if not report["pairs"]:
         lines.append("| — | — | — | — | — | — | — |")

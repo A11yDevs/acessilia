@@ -106,6 +106,42 @@ def test_a_line_covered_by_too_many_tests_is_ignored() -> None:
     ) == []
 
 
+def test_capped_lines_do_not_distort_the_metrics() -> None:
+    tests = {f"tests::other_{index}": frozenset({"common"}) for index in range(49)}
+    tests["tests::a"] = frozenset({"common", "x1", "x2", "x3", "x4"})
+    tests["tests::b"] = frozenset({"common", "x1", "x2", "x3", "x4"})
+
+    pairs = overlap.similarity_pairs(
+        tests, threshold=0.8, min_shared=1, max_element_tests=50
+    )
+
+    pair = next(pair for pair in pairs if pair.test_a == "tests::a")
+    assert pair.shared == 5
+    assert pair.union == 5
+    assert pair.similarity == 1.0
+    assert pair.only_a == pair.only_b == 0
+
+
+def test_coverage_subsets_are_independent_of_the_jaccard_threshold() -> None:
+    tests = {
+        "tests::big": frozenset({"f:1", "f:2", "f:3", "f:4", "f:5"}),
+        "tests::small": frozenset({"f:1", "f:2"}),
+        "tests::same_a": frozenset({"f:9"}),
+        "tests::same_b": frozenset({"f:9"}),
+    }
+
+    subsets = overlap.coverage_subsets(tests)
+
+    assert {
+        (subset.subsumed, subset.subsumer, subset.strict) for subset in subsets
+    } == {
+        ("tests::small", "tests::big", True),
+        ("tests::same_a", "tests::same_b", False),
+    }
+    small = next(subset for subset in subsets if subset.subsumed == "tests::small")
+    assert small.similarity == 0.4
+
+
 def test_parameterized_families_detect_identical_variants() -> None:
     tests = {
         "tests::test_x[1]": frozenset({"f:1", "f:2"}),
@@ -140,7 +176,9 @@ def test_build_report_keeps_the_top_pairs_and_zero_exclusive_tests() -> None:
 
     assert report["summary"]["tests"] == 2
     assert report["summary"]["pairs"] == 1
+    assert report["summary"]["coverage_subsets"] == 1
     assert report["pairs"][0]["similarity"] == 1.0
+    assert report["coverage_subsets"][0]["subsumed"] == "tests::test_a"
     assert report["zero_exclusive"] == [
         {"test": "tests::test_a", "elements": 2},
         {"test": "tests::test_b", "elements": 2},
@@ -230,6 +268,7 @@ def test_main_rejects_coverage_without_contexts(tmp_path: Path) -> None:
 def _overlap_payload() -> dict:
     return {
         "kind": "coverage-overlap",
+        "summary": {"coverage_subsets": 3, "zero_exclusive_tests": 2},
         "pairs": [
             {
                 "test_a": "tests::test_a",
@@ -238,96 +277,66 @@ def _overlap_payload() -> dict:
                 "shared": 10,
                 "only_a": 2,
                 "only_b": 0,
-                "exclusive_a": 0,
-                "exclusive_b": 0,
+                "same_parameterized_family": False,
+            }
+        ],
+        "coverage_subsets": [
+            {
+                "subsumed": "tests::test_b",
+                "subsumer": "tests::test_a",
+                "similarity": 0.8,
+                "shared": 8,
+                "union": 10,
+                "strict": True,
                 "same_parameterized_family": False,
             },
             {
-                "test_a": "tests::test_c[1]",
-                "test_b": "tests::test_c[2]",
+                "subsumed": "tests::test_c[1]",
+                "subsumer": "tests::test_c[2]",
                 "similarity": 1.0,
                 "shared": 5,
-                "only_a": 0,
-                "only_b": 0,
-                "exclusive_a": 0,
-                "exclusive_b": 0,
+                "union": 5,
+                "strict": False,
                 "same_parameterized_family": True,
             },
             {
-                "test_a": "tests::test_d",
-                "test_b": "tests::test_e",
-                "similarity": 0.85,
-                "shared": 8,
-                "only_a": 0,
-                "only_b": 1,
-                "exclusive_a": 0,
-                "exclusive_b": 0,
+                "subsumed": "tests::test_d",
+                "subsumer": "tests::test_e",
+                "similarity": 0.5,
+                "shared": 5,
+                "union": 10,
+                "strict": True,
                 "same_parameterized_family": False,
             },
+        ],
+        "zero_exclusive": [
+            {"test": "tests::test_a", "elements": 12},
+            {"test": "tests::test_b", "elements": 3},
         ],
     }
 
 
-def test_a_pair_with_exclusive_lines_on_both_sides_has_no_direction() -> None:
-    pair = {
-        "test_a": "tests::test_a",
-        "test_b": "tests::test_b",
-        "similarity": 1.0,
-        "shared": 10,
-        "only_a": 2,
-        "only_b": 1,
-        "exclusive_a": 0,
-        "exclusive_b": 0,
-        "same_parameterized_family": False,
-    }
+def test_review_pair_describes_the_pair_without_choosing_a_candidate() -> None:
+    pair = _overlap_payload()["pairs"][0]
 
-    review = redundancy.review_pair(pair, {"tests::test_b": 2.5})
+    review = redundancy.review_pair(pair)
 
     assert review.classification == "near-identical"
-    assert review.candidate is None
+    assert (review.only_a, review.only_b) == (2, 0)
 
 
-def test_review_pair_selects_a_coverage_subsumed_candidate() -> None:
-    pair = {
-        "test_a": "tests::test_a",
-        "test_b": "tests::test_b",
-        "similarity": 0.8,
-        "shared": 4,
-        "only_a": 3,
-        "only_b": 0,
-        "exclusive_a": 0,
-        "exclusive_b": 0,
-        "same_parameterized_family": False,
-    }
+def test_subset_classification_distinguishes_strict_and_parameterized() -> None:
+    strict = _overlap_payload()["coverage_subsets"][0]
+    parameterized = _overlap_payload()["coverage_subsets"][1]
 
-    review = redundancy.review_pair(pair, {"tests::test_b": 1.25})
-
-    assert review.candidate == "tests::test_b"
-    assert review.saved_seconds == 1.25
-    assert review.classification == "high-overlap"
+    assert redundancy.subset_classification(strict) == "coverage-subset"
+    assert (
+        redundancy.subset_classification(parameterized)
+        == "identical-parameterization"
+    )
 
 
-def test_a_parametrized_pair_is_reviewed_but_never_auto_subsumed() -> None:
-    pair = {
-        "test_a": "tests::test_c[1]",
-        "test_b": "tests::test_c[2]",
-        "similarity": 1.0,
-        "shared": 5,
-        "only_a": 0,
-        "only_b": 0,
-        "exclusive_a": 0,
-        "exclusive_b": 0,
-        "same_parameterized_family": True,
-    }
-
-    review = redundancy.review_pair(pair, {"tests::test_c[1]": 3.0})
-
-    assert review.classification == "identical-parameterization"
-    assert review.candidate is None
-    assert review.saved_seconds == 0.0
-
-
-def test_build_report_deduplicates_candidates_and_sums_unique_savings() -> None:
+def test_build_report_ranks_coverage_subset_candidates() -> None:
     durations = {"tests::test_b": 2.0, "tests::test_d": 1.0}
     report = redundancy.build_report(
         _overlap_payload(), durations, duration_source="baseline"
@@ -336,20 +345,19 @@ def test_build_report_deduplicates_candidates_and_sums_unique_savings() -> None:
     assert [candidate["test"] for candidate in report["candidates"]] == [
         "tests::test_b",
         "tests::test_d",
+        "tests::test_c[1]",
     ]
-    assert report["summary"]["candidates"] == 2
+    assert report["summary"]["candidates"] == 3
+    assert report["summary"]["coverage_subset_total"] == 3
     assert report["summary"]["estimated_savings_seconds"] == 3.0
     assert report["summary"]["duration_source"] == "baseline"
     summary = redundancy.render_summary(report)
     assert "review sheet, not a deletion list" in summary
+    assert "presentation sample" in summary
 
 
-def test_a_test_without_an_exclusive_line_is_reported_separately() -> None:
+def test_a_test_without_an_exclusive_line_uses_the_global_total() -> None:
     payload = _overlap_payload()
-    payload["zero_exclusive"] = [
-        {"test": "tests::test_a", "elements": 12},
-        {"test": "tests::test_b", "elements": 3},
-    ]
 
     report = redundancy.build_report(payload, {"tests::test_a": 2.0})
 
@@ -358,6 +366,7 @@ def test_a_test_without_an_exclusive_line_is_reported_separately() -> None:
         {"test": "tests::test_b", "elements": 3, "seconds": 0.0},
     ]
     assert report["summary"]["zero_exclusive"] == 2
+    assert report["summary"]["zero_exclusive_examples"] == 2
     assert "no exclusive production line" in redundancy.render_summary(report)
 
 
@@ -435,7 +444,7 @@ def test_main_writes_a_redundancy_report(tmp_path: Path) -> None:
     assert status == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["kind"] == "redundancy-report"
-    assert payload["summary"]["candidates"] == 2
+    assert payload["summary"]["candidates"] == 3
     assert summary.read_text(encoding="utf-8").startswith("## Redundancy candidates")
 
 

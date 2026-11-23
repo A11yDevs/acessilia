@@ -25,66 +25,79 @@ sets that context to the test node id with `--cov-context=test`, so the
 `.coverage` database knows which test executed each `file:line`:
 
 ```bash
-COVERAGE_FILE="$PWD/var/context/app/.coverage" \
-uv run pytest -m "not e2e" -n 4 --dist worksteal \
-  --cov=backend --cov=frontend --cov-branch --cov-context=test \
-  --cov-config="$PWD/pyproject.toml" --cov-report= \
-  --junitxml=var/context/app/results.xml
+make test-overlap
 
-uv run python scripts/tests/coverage_overlap.py \
-  --coverage-file var/context/app/.coverage \
-  --include backend --include frontend \
-  --output docs/testing/overlap-app.json \
-  --summary docs/testing/overlap-app.md
-
-uv run python scripts/tests/redundancy_report.py \
-  docs/testing/overlap-app.json \
-  --junit app=var/context/app/results.xml \
-  --output docs/testing/redundancy-app.json \
-  --summary docs/testing/redundancy-app.md
+# The target writes var/overlap/app.json, app.md, redundancy.json and
+# redundancy.md; the committed snapshot is those files copied here.
+cp var/overlap/app.json docs/testing/overlap-app.json
+cp var/overlap/app.md docs/testing/overlap-app.md
+cp var/overlap/redundancy.json docs/testing/redundancy-app.json
+cp var/overlap/redundancy.md docs/testing/redundancy-app.md
 ```
+
+The target runs the application suite with
+`--cov-context=test`, writes `var/overlap/context/.coverage` and
+`var/overlap/app-results.xml`, then invokes both analysis scripts with
+`--extra dev`.
 
 The first script computes the Jaccard similarity
 `|A ∩ B| / |A ∪ B|` for every pair that shares at least five lines, and flags
-pairs at or above `0.8`. A line covered by more than 50 tests is ignored as
-shared infrastructure: every test imports the application, so those lines would
-make unrelated tests look identical. The threshold and the cap are configurable.
+pairs at or above `0.8`. A line covered by more than 50 tests is used only to
+*propose* candidate pairs; every reported intersection, union, `only_a`,
+`only_b` and Jaccard value is recomputed from the complete test sets. The cap
+therefore bounds the search, not the metric.
 
-The second script adds durations, identifies whether one test covers no line
-the other does not, and separates parametrized variants. It never edits,
-deletes or skips a test.
+Coverage subsumption is computed separately from the complete sets and does not
+depend on the Jaccard threshold: a small test can be contained in a much larger
+one with low similarity. Tests with the same coverage signature are grouped, so
+the report shows signature relations and their group sizes instead of millions
+of pairwise duplicates.
+
+The second script adds durations, ranks the coverage-subset candidates,
+separates parametrized variants and states how many examples of each table are
+shown. `--junit` reads complete JUnit reports; `--baseline` is the optional PR 1
+baseline and is only used for its slowest-test lists. It never edits, deletes or
+skips a test.
 
 ## Results
 
-The application suite ran 3,192 tests over 3,559 measured lines.
+The application suite ran 3,197 tests over 3,559 measured lines.
 
 | Measure | Value |
 |---|---:|
-| Pairs at Jaccard >= 0.8 with >= 5 shared lines | 83 |
-| Exact pairs (Jaccard = 1.0) | 0 |
-| Mean similarity of the reported pairs | 0.815 |
+| Pairs at Jaccard >= 0.8 with >= 5 shared lines | 1,995 |
+| Exact pairs (Jaccard = 1.0) | 735 |
+| Mean similarity of the reported pairs | 0.951 |
 | Parametrized families analysed | 288 |
-| Families with identical line coverage | 246 |
-| Tests with no exclusive production line | 3,080 of 3,192 |
+| Families with identical line coverage | 247 |
+| Coverage-subset signature relations | 1,250 |
+| · strict subsets | 1,151 |
+| · identical-coverage groups | 99 |
+| Tests sharing an identical coverage signature | 2,914 |
+| Tests with no exclusive production line | 3,085 of 3,197 |
 
-At a looser threshold of 0.6 and three shared lines, the report has 234 pairs
-and still **no pair where one test's measured lines are a subset of the
-other's**. That is the central result of this PR: the suite has large overlap,
-but it does not have a demonstrable pairwise elimination candidate.
+The suite has substantial overlap, but the conclusion is not an automatic
+deletion list. The subset analysis finds **1,250 coverage relations between
+unique signatures**, including 1,151 strict subsets. That contradicts the
+earlier framing that no subset exists: a small test can be contained in a much
+larger one with low Jaccard, which is why subsumption must be computed without
+the similarity threshold. The review sheet ranks the examples by measured
+seconds; it does not remove any test.
 
 ### Where the overlap is
 
 | Cluster | Example | Jaccard | Shared | Only A | Only B |
 |---|---|---:|---:|---:|---:|
-| Telegram document flow | `test_document_does_not_consume_another_senders_preferences` ↔ `test_document_submits_with_mode_and_source` | 0.849 | 269 | 24 | 24 |
-| Telegram locale variants | `test_pdf_ua_warning_survives_worker_and_user_locales_differing[en_US-pt_BR]` ↔ `[pt_BR-en_US]` | 0.853 | 279 | 24 | 24 |
-| Web panel receipts | `test_receipt_close_info_only_while_the_email_promise_holds[done-failed-False-False]` ↔ `test_receipt_recovers_result_after_refresh[failed]` | 0.826 | 171 | 18 | 18 |
+| Long output names | `test_long_filename_can_be_exported_and_downloaded[long-ascii]` ↔ `[long-cjk]` | 1.000 | 605 | 0 | 0 |
+| Pending fixes | `test_email_delivery_status_does_not_lose_download[False]` ↔ `[None]` | 0.993 | 455 | 3 | 0 |
+| Model-call executor | `test_pending_calls_are_removed_and_never_start_late[False]` ↔ `test_running_deadline_retains_capacity_and_default_executor_stays_available` | 0.924 | 98 | 8 | 0 |
 | Benchmark client matrix | `test_the_harness_configures_clients_like_the_core[...]` variants | — | 273 | — | — |
 
-These clusters share the request/response plumbing of one scenario. Each test
-still covers between 18 and 30 lines that its neighbour does not, usually the
-branch for the state, locale or client it asserts. Removing one would lose
-coverage of that branch, so none is a candidate on coverage evidence alone.
+These clusters share the request/response plumbing of one scenario. Some pairs
+are strict coverage subsets; others still cover lines that their neighbour does
+not. Coverage alone cannot show whether the assertions, contracts or failure
+modes are duplicated, so the review sheet is the input for PR 3's mutation
+experiment.
 
 ### Parametrized families
 
@@ -95,13 +108,14 @@ parametrization usually varies inputs and expected assertions, not the
 production path. Equal line coverage is not duplicate behaviour; the variants
 can fail for different reasons.
 
-The review sheet lists the families and the pairs. It classifies
+The overlap report lists the families and their signature groups; the review
+sheet lists the candidate tests and pairs. It classifies
 `identical-parameterization` separately and never proposes one of its variants
-as subsumed.
+as a removal.
 
 ### Tests without an exclusive production line
 
-3,080 of 3,192 tests cover no line that no other test covers. This number is
+3,085 of 3,197 tests cover no line that no other test covers. This number is
 not a defect: coverage omits the test files themselves, so assertions,
 parametrized expected values and error messages are invisible to it. Almost
 every test that exercises the same service entry point will share all its
@@ -116,11 +130,12 @@ testing is the experiment that can tell them apart.
 | Question from #644 | Result |
 |---|---|
 | Matrix relating tests and covered code | `.coverage` contexts, summarised as `file:line` sets per test |
-| Coverage similarity between tests | Jaccard per pair, 83 pairs at 0.8 |
-| Sets with high overlap | Telegram, web panel, benchmark client and receipt clusters |
-| Exclusive contribution of each test | Per pair and per suite; 3,080 tests have none on production lines |
+| Coverage similarity between tests | Jaccard per pair, 1,995 pairs at 0.8 |
+| Sets with high overlap | Long-output, pending-fix, model-call and benchmark clusters |
+| Exclusive contribution of each test | Per pair and per suite; 3,085 tests have none on production lines |
+| Coverage subsumption | 1,250 signature relations (1,151 strict, 99 identical), independent of Jaccard |
 | Parametrized cases possibly equivalent | 246 families with identical line coverage; none auto-removed |
-| Duplication across unit, integration and contract tests | No pairwise subset at 0.8 or 0.6; PR 3 compares detection |
+| Duplication across unit, integration and contract tests | 1,250 coverage-subset signatures; PR 3 compares detection |
 | Expensive fixtures shared by similar tests | Duration is added from JUnit; the report ranks candidates by seconds |
 | Candidate classification and risk | No automatic candidate; the review sheet requires contract review |
 
@@ -131,9 +146,10 @@ testing is the experiment that can tell them apart.
   totals, but the per-test sets are line-based.
 - **Tests are omitted from coverage.** Assertion-only branches do not appear;
   this is why "no exclusive line" is weak evidence and why PR 3 is necessary.
-- **Common lines are capped.** Lines covered by more than 50 tests are ignored
-  to keep the analysis meaningful and fast; raising the cap adds noise and
-  quadratic work.
+- **Common lines only prune the pair search.** Lines covered by more than 50
+  tests are not used to propose pairs; the reported metrics and the subset
+  analysis use the complete sets. The candidate set can still miss a pair whose
+  every line is shared infrastructure, which is documented by the totals.
 - **One revision and one run.** Contexts come from a passing run at the commit
   in the snapshot; a later refactor can change which helper a test reaches.
 - **No semantic analysis.** Two tests can cover the same lines and assert
@@ -144,10 +160,10 @@ testing is the experiment that can tell them apart.
 ```bash
 # docstruct
 COVERAGE_FILE="$PWD/var/context/docstruct/.coverage" \
-  uv run --project "$PWD" python -m pytest libs/docstruct/tests \
+  uv run --extra dev --project "$PWD" python -m pytest libs/docstruct/tests \
   --cov=docstruct --cov-branch --cov-context=test \
   --cov-config="$PWD/pyproject.toml" --cov-report=
-uv run python scripts/tests/coverage_overlap.py \
+uv run --extra dev python scripts/tests/coverage_overlap.py \
   --coverage-file var/context/docstruct/.coverage \
   --include libs/docstruct/src/docstruct \
   --output var/overlap/docstruct.json

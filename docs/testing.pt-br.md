@@ -32,6 +32,7 @@ própria suíte completa mais rápida.
 | Quero verificar o lint (baseline do Ruff) | `make lint` | Executa o Ruff (`F`, `I`, `E` sem `E501`) via `scripts/check_ruff_baseline.py` |
 | Quero verificar tipos estáticos (Mypy) | `make typecheck` | Executa o Mypy no escopo configurado de `docstruct`, `acessilia_sdk`, `acessilia_core` e `backend` |
 | Quero relatórios de cobertura por componente | `make coverage` | Executa as quatro suítes com cobertura de desvios, grava `var/coverage/{app,core,sdk,docstruct}/` e exige os limites |
+| Quero evidência de sobreposição de cobertura | `make test-overlap` | Executa a suíte da aplicação com contextos por teste e grava os relatórios de sobreposição/redundância em `var/overlap/` (#644) |
 | Quero só a suíte principal, em paralelo | `uv run pytest -m "not e2e" -n 4 --dist worksteal` | Roda a suíte principal non-E2E com quatro workers |
 | Quero só a biblioteca do core | `(cd libs/core && uv run --extra dev pytest)` | Roda a suíte do core, sem o serviço |
 | Preciso ver os comandos exatos do `make` | `make -n test-all` | Imprime os comandos sem executar |
@@ -263,6 +264,7 @@ make test-all
 make lint
 make typecheck
 make coverage
+make test-overlap
 ```
 
 Pisos de cobertura: aplicação **85%**, docstruct **86%**, SDK **96%**, core **82%** (branch coverage).

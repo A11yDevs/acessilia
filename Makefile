@@ -73,11 +73,11 @@ test-overlap:
 		--cov=backend --cov=frontend --cov-branch --cov-context=test \
 		--cov-config="$(CURDIR)/pyproject.toml" --cov-report= \
 		--junitxml="$(CURDIR)/$(OVERLAP_DIR)/app-results.xml"
-	$(UV) run python scripts/tests/coverage_overlap.py \
+	$(UV) run --extra dev python scripts/tests/coverage_overlap.py \
 		--coverage-file "$(CURDIR)/$(OVERLAP_DIR)/context/.coverage" \
 		--include backend --include frontend \
 		--output "$(OVERLAP_DIR)/app.json" --summary "$(OVERLAP_DIR)/app.md"
-	$(UV) run python scripts/tests/redundancy_report.py "$(OVERLAP_DIR)/app.json" \
+	$(UV) run --extra dev python scripts/tests/redundancy_report.py "$(OVERLAP_DIR)/app.json" \
 		--junit "app=$(CURDIR)/$(OVERLAP_DIR)/app-results.xml" \
 		--output "$(OVERLAP_DIR)/redundancy.json" --summary "$(OVERLAP_DIR)/redundancy.md"
 
