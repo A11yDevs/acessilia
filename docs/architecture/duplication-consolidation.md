@@ -218,6 +218,20 @@ group disappears. Each shim is now one statement, so the detector's
 one-statement floor also applies; the shared helper is the actual extraction,
 not the floor.
 
+## Fourteenth consolidation: the lazily built planner
+
+`PddlPlanningEngine.planner` and `PddlAccessibilityOrchestrator.planner`
+repeated the same lazy `PlannerAgent` construction. Both now call
+`_lazy_planner`; the orchestrator keeps its setter, and the engine's public
+property is unchanged. The planning tests cover first-use caching and the
+injected planner.
+
+**Measured delta on this PR's code commit:** 8 groups / 17 functions / 222
+lines → **7 groups / 15 functions / 213 lines**. The planner-property group
+disappears. Each property is now one statement, so the detector's
+one-statement floor also applies; the shared helper is the actual extraction,
+not the floor.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -248,11 +262,10 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 21 | SDK layout/structure result readers (2/32) | **Reclassified:** false positive; the envelope extraction is already shared. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
-The table is anchored to the November baseline. The current tool also reports
-the planner property shared by the orchestrator and the planning engine
-introduced by #632 (2/9), tracked separately from the baseline rows. The two
+The table is anchored to the November baseline. The planner property shared by
+the orchestrator and the planning engine introduced by #632 and the two
 deprecation `__getattr__` functions in `table_ast`/`validators` were
-consolidated above.
+consolidated above; they were tracked separately from the baseline rows.
 
 The remaining groups are smaller or behaviour-sensitive. Agent selection and
 table selection need characterization before extraction, while the config
@@ -264,7 +277,7 @@ keep its own focused PR; the remaining groups were not changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

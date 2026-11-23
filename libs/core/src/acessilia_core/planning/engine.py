@@ -18,7 +18,7 @@ engine) sees later changes to its manifest.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -139,6 +139,19 @@ def require_engine(engine: object) -> PlanningEngine:
     return engine
 
 
+class _PlannerOwner(Protocol):
+    _planner: PlannerAgent | None
+
+
+def _lazy_planner(
+    owner: _PlannerOwner, factory: Callable[[], PlannerAgent]
+) -> PlannerAgent:
+    """The owner's default planner, built (loading the domain) on first use."""
+    if owner._planner is None:
+        owner._planner = factory()
+    return owner._planner
+
+
 class PddlPlanningEngine:
     """The PDDL engine: :class:`PlannerAgent` with one backend configuration.
 
@@ -168,9 +181,8 @@ class PddlPlanningEngine:
 
     @property
     def planner(self) -> PlannerAgent:
-        if self._planner is None:
-            self._planner = PlannerAgent()
-        return self._planner
+        """The default planner, built (loading the domain) on first use."""
+        return _lazy_planner(self, PlannerAgent)
 
     @property
     def identity(self) -> str:
