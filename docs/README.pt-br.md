@@ -40,6 +40,7 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 24. [Sobreposição de cobertura e candidatos à redundância](testing/overlap.pt-br.md) — PR 2 da #644: os contextos de cobertura por teste, a matriz de Jaccard, a subsunção de cobertura por assinatura e por que nenhum teste é removido apenas com evidência de cobertura. (English: [English version](testing/overlap.md))
 25. [Mutation testing e subsunção de testes](testing/mutation.pt-br.md) — PR 3 da #644: o experimento limitado de mutação em `flood` e `equations`, os três mutantes sobreviventes de fronteira, a matriz de subsunção e seu custo-benefício. (English: [English version](testing/mutation.md))
 26. [Resultados da otimização de testes](testing/optimizations.pt-br.md) — PR 4 da #644: as especificações de campo em cache que reduziram o tempo da suíte da docstruct, os três testes de fronteira que elevaram o mutation score do `flood_guard` para 100% e a comparação medida antes/depois. (English: [English version](testing/optimizations.md))
+27. [Seleção de testes orientada pela arquitetura (modo observação)](testing/impact-selection.pt-br.md) — a matriz de dependências da #644, as regras por caminho e o job de CI somente observação que registra quais suítes uma alteração deveria acionar. (English: [English version](testing/impact-selection.md))
 
 ---
 
