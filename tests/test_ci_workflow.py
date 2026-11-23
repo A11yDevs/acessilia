@@ -14,6 +14,7 @@ SECURITY = ROOT / ".github/workflows/security.yml"
 SCHEDULED = ROOT / ".github/workflows/scheduled-tests.yml"
 PRODUCTION = ROOT / ".github/workflows/production-deployment.yml"
 RULESETS = ROOT / ".github/rulesets"
+SETUP_ACTION = ROOT / ".github/actions/setup-root/action.yml"
 BYPASS_FILTER = ROOT / "scripts/rulesets-bypass.jq"
 
 
@@ -291,21 +292,26 @@ def test_core_runs_alone_from_its_wheel() -> None:
 
 
 def test_ci_installs_the_root_environment_from_the_lock() -> None:
-    """The component and quality jobs use the root uv.lock environment (#405)."""
+    """The component and quality jobs use the shared root environment (#405)."""
+    action = yaml.safe_load(SETUP_ACTION.read_text(encoding="utf-8"))
+    steps = {step.get("name"): step for step in action["runs"]["steps"]}
+    uv = steps["Set up uv"]
+    assert uv["uses"].startswith("astral-sh/setup-uv@")
+    assert uv["with"]["version"] == "0.11.17"
+    cache = steps["Restore uv cache"]
+    assert cache["with"]["path"] == "~/.cache/uv"
+    assert "inputs.lock-hash" in cache["with"]["key"]
+    install = steps["Check the lock and install from it"]["run"]
+    assert "uv lock --check" in install
+    assert "uv sync --locked --extra dev" in install
+
     jobs = _workflow()["jobs"]
     for job_id in ("quality", "component-tests"):
-        job = jobs[job_id]
-        steps = {step.get("name"): step for step in job["steps"]}
-        uv = steps["Set up uv"]
-        assert uv["uses"].startswith("astral-sh/setup-uv@")
-        assert uv["with"]["version"] == "0.11.17"
-        cache = steps["Restore uv cache"]
-        assert cache["with"]["path"] == "~/.cache/uv"
-        assert "hashFiles('uv.lock')" in cache["with"]["key"]
-        install = steps["Check the lock and install from it"]["run"]
-        assert "uv lock --check" in install
-        assert "uv sync --locked --extra dev" in install
-        assert not any("pip install" in (step.get("run") or "") for step in job["steps"])
+        steps = {step.get("name"): step for step in jobs[job_id]["steps"]}
+        setup = steps["Set up root environment"]
+        assert setup["uses"] == "./.github/actions/setup-root"
+        assert setup["with"]["lock-hash"] == "${{ hashFiles('uv.lock') }}"
+        assert not any("pip install" in (step.get("run") or "") for step in jobs[job_id]["steps"])
 
     component = jobs["component-tests"]
     steps = {step.get("name"): step for step in component["steps"]}
@@ -315,7 +321,7 @@ def test_ci_installs_the_root_environment_from_the_lock() -> None:
 
     aggregate = {step.get("name"): step for step in jobs["tests"]["steps"]}
     assert "Set up uv" not in aggregate
-    assert "Check the lock and install from it" not in aggregate
+    assert "Set up root environment" not in aggregate
 
 
 def test_production_container_installs_dev_deps_into_the_uv_venv() -> None:
