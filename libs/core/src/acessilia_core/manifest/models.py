@@ -11,6 +11,10 @@ from acessilia_core.i18n.log_messages import (
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
 )
+from acessilia_core.manifest.dependencies import (
+    DependencyCycleError,
+    dependency_closure,
+)
 from docstruct.manifest import (  # noqa: F401  (msgids re-exported for the catalogs)
     MSG_CHAR_RANGE_REVERSED,
     MSG_DUPLICATE_ELEMENT_IDS,
@@ -261,22 +265,12 @@ def _validate_obligation_dag(obligations: list[Obligation]) -> None:
     dependency_graph = {
         obligation.id: obligation.dependencies for obligation in obligations
     }
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(obligation_id: str) -> None:
-        if obligation_id in visiting:
-            raise ValueError("Ciclo detectado nas dependências de obrigações")
-        if obligation_id in visited:
-            return
-        visiting.add(obligation_id)
-        for dependency in dependency_graph.get(obligation_id, []):
-            visit(dependency)
-        visiting.remove(obligation_id)
-        visited.add(obligation_id)
-
-    for obligation_id in dependency_graph:
-        visit(obligation_id)
+    try:
+        dependency_closure(dependency_graph, dependency_graph)
+    except DependencyCycleError as error:
+        raise ValueError(
+            f"Ciclo detectado nas dependências de obrigações: {error}"
+        ) from error
 
 
 def _validate_satisfied_predecessors(obligations: list[Obligation]) -> None:

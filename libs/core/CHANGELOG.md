@@ -44,6 +44,10 @@ replan changes the manifest in place. Before, the compiler let both through:
 
 `PddlProblemCompiler` now refuses both before any planner runs, with a
 `ValueError` that names the cycle or the missing obligation (#783).
+The check covers the selected closure: a cycle reached below a root names only
+the cycle, and an unknown dependency names the obligation that has it. The
+model and the compiler share one walk (`acessilia_core.manifest.dependencies`),
+so they report the same cycle; the model's message now names it too.
 
 ## 0.3.7 — a planning engine seam
 
