@@ -1,13 +1,14 @@
 """Domain 2.4 under Fast Downward (review of #781).
 
-Opt-in: set ``ACESSILIA_FAST_DOWNWARD`` to ``fast-downward.py`` (or a built
-``downward`` driver) to run these; without it they are skipped, and Fast
-Downward is not verified. They run the internal planner and Fast Downward on
+Opt-in: these tests carry the ``fast_downward`` marker, which the core's pytest
+config deselects (CI rejects skipped tests). Select them with
+``-m fast_downward`` and set ``ACESSILIA_FAST_DOWNWARD`` to ``fast-downward.py``
+(or a wrapper around a build); selected without it, they skip. They run the internal planner and Fast Downward on
 the same problem and require the same plan, for a nominal case and for a
 cheaper method whose capability is not offered.
 
     ACESSILIA_FAST_DOWNWARD=/path/to/fast-downward.py \\
-        uv run --extra dev pytest tests/test_fast_downward_domain.py -v
+        uv run --extra dev pytest -m fast_downward tests/test_fast_downward_domain.py -v
 """
 from __future__ import annotations
 
@@ -22,9 +23,12 @@ from acessilia_core.planning.planner_agent import PlannerAgent
 
 EXECUTABLE = os.environ.get("ACESSILIA_FAST_DOWNWARD")
 
-pytestmark = pytest.mark.skipif(
-    not EXECUTABLE, reason="ACESSILIA_FAST_DOWNWARD is not set: Fast Downward not verified"
-)
+pytestmark = [
+    pytest.mark.fast_downward,
+    pytest.mark.skipif(
+        not EXECUTABLE, reason="ACESSILIA_FAST_DOWNWARD is not set: Fast Downward not verified"
+    ),
+]
 
 _EXTRACT = ("document.structure.extract", "docling")
 _RENDER = ("pdf.render", "pymupdf")

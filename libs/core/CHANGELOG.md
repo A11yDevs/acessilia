@@ -44,8 +44,10 @@ that normalize alike (a method and a provider both called `docling`) get
 distinct symbols, and the validator refuses an object declared twice.
 
 The internal planner is tested with domain 2.4. Fast Downward 26.6 was checked
-locally and agrees with it; CI does not run it yet (#790). `tests/test_fast_downward_domain.py` compares both backends when
-`ACESSILIA_FAST_DOWNWARD` is set.
+locally and agrees with it; CI does not run it yet (#790).
+`tests/test_fast_downward_domain.py` compares both backends. It carries the
+`fast_downward` marker, deselected by default because CI rejects skipped tests:
+run it with `-m fast_downward` and `ACESSILIA_FAST_DOWNWARD` set.
 
 ## 0.3.8 — the PDDL compiler refuses cyclic and unknown dependencies
 

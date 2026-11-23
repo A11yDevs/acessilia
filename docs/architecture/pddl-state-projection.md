@@ -139,7 +139,8 @@ result contracts, the execution journal and the replanning rules of #640
 The internal planner is tested against domain 2.4 in CI. Fast Downward 26.6
 (`aibasel/downward`, `astar(blind())`) was checked against it locally:
 `libs/core/tests/test_fast_downward_domain.py` runs both backends on the same
-problems when `ACESSILIA_FAST_DOWNWARD` points to a Fast Downward build, and
+problems when selected (`-m fast_downward`; deselected by default) with
+`ACESSILIA_FAST_DOWNWARD` pointing to a Fast Downward build, and
 they agree with and without a catalogue, under `observe` and `enforce`, and
 with names shared across types. CI does not run Fast Downward yet
 ([#790](https://github.com/A11yDevs/acessilia/issues/790)). The

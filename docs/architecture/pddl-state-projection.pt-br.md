@@ -143,8 +143,8 @@ atual.
 O planejador interno é testado contra o domínio 2.4 no CI. O Fast Downward
 26.6 (`aibasel/downward`, `astar(blind())`) foi conferido com ele localmente:
 `libs/core/tests/test_fast_downward_domain.py` roda os dois backends sobre os
-mesmos problemas quando `ACESSILIA_FAST_DOWNWARD` aponta para um build do Fast
-Downward, e eles concordam com e sem catálogo, em `observe` e `enforce`, e com
+mesmos problemas quando selecionado (`-m fast_downward`; fora da seleção por
+padrão) com `ACESSILIA_FAST_DOWNWARD` apontando para um build do Fast Downward, e eles concordam com e sem catálogo, em `observe` e `enforce`, e com
 nomes repetidos entre tipos. O CI ainda não roda o Fast Downward
 ([#790](https://github.com/A11yDevs/acessilia/issues/790)). Os predicados derivados exigem uma busca cujas heurísticas suportem
 axiomas, como o padrão `astar(blind())`.

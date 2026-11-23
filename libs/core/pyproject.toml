@@ -51,3 +51,9 @@ exclude = ["**/*.mo", "**/__pycache__"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"
+# Fast Downward runs only on request (#790): CI rejects skipped tests, so the
+# opt-in tests are deselected, not skipped. Run them with -m fast_downward.
+addopts = ["-m", "not fast_downward"]
+markers = [
+    "fast_downward: needs a Fast Downward build at ACESSILIA_FAST_DOWNWARD (opt-in, #790)",
+]

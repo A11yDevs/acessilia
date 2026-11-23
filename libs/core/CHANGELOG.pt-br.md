@@ -44,8 +44,10 @@ que se normalizam igual (um método e um provider chamados `docling`) recebem
 símbolos distintos, e o validador recusa um objeto declarado duas vezes.
 
 O planejador interno é testado com o domínio 2.4. O Fast Downward 26.6 foi
-conferido localmente e concorda com ele; o CI ainda não o roda (#790). `tests/test_fast_downward_domain.py` compara os dois
-backends quando `ACESSILIA_FAST_DOWNWARD` está definido.
+conferido localmente e concorda com ele; o CI ainda não o roda (#790).
+`tests/test_fast_downward_domain.py` compara os dois backends. Ele leva o
+marcador `fast_downward`, fora da seleção por padrão porque o CI recusa testes
+pulados: rode-o com `-m fast_downward` e `ACESSILIA_FAST_DOWNWARD` definido.
 
 ## 0.3.8 — o compilador PDDL recusa dependências cíclicas e desconhecidas
 
