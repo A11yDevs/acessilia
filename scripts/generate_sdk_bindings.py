@@ -209,8 +209,8 @@ def _escape_braces(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
 
-def _field(name: str, spec: dict, required: bool) -> tuple[str, str, str]:
-    """The dataclass field line, checker template and annotation for a property."""
+def _field(name: str, spec: dict, required: bool) -> tuple[str, str, str, str]:
+    """The dataclass field line, checker template, annotation and placeholder."""
     unknown = sorted(set(spec) - _KEYWORDS)
     if unknown:
         raise BindingError(f"property {name!r} uses unsupported keywords {unknown}")
@@ -228,6 +228,9 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str, str]:
         for kind in types
     )
     field = _FIELD_PLACEHOLDER
+    pattern = spec.get("pattern")
+    while isinstance(pattern, str) and field in pattern:
+        field += "_"
     lines = [f"def _check_{field}(value: Any) -> {annotation}:"]
     if "integer" in types:
         # Draft-07 (6.1.1): a number with a zero fractional part is an integer,
@@ -258,7 +261,7 @@ def _field(name: str, spec: dict, required: bool) -> tuple[str, str, str]:
         ]
     lines.append("    return value")
     default = "" if required else " = None"
-    return f"    {name}: {annotation}{default}", "\n".join(lines), annotation
+    return f"    {name}: {annotation}{default}", "\n".join(lines), annotation, field
 
 
 def render_model(schema: dict, class_name: str, schema_file: str) -> str:
@@ -283,29 +286,41 @@ def render_model(schema: dict, class_name: str, schema_file: str) -> str:
     for name in ordered:
         if not name.isidentifier():
             raise BindingError(f"{schema_file}: property {name!r} is not an identifier")
-        line, check, annotation = _field(name, properties[name], name in required)
+        line, check, annotation, placeholder = _field(
+            name, properties[name], name in required
+        )
         fields.append(line)
-        checkers.append((name, check, annotation))
+        checkers.append((name, check, annotation, placeholder))
 
-    grouped: dict[str, list[tuple[str, str]]] = {}
-    for name, check, annotation in checkers:
-        grouped.setdefault(check, []).append((name, annotation))
+    grouped: dict[str, list[tuple[str, str, str]]] = {}
+    for name, check, annotation, placeholder in checkers:
+        grouped.setdefault(check, []).append((name, annotation, placeholder))
+    used_checkers = {
+        f"_check_{name}" for name, _check, _annotation, _placeholder in checkers
+    }
     checks: list[str] = []
+    shared_index = 0
     for check, group in grouped.items():
         if len(group) == 1:
-            name, _annotation = group[0]
-            checks.append(check.replace(_FIELD_PLACEHOLDER, name))
+            name, _annotation, placeholder = group[0]
+            checks.append(check.replace(placeholder, name))
             continue
-        shared = f"_check_shared_{len(checks)}"
+        shared = f"_check_shared_{shared_index}"
+        while shared in used_checkers:
+            shared_index += 1
+            shared = f"_check_shared_{shared_index}"
+        used_checkers.add(shared)
+        shared_index += 1
+        placeholder = group[0][2]
         checks.append(
             check.replace(
-                f"def _check_{_FIELD_PLACEHOLDER}(value: Any)",
+                f"def _check_{placeholder}(value: Any)",
                 f"def {shared}(value: Any, name: str)",
             )
-            .replace(_FIELD_PLACEHOLDER, "{name}")
+            .replace(placeholder, "{name}")
             .replace('raise ValueError("{name}', 'raise ValueError(f"{name}')
         )
-        for name, annotation in group:
+        for name, annotation, _placeholder in group:
             checks.append(
                 f"def _check_{name}(value: Any) -> {annotation}:\n"
                 f"    return {shared}(value, {name!r})"

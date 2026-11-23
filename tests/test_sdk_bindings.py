@@ -189,6 +189,62 @@ def test_identical_property_constraints_share_one_checker(generator) -> None:
     ) in module
 
 
+@pytest.mark.parametrize("names", [("a",), ("a", "b")])
+def test_a_pattern_containing_the_placeholder_is_preserved(generator, names) -> None:
+    schema = {
+        "$id": "urn:test:1",
+        "type": "object",
+        "properties": {
+            name: {"type": "string", "pattern": "^__field__$"} for name in names
+        },
+        "required": list(names),
+    }
+
+    module = generator.render_model(schema, "Model", "test@1.json")
+
+    assert "re.fullmatch('^__field__$', value)" in module
+
+
+def test_shared_checker_names_do_not_collide_with_properties(generator) -> None:
+    schema = {
+        "$id": "urn:test:1",
+        "type": "object",
+        "properties": {
+            "a": {"type": "string", "pattern": "^x$"},
+            "b": {"type": "string", "pattern": "^x$"},
+            "shared_0": {"type": "integer"},
+        },
+        "required": ["a", "b", "shared_0"],
+    }
+
+    module = generator.render_model(schema, "Model", "test@1.json")
+
+    assert module.count("def _check_shared_0") == 1
+    assert module.count("def _check_shared_1") == 1
+    assert "return _check_shared_1(value, 'a')" in module
+
+
+def test_shared_checkers_keep_length_and_minimum_messages_interpolated(
+    generator,
+) -> None:
+    schema = {
+        "$id": "urn:test:1",
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "minLength": 2},
+            "code": {"type": "string", "minLength": 2},
+            "count": {"type": "integer", "minimum": 1},
+            "total": {"type": "integer", "minimum": 1},
+        },
+        "required": ["name", "code", "count", "total"],
+    }
+
+    module = generator.render_model(schema, "Model", "test@1.json")
+
+    assert 'raise ValueError(f"{name}: shorter than 2")' in module
+    assert 'raise ValueError(f"{name}: below 1")' in module
+
+
 def test_a_changed_schema_changes_the_generated_model(generator) -> None:
     schema = _reference_schema(generator)
     schema["properties"]["size"]["minimum"] = 1
