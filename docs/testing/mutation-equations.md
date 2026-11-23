@@ -43,9 +43,9 @@ Equivalent mutants are not identified automatically: a surviving mutant still ne
 | M027 | 84 | And -> Or | killed | `tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries`, `tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label` |
 | M028 | 84 | remove not | killed | `tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label`, `tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries`, `tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label` |
 
-### Test subsumption
+### Test subsumption (top 50 of 410)
 
-A subsumes B when every mutant B kills, A also kills. High coverage similarity does not imply this relation.
+A subsumes B when every mutant B kills, A also kills. High coverage similarity does not imply this relation. Both the JSON and this table are capped; the total is in the summary.
 
 | Subsumer | Subsumed | Mutants | Equal sets | Coverage Jaccard |
 |---|---|---:|---|---:|

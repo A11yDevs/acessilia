@@ -32,9 +32,9 @@ Equivalent mutants are not identified automatically: a surviving mutant still ne
 | M016 | 63 | Lt -> LtE | survived | — |
 | M017 | 64 | Add -> Sub | killed | `tests/test_flood.py::TestFloodGuard::test_descarta_blocos_curtos_sem_palavra_do_lexico` |
 
-### Test subsumption
+### Test subsumption (top 9 of 9)
 
-A subsumes B when every mutant B kills, A also kills. High coverage similarity does not imply this relation.
+A subsumes B when every mutant B kills, A also kills. High coverage similarity does not imply this relation. Both the JSON and this table are capped; the total is in the summary.
 
 | Subsumer | Subsumed | Mutants | Equal sets | Coverage Jaccard |
 |---|---|---:|---|---:|

@@ -218,6 +218,34 @@ def test_exclusive_mutants_name_the_only_detector() -> None:
     ]
 
 
+def test_unknown_operators_are_rejected(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source_root = tmp_path / "src"
+    module = source_root / "pkg" / "mod.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(SOURCE, encoding="utf-8")
+
+    status = mutation.main(
+        [
+            "--module",
+            str(module),
+            "--tests",
+            "tests/test_mod.py",
+            "--suite",
+            str(tmp_path),
+            "--source-root",
+            str(source_root),
+            "--operators",
+            "compare,typo",
+            "--list-mutants",
+        ]
+    )
+
+    assert status == 2
+    assert "unknown operators" in capsys.readouterr().err
+
+
 def test_build_report_classifies_uncovered_mutants_and_scores() -> None:
     results = [
         mutation.MutantResult(
@@ -249,6 +277,48 @@ def test_build_report_classifies_uncovered_mutants_and_scores() -> None:
     assert "Mutation experiment" in mutation.render_summary(report)
 
 
+def test_build_report_records_the_subsumption_total_before_the_example_cap() -> None:
+    results = [
+        _result("M1", "test::a", "test::b", "test::c"),
+        _result("M2", "test::a", "test::c"),
+        _result("M3", "test::a"),
+    ]
+
+    report = mutation.build_report(
+        results=results,
+        module=Path("pkg/mod.py"),
+        tests=["tests/test_mod.py"],
+        baseline={"status": "survived"},
+        covered_lines=None,
+        overlap=None,
+        settings={"max_subsumption": 1},
+    )
+
+    assert report["summary"]["subsumption_total"] == 3
+    assert report["summary"]["subsumption_examples"] == 1
+    assert len(report["subsumption"]) == 1
+    assert all("exclusive" not in pair for pair in report["subsumption"])
+
+
+def test_collection_errors_are_not_killing_tests(tmp_path: Path) -> None:
+    suite = tmp_path / "suite"
+    tests = suite / "tests"
+    tests.mkdir(parents=True)
+    (tests / "test_bad.py").write_text("import missing_module\n", encoding="utf-8")
+    junit = tmp_path / "junit.xml"
+
+    outcome = mutation._run_pytest(
+        ["tests/test_bad.py"],
+        suite=suite,
+        junit=junit,
+        timeout_seconds=20,
+        known_tests={"tests/test_bad.py::test_real"},
+    )
+
+    assert outcome["status"] == "invalid"
+    assert outcome["killers"] == []
+
+
 def test_the_mutation_documentation_has_a_linked_mirror() -> None:
     docs = Path(__file__).resolve().parents[1] / "docs" / "testing"
     english = (docs / "mutation.md").read_text(encoding="utf-8")
@@ -271,3 +341,9 @@ def test_load_covered_lines_reads_the_module(tmp_path: Path) -> None:
     assert mutation.load_covered_lines(tmp_path / ".coverage", module) == {1}
     assert mutation.load_covered_lines(None, module) is None
     assert mutation.load_covered_lines(tmp_path / "missing", module) is None
+
+    foreign = tmp_path / "foreign.coverage"
+    data = CoverageData(basename=str(foreign))
+    data.add_lines({str(tmp_path / "other.py"): {1}})
+    data.write()
+    assert mutation.load_covered_lines(foreign, module) is None

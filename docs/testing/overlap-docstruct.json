@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "coverage-overlap",
-  "coverage_file": "var/context/docstruct/.coverage",
+  "coverage_file": "var/coverage/docstruct/.coverage",
   "settings": {
     "threshold": 0.8,
     "min_shared": 5,

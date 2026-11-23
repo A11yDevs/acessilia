@@ -47,16 +47,16 @@ pode ser repetido em um job agendado.
 
 ```bash
 # Gerar e inspecionar as mutações sem executá-las
-uv run python scripts/tests/mutation_report.py \
+uv run --extra dev python scripts/tests/mutation_report.py \
   --module libs/docstruct/src/docstruct/fusion/flood.py \
   --tests tests/test_flood.py --suite libs/docstruct \
   --source-root libs/docstruct/src --list-mutants
 
-# Executar o experimento com classificação por cobertura de linhas
+# Executar o experimento com classificação por cobertura e comparação de sobreposição
 make test-mutation
 
 # O experimento de equations
-uv run python scripts/tests/mutation_report.py \
+uv run --extra dev python scripts/tests/mutation_report.py \
   --module libs/docstruct/src/docstruct/text/equations.py \
   --tests tests/test_equation_numbers.py --suite libs/docstruct \
   --source-root libs/docstruct/src \
@@ -108,11 +108,12 @@ Um teste A subsume B quando todo mutante morto por B também é morto por A. Ess
 é uma relação baseada em mutação, mais estrita que a similaridade de cobertura.
 
 Para `flood_guard`, a relação mais forte é
-`test_descarta_blocos_curtos_sem_palavra_do_lexico`: ele mata quatro mutantes
+`test_descarta_blocos_curtos_sem_palavra_do_lexico`: ele mata os sete mutantes
 que `test_blocos_longos_sao_preservados`,
 `test_blocos_nao_textuais_sao_preservados`,
 `test_lexico_vazio_descarta_todos_os_curtos` e
-`test_tag_entra_nas_stats` também matam, e mata quatro mutantes adicionais.
+`test_tag_entra_nas_stats` também matam, e mata quatro mutantes adicionais
+(7 compartilhados + 4 exclusivos = 11 no seu conjunto).
 `test_blocos_longos_sao_preservados` e
 `test_blocos_nao_textuais_sao_preservados` têm **conjuntos iguais** de mortes.
 
@@ -122,8 +123,9 @@ eles verificam comportamentos de manter/descartar e chaves de `stats`
 diferentes, e a matriz de mutação só diz quais defeitos artificiais cada um
 detecta.
 
-Para `equations`, 50 pares de subsunção foram relatados (o limite do
-relatório). Alguns pares não têm nenhum par de cobertura de alta similaridade:
+Para `equations`, o conjunto completo tem **410 pares direcionados de
+subsunção**; o relatório registra os primeiros 50 como exemplos. Alguns pares
+não têm nenhum par de cobertura de alta similaridade:
 por exemplo, testes que verificam fronteiras de exportação diferentes são
 subsumidos por mutação sem cobrirem o mesmo conjunto estreito de linhas. Esse é
 o complemento importante: **sobreposição de cobertura não substitui a detecção
@@ -168,6 +170,11 @@ específica e deve permanecer mesmo que sua cobertura pareça duplicada.
   pode ser o único a documentar um contrato, uma mensagem localizada ou um modo
   de falha; o conjunto de operadores também é incompleto.
 
+O relatório completo de sobreposição da docstruct é
+[`overlap-docstruct.json`](overlap-docstruct.json). Ele não é usado como entrada
+de comparação de mutação dos dois módulos pequenos; é o quadro mais amplo da
+suíte da biblioteca.
+
 ## Limitações
 
 - **Conjunto limitado de operadores.** O harness mira condições e operadores
@@ -183,5 +190,6 @@ específica e deve permanecer mesmo que sua cobertura pareça duplicada.
 - **A classificação de cobertura vem de outra execução.** Se o arquivo de
   cobertura estiver desatualizado, um mutante não coberto pode ser classificado
   errado.
-- **O limite de 50 pares no relatório.** A lista de subsunção de `equations` é
-  truncada; o JSON é o registro completo para o limite relatado.
+- **O limite de exemplos de subsunção.** `--max-subsumption` (padrão 50) limita
+  tanto a tabela Markdown quanto a lista JSON. `summary.subsumption_total`
+  registra a contagem completa; a execução de `equations` tem 410.

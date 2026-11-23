@@ -131,7 +131,7 @@ def _replace(tree: ast.AST, target: ast.AST, replacement: ast.AST) -> None:
 
 
 def _add(
-    mutants: list[tuple[str, str, int, int, str, str, int]],
+    mutants: list[tuple[str, int, int, str, str, int]],
     operator: str,
     node: ast.AST,
     description: str,
@@ -139,7 +139,6 @@ def _add(
 ) -> None:
     mutants.append(
         (
-            operator,
             operator,
             int(getattr(node, "lineno", 0)),
             int(getattr(node, "col_offset", 0)),
@@ -150,8 +149,8 @@ def _add(
     )
 
 
-def _mutations_for_node(node: ast.AST) -> list[tuple[str, str, int, int, str, str, int]]:
-    mutants: list[tuple[str, str, int, int, str, str, int]] = []
+def _mutations_for_node(node: ast.AST) -> list[tuple[str, int, int, str, str, int]]:
+    mutants: list[tuple[str, int, int, str, str, int]] = []
     if isinstance(node, ast.Compare):
         for index, operator in enumerate(node.ops):
             swap = COMPARE_SWAPS.get(type(operator))
@@ -190,7 +189,7 @@ def generate_mutants(source: str, *, operators: Sequence[str] = OPERATORS) -> li
         for row in _mutations_for_node(node)
         if row[0] in enabled
     ]
-    rows.sort(key=lambda row: (row[2], row[3], row[0], row[6]))
+    rows.sort(key=lambda row: (row[1], row[2], row[0], row[5]))
     return [
         Mutant(
             id=f"M{index:03d}",
@@ -201,7 +200,7 @@ def generate_mutants(source: str, *, operators: Sequence[str] = OPERATORS) -> li
             node_type=node_type,
             index=op_index,
         )
-        for index, (operator, _key, line, column, description, node_type, op_index) in enumerate(
+        for index, (operator, line, column, description, node_type, op_index) in enumerate(
             rows, start=1
         )
     ]
@@ -247,6 +246,7 @@ def _run_pytest(
     junit: Path,
     timeout_seconds: int,
     env: dict[str, str] | None = None,
+    known_tests: set[str] | None = None,
 ) -> dict[str, Any]:
     command = [
         sys.executable,
@@ -287,11 +287,16 @@ def _run_pytest(
             "error": (completed.stdout + completed.stderr)[-2000:],
         }
     result = parse_report(junit, "mutation", root=suite)
+    test_ids = sorted(result.cases)
     killers = sorted(
         case.nodeid
         for case in result.cases.values()
         if case.outcome in ("failed", "error")
     )
+    if known_tests is not None:
+        # Collection errors become module-level pseudo-cases that are not
+        # tests. They must not enter killing_tests or subsumption.
+        killers = [killer for killer in killers if killer in known_tests]
     status = "killed" if killers else "survived"
     if not killers and completed.returncode != 0:
         status = "invalid"
@@ -300,6 +305,7 @@ def _run_pytest(
         "seconds": seconds,
         "exit_code": completed.returncode,
         "killers": killers,
+        "test_ids": test_ids,
         "error": "",
     }
 
@@ -337,18 +343,20 @@ def run_experiment(
     """Run the baseline and every mutant in an isolated package copy."""
     with tempfile.TemporaryDirectory(prefix="acessilia-mutation-") as raw:
         temp = Path(raw)
+        temp_src = _copy_package(source_root, temp)
+        target = temp_src / module_relative
+        env = _mutant_env(temp_src)
         baseline_junit = temp / "baseline.xml"
         baseline = _run_pytest(
             tests,
             suite=suite,
             junit=baseline_junit,
             timeout_seconds=timeout_seconds,
+            env=env,
         )
         if baseline["status"] != "survived":
             raise RuntimeError(f"the selected tests do not pass before mutation: {baseline}")
-        temp_src = _copy_package(source_root, temp)
-        target = temp_src / module_relative
-        env = _mutant_env(temp_src)
+        known_tests = set(baseline.pop("test_ids", []))
         results: list[MutantResult] = []
         for mutant in mutants:
             target.write_text(mutate_source(source, mutant), encoding="utf-8")
@@ -359,6 +367,7 @@ def run_experiment(
                 junit=junit,
                 timeout_seconds=timeout_seconds,
                 env=env,
+                known_tests=known_tests,
             )
             results.append(
                 MutantResult(
@@ -381,7 +390,7 @@ def load_covered_lines(coverage_file: Path | None, module: Path) -> set[int] | N
     data = CoverageData(basename=str(coverage_file))
     data.read()
     lines = data.lines(str(module.resolve()))
-    return set(lines or [])
+    return None if lines is None else set(lines)
 
 
 def _kill_sets(results: Sequence[MutantResult]) -> dict[str, set[str]]:
@@ -407,7 +416,7 @@ def subsumption_pairs(
     results: Sequence[MutantResult],
     *,
     overlap: dict[str, Any] | None = None,
-    limit: int = 50,
+    limit: int | None = 50,
 ) -> list[dict[str, Any]]:
     """Pairs where every mutant B kills, A kills too."""
     kills = _kill_sets(results)
@@ -427,7 +436,6 @@ def subsumption_pairs(
                     "subsumer": subsumer,
                     "subsumed": subsumed,
                     "mutants": len(kills[subsumed]),
-                    "exclusive": len(kills[subsumed] - kills[subsumer]),
                     "equal": equal,
                     "coverage_similarity": similarities.get(
                         frozenset((subsumer, subsumed))
@@ -435,7 +443,7 @@ def subsumption_pairs(
                 }
             )
     pairs.sort(key=lambda item: (item["equal"], -item["mutants"], item["subsumer"]))
-    return pairs[:limit]
+    return pairs if limit is None else pairs[:limit]
 
 
 def exclusive_mutants(results: Sequence[MutantResult], limit: int = 20) -> list[dict[str, Any]]:
@@ -477,6 +485,8 @@ def build_report(
     invalid = sum(result.status == "invalid" for result in results)
     covered_mutants = killed + survived + timeout
     kills = _kill_sets(results)
+    limit = int(settings.get("max_subsumption", 50))
+    all_subsumption = subsumption_pairs(results, overlap=overlap, limit=None)
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "mutation-report",
@@ -494,10 +504,12 @@ def build_report(
             "covered_mutants": covered_mutants,
             "mutation_score": round(killed / covered_mutants, 4) if covered_mutants else 0.0,
             "killing_tests": len(kills),
+            "subsumption_total": len(all_subsumption),
+            "subsumption_examples": min(limit, len(all_subsumption)),
             "equivalent_mutants": "not identified automatically",
         },
         "mutants": [result.to_dict() for result in results],
-        "subsumption": subsumption_pairs(results, overlap=overlap),
+        "subsumption": all_subsumption[:limit],
         "exclusive": exclusive_mutants(results),
     }
 
@@ -540,11 +552,13 @@ def render_summary(report: dict[str, Any]) -> str:
 
     lines += [
         "",
-        "### Test subsumption",
+        f"### Test subsumption (top {summary.get('subsumption_examples', 0)} of "
+        f"{summary.get('subsumption_total', 0)})",
         "",
         (
             "A subsumes B when every mutant B kills, A also kills. High "
-            "coverage similarity does not imply this relation."
+            "coverage similarity does not imply this relation. Both the JSON "
+            "and this table are capped; the total is in the summary."
         ),
         "",
         "| Subsumer | Subsumed | Mutants | Equal sets | Coverage Jaccard |",
@@ -600,6 +614,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--operators", default=",".join(OPERATORS))
     parser.add_argument("--max-mutants", type=int, default=40)
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--max-subsumption", type=int, default=50)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--summary", type=Path)
     parser.add_argument(
@@ -609,9 +624,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    module = (ROOT / args.module).resolve()
-    source_root = (ROOT / args.source_root).resolve()
-    suite = (ROOT / args.suite).resolve()
+    def _anchored(path: Path | None) -> Path | None:
+        if path is None:
+            return None
+        return path if path.is_absolute() else (ROOT / path)
+
+    module = _anchored(args.module)
+    assert module is not None
+    source_root = _anchored(args.source_root)
+    assert source_root is not None
+    suite = _anchored(args.suite)
+    assert suite is not None
+    coverage_file = _anchored(args.coverage_file)
+    overlap_file = _anchored(args.overlap)
+    output = _anchored(args.output)
+    summary_path = _anchored(args.summary)
     if not module.is_file():
         print(f"error: {module} does not exist", file=sys.stderr)
         return 2
@@ -622,6 +649,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     source = _read_module(module)
     operators = [name.strip() for name in args.operators.split(",") if name.strip()]
+    unknown = sorted(set(operators) - set(OPERATORS))
+    if unknown:
+        print(f"error: unknown operators: {', '.join(unknown)}", file=sys.stderr)
+        return 2
     mutants = generate_mutants(source, operators=operators)[: args.max_mutants]
 
     if args.list_mutants:
@@ -631,7 +662,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return 0
 
-    if args.output is None:
+    if output is None:
         print("error: --output is required unless --list-mutants is used", file=sys.stderr)
         return 2
     try:
@@ -657,19 +688,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         module=module_label,
         tests=args.tests,
         baseline=baseline,
-        covered_lines=load_covered_lines(args.coverage_file, module),
-        overlap=_load_json(args.overlap),
+        covered_lines=load_covered_lines(coverage_file, module),
+        overlap=_load_json(overlap_file),
         settings={
             "operators": operators,
             "max_mutants": args.max_mutants,
             "timeout_seconds": args.timeout,
+            "max_subsumption": args.max_subsumption,
         },
     )
     summary = render_summary(report)
     print(summary)
-    _write(args.output, json.dumps(report, indent=2) + "\n")
-    if args.summary:
-        _write(args.summary, summary)
+    _write(output, json.dumps(report, indent=2) + "\n")
+    if summary_path:
+        _write(summary_path, summary)
     return 0
 
 

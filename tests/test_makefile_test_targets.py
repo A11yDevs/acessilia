@@ -34,6 +34,7 @@ def test_help_lists_the_supported_commands() -> None:
     assert "make test-baseline" in completed.stdout
     assert "make test-baseline-compare" in completed.stdout
     assert "make test-overlap" in completed.stdout
+    assert "make test-mutation" in completed.stdout
 
 
 def test_test_file_runs_one_path_without_e2e() -> None:
@@ -119,6 +120,18 @@ def test_test_overlap_runs_per_test_contexts_and_both_reports() -> None:
         "redundancy_report.py",
         "--junit",
         "app=",
+        "--extra dev",
+    ):
+        assert expected in completed.stdout
+
+
+def test_test_mutation_runs_the_bounded_experiment_with_overlap() -> None:
+    completed = _dry_run("test-mutation")
+    assert completed.returncode == 0, completed.stderr
+    for expected in (
+        "mutation_report.py",
+        "--overlap",
+        "docs/testing/overlap-flood.json",
         "--extra dev",
     ):
         assert expected in completed.stdout

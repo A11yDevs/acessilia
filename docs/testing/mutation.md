@@ -48,16 +48,16 @@ be repeated in a scheduled job.
 
 ```bash
 # Generate and inspect the mutations without running them
-uv run python scripts/tests/mutation_report.py \
+uv run --extra dev python scripts/tests/mutation_report.py \
   --module libs/docstruct/src/docstruct/fusion/flood.py \
   --tests tests/test_flood.py --suite libs/docstruct \
   --source-root libs/docstruct/src --list-mutants
 
-# Run the experiment with line coverage classification
+# Run the experiment with line coverage classification and overlap comparison
 make test-mutation
 
 # The equations experiment
-uv run python scripts/tests/mutation_report.py \
+uv run --extra dev python scripts/tests/mutation_report.py \
   --module libs/docstruct/src/docstruct/text/equations.py \
   --tests tests/test_equation_numbers.py --suite libs/docstruct \
   --source-root libs/docstruct/src \
@@ -107,11 +107,12 @@ A test A subsumes B when every mutant B kills, A also kills. This is a
 mutation-based relation, stricter than coverage similarity.
 
 For `flood_guard`, the strongest relation is
-`test_descarta_blocos_curtos_sem_palavra_do_lexico`: it kills four mutants that
-`test_blocos_longos_sao_preservados`,
+`test_descarta_blocos_curtos_sem_palavra_do_lexico`: it kills the seven mutants
+that `test_blocos_longos_sao_preservados`,
 `test_blocos_nao_textuais_sao_preservados`,
 `test_lexico_vazio_descarta_todos_os_curtos` and
-`test_tag_entra_nas_stats` also kill, and it kills four additional mutants.
+`test_tag_entra_nas_stats` also kill, and it kills four additional mutants
+(7 shared + 4 exclusive = 11 in its kill set).
 `test_blocos_longos_sao_preservados` and
 `test_blocos_nao_textuais_sao_preservados` have **equal** kill sets.
 
@@ -120,8 +121,9 @@ agree here. The conclusion is still not "remove the smaller tests": they assert
 different keep/drop behaviour and different `stats` keys, and the mutation
 matrix only says which artificial defects each detects.
 
-For `equations`, 50 subsumption pairs were reported (the report limit). Some
-pairs have no high-similarity coverage pair at all: for example, tests that
+For `equations`, the complete relation set has **410 directed subsumption
+pairs**; the report records the first 50 as examples. Some pairs have no
+high-similarity coverage pair at all: for example, tests that
 assert different export boundaries are mutation-subsumed without covering the
 same narrow line set. That is the important complement: **coverage overlap is
 not a substitute for mutation detection**, and mutation subsumption without a
@@ -164,6 +166,11 @@ specific mutation and must stay even if its coverage looks duplicated.
   be the only one documenting a contract, a localized message or a failure
   mode; the mutation operator set is also incomplete.
 
+The full docstruct overlap report is
+[`overlap-docstruct.json`](overlap-docstruct.json). It is not used as the
+mutation comparison input for the two small modules; it is the broader picture
+of the library suite.
+
 ## Limitations
 
 - **Limited operator set.** The harness targets conditions and simple
@@ -177,5 +184,6 @@ specific mutation and must stay even if its coverage looks duplicated.
   but is not the original text; comments and formatting are not preserved.
 - **Coverage classification comes from a separate run.** If the coverage file
   is stale, an uncovered mutant can be misclassified.
-- **The 50-pair report limit.** The `equations` subsumption list is truncated;
-  the JSON is the complete record for the reported limit.
+- **The subsumption example limit.** `--max-subsumption` (default 50) caps both
+  the Markdown table and the JSON list. `summary.subsumption_total` records the
+  complete relation count; the `equations` run has 410.

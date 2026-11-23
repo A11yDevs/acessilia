@@ -15,11 +15,12 @@
       "augassign"
     ],
     "max_mutants": 40,
-    "timeout_seconds": 60
+    "timeout_seconds": 60,
+    "max_subsumption": 50
   },
   "baseline": {
     "status": "survived",
-    "seconds": 0.7327927840015036,
+    "seconds": 3.2042641019997973,
     "exit_code": 0,
     "killers": [],
     "error": ""
@@ -34,6 +35,8 @@
     "covered_mutants": 28,
     "mutation_score": 1.0,
     "killing_tests": 40,
+    "subsumption_total": 410,
+    "subsumption_examples": 50,
     "equivalent_mutants": "not identified automatically"
   },
   "mutants": [
@@ -88,7 +91,7 @@
         "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 1.172,
+      "seconds": 4.563,
       "exit_code": 1,
       "error": ""
     },
@@ -143,7 +146,7 @@
         "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 1.177,
+      "seconds": 4.192,
       "exit_code": 1,
       "error": ""
     },
@@ -185,7 +188,7 @@
         "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.867,
+      "seconds": 3.347,
       "exit_code": 1,
       "error": ""
     },
@@ -207,7 +210,7 @@
         "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x \\\\neq (1)]",
         "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[x=\\\\sin (1)]"
       ],
-      "seconds": 0.792,
+      "seconds": 3.261,
       "exit_code": 1,
       "error": ""
     },
@@ -242,7 +245,7 @@
         "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.981,
+      "seconds": 3.299,
       "exit_code": 1,
       "error": ""
     },
@@ -278,7 +281,7 @@
         "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.911,
+      "seconds": 3.494,
       "exit_code": 1,
       "error": ""
     },
@@ -314,7 +317,7 @@
         "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.895,
+      "seconds": 3.465,
       "exit_code": 1,
       "error": ""
     },
@@ -351,7 +354,7 @@
         "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.85,
+      "seconds": 2.589,
       "exit_code": 1,
       "error": ""
     },
@@ -372,7 +375,7 @@
         "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
         "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]"
       ],
-      "seconds": 0.798,
+      "seconds": 2.727,
       "exit_code": 1,
       "error": ""
     },
@@ -389,7 +392,7 @@
         "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[\\\\sinh (1)]",
         "tests/test_equation_numbers.py::test_ambiguous_or_unsafe_input_is_unchanged[a \\\\times b (1)]"
       ],
-      "seconds": 0.863,
+      "seconds": 2.571,
       "exit_code": 1,
       "error": ""
     },
@@ -412,7 +415,7 @@
         "tests/test_equation_numbers.py::test_split_label[x \\\\neq 0 (7)-x \\\\neq 0-7]",
         "tests/test_equation_numbers.py::test_split_label[x \\\\to \\\\infty (9)-x \\\\to \\\\infty-9]"
       ],
-      "seconds": 0.801,
+      "seconds": 2.709,
       "exit_code": 1,
       "error": ""
     },
@@ -435,7 +438,7 @@
         "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.867,
+      "seconds": 2.63,
       "exit_code": 1,
       "error": ""
     },
@@ -451,7 +454,7 @@
       "killers": [
         "tests/test_equation_numbers.py::test_existing_number_and_idempotence"
       ],
-      "seconds": 0.795,
+      "seconds": 2.5,
       "exit_code": 1,
       "error": ""
     },
@@ -473,7 +476,7 @@
         "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.78,
+      "seconds": 2.585,
       "exit_code": 1,
       "error": ""
     },
@@ -496,7 +499,7 @@
         "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag"
       ],
-      "seconds": 0.796,
+      "seconds": 1.705,
       "exit_code": 1,
       "error": ""
     },
@@ -518,7 +521,7 @@
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.821,
+      "seconds": 1.735,
       "exit_code": 1,
       "error": ""
     },
@@ -540,7 +543,7 @@
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.823,
+      "seconds": 1.612,
       "exit_code": 1,
       "error": ""
     },
@@ -566,7 +569,7 @@
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.846,
+      "seconds": 1.657,
       "exit_code": 1,
       "error": ""
     },
@@ -585,7 +588,7 @@
         "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.829,
+      "seconds": 1.5,
       "exit_code": 1,
       "error": ""
     },
@@ -605,7 +608,7 @@
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.82,
+      "seconds": 1.373,
       "exit_code": 1,
       "error": ""
     },
@@ -625,7 +628,7 @@
         "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.823,
+      "seconds": 1.557,
       "exit_code": 1,
       "error": ""
     },
@@ -647,7 +650,7 @@
         "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.804,
+      "seconds": 1.533,
       "exit_code": 1,
       "error": ""
     },
@@ -669,7 +672,7 @@
         "tests/test_equation_numbers.py::test_unnumbered_block_is_unchanged_without_an_enricher",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.82,
+      "seconds": 1.443,
       "exit_code": 1,
       "error": ""
     },
@@ -688,7 +691,7 @@
         "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
         "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number"
       ],
-      "seconds": 0.845,
+      "seconds": 1.341,
       "exit_code": 1,
       "error": ""
     },
@@ -706,7 +709,7 @@
         "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
         "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
       ],
-      "seconds": 0.83,
+      "seconds": 1.292,
       "exit_code": 1,
       "error": ""
     },
@@ -724,7 +727,7 @@
         "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
         "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
       ],
-      "seconds": 0.849,
+      "seconds": 1.326,
       "exit_code": 1,
       "error": ""
     },
@@ -741,7 +744,7 @@
         "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
         "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
       ],
-      "seconds": 0.761,
+      "seconds": 1.252,
       "exit_code": 1,
       "error": ""
     },
@@ -759,7 +762,7 @@
         "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
         "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label"
       ],
-      "seconds": 0.831,
+      "seconds": 1.302,
       "exit_code": 1,
       "error": ""
     }
@@ -769,7 +772,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "mutants": 17,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -777,7 +779,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
       "mutants": 17,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": 0.5429
     },
@@ -785,7 +786,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "mutants": 16,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -793,7 +793,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "mutants": 16,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -801,7 +800,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -809,7 +807,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -817,7 +814,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -825,7 +821,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -833,7 +828,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -841,7 +835,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_existing_delimiters_do_not_nest_in_numbered_output",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -849,7 +842,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -857,7 +849,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -865,7 +856,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -873,7 +863,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_zero_is_a_valid_equation_number",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -881,7 +870,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -889,7 +877,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -897,7 +884,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -905,7 +891,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -913,7 +898,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[\\\\input{file}]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -921,7 +905,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_the_pdf_ua_text_fallback_shows_the_label_not_the_tag",
       "subsumed": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[]",
       "mutants": 11,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -929,7 +912,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -937,7 +919,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -945,7 +926,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -953,7 +933,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -961,7 +940,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -969,7 +947,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_a_promoted_numbered_span_is_converted_without_its_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -977,7 +954,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -985,7 +961,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -993,7 +968,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1001,7 +975,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1009,7 +982,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1017,7 +989,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_existing_number_and_idempotence",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1025,7 +996,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1033,7 +1003,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1041,7 +1010,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1049,7 +1017,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1057,7 +1024,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1065,7 +1031,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_number_survives_canonical_and_all_export_boundaries",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1073,7 +1038,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1081,7 +1045,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1089,7 +1052,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1097,7 +1059,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1105,7 +1066,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1113,7 +1073,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_numbered_formula_without_speech_keeps_expression_in_accessible_label",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1121,7 +1080,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[$$x=y\\\\tag{01}$$-x=y-01]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1129,7 +1087,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\quad(2)-x = y-2]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1137,7 +1094,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x = y\\\\tag{1}-x = y-1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1145,7 +1101,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\qquad\\\\text{(4)}-x=y-4]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1153,7 +1108,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\quad\\\\text{ (5) }-x=y-5]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     },
@@ -1161,7 +1115,6 @@
       "subsumer": "tests/test_equation_numbers.py::test_recognized_label_replaces_missing_or_invalid_metadata[None]",
       "subsumed": "tests/test_equation_numbers.py::test_split_label[x=y\\\\tag{A.1}-x=y-A.1]",
       "mutants": 7,
-      "exclusive": 0,
       "equal": false,
       "coverage_similarity": null
     }
