@@ -278,11 +278,23 @@ both together would still pass them. The `docstruct allowlist` workflow
 fixture with the base branch's (`scripts/check_docstruct_allowlist.py`). It
 fails when a pull request adds a module, an importer or a name, or
 reclassifies a module as contract. Replacing a `*` with names, removals and
-moves between pinned classes pass.
+moves between pinned classes pass. It fails closed: a base ref that does not
+resolve, or a base fixture that cannot be read, fails the check. Only a base
+commit that provably has no fixture has nothing to compare.
 
-A new exception is an architectural decision. The `architecture-exception`
-label turns the failure into a warning, and the pull request cites the ADR or
-issue that decides it.
+### Exceptions
+
+A new pin is an architectural decision, not a review shortcut. The
+`architecture-exception` label turns the check's failure into a warning; it
+does not replace the architectural review. A pull request that uses it:
+
+- links the ADR or decision issue that authorizes the exception;
+- names the modules, files and names it adds;
+- says whether the exception is temporary or permanent, why, and when it is
+  removed if temporary;
+- is approved by a maintainer responsible for the architecture.
+
+CODEOWNERS or an automated check of the approval may enforce this later.
 
 ## Indicators
 

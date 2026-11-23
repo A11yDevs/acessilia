@@ -15,6 +15,10 @@ Removals and reclassifications between pinned classes are fine. An exception
 is an architectural decision (ADR-0028): ``--allow-exceptions`` (the CI passes
 it when the pull request has the ``architecture-exception`` label) reports the
 widening as a warning instead, and the pull request cites the decision.
+
+Exit codes: 0 when the allowlist does not grow (or the base commit has no
+fixture), 1 when it grows, 2 when the baseline cannot be read: an unknown
+ref, an unreadable or invalid fixture. The check fails closed.
 """
 
 from __future__ import annotations
@@ -55,12 +59,42 @@ def widenings(base: dict[str, dict], head: dict[str, dict]) -> list[str]:
     return found
 
 
-def _fixture_at(ref: str) -> dict[str, dict] | None:
-    result = subprocess.run(
-        ["git", "show", f"{ref}:{FIXTURE.as_posix()}"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+class BaselineError(RuntimeError):
+    """The base fixture could not be read; the check fails closed."""
+
+
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=False
     )
-    return json.loads(result.stdout) if result.returncode == 0 else None
+
+
+def fixture_at(ref: str, repo: Path = REPO_ROOT) -> dict[str, dict] | None:
+    """The fixture at ``ref``, or ``None`` when ``ref`` is a commit without it.
+
+    Raises :class:`BaselineError` when ``ref`` does not resolve to a commit,
+    or when the fixture exists there and cannot be read or parsed: only a
+    valid commit that provably lacks the fixture means "nothing to compare".
+    """
+    resolved = _git(repo, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+    if resolved.returncode != 0:
+        raise BaselineError(
+            f"the base ref {ref!r} does not resolve to a commit; fetch it "
+            "(actions/checkout with fetch-depth: 0) or pass a valid --base"
+        )
+    commit = resolved.stdout.strip()
+    tree = _git(repo, "ls-tree", "--name-only", commit, "--", FIXTURE.as_posix())
+    if tree.returncode != 0:
+        raise BaselineError(f"cannot list {FIXTURE} at {ref}: {tree.stderr.strip()}")
+    if not tree.stdout.strip():
+        return None
+    shown = _git(repo, "show", f"{commit}:{FIXTURE.as_posix()}")
+    if shown.returncode != 0:
+        raise BaselineError(f"cannot read {FIXTURE} at {ref}: {shown.stderr.strip()}")
+    try:
+        return json.loads(shown.stdout)
+    except json.JSONDecodeError as error:
+        raise BaselineError(f"{FIXTURE} at {ref} is not valid JSON: {error}") from error
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -70,13 +104,23 @@ def main(argv: list[str] | None = None) -> int:
         "--allow-exceptions", action="store_true",
         help="report widenings as warnings (an approved architecture exception)",
     )
+    parser.add_argument("--repo", type=Path, default=REPO_ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
-    base = _fixture_at(args.base)
+    try:
+        base = fixture_at(args.base, args.repo)
+    except BaselineError as error:
+        print(f"::error::docstruct allowlist baseline: {error}")
+        return 2
     if base is None:
         print(f"{FIXTURE} does not exist at {args.base}: nothing to compare.")
         return 0
-    head = json.loads((REPO_ROOT / FIXTURE).read_text(encoding="utf-8"))
+    head_path = args.repo / FIXTURE
+    try:
+        head = json.loads(head_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"::error::cannot read {head_path}: {error}")
+        return 2
     found = widenings(base, head)
     if not found:
         print(f"The docstruct allowlist does not grow against {args.base}.")
@@ -85,7 +129,10 @@ def main(argv: list[str] | None = None) -> int:
     for line in found:
         print(f"::{level}::docstruct allowlist grows: {line}")
     if args.allow_exceptions:
-        print("Allowed by the architecture-exception label; cite the decision in the pull request.")
+        print(
+            "Allowed by the architecture-exception label. The pull request must cite "
+            "the decision (docs/architecture/docstruct-import-inventory.md, Exceptions)."
+        )
         return 0
     print(
         "The docstruct allowlist only shrinks (ADR-0028, #764): call a Toolbox "

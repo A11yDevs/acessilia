@@ -2,7 +2,9 @@ name: docstruct allowlist
 
 # The core's docstruct allowlist only shrinks against the base branch (#764,
 # ADR-0028). A separate workflow, so adding or removing the
-# architecture-exception label reruns this check and not the whole CI.
+# architecture-exception label reruns this check and not the whole CI. The
+# label does not replace the architectural review: see "Exceptions" in
+# docs/architecture/docstruct-import-inventory.md.
 on:
   pull_request:
     branches:
