@@ -43,6 +43,7 @@ INDICATORS = (
     "app_changed",
     "contracts_changed",
     "infrastructure_changed",
+    "unclassified_changed",
 )
 
 #: Paths that make every suite mandatory: shared configuration, schemas,
@@ -66,7 +67,6 @@ TRANSVERSAL_FILES = {
 CONTRACT_MARKERS = (
     "toolbox-contract",
     "capability_contract",
-    "schemas/",
 )
 
 
@@ -98,10 +98,12 @@ def classify_paths(paths: Sequence[str]) -> Selection:
     infrastructure = False
     conservative = False
 
-    for raw_path in paths:
-        path = raw_path.replace("\\", "/").strip()
-        if not path:
-            continue
+    normalized = [
+        raw_path.replace("\\", "/").strip()
+        for raw_path in paths
+        if raw_path.replace("\\", "/").strip()
+    ]
+    for path in normalized:
         lowered = path.lower()
         if path in TRANSVERSAL_FILES or lowered.startswith(TRANSVERSAL_PREFIXES):
             infrastructure = True
@@ -109,18 +111,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             indicators["infrastructure_changed"] = True
             for suite in SUITES:
                 reasons[suite].append(f"transversal path: {path}")
-            if any(marker in lowered for marker in CONTRACT_MARKERS):
-                contracts = True
-                indicators["contracts_changed"] = True
-            continue
-        if any(marker in lowered for marker in CONTRACT_MARKERS):
-            contracts = True
-            indicators["contracts_changed"] = True
-            selected.update(_all_suites())
-            for suite in SUITES:
-                reasons[suite].append(f"contract path: {path}")
-            continue
-        if lowered.startswith("libs/docstruct/"):
+        elif lowered.startswith("libs/docstruct/"):
             selected.update(_suites("docstruct", "sdk", "core", "app"))
             indicators["docstruct_changed"] = True
             for suite in _suites("docstruct", "sdk", "core", "app"):
@@ -149,14 +140,21 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             # Unknown paths are treated conservatively: the selector should
             # never hide a regression because it did not recognize a path.
             conservative = True
-            infrastructure = True
             selected.update(_all_suites())
-            indicators["infrastructure_changed"] = True
+            indicators["unclassified_changed"] = True
             for suite in SUITES:
                 reasons[suite].append(f"unknown path, conservative fallback: {path}")
 
+        if lowered.startswith("schemas/") or any(
+            marker in lowered for marker in CONTRACT_MARKERS
+        ):
+            contracts = True
+            indicators["contracts_changed"] = True
+            for suite in SUITES:
+                reasons[suite].append(f"contract path: {path}")
+
     ordered = _suites(*sorted(selected, key=SUITES.index))
-    if not paths:
+    if not normalized or not ordered:
         conservative = True
         ordered = _all_suites()
         infrastructure = True
@@ -165,7 +163,7 @@ def classify_paths(paths: Sequence[str]) -> Selection:
             reasons[suite].append("no changed paths: conservative fallback")
 
     return Selection(
-        paths=tuple(paths),
+        paths=tuple(normalized),
         suites=ordered,
         indicators=indicators,
         contracts_required=contracts,
@@ -178,7 +176,14 @@ def classify_paths(paths: Sequence[str]) -> Selection:
 def changed_files(base_ref: str, head_ref: str, *, root: Path = ROOT) -> list[str]:
     """Paths changed between ``base_ref`` and ``head_ref`` (three-dot diff)."""
     completed = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=ACMR", f"{base_ref}...{head_ref}"],
+        [
+            "git",
+            "diff",
+            "--name-only",
+            "--diff-filter=ACMRDT",
+            "--no-renames",
+            f"{base_ref}...{head_ref}",
+        ],
         cwd=root,
         text=True,
         capture_output=True,

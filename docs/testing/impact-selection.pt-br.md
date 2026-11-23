@@ -16,7 +16,9 @@ sendo o gate de merge.
 ## Modelo de dependências
 
 A seleção segue a direção de dependências de
-[dependencies.md](../architecture/dependencies.md):
+[dependencies.md](../architecture/dependencies.md) para as arestas do
+serviço/SDK/docstruct e do ADR-0016 para `libs/core`. Neste documento, **core**
+significa `libs/core` (`acessilia_core`), não o serviço `backend/`/`frontend/`:
 
 | Componente alterado | docstruct | SDK | core | aplicação |
 |---|---:|---:|---:|---:|
@@ -40,16 +42,20 @@ consumidores.
 - `docs/**` e `*.md` → aplicação (os guardas de documentação, links e português
   vivem na suíte da aplicação).
 - `.github/**`, `infra/**`, `schemas/**`, `scripts/**`, `deploy/**`, `Makefile`,
-  `pyproject.toml`, `uv.lock`, arquivos Docker Compose → todas as suítes.
-- Qualquer saída com marcadores de contrato (por exemplo `toolbox-contract` ou
-  `capability_contract`) também define `contracts_required`.
+  `pyproject.toml`, `uv.lock`, `.python-version`, arquivos Docker Compose →
+  todas as suítes. Arquivos aninhados em `libs/*` não são transversais, a menos
+  que batam com uma regra de biblioteca.
+- Um caminho sob `schemas/` de topo ou um nome de arquivo contendo
+  `toolbox-contract`/`capability_contract` define `contracts_required` além da
+  seleção de suítes.
 - Caminhos desconhecidos, diff vazio ou falha no `git diff` → todas as suítes e
-  a flag conservadora.
+  a flag conservadora. Caminhos desconhecidos definem `unclassified_changed` em
+  vez de fingir que são infraestrutura.
 
 O script reporta indicadores separados
 (`docstruct_changed`, `sdk_changed`, `core_changed`, `app_changed`,
-`contracts_changed`, `infrastructure_changed`) para que as regras possam ser
-auditadas sem ler a lista de caminhos.
+`contracts_changed`, `infrastructure_changed`, `unclassified_changed`) para que
+as regras possam ser auditadas sem ler a lista de caminhos.
 
 ## Modo observação
 
@@ -63,7 +69,9 @@ python scripts/tests/select_suites.py \
 ```
 
 O job exige `fetch-depth: 0` e busca a branch base antes do diff de três pontos.
-Ele **não** entra no `needs` do agregador `tests` e não altera o gate de entrega.
+Nenhum job depende dele; o gate de entrega não o inclui. Os passos de fetch e
+seleção usam `continue-on-error`, então a indisponibilidade da evidência não
+deixa o pull request vermelho.
 
 Localmente:
 
@@ -95,6 +103,8 @@ Até lá, a suíte completa é obrigatória e este job é apenas evidência.
   execução. Um import novo que cruze a fronteira de um componente precisa ser
   refletido aqui e em `dependencies.md`.
 - Um seletor por caminho não vê arquivos gerados que não são versionados.
+- Deleções e renomeações são expandidas (`--no-renames`, `ACMRDT`) para
+  classificar os dois lados.
 - Alterações de documentação são enviadas conservadoramente para a suíte da
   aplicação.
 - O `git diff` é de três pontos: uma base desatualizada ou um checkout raso

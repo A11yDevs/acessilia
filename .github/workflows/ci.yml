@@ -66,15 +66,21 @@ jobs:
           python-version: "3.12"
 
       - name: Fetch the base branch
+        continue-on-error: true
         env:
           BASE_REF: ${{ github.base_ref }}
         run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - name: Select impacted suites in shadow mode
+        continue-on-error: true
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          python scripts/tests/select_suites.py             --base-ref "origin/${BASE_REF}" --head-ref HEAD             --output var/selection.json             --summary "$GITHUB_STEP_SUMMARY"
+          # Standard-library-only tooling; no project install is needed.
+          python scripts/tests/select_suites.py \
+            --base-ref "origin/${BASE_REF}" --head-ref HEAD \
+            --output var/selection.json \
+            --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the shadow selection
         if: always()

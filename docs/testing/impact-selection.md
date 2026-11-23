@@ -16,7 +16,9 @@ would run, while the full suite remains the merge gate.
 ## Dependency model
 
 The selection follows the dependency direction in
-[dependencies.md](../architecture/dependencies.md):
+[dependencies.md](../architecture/dependencies.md) for the service/SDK/docstruct
+edges and ADR-0016 for `libs/core`. In this document, **core** means
+`libs/core` (`acessilia_core`), not the `backend/`/`frontend/` service:
 
 | Changed component | docstruct | SDK | core | application |
 |---|---:|---:|---:|---:|
@@ -39,16 +41,20 @@ change in a base library always selects its consumers.
 - `docs/**` and `*.md` → app (the documentation/link/Portuguese guards live in
   the application suite).
 - `.github/**`, `infra/**`, `schemas/**`, `scripts/**`, `deploy/**`, `Makefile`,
-  `pyproject.toml`, `uv.lock`, Docker Compose files → every suite.
-- Any output containing contract markers (for example `toolbox-contract` or
-  `capability_contract`) also sets `contracts_required`.
+  `pyproject.toml`, `uv.lock`, `.python-version`, Docker Compose files → every
+  suite. Nested `libs/*` files are not transversal unless they match a library
+  rule.
+- A path under top-level `schemas/` or a filename containing
+  `toolbox-contract`/`capability_contract` sets `contracts_required` in addition
+  to the suite selection.
 - Unknown paths, an empty diff or a failed `git diff` → every suite and the
-  conservative flag.
+  conservative flag. Unknown paths set `unclassified_changed` rather than
+  pretending to be infrastructure.
 
 The script reports separate indicators
 (`docstruct_changed`, `sdk_changed`, `core_changed`, `app_changed`,
-`contracts_changed`, `infrastructure_changed`) so the rules can be audited
-without reading the path list.
+`contracts_changed`, `infrastructure_changed`, `unclassified_changed`) so the
+rules can be audited without reading the path list.
 
 ## Shadow mode
 
@@ -62,8 +68,9 @@ python scripts/tests/select_suites.py \
 ```
 
 The job requires `fetch-depth: 0` and fetches the base branch before the
-three-dot diff. It is **not** in the `tests` aggregator's `needs` and does not
-change the delivery gate.
+three-dot diff. No job depends on it; the delivery gate does not include it. The
+fetch/select steps are `continue-on-error` so unavailable evidence cannot turn a
+pull request red.
 
 Locally:
 
@@ -94,6 +101,8 @@ Until then, the full suite is mandatory and this job is evidence only.
   that crosses a component boundary must be reflected here and in
   `dependencies.md`.
 - A path-only selector cannot see generated files that are not committed.
+- Deletions and renames are expanded (`--no-renames`, `ACMRDT`) so both sides
+  are classified.
 - Documentation changes are conservatively sent to the application suite.
 - `git diff` is three-dot: a stale base ref or a shallow checkout triggers the
   conservative fallback.
