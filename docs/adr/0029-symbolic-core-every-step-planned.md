@@ -111,17 +111,81 @@ experimental.
   belong to the current plan step, is ignored.
 - Replanning stays in the core and stays bounded.
 
-### Strategic agents stay in the core; operational agents are capabilities
+### The core is agentic; the Toolbox is passive
 
-- The agents in `acessilia_core.agents` are classified as strategic or
-  operational.
-- **Strategic agents stay in the core**: interpreting goals, decomposing
-  tasks, choosing strategies, coordinating subplans, evaluating state and
-  goals, deciding to replan, and the future LLM + planning integration of
-  #619.
-- **Operational agents become Toolbox capabilities**: OCR and semantic
-  extraction, document classification, image description, visual
-  adjudication, table and formula extraction, multimodal processing.
+- **The core is agentic and active**: it reasons, plans, delegates,
+  coordinates, evaluates and replans. **The Toolbox is operational and
+  passive**: it runs the capabilities it is asked for and returns results,
+  with no agentic autonomy and no responsibility for workflow decisions.
+- The Toolbox may hold atomic and composite capabilities, docstruct
+  algorithms, model inference, prompts, adapters, validation and result
+  processing, workers, queues, caches and operational recovery, and
+  deterministic composition of operations. A composite capability may keep
+  internal operational control. The Toolbox holds no autonomous agent, no
+  planner of goals or subgoals, no agentic workflow coordination, no semantic
+  replanning and no strategic or managerial decision.
+- **All agency is in the core.** Its agents take one of three permanent
+  roles, distinguished by the scope of their authority, not by the
+  technology they use (an LLM, a symbolic planner or deterministic rules):
+
+  | Role | Specialized by | Responsibility | Planning scope |
+  |---|---|---|---|
+  | strategic | global goals | Goals, policies and priorities; global coordination; evaluating global results; the decision to replan; the future LLM + planning integration of #619 | the global plan |
+  | managerial | domain | Decomposing a delegated goal; a domain subplan; delegating tasks to operational agents or invoking capabilities directly; evaluating results; replanning within the domain; escalating what exceeds its authority | a domain subplan |
+  | operational | task | Completing a logically atomic task with the capabilities it is allowed: choosing among alternatives, observing results, recovering local failures, escalating to its manager | a bounded local plan |
+
+- **An operational task is logically atomic, not computationally.** It has
+  one verifiable goal, contracted inputs and outputs, allowed capabilities,
+  bounded autonomy, a resource budget, completion criteria and escalation
+  conditions. The agent may use several capabilities. It does not redefine
+  domain goals, change policies, coordinate other subplans, create agents or
+  delegate subplans (a first boundary, which #774 may revisit).
+- **There is no agent per capability.** A task that a capability performs
+  without relevant adaptive decisions is invoked directly by the managerial
+  agent. An operational agent is justified by the need for autonomy: choosing
+  among alternatives, evaluating results or recovering from failures. Not
+  every workflow uses the three levels; the effective hierarchy follows the
+  task's complexity.
+- **Evidence is not authority.** Managerial and operational agents may use
+  support capabilities (comparing candidates, ranking strategies, estimating
+  costs, checking constraints, gathering evidence of consistency or
+  completion). They compute evidence; the decision to accept an alternative,
+  change a subplan or consider a goal satisfied stays with the responsible
+  agent in the core. A support capability lives in a pure core library when
+  it is a planning or coordination mechanism, and in the Toolbox when it is
+  operational processing.
+- **Role and lifecycle are separate.** A genuine operational agent can be a
+  permanent part of the core. The existing modules of
+  `acessilia_core.agents` are operational **legacy** components: they run or
+  wrap operations meant for the Toolbox (OCR and semantic extraction,
+  document classification, image description, visual adjudication, table
+  and formula extraction, multimodal processing).
+- **No agent moves to the Toolbox.** A legacy component is decomposed by
+  responsibility before it migrates. Model inference, deterministic
+  algorithms, technical validation and result transformation become
+  non-agentic capabilities. Goal setting and planning stay with the strategic
+  core. Subplanning and the choice of strategy stay with the managerial core.
+  Semantic evaluation and the decision to replan stay in the core, at the
+  scope of the agent that owns them. Contracts and transport belong to the
+  core SDK and the shared contracts. For example, a vision agent's inference
+  becomes a capability, while the decision to inspect again stays in the
+  core.
+- **Hierarchical planning stays possible.** Planning need not be monolithic.
+  The global plan may delegate domain goals to managerial agents that plan
+  subplans, and delegation may recurse with explicit limits on depth, cost,
+  time and authority. Delegation contracts, the managerial agents, and the
+  comparison of hierarchical with monolithic planning (HTN included) are
+  research directions tracked in
+  [#774](https://github.com/A11yDevs/acessilia/issues/774) and #619, not
+  decisions taken here. #774 compares one level (the strategic agent invokes
+  capabilities), two levels (strategic and managerial) and three levels
+  (with operational agents). Every semantic step is still planned, at some
+  level of the hierarchy, and the strategic core keeps the global logical
+  state; the other agents report results and evidence, and do not update it
+  in conflicting ways.
+- The classification of the existing agents is
+  [core-agent-classification.md](../architecture/core-agent-classification.md)
+  (#768).
 - With `AI_CLIENT=toolbox` (ADR-0012; the production and staging
   deployments), model calls go through the Toolbox, including those a
   strategic agent makes. The default is still `ollama`, and `openrouter` is
@@ -129,7 +193,8 @@ experimental.
   ADR-0012 and the configuration. The core interprets model results in the
   context of the plan.
   The Toolbox never decides global goals or replanning.
-- Contracts distinguish an operational result from a strategic decision.
+- Contracts distinguish a capability's result, and the evidence it carries,
+  from an agent's decision.
 
 ### Planner and coordination are separate
 
@@ -159,8 +224,8 @@ This ADR stays `Proposed` until these are closed in review:
 - The domain grows with the catalogue. Fragment curation, action costs and the
   CI planning fixtures keep it tractable.
 - Migration is incremental and follows ADR-0028, method by method. Then the
-  three fixed semantic stages become actions, and then the operational agents become
-  capabilities. The closed loop does not wait for durable queues
+  three fixed semantic stages become actions, and then the operational
+  responsibilities of the legacy agents become non-agentic capabilities. The closed loop does not wait for durable queues
   (#639): synchronous MCP calls are enough.
 - Progress indicators are tracked in #735: semantic stages outside the plan
   (3: inspection, extraction, enrichment), plan methods that compute locally
@@ -170,6 +235,9 @@ This ADR stays `Proposed` until these are closed in review:
     catalogue snapshot (REST and MCP resources).
   - core: compose the domain from those fragments; the policy check for the
     page limit; the journal extension and the result-applied record.
+  - core: the managerial layer, delegation contracts and hierarchical
+    planning, as research (#774, #619).
 - Compliance: the CI planning fixtures; an orchestrator test that every step of
   a job comes from the plan; `tests/test_architecture_layers.py` for model
-  clients in the core.
+  clients in the core, and for the classification of every module in
+  `acessilia_core.agents` (role and lifecycle).

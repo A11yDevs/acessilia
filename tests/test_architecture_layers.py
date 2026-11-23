@@ -315,6 +315,52 @@ def test_the_docstruct_inventory_lists_the_allowlist() -> None:
         )
 
 
+#: Every module in acessilia_core.agents, classified (ADR-0029, #768) by role
+#: and lifecycle. All agency is in the core: an agent is strategic (global
+#: goals), managerial (a domain subplan, #774) or operational (a logically
+#: atomic task), and no agent moves to the Toolbox, which stays passive. A
+#: support module is operational (decomposed with the operational code) or
+#: infrastructure (stays while the core makes model calls). The lifecycle
+#: separates a permanent component (active) from one being decomposed into
+#: non-agentic Toolbox capabilities (legacy) or retired (deprecated).
+AGENT_CLASSIFICATION = REPO_ROOT / "tests" / "fixtures" / "core_agent_classification.json"
+AGENT_CLASSES = {
+    "agent": {"strategic", "managerial", "operational"},
+    "support": {"operational", "infrastructure"},
+}
+AGENT_LIFECYCLES = {"active", "legacy", "deprecated"}
+AGENT_CLASSIFICATION_DOCS = (
+    REPO_ROOT / "docs" / "architecture" / "core-agent-classification.md",
+    REPO_ROOT / "docs" / "architecture" / "core-agent-classification.pt-br.md",
+)
+
+
+def test_every_core_agent_module_is_classified() -> None:
+    classification = json.loads(AGENT_CLASSIFICATION.read_text(encoding="utf-8"))
+    modules = {path.stem for path in (CORE_DIR / "agents").glob("*.py")} - {"__init__"}
+    assert set(classification) == modules, (
+        "classify the new agent modules in tests/fixtures/core_agent_classification.json "
+        f"(ADR-0029): missing {sorted(modules - set(classification))}, "
+        f"stale {sorted(set(classification) - modules)}"
+    )
+    wrong = sorted(
+        module for module, entry in classification.items()
+        if entry["class"] not in AGENT_CLASSES.get(entry["kind"], set())
+        or entry.get("lifecycle") not in AGENT_LIFECYCLES
+    )
+    assert not wrong, f"unknown kind, class or lifecycle: {wrong}"
+
+
+def test_the_agent_classification_lists_the_fixture() -> None:
+    expected = set(json.loads(AGENT_CLASSIFICATION.read_text(encoding="utf-8")))
+    for document in AGENT_CLASSIFICATION_DOCS:
+        listed = set(re.findall(r"^\| `agents/(\w+)` \|", document.read_text(encoding="utf-8"), re.M))
+        assert listed == expected, (
+            f"{document.relative_to(REPO_ROOT)}: missing {sorted(expected - listed)}, "
+            f"extra {sorted(listed - expected)}"
+        )
+
+
 def test_the_scanned_directories_exist() -> None:
     """A directory that moved would make every scan above pass on nothing."""
     for directory in (*SERVER_DIRS, *APPLICATION_DIRS):

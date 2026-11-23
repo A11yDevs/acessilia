@@ -1,0 +1,207 @@
+# Classification: the core's agents (#735 phase 4, ADR-0029)
+
+You can also read this documentation in **Brazilian Portuguese**: [português brasileiro](core-agent-classification.pt-br.md)
+
+[ADR-0029](../adr/0029-symbolic-core-every-step-planned.md) separates an
+agentic core from a passive Toolbox:
+
+> **The core is agentic and active**: it reasons, plans, delegates,
+> coordinates, evaluates and replans. **The Toolbox is operational and
+> passive**: it runs the capabilities it is asked for and returns results,
+> with no agentic autonomy and no responsibility for workflow decisions.
+
+All agency is in the core. Its agents take one of three permanent **roles**,
+distinguished by the scope of their authority, not by the technology they
+use:
+
+| Role | Specialized by | Responsibility | Planning scope |
+|---|---|---|---|
+| strategic | global goals | Goals, policies, priorities, global coordination, evaluation of global results, the decision to replan, the future LLM + planning integration (#619) | the global plan |
+| managerial | domain | A delegated goal: its decomposition, a domain subplan, delegating tasks to operational agents or invoking capabilities directly, evaluation, replanning within the domain, escalation ([#774](https://github.com/A11yDevs/acessilia/issues/774)) | a domain subplan |
+| operational | task | A logically atomic task with the capabilities it is allowed: choosing among alternatives, observing results, recovering local failures, escalating to its manager | a bounded local plan |
+
+An operational task is atomic logically, not computationally: the agent may
+use several capabilities, but it does not plan a domain, create agents or
+delegate subplans. There is no agent per capability: a task without relevant
+adaptive decisions is a capability the managerial agent invokes directly.
+
+Each module also has a **lifecycle**: `active` (a permanent part of the
+core), `legacy` (being decomposed: its operations become non-agentic Toolbox
+capabilities, and any decision it holds stays in the core) or `deprecated`
+(being retired). An operational role is permanent; a legacy lifecycle is not.
+No agent moves to the Toolbox (see
+[Decomposition before migration](#decomposition-before-migration)).
+
+This page classifies every module in `libs/core/src/acessilia_core/agents/`
+([#768](https://github.com/A11yDevs/acessilia/issues/768)). The classification
+is kept as data in
+[`tests/fixtures/core_agent_classification.json`](../../tests/fixtures/core_agent_classification.json),
+and `tests/test_architecture_layers.py` keeps the directory, the data and this
+page in step.
+
+## Summary
+
+Measured on `develop` at `a1a68a7b`.
+
+- **8 agents: 0 strategic, 0 managerial, 8 operational, all `legacy`.** This
+  closes #735's indicator "Agentes do Core classificados" (8/8). None of them
+  is an operational agent in the permanent sense: they run or wrap
+  operations meant for the Toolbox, and take no adaptive decision of their
+  own (see [Decomposition before migration](#decomposition-before-migration)).
+- **The scope is the package `acessilia_core.agents`, not every agent of the
+  core.** `PlannerAgent` (`planning/`) and `ExecutorAgent` (`execution/`) are
+  outside it. By function they are strategic, and they are listed under
+  [Where the strategic functions are](#where-the-strategic-functions-are).
+  The managerial role, and a permanent operational agent, have no instance
+  yet; the roles exist so that they can be introduced (#774) without
+  changing this policy.
+- **The strategic functions are not in `agents/`.** Planning, coordination,
+  state evaluation and replanning live in `planning/`, `execution/` and
+  `pipeline/` (see [Where the strategic functions are](#where-the-strategic-functions-are)).
+  They stay in the core, and none of them is an agent of this directory.
+- **Only two agents call a model:** `VisionAgent` and `DataAgent`. With
+  `AI_CLIENT=toolbox` (ADR-0012) the call itself already goes through the
+  Toolbox; the prompts, the validation of the answer, the retries and the
+  region cache still run in the core.
+- **The Agno envelopes do not run in production.** Six agents wrap
+  deterministic methods (`process`, `process_*`) in an Agno agent
+  (`build_agent`). No production code runs that agent (`.agent.run`); the
+  pipeline calls the methods directly.
+- **Four agents have no caller in the pipeline.** `AdjudicationAgent`,
+  `OrderAdjudicationAgent`, `PageLevelAgent` and `TableSpecialistAgent` came
+  with the Dr.DocBench work (#125). Only their unit tests and
+  `tests/test_docs_pr125.py` use them.
+
+## Agents
+
+| Module | Role, lifecycle | What it does | Called by (pipeline) | Calls a model | Route |
+|---|---|---|---|---|---|
+| `agents/vision_agent` | operational, legacy | Image and region description, page and region inspection, formula reading | `pipeline/enrichment/pictures`, `pipeline/enrichment/formulas`, `pipeline/handlers/inspection` | yes | Its inference becomes non-agentic capabilities (image description, region inspection, formula reading), with prompts, validation, retries and cache. The decisions of what to describe or inspect, and whether to inspect again, stay in the core |
+| `agents/data_agent` | operational, legacy | Validated extraction of tables and formulas from a region | `pipeline/enrichment/tables` | yes | Its inference becomes a non-agentic capability for table and formula extraction. The table stage's reread and retry budgets stay in the core |
+| `agents/informational_structural` | operational, legacy | Extracts the document through the Toolbox, fuses the providers and builds the processing manifest | `pipeline/orchestrator` | no (Agno envelope only) | Extraction is already a Toolbox call. The local fusion and manifest assembly become a composite extraction capability. Deriving the obligations stays in the core (see below) |
+| `agents/fusion_agent` | operational, legacy | Deterministic fusion, audit, classification, verse, tail join, repetition guard, normalization and reading order (`process_*`) | `pipeline/handlers/common`, for the plan-method handlers | no (Agno envelope only) | Each `process_*` becomes a capability with the plan method that uses it, as part of the [docstruct inventory](docstruct-import-inventory.md)'s migration. Which one runs stays the plan's choice |
+| `agents/adjudication_agent` | operational, legacy | Page routing between providers, VLM transcription decisions, the pairwise judge, the oracle | none | no (Agno envelope only) | Not migrated until a plan method needs it (see [Still open](#still-open)) |
+| `agents/order_adjudication_agent` | operational, legacy | Parses and completes a VLM reading order; Kendall tau | none | no (Agno envelope only) | As above |
+| `agents/page_level_agent` | operational, legacy | Whole-page fusion and selection, page agreement, upscale and orientation | none | no (Agno envelope only) | As above |
+| `agents/table_specialist_agent` | operational, legacy | Generate, compare and adjudicate table candidates | none | no (Agno envelope only) | As above |
+
+## Support modules
+
+| Module | Role, lifecycle | What it is | Used by | Route |
+|---|---|---|---|---|
+| `agents/model_call_policy` | operational, legacy | The deadline margin of the vision and data model calls | `vision_agent`, `data_agent` | Moves with those agents |
+| `agents/prompt_tools` | operational, legacy | Loads and assembles the vision and region prompts (`agents/prompts/`) | `vision_agent`, `data_agent` | Moves with those agents, with the prompts |
+| `agents/output_schemas` | operational, legacy | Validated output contracts of the vision and data agents | the two agents, enrichment and the inspection handler | Moves with those agents; the result contract the core reads stays as a capability contract |
+| `agents/run_helpers` | operational, legacy | Reads the result of an Agno run | `output_schemas` | Moves with `output_schemas` |
+| `agents/agno_support` | infrastructure, active | Builds Agno agents when the optional stack is installed | the agents above, `planning/planner_agent`, `execution/executor` | Stays: the planner and the executor use it |
+| `agents/ai_client` | infrastructure, active | The model client for each `AI_CLIENT` (Ollama, OpenRouter, the Toolbox gateway) | `vision_agent`, `data_agent`, `backend/api/routes/health` | Stays while the core makes model calls (ADR-0012); a strategic LLM (#619) needs it |
+| `agents/model_calls` | infrastructure, active | The application's execution port for synchronous model calls | `pipeline/orchestrator`, the two agents, `backend/services/model_calls` | Stays while the core makes model calls |
+| `agents/provider_breaker` | infrastructure, active | Stops calling a failing provider for the rest of a job | `pipeline/orchestrator`, enrichment | Stays: a job-level coordination concern; once the calls are capabilities it guards those |
+
+## Where the strategic functions are
+
+These are the strategic functions ADR-0029 keeps in the core. None of them is
+in `agents/`:
+
+| Function | Where |
+|---|---|
+| Building the planning problem: the obligations a document needs | `manifest/builder` (`_derive_processing_needs`, `inspect_document_needs`) |
+| Planning | `planning/planner_agent`, behind `planning/engine` (`PlanningEngine`, #744) |
+| Capability availability as a planning restriction | `planning/toolbox_gate` |
+| Executing and observing the plan | `execution/executor` (`ExecutorAgent`) |
+| Coordination and bounded replanning | `pipeline/orchestrator` (`_replan_until_done`) |
+| Evaluating the result: open obligations, critical ones block delivery | `pipeline/obligations` |
+
+Building the manifest mixes both sides: extraction and fusion are
+operational, while deriving the obligations defines the planning problem and
+stays in the core. Migrating `InformationalStructuralAgent` keeps that line.
+
+## Decomposition before migration
+
+A legacy component does not migrate whole. Its responsibilities are
+separated first:
+
+| Responsibility | Destination |
+|---|---|
+| Goals and planning | strategic core |
+| Subplanning and the choice of strategy | managerial core |
+| Semantic evaluation and the decision to replan | strategic or managerial core, at the scope that owns it |
+| Model inference | Toolbox |
+| Deterministic processing algorithms | Toolbox |
+| Technical validation and result transformation | Toolbox |
+| Contracts and transport | core SDK and shared contracts |
+
+For the eight agents today, the split is already clean. The decisions live
+in their callers in the core: which pictures get a description
+(`pipeline/enrichment/pictures`), the table stage's budgets
+(`pipeline/enrichment/tables`), the inspection as a plan method
+(`pipeline/handlers/inspection`), and which `process_*` a plan method runs.
+What the agents hold is operational, and it becomes capabilities. A future
+migration checks this again: a decision found inside an agent stays in the
+core.
+
+Decomposing a legacy component does not rule out an operational agent. If a
+task later needs autonomy (choosing among recognizers, judging a result,
+retrying within a budget), a permanent operational agent in the core may own
+it, using the capabilities the migration produced. For example, in making a
+formula accessible:
+
+- the strategic agent sets the obligation;
+- a math manager decomposes it into recognition, validation, adjudication if
+  needed, and MathML;
+- a recognition agent chooses among the allowed recognizers, evaluates the
+  result and retries within its budget;
+- the Toolbox runs math OCR, VLM recognition, LaTeX validation and the MathML
+  conversion.
+
+The manager decides whether to adjudicate further, whether the result meets
+the domain's criteria, or whether to escalate. Whether the three levels pay
+off is an experimental question (#774, #619).
+
+## The migration, in order
+
+1. **`VisionAgent` and `DataAgent`.** They are the only model-backed agents,
+   and they are where ADR-0029's "image description" and "table and formula
+   extraction" run. Each use becomes a non-agentic capability. The core keeps
+   the decision of when to ask for one and interprets the result in the
+   plan's context.
+2. **`FusionAgent`'s `process_*` methods**, per plan method, with the
+   docstruct inventory's migration.
+3. **`InformationalStructuralAgent`.** A composite extraction capability
+   returns the fused document; the core derives the obligations from it.
+4. **The Agno envelopes.** They go with their agents; none runs in
+   production.
+
+Each step follows the [docstruct inventory](docstruct-import-inventory.md#how-a-migration-shrinks-the-allowlist)'s
+steps: an equivalent capability, the call through the core SDK, a
+differential test, and the obsolete pins removed.
+
+## The guard
+
+`tests/test_architecture_layers.py` checks that:
+
+- every module in `acessilia_core/agents/` is in the fixture, and no entry is
+  stale. A new agent lands classified;
+- an agent's role is strategic, managerial or operational, a support
+  module's is operational or infrastructure, and every module has a
+  lifecycle (active, legacy or deprecated);
+- both pages list the fixture's modules.
+
+## Still open
+
+- **The managerial and operational roles.** Delegation and task contracts
+  (goal, inputs, constraints, allowed capabilities, budget, success
+  criteria, result, escalation), managerial agents, permanent operational
+  agents, support capabilities that compute evidence without deciding, and
+  the comparison of one, two and three levels (HTN and PDDL) are research, in
+  [#774](https://github.com/A11yDevs/acessilia/issues/774) and #619.
+
+- **The four agents without a pipeline caller.** Should they move to the
+  benchmark tooling (Dr.DocBench, #125) outside the core, be retired, or
+  become capabilities when a plan method needs them?
+- **Infrastructure after the migration.** Do `ai_client` and `model_calls`
+  stay only for a strategic LLM (#619), or go once the core makes no model
+  call of its own?
+- **Result and decision contracts.** ADR-0029 asks the contracts to
+  distinguish an operational result from a strategic decision. The
+  capability contracts (ADR-0027) define that for each migrated agent.
