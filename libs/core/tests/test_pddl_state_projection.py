@@ -15,7 +15,7 @@ from pddl_support import build_element, build_manifest
 
 from acessilia_core.manifest.models import Obligation, ObligationAttempt
 from acessilia_core.planning.domain_bundle import DomainBundle
-from acessilia_core.planning.pddl_processor import PddlProblemCompiler
+from acessilia_core.planning.pddl_processor import CatalogueFacts, PddlProblemCompiler
 from acessilia_core.planning.planner_agent import PlannerAgent
 
 NOW = datetime(2026, 11, 23, tzinfo=timezone.utc)
@@ -209,6 +209,115 @@ def test_the_document_content_is_not_projected():
     assert "e-1" not in compiled.text
     assert "(:goal (completed))" in compiled.text
     assert "(:metric minimize (total-cost))" in compiled.text
+
+
+# Domain 2.4: the catalogue snapshot as facts (#640, PR 1).
+
+_EXTRACT = ("document.structure.extract", "docling")
+_RENDER = ("pdf.render", "pymupdf")
+
+
+def _catalogue(offered=None) -> CatalogueFacts:
+    return CatalogueFacts(
+        requirements={"m-a": frozenset({_EXTRACT}), "m-b": frozenset({_EXTRACT, _RENDER})},
+        offered=offered,
+    )
+
+
+def test_without_a_catalogue_the_problem_has_no_catalogue_facts():
+    compiled = _compile(_manifest(_obligation("o-1")))
+    assert "requires" not in compiled.text and "offered" not in compiled.text
+    assert compiled.projection.runnable_methods == {"m-a", "m-b"}
+
+
+def test_requirements_become_requires_facts_and_typed_objects():
+    compiled = _compile(_manifest(_obligation("o-1")), catalogue=_catalogue())
+    facts = _facts(compiled)
+    assert {
+        "(requires m-a document-structure-extract docling)",
+        "(requires m-b document-structure-extract docling)",
+        "(requires m-b pdf-render pymupdf)",
+    } <= facts
+    assert _objects(compiled, "capability") == {"document-structure-extract", "pdf-render"}
+    assert _objects(compiled, "provider") == {"docling", "pymupdf"}
+
+
+def test_an_observing_catalogue_offers_every_requirement():
+    compiled = _compile(_manifest(_obligation("o-1")), catalogue=_catalogue(offered=None))
+    facts = _facts(compiled)
+    assert {"(offered document-structure-extract docling)", "(offered pdf-render pymupdf)"} <= facts
+    assert compiled.projection.runnable_methods == {"m-a", "m-b"}
+
+
+def test_an_enforcing_catalogue_offers_only_what_the_snapshot_publishes():
+    compiled = _compile(
+        _manifest(_obligation("o-1", costs={"m-a": 9, "m-b": 1})),
+        catalogue=_catalogue(offered=frozenset({_EXTRACT})),
+    )
+    facts = _facts(compiled)
+    assert "(offered document-structure-extract docling)" in facts
+    assert "(offered pdf-render pymupdf)" not in facts
+    # m-b is cheaper, but one of its requirements is not offered.
+    assert compiled.projection.runnable_methods == {"m-a"}
+
+
+def test_the_planner_uses_only_runnable_methods():
+    manifest = _manifest(_obligation("o-1", costs={"m-a": 9, "m-b": 1}))
+    _, observed = PlannerAgent().plan(manifest, catalogue=_catalogue())
+    _, enforced = PlannerAgent().plan(manifest, catalogue=_catalogue(offered=frozenset({_EXTRACT})))
+    assert [step.method for step in observed.steps if step.method] == ["m-b"]
+    assert [step.method for step in enforced.steps if step.method] == ["m-a"]
+
+
+def test_an_obligation_without_a_runnable_method_is_refused():
+    with pytest.raises(ValueError):
+        _compile(_manifest(_obligation("o-1")), catalogue=_catalogue(offered=frozenset()))
+
+
+def test_requirements_of_methods_outside_the_problem_are_ignored():
+    catalogue = CatalogueFacts(requirements={"m-z": frozenset({_RENDER})}, offered=frozenset())
+    compiled = _compile(_manifest(_obligation("o-1")), catalogue=catalogue)
+    assert "requires" not in compiled.text
+
+
+def test_the_same_capability_from_another_provider_is_not_an_offer():
+    compiled = _compile(
+        _manifest(_obligation("o-1")),
+        catalogue=_catalogue(offered=frozenset({_EXTRACT, ("pdf.render", "other")})),
+    )
+    assert compiled.projection.runnable_methods == {"m-a"}
+
+
+def _all_objects(compiled) -> list[str]:
+    block = compiled.text.split("(:objects", 1)[1].split("(:init", 1)[0]
+    return [name for line in block.splitlines() if " - " in line for name in line.split(" - ")[0].split()]
+
+
+def test_objects_of_different_types_never_share_a_symbol():
+    """PDDL objects share one namespace whatever their type (review of #781):
+    an obligation named like its kind, and a method, a capability and a
+    provider all called ``docling``, still get distinct symbols."""
+    catalogue = CatalogueFacts(requirements={"docling": frozenset({("docling", "docling")})})
+    manifest = _manifest(_obligation("test-kind", methods=("docling", "m-a")))
+    compiled = _compile(manifest, catalogue=catalogue)
+    names = _all_objects(compiled)
+    assert len(names) == len(set(names))
+    # The first type keeps its plain symbol; the order is obligation, kind,
+    # method, capability, provider.
+    assert compiled.projection.obligation_symbols == {"test-kind": "test-kind"}
+    assert compiled.projection.method_symbols["docling"] == "docling"
+    assert "(requires docling" in compiled.text
+    _, plan = PlannerAgent().plan(manifest, catalogue=catalogue, selected_roots=["test-kind"])
+    assert {step.obligation_id for step in plan.steps if step.method} == {"test-kind"}
+
+
+def test_the_validator_refuses_an_object_declared_twice():
+    from acessilia_core.planning.pddl_processor import PddlProblemValidator
+
+    compiled = _compile(_manifest(_obligation("o-1")))
+    broken = compiled.text.replace("o-1 - obligation", "o-1 - obligation\n    o-1 - provider", 1)
+    with pytest.raises(ValueError, match=r"declared more than once: \['o-1'\]"):
+        PddlProblemValidator(DomainBundle.load()).validate(broken)
 
 
 # Edge cases (review of #775).

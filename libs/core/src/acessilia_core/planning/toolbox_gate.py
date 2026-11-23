@@ -15,6 +15,12 @@ SDK allowlist is never made available.
   every method with Toolbox requirements is removed (fail closed), so the
   planner falls back to local methods or ``human-review``.
 - ``off``: no check.
+
+Since domain 2.4 (#640) the decision reaches the planner as problem facts
+(:meth:`AvailabilityDecision.catalogue_facts`): each method's requirements and
+what the snapshot offers, from which the domain derives ``runnable``. In
+``observe`` every requirement is offered, so the facts are visible and the
+plan does not change; in ``enforce`` the snapshot decides.
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ from typing import Any
 
 from acessilia_core.config import CoreConfig, ToolboxConfig
 from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.planning.pddl_processor import CatalogueFacts
 from acessilia_core.toolbox.toolbox_client import endpoints_from
 from acessilia_sdk.toolbox import (
     CatalogCache,
@@ -87,6 +94,10 @@ class AvailabilityDecision:
     #: Requested methods the catalogue rules out, with the reasons.
     blocked: dict[str, list[str]] = field(default_factory=dict)
     catalog_error: str | None = None
+    #: Requested method -> the ``(capability, provider)`` pairs it calls.
+    requirements: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    #: The required pairs the snapshot offers; ``None`` offers them all.
+    offered: list[tuple[str, str]] | None = None
 
     @property
     def enforced(self) -> bool:
@@ -94,8 +105,38 @@ class AvailabilityDecision:
 
     @property
     def unavailable_methods(self) -> list[str]:
-        """Methods to keep out of the plan (only when enforcing)."""
-        return sorted(self.blocked) if self.enforced else []
+        """Methods to keep out of the plan by name: none since domain 2.4.
+
+        The catalogue restricts the plan through :meth:`catalogue_facts`. A
+        plan checkpoint from before 2.4 still carries its own list.
+        """
+        return []
+
+    @property
+    def offered_source(self) -> str:
+        """Where the ``offered`` facts come from (review of #781).
+
+        ``catalogue_snapshot``: what the snapshot publishes (``enforce``).
+        ``assumed``: every requirement is offered whatever the snapshot says
+        (``observe``, option (a) of #640); not evidence of availability.
+        ``none``: no requirement to offer (``off``, or no Toolbox method).
+        """
+        if not self.requirements:
+            return "none"
+        return "assumed" if self.offered is None else "catalogue_snapshot"
+
+    @property
+    def assumed_runnable(self) -> list[str]:
+        """Methods the snapshot rules out that the plan may still use, because
+        the facts are assumed (``observe``)."""
+        return sorted(self.blocked) if self.offered is None else []
+
+    def catalogue_facts(self) -> CatalogueFacts:
+        """The decision as problem facts (domain 2.4)."""
+        return CatalogueFacts(
+            requirements={method: frozenset(pairs) for method, pairs in self.requirements.items()},
+            offered=None if self.offered is None else frozenset(self.offered),
+        )
 
     def to_metadata(self) -> dict[str, Any]:
         return {
@@ -104,7 +145,32 @@ class AvailabilityDecision:
             "catalog_error": self.catalog_error,
             "blocked_methods": self.blocked,
             "applied": self.enforced and bool(self.blocked),
+            "requirements": {method: [list(pair) for pair in pairs] for method, pairs in self.requirements.items()},
+            "offered": None if self.offered is None else [list(pair) for pair in self.offered],
+            "offered_source": self.offered_source,
+            "assumed_runnable_methods": self.assumed_runnable,
         }
+
+    @classmethod
+    def from_metadata(cls, metadata: dict[str, Any], toolbox: ToolboxConfig) -> AvailabilityDecision:
+        """The decision a plan was built under, from its checkpoint.
+
+        A checkpoint without the mode gets the run's (``toolbox``); one from
+        before domain 2.4 has no requirements, so its replans add no facts.
+        """
+        blocked = metadata.get("blocked_methods") or {}
+        offered = metadata.get("offered")
+        return cls(
+            mode=str(metadata.get("mode") or gate_mode(toolbox)),
+            catalog_revision=metadata.get("catalog_revision"),
+            blocked={str(method): [str(reason) for reason in reasons] for method, reasons in blocked.items()},
+            catalog_error=metadata.get("catalog_error"),
+            requirements={
+                str(method): [(str(capability), str(provider)) for capability, provider in pairs]
+                for method, pairs in (metadata.get("requirements") or {}).items()
+            },
+            offered=None if offered is None else [(str(c), str(p)) for c, p in offered],
+        )
 
 
 def gate_mode(toolbox: ToolboxConfig) -> str:
@@ -132,11 +198,20 @@ def evaluate(
 ) -> AvailabilityDecision:
     """Which of ``methods`` cannot run against ``snapshot``, with ``config``'s providers."""
     blocked: dict[str, list[str]] = {}
+    required: dict[str, list[tuple[str, str]]] = {}
+    offered: set[tuple[str, str]] = set()
     for method in sorted(set(methods)):
         requirements = METHOD_TOOLBOX_REQUIREMENTS.get(method)
         if requirements is None:
             continue
-        reasons = missing_requirements(snapshot, requirements(config))
+        needed = requirements(config)
+        required[method] = sorted({(item.capability_id, item.provider) for item in needed})
+        offered.update(
+            (item.capability_id, item.provider)
+            for item in needed
+            if not missing_requirements(snapshot, [item])
+        )
+        reasons = missing_requirements(snapshot, needed)
         if reasons:
             blocked[method] = reasons
     return AvailabilityDecision(
@@ -144,6 +219,10 @@ def evaluate(
         catalog_revision=snapshot.revision if snapshot else None,
         blocked=blocked,
         catalog_error=catalog_error if snapshot is None else None,
+        requirements=required,
+        # observe (option a, #640): every requirement is offered, the plan
+        # does not change; enforce: the snapshot decides.
+        offered=sorted(offered) if mode == "enforce" else None,
     )
 
 

@@ -34,7 +34,7 @@ from acessilia_core.planning.models import (
     PlannerSelection,
     PlanningComparison,
 )
-from acessilia_core.planning.pddl_processor import CompiledProblem
+from acessilia_core.planning.pddl_processor import CatalogueFacts, CompiledProblem
 from acessilia_core.planning.planner_agent import PlannerAgent
 
 
@@ -44,8 +44,9 @@ class PlanningProblem:
 
     ``selected_roots`` limits planning to the obligations under those roots
     (``None`` plans every obligation). ``unavailable_methods`` are methods the
-    plan must not use: those without a handler and those the Toolbox
-    availability gate rules out.
+    plan must not use (those without a handler). ``catalogue`` is the Toolbox
+    catalogue snapshot as problem facts (domain 2.4): the methods' requirements
+    and what the snapshot offers.
 
     The restrictions are copied into tuples; ``manifest`` is shared, not
     copied (see the module docstring).
@@ -54,6 +55,7 @@ class PlanningProblem:
     manifest: ProcessingManifest
     selected_roots: tuple[str, ...] | None = None
     unavailable_methods: tuple[str, ...] = ()
+    catalogue: CatalogueFacts | None = None
 
     @classmethod
     def of(
@@ -62,11 +64,13 @@ class PlanningProblem:
         *,
         selected_roots: Iterable[str] | None = None,
         unavailable_methods: Iterable[str] = (),
+        catalogue: CatalogueFacts | None = None,
     ) -> PlanningProblem:
         return cls(
             manifest=manifest,
             selected_roots=None if selected_roots is None else tuple(selected_roots),
             unavailable_methods=tuple(unavailable_methods),
+            catalogue=catalogue,
         )
 
 
@@ -180,6 +184,7 @@ class PddlPlanningEngine:
             problem.manifest,
             selected_roots=problem.selected_roots,
             unavailable_methods=problem.unavailable_methods,
+            catalogue=problem.catalogue,
             backend=self.backend,
             fast_downward=self.fast_downward,
             fast_downward_alias=self.fast_downward_alias,
@@ -192,6 +197,7 @@ class PddlPlanningEngine:
             problem.manifest,
             selected_roots=problem.selected_roots,
             unavailable_methods=problem.unavailable_methods,
+            catalogue=problem.catalogue,
             fast_downward=self.fast_downward,
             fast_downward_alias=self.fast_downward_alias,
             fast_downward_search=self.fast_downward_search,
@@ -205,6 +211,7 @@ class PddlPlanningEngine:
 
 
 __all__ = [
+    "CatalogueFacts",
     "PddlPlanningEngine",
     "PlanningEngine",
     "PlanningProblem",

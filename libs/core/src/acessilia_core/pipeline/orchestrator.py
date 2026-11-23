@@ -80,6 +80,7 @@ from acessilia_core.pipeline.preflight import (
 from acessilia_core.planning import toolbox_gate
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.engine import (
+    CatalogueFacts,
     PddlPlanningEngine,
     PlanningEngine,
     PlanningProblem,
@@ -257,6 +258,9 @@ class PddlAccessibilityOrchestrator:
             "fast_downward": str(self.fast_downward or ""), "max_replans": self.max_replans,
             "fast_downward_alias": self.fast_downward_alias or "",
             "fast_downward_search": self.fast_downward_search,
+            # A saved plan is bound to its domain (the executor refuses another),
+            # so a new domain version plans again instead of failing (#640).
+            "pddl_domain": f"{self.executor.domain.domain_sha256}:{self.executor.domain.description_sha256}",
         }
         # Only an injected engine adds its identity, so the default engine's
         # checkpoints keep the identity they had before the seam existed.
@@ -479,7 +483,7 @@ class PddlAccessibilityOrchestrator:
                     else None
                 ),
                 planning_manifest=ProcessingManifest.model_validate(plan_state["manifest"]),
-                availability=_availability_from(
+                availability=toolbox_gate.AvailabilityDecision.from_metadata(
                     plan_state.get("availability") or {}, ctx.config.toolbox
                 ),
                 gated=list(plan_state.get("gated") or []),
@@ -493,7 +497,8 @@ class PddlAccessibilityOrchestrator:
         _log_availability(availability)
         gated = availability.unavailable_methods
         plan, comparison = await run_blocking(
-            self._build_plan, manifest, extra_unavailable=gated
+            self._build_plan, manifest, extra_unavailable=gated,
+            catalogue=availability.catalogue_facts(),
         )
         await ctx.checkpoints.save_plan(plan, comparison, manifest, availability, gated, 0)
         return _PlanningState(
@@ -719,6 +724,7 @@ class PddlAccessibilityOrchestrator:
                 planning_manifest,
                 extra_unavailable=gated,
                 selected_roots=roots,
+                catalogue=availability.catalogue_facts() if availability else None,
             )
             await checkpoints.save_plan(
                 plan, comparison, planning_manifest, availability, gated, replans
@@ -772,17 +778,20 @@ class PddlAccessibilityOrchestrator:
         *,
         extra_unavailable: Iterable[str] = (),
         selected_roots: Iterable[str] | None = None,
+        catalogue: CatalogueFacts | None = None,
     ) -> tuple[NominalPlan, PlanningComparison | None]:
         # Tell the compiler which methods the executor can actually run. Without
         # this the planner happily emits steps for methods that have no handler,
         # and the failure only surfaces at execution time -- after the model-backed
-        # work has already been paid for. ``extra_unavailable`` adds the methods
-        # the Toolbox availability gate rules out for this document.
+        # work has already been paid for. ``extra_unavailable`` adds the methods a
+        # plan checkpoint from before domain 2.4 gated by name; ``catalogue`` is
+        # the Toolbox availability as problem facts (#640).
         unavailable = sorted(
             set(self._unavailable_methods(manifest)) | set(extra_unavailable)
         )
         problem = PlanningProblem.of(
-            manifest, selected_roots=selected_roots, unavailable_methods=unavailable
+            manifest, selected_roots=selected_roots, unavailable_methods=unavailable,
+            catalogue=catalogue,
         )
         result = self.planning_engine.plan(problem).verified()
         return result.plan, result.comparison
@@ -801,25 +810,6 @@ class PddlAccessibilityOrchestrator:
             for method in obligation.admissible_methods
         }
         return sorted(requested - registered)
-
-
-def _availability_from(
-    metadata: dict[str, Any], toolbox: ToolboxConfig
-) -> toolbox_gate.AvailabilityDecision:
-    """Rebuild the gate decision the plan was built under, for the payload.
-
-    A checkpoint without the mode gets the run's (``toolbox``).
-    """
-    blocked = metadata.get("blocked_methods") or {}
-    return toolbox_gate.AvailabilityDecision(
-        mode=str(metadata.get("mode") or toolbox_gate.gate_mode(toolbox)),
-        catalog_revision=metadata.get("catalog_revision"),
-        blocked={
-            str(method): [str(reason) for reason in reasons]
-            for method, reasons in blocked.items()
-        },
-        catalog_error=metadata.get("catalog_error"),
-    )
 
 
 def _plan_progress(

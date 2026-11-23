@@ -84,7 +84,7 @@ def test_domain_bundle_validates_matching_version():
     domain = DomainBundle.load()
 
     assert domain.name == "acessilia-obligations"
-    assert domain.version == "2.3"
+    assert domain.version == "2.4"
     assert len(domain.domain_sha256) == 64
 
 
@@ -288,9 +288,20 @@ def test_domain_v23_documents_the_new_obligations():
     domain = DomainBundle.load()
     description = domain.description_path.read_text(encoding="utf-8")
 
-    assert domain.version == "2.3"
+    assert domain.version == "2.4"
     for kind in V23_OBLIGATION_KINDS:
         assert kind in description, f"obrigação {kind} não documentada"
+
+
+def test_domain_v24_adds_the_catalogue_to_the_v22_structure():
+    domain = DomainBundle.load()
+    text = domain.domain_path.read_text(encoding="utf-8")
+
+    # 2.4 (#640): the catalogue snapshot as facts, and runnable derived from it.
+    assert "(requires ?m - method ?c - capability ?p - provider)" in text
+    assert "(offered ?c - capability ?p - provider)" in text
+    assert "(:derived (runnable ?m - method)" in text
+    assert "(runnable ?m)" in text.split("(:action execute-obligation", 1)[1]
 
 
 def test_domain_v23_keeps_the_v22_structure():

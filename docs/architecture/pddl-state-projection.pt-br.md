@@ -6,21 +6,23 @@ A [ADR-0029](../adr/0029-symbolic-core-every-step-planned.pt-br.md) compila
 cada problema de planejamento a partir do estado observado: os fatos do
 manifesto, as obrigações, os resultados já registrados e um snapshot do
 catálogo. Esta página documenta o que `PddlProblemCompiler.compile`
-(`planning/pddl_processor.py`) projeta hoje, para o domínio v2.3, e o que
+(`planning/pddl_processor.py`) projeta hoje, para o domínio v2.4, e o que
 ainda falta. `libs/core/tests/test_pddl_state_projection.py` tem um teste por
 regra, então uma mudança na projeção aparece no diff.
 
 ## Entradas
 
-`compile(manifest, *, selected_roots=None, unavailable_methods=())`. O
+`compile(manifest, *, selected_roots=None, unavailable_methods=(), catalogue=None)`. O
 orquestrador o chama pelo `PlanningEngine` (#744), com um `PlanningProblem`:
 
 - `manifest`: o manifesto de processamento, como observado até agora;
 - `selected_roots`: as obrigações a planejar, ou `None` (veja abaixo);
-- `unavailable_methods`: os métodos que o plano não pode usar. São os
-  métodos sem handler registrado e, quando o gate de disponibilidade está em
-  modo `enforce`, os métodos cuja capacidade ou provider da Toolbox falta no
-  snapshot do catálogo.
+- `unavailable_methods`: os métodos que o plano não pode usar: os que não
+  têm handler registrado. Um checkpoint de plano anterior ao domínio 2.4
+  também traz os métodos que o gate excluía pelo nome;
+- `catalogue` (`CatalogueFacts`, domínio 2.4): o snapshot do catálogo da
+  Toolbox, como os requisitos de cada método (capacidade, provider) e o que o
+  snapshot oferece. O gate de disponibilidade o monta (`catalogue_facts()`).
 
 ## Regras
 
@@ -38,13 +40,20 @@ orquestrador o chama pelo `PlanningEngine` (#744), com um `PlanningProblem`:
 | `dependencies` | `(depends-on o predecessora)` | |
 | Cada método admissível | `(supports m k)`, `(admissible m o)` | `supports` vem dos métodos admissíveis do manifesto, não de um catálogo |
 | `method_costs[m]` | `(= (execution-cost m o) custo)` | 50 quando o manifesto não declara custo |
-| Um método fora de `unavailable_methods` | `(available m)` | Por método, não por capacidade ou provider |
+| Um método fora de `unavailable_methods` | `(available m)` | O Core tem um handler para ele |
+| Os requisitos de catálogo de um método | `(requires m c p)`, objetos `capability` e `provider` | Só para os métodos deste problema. Um método sem requisitos não tem nenhum, então é executável qualquer que seja o catálogo: uma omissão na tabela é um falso positivo no `enforce` (protegida por uma lista que só encolhe; [#789](https://github.com/A11yDevs/acessilia/issues/789)) |
+| Os pares exigidos que o snapshot oferece | `(offered c p)` | Gate em `observe`: todo requisito é oferecido, então o plano não muda. Esses fatos são **presumidos**, não observados: o metadado diz `offered_source: assumed` e lista os métodos que o snapshot descarta (`assumed_runnable_methods`). Gate `off`: sem fatos de catálogo. `enforce`: o que o snapshot publica numa versão compatível; nada sem snapshot (falha fechada) |
+| — | `(runnable m)`, derivado pelo domínio | `available` e todo requisito oferecido. `execute-obligation` o exige |
 | Uma tentativa `failed` ou `rejected` | `(tried o m)` | Uma tentativa `succeeded` não é projetada; seu resultado é o status da obrigação. Uma tentativa `failed` descarta o método para aquela obrigação, qualquer que seja a causa (veja abaixo) |
-| Ids, kinds e nomes de métodos | símbolos PDDL (`[a-z][a-z0-9-]*`) | A projeção guarda o mapeamento nos dois sentidos |
+| Ids, kinds, métodos, capacidades e providers | símbolos PDDL (`[a-z][a-z0-9-]*`), únicos no problema inteiro | Objetos PDDL compartilham um espaço de nomes, qualquer que seja o tipo. A projeção guarda o mapeamento nos dois sentidos |
 
 Fatos duplicados são emitidos uma única vez. O problema não depende da ordem
-das obrigações nem dos seus métodos no manifesto, e ids distintos que se
-normalizam no mesmo símbolo recebem símbolos distintos (um sufixo de hash).
+das obrigações nem dos seus métodos no manifesto. Valores distintos que se
+normalizam no mesmo símbolo recebem símbolos distintos (um sufixo de hash),
+dentro de um tipo e entre tipos: uma obrigação com o nome do seu kind, ou um
+método, uma capacidade e um provider chamados `docling`. Os tipos são nomeados
+numa ordem fixa (obrigação, kind, método, capacidade, provider), e o primeiro
+fica com o símbolo simples. O validador recusa um objeto declarado duas vezes.
 
 Um conjunto vazio de raízes, ou um manifesto sem obrigações, não projeta
 nenhuma obrigação: o plano é `start-job`, `complete-job`.
@@ -82,8 +91,8 @@ a reportada:
    lugar.
 5. **Catálogo v2.3.** Para um kind do catálogo v2.3, métodos admissíveis fora
    dele, ou um método sem custo.
-6. **Métodos.** Uma obrigação pendente sem método admissível, disponível e
-   não tentado.
+6. **Métodos.** Uma obrigação pendente sem método admissível, executável
+   (`runnable`) e não tentado.
 7. **Status do job.** Um manifesto `completed`.
 8. **O problema renderizado.** O `PddlProblemValidator` o confere contra a
    projeção.
@@ -95,6 +104,16 @@ a reportada:
   (`problem_sha256`). O coordenador o confere desde o #744.
 - `manifest_sha256` é o hash do manifesto inteiro, inclusive do que não é
   projetado.
+- A identidade do checkpoint de planejamento inclui os hashes do domínio. O
+  executor recusa um plano feito com outro domínio, então, depois de uma
+  mudança de domínio (2.3 → 2.4), um job retomado planeja de novo em vez de
+  falhar.
+- Um job retomado reproduz a decisão de catálogo do checkpoint de plano: não
+  lê o catálogo de novo, então seus replanejamentos veem a Toolbox sob a qual
+  o plano foi feito, mesmo que o catálogo tenha mudado. Uma capacidade que
+  sumiu é descoberta quando sua chamada falha na execução, e a tentativa passa
+  a contar como `tried` (veja abaixo). Revalidar o catálogo na retomada é da
+  #640, PR 3.
 - São identidades diferentes. Dois manifestos que diferem só fora da
   projeção (o texto de um elemento, uma observação) produzem o mesmo
   problema, então `problem_sha256` é a identidade do estado de
@@ -119,12 +138,23 @@ aos contratos de resultado, ao journal de execução e às regras de
 replanejamento da #640 (PRs 3 e 4). Esta página documenta o comportamento
 atual.
 
+## Backends
+
+O planejador interno é testado contra o domínio 2.4 no CI. O Fast Downward
+26.6 (`aibasel/downward`, `astar(blind())`) foi conferido com ele localmente:
+`libs/core/tests/test_fast_downward_domain.py` roda os dois backends sobre os
+mesmos problemas quando selecionado (`-m fast_downward`; fora da seleção por
+padrão) com `ACESSILIA_FAST_DOWNWARD` apontando para um build do Fast Downward, e eles concordam com e sem catálogo, em `observe` e `enforce`, e com
+nomes repetidos entre tipos. O CI ainda não roda o Fast Downward
+([#790](https://github.com/A11yDevs/acessilia/issues/790)). Os predicados derivados exigem uma busca cujas heurísticas suportem
+axiomas, como o padrão `astar(blind())`.
+
 ## O que a ADR-0029 ainda pede
 
 | ADR-0029 | Hoje | Próximo |
 |---|---|---|
-| A disponibilidade de capacidades e providers é predicado do problema | O gate a transforma em `unavailable_methods`, fora do problema, e só no modo `enforce` | PR 1, segunda parte: o snapshot do catálogo como fatos (requisitos por método, capacidades e providers oferecidos) e a disponibilidade derivada no domínio. Isso exige uma nova versão do domínio |
-| O `toolbox_gate` vira só relatório | Ele decide `unavailable_methods` | #640, PR 2, depois dos predicados |
+| A disponibilidade de capacidades e providers é predicado do problema | Feito no domínio 2.4: `requires`, `offered` e o derivado `runnable` | — |
+| O `toolbox_gate` vira só relatório | Ele ainda decide o que é oferecido no `enforce` | #640, PR 2: o snapshot em si é a entrada, e o `observe` sai |
 | Ações operacionais ligadas a um id de capacidade e versão exata | Os métodos nomeiam handlers locais | #640, PR 2, com os fragmentos de domínio |
 | Um resultado atualiza o estado uma vez por `operation_id` | Os status e as tentativas do manifesto | #640, PR 3, com o journal da ADR-0020 |
 | Inspeção, extração e enriquecimento são ações | Rodam antes do planejamento | #640, PR 2 |

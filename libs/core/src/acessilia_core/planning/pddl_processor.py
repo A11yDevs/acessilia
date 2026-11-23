@@ -8,7 +8,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from acessilia_core.hashing import json_sha256 as _json_sha256
 from acessilia_core.i18n import t
@@ -31,6 +31,27 @@ from acessilia_core.planning.models import DomainIdentity, NominalPlan, PlanStep
 PDDL_SYMBOL = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
+#: A Toolbox requirement: ``(capability id, provider)``.
+Requirement = tuple[str, str]
+
+
+@dataclass(frozen=True)
+class CatalogueFacts:
+    """The catalogue snapshot as a problem sees it (domain 2.4, #640).
+
+    ``requirements`` maps a method to the capabilities and providers it calls.
+    ``offered`` is what the snapshot publishes; ``None`` offers every
+    requirement, so the catalogue is visible in the problem without changing
+    the plan (the availability gate's ``observe`` and ``off`` modes).
+    """
+
+    requirements: Mapping[str, frozenset[Requirement]]
+    offered: frozenset[Requirement] | None = None
+
+    def offers(self, requirement: Requirement) -> bool:
+        return self.offered is None or requirement in self.offered
+
+
 @dataclass(frozen=True)
 class PlanningProjection:
     problem_name: str
@@ -47,6 +68,12 @@ class PlanningProjection:
     initially_pending: frozenset[str]
     tried: frozenset[tuple[str, str]]
     lifecycle: str
+    #: Method -> its Toolbox requirements, for the methods of this problem.
+    requirements: dict[str, frozenset[Requirement]]
+    #: The requirements of this problem that the catalogue offers.
+    offered: frozenset[Requirement]
+    #: Available methods whose every requirement is offered (``runnable``).
+    runnable_methods: frozenset[str]
 
     def cost(self, obligation_id: str, method: str) -> int:
         return self.obligations[obligation_id].method_costs.get(method, 50)
@@ -70,13 +97,15 @@ class PddlProblemCompiler:
         *,
         selected_roots: Iterable[str] | None = None,
         unavailable_methods: Iterable[str] = (),
+        catalogue: CatalogueFacts | None = None,
     ) -> CompiledProblem:
         obligations = {item.id: item for item in manifest.obligations}
         roots = self._resolve_roots(obligations, selected_roots)
         selected = self._dependency_closure(obligations, roots)
         selected_obligations = {key: obligations[key] for key in selected}
 
-        obligation_symbols = _symbol_table(selected)
+        taken: dict[str, tuple[str, str]] = {}
+        obligation_symbols = _symbol_table(selected, "obligation", taken)
         kinds = sorted({item.kind for item in selected_obligations.values()})
         methods = sorted(
             {
@@ -85,10 +114,13 @@ class PddlProblemCompiler:
                 for method in item.admissible_methods
             }
         )
-        kind_symbols = _symbol_table(kinds)
-        method_symbols = _symbol_table(methods)
+        kind_symbols = _symbol_table(kinds, "obligationkind", taken)
+        method_symbols = _symbol_table(methods, "method", taken)
         available_methods = self._available_methods(
             obligations, methods, unavailable_methods
+        )
+        requirements, offered, runnable_methods = _catalogue_projection(
+            catalogue, methods, available_methods
         )
         tried, initially_satisfied, initially_pending = self._initial_status(
             selected, selected_obligations
@@ -98,7 +130,7 @@ class PddlProblemCompiler:
         self._validate_methods(
             selected_obligations,
             initially_pending,
-            available_methods,
+            runnable_methods,
             tried,
         )
 
@@ -125,6 +157,9 @@ class PddlProblemCompiler:
             initially_pending=initially_pending,
             tried=tried,
             lifecycle=lifecycle,
+            requirements=requirements,
+            offered=offered,
+            runnable_methods=runnable_methods,
         )
         text = self._render(projection)
         PddlProblemValidator(self.domain).validate(text, projection)
@@ -291,6 +326,7 @@ class PddlProblemCompiler:
             projection.method_symbols[item]
             for item in sorted(projection.method_symbols)
         )
+        catalogue_objects, catalogue_facts = _render_catalogue(projection)
         init: list[str] = [f"    ({projection.lifecycle})", "    (= (total-cost) 0)"]
 
         for obligation_id in projection.selected:
@@ -323,6 +359,7 @@ class PddlProblemCompiler:
                 )
                 if (obligation_id, method) in projection.tried:
                     init.append(f"    (tried {o} {m})")
+        init.extend(catalogue_facts)
 
         init = list(dict.fromkeys(init))
         object_lines: list[str] = []
@@ -332,6 +369,7 @@ class PddlProblemCompiler:
             object_lines.append(f"    {kind_objects} - obligationkind")
         if method_objects:
             object_lines.append(f"    {method_objects} - method")
+        object_lines.extend(catalogue_objects)
         rendered_objects = "\n".join(object_lines)
         if rendered_objects:
             rendered_objects += "\n"
@@ -373,6 +411,9 @@ class PddlProblemValidator:
                 "problem.pddl não cumpre o contrato do domínio: "
                 + ", ".join(missing)
             )
+        duplicated = _duplicated_objects(problem_text)
+        if duplicated:
+            raise ValueError(f"PDDL objects declared more than once: {duplicated}")
         if projection is None:
             return
         for obligation_id in projection.selected:
@@ -417,7 +458,7 @@ class InternalReferencePlanner:
             methods = [
                 method
                 for method in item.admissible_methods
-                if method in projection.available_methods
+                if method in projection.runnable_methods
                 and (obligation_id, method) not in projection.tried
             ]
             method = min(methods, key=lambda value: (projection.cost(obligation_id, value), value))
@@ -608,7 +649,7 @@ def _validate_execute_obligation_step(
         )
     if step.method not in item.admissible_methods:
         raise ValueError(f"Método não admissível: {step.method}")
-    if step.method not in projection.available_methods:
+    if step.method not in projection.runnable_methods:
         raise ValueError(f"Método indisponível: {step.method}")
     if (step.obligation_id, step.method) in projection.tried:
         raise ValueError(
@@ -731,17 +772,92 @@ def _build_plan(
     )
 
 
-def _symbol_table(values: Iterable[str]) -> dict[str, str]:
+def _catalogue_projection(
+    catalogue: CatalogueFacts | None,
+    methods: Iterable[str],
+    available_methods: frozenset[str],
+) -> tuple[dict[str, frozenset[Requirement]], frozenset[Requirement], frozenset[str]]:
+    """The problem's requirements, what is offered of them, and the runnable methods."""
+    requirements = {
+        method: frozenset(catalogue.requirements[method])
+        for method in methods
+        if catalogue is not None and catalogue.requirements.get(method)
+    }
+    offered = frozenset(
+        requirement
+        for needed in requirements.values()
+        for requirement in needed
+        if catalogue is not None and catalogue.offers(requirement)
+    )
+    runnable = frozenset(
+        method
+        for method in available_methods
+        if requirements.get(method, frozenset()) <= offered
+    )
+    return requirements, offered, runnable
+
+
+def _render_catalogue(projection: PlanningProjection) -> tuple[list[str], list[str]]:
+    """The ``capability`` and ``provider`` object lines, and the catalogue facts."""
+    required = sorted({pair for pairs in projection.requirements.values() for pair in pairs})
+    taken = _taken_symbols(projection)
+    capabilities = _symbol_table((capability for capability, _ in required), "capability", taken)
+    providers = _symbol_table((provider for _, provider in required), "provider", taken)
+    objects = [
+        f"    {' '.join(sorted(symbols.values()))} - {pddl_type}"
+        for symbols, pddl_type in ((capabilities, "capability"), (providers, "provider"))
+        if symbols
+    ]
+    facts = [
+        f"    (requires {projection.method_symbols[method]} "
+        f"{capabilities[capability]} {providers[provider]})"
+        for method in sorted(projection.requirements)
+        for capability, provider in sorted(projection.requirements[method])
+    ]
+    facts.extend(
+        f"    (offered {capabilities[capability]} {providers[provider]})"
+        for capability, provider in required
+        if (capability, provider) in projection.offered
+    )
+    return objects, facts
+
+
+def _symbol_table(
+    values: Iterable[str],
+    namespace: str,
+    taken: dict[str, tuple[str, str]],
+) -> dict[str, str]:
+    """PDDL symbols for ``values``, unique across the whole problem.
+
+    PDDL objects share one namespace whatever their type, so ``taken`` (symbol
+    -> namespace and value) is shared by every table of a problem. A value
+    whose symbol is already taken gets a hash suffix: within one type from the
+    value alone, as before domain 2.4, and across types from the type too, so
+    a method and a provider both called ``docling`` stay distinct.
+    """
     result: dict[str, str] = {}
-    used: dict[str, str] = {}
     for value in sorted(set(values)):
         symbol = _pddl_symbol(value)
-        if symbol in used and used[symbol] != value:
-            suffix = hashlib.sha256(value.encode()).hexdigest()[:8]
-            symbol = f"{symbol}-{suffix}"
-        used[symbol] = value
+        owner = taken.get(symbol)
+        if owner is not None and owner != (namespace, value):
+            seed = value if owner[0] == namespace else f"{namespace}:{value}"
+            symbol = f"{symbol}-{hashlib.sha256(seed.encode()).hexdigest()[:8]}"
+        taken[symbol] = (namespace, value)
         result[value] = symbol
     return result
+
+
+def _taken_symbols(projection: PlanningProjection) -> dict[str, tuple[str, str]]:
+    """The symbols the projection's obligations, kinds and methods hold."""
+    return {
+        symbol: (namespace, value)
+        for namespace, table in (
+            ("obligation", projection.obligation_symbols),
+            ("obligationkind", projection.kind_symbols),
+            ("method", projection.method_symbols),
+        )
+        for value, symbol in table.items()
+    }
 
 
 def _pddl_symbol(value: str) -> str:
@@ -752,6 +868,20 @@ def _pddl_symbol(value: str) -> str:
     if not PDDL_SYMBOL.fullmatch(normalized):
         raise ValueError(f"Não foi possível gerar símbolo PDDL para: {value!r}")
     return normalized
+
+
+def _duplicated_objects(problem_text: str) -> list[str]:
+    """Object names the ``:objects`` block declares more than once, of any type."""
+    if "(:objects" not in problem_text:
+        return []
+    block = problem_text.split("(:objects", 1)[1].split("(:init", 1)[0]
+    names = [
+        name
+        for line in block.splitlines()
+        if " - " in line
+        for name in line.split(" - ", 1)[0].split()
+    ]
+    return sorted({name for name in names if names.count(name) > 1})
 
 
 def _parenthesis_balance(text: str) -> int:

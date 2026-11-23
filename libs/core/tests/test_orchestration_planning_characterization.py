@@ -308,7 +308,9 @@ class TestPddlActionSequenceCharacterization:
                 projection,
             )
         without_method = replace(
-            projection, available_methods=frozenset({"human-review"})
+            projection,
+            available_methods=frozenset({"human-review"}),
+            runnable_methods=frozenset({"human-review"}),
         )
         with pytest.raises(ValueError, match="vision-description"):
             _validate_action_sequence([start, valid_step, complete], without_method)

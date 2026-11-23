@@ -8,4 +8,4 @@ the process once (the logger and the locales).
 """
 
 #: Kept equal to ``project.version`` in ``libs/core/pyproject.toml``; a test checks it.
-__version__ = "0.3.8"
+__version__ = "0.3.9"

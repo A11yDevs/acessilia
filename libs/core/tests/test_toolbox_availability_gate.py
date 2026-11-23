@@ -101,7 +101,11 @@ def test_enforce_without_a_catalogue_fails_closed() -> None:
         catalog_error="ToolboxTimeout: slow",
     )
 
-    assert decision.unavailable_methods == ["dual-provider-fusion", "single-provider"]
+    # Since domain 2.4 the restriction is a problem fact: nothing is offered.
+    assert decision.unavailable_methods == []
+    assert sorted(decision.blocked) == ["dual-provider-fusion", "single-provider"]
+    assert set(decision.requirements) == {"dual-provider-fusion", "single-provider"}
+    assert decision.offered == []
     metadata = decision.to_metadata()
     assert metadata["applied"] is True
     assert metadata["catalog_revision"] is None
@@ -266,9 +270,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
 
 
 def test_a_checkpoint_without_the_mode_gets_the_mode_of_the_run() -> None:
-    from acessilia_core.pipeline.orchestrator import _availability_from
-
-    decision = _availability_from({}, toolbox_config(availability_gate="enforce"))
+    decision = toolbox_gate.AvailabilityDecision.from_metadata({}, toolbox_config(availability_gate="enforce"))
 
     assert decision.mode == "enforce"
 
@@ -327,3 +329,107 @@ def test_the_least_recently_used_cache_goes_past_the_bound(monkeypatch) -> None:
     assert len(toolbox_gate._caches) == 2
     assert cache("a") is a
     assert cache("b") is not b
+
+
+def test_observe_offers_every_requirement_so_the_plan_does_not_change() -> None:
+    """Option (a) of #640: the catalogue is visible in the problem, not applied."""
+    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
+
+    assert decision.requirements
+    assert decision.offered is None
+    facts = decision.catalogue_facts()
+    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
+
+
+def test_the_catalogue_facts_survive_the_checkpoint() -> None:
+    decision = toolbox_gate.evaluate(
+        FUSE_METHODS, None, mode="enforce", config=_config(), catalog_error="down"
+    )
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(
+        json.loads(json.dumps(decision.to_metadata())), toolbox_config()
+    )
+
+    assert restored.catalogue_facts() == decision.catalogue_facts()
+
+
+def test_a_checkpoint_from_before_the_catalogue_facts_adds_none() -> None:
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(
+        {"mode": "enforce", "blocked_methods": {"single-provider": ["x"]}}, toolbox_config()
+    )
+
+    assert restored.requirements == {}
+    assert restored.catalogue_facts().requirements == {}
+
+
+def test_observed_facts_are_marked_assumed_not_evidence() -> None:
+    """Review of #781: in observe the offered facts are an assumption, and the
+    metadata says so, naming the methods the snapshot rules out."""
+    observed = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
+    enforced = toolbox_gate.evaluate(FUSE_METHODS, None, mode="enforce", config=_config())
+
+    assert observed.to_metadata()["offered_source"] == "assumed"
+    assert observed.to_metadata()["assumed_runnable_methods"] == ["dual-provider-fusion", "single-provider"]
+    assert enforced.to_metadata()["offered_source"] == "catalogue_snapshot"
+    assert enforced.to_metadata()["assumed_runnable_methods"] == []
+    assert toolbox_gate.AvailabilityDecision(mode="off", catalog_revision=None).offered_source == "none"
+
+
+@pytest.mark.asyncio
+async def test_a_resumed_plan_keeps_the_snapshot_it_was_built_under(monkeypatch) -> None:
+    """The current policy (review of #781): a resumed run reproduces the plan
+    checkpoint's decision and does not read the catalogue again, so its
+    replans see the same Toolbox even if the catalogue changed meanwhile.
+    Revalidating on resume is #640, PR 3."""
+    from types import SimpleNamespace
+
+    from acessilia_core.pipeline.checkpointing import PHASE_PLAN, manifest_payload
+    from acessilia_core.planning.planner_agent import PlannerAgent
+
+    async def must_not_read(*_args, **_kwargs):
+        raise AssertionError("a resumed plan read the catalogue again")
+
+    monkeypatch.setattr(toolbox_gate, "decide", must_not_read)
+    manifest = _fuse_manifest()
+    built_under = toolbox_gate.evaluate(
+        FUSE_METHODS, _staging_snapshot(), mode="enforce", config=_config()
+    )
+    _, plan = PlannerAgent().plan(manifest, catalogue=built_under.catalogue_facts())
+    state = {
+        "plan": plan.model_dump(mode="json", by_alias=True),
+        "manifest": manifest_payload(manifest),
+        "availability": json.loads(json.dumps(built_under.to_metadata())),
+    }
+    ctx = SimpleNamespace(
+        checkpoints=SimpleNamespace(load=lambda phase: state if phase == PHASE_PLAN else None),
+        config=_config(gate="enforce"),
+    )
+
+    restored = await _orchestrator()._load_or_build_plan(ctx, manifest)
+
+    assert restored.availability.catalogue_facts() == built_under.catalogue_facts()
+    assert restored.availability.catalog_revision == built_under.catalog_revision
+
+
+#: Methods with no entry in METHOD_TOOLBOX_REQUIREMENTS, so the gate never
+#: rules them out. Not all of them are local: the formula handler calls the
+#: Toolbox for ``mathml`` and ``latex-verbalizer``, and the others are not yet
+#: audited (review of #781, #789). This list only shrinks: a method moves out
+#: when it is declared in the table or confirmed local, and a new method must be
+#: declared there, or added here with a reason in the review.
+UNDECLARED_METHODS = frozenset({
+    "agreement-rule", "deterministic-heading-repair", "human-review", "latex-normalizer",
+    "latex-verbalizer", "line-number-extractor", "mathml", "norm-fix", "pandoc-code",
+    "pandoc-table", "rep-guard", "rescue-omitted", "skeleton-order", "table-smart-fusion",
+    "table-specialist", "tailjoin", "tailjoin-positioned", "unicode-repair", "verse-chunker",
+    "vision-description", "xycut-order",
+})
+
+
+def test_every_method_is_declared_or_known_undeclared() -> None:
+    """A method missing from the requirements table is runnable under
+    ``enforce`` whatever the catalogue says, so an omission must be visible."""
+    methods = set(DEFAULT_METHOD_COSTS)
+    undeclared = methods - set(toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS)
+
+    assert undeclared <= UNDECLARED_METHODS, f"declare or list: {sorted(undeclared - UNDECLARED_METHODS)}"
+    assert UNDECLARED_METHODS <= undeclared, f"shrink the list: {sorted(UNDECLARED_METHODS - undeclared)}"

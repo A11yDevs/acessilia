@@ -23,6 +23,7 @@ from acessilia_core.planning.models import (
     PlanningComparison,
 )
 from acessilia_core.planning.pddl_processor import (
+    CatalogueFacts,
     CompiledProblem,
     FastDownwardPlanner,
     InternalReferencePlanner,
@@ -209,11 +210,13 @@ class PlannerAgent:
         *,
         selected_roots: Iterable[str] | None = None,
         unavailable_methods: Iterable[str] = (),
+        catalogue: CatalogueFacts | None = None,
     ) -> CompiledProblem:
         return self.compiler.compile(
             manifest,
             selected_roots=selected_roots,
             unavailable_methods=unavailable_methods,
+            catalogue=catalogue,
         )
 
     def plan(
@@ -222,6 +225,7 @@ class PlannerAgent:
         *,
         selected_roots: Iterable[str] | None = None,
         unavailable_methods: Iterable[str] = (),
+        catalogue: CatalogueFacts | None = None,
         backend: str = "internal",
         fast_downward: Path | None = None,
         fast_downward_alias: str | None = None,
@@ -231,6 +235,7 @@ class PlannerAgent:
             manifest,
             selected_roots=selected_roots,
             unavailable_methods=unavailable_methods,
+            catalogue=catalogue,
         )
         planner = self._planner(
             backend=backend,
@@ -248,6 +253,7 @@ class PlannerAgent:
         *,
         selected_roots: Iterable[str] | None = None,
         unavailable_methods: Iterable[str] = (),
+        catalogue: CatalogueFacts | None = None,
         fast_downward: Path | None = None,
         fast_downward_alias: str | None = None,
         fast_downward_search: str = DEFAULT_FAST_DOWNWARD_SEARCH,
@@ -267,6 +273,7 @@ class PlannerAgent:
             manifest,
             selected_roots=selected_roots,
             unavailable_methods=unavailable_methods,
+            catalogue=catalogue,
         )
         plans: dict[str, NominalPlan] = {}
         outcomes: dict[PlannerBackend, PlannerOutcome] = {}

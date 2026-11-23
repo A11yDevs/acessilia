@@ -2,6 +2,53 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.9 — o catálogo da Toolbox como fatos de planejamento (domínio 2.4)
+
+A ADR-0029 torna a disponibilidade de capacidades e providers predicado do
+problema de planejamento (#640, PR 1). O domínio PDDL vai para **2.4**:
+- tipos `capability` e `provider`;
+- fatos `(requires m c p)` e `(offered c p)`;
+- um `(runnable m)` derivado: o método está `available` (o Core tem um
+  handler) e o catálogo oferece todo requisito.
+
+`execute-obligation` passa a exigir `runnable` no lugar de `available`. O
+domínio 2.3 continua distribuído.
+
+`PddlProblemCompiler.compile`, `PlannerAgent` e `PlanningProblem` recebem um
+`catalogue` (`CatalogueFacts`). O gate de disponibilidade o monta a partir do
+snapshot do catálogo (`AvailabilityDecision.catalogue_facts()`):
+- em `observe`, todo requisito é oferecido, então o catálogo fica visível no
+  problema e os planos não mudam. Esses fatos são presumidos, não observados:
+  o metadado do gate diz `offered_source: assumed` e lista os métodos que o
+  snapshot descarta (`assumed_runnable_methods`); `off` não acrescenta fatos
+  de catálogo;
+- em `enforce`, o snapshot decide o que é oferecido, e sem snapshot nada é
+  (falha fechada). O gate não exclui mais métodos pelo nome
+  (`unavailable_methods` fica vazio), e os mesmos métodos são excluídos pelos
+  fatos.
+
+Os requisitos e os pares oferecidos da decisão são salvos com o checkpoint
+do plano (`AvailabilityDecision.from_metadata`, que substitui o
+`_availability_from` do orquestrador), então um replanejamento depois de um
+reinício vê o mesmo catálogo. Um checkpoint anterior à 2.4 mantém sua própria
+lista de métodos excluídos.
+
+A identidade do checkpoint de planejamento passa a incluir os hashes do
+domínio. O executor recusa um plano feito com outro domínio, então, depois
+deste deploy, um job retomado planeja de novo em vez de falhar.
+Um job retomado reutiliza a decisão de catálogo do checkpoint de plano e não
+lê o catálogo de novo (revalidação na retomada: #640, PR 3).
+
+Os símbolos PDDL são únicos no problema inteiro: valores de tipos diferentes
+que se normalizam igual (um método e um provider chamados `docling`) recebem
+símbolos distintos, e o validador recusa um objeto declarado duas vezes.
+
+O planejador interno é testado com o domínio 2.4. O Fast Downward 26.6 foi
+conferido localmente e concorda com ele; o CI ainda não o roda (#790).
+`tests/test_fast_downward_domain.py` compara os dois backends. Ele leva o
+marcador `fast_downward`, fora da seleção por padrão porque o CI recusa testes
+pulados: rode-o com `-m fast_downward` e `ACESSILIA_FAST_DOWNWARD` definido.
+
 ## 0.3.8 — o compilador PDDL recusa dependências cíclicas e desconhecidas
 
 O modelo do manifesto recusa dependências cíclicas e desconhecidas entre

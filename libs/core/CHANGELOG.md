@@ -2,6 +2,53 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.9 — the Toolbox catalogue as planning facts (domain 2.4)
+
+ADR-0029 makes capability and provider availability predicates of the
+planning problem (#640, PR 1). The PDDL domain goes to **2.4**:
+- `capability` and `provider` types;
+- `(requires m c p)` and `(offered c p)` facts;
+- a derived `(runnable m)`: the method is `available` (the core has a
+  handler) and the catalogue offers every requirement.
+
+`execute-obligation` now needs `runnable` instead of `available`. Domain 2.3
+stays shipped.
+
+`PddlProblemCompiler.compile`, `PlannerAgent` and `PlanningProblem` take a
+`catalogue` (`CatalogueFacts`). The availability gate builds it from the
+catalogue snapshot (`AvailabilityDecision.catalogue_facts()`):
+- in `observe`, every requirement is offered, so the catalogue is visible in
+  the problem and the plans do not change. These facts are assumed, not
+  observed: the gate metadata says `offered_source: assumed` and lists the
+  methods the snapshot rules out (`assumed_runnable_methods`); `off` adds no
+  catalogue facts;
+- in `enforce`, the snapshot decides what is offered, and without a snapshot
+  nothing is (fail closed). The gate no longer excludes methods by name
+  (`unavailable_methods` is empty), and the same methods are excluded through
+  the facts.
+
+The decision's requirements and offered pairs are saved with the plan
+checkpoint (`AvailabilityDecision.from_metadata`, which replaces the
+orchestrator's `_availability_from`), so a replan after a restart sees the
+same catalogue. A checkpoint from before 2.4 keeps its own list of excluded
+methods.
+
+The planning checkpoint's identity now includes the domain's hashes. The
+executor refuses a plan built under another domain, so after this deploy a
+resumed job plans again instead of failing. A resumed job reuses the plan
+checkpoint's catalogue decision and does not read the catalogue again
+(revalidation on resume: #640, PR 3).
+
+PDDL symbols are unique across the whole problem: values of different types
+that normalize alike (a method and a provider both called `docling`) get
+distinct symbols, and the validator refuses an object declared twice.
+
+The internal planner is tested with domain 2.4. Fast Downward 26.6 was checked
+locally and agrees with it; CI does not run it yet (#790).
+`tests/test_fast_downward_domain.py` compares both backends. It carries the
+`fast_downward` marker, deselected by default because CI rejects skipped tests:
+run it with `-m fast_downward` and `ACESSILIA_FAST_DOWNWARD` set.
+
 ## 0.3.8 — the PDDL compiler refuses cyclic and unknown dependencies
 
 The manifest model refuses cyclic and unknown obligation dependencies, but a

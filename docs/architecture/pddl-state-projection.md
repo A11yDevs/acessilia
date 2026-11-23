@@ -6,22 +6,24 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 planning problem from observed state: the manifest's facts, the obligations,
 the results already recorded and one catalogue snapshot. This page documents
 what `PddlProblemCompiler.compile` (`planning/pddl_processor.py`) projects
-today, for domain v2.3, and what is still missing.
+today, for domain v2.4, and what is still missing.
 `libs/core/tests/test_pddl_state_projection.py` has one test per rule, so a
 change to the projection is a visible diff.
 
 ## Inputs
 
-`compile(manifest, *, selected_roots=None, unavailable_methods=())`. The
+`compile(manifest, *, selected_roots=None, unavailable_methods=(), catalogue=None)`. The
 orchestrator calls it through the `PlanningEngine` (#744) with a
 `PlanningProblem`:
 
 - `manifest`: the processing manifest, as observed so far;
 - `selected_roots`: the obligations to plan, or `None` (see below);
-- `unavailable_methods`: the methods the plan must not use. These are the
-  methods without a registered handler, plus, when the availability gate
-  enforces, the methods whose Toolbox capability or provider is missing from
-  the catalogue snapshot.
+- `unavailable_methods`: the methods the plan must not use: those without a
+  registered handler. A plan checkpoint from before domain 2.4 also carries
+  the methods the gate excluded by name;
+- `catalogue` (`CatalogueFacts`, domain 2.4): the Toolbox catalogue snapshot,
+  as each method's requirements (capability, provider) and what the snapshot
+  offers. The availability gate builds it (`catalogue_facts()`).
 
 ## Rules
 
@@ -39,13 +41,20 @@ orchestrator calls it through the `PlanningEngine` (#744) with a
 | `dependencies` | `(depends-on o predecessor)` | |
 | Each admissible method | `(supports m k)`, `(admissible m o)` | `supports` comes from the manifest's admissible methods, not from a catalogue |
 | `method_costs[m]` | `(= (execution-cost m o) cost)` | 50 when the manifest declares no cost |
-| A method not in `unavailable_methods` | `(available m)` | Per method, not per capability or provider |
+| A method not in `unavailable_methods` | `(available m)` | The core has a handler for it |
+| A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | Only for methods of this problem. A method without requirements has none, so it is runnable whatever the catalogue says: an omission in the table is a false positive under `enforce` (guarded by a list that only shrinks; [#789](https://github.com/A11yDevs/acessilia/issues/789)) |
+| The required pairs the snapshot offers | `(offered c p)` | Gate in `observe`: every requirement is offered, so the plan does not change. These facts are **assumed**, not observed: the metadata says `offered_source: assumed` and lists the methods the snapshot rules out (`assumed_runnable_methods`). Gate `off`: no catalogue facts. `enforce`: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed) |
+| — | `(runnable m)`, derived by the domain | `available` and every requirement offered. `execute-obligation` needs it |
 | An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status. A `failed` attempt rules the method out for that obligation whatever the cause (see below) |
-| Ids, kinds and method names | PDDL symbols (`[a-z][a-z0-9-]*`) | The projection keeps both directions of the mapping |
+| Ids, kinds, methods, capabilities and providers | PDDL symbols (`[a-z][a-z0-9-]*`), unique across the whole problem | PDDL objects share one namespace whatever their type. The projection keeps both directions of the mapping |
 
 Duplicated facts are emitted once. The problem does not depend on the order
-of the obligations or of their methods in the manifest, and distinct ids that
-normalize to the same symbol get distinct symbols (a hash suffix).
+of the obligations or of their methods in the manifest. Distinct values that
+normalize to the same symbol get distinct symbols (a hash suffix), within a
+type and across types: an obligation named like its kind, or a method, a
+capability and a provider all called `docling`. The types are named in a fixed
+order (obligation, kind, method, capability, provider), and the first keeps
+the plain symbol. The validator refuses an object declared twice.
 
 An empty root set, or a manifest without obligations, projects no obligation:
 the plan is `start-job`, `complete-job`.
@@ -81,7 +90,7 @@ checks run in this order, and the first one that fails is the one reported:
 5. **Catalogue v2.3.** For a kind in the v2.3 catalogue, admissible methods
    outside it, or a method without a cost.
 6. **Methods.** A pending obligation with no method that is admissible,
-   available and not tried.
+   runnable and not tried.
 7. **Job status.** A `completed` manifest.
 8. **The rendered problem.** `PddlProblemValidator` checks it against the
    projection.
@@ -93,6 +102,15 @@ checks run in this order, and the first one that fails is the one reported:
   (`problem_sha256`). The coordinator checks it since #744.
 - `manifest_sha256` is the hash of the whole manifest, including what is not
   projected.
+- The planning checkpoint's identity includes the domain's hashes. The
+  executor refuses a plan built under another domain, so after a domain
+  change (2.3 → 2.4) a resumed job plans again instead of failing.
+- A resumed run reproduces the plan checkpoint's catalogue decision: it does
+  not read the catalogue again, so its replans see the Toolbox the plan was
+  built under, even if the catalogue changed meanwhile. A capability that
+  disappeared is found when its call fails at execution, and the attempt then
+  counts as `tried` (see below). Revalidating the catalogue on resume belongs
+  to #640, PR 3.
 - The two are different identities. Two manifests that differ only outside
   the projection (an element's text, an observation) produce the same
   problem, so `problem_sha256` is the identity of the planning state, never
@@ -116,12 +134,25 @@ Not all of them should stop a retry of the same method. This belongs to the
 result contracts, the execution journal and the replanning rules of #640
 (PRs 3 and 4). This page documents today's behaviour.
 
+## Backends
+
+The internal planner is tested against domain 2.4 in CI. Fast Downward 26.6
+(`aibasel/downward`, `astar(blind())`) was checked against it locally:
+`libs/core/tests/test_fast_downward_domain.py` runs both backends on the same
+problems when selected (`-m fast_downward`; deselected by default) with
+`ACESSILIA_FAST_DOWNWARD` pointing to a Fast Downward build, and
+they agree with and without a catalogue, under `observe` and `enforce`, and
+with names shared across types. CI does not run Fast Downward yet
+([#790](https://github.com/A11yDevs/acessilia/issues/790)). The
+derived predicates need a search whose heuristics support axioms, such as the
+default `astar(blind())`.
+
 ## What ADR-0029 still asks for
 
 | ADR-0029 | Today | Next |
 |---|---|---|
-| Capability and provider availability are predicates of the problem | The gate turns them into `unavailable_methods`, outside the problem, and only in `enforce` mode | PR 1, second part: the catalogue snapshot as facts (requirements per method, offered capabilities and providers), and availability derived in the domain. This needs a new domain version |
-| `toolbox_gate` is reduced to reporting | It decides `unavailable_methods` | #640, PR 2, after the predicates |
+| Capability and provider availability are predicates of the problem | Done in domain 2.4: `requires`, `offered` and the derived `runnable` | — |
+| `toolbox_gate` is reduced to reporting | It still decides what is offered in `enforce` | #640, PR 2: the snapshot itself is the input, and `observe` goes |
 | Operational actions are bound to a capability id and exact version | Methods name local handlers | #640, PR 2, with the domain fragments |
 | A result updates the state once per `operation_id` | The manifest's statuses and attempts | #640, PR 3, with the journal of ADR-0020 |
 | Inspection, extraction and enrichment are actions | They run before planning | #640, PR 2 |

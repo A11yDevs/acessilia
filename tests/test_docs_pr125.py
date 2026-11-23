@@ -77,8 +77,10 @@ class TestDocumentedModulesExist:
 class TestDomainVersionIsConsistent:
     def test_referenced_domain_files_exist(self):
         domains = REPO_ROOT / "libs" / "core" / "src" / "acessilia_core" / "planning" / "domains"
-        assert (domains / "domain_v2.3.pddl").is_file()
-        assert (domains / "domain_description_v2.3.md").is_file()
+        # 2.3 introduced the #125 obligations; 2.4 (#640) is the current domain.
+        for version in ("2.3", "2.4"):
+            assert (domains / f"domain_v{version}.pddl").is_file()
+            assert (domains / f"domain_description_v{version}.md").is_file()
 
     @pytest.mark.parametrize(("en", "pt"), PAIRS)
     def test_no_stale_domain_version(self, en, pt):
@@ -88,8 +90,11 @@ class TestDomainVersionIsConsistent:
             assert "domain_description_v2.2.md" not in text, f"{name} ainda referencia v2.2"
 
     def test_pipeline_doc_references_the_current_version(self):
-        text = (DOCS / "pddl_pipeline.md").read_text(encoding="utf-8")
-        assert "domain_v2.3.pddl" in text
+        from acessilia_core.planning.domain_bundle import DomainBundle
+
+        current = DomainBundle.load().domain_path.name
+        for name in ("pddl_pipeline.md", "pddl_pipeline.pt-br.md"):
+            assert current in (DOCS / name).read_text(encoding="utf-8"), name
 
 
 class TestAgentsAreDocumented:

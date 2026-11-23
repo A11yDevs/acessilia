@@ -73,8 +73,8 @@ Schema Draft 2020-12.
 
 `PlannerAgent` carrega um par inseparável:
 
-- `core/planning/domains/domain_v2.3.pddl`;
-- `core/planning/domains/domain_description_v2.3.md`.
+- `core/planning/domains/domain_v2.4.pddl`;
+- `core/planning/domains/domain_description_v2.4.md`.
 
 O carregador verifica versão, nome, hashes e cláusulas obrigatórias. O
 compilador:
@@ -124,11 +124,13 @@ uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
 `astar(blind())` é o padrão conservador porque preserva custos e suporta
 axiomas/predicados derivados. Um alias pode ser informado explicitamente com
 `--fast-downward-alias`, desde que suas heurísticas suportem os recursos do
-domínio 2.2.
+domínio atual (axiomas e predicados derivados). O Fast Downward 26.6 foi
+conferido com o domínio 2.4 localmente; o CI ainda não o roda
+([#790](https://github.com/A11yDevs/acessilia/issues/790)).
 
 O backend interno não pretende substituir um planner geral. Ele explora a
-estrutura específica do domínio 2.2: ordena o DAG de obrigações e escolhe o
-método admissível não tentado de menor custo. É um oráculo simples e
+estrutura específica do domínio: ordena o DAG de obrigações e escolhe o
+método admissível, executável e não tentado de menor custo. É um oráculo simples e
 reprodutível para validar o pipeline.
 
 ### Execução dos dois backends
@@ -145,7 +147,7 @@ uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
 ```
 
 O domínio é carregado uma vez e o manifesto é compilado uma vez. Portanto,
-ambos os backends recebem os mesmos bytes de `domain_v2.3.pddl` e
+ambos os backends recebem os mesmos bytes de `domain_v2.4.pddl` e
 `problem.pddl`, identificados por SHA-256.
 
 As saídas são:
@@ -384,8 +386,8 @@ output/job-001/
 | `nominal_plan.schema.json` | plano nominal auditável |
 | `planning_comparison.schema.json` | resultados e comparação normalizada dos dois planners |
 | `execution_report.schema.json` | passos observados e decisão de replanejamento |
-| `domain_v2.3.pddl` | semântica geral das ações e custos |
-| `domain_description_v2.3.md` | contrato humano e regras do compilador |
+| `domain_v2.4.pddl` | semântica geral das ações e custos |
+| `domain_description_v2.4.md` | contrato humano e regras do compilador |
 
 Os três JSON Schemas são gerados dos modelos Pydantic:
 
