@@ -50,6 +50,22 @@ apenas as suítes.
   `.github/**` e `scripts/**`. Nenhum falso negativo foi observável porque o
   modo C não pula nada.
 
+## Seleções em observação
+
+O artefato `test-selection-shadow` estava disponível para três PRs de
+acompanhamento. As três execuções de CI passaram; isso não prova que o seletor
+teria pego uma regressão, porque o modo C não é usado para pular nada.
+
+| PR | Área alterada | Selecionadas | Não selecionadas | Conservador |
+|---|---|---|---|---|
+| #769 | somente `tests/**` | app | docstruct, SDK, core | não |
+| #771 | `scripts/**`, docs, tests | todas | — | não |
+| #772 | docs | app | docstruct, SDK, core | não |
+
+Isso corresponde às regras documentadas: `tests/**` e docs mantêm a suíte da
+aplicação, enquanto `scripts/**` é transversal e seleciona tudo. Nenhum falso
+negativo foi observável, mas a amostra contém apenas PRs verdes.
+
 ## Decisão
 
 Nenhum gate seletivo foi adotado. A suíte completa continua obrigatória

@@ -51,6 +51,22 @@ consumption, not only the test suites.
   `scripts/**`. No false negative was observable because mode C is not used to
   skip anything.
 
+## Shadow selections observed
+
+The `test-selection-shadow` artifact was available for three follow-up PRs. All
+three CI runs passed; this does not prove the selector would have caught a
+regression, because mode C is not used to skip anything.
+
+| PR | Changed area | Selected | Skipped | Conservative |
+|---|---|---|---|---|
+| #769 | `tests/**` only | app | docstruct, SDK, core | no |
+| #771 | `scripts/**`, docs, tests | all | — | no |
+| #772 | docs | app | docstruct, SDK, core | no |
+
+This matches the documented rules: `tests/**` and docs keep the application
+suite, while `scripts/**` is transversal and selects everything. No false
+negative was observable, but the sample contains only green PRs.
+
 ## Decision
 
 No selective gate is adopted. The full suite remains mandatory while the
