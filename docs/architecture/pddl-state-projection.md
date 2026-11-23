@@ -42,7 +42,7 @@ orchestrator calls it through the `PlanningEngine` (#744) with a
 | Each admissible method | `(supports m k)`, `(admissible m o)` | `supports` comes from the manifest's admissible methods, not from a catalogue |
 | `method_costs[m]` | `(= (execution-cost m o) cost)` | 50 when the manifest declares no cost |
 | A method not in `unavailable_methods` | `(available m)` | The core has a handler for it |
-| A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | Only for methods of this problem. A method without requirements has none, so it is runnable whatever the catalogue says. Every method whose handler calls the Toolbox is declared; the others are classified in `toolbox_gate.py`, the local ones as transitional, validation or symbolic (#804) ([#789](https://github.com/A11yDevs/acessilia/issues/789)) |
+| A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | The capability is bound to its exact contract version, `capability_id@version` (for example `math.convert@1`, symbol `math-convert-1`): the version the SDK client calls and the catalogue check requires. Only for methods of this problem. A method without requirements has none, so it is runnable whatever the catalogue says. Every method whose handler calls the Toolbox is declared; the others are classified in `toolbox_gate.py`, the local ones as transitional, validation or symbolic (#804) ([#789](https://github.com/A11yDevs/acessilia/issues/789)) |
 | The required pairs the snapshot offers | `(offered c p)` | Gate in `observe`: every requirement is offered, so the plan steps do not change (the problem hash does, when the facts are new). These facts are **assumed**, not observed: the metadata says `offered_source: assumed` and lists the methods the snapshot rules out (`assumed_runnable_methods`). Gate `off`: no catalogue facts. `enforce`: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed) |
 | — | `(runnable m)`, derived by the domain | `available` and every requirement offered. `execute-obligation` needs it |
 | An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status. A `failed` attempt rules the method out for that obligation whatever the cause (see below) |
@@ -154,7 +154,7 @@ default `astar(blind())`.
 | ADR-0029 | Today | Next |
 |---|---|---|
 | Capability and provider availability are predicates of the problem | Done in domain 2.4: `requires`, `offered` and the derived `runnable` | — |
-| `toolbox_gate` is reduced to reporting | It still decides what is offered in `enforce` | #640, PR 2: the snapshot itself is the input, and `observe` goes |
-| Operational actions are bound to a capability id and exact version | Methods name local handlers | #640, PR 2, with the domain fragments |
+| `toolbox_gate` is reduced to reporting | It still decides what is offered in `enforce`, and `observe` is the default | #640, PR 2: the snapshot itself is the input, and `observe` goes once production logs show no false "would remove" |
+| Operational actions are bound to a capability id and exact version | The requirement facts name `capability_id@version`; the methods still name local handlers | #640, PR 2: the actions themselves, with the domain fragments |
 | A result updates the state once per `operation_id` | The manifest's statuses and attempts | #640, PR 3, with the journal of ADR-0020 |
 | Inspection, extraction and enrichment are actions | They run before planning | #640, PR 2 |
