@@ -18,6 +18,7 @@ from typing import Any, cast
 from jsonschema import ValidationError, validate
 
 from acessilia_core.config import ExportConfig, ToolboxConfig
+from acessilia_core.config_helpers import _require_config
 from acessilia_core.export.catalog import DOCX, HTML, PDF_UA, TXT
 from acessilia_core.export.messages import (
     MSG_AUDIT_FAILED,
@@ -510,16 +511,20 @@ def export_accessible_document(
 
 def _export_config(export: ExportConfig | None, format_name: str) -> ExportConfig:
     """The run's ``ExportConfig``, which a Toolbox-rendered format cannot do without."""
-    if export is None:
-        raise TypeError(f"exporting {format_name} needs the run's ExportConfig")
-    return export
+    return _require_config(
+        export,
+        f"exporting {format_name} needs the run's ExportConfig",
+        TypeError,
+    )
 
 
 def _toolbox_config(toolbox: ToolboxConfig | None, format_name: str) -> ToolboxConfig:
     """The run's ``ToolboxConfig``, which a Toolbox-rendered format cannot do without."""
-    if toolbox is None:
-        raise TypeError(f"exporting {format_name} needs the run's ToolboxConfig")
-    return toolbox
+    return _require_config(
+        toolbox,
+        f"exporting {format_name} needs the run's ToolboxConfig",
+        TypeError,
+    )
 
 
 def _ensure_document(

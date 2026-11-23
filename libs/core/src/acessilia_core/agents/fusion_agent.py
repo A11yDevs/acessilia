@@ -39,6 +39,7 @@ from typing import Any
 
 from acessilia_core.agents.agno_support import build_agent
 from acessilia_core.config import CoreConfig, ToolboxConfig
+from acessilia_core.config_helpers import _require_config
 from docstruct.fusion.hf_end import move_hf_to_end
 from docstruct.fusion.line_numbers import extract_line_numbers
 
@@ -276,11 +277,11 @@ class FusionAgent:
         Returns:
             dict: Payload fundido com ``document.elements`` e ``fusion_stats``.
         """
-        if self.config is None:
-            raise RuntimeError(
-                "the fuse_providers tool needs the agent built with config= (ADR-0016, step 3)"
-            )
-        config = self.config
+        config = _require_config(
+            self.config,
+            "the fuse_providers tool needs the agent built with config= (ADR-0016, step 3)",
+            RuntimeError,
+        )
         return self.process_fuse_providers(
             Path(document_path),
             language=language,
