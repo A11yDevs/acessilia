@@ -330,6 +330,24 @@ def test_the_mutation_documentation_has_a_linked_mirror() -> None:
     assert (docs / "mutation-equations.json").is_file()
 
 
+def test_the_mutant_environment_drops_ambient_pytest_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-k nonexistent")
+    monkeypatch.setenv("PYTEST_PLUGINS", "ambient.plugin")
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "leak")
+    monkeypatch.setenv("PYTHONPATH", "/ambient")
+
+    env = mutation._mutant_env(tmp_path)
+
+    assert "PYTEST_ADDOPTS" not in env
+    assert "PYTEST_PLUGINS" not in env
+    assert "PYTEST_CURRENT_TEST" not in env
+    assert env["PYTHONPATH"].startswith(str(tmp_path))
+    assert "/ambient" in env["PYTHONPATH"]
+    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
 def test_load_covered_lines_reads_the_module(tmp_path: Path) -> None:
     module = tmp_path / "pkg" / "mod.py"
     module.parent.mkdir(parents=True)

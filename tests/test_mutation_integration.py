@@ -86,6 +86,31 @@ def test_an_import_error_is_invalid_without_a_pseudo_killer(tmp_path: Path) -> N
         assert result.exit_code == 2
 
 
+def test_ambient_pytest_options_cannot_change_the_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-k definitely-not-a-test")
+    monkeypatch.setenv("PYTEST_PLUGINS", "ambient.plugin")
+    source_root, suite, module = _project(
+        tmp_path,
+        "def value():\n    return 1\n",
+        "from pkg.mod import value\n\ndef test_value():\n    assert value() == 1\n",
+    )
+
+    baseline, results = mutation.run_experiment(
+        [],
+        source=module.read_text(encoding="utf-8"),
+        module_relative=Path("pkg/mod.py"),
+        source_root=source_root,
+        suite=suite,
+        tests=["tests/test_mod.py"],
+        timeout_seconds=20,
+    )
+
+    assert baseline["status"] == "survived"
+    assert results == []
+
+
 def test_a_failing_baseline_is_refused(tmp_path: Path) -> None:
     source_root, suite, module = _project(
         tmp_path,

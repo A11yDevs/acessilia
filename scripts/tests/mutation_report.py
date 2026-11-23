@@ -322,11 +322,17 @@ def _copy_package(source_root: Path, destination: Path) -> Path:
     return target
 
 
+#: Ambient pytest settings that could change the selected tests or plugins.
+PYTEST_ENV_VARS = ("PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_CURRENT_TEST")
+
+
 def _mutant_env(temp_src: Path) -> dict[str, str]:
     env = os.environ.copy()
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = str(temp_src) + (os.pathsep + existing if existing else "")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    for name in PYTEST_ENV_VARS:
+        env.pop(name, None)
     return env
 
 

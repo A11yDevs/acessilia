@@ -66,6 +66,11 @@ uv run --extra dev python scripts/tests/mutation_report.py \
   --output var/mutation/equations.json
 ```
 
+The isolated environment drops ambient `PYTEST_ADDOPTS`, `PYTEST_PLUGINS`
+and `PYTEST_CURRENT_TEST`, so a developer shell cannot change the selected
+tests or plugins. Plugin autoload stays enabled because the focused target may
+need pytest-timeout or pytest-asyncio.
+
 Operators: comparison swaps (`==`/`!=`, `<`/`<=`, `>`/`>=`, `in`/`not in`,
 `is`/`is not`), boolean `and`/`or`, boolean constant flips, `not` removal,
 condition negation and `+=`/`-=`. A mutant that makes the tests fail is
