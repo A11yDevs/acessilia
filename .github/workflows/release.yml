@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  security-events: write
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -91,6 +92,40 @@ jobs:
 
       - name: Enforce local image size guardrail
         run: python scripts/check_image_size.py local acessilia:release --limit-gb 0.5
+
+      - name: List the release image findings for the log
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          image-ref: acessilia:release
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: table
+          output: trivy-results.txt
+
+      - name: Show the release image findings
+        run: cat trivy-results.txt
+
+      - name: Scan the release image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          image-ref: acessilia:release
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: trivy-results.sarif
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload the release image scan report
+        if: always()
+        uses: github/codeql-action/upload-sarif@5895b2c9be147bc7f1c75ce72c5cb577febb1907 # v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: release
 
       - name: Publish verified release image
         id: publish
