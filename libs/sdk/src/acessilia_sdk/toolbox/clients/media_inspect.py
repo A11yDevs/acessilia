@@ -57,12 +57,14 @@ class ToolboxMediaInspectClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> MediaInspection:
         """Typed published result of :meth:`inspect`; raw compatibility is unchanged."""
-        result = await self.inspect(
-            file_path=file_path,
-            artifact_id=artifact_id,
-            use_remote_cache=use_remote_cache,
+        return read_result(
+            await self.inspect(
+                file_path=file_path,
+                artifact_id=artifact_id,
+                use_remote_cache=use_remote_cache,
+            ),
+            MediaInspection,
         )
-        return read_result(result, MediaInspection)
 
 
 __all__ = ["CAPABILITY", "ToolboxMediaInspectClient"]

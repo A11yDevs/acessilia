@@ -70,13 +70,15 @@ class ToolboxPdfValidateClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> PdfValidationReport:
         """Typed published result of :meth:`validate`; raw compatibility is unchanged."""
-        result = await self.validate(
-            file_path=file_path,
-            artifact_id=artifact_id,
-            profile=profile,
-            use_remote_cache=use_remote_cache,
+        return read_result(
+            await self.validate(
+                file_path=file_path,
+                artifact_id=artifact_id,
+                profile=profile,
+                use_remote_cache=use_remote_cache,
+            ),
+            PdfValidationReport,
         )
-        return read_result(result, PdfValidationReport)
 
 
 __all__ = ["CAPABILITY", "PROFILES", "ToolboxPdfValidateClient"]

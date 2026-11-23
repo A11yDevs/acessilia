@@ -48,13 +48,16 @@ class ToolboxStructureClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> ManifestResult:
         """Typed published result, preserving the existing raw method."""
-        result = await self.extract_structure(
-            file_path=file_path,
-            artifact_id=artifact_id,
-            language=language,
-            use_remote_cache=use_remote_cache,
+        return read_manifest(
+            (
+                await self.extract_structure(
+                    file_path=file_path,
+                    artifact_id=artifact_id,
+                    language=language,
+                    use_remote_cache=use_remote_cache,
+                )
+            ).get("document")
         )
-        return read_manifest(result.get("document"))
 
 
 __all__ = ["CAPABILITY", "ToolboxStructureClient"]

@@ -81,13 +81,16 @@ class ToolboxLayoutClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> LayoutResult:
         """Typed published result, preserving the existing raw method."""
-        result = await self.analyze(
-            file_path=file_path,
-            artifact_id=artifact_id,
-            language=language,
-            use_remote_cache=use_remote_cache,
+        return read_layout(
+            (
+                await self.analyze(
+                    file_path=file_path,
+                    artifact_id=artifact_id,
+                    language=language,
+                    use_remote_cache=use_remote_cache,
+                )
+            ).get("document")
         )
-        return read_layout(result.get("document"))
 
 
 __all__ = ["CAPABILITY", "ToolboxLayoutClient"]

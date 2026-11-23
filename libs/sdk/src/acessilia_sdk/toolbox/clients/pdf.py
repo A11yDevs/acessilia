@@ -251,13 +251,15 @@ class ToolboxPdfClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> TextSpansResult:
         """Typed published result of :meth:`text_spans`; raw compatibility is unchanged."""
-        result = await self.text_spans(
-            file_path=file_path,
-            artifact_id=artifact_id,
-            pages=pages,
-            use_remote_cache=use_remote_cache,
+        return read_result(
+            await self.text_spans(
+                file_path=file_path,
+                artifact_id=artifact_id,
+                pages=pages,
+                use_remote_cache=use_remote_cache,
+            ),
+            TextSpansResult,
         )
-        return read_result(result, TextSpansResult)
 
 
 def _is_number(value: Any) -> bool:

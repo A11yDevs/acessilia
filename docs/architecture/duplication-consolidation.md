@@ -72,6 +72,26 @@ before it takes the lock.
 lines → **20 groups / 49 functions / 499 lines**. The `_is_process_running`,
 `acquire_lock` and `startup` groups disappear.
 
+## Fourth consolidation: the SDK typed-result wrappers
+
+The three SDK groups were not independent validators. Validation already lived
+in the shared readers: `read_result`/`read_document` for execute results,
+`read_layout`/`read_manifest` for the layout and structure documents. The
+duplicate was only the two-statement forwarding shape (`await` the raw client
+method into a temporary, then pass it to the reader). Each typed accessor now
+inlines the awaited call into its reader, so the public signatures and the
+reader behaviour stay the same while the forwarding is explicit and the
+temporary disappears.
+
+This covers `transcribe_region_result`, `text_spans_result`, `validate_result`,
+`convert_result`, `verbalize_result`, `inspect_result`, `analyze_result` and
+`extract_structure_result`. The existing result-reader and layout-reader tests
+exercise both valid and invalid outputs.
+
+**Measured delta on this PR's code commit:** 20 groups / 49 functions / 499
+lines → **17 groups / 41 functions / 381 lines**. The three SDK result-reader
+groups disappear.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -82,8 +102,8 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 1 | Generated SDK dataset readers (5/15) | Generated file (`_dataset_generated.py`): fix the generator, not the generated functions. |
 | 2 | Core schema writers `write_*_schema` (4/33) | **Consolidated:** shared `schema_files.write_schema`, with writer/schema tests. |
 | 3 | Core config helpers `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Defer: the surrounding config dataclasses differ. |
-| 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | Candidate: a generic typed-result reader after the SDK contract tests. |
-| 5 | SDK result readers in math/media_inspect (3/38) | Candidate: same generic reader. |
+| 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | **Consolidated:** the awaited call is inlined into `read_result`/`read_document`. |
+| 5 | SDK result readers in math/media_inspect (3/38) | **Consolidated:** same reader, with the temporary response removed. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidated in this PR.** |
 | 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | Trivial; no action. |
 | 8 | Frontend `_is_process_running` (2/26) | **Consolidated:** one runtime behind both entry points, with PID-probe tests. |
@@ -99,7 +119,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 18 | Core `_sha256` in builder/domain bundle (2/12) | Candidate utility consolidation. |
 | 19 | Math async wrappers (2/12) | Candidate small wrapper helper. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | Candidate small helper. |
-| 21 | SDK layout/structure result readers (2/32) | Candidate: same generic result reader as groups 4–5. |
+| 21 | SDK layout/structure result readers (2/32) | **Consolidated:** envelope extraction is inlined into `read_layout`/`read_manifest`. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
 The table is anchored to the November baseline. The current tool also reports two
@@ -107,17 +127,17 @@ groups introduced by later PRs: `pause_chat`/`resume_chat` (2/14) and the two
 deprecation `__getattr__` functions in `table_ast`/`validators` (2/20); they are
 tracked separately from the baseline rows.
 
-The next highest-value candidate is the SDK result readers (groups 4, 5 and 21).
-The frontend startup/lock trio was consolidated in this PR. Each consolidation
-should keep its own focused PR and characterization tests; the remaining groups
-were not changed here.
+The remaining groups are smaller or behaviour-sensitive. The Telegram command
+copies need user-facing copy review, while agent selection and table selection
+need characterization before extraction. Each consolidation should keep its own
+focused PR; the remaining groups were not changed here.
 
 ## Reproduction
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py tests/test_frontend_startup.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.

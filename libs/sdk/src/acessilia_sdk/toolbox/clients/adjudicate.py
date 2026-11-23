@@ -124,13 +124,15 @@ class ToolboxAdjudicateClient(ToolboxCapabilityClient):
         use_remote_cache: bool | None = None,
     ) -> RegionTranscription:
         """Typed published result of :meth:`transcribe_region`; raw compatibility is unchanged."""
-        result = await self.transcribe_region(
-            candidates=candidates,
-            file_path=file_path,
-            artifact_id=artifact_id,
-            use_remote_cache=use_remote_cache,
+        return read_document(
+            await self.transcribe_region(
+                candidates=candidates,
+                file_path=file_path,
+                artifact_id=artifact_id,
+                use_remote_cache=use_remote_cache,
+            ),
+            RegionTranscription,
         )
-        return read_document(result, RegionTranscription)
 
 
 __all__ = [
