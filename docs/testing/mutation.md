@@ -71,7 +71,8 @@ Operators: comparison swaps (`==`/`!=`, `<`/`<=`, `>`/`>=`, `in`/`not in`,
 condition negation and `+=`/`-=`. A mutant that makes the tests fail is
 **killed**; a mutant that leaves them passing is **surviving**. A surviving
 mutant on a line the suite never executes is reported as **uncovered**, not as
-a test weakness. Timeouts and invalid runs are reported separately.
+a test weakness. Timeouts and invalid runs are reported separately. A timeout sits in the mutation-score
+denominator but not in the numerator: a hang is a separate outcome, not a kill.
 
 The mutation score is `killed / (killed + survived + timeout)` over covered
 mutants. Equivalent mutants are **not** identified automatically: a surviving
