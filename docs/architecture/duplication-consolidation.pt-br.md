@@ -112,7 +112,8 @@ ações de pausa.
 
 **Delta medido no commit de código deste PR:** 17 grupos / 41 funções / 381
 linhas → **15 grupos / 34 funções / 324 linhas**. O grupo dos cinco modos e o
-grupo pausar/retomar desaparecem.
+grupo de comandos pausar/retomar desaparecem; as funções `pause_chat`/`resume_chat`
+do middleware continuam como um grupo separado.
 
 ## Classificação dos grupos restantes
 

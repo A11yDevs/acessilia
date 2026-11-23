@@ -110,7 +110,8 @@ are unchanged; the parameterized tests cover every mode and both pause actions.
 
 **Measured delta on this PR's code commit:** 17 groups / 41 functions / 381
 lines → **15 groups / 34 functions / 324 lines**. The five-mode group and the
-pause/resume group disappear.
+pause/resume **command** group disappear; the `pause_chat`/`resume_chat`
+middleware functions remain a separate group.
 
 ## Classification of the remaining groups
 
