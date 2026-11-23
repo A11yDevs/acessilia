@@ -139,6 +139,17 @@ def require_engine(engine: object) -> PlanningEngine:
     return engine
 
 
+class _PlannerOwner(Protocol):
+    _planner: PlannerAgent | None
+
+
+def _lazy_planner(owner: _PlannerOwner) -> PlannerAgent:
+    """The owner's default planner, built (loading the domain) on first use."""
+    if owner._planner is None:
+        owner._planner = PlannerAgent()
+    return owner._planner
+
+
 class PddlPlanningEngine:
     """The PDDL engine: :class:`PlannerAgent` with one backend configuration.
 
@@ -168,9 +179,8 @@ class PddlPlanningEngine:
 
     @property
     def planner(self) -> PlannerAgent:
-        if self._planner is None:
-            self._planner = PlannerAgent()
-        return self._planner
+        """The default planner, built (loading the domain) on first use."""
+        return _lazy_planner(self)
 
     @property
     def identity(self) -> str:

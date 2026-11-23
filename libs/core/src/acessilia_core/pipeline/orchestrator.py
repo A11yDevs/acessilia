@@ -84,6 +84,7 @@ from acessilia_core.planning.engine import (
     PddlPlanningEngine,
     PlanningEngine,
     PlanningProblem,
+    _lazy_planner,
     require_engine,
 )
 from acessilia_core.planning.models import (
@@ -206,10 +207,8 @@ class PddlAccessibilityOrchestrator:
 
     @property
     def planner(self) -> PlannerAgent:
-        """The default engine's `PlannerAgent`, built (loading the domain) on first use."""
-        if self._planner is None:
-            self._planner = PlannerAgent()
-        return self._planner
+        """The default planner, built (loading the domain) on first use."""
+        return _lazy_planner(self)
 
     @planner.setter
     def planner(self, planner: PlannerAgent | None) -> None:

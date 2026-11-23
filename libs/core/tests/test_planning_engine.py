@@ -92,6 +92,7 @@ def test_planning_problem_is_frozen_but_shares_its_manifest():
 
 def test_the_coordinator_uses_an_injected_engine_without_the_planner(monkeypatch):
     from acessilia_core.pipeline import orchestrator as orchestrator_module
+    from acessilia_core.planning import engine as engine_module
 
     manifest = _text_manifest()
     expected = PlannerAgent().plan(manifest)[1]
@@ -104,6 +105,7 @@ def test_the_coordinator_uses_an_injected_engine_without_the_planner(monkeypatch
         raise AssertionError("the coordinator built a PlannerAgent")
 
     monkeypatch.setattr(orchestrator_module, "PlannerAgent", no_planner)
+    monkeypatch.setattr(engine_module, "PlannerAgent", no_planner)
 
     plan, comparison = orchestrator._build_plan(
         manifest, extra_unavailable=["gated-method"], selected_roots=["text"]
