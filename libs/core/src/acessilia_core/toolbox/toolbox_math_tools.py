@@ -10,7 +10,8 @@ instead of falling back to a local converter.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.logger import logger
@@ -28,6 +29,18 @@ from acessilia_sdk.toolbox.clients.math import (
     RECOGNIZE_CAPABILITY,
     VERBALIZE_CAPABILITY,
 )
+
+T = TypeVar("T")
+
+
+async def _with_math_client(
+    toolbox: ToolboxConfig, call: Callable[[ToolboxMathClient], Awaitable[T]]
+) -> T:
+    client = make_toolbox_client(ToolboxMathClient, toolbox)
+    try:
+        return await call(client)
+    finally:
+        await client.close()
 
 
 def toolbox_recognize_formula(
@@ -73,11 +86,11 @@ def toolbox_recognize_formula(
 async def _recognize_formula_async(
     image_bytes: bytes, toolbox: ToolboxConfig
 ) -> list[dict[str, Any]]:
-    client = make_toolbox_client(ToolboxMathClient, toolbox)
-    try:
-        return (await recognize_formula(client, image_bytes)).candidates
-    finally:
-        await client.close()
+    return (
+        await _with_math_client(
+            toolbox, lambda client: recognize_formula(client, image_bytes)
+        )
+    ).candidates
 
 
 class MathCapabilityUnavailable(RuntimeError):
@@ -141,11 +154,12 @@ def toolbox_convert_latex(
 
 
 async def _convert_latex_async(latex: str, direction: str, toolbox: ToolboxConfig) -> str:
-    client = make_toolbox_client(ToolboxMathClient, toolbox)
-    try:
-        return (await convert_formula(client, latex, direction=direction)).text
-    finally:
-        await client.close()
+    return (
+        await _with_math_client(
+            toolbox,
+            lambda client: convert_formula(client, latex, direction=direction),
+        )
+    ).text
 
 
 def toolbox_verbalize_latex(
@@ -174,11 +188,12 @@ def toolbox_verbalize_latex(
 
 
 async def _verbalize_latex_async(latex: str, language: str, toolbox: ToolboxConfig) -> str:
-    client = make_toolbox_client(ToolboxMathClient, toolbox)
-    try:
-        return (await verbalize_formula(client, latex, language=language)).text
-    finally:
-        await client.close()
+    return (
+        await _with_math_client(
+            toolbox,
+            lambda client: verbalize_formula(client, latex, language=language),
+        )
+    ).text
 
 
 __all__ = [

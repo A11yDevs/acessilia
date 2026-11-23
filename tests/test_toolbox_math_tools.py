@@ -5,10 +5,13 @@ Uses respx for HTTP mocking.
 """
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 import pytest
 import respx
 
+from acessilia_core.toolbox import toolbox_math_tools
 from acessilia_core.toolbox.toolbox_math_tools import (
     MathCapabilityUnavailable,
     toolbox_convert_latex,
@@ -229,6 +232,35 @@ class TestRecognizeUnexpectedErrors:
         monkeypatch.setattr(toolbox_math_tools, "_recognize_formula_async", broken)
         with pytest.raises(TypeError, match="a bug in the call"):
             toolbox_recognize_formula(b"png", raise_on_unavailable=raise_on_unavailable, toolbox=toolbox_config())
+
+
+class TestSharedMathClient:
+    """The three operations share one lifecycle, including the close."""
+
+    def test_the_client_is_closed_after_success_and_failure(self, monkeypatch):
+        closed: list[bool] = []
+
+        class FakeClient:
+            async def close(self):
+                closed.append(True)
+
+        monkeypatch.setattr(
+            toolbox_math_tools, "make_toolbox_client", lambda *_args, **_kwargs: FakeClient()
+        )
+
+        async def succeed(client):
+            return "ok"
+
+        async def fail(_client):
+            raise RuntimeError("boom")
+
+        assert asyncio.run(toolbox_math_tools._with_math_client(toolbox_config(), succeed)) == "ok"
+        assert closed == [True]
+
+        closed.clear()
+        with pytest.raises(RuntimeError, match="boom"):
+            asyncio.run(toolbox_math_tools._with_math_client(toolbox_config(), fail))
+        assert closed == [True]
 
 
 if __name__ == "__main__":
