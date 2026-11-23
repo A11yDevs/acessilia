@@ -124,8 +124,8 @@ uv run python scripts/pddl_pipeline.py plan output/processing-manifest.json \
 `astar(blind())` é o padrão conservador porque preserva custos e suporta
 axiomas/predicados derivados. Um alias pode ser informado explicitamente com
 `--fast-downward-alias`, desde que suas heurísticas suportem os recursos do
-domínio atual (axiomas e predicados derivados). O Fast Downward ainda não foi
-verificado com o domínio 2.4
+domínio atual (axiomas e predicados derivados). O Fast Downward 26.6 foi
+conferido com o domínio 2.4 localmente; o CI ainda não o roda
 ([#790](https://github.com/A11yDevs/acessilia/issues/790)).
 
 O backend interno não pretende substituir um planner geral. Ele explora a

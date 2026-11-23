@@ -43,8 +43,8 @@ PDDL symbols are unique across the whole problem: values of different types
 that normalize alike (a method and a provider both called `docling`) get
 distinct symbols, and the validator refuses an object declared twice.
 
-The internal planner is tested with domain 2.4; Fast Downward is not verified
-yet (#790). `tests/test_fast_downward_domain.py` compares both backends when
+The internal planner is tested with domain 2.4. Fast Downward 26.6 was checked
+locally and agrees with it; CI does not run it yet (#790). `tests/test_fast_downward_domain.py` compares both backends when
 `ACESSILIA_FAST_DOWNWARD` is set.
 
 ## 0.3.8 — the PDDL compiler refuses cyclic and unknown dependencies

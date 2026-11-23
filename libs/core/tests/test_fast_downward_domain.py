@@ -65,3 +65,13 @@ def test_fast_downward_parses_symbols_shared_across_types():
     manifest = _manifest(_obligation("test-kind", methods=("docling", "m-a")))
     _, report = _compare(manifest, catalogue)
     assert report.outcomes["fast-downward"].status == "solved"
+
+
+def test_fast_downward_plans_without_a_catalogue():
+    """No catalogue: the capability and provider types are empty, and the
+    `forall` in `runnable` ranges over nothing."""
+    manifest = _manifest(_obligation("o-1", costs={"m-a": 9, "m-b": 1}))
+    plans, report = _compare(manifest, None)
+    assert report.outcomes["fast-downward"].status == "solved"
+    assert report.comparison.verdict in {"identical", "equivalent"}
+    assert _methods(plans["fast-downward"]) == ["m-b"]
