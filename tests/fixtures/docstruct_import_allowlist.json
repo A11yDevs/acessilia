@@ -1,0 +1,399 @@
+{
+  "docstruct.blocks.callouts": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  },
+  "docstruct.blocks.lists": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/elements.py",
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  },
+  "docstruct.canonical": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/canonical_builder.py"
+    ]
+  },
+  "docstruct.data_uri": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/enrichment/common.py"
+    ]
+  },
+  "docstruct.export.filters": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py"
+    ]
+  },
+  "docstruct.export.formats": {
+    "class": "contract"
+  },
+  "docstruct.export.html": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/export/renderers/html_renderer.py"
+    ]
+  },
+  "docstruct.export.markdown": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/export/exporters/drbench_md_exporter.py"
+    ]
+  },
+  "docstruct.export.markers": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/export/markers.py"
+    ]
+  },
+  "docstruct.export.page_text": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  },
+  "docstruct.export.pandoc_ast": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py"
+    ]
+  },
+  "docstruct.export.txt": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/export/renderers/txt_renderer.py"
+    ]
+  },
+  "docstruct.fusion.adjudication": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/fusion.py"
+    ]
+  },
+  "docstruct.fusion.hf_end": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py"
+    ]
+  },
+  "docstruct.fusion.judge": {
+    "class": "policy",
+    "files": [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/judge.py",
+      "libs/core/src/acessilia_core/pipeline/judge.py"
+    ]
+  },
+  "docstruct.fusion.line_numbers": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py"
+    ]
+  },
+  "docstruct.fusion.noise": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/handlers/rescue.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py",
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  },
+  "docstruct.fusion.oracle": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py"
+    ]
+  },
+  "docstruct.fusion.page_select": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py"
+    ]
+  },
+  "docstruct.fusion.payload": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/builder.py",
+      "libs/core/src/acessilia_core/pipeline/fusion.py"
+    ]
+  },
+  "docstruct.fusion.repetition": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/agents/vision_agent.py"
+    ]
+  },
+  "docstruct.fusion.similarity": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/slides.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/rescue.py",
+      "libs/core/src/acessilia_core/pipeline/secondary.py"
+    ]
+  },
+  "docstruct.fusion.skeleton": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/handlers/order.py"
+    ]
+  },
+  "docstruct.fusion.table_specialist": {
+    "class": "operation",
+    "files": [
+      "libs/core/src/acessilia_core/agents/table_specialist_agent.py"
+    ]
+  },
+  "docstruct.fusion.tailjoin": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py",
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py"
+    ]
+  },
+  "docstruct.fusion.types": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py"
+    ]
+  },
+  "docstruct.fusion.verse": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/structure.py"
+    ]
+  },
+  "docstruct.fusion.xycut": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/agents/order_adjudication_agent.py",
+      "libs/core/src/acessilia_core/manifest/detectors/layout.py"
+    ]
+  },
+  "docstruct.geometry": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/builder.py",
+      "libs/core/src/acessilia_core/manifest/detectors/types.py",
+      "libs/core/src/acessilia_core/manifest/slides.py",
+      "libs/core/src/acessilia_core/pipeline/elements.py",
+      "libs/core/src/acessilia_core/pipeline/payload.py",
+      "libs/core/src/acessilia_core/pipeline/secondary.py"
+    ]
+  },
+  "docstruct.geometry.boxes": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/slides.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/common.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py",
+      "libs/core/src/acessilia_core/pipeline/toolbox.py"
+    ]
+  },
+  "docstruct.imaging": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/toolbox/vision_payload.py"
+    ]
+  },
+  "docstruct.imaging.policy": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/page_level_agent.py"
+    ]
+  },
+  "docstruct.manifest": {
+    "class": "contract"
+  },
+  "docstruct.placeholders": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/builder.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/content.py",
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  },
+  "docstruct.policy": {
+    "class": "policy",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/toolbox_extractor.py",
+      "libs/core/src/acessilia_core/pipeline/fusion.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/fusion.py"
+    ]
+  },
+  "docstruct.profiles": {
+    "class": "policy",
+    "files": [
+      "backend/service.py"
+    ]
+  },
+  "docstruct.regions.classify": {
+    "class": "policy",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/agents/vision_agent.py"
+    ]
+  },
+  "docstruct.regions.letterhead": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  },
+  "docstruct.sections": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/builder.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py"
+    ]
+  },
+  "docstruct.tables.ast": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/detectors/text.py",
+      "libs/core/src/acessilia_core/pipeline/elements.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/tables.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/content.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/fusion.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py",
+      "libs/core/src/acessilia_core/pipeline/table_ast.py"
+    ]
+  },
+  "docstruct.tables.garble": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/enrichment/tables.py"
+    ]
+  },
+  "docstruct.tables.structured": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/output_schemas.py",
+      "libs/core/src/acessilia_core/pipeline/elements.py"
+    ]
+  },
+  "docstruct.tables.text_rows": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/enrichment/tables.py"
+    ]
+  },
+  "docstruct.text.code_reflow": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/elements.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/content.py"
+    ]
+  },
+  "docstruct.text.equations": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/builder.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py"
+    ]
+  },
+  "docstruct.text.implicit_products": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py"
+    ]
+  },
+  "docstruct.text.inline_math": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py"
+    ]
+  },
+  "docstruct.text.latex": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/formula_tools.py",
+      "libs/core/src/acessilia_core/manifest/builder.py",
+      "libs/core/src/acessilia_core/manifest/detectors/text.py",
+      "libs/core/src/acessilia_core/pipeline/canonical_builder.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/inspection.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py",
+      "libs/core/src/acessilia_core/pipeline/obligations.py"
+    ]
+  },
+  "docstruct.text.math_spans": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py"
+    ]
+  },
+  "docstruct.text.named_operators": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/handlers/formula.py"
+    ]
+  },
+  "docstruct.text.negation_overlay": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/pipeline/enrichment/inline_math.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py"
+    ]
+  },
+  "docstruct.text.norm_fix": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/manifest/detectors/text.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py"
+    ]
+  },
+  "docstruct.text.paragraphs": {
+    "class": "algorithm",
+    "files": [
+      "backend/service.py"
+    ]
+  },
+  "docstruct.text.unicode_repair": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/manifest/detectors/text.py",
+      "libs/core/src/acessilia_core/pipeline/handlers/unicode_repair.py"
+    ]
+  },
+  "docstruct.types": {
+    "class": "contract"
+  },
+  "docstruct.validation": {
+    "class": "validation",
+    "files": [
+      "libs/core/src/acessilia_core/agents/fusion_agent.py",
+      "libs/core/src/acessilia_core/export/pandoc_exporter.py",
+      "libs/core/src/acessilia_core/pipeline/validators.py"
+    ]
+  },
+  "docstruct.visual_text": {
+    "class": "algorithm",
+    "files": [
+      "libs/core/src/acessilia_core/agents/prompt_tools.py",
+      "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py",
+      "libs/core/src/acessilia_core/pipeline/payload.py"
+    ]
+  }
+}
