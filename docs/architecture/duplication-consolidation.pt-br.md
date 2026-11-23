@@ -206,6 +206,21 @@ dataset desaparece. Cada leitor agora tem uma instrução, então o piso de uma
 instrução do detector também se aplica; o helper compartilhado é a extração
 real, não o piso.
 
+## Décima terceira consolidação: os shims de atributos depreciados
+
+`table_ast.__getattr__` e `validators.__getattr__` repetiam a mesma busca, aviso
+e lógica de `AttributeError`, diferindo apenas no nome do módulo e no import
+substituto. Os dois agora delegam a `_deprecated_attribute`; o aviso continua
+apontando para o chamador do shim, e a mensagem, o valor retornado e o erro de
+atributo desconhecido permanecem iguais. Os testes de depreciação cobrem os
+dois módulos.
+
+**Delta medido no commit de código deste PR:** 9 grupos / 19 funções / 242
+linhas → **8 grupos / 17 funções / 222 linhas**. O grupo de `__getattr__` de
+depreciação desaparece. Cada shim agora tem uma instrução, então o piso de uma
+instrução do detector também se aplica; o helper compartilhado é a extração
+real, não o piso.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -236,11 +251,11 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 21 | Leitores de layout/structure do SDK (2/32) | **Reclassificado:** falso positivo; a extração do envelope já é compartilhada. |
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidato a helper pequeno de validação. |
 
-A tabela é ancorada no baseline de novembro. O tool atual também reporta dois
-grupos fora dele: as duas funções de depreciação `__getattr__` em
-`table_ast`/`validators` (2/20) e a propriedade `planner` compartilhada pelo
-orchestrator e pelo planning engine introduzida pela #632 (2/9); eles são
-acompanhados separadamente das linhas do baseline.
+A tabela é ancorada no baseline de novembro. O tool atual também reporta a
+propriedade `planner` compartilhada pelo orchestrator e pelo planning engine
+introduzida pela #632 (2/9), acompanhada separadamente das linhas do baseline.
+As duas funções de depreciação `__getattr__` em `table_ast`/`validators` foram
+consolidadas acima.
 
 Os grupos restantes são menores ou sensíveis a comportamento. A seleção dos
 agentes e a seleção de tabelas precisa de caracterização antes da extração,
@@ -253,7 +268,7 @@ alterados aqui.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.

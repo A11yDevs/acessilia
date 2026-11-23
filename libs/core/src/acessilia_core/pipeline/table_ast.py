@@ -9,11 +9,11 @@ for translation).
 """
 from __future__ import annotations
 
-import warnings
 from typing import Any
 
 import docstruct.tables.ast as _docstruct_ast
 from acessilia_core.i18n import t
+from acessilia_core.pipeline._deprecations import _deprecated_attribute
 
 _DEPRECATED_NAMES = (
     "ALLOWED_SCOPES",
@@ -41,15 +41,7 @@ def __dir__() -> list[str]:
 
 
 def __getattr__(name: str) -> Any:
-    if name in _DEPRECATED:
-        warnings.warn(
-            f"acessilia_core.pipeline.table_ast.{name} is deprecated; "
-            "import it from docstruct.tables.ast",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _DEPRECATED[name]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return _deprecated_attribute(__name__, name, "docstruct.tables.ast", _DEPRECATED)
 
 
 # Reverse map: canonical English line prefix -> (msgid, format kwargs).

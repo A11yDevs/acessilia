@@ -203,6 +203,21 @@ group disappears. Each reader is now one statement, so the detector's
 one-statement floor also applies; the shared helper is the actual extraction,
 not the floor.
 
+## Thirteenth consolidation: the deprecation attribute shims
+
+`table_ast.__getattr__` and `validators.__getattr__` repeated the same lookup,
+warning and `AttributeError` logic, differing only in the module name and the
+replacement import. Both now delegate to `_deprecated_attribute`; the warning
+keeps pointing to the caller of the shim, and the message, returned value and
+unknown-attribute error are unchanged. The deprecation tests cover both
+modules.
+
+**Measured delta on this PR's code commit:** 9 groups / 19 functions / 242
+lines → **8 groups / 17 functions / 222 lines**. The deprecation `__getattr__`
+group disappears. Each shim is now one statement, so the detector's
+one-statement floor also applies; the shared helper is the actual extraction,
+not the floor.
+
 ## Classification of the remaining groups
 
 Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
@@ -234,10 +249,10 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | Candidate small validation helper. |
 
 The table is anchored to the November baseline. The current tool also reports
-two groups outside it: the two deprecation `__getattr__` functions in
-`table_ast`/`validators` (2/20) and the planner property shared by the
-orchestrator and the planning engine introduced by #632 (2/9); they are tracked
-separately from the baseline rows.
+the planner property shared by the orchestrator and the planning engine
+introduced by #632 (2/9), tracked separately from the baseline rows. The two
+deprecation `__getattr__` functions in `table_ast`/`validators` were
+consolidated above.
 
 The remaining groups are smaller or behaviour-sensitive. Agent selection and
 table selection need characterization before extraction, while the config
@@ -249,7 +264,7 @@ keep its own focused PR; the remaining groups were not changed here.
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py
 ```
 
 The machine-readable initial snapshot remains in [quality-baseline.json](quality-baseline.json). The classification is intentionally about candidates; PR 5 will decide which remaining measures become a CI guard.
