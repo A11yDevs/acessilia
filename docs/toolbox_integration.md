@@ -281,6 +281,18 @@ result. Do not add a local implementation behind it (see 2.3).
   The availability gate then checks it against the live catalogue before each
   document is planned (see below).
 
+  A method left out of the table is never checked: under `enforce` it stays
+  runnable whatever the catalogue says. So every method, with a cost or a
+  handler, is either declared there or classified next to it in
+  `planning/toolbox_gate.py`, and a test fails for one that is neither (#789):
+  - `LOCAL_METHODS` gives each method without Toolbox requirements a role and
+    a reason. `transitional` is document computation still in the core: the
+    current state, not a permanent allowance. ADR-0028 moves it to Toolbox
+    capabilities (#804), and the set only shrinks. `validation` checks work
+    done before planning, which becomes a planned action (ADR-0029).
+    `symbolic` is a workflow decision that stays in the core (`human-review`);
+  - `NEVER_AVAILABLE_METHODS` lists methods with a cost but no handler.
+
 #### Availability gate
 
 Before planning a document the orchestrator takes one catalogue snapshot
@@ -301,7 +313,7 @@ still sends to the primary. When the primary's catalogue cannot be read,
 
 | `TOOLBOX_AVAILABILITY_GATE` | Effect |
 |---|---|
-| `observe` (default) | Logs what would be removed and records it in `canonical_metadata.pddl_toolbox_availability`; the plan is unchanged |
+| `observe` (default) | Logs what would be removed and records it in `canonical_metadata.pddl_toolbox_availability`; the plan steps are unchanged |
 | `enforce` | Removes those methods from the plan and from every replan of the document. When the catalogue cannot be read and the last good snapshot is older than `TOOLBOX_CATALOG_STALE_SECONDS`, every method with Toolbox requirements is removed (fail closed) |
 | `off` | No check |
 

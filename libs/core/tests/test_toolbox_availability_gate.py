@@ -410,26 +410,104 @@ async def test_a_resumed_plan_keeps_the_snapshot_it_was_built_under(monkeypatch)
     assert restored.availability.catalog_revision == built_under.catalog_revision
 
 
-#: Methods with no entry in METHOD_TOOLBOX_REQUIREMENTS, so the gate never
-#: rules them out. Not all of them are local: the formula handler calls the
-#: Toolbox for ``mathml`` and ``latex-verbalizer``, and the others are not yet
-#: audited (review of #781, #789). This list only shrinks: a method moves out
-#: when it is declared in the table or confirmed local, and a new method must be
-#: declared there, or added here with a reason in the review.
-UNDECLARED_METHODS = frozenset({
-    "agreement-rule", "deterministic-heading-repair", "human-review", "latex-normalizer",
-    "latex-verbalizer", "line-number-extractor", "mathml", "norm-fix", "pandoc-code",
-    "pandoc-table", "rep-guard", "rescue-omitted", "skeleton-order", "table-smart-fusion",
-    "table-specialist", "tailjoin", "tailjoin-positioned", "unicode-repair", "verse-chunker",
-    "vision-description", "xycut-order",
+#: The transitional methods when #801 classified them. The set only shrinks
+#: (ADR-0028, #804): a new local document method fails here unless this baseline
+#: is edited in review, with the reason.
+TRANSITIONAL_BASELINE = frozenset({
+    "deterministic-heading-repair", "latex-normalizer", "line-number-extractor", "norm-fix",
+    "pandoc-code", "rep-guard", "tailjoin", "tailjoin-positioned", "unicode-repair",
+    "verse-chunker", "xycut-order", "agreement-rule", "rescue-omitted", "skeleton-order",
+    "table-smart-fusion",
 })
 
 
-def test_every_method_is_declared_or_known_undeclared() -> None:
-    """A method missing from the requirements table is runnable under
-    ``enforce`` whatever the catalogue says, so an omission must be visible."""
-    methods = set(DEFAULT_METHOD_COSTS)
-    undeclared = methods - set(toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS)
+def _every_method() -> set[str]:
+    from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS
 
-    assert undeclared <= UNDECLARED_METHODS, f"declare or list: {sorted(undeclared - UNDECLARED_METHODS)}"
-    assert UNDECLARED_METHODS <= undeclared, f"shrink the list: {sorted(UNDECLARED_METHODS - undeclared)}"
+    return set(DEFAULT_METHOD_COSTS) | set(METHOD_HANDLERS)
+
+
+def test_every_method_is_declared_or_classified() -> None:
+    """A method missing from the requirements table is runnable under
+    ``enforce`` whatever the catalogue says, so each one must be classified.
+    Every method counts, with a cost or with a handler: the planner gives an
+    unknown method the default cost."""
+    undeclared = _every_method() - set(toolbox_gate.METHOD_TOOLBOX_REQUIREMENTS)
+    classified = set(toolbox_gate.LOCAL_METHODS) | set(toolbox_gate.NEVER_AVAILABLE_METHODS)
+
+    assert undeclared == classified, (
+        f"declare or classify: {sorted(undeclared - classified)}; "
+        f"declared or gone, unclassify: {sorted(classified - undeclared)}"
+    )
+    assert not set(toolbox_gate.LOCAL_METHODS) & set(toolbox_gate.NEVER_AVAILABLE_METHODS)
+    assert {role for role, _ in toolbox_gate.LOCAL_METHODS.values()} <= set(toolbox_gate.LOCAL_ROLES)
+
+
+def test_costs_and_handlers_match_but_for_the_never_available() -> None:
+    from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS
+
+    assert set(METHOD_HANDLERS) - set(DEFAULT_METHOD_COSTS) == set()
+    assert set(DEFAULT_METHOD_COSTS) - set(METHOD_HANDLERS) == set(toolbox_gate.NEVER_AVAILABLE_METHODS)
+
+
+def test_the_transitional_methods_only_shrink() -> None:
+    transitional = {
+        method for method, (role, _) in toolbox_gate.LOCAL_METHODS.items() if role == "transitional"
+    }
+
+    assert transitional <= TRANSITIONAL_BASELINE, sorted(transitional - TRANSITIONAL_BASELINE)
+
+
+def test_every_obligation_can_escalate_to_human_review() -> None:
+    """Why ruling a method out never leaves an obligation unplannable: every
+    kind admits ``human-review``, last."""
+    from acessilia_core.manifest.builder import (
+        OBLIGATION_BY_TYPE,
+        V23_OBLIGATION_BY_KIND,
+    )
+
+    admissible = [methods for _, _, methods in OBLIGATION_BY_TYPE.values()]
+    admissible += [methods for _, methods in V23_OBLIGATION_BY_KIND.values()]
+    assert all(methods[-1] == "human-review" for methods in admissible)
+
+
+@pytest.mark.parametrize(
+    ("method", "capability"),
+    [("mathml", "math.convert"), ("latex-verbalizer", "math.verbalize")],
+)
+def test_the_formula_methods_need_the_math_transform_provider(method, capability) -> None:
+    """#789: the formula handler calls the Toolbox, so enforce rules the
+    methods out when the math provider does not offer the capability."""
+    config = replace(
+        _config(), toolbox=toolbox_config(providers={"toolbox_math_provider": "not-registered"})
+    )
+
+    offered = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=_config())
+    missing = toolbox_gate.evaluate([method], _staging_snapshot(), mode="enforce", config=config)
+
+    assert offered.requirements[method] == [(capability, "math-speech")]
+    assert method not in offered.blocked
+    assert "not-registered" in " ".join(missing.blocked[method])
+
+
+@pytest.mark.parametrize(
+    ("kind", "methods", "fallback"),
+    [
+        ("verbalize-formula", ["mathml", "latex-verbalizer", "human-review"], "human-review"),
+        ("normalize-formula", ["latex-normalizer", "mathml", "human-review"], "latex-normalizer"),
+    ],
+)
+def test_enforce_without_the_math_provider_plans_the_fallback(kind, methods, fallback) -> None:
+    """The formula methods need math-speech; without it each formula kind
+    plans its fallback instead of becoming unplannable."""
+    from acessilia_core.planning.planner_agent import PlannerAgent
+
+    obligation = _obligation(f"{kind}-1", ["el-1"], methods)
+    obligation.kind = kind
+    obligation.method_costs = {m: DEFAULT_METHOD_COSTS[m] for m in methods}
+    manifest = _manifest([_element("el-1", "formula", text="x^2")], [obligation])
+    decision = toolbox_gate.evaluate(methods, None, mode="enforce", config=_config())
+
+    _, plan = PlannerAgent().plan(manifest, catalogue=decision.catalogue_facts())
+
+    assert [step.method for step in plan.steps if step.method] == [fallback]
