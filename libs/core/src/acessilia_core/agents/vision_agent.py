@@ -14,8 +14,9 @@ from agno.media import Image
 from pydantic import ValidationError
 
 from acessilia_core.agents.ai_client import active_model_name, get_agno_model
-from acessilia_core.agents.model_call_policy import model_call_deadline
-from acessilia_core.agents.model_calls import ModelCallRunner, current_model_calls
+
+from acessilia_core.agents.model_call_policy import ADMISSION_RETRIES, ADMISSION_RETRY_SECONDS, model_call_deadline  # isort: skip
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected, ModelCallRunner, current_model_calls  # isort: skip
 from acessilia_core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
@@ -296,6 +297,8 @@ class VisionAgent:
                 max_tokens=max_tokens,
                 model_calls=self.model_calls,
             )
+        except ModelCallRejected:
+            raise  # local admission pressure: the stage records its own reason (#590)
         except Exception as error:
             return _handle_describe_region_error(
                 error,
@@ -370,6 +373,7 @@ class _VisionRetryRunner(Generic[OutputModel]):
         self.rate_limit_retries = 0
         self.timeout_retries = 0
         self.context_retries = 0
+        self.admission_retries = 0
 
     async def _retry_after_context_overflow(self, error: BaseException) -> bool:
         if (
@@ -453,6 +457,16 @@ class _VisionRetryRunner(Generic[OutputModel]):
                         error=error,
                     )
                 )
+                return None, True
+            raise
+        except ModelCallClosed:
+            raise  # shutdown is lifecycle, not a retryable admission rejection
+        except ModelCallRejected:
+            # Local admission pressure: one retry like a timeout (#590).
+            if self.admission_retries < ADMISSION_RETRIES:
+                self.admission_retries += 1
+                self.attempt -= 1
+                await asyncio.sleep(ADMISSION_RETRY_SECONDS)
                 return None, True
             raise
         except Exception as error:

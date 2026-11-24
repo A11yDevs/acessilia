@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from acessilia_core.agents.model_calls import (
+    ModelCallClosed,
     ModelCallRejected,
     ModelCallTimeout,
     current_model_calls,
@@ -336,9 +337,9 @@ async def test_close_discards_pending_work_without_joining_running_provider(runn
         assert runner.snapshot()["active"] == 1
         assert runner.snapshot()["pending"] == 0
         for task in (active, pending):
-            with pytest.raises(ModelCallRejected):
+            with pytest.raises(ModelCallClosed):
                 await asyncio.wait_for(task, 2)
-        with pytest.raises(ModelCallRejected):
+        with pytest.raises(ModelCallClosed):
             await runner.run(lambda: None, timeout=1, label="closed")
     finally:
         blocked.release.set()

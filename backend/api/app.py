@@ -35,7 +35,7 @@ async def _lifespan(app: FastAPI):
     # in one process); only the shutdown path sets the signal again.
     reset_shutdown()
     with runtime_lease():
-        setup_process()
+        setup_process(jobs_at_once=unified_queue.max_concurrent)
         from backend.services.model_calls import get_model_calls, shutdown_model_calls
         get_model_calls()
         from acessilia_core.blocking import run_blocking

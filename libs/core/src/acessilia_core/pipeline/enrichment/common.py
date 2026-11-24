@@ -35,10 +35,23 @@ if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
 
 
-#: Picture failures a second try may fix: the provider gave no answer, or an
-#: empty one (empty answers are never cached, so the try reaches the model). A
-#: crop that could not be rendered will not render the second time either.
-_RETRIED_VISION_FAILURES = frozenset({"model_failed", "empty_description"})
+#: Vision-stage failures a second try may fix (pictures and tables): the
+#: provider gave no answer, an empty picture answer (empty answers are never
+#: cached, so the try reaches the model), or a local admission rejection
+#: (capacity may have freed by the second pass). A crop that could not be
+#: rendered will not render the second time either.
+_RETRIED_VISION_FAILURES = frozenset(
+    {"model_failed", "empty_description", "admission_rejected"}
+)
+
+
+def should_retry_vision_failure(reason: str | None) -> bool:
+    """Whether a picture/table failure reason gets the collective second pass.
+
+    The policy is shared by both stages; keeping the set private and exposing
+    the predicate gives the rule one name and one owner (#590 review).
+    """
+    return reason in _RETRIED_VISION_FAILURES
 
 
 async def _retry_failed(

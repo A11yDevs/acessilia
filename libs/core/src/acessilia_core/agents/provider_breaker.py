@@ -10,7 +10,10 @@ instead of waiting on each call.
 
 Only a call that got no usable answer counts. An answer the job does not
 use (an empty description, a table reading refused as worse) is the model
-working, and resets the count.
+working, and resets the count. A local admission rejection
+(``ModelCallRejected``) never reaches ``record``: the stages record it as its
+own retryable reason, because the runner being full says nothing about the
+provider (#590).
 
 A known limitation: the callers return None both when the provider gave
 nothing and when an answer came back but failed validation, so a model

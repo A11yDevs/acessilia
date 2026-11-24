@@ -33,7 +33,7 @@ closures can therefore retain images, agents and clients.
   General blocking work keeps its executor and cancellation semantics. Core
   synchronous inspection bridges preserve request context in their helper thread.
 - API/CLI shutdown closes admission, discards pending work and wakes pending
-  and active awaiters with `ModelCallRejected`, without joining model threads.
+  and active awaiters with `ModelCallClosed`, without joining model threads.
   Active provider threads continue, retain their reservations until completion
   and have their late results discarded. Do not replace a closed owner while
   its workers remain. Neither
@@ -59,6 +59,35 @@ is outside the core: with `AI_CLIENT=toolbox`, it belongs to the Toolbox's
 gateway; Ollama and OpenRouter have no gateway of ours, so their own limits
 apply. See the [architecture](../architecture.md).
 
+Follow-up (#590). The queue's concurrency and `VISION_CONCURRENCY` multiply:
+`jobs at once × VISION_CONCURRENCY` calls may arrive together, and the runner
+must admit them or reject the excess. Keeping the immediate rejection above,
+the service derives `MODEL_CALL_MAX_PENDING` from that product when the
+variable is unset or -1 (at least the historical 4) and warns at startup, without
+refusing it, when an explicit value cannot cover the configured jobs. The
+warning names the exact pending capacity that closes the gap. Over capacity is
+a degraded mode, not an unsafe one, and the stages may use fewer calls than
+their bound. The formula assumes a job's enrichment subplans stay sequential, so
+one stage bound applies at a time; parallel subplans would need a new aggregate
+budget (#828).
+
+A rejection is admission pressure, not provider health. It is retried once
+like a timeout, without consuming an answer attempt; if it persists, the stage
+records `admission_rejected` (pictures, tables, formulas), leaves the shared
+breaker untouched, and keeps the run out of the cache so a rerun can retry it.
+A closed runner raises the `ModelCallClosed` subtype instead: it is lifecycle,
+not capacity pressure, so the agents do not retry it and the stages abort
+rather than record a recoverable degradation. A closed runner also wakes
+pending and active awaiters with the same subtype.
+
+Retry composition (#590 review). The budgets are independent and bounded: one
+admission retry per agent call, one timeout retry, two rate-limit retries, and
+the answer/validation attempts inside the agent; then the document-level
+`_retry_failed` pass gives each failed picture/table one more try after
+`VISION_RETRY_PASS_DELAY_SECONDS`; a misread table has its own reread budget.
+An admission rejection creates no per-table wait, consumes no answer attempt and
+does not open the breaker.
+
 ## Consequences and verification
 
 Core capacity, `VISION_CONCURRENCY`, gateway/provider slots and whole-job duration
@@ -67,5 +96,7 @@ are separate limits. This bounds local retention and isolates unrelated work.
 the bound shared by runs at once on separate event loops (#547),
 retained reservations, late results, independent `run_blocking`, concurrent
 locales, synchronous handlers/transient loops and owner shutdown/restart with
-event-blocked providers. Existing agent, table and cancellation suites preserve
-the surrounding policies.
+event-blocked providers. `tests/test_model_call_capacity.py` and
+`libs/core/tests/test_model_call_admission.py` cover the #590 sizing check and
+the rejection/reason semantics. Existing agent, table and cancellation suites
+preserve the surrounding policies.

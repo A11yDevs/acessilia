@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.agents.vision_agent import VisionAgent
@@ -228,12 +229,19 @@ async def _classify_formula_regions(
                 )
                 if image:
                     reason = "model_failed"
-                    output = await agent.describe_region(
-                        image_bytes=image, classification="formula_candidate",
-                        page_num=page, total_pages=len(manifest.pages), mode=mode,
-                        full_budget=True, errors=errors,
-                    )
-                    breaker.record(isinstance(output, VisionOutput))
+                    try:
+                        output = await agent.describe_region(
+                            image_bytes=image, classification="formula_candidate",
+                            page_num=page, total_pages=len(manifest.pages), mode=mode,
+                            full_budget=True, errors=errors,
+                        )
+                    except ModelCallRejected as error:
+                        if isinstance(error, ModelCallClosed):
+                            raise  # shutdown aborts the stage
+                        reason = "admission_rejected"  # local capacity, not provider
+                        errors.append(str(error) or "model-call admission rejected")
+                    else:
+                        breaker.record(isinstance(output, VisionOutput))
             status = "unclassified"
             if isinstance(output, VisionOutput):
                 if output.classification_uncertain:
@@ -510,9 +518,17 @@ class _FormulaEnrichment:
         gate: _TextLayerGate,
     ) -> _VisionReading:
         blocked = self.breaker.open
-        output = await _formula_by_vision(
-            self.vision, self.breaker, image_bytes, page_number, self.total_pages, self.mode
-        )
+        try:
+            output = await _formula_by_vision(
+                self.vision, self.breaker, image_bytes, page_number, self.total_pages, self.mode
+            )
+        except ModelCallClosed:
+            raise  # shutdown aborts the stage
+        except ModelCallRejected:
+            # Local admission pressure: not evidence against the provider, and
+            # retryable on a later pass (#590).
+            element.metadata["formula_recognition_failure"] = "admission_rejected"
+            return _VisionReading(latex="", confidence=None, reclassified=False)
         if output is None:
             element.metadata["formula_recognition_failure"] = (
                 "provider_blocked" if blocked else "model_failed"
@@ -541,8 +557,9 @@ class _FormulaEnrichment:
         A formula whose reading a provider outage changed records why in
         ``metadata["formula_recognition_failure"]``: ``recognizer_unavailable``
         (``math.recognize`` was down) or, when the vision fallback got no
-        answer, ``provider_blocked`` (an open breaker) or ``model_failed``. A
-        run that records one is not cached (#544 review), as for pictures.
+        answer, ``provider_blocked`` (an open breaker), ``model_failed``, or
+        ``admission_rejected`` (the local model-call runner was full). A run
+        that records one is not cached (#544 review), as for pictures.
         """
         element.metadata.pop("formula_recognition_failure", None)
         async with self.slots:
