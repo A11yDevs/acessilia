@@ -21,6 +21,24 @@ Since domain 2.4 (#640) the decision reaches the planner as problem facts
 what the snapshot offers, from which the domain derives ``runnable``. In
 ``observe`` every requirement is offered, so the facts are visible and the
 plan does not change; in ``enforce`` the snapshot decides.
+
+A method's Toolbox calls are of three kinds (#848):
+
+- **required** (``METHOD_TOOLBOX_REQUIREMENTS``): missing one rules the
+  method out;
+- **optional** (``METHOD_OPTIONAL_CAPABILITIES``): missing one degrades the
+  method per element (a picture left with ``crop_unavailable``, a formula
+  read by the vision fallback, a table without its inline math), so it
+  never rules the method out. The decision records the missing ones as
+  ``degraded_methods``, which reach the output metadata. It is per method,
+  not per document: a method whose document never makes the call (a DOCX
+  picture carries its bytes; a DOCX formula is not rendered) is still
+  reported, so it *may* run degraded (#859);
+- none: the method runs in the core alone.
+
+Where a method's implementation lives (``LOCAL_METHODS``' role, such as
+``transitional``) is a separate dimension: a transitional method can still
+have optional capabilities.
 """
 
 from __future__ import annotations
@@ -57,13 +75,22 @@ CATALOG_TIMEOUT_SECONDS = 10.0
 _EXTRACT = "document.structure.extract"
 
 def _provider(config: CoreConfig, key: str) -> str:
-    return config.toolbox.providers[key]
+    """The provider the client calls: the setting, or the registry default
+    when it is empty, as ``ToolboxCapabilityClient`` resolves it. Required
+    and optional calls resolve it the same way (#856 review): an empty
+    ``TOOLBOX_PDF_PROVIDER`` used to block, under ``enforce``, a method the
+    client runs with the default provider."""
+    from acessilia_sdk.toolbox.capabilities import provider_default
+
+    return config.toolbox.providers[key] or provider_default(key)
 
 
 #: Method -> Toolbox requirements, resolved from the run's config when
 #: evaluated, so the providers checked are the ones the run calls. Every
-#: method whose handler calls the Toolbox is listed (#789); every other one is
-#: in ``LOCAL_METHODS`` or ``NEVER_AVAILABLE_METHODS`` below.
+#: method whose handler needs the Toolbox to run is listed (#789); one whose
+#: calls only degrade it is in ``METHOD_OPTIONAL_CAPABILITIES`` (#848), and
+#: every method without requirements is in ``LOCAL_METHODS`` or
+#: ``NEVER_AVAILABLE_METHODS`` below.
 METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
     "dual-provider-fusion": lambda config: [
         Requirement(_EXTRACT, _provider(config, "toolbox_provider")),
@@ -97,7 +124,32 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]
 }
 
 
-#: Roles of the methods that do not call the Toolbox (#789):
+#: Method -> the Toolbox calls whose absence only degrades it (#848): the
+#: method still runs, and the elements it could not serve keep their reason.
+#: Resolved from the run's config, like the requirements. A method is in this
+#: map or in ``METHOD_TOOLBOX_REQUIREMENTS``, never both.
+METHOD_OPTIONAL_CAPABILITIES: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
+    # A picture's crop; without it the picture records crop_unavailable.
+    "picture-description": lambda config: [
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
+    ],
+    # math.recognize degrades to the vision fallback; without pdf.render a
+    # formula has no crop and records crop_unavailable.
+    "formula-recognizer": lambda config: [
+        Requirement("math.recognize", _provider(config, "toolbox_math_recognize_provider")),
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider")),
+    ],
+    # pdf.render only for a table read again; document.text.spans for the
+    # cells' inline math, recorded as unavailable without it.
+    "table-enrichment": lambda config: [
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider")),
+        Requirement("document.text.spans", _provider(config, "toolbox_pdf_provider")),
+    ],
+}
+
+
+#: Roles of the methods without Toolbox requirements (#789); a method here
+#: may still have optional capabilities (#848):
 #: - ``transitional``: document computation still running in the core. Not a
 #:   permanent allowance: ADR-0028 moves it to Toolbox capabilities (#804), and
 #:   the method then moves to ``METHOD_TOOLBOX_REQUIREMENTS``;
@@ -106,8 +158,8 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]
 #: - ``symbolic``: a workflow decision that stays in the core.
 LOCAL_ROLES = ("transitional", "validation", "symbolic")
 
-#: Method -> (role, reason) for every method without Toolbox requirements, so
-#: the catalogue cannot rule it out. An inventory of the current state, kept
+#: Method -> (role, reason) for every method without required Toolbox calls
+#: (it may have optional ones), so the catalogue cannot rule it out. An inventory of the current state, kept
 #: complete by ``tests/test_toolbox_availability_gate.py``.
 LOCAL_METHODS: dict[str, tuple[str, str]] = {
     "deterministic-heading-repair": ("transitional", "docstruct heading repair"),
@@ -126,19 +178,13 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     "skeleton-order": ("transitional", "compares the recorded secondary extraction"),
     "table-smart-fusion": ("transitional", "compares the recorded secondary extraction"),
     # Moved from before planning into the plan (#640, M2); not new work in the
-    # core. Its Toolbox calls (pdf.render for a table read again,
-    # document.text.spans for the marks) are conditional and degrade per
-    # table, so they are not requirements that could rule it out.
+    # core. Its Toolbox calls are optional (METHOD_OPTIONAL_CAPABILITIES).
     "table-enrichment": ("transitional", "reads tables with the DataAgent model; marks cell math"),
     # Moved from before planning into the plan (#640, M1); not new work in
-    # the core. Its Toolbox call (pdf.render for a picture's crop) is per
-    # picture and degrades to crop_unavailable, so it is not a requirement
-    # that could rule it out.
+    # the core. Its Toolbox call is optional (METHOD_OPTIONAL_CAPABILITIES).
     "picture-description": ("transitional", "describes pictures with the VisionAgent model"),
     # Moved from before planning into the plan (#640, M3). Its Toolbox calls
-    # (math.recognize, pdf.render for the crop) degrade per formula, to the
-    # vision fallback or to the text layer, so they are not requirements that
-    # could rule it out (#848).
+    # are optional (METHOD_OPTIONAL_CAPABILITIES).
     "formula-recognizer": ("transitional", "reads formula LaTeX, with the VisionAgent model as fallback"),
     "vision-description": ("validation", "the picture descriptions picture-description made"),
     "pandoc-table": ("validation", "the table structure table-enrichment produced"),
@@ -162,6 +208,12 @@ class AvailabilityDecision:
     requirements: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
     #: The required pairs the snapshot offers; ``None`` offers them all.
     offered: list[tuple[str, str]] | None = None
+    #: Requested method -> its optional ``(capability@version, provider)`` pairs (#848).
+    optional: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    #: Requested methods that may run degraded, with the optional calls the
+    #: snapshot lacks: per method, not per document (a document may never
+    #: make the call). Whatever the mode, they are never ruled out.
+    degraded: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def enforced(self) -> bool:
@@ -213,6 +265,8 @@ class AvailabilityDecision:
             "offered": None if self.offered is None else [list(pair) for pair in self.offered],
             "offered_source": self.offered_source,
             "assumed_runnable_methods": self.assumed_runnable,
+            "optional": {method: [list(pair) for pair in pairs] for method, pairs in self.optional.items()},
+            "degraded_methods": self.degraded,
         }
 
     @classmethod
@@ -222,19 +276,31 @@ class AvailabilityDecision:
         A checkpoint without the mode gets the run's (``toolbox``); one from
         before domain 2.4 has no requirements, so its replans add no facts.
         """
-        blocked = metadata.get("blocked_methods") or {}
         offered = metadata.get("offered")
         return cls(
             mode=str(metadata.get("mode") or gate_mode(toolbox)),
             catalog_revision=metadata.get("catalog_revision"),
-            blocked={str(method): [str(reason) for reason in reasons] for method, reasons in blocked.items()},
+            blocked=_restored_reasons(metadata.get("blocked_methods")),
             catalog_error=metadata.get("catalog_error"),
-            requirements={
-                str(method): [(str(capability), str(provider)) for capability, provider in pairs]
-                for method, pairs in (metadata.get("requirements") or {}).items()
-            },
+            requirements=_restored_pairs(metadata.get("requirements")),
             offered=None if offered is None else [(str(c), str(p)) for c, p in offered],
+            # A checkpoint from before #848 has neither: nothing degraded on record.
+            optional=_restored_pairs(metadata.get("optional")),
+            degraded=_restored_reasons(metadata.get("degraded_methods")),
         )
+
+
+def _restored_pairs(raw: dict[str, Any] | None) -> dict[str, list[tuple[str, str]]]:
+    """Method -> ``(capability, provider)`` pairs, from a checkpoint's JSON."""
+    return {
+        str(method): [(str(capability), str(provider)) for capability, provider in pairs]
+        for method, pairs in (raw or {}).items()
+    }
+
+
+def _restored_reasons(raw: dict[str, Any] | None) -> dict[str, list[str]]:
+    """Method -> reasons, from a checkpoint's JSON."""
+    return {str(method): [str(reason) for reason in reasons] for method, reasons in (raw or {}).items()}
 
 
 def capability_ref(capability_id: str) -> str:
@@ -271,11 +337,16 @@ def evaluate(
     config: CoreConfig,
     catalog_error: str | None = None,
 ) -> AvailabilityDecision:
-    """Which of ``methods`` cannot run against ``snapshot``, with ``config``'s providers."""
+    """Which of ``methods`` cannot run against ``snapshot``, with ``config``'s
+    providers, and which may run degraded (#848)."""
+    # Read once: both passes below go over it, and a generator would leave
+    # the second empty (#856 review).
+    methods = sorted(set(methods))
     blocked: dict[str, list[str]] = {}
     required: dict[str, list[tuple[str, str]]] = {}
     offered: set[tuple[str, str]] = set()
-    for method in sorted(set(methods)):
+    optional, degraded = _optional_calls(methods, snapshot, config)
+    for method in methods:
         requirements = METHOD_TOOLBOX_REQUIREMENTS.get(method)
         if requirements is None:
             continue
@@ -298,7 +369,28 @@ def evaluate(
         # observe (option a, #640): every requirement is offered, the plan
         # does not change; enforce: the snapshot decides.
         offered=sorted(offered) if mode == "enforce" else None,
+        optional=optional,
+        degraded=degraded,
     )
+
+
+def _optional_calls(
+    methods: Iterable[str], snapshot: CatalogSnapshot | None, config: CoreConfig
+) -> tuple[dict[str, list[tuple[str, str]]], dict[str, list[str]]]:
+    """Each requested method's optional calls, and the ones ``snapshot``
+    lacks. Without a snapshot nothing is known, so nothing is reported
+    degraded: the decision's ``catalog_error`` already says why."""
+    optional: dict[str, list[tuple[str, str]]] = {}
+    degraded: dict[str, list[str]] = {}
+    for method in sorted(set(methods)):
+        calls = METHOD_OPTIONAL_CAPABILITIES.get(method)
+        if calls is None:
+            continue
+        wanted = calls(config)
+        optional[method] = sorted({(capability_ref(item.capability_id), item.provider) for item in wanted})
+        if snapshot is not None and (reasons := missing_requirements(snapshot, wanted)):
+            degraded[method] = reasons
+    return optional, degraded
 
 
 def _catalog_endpoint(toolbox: ToolboxConfig) -> ToolboxEndpoint:
@@ -404,7 +496,7 @@ async def decide(manifest: ProcessingManifest, config: CoreConfig) -> Availabili
     """Take the catalogue snapshot for one document and evaluate its methods."""
     mode = gate_mode(config.toolbox)
     methods = requested_methods(manifest)
-    if mode == "off" or not methods & set(METHOD_TOOLBOX_REQUIREMENTS):
+    if mode == "off" or not methods & (set(METHOD_TOOLBOX_REQUIREMENTS) | set(METHOD_OPTIONAL_CAPABILITIES)):
         return AvailabilityDecision(mode=mode, catalog_revision=None)
     cache = catalog_cache(config.toolbox)
     snapshot = await cache.get()
@@ -416,6 +508,7 @@ async def decide(manifest: ProcessingManifest, config: CoreConfig) -> Availabili
 __all__ = [
     "LOCAL_METHODS",
     "LOCAL_ROLES",
+    "METHOD_OPTIONAL_CAPABILITIES",
     "METHOD_TOOLBOX_REQUIREMENTS",
     "NEVER_AVAILABLE_METHODS",
     "AvailabilityDecision",

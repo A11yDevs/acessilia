@@ -2,6 +2,37 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.16 — optional Toolbox capabilities (#848)
+
+A method's Toolbox calls are now of three kinds:
+- **required** (`METHOD_TOOLBOX_REQUIREMENTS`): missing one rules the method
+  out, as before;
+- **optional** (`METHOD_OPTIONAL_CAPABILITIES`, new): missing one degrades
+  the method per element, so it never rules the method out;
+- none: the method runs in the core alone.
+
+`picture-description` (`pdf.render`), `formula-recognizer`
+(`math.recognize`, `pdf.render`) and `table-enrichment` (`pdf.render`,
+`document.text.spans`) declare their optional calls; until now the gate did
+not record them at all. A snapshot that lacks one reports the method under
+`degraded_methods`, next to `optional`, in the availability metadata the
+output carries and in a log warning, in `observe` and in `enforce` alike. The
+catalogue facts and the plan do not change, and the methods degrade as
+before. Without a snapshot nothing is reported degraded (`catalog_error`
+says why). A document whose only Toolbox calls are optional now has its
+catalogue read. A plan checkpoint from before restores no optional calls.
+Where a method lives (`LOCAL_METHODS`' role) stays a separate dimension.
+- The report is per method, not per document: a method is listed when the
+  catalogue lacks an optional call it *may* make, even if this document
+  never makes it (a DOCX picture carries its bytes). The log says "may run
+  degraded"; reporting only the real degradations is #859.
+- **Fix:** required and optional calls resolve an empty provider setting to
+  the registry default, as the client does. Under `enforce`, an empty
+  `TOOLBOX_PDF_PROVIDER` used to rule out a method the client runs.
+- `evaluate` reads its `methods` once, so a generator no longer loses the
+  required checks.
+- `docs/toolbox_integration.md` (EN/PT) explains where to declare a call.
+
 ## 0.3.15 — the formula LaTeX is a planned action (#640, M3, #846)
 
 Until 0.3.14 the orchestrator read the formulas' LaTeX before planning. Now a

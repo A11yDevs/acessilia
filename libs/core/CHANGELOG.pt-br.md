@@ -2,6 +2,39 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.16 — capacidades opcionais do Toolbox (#848)
+
+As chamadas de um método ao Toolbox agora são de três tipos:
+- **obrigatórias** (`METHOD_TOOLBOX_REQUIREMENTS`): a falta de uma exclui o
+  método, como antes;
+- **opcionais** (`METHOD_OPTIONAL_CAPABILITIES`, novo): a falta de uma
+  degrada o método por elemento, então nunca o exclui;
+- nenhuma: o método roda só no core.
+
+`picture-description` (`pdf.render`), `formula-recognizer`
+(`math.recognize`, `pdf.render`) e `table-enrichment` (`pdf.render`,
+`document.text.spans`) declaram suas chamadas opcionais; até agora o gate não
+as registrava. Um snapshot que não tem uma delas informa o método em
+`degraded_methods`, ao lado de `optional`, nos metadados de disponibilidade
+que a saída leva e num aviso de log, tanto em `observe` quanto em
+`enforce`. Os fatos do catálogo e o plano não mudam, e os métodos degradam
+como antes. Sem snapshot nada é informado como degradado (o `catalog_error`
+diz por quê). Um documento cujas únicas chamadas ao Toolbox são opcionais
+agora tem o catálogo lido. Um checkpoint de plano de antes não restaura
+chamadas opcionais. Onde um método vive (o papel em `LOCAL_METHODS`)
+continua uma dimensão separada.
+- O relatório é por método, não por documento: um método é listado quando o
+  catálogo não tem uma chamada opcional que ele *pode* fazer, mesmo que este
+  documento nunca a faça (uma imagem de DOCX traz os próprios bytes). O log
+  diz "may run degraded"; informar só as degradações reais é a #859.
+- **Correção:** chamadas obrigatórias e opcionais resolvem um provider
+  configurado vazio para o padrão do registro, como o cliente faz. No
+  `enforce`, um `TOOLBOX_PDF_PROVIDER` vazio excluía um método que o cliente
+  roda.
+- `evaluate` lê `methods` uma só vez, então um gerador não perde mais as
+  checagens obrigatórias.
+- `docs/toolbox_integration.md` (EN/PT) explica onde declarar uma chamada.
+
 ## 0.3.15 — o LaTeX das fórmulas é uma ação planejada (#640, M3, #846)
 
 Até a 0.3.14 o orquestrador lia o LaTeX das fórmulas antes do planejamento.

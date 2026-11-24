@@ -267,10 +267,17 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
 - **Fusão dual** (`libs/core/src/acessilia_core/pipeline/fusion.py`): se a capacidade produz blocos
   canônicos, pode participar como provider em `extract_fused()`.
 - **Método PDDL** (`libs/core/src/acessilia_core/planning/toolbox_gate.py`): se o handler de um
-  método de planejamento chama a capacidade, declare-a em
-  `METHOD_TOOLBOX_REQUIREMENTS`. Cada entrada é uma função do `CoreConfig` da
-  execução que devolve os requisitos (capacidade e provider), para que o provider
-  conferido seja o que a execução chama:
+  método de planejamento chama a capacidade, declare-a:
+  - em `METHOD_TOOLBOX_REQUIREMENTS` quando o método não roda sem ela: na
+    falta dela, o método é excluído;
+  - em `METHOD_OPTIONAL_CAPABILITIES` quando a falta dela só degrada o
+    método por elemento (uma imagem sem recorte, uma fórmula lida pela
+    alternativa de visão), então ela nunca o exclui (#848).
+
+  Um método está num mapa ou no outro, nunca nos dois. Cada entrada é uma
+  função do `CoreConfig` da execução que devolve as chamadas (capacidade e
+  provider), para que o provider conferido seja o que a execução chama; um
+  provider configurado vazio vira o padrão do registro, como no cliente:
 
   ```python
   "meu-metodo": lambda config: [
@@ -281,13 +288,15 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
   O gate de disponibilidade passa a conferi-la contra o catálogo vivo antes de
   cada documento ser planejado (veja abaixo).
 
-  Um método fora da tabela nunca é conferido: no `enforce` ele continua
-  executável qualquer que seja o catálogo. Por isso todo método, com custo ou
-  handler, está declarado ali ou classificado ao lado dela em
-  `planning/toolbox_gate.py`, e um teste falha para um que não esteja em
-  nenhum dos dois (#789):
-  - `LOCAL_METHODS` dá a cada método sem requisitos de Toolbox um papel e um
-    motivo. `transitional` é computação documental ainda no Core: o estado
+  Um método fora do `METHOD_TOOLBOX_REQUIREMENTS` nunca é excluído: no
+  `enforce` ele continua executável qualquer que seja o catálogo (as chamadas
+  opcionais dele ainda são conferidas, para o relatório de degradação). Por
+  isso todo método, com custo ou handler, está declarado ali ou classificado
+  ao lado dela em `planning/toolbox_gate.py`, e um teste falha para um que
+  não esteja em nenhum dos dois (#789):
+  - `LOCAL_METHODS` dá a cada método sem chamadas obrigatórias à Toolbox um
+    papel e um motivo; ele ainda pode ter chamadas opcionais. O papel diz
+    onde a implementação vive, uma dimensão separada das chamadas. `transitional` é computação documental ainda no Core: o estado
     atual, não uma autorização permanente. A ADR-0028 a leva para capacidades
     da Toolbox (#804), e o conjunto só encolhe. `validation` confere trabalho
     feito antes do planejamento, que vira uma ação planejada (ADR-0029).
@@ -303,6 +312,14 @@ Antes de planejar um documento, o orquestrador tira um snapshot do catálogo
 publicada com a versão exata do contrato, e o provider configurado precisa estar
 registrado e implementá-la. O catálogo só restringe; nunca torna um método
 disponível.
+
+Ele também confere as chamadas de cada método pedido que estão em
+`METHOD_OPTIONAL_CAPABILITIES`. A falta de uma nunca remove o método: ela é
+registrada, com os motivos, em `degraded_methods` (ao lado de `optional`) em
+`canonical_metadata.pddl_toolbox_availability`, e o log diz que o método
+*pode* rodar degradado. O relatório é por método, não por documento: uma
+imagem de DOCX traz os próprios bytes e nunca precisa do `pdf.render`, mas o
+método dela é listado (#859).
 
 O snapshot é lido do endpoint primário dos clientes de capacidade: o primeiro
 de `TOOLBOX_BASE_URLS`, ou então `TOOLBOX_BASE_URL`. Toda chamada de capacidade
