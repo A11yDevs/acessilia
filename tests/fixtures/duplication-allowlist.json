@@ -1,0 +1,14 @@
+{
+  "reason": "Accepted remainder: two independent constructors with no shared behaviour; see docs/architecture/duplication-consolidation.md.",
+  "groups": [
+    [
+      "backend/services/operation_registry.py:JobOperations.__init__",
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py:_FurnitureView.__init__"
+    ]
+  ],
+  "totals": {
+    "groups": 1,
+    "functions_in_groups": 2,
+    "lines_in_groups": 6
+  }
+}
