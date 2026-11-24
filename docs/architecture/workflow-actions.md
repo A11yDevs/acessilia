@@ -146,23 +146,50 @@ the manifest. **The enrichment migration needs no domain change.**
 
 ## Constraints
 
-1. **A plan cannot create objects, and today nothing replans after a
-   success.** Formula classification can reclassify an element and reconcile
-   its obligations, so after it the next actions depend on obligations the
-   problem did not have. The current loop does not handle this:
-   `_replan_until_done` loops only while `execution_report.replan_required`,
-   and the executor sets that flag after a failure with alternatives, never
-   after a successful step. A migration that creates obligations (M3, M4)
-   needs a new trigger. The proposal is a **discovery replan**. After a plan
-   runs, the coordinator compares the obligations before and after. New
-   unsatisfied obligations become the roots of a replan, which:
-   - is counted by its own bound, not by `max_replans`, which keeps counting
-     failures;
-   - is saved with `save_plan` like any replan;
-   - drops the execution checkpoint, as today.
+1. **A plan cannot create objects; discovery replans exist only for
+   additions.** Formula classification can reclassify an element and
+   reconcile its obligations, so after it the next actions depend on
+   obligations the problem did not have.
 
-   The alternative is a `MethodResult` flag ("state changed, replan"). It is
-   more explicit, but it changes the result contract.
+   The executor already handles one case. After a successful, validated
+   handler, `_run_obligation_handler` calls `_select_discovered` (#594), which
+   selects the obligations the handler added. When one is still unsatisfied,
+   it sets `replan_required`. The rest of the plan still runs, and the report
+   carries the flag to `_replan_until_done`, which replans with those
+   obligations as roots.
+
+   What is missing:
+   - the discovery signal shares the `max_replans` budget with failure
+     recovery, and the report does not say why it asks for a replan;
+   - it sees only **added** obligations, not the other semantic changes: an
+     obligation made inapplicable, removed or replaced by a reclassification,
+     or a changed dependency;
+   - the rest of the plan runs even if a change invalidated some of its
+     steps.
+
+   M3 and M4 evolve this mechanism; they do not add a second one. Their
+   criteria:
+   1. **Reuse the trigger:** start from `_select_discovered` and the
+      `replan_required` flow.
+   2. **Tell the reasons apart:** a discovery or state change versus an
+      operational failure, both in the report (for observability) and in the
+      budget.
+   3. **Separate the bounds:** `max_replans` keeps counting failure recovery;
+      a separate guard stops expansion or reclassification that makes no
+      progress, so it cannot cycle.
+   4. **Cover more than additions:** detect when a reclassification makes
+      existing obligations inapplicable, changes dependencies or needs new
+      obligations.
+   5. **Revalidate the remaining plan:** do not run steps based on types or
+      obligations made obsolete by a relevant change of the manifest.
+   6. **Keep persistence and resume:** `save_plan`, the replacement of the
+      execution checkpoint as today, and idempotence tests.
+   7. **Test the scenarios:** a success that creates an obligation, a success
+      that reclassifies an element, a failure with an alternative, a resume
+      from a checkpoint, and the guard against cyclic replans.
+
+   A `MethodResult` flag ("state changed, replan") stays open for discussion,
+   as an evolution of the existing contract.
 2. **Causal order becomes dependencies, never costs.** Costs choose between
    alternatives; they must not force a technically required order. The
    fixed order turns into `depends-on` between obligations of the same
@@ -221,9 +248,10 @@ and kind names for M3 and M4 are proposals, settled in their pull requests.
 | M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`) | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
 | — | Bootstrap | Kept and documented as the 0.3.0 baseline | — | — | — |
 
-M1 and M2 create no obligations and need neither the discovery replan nor a
-manifest change, so they come first. M3 and M4 add kinds and rely on the
-discovery replan (constraint 1), so the trigger lands with M3.
+M1 and M2 create no obligations and need neither a change to the discovery
+replan nor a manifest change, so they come first. M3 and M4 add kinds and
+change obligations, so the evolution of the discovery replan (constraint 1)
+lands with M3.
 
 Each PR:
 - removes its step from `_enrich_before_planning`;
@@ -255,8 +283,9 @@ itself is #816 (0.4.0).
   relies on explicit and recorded. Once the Toolbox reports them (#169), the
   manifest keeps them as provenance.
 
-- **The discovery replan:** the coordinator comparison or a `MethodResult`
-  flag, and its bound.
+- **The discovery replan:** how the existing `_select_discovered` signal
+  reports its reason and gets its own bound, and whether a `MethodResult`
+  flag is worth the contract change.
 - **Costs** of the new methods, so that, when nothing fails, the planner
   picks the same methods enrichment runs today. The order itself comes from
   `depends-on`.

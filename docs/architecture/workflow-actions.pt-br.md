@@ -149,24 +149,51 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
 
 ## Restrições
 
-1. **Um plano não cria objetos, e hoje nada replaneja depois de um sucesso.**
-   A classificação de fórmulas pode reclassificar um elemento e reconciliar
-   suas obrigações, então depois dela as próximas ações dependem de obrigações
-   que o problema não tinha. O ciclo atual não trata isso:
-   `_replan_until_done` só itera enquanto `execution_report.replan_required`, e
-   o executor liga essa flag depois de uma falha com alternativas, nunca
-   depois de um passo bem-sucedido. Uma migração que cria obrigações (M3, M4)
-   precisa de um gatilho novo. A proposta é um **replanejamento de
-   descoberta**. Depois que um plano roda, o coordenador compara as obrigações
-   de antes e de depois. As obrigações novas e insatisfeitas viram as raízes de
-   um replanejamento, que:
-   - é contado por um limite próprio, não por `max_replans`, que continua
-     contando falhas;
-   - é salvo com `save_plan`, como qualquer replanejamento;
-   - descarta o checkpoint de execução, como hoje.
+1. **Um plano não cria objetos; o replanejamento de descoberta só existe para
+   acréscimos.** A classificação de fórmulas pode reclassificar um elemento e
+   reconciliar suas obrigações, então depois dela as próximas ações dependem
+   de obrigações que o problema não tinha.
 
-   A alternativa é uma flag em `MethodResult` ("o estado mudou, replaneje").
-   Ela é mais explícita, mas muda o contrato do resultado.
+   O executor já trata um caso. Depois de um handler bem-sucedido e validado,
+   `_run_obligation_handler` chama `_select_discovered` (#594), que seleciona
+   as obrigações que o handler acrescentou. Quando alguma continua
+   insatisfeita, ele liga `replan_required`. O resto do plano ainda roda, e o
+   relatório leva a flag a `_replan_until_done`, que replaneja com essas
+   obrigações como raízes.
+
+   O que falta:
+   - o sinal de descoberta divide o orçamento `max_replans` com a recuperação
+     de falhas, e o relatório não diz por que pede um replanejamento;
+   - ele só vê obrigações **acrescentadas**, não as outras mudanças
+     semânticas: uma obrigação tornada inaplicável, removida ou substituída
+     por uma reclassificação, ou uma dependência alterada;
+   - o resto do plano roda mesmo que uma mudança tenha invalidado alguns dos
+     seus passos.
+
+   O M3 e o M4 evoluem esse mecanismo; não acrescentam um segundo. Seus
+   critérios:
+   1. **Reaproveitar o gatilho:** partir de `_select_discovered` e do fluxo de
+      `replan_required`.
+   2. **Distinguir os motivos:** descoberta ou mudança de estado versus falha
+      operacional, tanto no relatório (para a observabilidade) quanto no
+      orçamento.
+   3. **Separar os limites:** `max_replans` continua contando a recuperação de
+      falhas; uma proteção própria impede expansão ou reclassificação sem
+      progresso, para que não haja ciclos.
+   4. **Cobrir mais que acréscimos:** detectar quando uma reclassificação
+      torna obrigações existentes inaplicáveis, muda dependências ou exige
+      obrigações novas.
+   5. **Revalidar o plano remanescente:** não executar passos baseados em
+      tipos ou obrigações que uma mudança relevante do manifesto tornou
+      obsoletos.
+   6. **Preservar a persistência e a retomada:** `save_plan`, a substituição do
+      checkpoint de execução como hoje, e testes de idempotência.
+   7. **Testar os cenários:** sucesso que cria obrigação, sucesso que
+      reclassifica um elemento, falha com alternativa, retomada a partir de
+      checkpoint e a proteção contra replanejamento cíclico.
+
+   Uma flag em `MethodResult` ("o estado mudou, replaneje") continua em
+   discussão, como evolução do contrato existente.
 2. **A ordem causal vira dependência, nunca custo.** Custos escolhem entre
    alternativas; não podem impor uma ordem tecnicamente obrigatória. A ordem
    fixa vira `depends-on` entre obrigações do mesmo elemento:
@@ -230,10 +257,10 @@ requests.
 | M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`) | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
-O M1 e o M2 não criam obrigações e não precisam nem do replanejamento de
-descoberta nem de mudança no manifesto, então vêm primeiro. O M3 e o M4
-acrescentam kinds e dependem do replanejamento de descoberta (restrição 1),
-então o gatilho chega com o M3.
+O M1 e o M2 não criam obrigações e não precisam nem de mudança no
+replanejamento de descoberta nem no manifesto, então vêm primeiro. O M3 e o
+M4 acrescentam kinds e mudam obrigações, então a evolução do replanejamento
+de descoberta (restrição 1) chega com o M3.
 
 Cada PR:
 - tira seu passo de `_enrich_before_planning`;
@@ -264,8 +291,9 @@ bootstrap é a #816 (0.4.0).
   registradas as opções das quais o core depende. Quando a Toolbox as
   informar (#169), o manifesto as guarda como proveniência.
 
-- **O replanejamento de descoberta:** a comparação no coordenador ou uma flag
-  em `MethodResult`, e o seu limite.
+- **O replanejamento de descoberta:** como o sinal existente de
+  `_select_discovered` informa seu motivo e ganha um limite próprio, e se uma
+  flag em `MethodResult` vale a mudança de contrato.
 - **Custos** dos novos métodos, para que, quando nada falha, o planejador
   escolha os mesmos métodos que o enriquecimento roda hoje. A ordem em si vem
   de `depends-on`.
