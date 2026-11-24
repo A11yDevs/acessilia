@@ -49,6 +49,7 @@ from acessilia_core.pipeline.handlers.order import (
     _handle_skeleton_order_method,
     _handle_xycut_order_method,
 )
+from acessilia_core.pipeline.handlers.pictures import _handle_picture_description_method
 from acessilia_core.pipeline.handlers.rescue import _handle_rescue_omitted_method
 from acessilia_core.pipeline.handlers.review import _handle_human_review_method
 from acessilia_core.pipeline.handlers.tables import _handle_table_enrichment_method
@@ -77,6 +78,8 @@ METHOD_HANDLERS: dict[str, Callable[..., MethodResult]] = {
     "vision-description": _handle_vision_description_method,
     # The document's table enrichment, a planned action since #640 (M2).
     "table-enrichment": _handle_table_enrichment_method,
+    # The document's picture descriptions, a planned action since #640 (M1).
+    "picture-description": _handle_picture_description_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
     "pymupdf-region": _handle_pymupdf_region_method,

@@ -238,11 +238,11 @@ async def test_a_restored_block_is_repaired_in_the_same_job(monkeypatch, tmp_pat
     )
 
     from acessilia_core.agents.model_calls import current_model_calls
-    from acessilia_core.pipeline import (
-        orchestrator as pddl,
-        preflight as pipeline_preflight,
+    from acessilia_core.pipeline import preflight as pipeline_preflight
+    from acessilia_core.pipeline.handlers import (
+        pictures as picture_method,
+        tables as table_method,
     )
-    from acessilia_core.pipeline.handlers import tables as table_method
     from acessilia_core.ports import RunPorts
 
     legacy = "The capital moved to Bras\u0131\u0301lia in the sixties."
@@ -263,7 +263,7 @@ async def test_a_restored_block_is_repaired_in_the_same_job(monkeypatch, tmp_pat
         return None
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     # The tables are read inside the plan, by ``table-enrichment`` (#640, M2).
     monkeypatch.setattr(table_method, "_enrich_table_structures", noop)
 
@@ -295,11 +295,11 @@ async def test_a_restored_math_block_is_marked_after_the_replan(monkeypatch, tmp
     )
 
     from acessilia_core.agents.model_calls import current_model_calls
-    from acessilia_core.pipeline import (
-        orchestrator as pddl,
-        preflight as pipeline_preflight,
+    from acessilia_core.pipeline import preflight as pipeline_preflight
+    from acessilia_core.pipeline.handlers import (
+        pictures as picture_method,
+        tables as table_method,
     )
-    from acessilia_core.pipeline.handlers import tables as table_method
     from acessilia_core.ports import RunPorts
 
     body = "The first paragraph of the body text."
@@ -340,7 +340,7 @@ async def test_a_restored_math_block_is_marked_after_the_replan(monkeypatch, tmp
         return None
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(table_method, "_enrich_table_structures", noop)
 
     orchestrator = build_orchestrator(max_replans=1)

@@ -8,190 +8,42 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from acessilia_core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from acessilia_core.i18n import t
-from acessilia_core.i18n.log_messages import MSG_OBLIGATION_TABLE_ENRICHMENT
-from acessilia_core.i18n.stage_messages import (
-    STAGE_PAGE,
-    STAGE_PAGE_OF,
-    STAGE_PAGE_UNKNOWN,
-    STAGE_PAGES,
-    STAGE_PAGES_SPAN,
-)
-from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
+from acessilia_core.i18n.stage_messages import STAGE_PAGE_UNKNOWN
 from acessilia_core.manifest.models import (
     ManifestElement,
     Obligation,
     ProcessingManifest,
 )
+from acessilia_core.pipeline.document_obligations import (
+    TABLE_ENRICHMENT,
+    reconcile_document_step,
+)
+from acessilia_core.pipeline.page_labels import _pages_label
 from docstruct.text.latex import bare_latex as normalize_latex
 
 if TYPE_CHECKING:
     pass
 
 
-#: The document's table enrichment as one planned action (#640, M2,
-#: ``docs/architecture/workflow-actions.md``). One obligation for every table,
-#: so its method keeps the step's document-wide behaviour: one breaker, one
-#: retry pass and one text-span reader for all the tables.
-TABLE_ENRICHMENT_KIND = "enrich-tables"
-TABLE_ENRICHMENT_METHOD = "table-enrichment"
-TABLE_ENRICHMENT_OBLIGATION_ID = "obligation-enrich-tables"
-#: Statuses after which an obligation is not planned again: satisfied, or
-#: exhausted (every automatic method failed).
-_CLOSED = frozenset({"satisfied", "failed"})
+#: The document's table enrichment as one planned action (#640, M2): its
+#: kind, method and first id, kept here for the callers that name them. The
+#: rules live in ``document_obligations``, shared with the picture
+#: descriptions (M1).
+TABLE_ENRICHMENT_KIND = TABLE_ENRICHMENT.kind
+TABLE_ENRICHMENT_METHOD = TABLE_ENRICHMENT.method
+TABLE_ENRICHMENT_OBLIGATION_ID = TABLE_ENRICHMENT.obligation_id
 
 
 def add_table_enrichment_obligation(
     manifest: ProcessingManifest, *, replan: bool = False
 ) -> Obligation | None:
-    """Cover every table of the document with an ``enrich-tables`` obligation.
-
-    Called when the manifest is enriched, before the first plan, and again
-    before each replan (#832), so it reconciles as well as creates:
-
-    - a table no enrichment covers joins the open one, or, when the existing
-      ones are closed (satisfied or exhausted), a new one for the new tables
-      only. Reopening a satisfied one would leave satisfied obligations after
-      an open one; an exhausted one is not planned again, so a table joining
-      it would never be read;
-    - an enrichment drops the tables the document no longer has, and one left
-      without tables is removed, with the dependencies on it (there is
-      nothing left to read, and ``target_ids`` cannot be empty);
-    - every open obligation whose targets include a table depends on the open
-      enrichment of that table, and only on those: an edge to an open
-      enrichment that no longer shares a table with it (the enrichment lost
-      the table, or the obligation was retargeted) is dropped. Only this rule
-      makes edges to an ``enrich-tables`` obligation, so the edges it drops
-      are its own; edges to closed enrichments are history and stay. It is
-      a rule on targets, not a list of kinds: the obligations that target a
-      table today (``linearize-table``, ``select-table-source``) and the page
-      obligations (``refine-reading-order``, ``fuse-providers``,
-      ``adjudicate-page``) of a page with a table, which target the page's
-      elements, are ordered after its reading, the order of 0.3.11, at the
-      cost of serializing the page obligations behind it. A future step that
-      must run *before* the reading (as the bootstrap does) is not an
-      obligation this rule should order: it needs an exclusion here.
-
-    The step that removes an element must also remove or retarget that
-    element's own obligations and the page's ``element_ids``; the manifest
-    refuses dangling targets.
-
-    ``replan`` says the call is before a replan, whose roots are the selected
-    obligations: a new enrichment is then selected. Before the first plan the
-    plan selects it.
-
-    Idempotent. Returns the enrichment of the newest tables, or the first one
-    when nothing changed; ``None`` for a document without tables.
-    """
-    tables = [element.id for element in manifest.elements if element.type == "table"]
-    _drop_lost_tables(manifest, set(tables))
-    enrichments = [item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND]
-    covered = {target for item in enrichments for target in item.target_ids}
-    new = [table for table in tables if table not in covered]
-    target = _cover(manifest, enrichments, new, replan) if new else (enrichments[0] if enrichments else None)
-    _reconcile_edges(manifest)
-    manifest.summary.obligation_count = len(manifest.obligations)
-    return target
-
-
-def _drop_lost_tables(manifest: ProcessingManifest, tables: set[str]) -> None:
-    """Every enrichment keeps only the tables the document has; empty ones go."""
-    emptied: set[str] = set()
-    for item in manifest.obligations:
-        if item.kind == TABLE_ENRICHMENT_KIND:
-            item.target_ids = [target for target in item.target_ids if target in tables]
-            if not item.target_ids:
-                emptied.add(item.id)
-    if not emptied:
-        return
-    manifest.obligations = [item for item in manifest.obligations if item.id not in emptied]
-    for item in manifest.obligations:
-        item.dependencies = [
-            dependency for dependency in item.dependencies if dependency not in emptied
-        ]
-
-
-def _cover(
-    manifest: ProcessingManifest, enrichments: list[Obligation], new: list[str], replan: bool
-) -> Obligation:
-    """The enrichment the ``new`` tables join: the open one, or a new one."""
-    open_one = next((item for item in enrichments if item.status not in _CLOSED), None)
-    if open_one is not None:
-        open_one.target_ids.extend(new)
-        return open_one
-    index = _next_index(enrichments)
-    created = _new_table_enrichment(manifest, new, index=index, selected=replan or index > 0)
-    manifest.obligations.append(created)
-    return created
-
-
-def _next_index(enrichments: list[Obligation]) -> int:
-    """The first free suffix: removing an emptied enrichment frees its id."""
-    ids = {item.id for item in enrichments}
-    index = len(enrichments)
-    while _enrichment_id(index) in ids:
-        index += 1
-    return index
-
-
-def _enrichment_id(index: int) -> str:
-    if index == 0:
-        return TABLE_ENRICHMENT_OBLIGATION_ID
-    return f"{TABLE_ENRICHMENT_OBLIGATION_ID}-{index + 1}"
-
-
-def _new_table_enrichment(
-    manifest: ProcessingManifest, tables: list[str], *, index: int, selected: bool
-) -> Obligation:
-    methods = [TABLE_ENRICHMENT_METHOD, "human-review"]
-    return Obligation(
-        id=_enrichment_id(index),
-        kind=TABLE_ENRICHMENT_KIND,
-        selected=selected,
-        target_ids=list(tables),
-        admissible_methods=methods,
-        method_costs={method: DEFAULT_METHOD_COSTS.get(method, 50) for method in methods},
-        rationale=t(MSG_OBLIGATION_TABLE_ENRICHMENT),
-    )
-
-
-def _reconcile_edges(manifest: ProcessingManifest) -> None:
-    """Each open obligation depends on the open enrichments of its tables,
-    and on no enrichment edge whose target it no longer justifies.
-
-    An edge to an enrichment that no longer shares a table with the
-    obligation is dropped, whether the enrichment is open or closed: a closed
-    one is history only while the target that justified it stays, and an edge
-    to a ``failed`` enrichment would block the obligation from being replanned
-    at all. A closed obligation is not planned again, so it is left as it is.
-    """
-    enrichments = {
-        item.id: set(item.target_ids)
-        for item in manifest.obligations
-        if item.kind == TABLE_ENRICHMENT_KIND
-    }
-    open_enrichments = {
-        item.id: set(item.target_ids)
-        for item in manifest.obligations
-        if item.kind == TABLE_ENRICHMENT_KIND and item.status not in _CLOSED
-    }
-    for item in manifest.obligations:
-        if item.kind == TABLE_ENRICHMENT_KIND or item.status in _CLOSED:
-            continue
-        targets = set(item.target_ids)
-        kept = [
-            dependency for dependency in item.dependencies
-            if dependency not in enrichments or enrichments[dependency] & targets
-        ]
-        needed = [
-            enrichment for enrichment, tables in open_enrichments.items()
-            if tables & targets and enrichment not in kept
-        ]
-        item.dependencies = kept + needed
+    """Cover every table of the document with an ``enrich-tables`` obligation,
+    and reconcile the existing ones (``document_obligations``)."""
+    return reconcile_document_step(manifest, TABLE_ENRICHMENT, replan=replan)
 
 
 def _formula_elements_for_obligation(
@@ -388,35 +240,6 @@ def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
             labels.append(t(STAGE_PAGE_UNKNOWN))
         groups.append(f"{kind} ({', '.join(labels)})")
     return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
-
-
-#: Up to this many pages, a label lists them; beyond, it gives the span.
-_PAGES_LISTED = 5
-
-
-def _pages_label(
-    pages: Iterable[int | None], total_pages: int | None = None
-) -> str:
-    """Localized location of a unit of work, e.g. "page 3" or "pages 3, 4".
-
-    When the document's page count is known and the work sits on a single page,
-    the label also names the total, e.g. "page 3 of 12": progress messages pair
-    that with image or step counters ("image 11 of 37 (page 18 of 42)"), and
-    without the total users could read 37 as the page count. Single-page
-    documents keep the plain "page 1" label because "of 1" adds nothing.
-    Work over more than ``_PAGES_LISTED`` pages, such as a step over every
-    table of the document, gets its count and span, not the list.
-    """
-    numbers = sorted({page for page in pages if page})
-    if not numbers:
-        return t(STAGE_PAGE_UNKNOWN)
-    if len(numbers) == 1:
-        if total_pages is not None and total_pages > 1:
-            return t(STAGE_PAGE_OF).format(page=numbers[0], total_pages=total_pages)
-        return t(STAGE_PAGE).format(page=numbers[0])
-    if len(numbers) > _PAGES_LISTED:
-        return t(STAGE_PAGES_SPAN).format(count=len(numbers), first=numbers[0], last=numbers[-1])
-    return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
 
 
 def _obligation_pages(manifest: ProcessingManifest, obligation_id: str) -> list[int | None]:

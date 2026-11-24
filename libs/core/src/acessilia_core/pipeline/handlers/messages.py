@@ -21,6 +21,12 @@ MSG_VISION_VALIDATED = (
     "Picture description validated for {count} picture",
     "Picture descriptions validated for {count} pictures",
 )
+MSG_PICTURES_DESCRIBED = (
+    "Picture description ran for {count} picture: {described} described, {formulas} read as "
+    "formulas, {already} already described; left undescribed: {left}",
+    "Picture description ran for {count} pictures: {described} described, {formulas} read as "
+    "formulas, {already} already described; left undescribed: {left}",
+)
 
 MSG_TABLE_NO_TABLE = "No table found for the obligation"
 MSG_TABLE_NO_STRUCTURE = "Table without tabular structure: {ids}"
@@ -192,6 +198,7 @@ MSG_JUDGE_CONFIRMS = "VLM judge confirms the applied page: {pages}"
 
 MSG_TABLES: tuple[tuple[str, str], ...] = (
     MSG_VISION_VALIDATED,
+    MSG_PICTURES_DESCRIBED,
     MSG_TABLES_ENRICHED,
     MSG_TABLE_VALIDATED,
     MSG_CODE_NORMALIZED,

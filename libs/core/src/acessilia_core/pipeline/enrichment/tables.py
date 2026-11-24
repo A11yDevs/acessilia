@@ -40,7 +40,7 @@ from acessilia_core.pipeline.enrichment.common import (
     _retry_failed,
     should_retry_vision_failure,
 )
-from acessilia_core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.page_labels import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id
 from docstruct.tables.ast import (
     raw_rows_from_table_ast as _rows_from_table_ast,

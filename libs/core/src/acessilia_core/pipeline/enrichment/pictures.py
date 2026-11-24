@@ -1,9 +1,15 @@
 """The picture enrichment stage: describe each picture with the vision model.
 
-Runs before planning. It chooses the pictures to describe, asks the vision
-model with bounded concurrency, folds each description into the manifest or
-records why a picture was left undescribed, and retries the failures a second
-try may fix.
+Runs inside the plan, as the ``picture-description`` method of the
+document's ``describe-images`` obligation (#640, M1). It chooses the pictures
+to describe, asks the vision model with bounded concurrency, folds each
+description into the manifest or records why a picture was left
+undescribed, and retries the failures a second try may fix.
+
+What derives from the media inspection stays before planning, with the
+bootstrap (``_prepare_pictures``): the injected full-page picture and the
+first text-ownership annotation, so the plan's obligations include the
+injected picture's.
 
 Moved from the PDDL orchestrator (#402, phase 3, step 6): the code verbatim,
 with the docstring of ``_inject_full_page_picture`` translated from Portuguese.
@@ -46,7 +52,7 @@ from acessilia_core.pipeline.enrichment.common import (
     _retry_failed,
     should_retry_vision_failure,
 )
-from acessilia_core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.page_labels import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id
 from acessilia_core.ports import RegionCache
 from docstruct.placeholders import (
@@ -232,13 +238,26 @@ async def _enrich_picture_descriptions(
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
-) -> None:
-    _inject_full_page_picture(manifest, media_inspection)
+    targets: frozenset[str] | None = None,
+    inject: bool = True,
+) -> int:
+    """Describe the pictures not described yet; returns how many were described.
+
+    ``targets`` keeps the step to an obligation's elements (``None``: the
+    whole document). The text ownership is annotated before and after the
+    descriptions. ``inject`` adds the full-page picture of a standalone
+    image first, as the step did before planning; the planned method passes
+    ``False``, because that structural part of the bootstrap already ran
+    (``_prepare_pictures``) and an element the plan needs is found through
+    the reconciliation, not injected again (#845 review).
+    """
+    if inject:
+        _inject_full_page_picture(manifest, media_inspection)
     _annotate_visual_text_ownership(manifest, media_inspection)
 
-    pictures = _pictures_to_describe(manifest)
+    pictures = _pictures_to_describe(manifest, targets=targets)
     if not pictures:
-        return
+        return 0
 
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
     enrichment = _PictureEnrichment(
@@ -280,41 +299,79 @@ async def _enrich_picture_descriptions(
 
     if enriched:
         logger.info(t(LOG_PDDL_IMAGES_ENRICHED).format(count=enriched))
+    return enriched
 
 
-def _pictures_to_describe(manifest: ProcessingManifest) -> list[ManifestElement]:
-    """The elements the vision step describes, none already described.
+def _prepare_pictures(
+    manifest: ProcessingManifest, media_inspection: dict[str, Any] | None
+) -> None:
+    """What derives from the media inspection, before planning: the injected
+    full-page picture and the text ownership. Idempotent."""
+    _inject_full_page_picture(manifest, media_inspection)
+    _annotate_visual_text_ownership(manifest, media_inspection)
+
+
+#: Types another step reads, which the descriptions never take: a formula
+#: (the formula steps) and a table (``enrich-tables``). A one-page mostly
+#: visual document whose first element is one of them is not described, so a
+#: table or a formula is never retyped as a picture, and the two document
+#: steps never share an element (#845 review).
+_NOT_DESCRIBABLE = frozenset({"formula", "table"})
+
+
+def is_describable(element: ManifestElement) -> bool:
+    """Whether the picture descriptions may take ``element``. The candidates
+    and the obligation's ``applies`` share it, so they never disagree."""
+    return element.type not in _NOT_DESCRIBABLE
+
+
+def description_candidates(manifest: ProcessingManifest) -> list[ManifestElement]:
+    """The elements the picture descriptions work on, described or not.
 
     The pictures; without any, in a mostly visual document, the elements that
     stand in for visual content (``is_placeholder_visual``); and without
     those either, in a one-page mostly visual document, its first element
     that is not an unstructured-page placeholder (a page inspection reads
-    that one).
+    that one). Never a formula (``is_describable``).
     """
-    pictures = [
-        element
-        for element in manifest.elements
-        if element.type == "picture"
-        and not element.metadata.get("vision_description_complete")
+    elements = manifest.elements
+    pictures = [element for element in elements if element.type == "picture"]
+    if pictures or not is_mostly_visual(elements):
+        return pictures
+    placeholders = [
+        element for element in elements
+        if is_placeholder_visual(element) and is_describable(element)
     ]
-    if not pictures and is_mostly_visual(manifest.elements):
-        pictures = [
-            element
-            for element in manifest.elements
-            if is_placeholder_visual(element)
-            and not element.metadata.get("vision_description_complete")
-        ]
+    if placeholders or len(manifest.pages) != 1:
+        return placeholders
+    return [
+        element for element in elements
+        if not is_unstructured_page_placeholder(element) and is_describable(element)
+    ][:1]
 
-    if (
-        not pictures
-        and is_mostly_visual(manifest.elements)
-        and len(manifest.pages) == 1
-        and manifest.elements
-    ):
-        pictures = [element for element in manifest.elements
-                    if not element.metadata.get("vision_description_complete")
-                    and not is_unstructured_page_placeholder(element)][:1]
-    return pictures
+
+def _pictures_to_describe(
+    manifest: ProcessingManifest, *, targets: frozenset[str] | None = None
+) -> list[ManifestElement]:
+    """The elements the vision step describes, none already described.
+
+    With ``targets``, the plan's obligation decided them: its targets still
+    describable, whatever the candidates are now (a placeholder visual stays
+    one of them after a picture appears in the document), so the method never
+    succeeds without trying the work it was planned for. Without, the
+    document's candidates (``description_candidates``), chosen before the
+    described ones are left out, so a document whose pictures are all
+    described does not move on to its placeholder visuals.
+    """
+    if targets is not None:
+        chosen = [element for element in manifest.elements if element.id in targets]
+    else:
+        chosen = description_candidates(manifest)
+    return [
+        element
+        for element in chosen
+        if is_describable(element) and not element.metadata.get("vision_description_complete")
+    ]
 
 
 def _fold_picture_description(

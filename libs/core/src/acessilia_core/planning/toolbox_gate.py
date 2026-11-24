@@ -130,7 +130,12 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     # document.text.spans for the marks) are conditional and degrade per
     # table, so they are not requirements that could rule it out.
     "table-enrichment": ("transitional", "reads tables with the DataAgent model; marks cell math"),
-    "vision-description": ("validation", "the picture descriptions made before planning"),
+    # Moved from before planning into the plan (#640, M1); not new work in
+    # the core. Its Toolbox call (pdf.render for a picture's crop) is per
+    # picture and degrades to crop_unavailable, so it is not a requirement
+    # that could rule it out.
+    "picture-description": ("transitional", "describes pictures with the VisionAgent model"),
+    "vision-description": ("validation", "the picture descriptions picture-description made"),
     "pandoc-table": ("validation", "the table structure table-enrichment produced"),
     "human-review": ("symbolic", "the terminal escalation"),
 }

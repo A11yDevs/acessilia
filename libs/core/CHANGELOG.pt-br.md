@@ -2,6 +2,80 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.14 — as descrições de imagens são uma ação planejada (#640, M1)
+
+Até a 0.3.13 o orquestrador descrevia as imagens antes do planejamento.
+Agora um documento com imagens a descrever ganha uma obrigação
+`describe-images`, satisfeita pelo método `picture-description`, que roda o
+mesmo passo dentro do plano: o modelo de visão, com seu paralelismo, o
+breaker e o cache de regiões da execução, uma passada de retry e a anotação
+de posse de novo depois das descrições.
+- **Uma obrigação para o documento.** Ela tem como alvo as imagens ainda não
+  descritas; sem imagens, num documento majoritariamente visual, seus
+  visuais substitutos, ou o primeiro elemento de um documento de uma
+  página, como o passo os escolhia, mas nunca uma fórmula nem uma tabela:
+  os candidatos e os elementos que o passo mantém compartilham um só teste
+  (`is_describable`), então ele nunca pega um que depois deixaria de lado,
+  nem retipa uma fórmula ou uma tabela como imagem. Os dois passos do
+  documento não compartilham elemento, então nenhum depende do outro; como
+  proteção, as arestas entre eles seguem `DOCUMENT_STEPS` (a de um passo
+  pode depender da de um anterior, nunca da de um posterior), então não
+  fazem ciclo. O método descreve os alvos da sua obrigação ainda
+  descritíveis e não descritos, sejam quais forem os candidatos quando ele
+  roda, então nunca tem sucesso sem tentá-los; um alvo que agora é lido por
+  outro passo é informado como `not_describable`. O `describe-image` de
+  cada imagem mantém o `vision-description`, que confere o resultado, e depende dela, assim como
+  as obrigações de página de uma página com imagem. A única alternativa é
+  `human-review`. O método tem sucesso quando o passo rodou para todas as
+  imagens; uma imagem que ficou sem descrição mantém o motivo
+  (`vision_failure_reason`), e o seu `describe-image` a valida. A mensagem
+  conta as imagens descritas, lidas como fórmula, já descritas e o motivo de
+  cada uma que ficou sem descrição.
+- **Ela muda obrigações enquanto o plano roda.** Uma imagem que o modelo lê
+  como fórmula vira fórmula, então o seu `describe-image` é trocado por
+  `verbalize-formula`; um visual substituto que ele descreve vira imagem com
+  `describe-image`. O executor pula o passo trocado e replaneja para as
+  novas, dentro de `max_discovery_replans` (M0).
+- **O que fica antes do planejamento.** O que deriva da inspeção de mídia: a
+  imagem de página inteira injetada e a primeira anotação de posse
+  (`_prepare_pictures`), para que as obrigações do plano incluam as da
+  imagem injetada. O método anota de novo com a inspeção que o orquestrador
+  entrega aos serviços da execução (`RunServices.media_inspection`; gravar
+  no manifesto os fatos de que ele precisa é a #847), e não injeta de novo
+  a imagem de página inteira. A
+  mensagem de progresso antes do planejamento agora é a das fórmulas
+  (`STAGE_ENRICHING_FORMULAS`); o método anuncia as descrições dentro do
+  plano.
+- **Uma regra para os dois passos do documento.** As regras da 0.3.13 para o
+  enriquecimento de tabelas (cobrir, deixar de lado os alvos perdidos,
+  reconciliar as arestas, selecionar uma obrigação nova antes de um
+  replanejamento) vão para `pipeline/document_obligations.py` e valem para
+  os dois passos (`DocumentStep`, `reconcile_document_steps`).
+  `add_table_enrichment_obligation` e as constantes de tabela mantêm os
+  nomes.
+- **Lacuna conhecida até o M3.** O passo de LaTeX das fórmulas roda antes do
+  planejamento, então não vê mais uma imagem que o modelo lê como fórmula:
+  essa fórmula fica com o LaTeX do modelo, sem a segunda leitura do
+  reconhecedor nem a separação do número da equação. O M3 (#846) torna o
+  reconhecimento uma obrigação da própria fórmula; fechar a lacuna é
+  condição da release 0.3.0, e um teste a fixa, falhando quando o M3 a
+  fechar.
+- Um manifesto com todas as imagens descritas, como um checkpoint de
+  enriquecimento da 0.3.13, não ganha `describe-images`, então uma retomada
+  não descreve nada de novo antes do primeiro plano; a reconciliação de um
+  replanejamento dá uma obrigação às imagens que ficaram sem descrição,
+  tentadas no replanejamento que a execução já faria. Os candidatos são escolhidos antes de deixar de
+  lado os já descritos, então um documento com todas as imagens descritas
+  não passa mais para os seus visuais substitutos, como o passo fazia numa
+  retomada.
+- `picture-description` é `transitional` em `LOCAL_METHODS` (sua chamada de
+  modelo é o `VisionAgent` do core) e não declara requisito do Toolbox: o
+  recorte por `pdf.render` é por imagem e degrada para `crop_unavailable`.
+- Testes: a obrigação, a ordem no plano (também no Fast Downward), o escopo
+  e a mensagem do método, uma imagem lida como fórmula replanejada de ponta
+  a ponta, a retomada de um checkpoint da 0.3.13 e um teste diferencial dos
+  elementos antes e depois da migração.
+
 ## 0.3.13 — o executor trata obrigações que uma execução muda (#832, M0 da #640)
 
 Uma reclassificação durante o plano, como uma imagem que o modelo de visão lê

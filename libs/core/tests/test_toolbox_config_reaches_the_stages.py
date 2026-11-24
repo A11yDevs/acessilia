@@ -194,17 +194,22 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     async def no_marks(*_args, **_kwargs):
         return {"elements": 0, "marked": 0, "unmatched": 0}
 
-    for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
-                 "_enrich_formula_latex", "_mark_inline_math"):
+    for name in ("_classify_formula_regions", "_enrich_formula_latex", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, record(name))
-    # The table step runs inside the plan, as ``table-enrichment`` (#640, M2).
-    from acessilia_core.pipeline.handlers import tables as table_method
+    # The picture and table steps run inside the plan, as
+    # ``picture-description`` (#640, M1) and ``table-enrichment`` (M2).
+    from acessilia_core.pipeline.handlers import (
+        pictures as picture_method,
+        tables as table_method,
+    )
 
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", record("_enrich_picture_descriptions"))
     monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
     monkeypatch.setattr(table_method, "_mark_table_inline_math", no_marks)
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
     manifest = build_manifest(
-        [build_element("h", "heading", text="Title"), build_element("t", "table", text="a b")], []
+        [build_element("h", "heading", text="Title"), build_element("t", "table", text="a b"),
+         build_element("p", "picture", text="")], []
     )
     orchestrator = build_orchestrator(max_replans=1)
     run_config = replace(core_config(), toolbox=RUN)

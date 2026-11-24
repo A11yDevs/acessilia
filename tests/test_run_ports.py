@@ -72,6 +72,7 @@ class MemoryCheckpoints:
 def _stopped_before_execution(monkeypatch, counts):
     """An orchestrator whose stages are stubs and whose plan run stops the job."""
     from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline.handlers import pictures as picture_method
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -93,10 +94,11 @@ def _stopped_before_execution(monkeypatch, counts):
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
     for name in (
-        "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
+        "_classify_formula_regions", "_mark_inline_math",
         "_enrich_formula_latex",
     ):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
     orchestrator = build_orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=extract)
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
@@ -288,7 +290,7 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
         return stage
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, recording(name))
     monkeypatch.setattr(pddl, "_mark_inline_math", recording("_mark_inline_math"))
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
@@ -314,13 +316,14 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     expected = cache if enabled else None
     assert caches == {
         "_classify_formula_regions": expected,
-        "_enrich_picture_descriptions": expected,
         "_enrich_formula_latex": expected,
         # The steps without a vision agent take no cache.
         "_mark_inline_math": ...,
     }
     [executor] = received
-    for method in ("pymupdf-region", "vision-page-inspection"):
+    # The picture descriptions run inside the plan (#640, M1): their method
+    # takes the region cache from the ports, like the inspection handlers.
+    for method in ("pymupdf-region", "vision-page-inspection", "picture-description"):
         assert executor.registry.get(method).keywords["ports"] is ports
 
 
