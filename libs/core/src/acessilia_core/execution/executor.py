@@ -9,6 +9,7 @@ from typing import Any, Callable
 from acessilia_core.agents.agno_support import require_workflow_classes
 from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
+    EXE_DEPENDENCY_REMOVED,
     EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DOMAIN_DESCRIPTION_CHANGED,
     EXE_DOMAIN_PDDL_CHANGED,
@@ -24,7 +25,7 @@ from acessilia_core.execution.messages import (
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
     EXE_OBLIGATION_REMOVED,
-    EXE_OBLIGATION_WAITS_FOR_DISCOVERED,
+    EXE_OBLIGATION_WAITS_FOR_OPEN,
     EXE_PLAN_DIFFERENT_DOMAIN,
     EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE,
     EXE_PLAN_OTHER_MANIFEST,
@@ -489,22 +490,25 @@ class ExecutorAgent:
 
     @staticmethod
     def _execute_complete_job(state: _ExecutionState) -> None:
-        found_open = sorted(
-            item.id
-            for item in state.manifest.obligations
-            if item.id not in state.planned and item.selected and item.status != "satisfied"
-        )
-        if found_open:
-            # Not a failure: the replan takes them as roots (#594, #832).
-            state.replan_required = True
-            raise _SkipStep(t(EXE_DISCOVERED_OBLIGATIONS_OPEN).format(open=found_open))
         # `selected`, not the plan's list: it also holds what a
         # handler added during this execution.
-        unsatisfied = [
-            item.id
+        open_items = [
+            item
             for item in state.manifest.obligations
             if item.selected and item.status != "satisfied"
         ]
+        skipped = {result.obligation_id for result in state.results if result.status == "skipped"}
+        if open_items and all(
+            item.id not in state.planned or item.id in skipped for item in open_items
+        ):
+            # Not a failure: every open one was found during this execution or
+            # had its step skipped to wait for one; the replan takes them as
+            # roots (#594, #832). One the plan ran and left open is a failure.
+            state.replan_required = True
+            raise _SkipStep(
+                t(EXE_DISCOVERED_OBLIGATIONS_OPEN).format(open=_by_kind(open_items))
+            )
+        unsatisfied = [item.id for item in open_items]
         if unsatisfied:
             raise ValueError(
                 t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
@@ -527,8 +531,15 @@ class ExecutorAgent:
         """The step's obligation, or a skip when this execution changed it (#832).
 
         Removed or replaced by a reclassification: the step no longer applies.
-        Made to depend on an obligation found during this execution and still
-        open: it waits for the replan, which orders the two.
+        Made to depend on an open obligation this plan does not run before it
+        (found during this execution, or planned and not run yet): it waits
+        for the replan, which orders the two. A dependency the plan ran and
+        left open is still a failure (``_check_obligation_preconditions``).
+
+        A removal rewires the removed obligation's dependents to its
+        replacement (``_rewire_removed_dependencies``), and the manifest
+        refuses a dangling dependency. One left dangling is a bug of the
+        handler, reported as such instead of a ``KeyError``.
         """
         if obligation_id in state.planned and all(
             item.id != obligation_id for item in state.manifest.obligations
@@ -536,18 +547,25 @@ class ExecutorAgent:
             raise _SkipStep(t(EXE_OBLIGATION_REMOVED).format(obligation_id=obligation_id))
         obligation = cls._find_obligation(state, obligation_id)
         by_id = {item.id: item for item in state.manifest.obligations}
+        missing = sorted(set(obligation.dependencies) - by_id.keys())
+        if missing:
+            raise ValueError(
+                t(EXE_DEPENDENCY_REMOVED).format(
+                    obligation_id=obligation_id, missing=", ".join(missing)
+                )
+            )
+        ran = {result.obligation_id for result in state.results if result.status != "skipped"}
         waiting = sorted(
             dependency
             for dependency in obligation.dependencies
-            if dependency not in state.planned
-            and dependency in by_id
-            and by_id[dependency].status != "satisfied"
+            if by_id[dependency].status != "satisfied"
+            and (dependency not in state.planned or dependency not in ran)
         )
         if waiting:
             state.replan_required = True
             raise _SkipStep(
-                t(EXE_OBLIGATION_WAITS_FOR_DISCOVERED).format(
-                    obligation_id=obligation_id, waiting=waiting
+                t(EXE_OBLIGATION_WAITS_FOR_OPEN).format(
+                    obligation_id=obligation_id, waiting=", ".join(waiting)
                 )
             )
         return obligation
@@ -716,6 +734,17 @@ class ExecutorAgent:
                     unsatisfied=unsatisfied,
                 )
             )
+
+
+def _by_kind(obligations: list[Obligation]) -> str:
+    """The ids grouped by kind, e.g.
+    ``verbalize-formula (o-1, o-2); describe-image (o-3)``."""
+    kinds: dict[str, list[str]] = {}
+    for item in obligations:
+        kinds.setdefault(item.kind, []).append(item.id)
+    return "; ".join(
+        f"{kind} ({', '.join(sorted(ids))})" for kind, ids in sorted(kinds.items())
+    )
 
 
 def _execution_snapshot(plan: NominalPlan, state: _ExecutionState) -> dict[str, Any]:

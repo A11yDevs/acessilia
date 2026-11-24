@@ -117,7 +117,10 @@ async def _async_noop(*_args, **_kwargs):
 
 @pytest.mark.parametrize(
     "name",
-    ["pdf_split_dpi", "pddl_max_replans", "slide_fold_figure_labels", "table_visual_review"],
+    [
+        "pdf_split_dpi", "pddl_max_replans", "pddl_max_discovery_replans",
+        "slide_fold_figure_labels", "table_visual_review",
+    ],
 )
 def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name):
     from acessilia_core.cache_keys import options_cache_key
@@ -127,6 +130,17 @@ def test_output_affecting_settings_invalidate_processing_cache(monkeypatch, name
     value = getattr(settings, name)
     monkeypatch.setattr(settings, name, not value if isinstance(value, bool) else value + 1)
     assert options_cache_key("document", configuration=processing_cache_configuration(core_config())) != before
+
+
+def test_the_default_discovery_bound_leaves_the_cache_key_alone(monkeypatch):
+    """At its default the bound stays out of the key, so the documents cached
+    before the setting existed are still found (#832)."""
+    from acessilia_core.pipeline.orchestrator import DEFAULT_MAX_DISCOVERY_REPLANS
+    from backend.config.settings import settings
+    from backend.services.cache import processing_cache_configuration
+
+    monkeypatch.setattr(settings, "pddl_max_discovery_replans", DEFAULT_MAX_DISCOVERY_REPLANS)
+    assert "pddl_max_discovery_replans" not in processing_cache_configuration(core_config())
 
 
 def test_toolbox_endpoints_invalidate_processing_cache(monkeypatch):

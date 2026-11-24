@@ -769,15 +769,27 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
-"Skipped: obligation {obligation_id} now depends on {waiting}, found "
-"during this execution"
+"Skipped: obligation {obligation_id} now depends on {waiting}, still open;"
+" the replan orders them"
 msgstr ""
-"Skipped: obligation {obligation_id} now depends on {waiting}, found "
-"during this execution"
+"Skipped: obligation {obligation_id} now depends on {waiting}, still open;"
+" the replan orders them"
 
 #, python-brace-format
-msgid "Skipped: obligations found during this execution are still open: {open}"
-msgstr "Skipped: obligations found during this execution are still open: {open}"
+msgid ""
+"Obligation {obligation_id} depends on {missing}, removed during this "
+"execution without rewiring its dependents"
+msgstr ""
+"Obligation {obligation_id} depends on {missing}, removed during this "
+"execution without rewiring its dependents"
+
+#, python-brace-format
+msgid ""
+"Skipped: obligations this execution found or deferred are still open: "
+"{open}"
+msgstr ""
+"Skipped: obligations this execution found or deferred are still open: "
+"{open}"
 
 msgid "Simulated execution; no effect was persisted"
 msgstr "Simulated execution; no effect was persisted"

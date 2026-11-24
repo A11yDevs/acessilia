@@ -19,6 +19,7 @@ from pathlib import Path
 
 from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
+    EXE_DEPENDENCY_REMOVED,
     EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DOMAIN_DESCRIPTION_CHANGED,
     EXE_DOMAIN_PDDL_CHANGED,
@@ -34,7 +35,7 @@ from acessilia_core.execution.messages import (
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
     EXE_OBLIGATION_REMOVED,
-    EXE_OBLIGATION_WAITS_FOR_DISCOVERED,
+    EXE_OBLIGATION_WAITS_FOR_OPEN,
     EXE_PLAN_DIFFERENT_DOMAIN,
     EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE,
     EXE_PLAN_OTHER_MANIFEST,
@@ -702,7 +703,8 @@ MESSAGES: tuple[str, ...] = (
     EXE_START_JOB_INVALID_STATE,
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_REMOVED,
-    EXE_OBLIGATION_WAITS_FOR_DISCOVERED,
+    EXE_OBLIGATION_WAITS_FOR_OPEN,
+    EXE_DEPENDENCY_REMOVED,
     EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DRY_RUN_SIMULATED,
     EXE_NO_HANDLER_REGISTERED,
@@ -1361,11 +1363,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         EXE_OBLIGATION_REMOVED: (
             "Pulado: a obrigação {obligation_id} foi removida ou substituída durante esta execução"
         ),
-        EXE_OBLIGATION_WAITS_FOR_DISCOVERED: (
-            "Pulado: a obrigação {obligation_id} agora depende de {waiting}, encontradas durante esta execução"
+        EXE_OBLIGATION_WAITS_FOR_OPEN: (
+            "Pulado: a obrigação {obligation_id} agora depende de {waiting}, ainda abertas; o replanejamento as ordena"
+        ),
+        EXE_DEPENDENCY_REMOVED: (
+            "A obrigação {obligation_id} depende de {missing}, removida durante esta execução sem religar as dependentes"
         ),
         EXE_DISCOVERED_OBLIGATIONS_OPEN: (
-            "Pulado: obrigações encontradas durante esta execução continuam abertas: {open}"
+            "Pulado: obrigações que esta execução encontrou ou adiou continuam abertas: {open}"
         ),
         EXE_DRY_RUN_SIMULATED: (
             "Execução simulada; nenhum efeito foi persistido"

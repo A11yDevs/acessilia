@@ -10,26 +10,43 @@ executor already selected the added ones (#594). Now it also handles the
 rest, so M1 (the picture descriptions as a planned action) can follow:
 - **Skipped, not failed.** The step of an obligation this execution removed
   or replaced is `skipped`, with the reason (`EXE_OBLIGATION_REMOVED`). So is
-  the step of an obligation that now depends on one found during the
-  execution and still open (`EXE_OBLIGATION_WAITS_FOR_DISCOVERED`); the
-  replan orders the two. `complete-job` is `skipped`, no longer `failed`,
-  while found obligations are open (`EXE_DISCOVERED_OBLIGATIONS_OPEN`).
-  `skipped` was already a step status of the execution report, so the
+  the step of an obligation that now depends on an open obligation this plan
+  does not run before it: one found during the execution, or one planned and
+  not run yet (`EXE_OBLIGATION_WAITS_FOR_OPEN`). The replan orders the two.
+  `complete-job` is `skipped`, no longer `failed`, while every open
+  obligation was found or deferred by this execution
+  (`EXE_DISCOVERED_OBLIGATIONS_OPEN`, which names them by kind). One the plan
+  ran and left open is still a failure.
+- **A removal rewires.** A handler that removes an obligation must rewire
+  its dependents to the replacement, as the reconciliation does; the
+  manifest refuses a dangling dependency. The executor reports one left
+  dangling by name (`EXE_DEPENDENCY_REMOVED`) instead of a `KeyError`.
+- `skipped` was already a step status of the execution report, so the
   contract does not change. A run where only obligations changed has no
   `failed` step.
 - **Its own bound.** After a run without a failed step, the orchestrator
-  replans with its own bound, `max_discovery_replans` (default 3), apart from
-  `max_replans`, which keeps counting failures. It stops when a replan would
-  leave the same open obligations. The count is saved with the plan
-  checkpoint (`discoveries`).
+  replans with its own bound, `max_discovery_replans`, apart from
+  `max_replans`, which keeps counting failures. It is a constructor option
+  (negative values count as 0), set by the service from
+  `PDDL_MAX_DISCOVERY_REPLANS` (default 3). A value other than the default
+  enters the checkpoint and cache identities, so the default keeps those of
+  0.3.12. It stops when a replan would leave the same open obligations. The
+  count is saved with the plan checkpoint (`discoveries`) and restored on
+  resume.
 - **Document-level obligations reconciled.** `add_table_enrichment_obligation`
   also runs before each replan:
-  - a new table joins the open enrichment, or a new one
-    (`obligation-enrich-tables-2`) when the first is satisfied;
-  - an open enrichment drops the tables the document lost;
-  - every open obligation about a table depends on its enrichment. That is a
-    rule instead of the list of 0.3.12, so any kind about tables is ordered
-    after the reading, as before planning.
+  - a new table joins the open enrichment, or gets a new one
+    (`obligation-enrich-tables-2`) when the existing ones are closed:
+    satisfied, or exhausted (`failed`), which is not planned again. Before a
+    replan the new one is selected, so the replan schedules it;
+  - an open enrichment drops the tables the document lost, and one left
+    without tables is removed with the dependencies on it (`target_ids`
+    cannot be empty);
+  - every open obligation whose targets include a table depends on that
+    table's open enrichment. That is a rule on targets instead of the list
+    of 0.3.12: besides `linearize-table` and `select-table-source`, it orders
+    the page obligations of a page with a table after the reading, as in
+    0.3.11, at the cost of serializing them behind it.
 - `_plan_progress` and `_thread_status` move to `pipeline/progress.py`.
 
 ## 0.3.12 — the table enrichment is a planned action (#640, M2)

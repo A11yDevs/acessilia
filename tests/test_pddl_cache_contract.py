@@ -21,6 +21,7 @@ isolated_runtime = runtime_fixture
 
 @pytest.mark.parametrize("field,value", [
     ("pddl_execute_dry_run", False), ("pddl_max_replans", 99),
+    ("pddl_max_discovery_replans", 99),
     ("pddl_planner_backend", "fast-downward"), ("pddl_preferred_plan", "fast-downward"),
     ("pddl_fast_downward", "/another/planner"),
     ("pddl_fast_downward_alias", "another-alias"),

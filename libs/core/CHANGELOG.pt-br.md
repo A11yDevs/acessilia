@@ -10,27 +10,45 @@ executor já selecionava as acrescentadas (#594). Agora ele trata também o
 resto, para que o M1 (as descrições de imagens como ação planejada) possa vir:
 - **Pulado, não falho.** O passo de uma obrigação que esta execução removeu
   ou substituiu fica `skipped`, com o motivo (`EXE_OBLIGATION_REMOVED`). O
-  mesmo vale para o passo de uma obrigação que agora depende de uma
-  encontrada durante a execução e ainda aberta
-  (`EXE_OBLIGATION_WAITS_FOR_DISCOVERED`); o replanejamento ordena as duas. O
-  `complete-job` fica `skipped`, não mais `failed`, enquanto houver
-  obrigações encontradas em aberto (`EXE_DISCOVERED_OBLIGATIONS_OPEN`).
-  `skipped` já era um status de passo do relatório de execução, então o
+  mesmo vale para o passo de uma obrigação que agora depende de uma obrigação
+  aberta que este plano não executa antes dele: uma encontrada durante a
+  execução, ou uma planejada e ainda não executada
+  (`EXE_OBLIGATION_WAITS_FOR_OPEN`). O replanejamento ordena as duas. O
+  `complete-job` fica `skipped`, não mais `failed`, enquanto toda obrigação
+  aberta foi encontrada ou adiada por esta execução
+  (`EXE_DISCOVERED_OBLIGATIONS_OPEN`, que as agrupa por kind). Uma que o
+  plano executou e deixou aberta continua sendo falha.
+- **Uma remoção religa.** Um handler que remove uma obrigação precisa religar
+  as dependentes dela à substituta, como faz a reconciliação; o manifesto
+  recusa uma dependência pendurada. O executor relata uma que ficou
+  pendurada pelo nome (`EXE_DEPENDENCY_REMOVED`), em vez de um `KeyError`.
+- `skipped` já era um status de passo do relatório de execução, então o
   contrato não muda. Uma execução em que só as obrigações mudaram não tem
   passo `failed`.
 - **Limite próprio.** Depois de uma execução sem passo falho, o orquestrador
-  replaneja com um limite próprio, `max_discovery_replans` (padrão 3),
-  separado de `max_replans`, que continua contando as falhas. Ele para quando
-  um replanejamento deixaria as mesmas obrigações abertas. O contador é salvo
-  com o checkpoint de plano (`discoveries`).
+  replaneja com um limite próprio, `max_discovery_replans`, separado de
+  `max_replans`, que continua contando as falhas. É uma opção do construtor
+  (valores negativos contam como 0), que o serviço lê de
+  `PDDL_MAX_DISCOVERY_REPLANS` (padrão 3). Um valor diferente do padrão entra
+  nas identidades do checkpoint e do cache, então o padrão mantém as da
+  0.3.12. Ele para quando um replanejamento deixaria as mesmas obrigações
+  abertas. O contador é salvo com o checkpoint de plano (`discoveries`) e
+  restaurado na retomada.
 - **Obrigações do documento reconciliadas.** `add_table_enrichment_obligation`
   também roda antes de cada replanejamento:
-  - uma tabela nova entra no enriquecimento aberto, ou num novo
-    (`obligation-enrich-tables-2`) quando o primeiro já está satisfeito;
-  - um enriquecimento aberto deixa de lado as tabelas que o documento perdeu;
-  - toda obrigação aberta sobre uma tabela depende do enriquecimento dela.
-    Isso é uma regra, no lugar da lista da 0.3.12, então qualquer kind sobre
-    tabelas fica ordenado depois da leitura, como antes do planejamento.
+  - uma tabela nova entra no enriquecimento aberto, ou ganha um novo
+    (`obligation-enrich-tables-2`) quando os existentes estão fechados:
+    satisfeitos, ou esgotados (`failed`), que não são planejados de novo.
+    Antes de um replanejamento o novo já vem selecionado, então o
+    replanejamento o agenda;
+  - um enriquecimento aberto deixa de lado as tabelas que o documento perdeu,
+    e um que fica sem tabelas é removido junto com as dependências dele
+    (`target_ids` não pode ficar vazio);
+  - toda obrigação aberta cujos alvos incluem uma tabela depende do
+    enriquecimento aberto daquela tabela. É uma regra sobre alvos, no lugar
+    da lista da 0.3.12: além de `linearize-table` e `select-table-source`,
+    ordena as obrigações de página de uma página com tabela depois da
+    leitura, como na 0.3.11, ao custo de serializá-las atrás dela.
 - `_plan_progress` e `_thread_status` vão para `pipeline/progress.py`.
 
 ## 0.3.12 — o enriquecimento de tabelas é uma ação planejada (#640, M2)

@@ -528,6 +528,8 @@ class Settings:
     pddl_max_replans: int = int(
         os.getenv("PDDL_MAX_REPLANS", os.getenv("PMV_MAX_REPLANS", "2"))
     )
+    # Replans after a run that changed the obligations without failing (#832).
+    pddl_max_discovery_replans: int = int(os.getenv("PDDL_MAX_DISCOVERY_REPLANS", "3"))
     pddl_fast_downward_alias: str = field(
         default_factory=lambda: _str_from_env_alias(
             ("PDDL_FAST_DOWNWARD_ALIAS", "PMV_FAST_DOWNWARD_ALIAS"),

@@ -4,8 +4,9 @@
 page limit, extracts the manifest through the Toolbox, runs the enrichment
 stages, plans with the PDDL planner and executes the plan with the method
 registry, planning again while the execution report asks for it (up to
-``max_replans``); ``_plan_progress`` reports each step to the job, and
-``_log_availability`` the Toolbox's availability decision. The stages, the
+``max_replans`` after a failed step, ``max_discovery_replans`` after a run
+that changed the obligations); ``pipeline/progress.py`` reports each step to
+the job, and ``_log_availability`` the Toolbox's availability decision. The stages, the
 handlers and the page judge live in the modules of ``libs/core/src/acessilia_core/pipeline``.
 Moved verbatim from ``backend/agents/pddl_orchestrator.py``, the last move of
 #402's phase 3, step 6; the module itself is gone.
@@ -119,6 +120,11 @@ class _RunContext:
     checkpoints: RunCheckpoints
 
 
+#: Replans after a run that changed the obligations without failing (#832); a
+#: run of one document should need one or two.
+DEFAULT_MAX_DISCOVERY_REPLANS = 3
+
+
 @dataclass(frozen=True)
 class _PlanningState:
     """The plan of a run and the planning inputs a replan reuses."""
@@ -136,9 +142,6 @@ class _PlanningState:
 class PddlAccessibilityOrchestrator:
     """Drives the PDDL pipeline: informational-extraction -> planner -> executor.
 
-    ``max_discovery_replans`` bounds the replans after a run that changed the
-    obligations without failing (#832), apart from ``max_replans``.
-
     Args:
         planner_backend (str): Which planner backend to prefer for nominal-plan generation; defaults to "internal".
         preferred_plan (str): Which plan source to prefer when multiple are available; defaults to "internal".
@@ -152,7 +155,8 @@ class PddlAccessibilityOrchestrator:
             - "toolbox" — ToolboxManifestExtractor (remote via Acessilia Toolbox)
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
             Defaults to "toolbox".
-        max_replans (int): How many times a run plans again when the executor reports `replan-required`; negative values count as 0; defaults to 2.
+        max_replans (int): How many times a run plans again after a failed step, when the executor reports `replan-required`; negative values count as 0; defaults to 2.
+        max_discovery_replans (int): How many times a run plans again after a run that changed the obligations without failing (found, removed or replaced, #832); a chain of discoveries longer than this ends the job with `replan-required`. Negative values count as 0; defaults to 3.
         planning_engine (PlanningEngine | None): The engine that produces the plans (#632, PR 3). Defaults to None: a `PddlPlanningEngine` built from `planner_backend`, `preferred_plan` and the Fast Downward options at each planning call. Can also be set later through the `planning_engine` property.
     """
 
@@ -160,10 +164,7 @@ class PddlAccessibilityOrchestrator:
     # helpers do) has no planner yet and no injected engine.
     _planner: PlannerAgent | None = None
     _planning_engine: PlanningEngine | None = None
-
-    #: Replans after obligations changed without a failure (#832); a run of
-    #: one document should need one or two.
-    max_discovery_replans: int = 3
+    max_discovery_replans: int = DEFAULT_MAX_DISCOVERY_REPLANS
 
     def __init__(
         self,
@@ -178,12 +179,14 @@ class PddlAccessibilityOrchestrator:
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
         planning_engine: PlanningEngine | None = None,
+        max_discovery_replans: int = DEFAULT_MAX_DISCOVERY_REPLANS,
     ) -> None:
         self.planning_engine = planning_engine
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
         self.max_replans = max(0, max_replans)
+        self.max_discovery_replans = max(0, max_discovery_replans)
         self.fast_downward = fast_downward
         self.fast_downward_alias = fast_downward_alias
         self.fast_downward_search = fast_downward_search
@@ -266,6 +269,9 @@ class PddlAccessibilityOrchestrator:
         # checkpoints keep the identity they had before the seam existed.
         if self._planning_engine is not None:
             planner["planning_engine"] = self._planning_engine.identity
+        # Likewise the default bound keeps the checkpoints of 0.3.12.
+        if self.max_discovery_replans != DEFAULT_MAX_DISCOVERY_REPLANS:
+            planner["max_discovery_replans"] = self.max_discovery_replans
         return {"planning": planner, "execution": {**planner, "dry_run": self.execute_dry_run}}
 
     @staticmethod
@@ -686,7 +692,9 @@ class PddlAccessibilityOrchestrator:
         discoveries: int = 0,
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
-        """Plan and execute again while the report asks for it, up to ``max_replans``.
+        """Plan and execute again while the report asks for it, within
+        ``max_replans`` (after a failed step) and ``max_discovery_replans``
+        (after a run that changed the obligations).
 
         Returns the last manifest, report, plan and comparison. The replan count
         and the plan it produced come from the checkpoint, so a restart after a
@@ -721,7 +729,7 @@ class PddlAccessibilityOrchestrator:
             if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
             # A table the run added is enriched before its own obligations (#832).
-            add_table_enrichment_obligation(manifest)
+            add_table_enrichment_obligation(manifest, replan=True)
             roots = _replannable_obligation_ids(manifest)
             if not roots:
                 break

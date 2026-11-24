@@ -55,15 +55,24 @@ EXE_OBLIGATION_NOT_FOUND: str = "Non-existent obligation: {obligation_id}"
 EXE_OBLIGATION_REMOVED: str = (
     "Skipped: obligation {obligation_id} was removed or replaced during this execution"
 )
-#: A plan step skipped because its obligation now waits for obligations an
-#: earlier step of this execution discovered; the replan orders them (#832).
-EXE_OBLIGATION_WAITS_FOR_DISCOVERED: str = (
-    "Skipped: obligation {obligation_id} now depends on {waiting}, found during this execution"
+#: A plan step skipped because an earlier step of this execution made its
+#: obligation depend on open obligations this plan does not run before it:
+#: found during the execution, or planned and not run yet. The replan orders
+#: them (#832).
+EXE_OBLIGATION_WAITS_FOR_OPEN: str = (
+    "Skipped: obligation {obligation_id} now depends on {waiting}, still open; the replan orders them"
 )
-#: complete-job skipped because obligations found during this execution are
-#: still open; the replan takes them as roots (#594, #832).
+#: Raised when a step's obligation depends on an obligation this execution
+#: removed without rewiring its dependents to the replacement (#832). A
+#: removal must rewire them; the manifest refuses a dangling dependency.
+EXE_DEPENDENCY_REMOVED: str = (
+    "Obligation {obligation_id} depends on {missing}, removed during this execution without rewiring its dependents"
+)
+#: complete-job skipped because the open obligations were all found during
+#: this execution or deferred by it (their steps skipped to wait); the replan
+#: takes them as roots (#594, #832). ``{open}`` groups their ids by kind.
 EXE_DISCOVERED_OBLIGATIONS_OPEN: str = (
-    "Skipped: obligations found during this execution are still open: {open}"
+    "Skipped: obligations this execution found or deferred are still open: {open}"
 )
 #: Status message recorded on a dry-run step; nothing is persisted.
 EXE_DRY_RUN_SIMULATED: str = (

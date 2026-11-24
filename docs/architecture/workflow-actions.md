@@ -149,19 +149,20 @@ the manifest. **The enrichment migration needs no domain change.**
 
 ## Constraints
 
-1. **A plan cannot create objects; discovery replans exist only for
-   additions.** Formula classification can reclassify an element and
-   reconcile its obligations, so after it the next actions depend on
-   obligations the problem did not have.
+1. **A plan cannot create objects; obligations change during the plan.**
+   Formula classification can reclassify an element and reconcile its
+   obligations, so after it the next actions depend on obligations the
+   problem did not have: added ones, and also removed, replaced or rewired
+   ones.
 
-   The executor already handles one case. After a successful, validated
+   Before M0 the executor handled only additions. After a successful, validated
    handler, `_run_obligation_handler` calls `_select_discovered` (#594), which
    selects the obligations the handler added. When one is still unsatisfied,
    it sets `replan_required`. The rest of the plan still runs, and the report
    carries the flag to `_replan_until_done`, which replans with those
    obligations as roots.
 
-   What is missing:
+   What was missing (met by M0, below):
    - the discovery signal shares the `max_replans` budget with failure
      recovery, and the report does not say why it asks for a replan;
    - it sees only **added** obligations, not the other semantic changes: an
@@ -203,12 +204,22 @@ the manifest. **The enrichment migration needs no domain change.**
      orchestrator counts that replan apart and logs its reason (2).
    - `max_replans` counts failures and `max_discovery_replans` the rest. A
      replan that would leave the same open obligations does not run (3).
-   - Removed, replaced and rewired obligations are covered (4).
+   - Removed, replaced and rewired obligations are covered (4). A step
+     whose obligation now depends on an open obligation this plan does not
+     run before it (found during the execution, or planned and not run yet)
+     waits for the replan. A removal must rewire the removed obligation's
+     dependents (`_rewire_removed_dependencies`); the manifest refuses a
+     dangling dependency, and the executor reports one as the handler's bug.
+   - `PDDL_MAX_DISCOVERY_REPLANS` (default 3) sets the separate bound; a
+     value other than the default enters the checkpoint and cache
+     identities.
    - The steps they make obsolete are skipped, not run (5).
    - The discovery count is in the plan checkpoint, and the skips derive from
      the plan's and the checkpoint's manifests, so a resume needs nothing
      else (6).
-   - `tests/test_changed_obligations.py` has the scenarios (7).
+   - `tests/test_changed_obligations.py` has the scenarios (7), including a
+     reclassification inside a real handler, a failure with an alternative
+     and the resume of the discovery count.
 
    Steps whose obligation is still there but whose element changed type are
    not detected yet; M1 meets that case first.
@@ -294,14 +305,22 @@ happened to each element, and it fails only when the step raises.
 
 **Reconciled before each plan (M0, #832).** `add_table_enrichment_obligation`
 runs when the manifest is enriched and again before each replan:
-- a table that no open enrichment covers joins the open one; when the
-  existing one is already satisfied, the new tables get a new one
-  (`obligation-enrich-tables-2`, …), because reopening it would leave
-  satisfied obligations waiting for an open one;
-- an open enrichment drops the tables the document lost;
-- every open obligation with a table among its targets depends on that
-  table's enrichment. This is a rule, not a list of kinds, so it orders any
-  kind about tables as reading them before planning did.
+- a table that no enrichment covers joins the open one; when the existing
+  ones are closed, the new tables get a new one
+  (`obligation-enrich-tables-2`, …). Reopening a satisfied one would leave
+  satisfied obligations waiting for an open one, and an exhausted (`failed`)
+  one is not planned again, so a table joining it would never be read;
+- an enrichment drops the tables the document lost, and one left without
+  tables is removed with the dependencies on it (an empty `target_ids` is
+  invalid). The step that removed an element removes or retargets that
+  element's own obligations and the page's `element_ids`;
+- every open obligation whose targets include a table depends on that
+  table's open enrichment. This is a rule on targets, not a list of kinds:
+  besides `linearize-table` and `select-table-source`, it orders the page
+  obligations (`refine-reading-order`, `fuse-providers`, `adjudicate-page`)
+  of a page with a table, whose targets are the page's elements. That is the
+  order of 0.3.11, where the tables were read before planning, at the cost
+  of serializing those page obligations behind the reading.
 
 ## Migration order
 
@@ -311,7 +330,7 @@ proposals, settled in their pull requests.
 | PR | Step | Obligation and method | Role | Toolbox requirements | Changes obligations while the plan runs |
 |---|---|---|---|---|---|
 | M2 (done, core 0.3.12) | Table structures and table inline math | `enrich-tables`, one per document with tables, method `table-enrichment`; `linearize-table` and `select-table-source` depend on it. After #170 the method calls `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `transitional` (`DataAgent`) | none declared: its Toolbox calls (`pdf.render` for a table read again, `document.text.spans` for the marks) are conditional and degrade per table, so they must not rule it out | no |
-| M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an obligation it found. `complete-job` is skipped while found obligations are open. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan leaves the same open obligations. Document-level obligations are reconciled before each replan | — | — | — |
+| M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an open obligation the plan does not run before it. `complete-job` is skipped while every open obligation was found or deferred; one the plan ran and left open is a failure. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan leaves the same open obligations. Document-level obligations are reconciled before each replan | — | — | — |
 | M1 | Picture descriptions | `describe-images`, one per document with pictures (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it | `transitional` (`VisionAgent`) | those `VisionAgent` makes, if any | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
 | M3 | Formula LaTeX | new kind `recognize-formula`, method `formula-recognizer`, a dependency of `verbalize-formula` and `normalize-formula` | new, declared | `math.recognize`, `pdf.render` | yes: the new kind, per formula |
 | M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`) | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |

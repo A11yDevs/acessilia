@@ -74,6 +74,7 @@ def _build_orchestrator():
             enable_ocr=False,
             extractor_backend="toolbox",
             max_replans=settings.pddl_max_replans,
+            max_discovery_replans=settings.pddl_max_discovery_replans,
         )
     raise RuntimeError("Pipeline legado desativado — use PIPELINE_ENGINE=pddl")
 
