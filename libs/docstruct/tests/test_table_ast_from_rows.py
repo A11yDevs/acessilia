@@ -9,9 +9,12 @@ and is left out; the table is ``None`` only when no row with a cell remains.
 
 from __future__ import annotations
 
+from typing import Any
+
 from docstruct.canonical import sanitize_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.markdown import document_to_markdown
+from docstruct.export.pandoc_ast import build_pandoc_ast
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.tables.ast import (
     linearize_table_for_text,
@@ -173,3 +176,24 @@ def test_exporters_do_not_make_a_blank_first_row_a_header() -> None:
     assert "<thead>" not in markdown
     assert body in markdown
     assert document_to_txt_lines(document) == ["T", "Row 1:  | ", "Row 2: a | b"]
+
+    table = _find_pandoc_node(build_pandoc_ast(document), "Table")
+    assert table is not None
+    assert table["c"][3][1] == []          # no header row
+    assert len(table["c"][4][0][3]) == 2   # both rows are body rows
+
+
+def _find_pandoc_node(node: Any, kind: str) -> dict | None:
+    if isinstance(node, dict):
+        if node.get("t") == kind:
+            return node
+        for value in node.values():
+            found = _find_pandoc_node(value, kind)
+            if found:
+                return found
+    elif isinstance(node, list):
+        for value in node:
+            found = _find_pandoc_node(value, kind)
+            if found:
+                return found
+    return None
