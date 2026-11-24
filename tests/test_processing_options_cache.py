@@ -17,7 +17,7 @@ def test_document_cache_key_changes_with_each_processing_option(monkeypatch):
     config = core_config(models={"ai_client": "fake"})
     base = service._cache_version(config, "normal", None, False)
 
-    assert base.startswith("fake-pddl-v13_")
+    assert base.startswith("fake-pddl-v14_")
     assert service._cache_version(config, "detailed", None, False) != base
     assert service._cache_version(config, "normal", "Describe charts", False) != base
     assert service._cache_version(config, "normal", None, True) != base

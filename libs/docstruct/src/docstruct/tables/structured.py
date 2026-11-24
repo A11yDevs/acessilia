@@ -38,16 +38,22 @@ def rows_look_like_placeholder(
 def table_ast_has_structured_content(
     table_ast: Any, *, placeholder: str
 ) -> bool:
-    """Whether ``table_ast`` holds real table cells rather than a single placeholder cell.
+    """Whether ``table_ast`` holds real table cells rather than a blank grid.
 
-    ``placeholder`` is required because the label the core writes into a table
-    it could not read is localized: a default here would answer the opposite of
-    ``_table_element_has_structured_content`` for a table made only of it.
+    A structurally valid grid is not enough: every cell may be empty, which
+    carries no content to export. At least one non-empty cell is required, so
+    the enrichment stage re-reads the table instead of skipping it and the
+    validation stage agrees. ``placeholder`` is required because the label the
+    core writes into a table it could not read is localized: a default here
+    would answer the opposite of ``_table_element_has_structured_content`` for
+    a table made only of it.
     """
     if not isinstance(table_ast, dict):
         return False
     rows = raw_rows_from_table_ast(table_ast)
     if not rows:
+        return False
+    if not any(value.strip() for row in rows for value in row):
         return False
     width = max((len(row) for row in rows), default=0)
     if len(rows) >= 2 and width >= 2:

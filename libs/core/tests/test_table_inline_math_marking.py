@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from pddl_support import build_element, build_manifest
 from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
 from acessilia_core.pipeline.handlers import text as text_handlers
+from acessilia_core.pipeline.handlers.fusion import _adopt_secondary_table
 
 HEIGHT = 792.0
 FRACTION = r"\frac{s(3+h)-s(3)}{(3+h)-3}"
@@ -146,6 +148,45 @@ def test_a_marked_table_is_not_marked_again(spans):
 
     assert _run(manifest)["elements"] == 0
     assert _texts(manifest.elements[1])[0] == r"$h\neq0$"
+
+
+def test_a_table_replaced_by_the_secondary_provider_is_marked_again(spans):
+    """#599: the adopted cells are new, so the old inline-math mark is stale."""
+    manifest = _manifest()
+    table = manifest.elements[1]
+    provenance = table.provenance
+    flat_ast = deepcopy(table.metadata["table_ast"])
+    reader = inline_math_stage._TextSpanReader(
+        manifest, Path("/tmp/amostra.pdf"), toolbox_config()
+    )
+
+    asyncio.run(
+        inline_math_stage._mark_table_inline_math(
+            manifest, Path("/tmp/amostra.pdf"), document_config(), reader
+        )
+    )
+    assert _texts(table)[0] == r"$h\neq0$"
+    assert table.metadata["inline_math_detection"]["marked"] == 4
+
+    _adopt_secondary_table(table, {"text": "", "metadata": {"table_ast": flat_ast}})
+
+    assert "inline_math_detection" not in table.metadata
+    assert table.provenance == provenance
+    assert _texts(table)[0] == "h = 0"
+
+    counts = asyncio.run(
+        inline_math_stage._mark_table_inline_math(
+            manifest, Path("/tmp/amostra.pdf"), document_config(), reader
+        )
+    )
+
+    assert counts == {"elements": 1, "marked": 4, "unmatched": 0}
+    assert _texts(table)[0] == r"$h\neq0$"
+    assert table.metadata["inline_math_detection"]["marked"] == 4
+    assert manifest.elements[2].metadata["negation_overlay"] == {
+        "outcome": "inline-math", "host": "t1",
+    }
+    assert spans == [[1]], "the adopted cells read the cached page"
 
 
 def test_the_prose_and_table_steps_fetch_a_page_once(spans):

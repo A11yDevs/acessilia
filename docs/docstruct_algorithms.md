@@ -375,7 +375,85 @@ after a relation (`=`, `<`, `>`, `\neq`, `\le`, `\approx`, `\sim`, `\propto`,
 `f(1)` also stays unchanged. Identifiers are limited to digits with optional dotted components
 and letter suffixes or an appendix prefix, such as `1`, `2.3`, `4a` and `A.1`.
 
-## 7. Related documentation
+## 7. A table AST built from rows
+
+### 7.1 The grid is the contract
+
+A table reaches export as a canonical table AST: sections (`header`, `body`,
+`footer`), each a list of rows, each row a list of cells, each cell a `text`.
+The AST is what preserves the grid assistive technology depends on — which
+cell belongs to which column and row, including merged cells (`rowspan`,
+`colspan`) and header cells (`scope`). A blank cell is still a grid position:
+removing it shifts the rest of its row. For the same reason, a row whose cells
+are all blank is still a row: removing it shifts every row after it.
+
+`docstruct.tables.ast.table_ast_from_rows(rows, *, caption=None)` is the single
+implementation that turns rows into a body-only AST, for the shape extractors
+report (rows of cell text). It:
+
+- strips each cell's text, so a caller that already sanitized the cells (the
+  canonical builder) gets the same result — stripping is idempotent;
+- keeps a cell whose text is blank, because it still occupies a column;
+- keeps a row whose cells are all blank, because it still occupies a row;
+- leaves out a row with no cell at all, which occupies no position;
+- returns `None` when no row with a cell remains, leaving the caller to decide
+  whether to reject or keep the block;
+- adds `caption` only when it is not blank.
+
+A blank first row is never promoted to a legacy header: a header with no text
+would announce empty labels, so `split_header_and_body` keeps that row in the
+body, where it remains a grid position like any other blank row.
+
+The builder preserves the grid; whether the grid carries usable content is a
+separate question. `table_ast_has_structured_content` requires at least one
+non-empty cell (and rejects the localized placeholder), so a table with a
+structurally valid but all-blank grid is selected for re-reading and fails
+validation instead of being treated as done (#601).
+
+`normalize_table_ast` reads `rows` with the same function, so a table AST built
+from rows is the same whichever path reads it. The canonical document builder
+(`docstruct.canonical`) calls it when a table block carries `rows` but no
+`table_ast`; the core's payload builder and table backfill call it too (#470,
+#600). No module keeps a second copy.
+
+### 7.2 Why blank rows are kept (#601)
+
+The canonical builder kept a private `_table_ast_from_rows` that agreed with
+the public function everywhere except blank rows: it kept them and returned
+`{"body": []}` when no row was left, while the public function dropped them and
+returned `None`. The same rows therefore produced two grids depending on the
+path. #601 resolved the duplicate by keeping the canonical reading:
+
+- blank rows are part of the table, because that is what the exporters did
+  before the split and what preserves the grid;
+- the private copy is gone; the canonical path uses the public function;
+- the public function now returns `None` only when no row with a cell remains,
+  so a table block built from `rows` is never given an empty-body AST (the
+  canonical schema requires at least one body row).
+
+The alternative — dropping blank rows everywhere — was rejected because it
+would change the grid of exported tables that have empty rows, a visible
+behavior change with no accessibility benefit.
+
+### 7.3 How it is verified
+
+- `libs/docstruct/tests/test_table_ast_from_rows.py` checks the contract above,
+  including that `normalize_table_ast` and the canonical builder return the same
+  AST as the public function for the same rows, that a blank first row is not
+  promoted to a legacy header, and that the exporters agree on it.
+- `libs/core/tests/test_table_ast_from_rows_parity.py` checks the core's frozen
+  reference over random rows (including blank rows), the whitespace-only table
+  the payload builder passes, and that `docstruct.canonical` has no private
+  builder left.
+- Export characterization: the export snapshots' table is defined by
+  `table_ast`, not built from rows, so its TXT/HTML/Markdown/Pandoc bytes are
+  unchanged. The strict-gate acceptance corpus
+  (`tests/fixtures/export_schema_gate`) has a rows-only table
+  (`numeric-table-rows`), but no table with blank rows, so all 68
+  TXT/HTML/DOCX/PDF-UA baseline outcomes are unchanged;
+  `libs/core/tests/test_export_schema_gate.py` continues to compare them.
+
+## 8. Related documentation
 
 - [libs/docstruct/README.md](../libs/docstruct/README.md) — public API.
 - [pddl_pipeline.md](pddl_pipeline.md) — PDDL orchestration and the

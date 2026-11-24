@@ -277,3 +277,82 @@ async def test_a_restored_block_is_repaired_in_the_same_job(monkeypatch, tmp_pat
     # The restored block reached the document, with its dotless i repaired.
     assert "capital moved to Bras" in payload["text"]
     assert "\u0131" not in payload["text"]
+
+
+@pytest.mark.asyncio
+async def test_a_restored_math_block_is_marked_after_the_replan(monkeypatch, tmp_path):
+    """#599 through a real rescue, replan and second pass."""
+    from types import SimpleNamespace
+
+    from core_config_support import core_config
+    from pddl_support import build_orchestrator
+    from test_rescue_omitted_method import (
+        LOWER,
+        MIDDLE,
+        _adopted,
+        _manifest as rescue_manifest,
+        _row,
+    )
+
+    from acessilia_core.agents.model_calls import current_model_calls
+    from acessilia_core.pipeline import (
+        orchestrator as pddl,
+        preflight as pipeline_preflight,
+    )
+    from acessilia_core.pipeline.handlers import tables as table_method
+    from acessilia_core.ports import RunPorts
+
+    body = "The first paragraph of the body text."
+    math = "The relation h = 0 holds."
+    manifest = rescue_manifest(
+        tmp_path,
+        [_adopted("m-1", "paragraph", body, MIDDLE, 1)],
+        replaced={1: [
+            _row("d-1", "paragraph", body, MIDDLE, 1),
+            _row("d-2", "paragraph", math, LOWER, 2),
+        ]},
+    )
+    (tmp_path / "doc.pdf").write_bytes(b"%PDF-1.4\n")
+
+    def span(value, font, x, baseline=450.0, size=11.96):
+        width = max(len(value), 1) * size * 0.5
+        return {
+            "text": value, "font": font, "size": size, "flags": 4,
+            "bbox": [x, baseline - size * 0.75, x + width, baseline + size * 0.25],
+            "origin": [x, baseline],
+        }
+
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        return {1: {
+            "page_number": 1, "width": 600.0, "height": 800.0, "rotation": 0,
+            "lines": [{"bbox": [0, 0, 0, 0], "spans": [
+                span("The relation ", "CMR12", 40),
+                span("h", "CMMI12", 117.74),
+                span("̸", "CMSY10", 123.72),
+                span(" = 0", "CMR12", 123.72),
+                span(" holds.", "CMR12", 147.64),
+            ]}],
+        }}
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
+
+    async def noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
+    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(table_method, "_enrich_table_structures", noop)
+
+    orchestrator = build_orchestrator(max_replans=1)
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
+    payload = await orchestrator.execute(
+        tmp_path / "doc.pdf", tmp_path, structured_output=True,
+        config=core_config(document={"legacy_unicode_repair": "off"}),
+        model_calls=current_model_calls(), ports=RunPorts.none(),
+    )
+
+    assert "The relation $h\\neq0$ holds." in payload["text"]
+    blocks = [block for page in payload["pages"] for block in page["blocks"]]
+    restored = next(block for block in blocks if "relation" in str(block.get("text")))
+    assert restored["text"] == r"The relation $h\neq0$ holds."
+    assert restored["metadata"]["inline_math_detection"] == {"marked": 1, "unmatched": 0}

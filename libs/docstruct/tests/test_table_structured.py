@@ -44,6 +44,27 @@ def test_table_ast_has_structured_content():
     assert table_ast_has_structured_content(real_ast, placeholder="Detected table") is True
 
 
+def test_table_ast_has_structured_content_requires_a_non_empty_cell():
+    """A valid grid with only blank cells carries no content (#601)."""
+    all_blank = {
+        "body": [
+            {"cells": [{"text": ""}, {"text": " "}]},
+            {"cells": [{"text": "\t"}, {"text": ""}]},
+        ]
+    }
+    single_blank = {"body": [{"cells": [{"text": " "}]}]}
+    one_text = {
+        "body": [
+            {"cells": [{"text": ""}, {"text": ""}]},
+            {"cells": [{"text": "value"}, {"text": ""}]},
+        ]
+    }
+
+    assert table_ast_has_structured_content(all_blank, placeholder="Detected table") is False
+    assert table_ast_has_structured_content(single_blank, placeholder="Detected table") is False
+    assert table_ast_has_structured_content(one_text, placeholder="Detected table") is True
+
+
 def test_normalize_strict_table_ast_validates_and_filters_fields():
     raw = {
         "caption": "  Table 1  ",

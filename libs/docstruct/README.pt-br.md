@@ -54,8 +54,8 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 | `docstruct.text.normalize` | `norm` — limpezas determinísticas de texto |
 | `docstruct.text.norm_fix` | `norm_fix` — reparos pós-normalização |
 | `docstruct.adapters.mineru` | `clean_mineru_text`, `format_mineru_block_text`, `extract_mineru_blocks` — parsing de `middle_json` do MinerU, espaçamento, de-hifenização e formatação de fórmulas/tabelas |
-| `docstruct.tables.ast` | `TABLE_SECTIONS`, `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `table_ast_column_count`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
-| `docstruct.tables.structured` | `StructuredTableCell`, `rows_look_like_placeholder`, `table_ast_has_structured_content`, `normalize_strict_table_ast`, `table_ast_from_structured_rows` — validação estrita de `table_ast` em metadados, verificação de placeholder e construção canônica de `table_ast` a partir de linhas estruturadas |
+| `docstruct.tables.ast` | `TABLE_SECTIONS`, `table_ast_from_rows`, `table_ast_from_docling_grid`, `analyze_table_complexity`, `raw_rows_from_table_ast`, `table_ast_column_count`, `TableAST`, `TableComplexityMetrics`, `TableASTError` |
+| `docstruct.tables.structured` | `StructuredTableCell`, `rows_look_like_placeholder`, `table_ast_has_structured_content`, `normalize_strict_table_ast`, `table_ast_from_structured_rows` — validação estrita de `table_ast` em metadados, verificação de placeholder e construção canônica de `table_ast` a partir de linhas estruturadas; `table_ast_has_structured_content` exige pelo menos uma célula não vazia, então uma grade toda vazia é lida de novo |
 | `docstruct.tables.text_rows` | `rows_from_visual_table_text`, `rows_from_pipe_table`, `rows_from_delimited_lines`, `looks_like_markdown_separator`, `score_rows` — linhas de uma tabela lidas do seu texto simples (barras, tabs, `;` ou `,`) |
 | `docstruct.text` | `sanitize_text`, `merge_broken_paragraphs`, `normalize_code_text`, `classify_text_block`; `docstruct.text.paragraphs.PAGE_HEADING` — o cabeçalho de página que `merge_broken_paragraphs` nunca atravessa |
 | `docstruct.sections` | `HeadingGap`, `find_heading_gaps`, `repair_heading_levels`, `explicit_section_title`, `section_body_blocks`, `section_title_alias` — detecção/reparo de lacunas na hierarquia de títulos e auxiliares legados de seção |
@@ -221,6 +221,7 @@ Parser leve para saída `middle_json` do MinerU:
 ### AST de Tabelas e Complexidade (`docstruct.tables.ast`)
 
 Análise pura de grades e conversão em AST:
+- `table_ast_from_rows(rows, *, caption=None)`: Constrói uma `TableAST` canônica apenas de corpo a partir de linhas de texto de células. Uma célula vazia e uma linha de células vazias permanecem, porque são posições da grade; uma linha sem célula e uma tabela vazia ficam de fora (`None`) (#601). O construtor canônico usa esta única implementação.
 - `table_ast_from_docling_grid(grid_or_cells, caption=None)`: Constrói uma `TableAST` canônica a partir de células do Docling (`start_row_offset_idx`, `start_col_offset_idx`, spans de linhas e colunas).
 - `analyze_table_complexity(table_ast_or_cells)`: Avalia métricas de complexidade retornando `TableComplexityMetrics` (`has_spans`, `max_rowspan`, `max_colspan`, `spanned_cell_count`, `is_complex`).
 

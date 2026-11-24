@@ -62,6 +62,17 @@ What the steps share is not uniform:
 | Media inspection | 2 | a bootstrap output |
 | Source file | all | the run context; the manifest records its digest |
 
+Until M4, steps 3 and 6 also run once after execution, before the canonical
+build, over the executed manifest: `rescue-omitted` adds blocks while the plan
+runs, and the canonical build only converts the spans the manifest carries
+(#599). The pass reuses the run's text-span reader, so no page already fetched
+in that run is requested again, and it is a transient exception to ADR-0029:
+M4's `mark-inline-math` obligation (after M0's executor preparation, #832)
+replaces it. It also drops a stale
+`inline_math_detection` from a table adopted from the secondary provider and
+invalidates the planned formula conversions when a block added during the plan
+carries inline math.
+
 The plan then works on what enrichment produced. Some methods only check that
 work: `vision-description` checks the descriptions and `pandoc-table` checks
 the table AST. Both are `validation` in `toolbox_gate.LOCAL_METHODS` (#804).
@@ -333,7 +344,7 @@ proposals, settled in their pull requests.
 | M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an open obligation the plan does not run before it. `complete-job` is skipped while every open obligation was found or deferred; one the plan ran and left open is a failure. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan leaves the same open obligations. Document-level obligations are reconciled before each replan | — | — | — |
 | M1 | Picture descriptions | `describe-images`, one per document with pictures (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it | `transitional` (`VisionAgent`) | those `VisionAgent` makes, if any | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
 | M3 | Formula LaTeX | new kind `recognize-formula`, method `formula-recognizer`, a dependency of `verbalize-formula` and `normalize-formula` | new, declared | `math.recognize`, `pdf.render` | yes: the new kind, per formula |
-| M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`) | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
+| M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`), replacing the post-execution pass of #599 | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
 | — | Bootstrap | Kept and documented as the 0.3.0 baseline | — | — | — |
 
 M2 came first because it changes no obligation while the plan runs. M1 was

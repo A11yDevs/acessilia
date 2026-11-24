@@ -62,6 +62,17 @@ O que os passos compartilham não é uniforme:
 | Inspeção de mídia | 2 | uma saída do bootstrap |
 | Arquivo de origem | todos | o contexto da execução; o manifesto registra seu digest |
 
+Até M4, os passos 3 e 6 também rodam uma vez depois da execução, antes do
+build canônico, sobre o manifesto executado: o `rescue-omitted` acrescenta
+blocos enquanto o plano roda, e o build canônico só converte os spans que o
+manifesto carrega (#599). A passagem reusa o leitor de spans da execução, então
+nenhuma página já buscada nessa execução é pedida de novo, e é uma exceção
+transitória à ADR-0029: a obrigação `mark-inline-math` da M4 (depois da
+preparação do executor na M0, #832) a substitui. Ela
+também descarta uma `inline_math_detection` obsoleta de uma tabela adotada do
+provedor secundário e invalida as conversões planejadas das fórmulas quando um
+bloco adicionado durante o plano carrega matemática inline.
+
 O plano então trabalha sobre o que o enriquecimento produziu. Alguns métodos
 só conferem esse trabalho: `vision-description` confere as descrições e
 `pandoc-table` confere a AST da tabela. Os dois são `validation` em
@@ -347,7 +358,7 @@ propostas, decididas nos seus pull requests.
 | M0 (feito, core 0.3.13) | Preparação do executor | O executor pula, e registra como `skipped` com o motivo, o passo de uma obrigação que esta execução removeu ou substituiu, e o de uma que agora espera uma obrigação aberta que o plano não executa antes dele. O `complete-job` é pulado enquanto toda obrigação aberta foi encontrada ou adiada; uma que o plano executou e deixou aberta é falha. O orquestrador replaneja depois de uma execução assim com um limite próprio (`max_discovery_replans`), separado de `max_replans`, e para quando um replanejamento deixa as mesmas obrigações abertas. As obrigações do documento são reconciliadas antes de cada replanejamento | — | — | — |
 | M1 | Descrições de imagens | `describe-images`, uma por documento com imagens (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela | `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
 | M3 | LaTeX das fórmulas | kind novo `recognize-formula`, método `formula-recognizer`, uma dependência de `verbalize-formula` e `normalize-formula` | novo, declarado | `math.recognize`, `pdf.render` | sim: o kind novo, por fórmula |
-| M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`) | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
+| M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`), substituindo a passagem pós-execução da #599 | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
 O M2 veio primeiro porque não muda nenhuma obrigação enquanto o plano roda. O

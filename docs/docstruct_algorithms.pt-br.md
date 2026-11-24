@@ -389,7 +389,92 @@ também fica intacto. Os
 identificadores aceitam dígitos com componentes separados por pontos e sufixo
 de letra ou prefixo de apêndice, como `1`, `2.3`, `4a` e `A.1`.
 
-## 7. Documentação relacionada
+## 7. Uma AST de tabela construída a partir das linhas
+
+### 7.1 A grade é o contrato
+
+Uma tabela chega à exportação como AST canônica de tabela: seções (`header`,
+`body`, `footer`), cada uma uma lista de linhas, cada linha uma lista de
+células, cada célula um `text`. A AST é o que preserva a grade da qual a
+tecnologia assistiva depende — qual célula pertence a qual coluna e linha,
+incluindo células mescladas (`rowspan`, `colspan`) e células de cabeçalho
+(`scope`). Uma célula vazia continua sendo uma posição da grade: removê-la
+desloca o resto da linha. Pelo mesmo motivo, uma linha cujas células estão
+todas vazias continua sendo uma linha: removê-la desloca todas as linhas
+seguintes.
+
+`docstruct.tables.ast.table_ast_from_rows(rows, *, caption=None)` é a única
+implementação que transforma linhas numa AST só de corpo, para a forma que os
+extratores relatam (linhas com o texto das células). Ela:
+
+- remove espaços das pontas do texto de cada célula, então um chamador que já
+  sanitizou as células (o construtor canônico) obtém o mesmo resultado — a
+  remoção é idempotente;
+- mantém uma célula cujo texto é vazio, porque ela ainda ocupa uma coluna;
+- mantém uma linha cujas células estão todas vazias, porque ela ainda ocupa uma
+  linha;
+- descarta uma linha sem nenhuma célula, que não ocupa posição;
+- retorna `None` quando não sobra linha com célula, deixando o chamador decidir
+  entre rejeitar ou manter o bloco;
+- adiciona `caption` apenas quando ele não é vazio.
+
+Uma primeira linha vazia nunca é promovida a cabeçalho legado: um cabeçalho sem
+texto anunciaria rótulos vazios, então `split_header_and_body` mantém essa linha
+no corpo, onde ela continua sendo uma posição da grade como qualquer outra linha
+vazia.
+
+O construtor preserva a grade; se a grade carrega conteúdo utilizável é uma
+questão separada. `table_ast_has_structured_content` exige pelo menos uma célula
+não vazia (e rejeita o placeholder localizado), então uma tabela com grade
+estruturalmente válida mas toda vazia é selecionada para releitura e falha na
+validação, em vez de ser considerada pronta (#601).
+
+`normalize_table_ast` lê `rows` com a mesma função, então uma AST de tabela
+construída a partir das linhas é a mesma em qualquer caminho que a leia. O
+construtor de documento canônico (`docstruct.canonical`) a chama quando um
+bloco de tabela traz `rows` sem `table_ast`; o construtor de payload do core e
+o backfill de tabelas a chamam também (#470, #600). Nenhum módulo mantém uma
+segunda cópia.
+
+### 7.2 Por que as linhas vazias são mantidas (#601)
+
+O construtor canônico mantinha um `_table_ast_from_rows` privado que concordava
+com a função pública em tudo, exceto em linhas vazias: ele as mantinha e
+retornava `{"body": []}` quando nenhuma linha sobrava, enquanto a função
+pública as descartava e retornava `None`. As mesmas linhas, portanto,
+produziam duas grades diferentes conforme o caminho. A #601 resolveu a
+duplicação mantendo a leitura canônica:
+
+- linhas vazias fazem parte da tabela, porque é o que os exportadores faziam
+  antes da separação e é o que preserva a grade;
+- a cópia privada foi removida; o caminho canônico usa a função pública;
+- a função pública agora retorna `None` apenas quando não sobra linha com
+  célula, então um bloco de tabela construído a partir de `rows` nunca recebe
+  uma AST de corpo vazio (o schema canônico exige ao menos uma linha de corpo).
+
+A alternativa — descartar linhas vazias em todos os caminhos — foi rejeitada
+porque mudaria a grade de tabelas exportadas que têm linhas vazias, uma
+mudança visível de comportamento sem ganho de acessibilidade.
+
+### 7.3 Como isso é verificado
+
+- `libs/docstruct/tests/test_table_ast_from_rows.py` verifica o contrato acima,
+  incluindo que `normalize_table_ast` e o construtor canônico retornam a mesma
+  AST que a função pública para as mesmas linhas, que uma primeira linha vazia
+  não é promovida a cabeçalho legado e que os exportadores concordam nisso.
+- `libs/core/tests/test_table_ast_from_rows_parity.py` verifica a referência
+  congelada do core sobre linhas aleatórias (incluindo linhas vazias), a tabela
+  só com espaços que o construtor de payload passa, e que `docstruct.canonical`
+  não tem mais construtor privado.
+- Caracterização da exportação: a tabela dos snapshots de exportação é definida
+  por `table_ast`, não construída a partir de linhas, então seus bytes de
+  TXT/HTML/Markdown/Pandoc não mudam. O corpus de aceitação do gate estrito
+  (`tests/fixtures/export_schema_gate`) tem uma tabela só de linhas
+  (`numeric-table-rows`), mas nenhuma tabela com linhas vazias, então os 68
+  resultados de linha de base TXT/HTML/DOCX/PDF-UA não mudam;
+  `libs/core/tests/test_export_schema_gate.py` continua comparando-os.
+
+## 8. Documentação relacionada
 
 - [libs/docstruct/README.md](../libs/docstruct/README.md) — API pública.
 - [pddl_pipeline.pt-br.md](pddl_pipeline.pt-br.md) — orquestração PDDL e o método
