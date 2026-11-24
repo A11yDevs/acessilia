@@ -7,13 +7,14 @@ artifact keeps the primary elements those pages replaced.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from core_config_support import core_config
+from core_config_support import core_config, document_config, toolbox_config
 
 from acessilia_core.i18n import reset_request_locale, set_request_locale
 from acessilia_core.manifest.builder import (
@@ -34,12 +35,14 @@ from acessilia_core.manifest.models import (
     Provenance,
     SourceDocument,
 )
+from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
 from acessilia_core.pipeline.handlers.registry import METHOD_HANDLERS
 from acessilia_core.pipeline.handlers.rescue import (
     _handle_rescue_omitted_method,
     is_legitimate_text,
 )
 from acessilia_core.pipeline.obligations import NON_CRITICAL_OBLIGATION_KINDS
+from acessilia_core.ports import RunPorts
 
 NOW = datetime(2026, 11, 18, tzinfo=UTC)
 W, H = 600.0, 800.0
@@ -223,6 +226,55 @@ def test_restores_the_primary_block_a_routed_page_lost(tmp_path):
     assert [e.reading_order for e in manifest.elements] == list(range(1, 6))
     assert manifest.pages[0].element_ids == ["m-1", "m-2", rescued.id, "m-3"]
     assert manifest.summary.element_count == 5
+
+
+def test_the_restored_block_is_marked_by_the_post_execution_pass(tmp_path, monkeypatch):
+    """#599: the real rescue handler restores a block the second pass marks."""
+    text = "The relation h = 0 holds."
+    elements = [
+        _adopted("m-1", "heading", "Introduction", TOP, 1),
+        _adopted("m-2", "paragraph", "The first paragraph of the body text.", MIDDLE, 2),
+        _adopted("m-3", "table", "a | b", BOTTOM, 3),
+    ]
+    replaced = {1: [
+        _row("d-1", "heading", "Introduction", TOP, 1),
+        _row("d-2", "paragraph", "The first paragraph of the body text.", MIDDLE, 2),
+        _row("d-3", "paragraph", text, LOWER, 3),
+    ]}
+    manifest = _manifest(tmp_path, elements, replaced=replaced)
+    planning = manifest.model_copy(deep=True)
+    _rescue(manifest)
+
+    def span(value, font, x, baseline=450.0, size=11.96):
+        width = max(len(value), 1) * size * 0.5
+        return {
+            "text": value, "font": font, "size": size, "flags": 4,
+            "bbox": [x, baseline - size * 0.75, x + width, baseline + size * 0.25],
+            "origin": [x, baseline],
+        }
+
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        return {1: {
+            "page_number": 1, "width": W, "height": H, "rotation": 0,
+            "lines": [{"bbox": [0, 0, 0, 0], "spans": [
+                span("The relation ", "CMR12", 40),
+                span("h", "CMMI12", 117.74),
+                span("̸", "CMSY10", 123.72),
+                span(" = 0", "CMR12", 123.72),
+                span(" holds.", "CMR12", 147.64),
+            ]}],
+        }}
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
+
+    asyncio.run(inline_math_stage._mark_inline_math_after_execution(
+        manifest, planning, tmp_path / "doc.pdf", document_config(),
+        RunPorts.none(), toolbox_config(),
+    ))
+
+    rescued = next(e for e in manifest.elements if e.text and "relation" in e.text)
+    assert rescued.text == r"The relation $h\neq0$ holds."
+    assert manifest.extractor.configuration["inline_math_detection"] == "fonts"
 
 
 def test_a_second_run_restores_nothing(tmp_path):

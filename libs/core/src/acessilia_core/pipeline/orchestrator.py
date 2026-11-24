@@ -386,7 +386,7 @@ class PddlAccessibilityOrchestrator:
         )
         self._check_unsatisfied(manifest, execution_report)
         # The canonical build converts the spans of the manifest it is given.
-        await _mark_inline_math_after_execution(manifest, ctx.source_path, config.document, ctx.ports, config.toolbox)
+        await _mark_inline_math_after_execution(manifest, planning.planning_manifest, ctx.source_path, config.document, ctx.ports, config.toolbox)
 
         payload = build_pddl_structured_payload(
             file_path=file_path,

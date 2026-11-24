@@ -669,3 +669,95 @@ def test_plan_and_canonical_use_the_same_variable_sources(toolbox_math, kind, ha
     assert manifest == before
     assert getattr(formula_handlers, handler)(manifest, 'o-f', config=core_config()).success
     assert toolbox_math[capability] == ['h' + (IT if expected else '') + '(1+h)']
+
+
+@pytest.mark.parametrize(('handler', 'capability'), [
+    ('_handle_mathml_method', 'convert'),
+    ('_handle_latex_verbalizer_method', 'verbalize'),
+])
+def test_a_late_inline_mark_invalidates_the_planned_formula_conversion(
+    toolbox_math, handler, capability, monkeypatch
+):
+    """#599: a block restored after the handler adds variable evidence.
+
+    The handler ran with no evidence that h is a variable, so it sent
+    ``h(12+h)`` as a function call. The restored paragraph later marked by the
+    second pass adds ``h \\neq 0``; the canonical build must redo the formula
+    with the final variables instead of reusing the stale conversion.
+    """
+    import asyncio
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from acessilia_core.manifest.models import (
+        BoundingBox,
+        ManifestElement,
+        PageDescriptor,
+        Provenance,
+    )
+    from acessilia_core.pipeline import canonical_builder
+    from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
+    from acessilia_core.pipeline.payload import build_pddl_structured_payload
+    from acessilia_core.ports import RunPorts
+
+    manifest = _manifest_with_formulas('h(12+h)')
+    assert getattr(formula_handlers, handler)(
+        manifest, 'o-f', config=core_config()
+    ).success
+    assert toolbox_math[capability] == ['h(12+h)']
+    baseline = manifest.model_copy(deep=True)
+
+    restored = ManifestElement(
+        id='restored', type='paragraph', raw_label='paragraph',
+        reading_order=2, hierarchy_level=1, text='h = 0', page_number=1,
+        provenance=[Provenance(page_number=1, bbox=BoundingBox(
+            left=50, top=210, right=560, bottom=232, coord_origin='TOPLEFT',
+        ))],
+    )
+    manifest.elements.append(restored)
+    manifest.pages = [PageDescriptor(
+        page_number=1, height=792.0, width=612.0,
+        element_ids=[element.id for element in manifest.elements],
+    )]
+
+    def span(text, font, x, size=11.96, baseline=225.96):
+        width = max(len(text), 1) * size * 0.5
+        return {
+            'text': text, 'font': font, 'size': size, 'flags': 4,
+            'bbox': [x, baseline - size * 0.75, x + width, baseline + size * 0.25],
+            'origin': [x, baseline],
+        }
+
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        line = [span('h', 'CMMI12', 60), span('̸', 'CMSY10', 67), span(' = 0', 'CMR12', 67)]
+        return {1: {
+            'page_number': 1, 'width': 612.0, 'height': 792.0, 'rotation': 0,
+            'lines': [{'bbox': [0, 0, 0, 0], 'spans': line}],
+        }}
+
+    monkeypatch.setattr('acessilia_core.toolbox.text_spans.fetch_text_spans', fetch)
+
+    asyncio.run(inline_math_stage._mark_inline_math_after_execution(
+        manifest, baseline, Path('/tmp/f.pdf'), core_config().document,
+        RunPorts.none(), toolbox_config(),
+    ))
+
+    formula = manifest.elements[0]
+    assert restored.text == r'$h\neq0$'
+    assert 'mathml' not in formula.metadata
+    assert 'verbalization' not in formula.metadata
+
+    payload = build_pddl_structured_payload(
+        file_path=Path('/tmp/f.pdf'), manifest=manifest,
+        plan=SimpleNamespace(plan_id='p', planner='internal', expected_total_cost=0),
+        planner_backend='internal',
+        execution_report=SimpleNamespace(status='completed', execution_id='e'),
+        comparison=None,
+    )
+    canonical_builder.build_canonical_document(
+        payload, title='t', toolbox=toolbox_config()
+    )
+
+    marked = 'h' + IT + '(12+h)'
+    assert marked in toolbox_math['convert']
+    assert marked in toolbox_math['verbalize']

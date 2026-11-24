@@ -320,8 +320,36 @@ async def _mark_table_inline_math(
     return counts
 
 
+def _carries_inline_math(element: ManifestElement) -> bool:
+    """Whether a block already carries a ``$…$`` span (a table's cells included)."""
+    if "$" in (element.text or ""):
+        return True
+    return element.type == "table" and "$" in str(
+        element.metadata.get("table_ast") or ""
+    )
+
+
+def _invalidate_formula_conversions(manifest: ProcessingManifest) -> None:
+    """Drop the planned formula conversions a new block can contradict.
+
+    The ``mathml`` and ``latex-verbalizer`` handlers mark implicit products
+    with the variables the manifest had when they ran. A block added during the
+    plan can carry variable evidence they never saw, either already written as
+    ``$…$`` or marked by the second pass. The canonical build reuses
+    ``metadata["mathml"]`` and ``metadata["verbalization"]`` when present, so
+    keeping them would ship a conversion made with the old variables; dropping
+    them makes the build redo every formula with the final manifest. The LaTeX
+    and ``latex_normalized`` stay.
+    """
+    for element in manifest.elements:
+        if element.type == "formula" and (element.text or "").strip():
+            element.metadata.pop("mathml", None)
+            element.metadata.pop("verbalization", None)
+
+
 async def _mark_inline_math_after_execution(
     manifest: ProcessingManifest,
+    planning_manifest: ProcessingManifest,
     source_path: Path,
     document: DocumentConfig,
     ports: RunPorts,
@@ -337,16 +365,38 @@ async def _mark_inline_math_after_execution(
     before the payload is built.
 
     The reader is the run's (``RunPorts.services``), the one the prose and table
-    steps used, so a page already fetched is not requested again and a
-    capability that failed is not asked again. The steps skip every element
-    that already carries ``metadata["inline_math_detection"]``, so only the
-    elements the execution added are touched. A page the reader cannot read is
-    recorded as ``unavailable`` on ``manifest``, the copy the executor returned
-    included.
+    steps used, so a page already fetched in this run is not requested again
+    and a capability that failed is not asked again; a resumed run rebuilds
+    that in-memory cache. The steps skip every element that already carries
+    ``metadata["inline_math_detection"]``; elements that never got a mark stay
+    candidates. A page the reader cannot read is recorded as ``unavailable`` on
+    ``manifest``, the copy the executor returned included.
+
+    ``planning_manifest`` is the manifest the plan ran from, before any handler
+    added a block. A block added during the plan can carry variable evidence
+    the planned formula handlers never saw (already written as ``$…$``, or
+    marked here). Those formulas are converted with the old variables, so their
+    planned conversions are dropped and the canonical build redoes them with
+    the final manifest (``_invalidate_formula_conversions``).
     """
+    planned = {element.id for element in planning_manifest.elements}
+    added = [
+        element
+        for element in manifest.elements
+        if element.id not in planned
+        and element.type in _INLINE_MATH_ELEMENT_TYPES | {"table"}
+    ]
     text_spans = run_text_spans(ports, manifest, source_path, toolbox)
-    await _mark_inline_math(manifest, source_path, document, text_spans)
-    await _mark_table_inline_math(manifest, source_path, document, text_spans)
+    counts = await _mark_inline_math(manifest, source_path, document, text_spans)
+    table_counts = await _mark_table_inline_math(
+        manifest, source_path, document, text_spans
+    )
+    if (
+        counts["marked"]
+        or table_counts["marked"]
+        or any(_carries_inline_math(element) for element in added)
+    ):
+        _invalidate_formula_conversions(manifest)
 
 
 def _placements(element: ManifestElement) -> list[Placement]:

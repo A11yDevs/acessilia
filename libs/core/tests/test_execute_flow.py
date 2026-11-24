@@ -39,8 +39,12 @@ def _recorders(monkeypatch):
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
                  "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, record(name))
-    # The post-execution inline math pass (#599).
-    monkeypatch.setattr(pddl, "_mark_inline_math_after_execution", record("_mark_inline_math_after_execution"))
+    # The post-execution inline math pass (#599) takes the executed and the
+    # planning manifests before the source.
+    async def after_execution(manifest, planning_manifest, source, *args, **kwargs):
+        calls.append(("_mark_inline_math_after_execution", source.name, tuple(args), dict(kwargs)))
+
+    monkeypatch.setattr(pddl, "_mark_inline_math_after_execution", after_execution)
     # The table steps run inside the plan, as the ``table-enrichment`` method (#640, M2).
     monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
 

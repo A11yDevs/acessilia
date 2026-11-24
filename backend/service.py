@@ -94,7 +94,7 @@ def _cache_version(
     """
     engine = _normalized_engine()
     return options_cache_key(
-        f"{config.models.ai_client}-{engine}-v13",
+        f"{config.models.ai_client}-{engine}-v14",
         mode=mode,
         custom_prompt=custom_prompt or "",
         thinking_mode=thinking_mode,

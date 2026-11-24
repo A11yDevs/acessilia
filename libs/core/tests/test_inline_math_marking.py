@@ -219,11 +219,12 @@ def _first_pass(manifest, ports, detection="fonts"):
     )
 
 
-def _after_execution(manifest, ports, detection="fonts"):
+def _after_execution(manifest, ports, baseline=None, detection="fonts"):
     """What ``execute`` runs after the plan: both steps over the run's reader (#599)."""
     asyncio.run(
         inline_math_stage._mark_inline_math_after_execution(
             manifest,
+            baseline or manifest,
             SOURCE,
             document_config(inline_math_detection=detection),
             ports,
@@ -240,10 +241,11 @@ def test_the_second_pass_marks_only_the_block_the_plan_added(spans):
     text_before = marked_before.text
     assert marked_before.metadata["inline_math_detection"] == {"marked": 2, "unmatched": 0}
 
+    baseline = manifest.model_copy(deep=True)
     restored = _element("p2", "paragraph", FLAT, 210, 232, reading_order=4)
     manifest.elements.append(restored)
 
-    _after_execution(manifest, ports)
+    _after_execution(manifest, ports, baseline)
 
     assert marked_before.text == text_before
     assert marked_before.metadata["inline_math_detection"] == {"marked": 2, "unmatched": 0}
