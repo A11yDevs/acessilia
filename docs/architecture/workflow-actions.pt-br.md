@@ -289,8 +289,8 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    reconhecimento uma obrigação da própria fórmula, que a reconciliação
    então dá a uma fórmula encontrada durante o plano (#846; fechá-la é
    condição da release 0.3.0). O
-   `test_a_picture_read_as_a_formula_gets_the_formula_steps` a fixa como um
-   `xfail` estrito.
+   `test_a_picture_read_as_a_formula_misses_the_formula_steps_until_m3` a
+   fixa e falha quando o M3 a fechar.
 3. **A infraestrutura fica fora do domínio** (ADR-0029). O cache de regiões já
    está em `RunPorts`. O breaker, o gancho de progresso e o leitor de spans de
    texto são variáveis locais hoje. A proposta é torná-los um **serviço de

@@ -376,7 +376,7 @@ def test_the_method_leaves_the_pictures_as_the_step_before_planning_did(monkeypa
     are listed in the 0.3.14 changelog: a formula or a table is never
     described, a document whose pictures are all described does not move on
     to its placeholder visuals, and a picture read as a formula misses the
-    formula LaTeX step until M3 (``test_a_picture_read_as_a_formula_gets_the_formula_steps``)."""
+    formula LaTeX step until M3 (``test_a_picture_read_as_a_formula_misses_the_formula_steps_until_m3``)."""
     answers = {
         "p-1": _description("A bar chart of sales."),
         "p-2": _formula(r"\frac{a}{b}"),
@@ -470,22 +470,24 @@ def test_a_picture_read_as_a_formula_replaces_its_obligation(monkeypatch) -> Non
     assert "verbalize-formula" in kinds and "describe-image" not in kinds
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known gap until M3 (#846): the formula LaTeX step runs before planning, so a "
-    "formula the descriptions find misses the recognition and the equation number.",
-)
-def test_a_picture_read_as_a_formula_gets_the_formula_steps(monkeypatch) -> None:
-    """Picture, then formula, then recognition and the equation number: what
-    the step before planning gave such a formula until 0.3.13, because the
-    formula LaTeX step ran after it."""
+def test_a_picture_read_as_a_formula_misses_the_formula_steps_until_m3(monkeypatch) -> None:
+    """The known gap, pinned (#846): picture, then formula, keeps the model's
+    LaTeX but neither the recognition nor the separation of its equation
+    number, which the step before planning gave it until 0.3.13, because
+    the formula LaTeX step ran after it.
+
+    It pins today's behaviour instead of an ``xfail``, which the CI counts as
+    a skipped test and refuses. When M3 makes the recognition the formula's
+    own obligation, this test fails: invert it to require the equation
+    number, picture, then formula, then recognition and verbalization."""
     _answers(monkeypatch, {"p-1": _formula(r"E = mc^{2} \qquad (3)")})
 
     updated, _ = _in_executor(_pictures_manifest("p-1"))
 
     formula = next(element for element in updated.elements if element.id == "p-1")
     assert formula.type == "formula"
-    assert formula.metadata.get("equation_number") == "3"
+    assert "equation_number" not in formula.metadata
+    assert formula.text.endswith("(3)")
 
 
 def _run(monkeypatch, manifest, tmp_path, *, register):

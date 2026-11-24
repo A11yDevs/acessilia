@@ -283,8 +283,9 @@ the manifest. **The enrichment migration needs no domain change.**
    equation number. It is a known gap until M3 makes the recognition the
    formula's own obligation, which the reconciliation then gives to a
    formula found during the plan (#846; closing it is a condition of the
-   0.3.0 release). `test_a_picture_read_as_a_formula_gets_the_formula_steps`
-   pins it as a strict `xfail`.
+   0.3.0 release).
+   `test_a_picture_read_as_a_formula_misses_the_formula_steps_until_m3`
+   pins it, and fails once M3 closes it.
 3. **Infrastructure stays out of the domain** (ADR-0029). The region cache is
    already in `RunPorts`. The breaker, the progress hook and the text-span
    reader are locals today. The proposal is to make them a per-run

@@ -58,7 +58,8 @@ de posse de novo depois das descrições.
   essa fórmula fica com o LaTeX do modelo, sem a segunda leitura do
   reconhecedor nem a separação do número da equação. O M3 (#846) torna o
   reconhecimento uma obrigação da própria fórmula; fechar a lacuna é
-  condição da release 0.3.0, e um teste `xfail` estrito a fixa.
+  condição da release 0.3.0, e um teste a fixa, falhando quando o M3 a
+  fechar.
 - Um manifesto com todas as imagens descritas, como um checkpoint de
   enriquecimento da 0.3.13, não ganha `describe-images`, então uma retomada
   não descreve nada de novo antes do primeiro plano; a reconciliação de um

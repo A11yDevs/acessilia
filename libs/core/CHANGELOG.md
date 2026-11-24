@@ -54,7 +54,7 @@ the descriptions.
   the model's LaTeX, without the recognizer's second reading or the
   separation of its equation number. M3 (#846) makes the recognition the
   formula's own obligation; closing the gap is a condition of the 0.3.0
-  release, and a strict `xfail` test pins it.
+  release, and a test pins it, failing once M3 closes it.
 - A manifest whose pictures are all described, such as an enrichment
   checkpoint from 0.3.13, gets no `describe-images`, so a resume describes
   nothing again before the first plan; a replan's reconciliation gives its
