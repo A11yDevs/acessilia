@@ -25,6 +25,7 @@ from pddl_support import (
     install_formula_recognizer,
 )
 
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.pipeline import payload as pipeline_payload
@@ -108,6 +109,47 @@ def _data(monkeypatch, answers):
             return answers[len(calls) - 1]
 
     monkeypatch.setattr("acessilia_core.pipeline.enrichment.tables.DataAgent", FakeDataAgent)
+    return calls
+
+
+def _rejecting_vision(monkeypatch, error: type[Exception] = ModelCallRejected):
+    """Every vision call is rejected/rejected-closed, never reaching a provider."""
+    calls = []
+
+    class RejectingVision:
+        def __init__(self, mode: str, *, region_cache, toolbox, models) -> None:
+            self.mode = mode
+
+        async def describe_region(self, **kwargs):
+            calls.append(kwargs)
+            raise error("model-call execution capacity is full")
+
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.formulas.VisionAgent", RejectingVision)
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.pictures.VisionAgent", RejectingVision)
+    for crop_user in (
+        "acessilia_core.pipeline.enrichment.tables._extract_picture_bytes",
+        "acessilia_core.pipeline.enrichment.pictures._extract_picture_bytes",
+    ):
+        monkeypatch.setattr(crop_user, lambda *_args, **_kwargs: (b"image-bytes", 1))
+    return calls
+
+
+def _rejecting_data(monkeypatch, error: type[Exception] = ModelCallRejected):
+    calls = []
+
+    class RejectingDataAgent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def process_region(self, **kwargs):
+            calls.append(kwargs)
+            raise error("model-call execution capacity is full")
+
+    monkeypatch.setattr("acessilia_core.pipeline.enrichment.tables.DataAgent", RejectingDataAgent)
+    monkeypatch.setattr(
+        "acessilia_core.pipeline.enrichment.tables._extract_picture_bytes",
+        lambda *_args, **_kwargs: (b"image-bytes", 1),
+    )
     return calls
 
 
@@ -423,3 +465,75 @@ async def test_validation_failures_open_the_breaker_too(monkeypatch, tmp_path):
     details = [(p.metadata.get("vision_failure_detail") or "") for p in manifest.elements]
     assert details[0] == "ValidationError after 2 tries"
     assert details[-1].startswith("skipped:")
+
+
+@pytest.mark.asyncio
+async def test_a_local_admission_rejection_does_not_open_the_breaker(monkeypatch, tmp_path):
+    """The runner being busy says nothing about the provider (#590)."""
+    calls = _rejecting_vision(monkeypatch)
+    manifest = _pictures(2)
+
+    await _enrich_picture_descriptions(
+        manifest, tmp_path / "doc.pdf", mode="medio",
+        breaker=ProviderBreaker(1), vision=_serial(breaker_threshold=1),
+        toolbox=toolbox_config(), models=model_config(), region_cache=None,
+    )
+
+    # Both pictures were asked on the first pass, and both again on the retry
+    # pass. Had the rejection counted, the first would have opened the breaker
+    # and the second would have been skipped (one probe, not four calls).
+    assert len(calls) == 4
+    assert [
+        pic.metadata["vision_failure_reason"] for pic in manifest.elements
+    ] == ["admission_rejected", "admission_rejected"]
+    assert all(
+        "capacity is full" in pic.metadata["vision_failure_detail"]
+        for pic in manifest.elements
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_closed_runner_aborts_the_stage_instead_of_degrading(monkeypatch, tmp_path):
+    """Shutdown is lifecycle, not an object failure that a retry pass can fix."""
+    _rejecting_vision(monkeypatch, ModelCallClosed)
+    manifest = _pictures(1)
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        await _enrich_picture_descriptions(
+            manifest, tmp_path / "doc.pdf", mode="medio",
+            breaker=ProviderBreaker(1), vision=_serial(breaker_threshold=1),
+            toolbox=toolbox_config(), models=model_config(), region_cache=None,
+        )
+
+    assert any(isinstance(error, ModelCallClosed) for error in raised.value.exceptions)
+    assert "vision_failure_reason" not in manifest.elements[0].metadata
+
+
+@pytest.mark.asyncio
+async def test_a_closed_runner_aborts_the_table_stage(monkeypatch, tmp_path):
+    _rejecting_data(monkeypatch, ModelCallClosed)
+    tables = _manifest([_element("t-1", "table", text="")], [])
+
+    with pytest.raises(ModelCallClosed):
+        await _enrich_table_structures(
+            tables, Path(tmp_path / "doc.pdf"), breaker=ProviderBreaker(1),
+            vision=_serial(breaker_threshold=1), toolbox=toolbox_config(), models=model_config(),
+        )
+
+    assert "table_read_failure" not in tables.elements[0].metadata
+
+
+@pytest.mark.asyncio
+async def test_a_local_admission_rejection_does_not_open_the_table_breaker(monkeypatch, tmp_path):
+    calls = _rejecting_data(monkeypatch)
+    tables = _manifest([_element("t-1", "table", text=""), _element("t-2", "table", text="")], [])
+
+    await _enrich_table_structures(
+        tables, Path(tmp_path / "doc.pdf"), breaker=ProviderBreaker(1),
+        vision=_serial(breaker_threshold=1), toolbox=toolbox_config(), models=model_config(),
+    )
+
+    assert len(calls) == 4
+    assert [
+        table.metadata["table_read_failure"] for table in tables.elements
+    ] == ["admission_rejected", "admission_rejected"]

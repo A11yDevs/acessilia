@@ -15,6 +15,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_WORKER_TASK_STARTING,
 )
 from acessilia_core.logger import logger
+from backend.config.settings import Settings, settings
 
 
 @dataclass
@@ -30,6 +31,8 @@ class QueueItem:
 
 class UnifiedQueue:
     def __init__(self, max_concurrent: int = 1):
+        if max_concurrent < 1:
+            raise ValueError(f"max_concurrent must be positive, got {max_concurrent}")
         self._queue: deque[QueueItem] = deque()
         self._active_items: dict[str, QueueItem] = {}
         self._active_tasks: dict[str, asyncio.Task] = {}
@@ -38,6 +41,11 @@ class UnifiedQueue:
         self._max_concurrent = max_concurrent
         self._lock = asyncio.Lock()
         self._worker_task: asyncio.Task | None = None
+
+    @property
+    def max_concurrent(self) -> int:
+        """How many jobs may run at once; the model-call capacity is sized for it."""
+        return self._max_concurrent
 
     def start_worker(self):
         if self._worker_task is None or self._worker_task.done():
@@ -149,4 +157,14 @@ class UnifiedQueue:
         }
 
 
-unified_queue = UnifiedQueue(max_concurrent=1)
+def create_unified_queue(configured: Settings | None = None) -> UnifiedQueue:
+    """Build a queue with the configured job concurrency.
+
+    Kept as a factory so tests can exercise a custom ``Settings`` without
+    reloading the module; the process owner is built from the service settings.
+    """
+    source = settings if configured is None else configured
+    return UnifiedQueue(max_concurrent=source.queue_max_concurrent)
+
+
+unified_queue = create_unified_queue()

@@ -15,6 +15,7 @@ from pddl_support import (
     install_formula_recognizer,
 )
 
+from acessilia_core.agents.model_calls import ModelCallRejected
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.elements import _element_to_block
@@ -268,6 +269,46 @@ def _html_of(element):
 
     block = _element_to_block(element)
     return document_to_html({"sections": [{"blocks": [block]}]})
+
+
+@pytest.mark.asyncio
+async def test_a_local_admission_rejection_is_not_counted_against_the_provider(monkeypatch):
+    """Local capacity pressure is not evidence that the provider is down (#590)."""
+    calls = []
+
+    class RejectingVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **kwargs):
+            calls.append(kwargs)
+            raise ModelCallRejected("model-call execution capacity is full")
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", RejectingVision)
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *a, **k: (b"crop", 1))
+    breaker = pddl.ProviderBreaker(1)
+    candidates = build_manifest(
+        [
+            build_element("element-1", "formula", text="a"),
+            build_element("element-2", "formula", text="b"),
+        ],
+        [],
+    )
+
+    await formula_stage._classify_formula_regions(
+        candidates, Path("source.pdf"), mode="medio", breaker=breaker,
+        vision=vision_config(), toolbox=toolbox_config(), models=model_config(),
+        region_cache=None,
+    )
+
+    # Both candidates were asked; had the rejection opened the breaker, the
+    # second one would have been skipped.
+    assert len(calls) == 2
+    assert [
+        element.metadata["formula_classification"]["reason"]
+        for element in candidates.elements
+    ] == ["admission_rejected", "admission_rejected"]
+    assert not breaker.open
 
 
 def test_a_missing_candidate_prompt_falls_back_to_the_system_prompt(monkeypatch):

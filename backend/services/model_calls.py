@@ -7,7 +7,7 @@ Running abandoned calls retain capacity until their thread exits. No event
 loop owns this executor; asyncio.run() never joins it on loop shutdown.
 
 close(wait=False) rejects new work, discards pending calls and wakes active
-awaiters with ModelCallRejected. Active provider threads continue; their late
+awaiters with ModelCallClosed. Active provider threads continue; their late
 results are discarded and their reservations remain held until they finish.
 Closing cannot kill threads or guarantee immediate interpreter exit. Python
 still joins executor threads at exit. The service must be stopped externally if a provider never
@@ -28,7 +28,11 @@ from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any, TypeVar, cast
 
-from acessilia_core.agents.model_calls import ModelCallRejected, ModelCallTimeout
+from acessilia_core.agents.model_calls import (
+    ModelCallClosed,
+    ModelCallRejected,
+    ModelCallTimeout,
+)
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     LOG_MODEL_CALL_ABANDONED,
@@ -100,20 +104,26 @@ class ModelCallExecutor:
         submitted = time.monotonic()
         entry = _Call(call, contextvars.copy_context(), submitted + timeout, label, submitted=submitted)
         rejected = None
+        closed = False
         with self._lock:
-            if self._closed or (
+            if self._closed:
+                self._rejections += 1
+                rejected = MSG_MODEL_CALL_CLOSED
+                closed = True
+            elif (
                 len(self._active) >= self.limits.workers
                 and len(self._pending) >= self.limits.max_pending
             ):
                 self._rejections += 1
-                rejected = MSG_MODEL_CALL_CLOSED if self._closed else MSG_MODEL_CALL_FULL
+                rejected = MSG_MODEL_CALL_FULL
             elif len(self._active) < self.limits.workers:
                 self._dispatch(entry)
             else:
                 self._pending[id(entry)] = entry
         if rejected is not None:
             self._log(LOG_MODEL_CALL_REJECTED, label, warning=True)
-            raise ModelCallRejected(t(rejected))
+            error = ModelCallClosed if closed else ModelCallRejected
+            raise error(t(rejected))
         wrapped = asyncio.wrap_future(entry.result)
         # An awaiter can disappear just as a provider fails. Consume a late
         # exception even in that race; it must never publish an abandoned result.
@@ -236,14 +246,14 @@ class ModelCallExecutor:
             for entry in list(self._pending.values()):
                 entry.call = None
                 entry.abandoned = True
-                entry.result.set_exception(ModelCallRejected(t(MSG_MODEL_CALL_CLOSED)))
+                entry.result.set_exception(ModelCallClosed(t(MSG_MODEL_CALL_CLOSED)))
             self._pending.clear()
             for entry in self._active.values():
                 if not entry.abandoned:
                     abandoned.append(entry)
                 entry.abandoned = True
                 if not entry.result.done():
-                    entry.result.set_exception(ModelCallRejected(t(MSG_MODEL_CALL_CLOSED)))
+                    entry.result.set_exception(ModelCallClosed(t(MSG_MODEL_CALL_CLOSED)))
         for entry in abandoned:
             self._log(LOG_MODEL_CALL_ABANDONED, entry.label, warning=True)
         self._pool.shutdown(wait=wait)

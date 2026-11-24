@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import fitz
 import pytest
 
-from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import ModelCallRejected, current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.manifest.models import (
     BoundingBox,
@@ -246,6 +246,28 @@ def test_the_region_handler_replaces_a_failed_description(inspection, kind):
     assert updated.metadata["vision_description_complete"] is True
     assert "vision_failure_reason" not in updated.metadata
     assert "vision_failure_detail" not in updated.metadata
+
+
+def test_a_region_inspection_admission_rejection_fails_the_method_with_its_reason(
+    inspection, monkeypatch
+):
+    """The typed rejection must reach the failed method, not become a generic None."""
+    manifest, _, vision = inspection
+
+    async def reject(self, **_kwargs):
+        raise ModelCallRejected("model-call execution capacity is full")
+
+    monkeypatch.setattr(vision, "describe_region", reject)
+
+    result = inspection_handlers._handle_pymupdf_region_method(
+        manifest, "o-1", config=core_config(), ports=RunPorts.none()
+    )
+
+    assert result.success is False and result.validated is False
+    assert result.message is not None
+    assert "ModelCallRejected" in result.message
+    assert "capacity is full" in result.message
+    assert manifest.elements[0].type == "unknown"
 
 
 @pytest.mark.parametrize("enabled", [True, False])

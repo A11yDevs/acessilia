@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from acessilia_core.agents.data_agent import DataAgent
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import DataOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.blocking import run_blocking
@@ -36,6 +37,7 @@ from acessilia_core.pipeline.elements import _table_element_has_structured_conte
 from acessilia_core.pipeline.enrichment.common import (
     _extract_picture_bytes,
     _retry_failed,
+    should_retry_vision_failure,
 )
 from acessilia_core.pipeline.obligations import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id
@@ -136,11 +138,14 @@ class _TableReader:
                 )
             return False
 
-        table_output, answered, why, attempt = await _read_table(
+        table_output, answered, why, attempt, rejected = await _read_table(
             self.data_agent, self.breaker, element, image_bytes, page_number, reason
         )
         if table_output is None:
-            _record_unread_table(element, page_number, reason, answered, why, attempt)
+            _record_unread_table(
+                element, page_number, reason, answered, why, attempt,
+                rejected=rejected,
+            )
             return False
         _fold_table_reading(element, table_output, page_number, reason, attempt)
         return True
@@ -183,7 +188,7 @@ async def _enrich_table_structures(
         [
             (position, element)
             for position, element in enumerate(table_elements, start=1)
-            if element.metadata.get("table_read_failure") == "model_failed"
+            if should_retry_vision_failure(element.metadata.get("table_read_failure"))
         ],
         reader.read_and_notify,
         kind="tables",
@@ -230,19 +235,21 @@ async def _read_table(
     image_bytes: bytes,
     page_number: int,
     reason: str | None,
-) -> tuple[DataOutput | None, bool, str, int]:
-    """Ask the data agent for a table: ``(reading, answered, why, attempts)``.
+) -> tuple[DataOutput | None, bool, str, int, bool]:
+    """Ask the data agent for a table: ``(reading, answered, why, attempts, rejected)``.
 
     A misread table (``reason``) gets a few readings: the model may drop
     columns or rows on one try and read the table whole on the next, and a
     reading that is not the same table read better is refused
     (``_table_reread_disqualified``). ``reading`` is ``None`` when none was
     kept; ``answered`` says whether the model answered at all, ``why`` why
-    nothing was kept, and ``attempts`` how many readings were made.
+    nothing was kept, ``attempts`` how many readings were made, and
+    ``rejected`` that a local admission rejection stopped the reads (#590).
     """
     attempts = _TABLE_REREAD_ATTEMPTS if reason is not None else 1
     table_output = None
     answered = False
+    rejected = False
     why = "no table was read"
     attempt = 0
     for attempt in range(1, attempts + 1):
@@ -250,12 +257,23 @@ async def _read_table(
             why = breaker.skip_detail()
             attempt -= 1  # this try was not made
             break
-        candidate = await data_agent.process_region(
-            image_bytes=image_bytes,
-            classification="table",
-            page_num=page_number,
-            fallback_text=element.text or "",
-        )
+        try:
+            candidate = await data_agent.process_region(
+                image_bytes=image_bytes,
+                classification="table",
+                page_num=page_number,
+                fallback_text=element.text or "",
+            )
+        except ModelCallClosed:
+            raise  # shutdown aborts the stage instead of degrading the table
+        except ModelCallRejected as error:
+            # Local admission pressure, not the provider: stop the rereads,
+            # do not count it toward the breaker, and record a reason a later
+            # pass can retry (#590).
+            rejected = True
+            why = str(error) or "model-call admission rejected"
+            attempt -= 1  # this try made no reading
+            break
         # The data agent returns None for any failure, an unusable answer
         # included, so the breaker may count one of those too.
         breaker.record(candidate is not None)
@@ -271,7 +289,7 @@ async def _read_table(
                 continue
         table_output = candidate
         break
-    return table_output, answered, why, attempt
+    return table_output, answered, why, attempt, rejected
 
 
 def _record_unread_table(
@@ -281,14 +299,22 @@ def _record_unread_table(
     answered: bool,
     why: str,
     attempt: int,
+    *,
+    rejected: bool = False,
 ) -> None:
     """Record that no reading of a table was kept.
 
     A reading refused as worse than the table, or an answer that it is not a
     table, is the model's answer; only no answer at all is a failure a rerun
-    may not repeat. A misread table stays as it was, with why.
+    may not repeat. A local admission rejection is a third case: the provider
+    was never asked, so it must not count against it and the table may be read
+    on a later pass (#590). A misread table stays as it was, with why.
     """
-    if answered:
+    if rejected:
+        # The provider was never asked for the reread that might have read the
+        # table better, so the run is not cacheable and a later pass may retry.
+        _record_table_read_failure(element, "admission_rejected")
+    elif answered:
         # The provider is up and answered; a failure an earlier pass
         # recorded on this element is no longer true.
         element.metadata.pop("table_read_failure", None)
@@ -353,8 +379,9 @@ def _fold_table_reading(
 
 
 #: Why a table was left unread, recorded in metadata["table_read_failure"]: the
-#: crop could not be rendered, or the data agent returned no answer at all.
-TableReadFailure = Literal["crop_unavailable", "model_failed"]
+#: crop could not be rendered, the data agent returned no answer at all, or the
+#: local model-call runner had no admission capacity (#590).
+TableReadFailure = Literal["crop_unavailable", "model_failed", "admission_rejected"]
 
 
 def _record_table_read_failure(element: ManifestElement, reason: TableReadFailure) -> None:
