@@ -187,6 +187,18 @@ class TableSpecialistAgent:
         cands = self.process_build_candidates(record, greedy, samples, max_chars)
         return {"candidates": [{"name": n, "html": h} for n, h in cands]}
 
+    def _select_tool(
+        self,
+        process: Callable[..., tuple[dict[str, Any] | None, Counter]],
+        record: dict[str, Any],
+        greedy: str,
+        samples: list[str] | None,
+        max_chars: int,
+    ) -> dict[str, Any]:
+        """Run a table-selection process function and wrap its result for Agno."""
+        decision, stats = process(record, greedy, samples, max_chars)
+        return {"decision": decision, "stats": dict(stats)}
+
     def select_table(
         self,
         record: dict[str, Any],
@@ -205,8 +217,9 @@ class TableSpecialistAgent:
         Returns:
             dict: ``{"decision": dict | None, "stats": dict}``.
         """
-        decision, stats = self.process_select_table(record, greedy, samples, max_chars)
-        return {"decision": decision, "stats": dict(stats)}
+        return self._select_tool(
+            self.process_select_table, record, greedy, samples, max_chars
+        )
 
     def select_greedy(
         self,
@@ -226,5 +239,6 @@ class TableSpecialistAgent:
         Returns:
             dict: ``{"decision": dict | None, "stats": dict}``.
         """
-        decision, stats = self.process_select_greedy(record, greedy, samples, max_chars)
-        return {"decision": decision, "stats": dict(stats)}
+        return self._select_tool(
+            self.process_select_greedy, record, greedy, samples, max_chars
+        )
