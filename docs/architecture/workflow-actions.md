@@ -282,7 +282,9 @@ the manifest. **The enrichment migration needs no domain change.**
    without the recognizer's second reading or the separation of its
    equation number. It is a known gap until M3 makes the recognition the
    formula's own obligation, which the reconciliation then gives to a
-   formula found during the plan.
+   formula found during the plan (#846; closing it is a condition of the
+   0.3.0 release). `test_a_picture_read_as_a_formula_gets_the_formula_steps`
+   pins it as a strict `xfail`.
 3. **Infrastructure stays out of the domain** (ADR-0029). The region cache is
    already in `RunPorts`. The breaker, the progress hook and the text-span
    reader are locals today. The proposal is to make them a per-run
@@ -297,7 +299,10 @@ the manifest. **The enrichment migration needs no domain change.**
    bootstrap**. The picture method (M1) annotates the ownership again after
    it retypes elements, as the step did, so it reads the inspection the
    orchestrator gives the run's services (`RunServices.media_inspection`);
-   the planner never reads it.
+   the planner never reads it. Recording the two facts it needs in the
+   manifest instead, typed, is #847. Inside the plan the method does not
+   inject the full-page picture again: that structural part stays the
+   bootstrap's.
 5. **Handlers are synchronous.** `MethodHandler` is
    `(manifest, obligation_id) -> MethodResult`; the steps are asynchronous. A
    migrated handler calls them through `acessilia_sdk.runtime.run_sync`, as
@@ -349,7 +354,7 @@ both:
 | Step | Kind and method | Targets | Dropped from its targets | Depends on it |
 |---|---|---|---|---|
 | Table enrichment (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | every table | an element no longer a table | `linearize-table`, `select-table-source`, and the page obligations of a page with a table |
-| Picture descriptions (M1, 0.3.14) | `describe-images`, `picture-description` | the pictures not described yet; without pictures, in a mostly visual document, its placeholder visuals, or the first element of a one-page one; never a formula | an element that became a formula | `describe-image`, and the page obligations of a page with a picture |
+| Picture descriptions (M1, 0.3.14) | `describe-images`, `picture-description` | the pictures not described yet; without pictures, in a mostly visual document, its placeholder visuals, or the first element of a one-page one; never a formula or a table | an element that became a formula or a table | `describe-image`, and the page obligations of a page with a picture |
 
 A manifest whose pictures are all described (an enrichment checkpoint from
 0.3.13) gets no `describe-images`. The candidates are chosen before the
@@ -357,16 +362,28 @@ described ones are left out, so a document whose pictures are all described
 no longer moves on to its placeholder visuals, as the step before planning
 did on a resume. The candidates and the elements the step keeps share one
 test (`is_describable`), so the step never takes an element it would then
-drop: a formula, which the one-page fallback used to take, is left to the
-formula steps.
+drop. A formula or a table, which the one-page fallback used to take, is
+left to its own steps and never retyped as a picture.
 
-Between the two steps, the edges follow `DOCUMENT_STEPS`: a step's
-obligation may depend on an earlier step's that shares an element, never on
-a later one's. They share one in a one-page mostly visual document whose
-first element is a table: the descriptions take it as their fallback and
-the table step as its table. Then `enrich-tables` depends on
-`describe-images`, the order before planning until 0.3.13; applied in both
-directions, the rule made a cycle.
+**Between the two steps** the policy is explicit: they share no element, so
+neither depends on the other. Before the review of #845 they could share
+the table of a one-page document, and the target rule, applied by each
+step, made them depend on each other: a cycle. As a guard for a later step,
+the edges follow `DOCUMENT_STEPS`: a step's obligation may depend on an
+earlier step's that shares an element, never on a later one's.
+
+**The plan decides the targets.** The method describes its obligation's
+targets that are still describable and not described, whatever the
+candidates are when it runs (a placeholder visual stays a target after a
+picture appears), so it never succeeds without trying the work it was
+planned for. A target another step now reads is reported as
+`not_describable`.
+
+**Resuming an older checkpoint.** An enrichment checkpoint from 0.3.13 is
+resumed as it is: its pictures were described, or left with a failure
+reason, before planning, so it gets no `describe-images`. A replan's
+reconciliation gives the ones left undescribed one obligation, so the
+replan the run makes anyway tries them once more.
 
 **What its result means.** The method succeeds when the collective attempt
 ran: the step completed for every target. That is not a claim that every

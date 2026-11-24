@@ -239,14 +239,21 @@ async def _enrich_picture_descriptions(
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
     targets: frozenset[str] | None = None,
+    inject: bool = True,
 ) -> int:
     """Describe the pictures not described yet; returns how many were described.
 
     ``targets`` keeps the step to an obligation's elements (``None``: the
-    whole document). The preparation (``_prepare_pictures``) runs first and
-    is idempotent: before planning it already ran, and it changes nothing.
+    whole document). The text ownership is annotated before and after the
+    descriptions. ``inject`` adds the full-page picture of a standalone
+    image first, as the step did before planning; the planned method passes
+    ``False``, because that structural part of the bootstrap already ran
+    (``_prepare_pictures``) and an element the plan needs is found through
+    the reconciliation, not injected again (#845 review).
     """
-    _prepare_pictures(manifest, media_inspection)
+    if inject:
+        _inject_full_page_picture(manifest, media_inspection)
+    _annotate_visual_text_ownership(manifest, media_inspection)
 
     pictures = _pictures_to_describe(manifest, targets=targets)
     if not pictures:
@@ -304,11 +311,18 @@ def _prepare_pictures(
     _annotate_visual_text_ownership(manifest, media_inspection)
 
 
+#: Types another step reads, which the descriptions never take: a formula
+#: (the formula steps) and a table (``enrich-tables``). A one-page mostly
+#: visual document whose first element is one of them is not described, so a
+#: table or a formula is never retyped as a picture, and the two document
+#: steps never share an element (#845 review).
+_NOT_DESCRIBABLE = frozenset({"formula", "table"})
+
+
 def is_describable(element: ManifestElement) -> bool:
-    """Whether the picture descriptions may take ``element``: anything but a
-    formula, which the formula steps read (#845 review). The candidates and
-    the obligation's ``applies`` share it, so they never disagree."""
-    return element.type != "formula"
+    """Whether the picture descriptions may take ``element``. The candidates
+    and the obligation's ``applies`` share it, so they never disagree."""
+    return element.type not in _NOT_DESCRIBABLE
 
 
 def description_candidates(manifest: ProcessingManifest) -> list[ManifestElement]:
@@ -339,18 +353,24 @@ def description_candidates(manifest: ProcessingManifest) -> list[ManifestElement
 def _pictures_to_describe(
     manifest: ProcessingManifest, *, targets: frozenset[str] | None = None
 ) -> list[ManifestElement]:
-    """The elements the vision step describes (``description_candidates``),
-    none already described, and only ``targets`` when given.
+    """The elements the vision step describes, none already described.
 
-    The candidates are chosen before the described ones are left out, so a
-    document whose pictures are all described does not move on to its
-    placeholder visuals.
+    With ``targets``, the plan's obligation decided them: its targets still
+    describable, whatever the candidates are now (a placeholder visual stays
+    one of them after a picture appears in the document), so the method never
+    succeeds without trying the work it was planned for. Without, the
+    document's candidates (``description_candidates``), chosen before the
+    described ones are left out, so a document whose pictures are all
+    described does not move on to its placeholder visuals.
     """
+    if targets is not None:
+        chosen = [element for element in manifest.elements if element.id in targets]
+    else:
+        chosen = description_candidates(manifest)
     return [
         element
-        for element in description_candidates(manifest)
-        if not element.metadata.get("vision_description_complete")
-        and (targets is None or element.id in targets)
+        for element in chosen
+        if is_describable(element) and not element.metadata.get("vision_description_complete")
     ]
 
 

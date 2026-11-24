@@ -13,12 +13,16 @@ the descriptions.
 - **One obligation for the document.** It targets the pictures not described
   yet; without pictures, in a mostly visual document, its placeholder
   visuals, or the first element of a one-page one, as the step chose them,
-  but never a formula: the candidates and the elements the step keeps share
-  one test (`is_describable`), so it never takes one it would then drop.
-  Between the two document steps the edges follow `DOCUMENT_STEPS`:
-  `enrich-tables` may depend on `describe-images` when they share an element
-  (a one-page document whose first element is a table), never the reverse,
-  so they make no cycle.
+  but never a formula or a table: the candidates and the elements the step
+  keeps share one test (`is_describable`), so it never takes one it would
+  then drop, and never retypes a formula or a table as a picture. The two
+  document steps share no element, so neither depends on the other; as a
+  guard, the edges between them follow `DOCUMENT_STEPS` (a step's may depend
+  on an earlier step's, never on a later one's), so they make no cycle.
+  The method describes its obligation's targets still describable and not
+  described, whatever the candidates are when it runs, so it never succeeds
+  without trying them; a target another step now reads is reported as
+  `not_describable`.
   Each picture's `describe-image` keeps `vision-description`, which checks
   the result, and depends on it, as do the page obligations of a page with a
   picture. The only alternative is `human-review`. The method succeeds when
@@ -35,7 +39,9 @@ the descriptions.
   injected full-page picture and the first ownership annotation
   (`_prepare_pictures`), so the plan's obligations include the injected
   picture's. The method annotates again with the inspection the orchestrator
-  gives the run's services (`RunServices.media_inspection`). The progress
+  gives the run's services (`RunServices.media_inspection`; recording the
+  facts it needs in the manifest is #847), and does not inject the
+  full-page picture again. The progress
   message before planning is now the formulas' (`STAGE_ENRICHING_FORMULAS`);
   the method announces the descriptions inside the plan.
 - **One rule for both document steps.** The rules of 0.3.13 for the table
@@ -46,11 +52,14 @@ the descriptions.
 - **Known gap until M3.** The formula LaTeX step runs before planning, so it
   no longer sees a picture the model reads as a formula: that formula keeps
   the model's LaTeX, without the recognizer's second reading or the
-  separation of its equation number. M3 makes the recognition the formula's
-  own obligation.
+  separation of its equation number. M3 (#846) makes the recognition the
+  formula's own obligation; closing the gap is a condition of the 0.3.0
+  release, and a strict `xfail` test pins it.
 - A manifest whose pictures are all described, such as an enrichment
   checkpoint from 0.3.13, gets no `describe-images`, so a resume describes
-  nothing again. The candidates are chosen before the described ones are
+  nothing again before the first plan; a replan's reconciliation gives its
+  pictures left undescribed one obligation, tried in the replan the run
+  makes anyway. The candidates are chosen before the described ones are
   left out, so a document whose pictures are all described no longer moves
   on to its placeholder visuals, as the step did on a resume.
 - `picture-description` is `transitional` in `LOCAL_METHODS` (its model call

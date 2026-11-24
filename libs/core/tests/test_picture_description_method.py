@@ -176,33 +176,57 @@ def test_the_plan_describes_the_pictures_before_it_validates_them() -> None:
 
 def _lone_table() -> ProcessingManifest:
     """A one-page mostly visual document whose only element is a table: the
-    descriptions take it (the first element), and so does the table step."""
+    descriptions' one-page fallback took it before the review of #845."""
     linearize = build_obligation("linearize-table", ["t-1"], ["pandoc-table", "human-review"])
     linearize.id = "o-linearize"
     return build_manifest([build_element("t-1", "table", text="a b")], [linearize])
 
 
 @pytest.mark.parametrize("table_first", [False, True], ids=["together", "tables-first"])
-def test_two_document_steps_on_one_element_make_no_cycle(table_first) -> None:
-    """#845 review, item 1: the rule applied in both directions made
-    ``describe-images`` and ``enrich-tables`` depend on each other. The
-    descriptions come first, as before planning until 0.3.13."""
+def test_a_table_is_left_to_the_table_step(table_first) -> None:
+    """#845 review, items 2.1 and 2.2: the descriptions shared the table with
+    ``enrich-tables`` and the two came to depend on each other, a cycle; the
+    table could also be retyped as a picture. A table is not describable, so
+    the steps never share an element. Reconciled twice, the graph is the
+    same, a DAG, and the table is read before it is linearized."""
     manifest = _lone_table()
     if table_first:
         reconcile_document_step(manifest, TABLE_ENRICHMENT)
 
     reconcile_document_steps(manifest)
+    once = manifest.model_dump()
     reconcile_document_steps(manifest, replan=True)
 
+    assert manifest.model_dump() == once
     validate_obligation_graph(manifest)
-    by_kind = {item.kind: item for item in manifest.obligations}
-    describe, enrich = by_kind[PICTURE_DESCRIPTION.kind], by_kind[TABLE_ENRICHMENT.kind]
-    assert describe.target_ids == enrich.target_ids == ["t-1"]
-    assert describe.dependencies == []
-    assert describe.id in enrich.dependencies
+    assert [item.kind for item in manifest.obligations] == ["linearize-table", TABLE_ENRICHMENT.kind]
     _, plan = PlannerAgent().plan(manifest)
     order = [step.obligation_id for step in plan.steps if step.method]
-    assert order.index(describe.id) < order.index(enrich.id) < order.index("o-linearize")
+    assert order.index("obligation-enrich-tables") < order.index("o-linearize")
+
+
+def test_the_edge_rule_never_makes_a_cycle_between_document_steps() -> None:
+    """The guard behind the policy: even with obligations of both steps on
+    one element (none of today's rules makes that), an earlier step's never
+    depends on a later one's, in whichever order they are reconciled."""
+    from acessilia_core.manifest.models import Obligation
+    from acessilia_core.pipeline.document_obligations import _reconcile_edges
+
+    manifest = build_manifest([build_element("x", "table", text="a b")], [])
+    for kind, obligation_id in ((PICTURE_DESCRIPTION.kind, "d"), (TABLE_ENRICHMENT.kind, "e")):
+        manifest.obligations.append(Obligation(
+            id=obligation_id, kind=kind, target_ids=["x"],
+            admissible_methods=["human-review"], method_costs={"human-review": 100},
+            rationale="test",
+        ))
+    manifest.summary.obligation_count = len(manifest.obligations)
+
+    for step in (TABLE_ENRICHMENT, PICTURE_DESCRIPTION, TABLE_ENRICHMENT):
+        _reconcile_edges(manifest, step)
+
+    by_id = {item.id: item for item in manifest.obligations}
+    assert by_id["d"].dependencies == [] and by_id["e"].dependencies == ["d"]
+    validate_obligation_graph(manifest)
 
 
 def test_a_formula_is_never_a_picture_to_describe() -> None:
@@ -217,7 +241,7 @@ def test_a_formula_is_never_a_picture_to_describe() -> None:
 
 @pytest.mark.parametrize("elements", [
     [("h", "heading", "Titulo")],
-    [("t-1", "table", "a b")],
+    [("t-1", "table", "a b"), ("h", "heading", "Titulo")],
     [("f-1", "formula", ""), ("h", "heading", "Titulo")],
     [("p-1", "picture", ""), ("prose", "paragraph", _PROSE)],
 ])
@@ -337,27 +361,90 @@ def test_the_method_annotates_with_the_run_media_inspection(monkeypatch) -> None
     assert seen and all(item == {"is_image": True} for item in seen)
 
 
-def test_the_method_leaves_the_pictures_as_the_step_before_planning_did(monkeypatch) -> None:
+def _heading_only() -> ProcessingManifest:
+    """A one-page mostly visual document: the fallback describes its heading."""
+    return build_manifest([build_element("h", "heading", text="Titulo")], [])
+
+
+@pytest.mark.parametrize("scenario", ["pictures-and-a-formula", "one-page-fallback"])
+def test_the_method_leaves_the_pictures_as_the_step_before_planning_did(monkeypatch, scenario) -> None:
     """The differential test of the migration (ADR-0028): the same answers
     give the same elements, whether the step runs before planning, as until
-    0.3.13, or as the method inside the plan."""
+    0.3.13, or as the method inside the plan.
+
+    It compares the step, not the whole pipeline. The intended differences
+    are listed in the 0.3.14 changelog: a formula or a table is never
+    described, a document whose pictures are all described does not move on
+    to its placeholder visuals, and a picture read as a formula misses the
+    formula LaTeX step until M3 (``test_a_picture_read_as_a_formula_gets_the_formula_steps``)."""
     answers = {
         "p-1": _description("A bar chart of sales."),
         "p-2": _formula(r"\frac{a}{b}"),
+        "h": _description("A road sign."),
     }
     _answers(monkeypatch, answers)
-    before = _pictures_manifest("p-1", "p-2", "p-3")
+    build = {
+        "pictures-and-a-formula": lambda: _pictures_manifest("p-1", "p-2", "p-3"),
+        "one-page-fallback": _heading_only,
+    }[scenario]
+    before = build()
     asyncio.run(picture_stage._enrich_picture_descriptions(
         before, Path("doc.pdf"), mode="medio", vision=CONFIG.vision, toolbox=CONFIG.toolbox,
         models=CONFIG.models, region_cache=None,
     ))
 
-    inside, _ = _in_executor(_pictures_manifest("p-1", "p-2", "p-3"))
+    inside, _ = _in_executor(build())
 
     def elements(manifest):
         return [element.model_dump() for element in manifest.elements]
 
     assert elements(inside) == elements(before)
+
+
+def test_the_method_tries_its_targets_even_when_the_candidates_changed(monkeypatch) -> None:
+    """#845 review, item 2.3: the heading the one-page fallback took stops
+    being a candidate once a picture appears; the method still describes it,
+    because the plan's obligation decided its targets."""
+    calls = _answers(monkeypatch, {"h": _description("A road sign."), "p-new": _description("x")})
+    manifest = _heading_only()
+    enrichment = reconcile_document_step(manifest, PICTURE_DESCRIPTION)
+    manifest.elements.append(build_element("p-new", "picture", text=""))
+    manifest.summary.element_count = len(manifest.elements)
+    handler = build_method_registry().get("picture-description")
+
+    result = handler(manifest, enrichment.id, config=CONFIG, ports=RunPorts.none())
+
+    assert calls == ["h"]
+    assert result.message == n(*MSG_PICTURES_DESCRIBED, 1).format(
+        count=1, described=1, formulas=0, already=0, left="-"
+    )
+
+
+def test_a_target_another_step_now_reads_is_reported_not_described(monkeypatch) -> None:
+    calls = _answers(monkeypatch, {})
+    manifest = _pictures_manifest("p-1")
+    enrichment = reconcile_document_step(manifest, PICTURE_DESCRIPTION)
+    manifest.elements[1].type = "table"
+    handler = build_method_registry().get("picture-description")
+
+    result = handler(manifest, enrichment.id, config=CONFIG, ports=RunPorts.none())
+
+    assert calls == []
+    assert result.message == n(*MSG_PICTURES_DESCRIBED, 1).format(
+        count=1, described=0, formulas=0, already=0, left="not_describable: 1"
+    )
+
+
+def test_the_method_does_not_inject_the_full_page_picture_again(monkeypatch) -> None:
+    """#845 review, item 4.7: the injection is the bootstrap's; inside the
+    plan the method only annotates and describes."""
+    _answers(monkeypatch, {"h": _description("A photo.")})
+    ports = RunPorts.none()
+    ports.services.media_inspection = {"is_image": True, "requires_visual_inspection": True}
+
+    updated, _ = _in_executor(_heading_only(), ports=ports)
+
+    assert [element.id for element in updated.elements] == ["h"]
 
 
 # The obligations the step changes while the plan runs.
@@ -381,6 +468,24 @@ def test_a_picture_read_as_a_formula_replaces_its_obligation(monkeypatch) -> Non
     assert report.status == "replan-required"
     kinds = {item.kind for item in updated.obligations if "p-1" in item.target_ids}
     assert "verbalize-formula" in kinds and "describe-image" not in kinds
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Known gap until M3 (#846): the formula LaTeX step runs before planning, so a "
+    "formula the descriptions find misses the recognition and the equation number.",
+)
+def test_a_picture_read_as_a_formula_gets_the_formula_steps(monkeypatch) -> None:
+    """Picture, then formula, then recognition and the equation number: what
+    the step before planning gave such a formula until 0.3.13, because the
+    formula LaTeX step ran after it."""
+    _answers(monkeypatch, {"p-1": _formula(r"E = mc^{2} \qquad (3)")})
+
+    updated, _ = _in_executor(_pictures_manifest("p-1"))
+
+    formula = next(element for element in updated.elements if element.id == "p-1")
+    assert formula.type == "formula"
+    assert formula.metadata.get("equation_number") == "3"
 
 
 def _run(monkeypatch, manifest, tmp_path, *, register):
@@ -453,6 +558,20 @@ def test_an_enrichment_checkpoint_from_before_the_migration_gets_no_obligation()
     # its pictures are described.
     reconcile_document_steps(resumed, replan=True)
     assert not any(item.kind == PICTURE_DESCRIPTION.kind for item in resumed.obligations)
+
+
+def test_a_picture_a_0_3_13_run_left_undescribed_is_tried_again_on_a_replan() -> None:
+    """The compatibility policy (#845 review, item 4.6): an enrichment
+    checkpoint from 0.3.13 is resumed as it is, so its pictures the step
+    left undescribed are not described before the first plan, as then. A
+    replan's reconciliation gives them one obligation, selected, so the
+    replan the run makes anyway tries them once more."""
+    manifest = _pictures_manifest("p-1", "p-2", described=("p-1",))
+    manifest.elements[2].metadata["vision_failure_reason"] = "model_failed"
+
+    created = reconcile_document_step(manifest, PICTURE_DESCRIPTION, replan=True)
+
+    assert (created.target_ids, created.selected) == (["p-2"], True)
 
 
 def test_a_fresh_enrichment_adds_the_obligation_before_its_checkpoint(monkeypatch) -> None:

@@ -9,6 +9,10 @@ yet, with its concurrency and its single retry pass, then annotates the text
 ownership again. What derives from the media inspection (the injected
 full-page picture, the first annotation) stays before planning.
 
+The model call is the core's ``VisionAgent``, so the method is
+``transitional`` in ``LOCAL_METHODS`` until that call becomes a Toolbox
+capability (#804, the target architecture of #735).
+
 The breaker, the region cache and the progress reporter are the run's
 (``RunPorts``), the ones the enrichment before planning uses, so a provider
 outage and a progress message count for the whole document. The mode is the
@@ -42,7 +46,10 @@ from acessilia_core.i18n import n, t
 from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_IMAGE_DESCRIPTIONS
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.enrichment.common import run_breaker
-from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.enrichment.pictures import (
+    _enrich_picture_descriptions,
+    is_describable,
+)
 from acessilia_core.pipeline.handlers.common import run_status
 from acessilia_core.pipeline.handlers.messages import (
     MSG_PICTURES_DESCRIBED,
@@ -77,6 +84,7 @@ async def _describe_pictures(
         status_callback=status,
         breaker=run_breaker(ports, config.vision),
         targets=targets,
+        inject=False,
     )
 
 
@@ -84,6 +92,9 @@ def _outcome(element: ManifestElement) -> str:
     """What the step left on a picture it was asked to describe."""
     if element.metadata.get("vision_description_complete"):
         return "formula" if element.type == "formula" else "described"
+    if not is_describable(element):
+        # Another step's element now: not tried, and said so.
+        return "not_describable"
     return str(element.metadata.get("vision_failure_reason") or "undescribed")
 
 

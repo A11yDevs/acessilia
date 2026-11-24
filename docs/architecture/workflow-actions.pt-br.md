@@ -287,7 +287,10 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    fica com o LaTeX do modelo, sem a segunda leitura do reconhecedor nem a
    separação do número da equação. É uma lacuna conhecida até o M3 tornar o
    reconhecimento uma obrigação da própria fórmula, que a reconciliação
-   então dá a uma fórmula encontrada durante o plano.
+   então dá a uma fórmula encontrada durante o plano (#846; fechá-la é
+   condição da release 0.3.0). O
+   `test_a_picture_read_as_a_formula_gets_the_formula_steps` a fixa como um
+   `xfail` estrito.
 3. **A infraestrutura fica fora do domínio** (ADR-0029). O cache de regiões já
    está em `RunPorts`. O breaker, o gancho de progresso e o leitor de spans de
    texto são variáveis locais hoje. A proposta é torná-los um **serviço de
@@ -303,7 +306,10 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    objetos, então **ficam no bootstrap**. O método de imagens (M1) anota a
    posse de novo depois de retipar elementos, como o passo fazia, então lê a
    inspeção que o orquestrador entrega aos serviços da execução
-   (`RunServices.media_inspection`); o planejador nunca a lê.
+   (`RunServices.media_inspection`); o planejador nunca a lê. Gravar no
+   manifesto, tipados, os dois fatos de que ele precisa é a #847. Dentro do
+   plano o método não injeta de novo a imagem de página inteira: essa parte
+   estrutural continua sendo do bootstrap.
 5. **Os handlers são síncronos.** `MethodHandler` é
    `(manifest, obligation_id) -> MethodResult`; os passos são assíncronos. Um
    handler migrado os chama por `acessilia_sdk.runtime.run_sync`, como o
@@ -358,7 +364,7 @@ os dois:
 | Passo | Tipo e método | Alvos | Sai dos alvos | Dependem dela |
 |---|---|---|---|---|
 | Enriquecimento de tabelas (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | todas as tabelas | um elemento que deixou de ser tabela | `linearize-table`, `select-table-source` e as obrigações de página de uma página com tabela |
-| Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um documento de uma página; nunca uma fórmula | um elemento que virou fórmula | `describe-image` e as obrigações de página de uma página com imagem |
+| Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um documento de uma página; nunca uma fórmula nem uma tabela | um elemento que virou fórmula ou tabela | `describe-image` e as obrigações de página de uma página com imagem |
 
 Um manifesto com todas as imagens descritas (um checkpoint de enriquecimento
 da 0.3.13) não ganha `describe-images`. Os candidatos são escolhidos antes de
@@ -366,16 +372,31 @@ deixar de lado os já descritos, então um documento com todas as imagens
 descritas não passa mais para os seus visuais substitutos, como o passo
 antes do planejamento fazia numa retomada. Os candidatos e os elementos que
 o passo mantém compartilham um só teste (`is_describable`), então o passo
-nunca pega um elemento que depois deixaria de lado: uma fórmula, que a
-alternativa de uma página pegava, fica para os passos de fórmula.
+nunca pega um elemento que depois deixaria de lado. Uma fórmula ou uma
+tabela, que a alternativa de uma página pegava, fica para os seus próprios
+passos e nunca é retipada como imagem.
 
-Entre os dois passos, as arestas seguem `DOCUMENT_STEPS`: a obrigação de um
-passo pode depender da de um passo anterior que compartilha um elemento,
-nunca da de um posterior. Eles compartilham um num documento de uma página,
-majoritariamente visual, cujo primeiro elemento é uma tabela: as descrições
-o pegam como alternativa, e o passo de tabelas como sua tabela. Então
-`enrich-tables` depende de `describe-images`, a ordem antes do planejamento
-até a 0.3.13; aplicada nos dois sentidos, a regra fazia um ciclo.
+**Entre os dois passos** a política é explícita: eles não compartilham
+elemento, então nenhum depende do outro. Antes da revisão da #845 eles
+podiam compartilhar a tabela de um documento de uma página, e a regra de
+alvos, aplicada por cada passo, fazia um depender do outro: um ciclo. Como
+proteção para um passo futuro, as arestas seguem `DOCUMENT_STEPS`: a
+obrigação de um passo pode depender da de um passo anterior que compartilha
+um elemento, nunca da de um posterior.
+
+**O plano decide os alvos.** O método descreve os alvos da sua obrigação
+que ainda são descritíveis e não estão descritos, sejam quais forem os
+candidatos quando ele roda (um visual substituto continua alvo depois que
+aparece uma imagem), então ele nunca tem sucesso sem tentar o trabalho para
+o qual foi planejado. Um alvo que agora é lido por outro passo é informado
+como `not_describable`.
+
+**Retomar um checkpoint antigo.** Um checkpoint de enriquecimento da 0.3.13
+é retomado como está: suas imagens foram descritas, ou ficaram com um motivo
+de falha, antes do planejamento, então ele não ganha `describe-images`. A
+reconciliação de um replanejamento dá uma obrigação às que ficaram sem
+descrição, então o replanejamento que a execução já faria as tenta mais uma
+vez.
 
 **O que o resultado significa.** O método tem sucesso quando a tentativa
 coletiva rodou: o passo terminou para todos os alvos. Isso não afirma que todo

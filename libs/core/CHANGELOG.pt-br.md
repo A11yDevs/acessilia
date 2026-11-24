@@ -13,14 +13,18 @@ de posse de novo depois das descrições.
 - **Uma obrigação para o documento.** Ela tem como alvo as imagens ainda não
   descritas; sem imagens, num documento majoritariamente visual, seus
   visuais substitutos, ou o primeiro elemento de um documento de uma
-  página, como o passo os escolhia, mas nunca uma fórmula: os candidatos e
-  os elementos que o passo mantém compartilham um só teste
-  (`is_describable`), então ele nunca pega um que depois deixaria de lado.
-  Entre os dois passos do documento, as arestas seguem `DOCUMENT_STEPS`:
-  `enrich-tables` pode depender de `describe-images` quando compartilham um
-  elemento (um documento de uma página cujo primeiro elemento é uma tabela),
-  nunca o contrário, então não fazem ciclo. O `describe-image` de cada imagem mantém o
-  `vision-description`, que confere o resultado, e depende dela, assim como
+  página, como o passo os escolhia, mas nunca uma fórmula nem uma tabela:
+  os candidatos e os elementos que o passo mantém compartilham um só teste
+  (`is_describable`), então ele nunca pega um que depois deixaria de lado,
+  nem retipa uma fórmula ou uma tabela como imagem. Os dois passos do
+  documento não compartilham elemento, então nenhum depende do outro; como
+  proteção, as arestas entre eles seguem `DOCUMENT_STEPS` (a de um passo
+  pode depender da de um anterior, nunca da de um posterior), então não
+  fazem ciclo. O método descreve os alvos da sua obrigação ainda
+  descritíveis e não descritos, sejam quais forem os candidatos quando ele
+  roda, então nunca tem sucesso sem tentá-los; um alvo que agora é lido por
+  outro passo é informado como `not_describable`. O `describe-image` de
+  cada imagem mantém o `vision-description`, que confere o resultado, e depende dela, assim como
   as obrigações de página de uma página com imagem. A única alternativa é
   `human-review`. O método tem sucesso quando o passo rodou para todas as
   imagens; uma imagem que ficou sem descrição mantém o motivo
@@ -36,7 +40,9 @@ de posse de novo depois das descrições.
   imagem de página inteira injetada e a primeira anotação de posse
   (`_prepare_pictures`), para que as obrigações do plano incluam as da
   imagem injetada. O método anota de novo com a inspeção que o orquestrador
-  entrega aos serviços da execução (`RunServices.media_inspection`). A
+  entrega aos serviços da execução (`RunServices.media_inspection`; gravar
+  no manifesto os fatos de que ele precisa é a #847), e não injeta de novo
+  a imagem de página inteira. A
   mensagem de progresso antes do planejamento agora é a das fórmulas
   (`STAGE_ENRICHING_FORMULAS`); o método anuncia as descrições dentro do
   plano.
@@ -50,11 +56,14 @@ de posse de novo depois das descrições.
 - **Lacuna conhecida até o M3.** O passo de LaTeX das fórmulas roda antes do
   planejamento, então não vê mais uma imagem que o modelo lê como fórmula:
   essa fórmula fica com o LaTeX do modelo, sem a segunda leitura do
-  reconhecedor nem a separação do número da equação. O M3 torna o
-  reconhecimento uma obrigação da própria fórmula.
+  reconhecedor nem a separação do número da equação. O M3 (#846) torna o
+  reconhecimento uma obrigação da própria fórmula; fechar a lacuna é
+  condição da release 0.3.0, e um teste `xfail` estrito a fixa.
 - Um manifesto com todas as imagens descritas, como um checkpoint de
   enriquecimento da 0.3.13, não ganha `describe-images`, então uma retomada
-  não descreve nada de novo. Os candidatos são escolhidos antes de deixar de
+  não descreve nada de novo antes do primeiro plano; a reconciliação de um
+  replanejamento dá uma obrigação às imagens que ficaram sem descrição,
+  tentadas no replanejamento que a execução já faria. Os candidatos são escolhidos antes de deixar de
   lado os já descritos, então um documento com todas as imagens descritas
   não passa mais para os seus visuais substitutos, como o passo fazia numa
   retomada.

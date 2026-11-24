@@ -41,11 +41,12 @@ before each replan (#832):
   it. A future step that must run *before* it is not one this rule should
   order: it needs an exclusion here.
 
-  Between the document's steps, the rule follows ``DOCUMENT_STEPS``: a
-  step's obligation may depend on an earlier step's that shares an element,
-  never on a later one's. Applied in both directions, the rule would make a
-  cycle when the two steps share an element (a one-page mostly visual
-  document whose first element, the one the descriptions take, is a table).
+  Between the document's steps, the policy is explicit (#845 review): the
+  steps do not share elements (the descriptions never take a table or a
+  formula, ``is_describable``), so neither depends on the other. As a guard
+  for a future step, the rule follows ``DOCUMENT_STEPS``: a step's
+  obligation may depend on an earlier step's that shares an element, never
+  on a later one's, so the rule can never make a cycle between them.
 
 The step that removes an element must also remove or retarget that element's
 own obligations and the page's ``element_ids``; the manifest refuses dangling
@@ -216,7 +217,11 @@ def _cover(
 
 
 def _next_index(step: DocumentStep, own: list[Obligation]) -> int:
-    """The first free suffix: removing an emptied obligation frees its id."""
+    """The next suffix: from the number of the step's obligations, skipping
+    the ids in use. An id freed by a removal comes back only when no later
+    one is left (every obligation of the step removed); within one
+    execution the executor compares a step with the plan's own obligation,
+    so a reused id never runs a stale step (#832)."""
     ids = {item.id for item in own}
     index = len(own)
     while _obligation_id(step, index) in ids:
