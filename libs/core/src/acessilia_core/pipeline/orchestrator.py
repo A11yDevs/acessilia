@@ -855,6 +855,13 @@ class PddlAccessibilityOrchestrator:
 
 
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
+    if availability.degraded:
+        # Optional calls (#848): the methods stay in the plan, degraded.
+        logger.warning(
+            "Toolbox gate (catalogue {}): methods that will run degraded — {}",
+            availability.catalog_revision or "unavailable",
+            "; ".join(f"{method}: {', '.join(reasons)}" for method, reasons in availability.degraded.items()),
+        )
     if not availability.blocked:
         return
     blocked = "; ".join(

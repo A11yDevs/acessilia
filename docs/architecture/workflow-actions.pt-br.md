@@ -351,7 +351,12 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    método fica `transitional` em `LOCAL_METHODS` até a chamada virar uma
    capacidade (#804, #640 PR 4). Até lá o gate não consegue conferir a
    chamada de modelo; as chamadas à Toolbox que o passo faz são declaradas em
-   `METHOD_TOOLBOX_REQUIREMENTS`.
+   `METHOD_TOOLBOX_REQUIREMENTS` quando a falta de uma exclui o método, ou em
+   `METHOD_OPTIONAL_CAPABILITIES` quando a falta de uma só o degrada por
+   elemento (#848). O gate informa uma chamada opcional ausente como
+   `degraded_methods` nos metadados de disponibilidade e no log, e nunca
+   exclui o método; o papel dele em `LOCAL_METHODS` (onde a implementação
+   vive) é uma dimensão separada.
 7. **A retomada continua idempotente.** Hoje um passo pula os objetos que já
    terminou. Como método, o mesmo registro torna barato um passo do plano
    executado de novo, e o checkpoint de execução registra quais passos
@@ -492,10 +497,10 @@ propostas, decididas no seu pull request.
 
 | PR | Passo | Obrigação e método | Papel | Requisitos de Toolbox | Muda obrigações enquanto o plano roda |
 |---|---|---|---|---|---|
-| M2 (feito, core 0.3.12) | Estrutura das tabelas e matemática inline das tabelas | `enrich-tables`, uma por documento com tabelas, método `table-enrichment`; `linearize-table` e `select-table-source` dependem dela. Depois da #170, o método chama `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `transitional` (`DataAgent`) | nenhum declarado: suas chamadas à Toolbox (`pdf.render` para uma tabela lida de novo, `document.text.spans` para as marcas) são condicionais e se degradam por tabela, então não podem descartá-lo | não |
+| M2 (feito, core 0.3.12) | Estrutura das tabelas e matemática inline das tabelas | `enrich-tables`, uma por documento com tabelas, método `table-enrichment`; `linearize-table` e `select-table-source` dependem dela. Depois da #170, o método chama `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `transitional` (`DataAgent`) | opcionais (#848): `pdf.render` para uma tabela lida de novo e `document.text.spans` para as marcas se degradam por tabela, então nunca o excluem | não |
 | M0 (feito, core 0.3.13) | Preparação do executor | O executor pula, e registra como `skipped` com o motivo, o passo de uma obrigação que esta execução removeu ou substituiu, e o de uma que agora espera uma obrigação aberta que o plano não executa antes dele. O `complete-job` é pulado enquanto toda obrigação aberta foi encontrada ou adiada; uma que o plano executou e deixou aberta é falha. O orquestrador replaneja depois de uma execução assim com um limite próprio (`max_discovery_replans`), separado de `max_replans`, e para quando um replanejamento partiria do mesmo estado de planejamento. O passo de uma obrigação mudada sob o mesmo id também é pulado. As obrigações do documento são reconciliadas antes de cada replanejamento, e o enriquecimento de tabelas se restringe aos seus alvos | — | — | — |
-| M1 (feito, core 0.3.14) | Descrições de imagens | `describe-images`, uma por documento com imagens a descrever (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela. A imagem injetada e a primeira anotação de posse ficam antes do planejamento | `transitional` (`VisionAgent`) | nenhum declarado: sua chamada ao Toolbox (`pdf.render` para o recorte de uma imagem) é por imagem e degrada para `crop_unavailable` | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
-| M3 (feito, core 0.3.15) | LaTeX das fórmulas | `recognize-formulas`, uma por documento com fórmulas a reconhecer ou rótulos de equação a separar, método `formula-recognizer`, que roda o passo com seu paralelismo; `verbalize-formula` e `normalize-formula` dependem dela. Uma obrigação do documento, como no M1 e no M2, não uma por fórmula como proposto antes: o passo compartilha um breaker, uma sondagem do `math.recognize` por obrigação e seu paralelismo no documento inteiro | `transitional` (`VisionAgent`, a alternativa) | nenhum declarado: o `math.recognize` degrada para a alternativa de visão e o `pdf.render` por fórmula, então não devem excluí-lo (#848) | sim: a alternativa pode ler uma fórmula como imagem, o que troca suas obrigações de fórmula por `describe-image`; e uma fórmula que as descrições encontram ganha o passo no replanejamento |
+| M1 (feito, core 0.3.14) | Descrições de imagens | `describe-images`, uma por documento com imagens a descrever (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela. A imagem injetada e a primeira anotação de posse ficam antes do planejamento | `transitional` (`VisionAgent`) | opcional (#848): `pdf.render` para o recorte de uma imagem degrada para `crop_unavailable` | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
+| M3 (feito, core 0.3.15) | LaTeX das fórmulas | `recognize-formulas`, uma por documento com fórmulas a reconhecer ou rótulos de equação a separar, método `formula-recognizer`, que roda o passo com seu paralelismo; `verbalize-formula` e `normalize-formula` dependem dela. Uma obrigação do documento, como no M1 e no M2, não uma por fórmula como proposto antes: o passo compartilha um breaker, uma sondagem do `math.recognize` por obrigação e seu paralelismo no documento inteiro | `transitional` (`VisionAgent`, a alternativa) | opcionais (#848): o `math.recognize` degrada para a alternativa de visão e o `pdf.render` por fórmula, então nunca o excluem | sim: a alternativa pode ler uma fórmula como imagem, o que troca suas obrigações de fórmula por `describe-image`; e uma fórmula que as descrições encontram ganha o passo no replanejamento |
 | M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`), substituindo a passagem pós-execução da #599 | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
@@ -510,7 +515,8 @@ M4 também muda obrigações e se apoia no M0.
 
 Cada PR:
 - tira seu passo de `_enrich_before_planning`;
-- atualiza `LOCAL_METHODS` e `METHOD_TOOLBOX_REQUIREMENTS`;
+- atualiza `LOCAL_METHODS`, `METHOD_TOOLBOX_REQUIREMENTS` e
+  `METHOD_OPTIONAL_CAPABILITIES`;
 - acrescenta o teste diferencial e um caso de fixture do Fast Downward (o job
   de CI da #790);
 - atualiza esta página.

@@ -341,7 +341,12 @@ the manifest. **The enrichment migration needs no domain change.**
    the core. Such a method is `transitional` in `LOCAL_METHODS` until the call
    becomes a capability (#804, #640 PR 4). Until then the gate cannot check
    the model call; the Toolbox calls the step makes are declared in
-   `METHOD_TOOLBOX_REQUIREMENTS`.
+   `METHOD_TOOLBOX_REQUIREMENTS` when missing one rules the method out, or
+   in `METHOD_OPTIONAL_CAPABILITIES` when missing one only degrades it per
+   element (#848). The gate reports a missing optional call as
+   `degraded_methods` in the availability metadata and in the log, and
+   never rules the method out; its role in `LOCAL_METHODS` (where the
+   implementation lives) is a separate dimension.
 7. **Resume stays idempotent.** A step today skips the objects it already
    finished. As a method, the same record makes a re-executed plan step cheap,
    and the execution checkpoint records which steps ran.
@@ -476,10 +481,10 @@ settled in its pull request.
 
 | PR | Step | Obligation and method | Role | Toolbox requirements | Changes obligations while the plan runs |
 |---|---|---|---|---|---|
-| M2 (done, core 0.3.12) | Table structures and table inline math | `enrich-tables`, one per document with tables, method `table-enrichment`; `linearize-table` and `select-table-source` depend on it. After #170 the method calls `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `transitional` (`DataAgent`) | none declared: its Toolbox calls (`pdf.render` for a table read again, `document.text.spans` for the marks) are conditional and degrade per table, so they must not rule it out | no |
+| M2 (done, core 0.3.12) | Table structures and table inline math | `enrich-tables`, one per document with tables, method `table-enrichment`; `linearize-table` and `select-table-source` depend on it. After #170 the method calls `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `transitional` (`DataAgent`) | optional (#848): `pdf.render` for a table read again and `document.text.spans` for the marks degrade per table, so they never rule it out | no |
 | M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an open obligation the plan does not run before it. `complete-job` is skipped while every open obligation was found or deferred; one the plan ran and left open is a failure. A step whose obligation changed under its id is skipped too. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan would start from the same planning state. Document-level obligations are reconciled before each replan, and the table enrichment keeps to its targets | — | — | — |
-| M1 (done, core 0.3.14) | Picture descriptions | `describe-images`, one per document with pictures to describe (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it. The injected picture and the first ownership annotation stay before planning | `transitional` (`VisionAgent`) | none declared: its Toolbox call (`pdf.render` for a picture's crop) is per picture and degrades to `crop_unavailable` | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
-| M3 (done, core 0.3.15) | Formula LaTeX | `recognize-formulas`, one per document with formulas to recognize or equation labels to separate, method `formula-recognizer`, running the step with its concurrency; `verbalize-formula` and `normalize-formula` depend on it. A document-level obligation, like M1 and M2, not one per formula as first proposed: the step shares one breaker, one `math.recognize` probe per obligation and its concurrency across the document | `transitional` (`VisionAgent`, the fallback) | none declared: `math.recognize` degrades to the vision fallback and `pdf.render` per formula, so they must not rule it out (#848) | yes: the fallback can read a formula as a picture, which replaces its formula obligations with `describe-image`; and a formula the descriptions find gets the step on the replan |
+| M1 (done, core 0.3.14) | Picture descriptions | `describe-images`, one per document with pictures to describe (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it. The injected picture and the first ownership annotation stay before planning | `transitional` (`VisionAgent`) | optional (#848): `pdf.render` for a picture's crop degrades to `crop_unavailable` | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
+| M3 (done, core 0.3.15) | Formula LaTeX | `recognize-formulas`, one per document with formulas to recognize or equation labels to separate, method `formula-recognizer`, running the step with its concurrency; `verbalize-formula` and `normalize-formula` depend on it. A document-level obligation, like M1 and M2, not one per formula as first proposed: the step shares one breaker, one `math.recognize` probe per obligation and its concurrency across the document | `transitional` (`VisionAgent`, the fallback) | optional (#848): `math.recognize` degrades to the vision fallback and `pdf.render` per formula, so they never rule it out | yes: the fallback can read a formula as a picture, which replaces its formula obligations with `describe-image`; and a formula the descriptions find gets the step on the replan |
 | M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`), replacing the post-execution pass of #599 | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
 | — | Bootstrap | Kept and documented as the 0.3.0 baseline | — | — | — |
 
@@ -494,7 +499,8 @@ and builds on M0.
 
 Each PR:
 - removes its step from `_enrich_before_planning`;
-- updates `LOCAL_METHODS` and `METHOD_TOOLBOX_REQUIREMENTS`;
+- updates `LOCAL_METHODS`, `METHOD_TOOLBOX_REQUIREMENTS` and
+  `METHOD_OPTIONAL_CAPABILITIES`;
 - adds the differential test and a Fast Downward fixture case (the CI job
   from #790);
 - updates this page.
