@@ -146,7 +146,7 @@ needs a larger representative set and a controlled comparison.
   `image-changes` detector itself runs on every event: GitHub evaluates a
   caller's `needs` on a reusable workflow by its internal jobs, so a detector
   skipped outside pull requests would autoskip `publish verified images` even
-  when the scan passed (the regression fixed after the 2026-11-23 run).
+  when the scan passed (the regression observed in the 2026-11-23 run).
 - `docs/testing.md` still records the #448-era 1m59s / 59s–1m26s figures. The
   job absorbed Ruff/Mypy on 2026-11-20 and the suite grew; the numbers here are
   the comparable 2026-11-23 sample, not a contradiction of the historical

@@ -332,9 +332,24 @@ def test_the_integration_marker_is_registered() -> None:
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
-    assert set(jobs["delivery"]["needs"]) >= {
-        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated",
+    delivery = jobs["delivery"]
+
+    # The security call is part of the gate: a delivery without the scan would
+    # publish an image the security job has not seen.
+    assert set(delivery["needs"]) == {
+        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated", "security",
     }
+    # `changes` and `detect-changes` are PR-only. A `needs` edge to either
+    # would autoskip delivery on pushes, the exact #644 regression.
+    assert "changes" not in delivery["needs"]
+    assert "detect-changes" not in delivery["needs"]
+    condition = " ".join(delivery["if"].split())
+    assert condition == (
+        "github.event_name == 'push' && ( "
+        "github.ref_name == 'main' || "
+        "github.ref_name == 'develop' || "
+        "startsWith(github.ref_name, 'release/') )"
+    )
     assert "sdk-isolated" in jobs
     assert "docstruct-isolated" in jobs
 
@@ -697,10 +712,16 @@ def test_the_container_scan_is_conditional_on_image_paths() -> None:
     scan = workflow["jobs"]["container-scan"]
 
     assert "if" not in changes
+    assert changes["permissions"] == {
+        "contents": "read",
+        "pull-requests": "read",
+    }
     assert changes["outputs"]["image"] == (
         "${{ steps.filter.outputs.image || steps.assume.outputs.image }}"
     )
     steps = {step.get("name"): step for step in changes["steps"]}
+    checkout = steps["Check out repository"]
+    assert checkout["if"] == "github.event_name == 'pull_request'"
     filter_step = steps["Filter image paths"]
     assert filter_step["if"] == "github.event_name == 'pull_request'"
     assert filter_step["uses"] == (

@@ -54,11 +54,15 @@ jobs:
     # scan ignores that output for those events anyway.
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       image: ${{ steps.filter.outputs.image || steps.assume.outputs.image }}
 
     steps:
       - name: Check out repository
+        if: github.event_name == 'pull_request'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -88,6 +92,10 @@ jobs:
   container-scan:
     name: Container image scan
     needs: image-changes
+    # The PR-only skip below is safe because the only caller today is `delivery`
+    # in ci.yml, which runs only on push; on pushes this condition is always
+    # true. A future job that needs `security` on pull requests must tolerate
+    # this skipped internal job explicitly (GitHub's needs rule).
     if: "!cancelled() && (github.event_name != 'pull_request' || needs.image-changes.outputs.image != 'false')"
     runs-on: ubuntu-latest
     timeout-minutes: 30
