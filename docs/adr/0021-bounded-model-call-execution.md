@@ -59,6 +59,23 @@ is outside the core: with `AI_CLIENT=toolbox`, it belongs to the Toolbox's
 gateway; Ollama and OpenRouter have no gateway of ours, so their own limits
 apply. See the [architecture](../architecture.md).
 
+Follow-up (#590). The queue's concurrency and `VISION_CONCURRENCY` multiply:
+`jobs at once × VISION_CONCURRENCY` calls may arrive together, and the runner
+must admit them or reject the excess. Keeping the immediate rejection above,
+the service derives `MODEL_CALL_MAX_PENDING` from that product when the
+variable is unset (at least the historical 4) and warns at startup, without
+refusing it, when an explicit value cannot cover the configured jobs. The
+warning names the exact pending capacity that closes the gap. Over capacity is
+a degraded mode, not an unsafe one, and the stages may use fewer calls than
+their bound.
+
+A rejection is admission pressure, not provider health. It is retried once
+like a timeout, without consuming an answer attempt; if it persists, the stage
+records `admission_rejected` (pictures, tables, formulas), leaves the shared
+breaker untouched, and keeps the run out of the cache so a rerun can retry it.
+A closed runner also raises `ModelCallRejected`; the single retry is bounded
+and does not hide shutdown.
+
 ## Consequences and verification
 
 Core capacity, `VISION_CONCURRENCY`, gateway/provider slots and whole-job duration
@@ -67,5 +84,7 @@ are separate limits. This bounds local retention and isolates unrelated work.
 the bound shared by runs at once on separate event loops (#547),
 retained reservations, late results, independent `run_blocking`, concurrent
 locales, synchronous handlers/transient loops and owner shutdown/restart with
-event-blocked providers. Existing agent, table and cancellation suites preserve
-the surrounding policies.
+event-blocked providers. `tests/test_model_call_capacity.py` and
+`libs/core/tests/test_model_call_admission.py` cover the #590 sizing check and
+the rejection/reason semantics. Existing agent, table and cancellation suites
+preserve the surrounding policies.

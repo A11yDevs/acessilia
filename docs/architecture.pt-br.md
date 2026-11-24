@@ -57,15 +57,25 @@ ADR-0016). Nada recorre ao executor do processo mantido pelo serviço nem às
 configurações. Os agentes não leem configurações de capacidade de execução. Os agentes Agno
 separados do chat AgentOS ficam fora desse caminho de execução.
 
-`MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers entre jobs e loops
-transitórios; `MODEL_CALL_MAX_PENDING` (padrão 4) limita chamadas adicionais em
-espera. São configurações do processo, não valores de CoreConfig por execução.
-Somente reservas de workers chegam ao ThreadPoolExecutor. Chamadas pendentes
-ficam numa fila FIFO limitada que remove prontamente as closures canceladas ou
-expiradas; uma chamada pendente não pode iniciar inferência após ser abandonada.
-A saturação gera `ModelCallRejected` explícito e segue a degradação existente do
-agente. Com capacidade pendente zero, cada worker ocupado conta imediatamente
+`QUEUE_MAX_CONCURRENT` (padrão 1) limita quantos jobs a fila roda ao mesmo
+tempo. `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers entre jobs e
+loops transitórios; `MODEL_CALL_MAX_PENDING` (padrão 4, ou o maior valor
+`QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` quando não
+definido) limita chamadas adicionais em espera. São configurações do processo,
+não valores de CoreConfig por execução. Somente reservas de workers chegam ao
+ThreadPoolExecutor. Chamadas pendentes ficam numa fila FIFO limitada que remove
+prontamente as closures canceladas ou expiradas; uma chamada pendente não pode
+iniciar inferência após ser abandonada. A saturação gera `ModelCallRejected`
+explícito. Com capacidade pendente zero, cada worker ocupado conta imediatamente
 para a saturação.
+
+Capacidade que não admite os jobs configurados é informada uma vez no startup,
+sem recusá-la: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` não deve exceder
+`MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING`. Uma rejeição é pressão de admissão
+local, não saúde do provider: os agentes a tentam de novo uma vez, como um
+timeout, sem consumir uma tentativa de resposta. Se persistir, a etapa registra
+`admission_rejected`, deixa o breaker compartilhado do provider intacto e mantém
+a execução fora do cache para que uma nova execução a retente.
 
 O deadline por tentativa inclui a espera na fila local e a execução; com a
 Toolbox inclui também a espera por uma vaga no gateway. `VISION_CONCURRENCY`

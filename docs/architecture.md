@@ -55,14 +55,24 @@ back to the service's process owner or settings. Agents read no
 execution-capacity settings. AgentOS's separate
 Agno chat agents are outside this execution path.
 
-`MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and
-transient loops; `MODEL_CALL_MAX_PENDING` (default 4) bounds additional waiting
-calls. These are process setup, not per-run CoreConfig values. Only worker
-reservations reach the ThreadPoolExecutor. Pending calls stay in a bounded FIFO
-that removes cancelled/expired closures promptly; a pending call cannot start
-inference after abandonment. Saturation raises an explicit `ModelCallRejected`
-and follows the existing agent degradation path. With zero pending capacity,
-every occupied worker immediately counts toward saturation.
+`QUEUE_MAX_CONCURRENT` (default 1) bounds how many jobs the queue runs at
+once. `MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and
+transient loops; `MODEL_CALL_MAX_PENDING` (default 4, or the larger
+`QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` when unset)
+bounds additional waiting calls. These are process setup, not per-run CoreConfig
+values. Only worker reservations reach the ThreadPoolExecutor. Pending calls
+stay in a bounded FIFO that removes cancelled/expired closures promptly; a
+pending call cannot start inference after abandonment. Saturation raises an
+explicit `ModelCallRejected`. With zero pending capacity, every occupied worker
+immediately counts toward saturation.
+
+Capacity that cannot admit the configured jobs is reported once at startup,
+without refusing it: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` must not exceed
+`MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING`. A rejection is local admission
+pressure, not provider health: the agents retry it once like a timeout, without
+consuming an answer attempt. If it persists, the stage records
+`admission_rejected`, leaves the shared provider breaker untouched, and keeps the
+run out of the cache so a rerun can retry it.
 
 The overall per-attempt deadline includes local queue wait and execution; with
 the Toolbox it also includes the gateway's slot wait. `VISION_CONCURRENCY`

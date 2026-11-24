@@ -59,6 +59,23 @@ frouxo. Um limite entre processos ou máquinas fica fora do core: com
 gateway nosso, então valem os limites deles. Veja a
 [arquitetura](../architecture.pt-br.md).
 
+Desdobramento (#590). A concorrência da fila e o `VISION_CONCURRENCY` se
+multiplicam: `jobs simultâneos × VISION_CONCURRENCY` chamadas podem chegar
+juntas, e o runner precisa admiti-las ou rejeitar o excesso. Mantendo a rejeição
+imediata acima, o serviço deriva `MODEL_CALL_MAX_PENDING` desse produto quando a
+variável não está definida (no mínimo os 4 históricos) e avisa no startup, sem
+recusá-lo, quando um valor explícito não cobre os jobs configurados. O aviso
+nomeia a capacidade pendente exata que fecha a lacuna. Ficar acima da capacidade
+é um modo degradado, não inseguro, e as etapas podem usar menos chamadas que seu
+limite.
+
+Uma rejeição é pressão de admissão, não saúde do provider. Ela é tentada uma vez
+de novo, como um timeout, sem consumir uma tentativa de resposta; se persistir, a
+etapa registra `admission_rejected` (imagens, tabelas, fórmulas), deixa o breaker
+compartilhado intacto e mantém a execução fora do cache para que uma nova
+execução a retente. Um runner fechado também gera `ModelCallRejected`; a única
+retentativa é limitada e não esconde o shutdown.
+
 ## Consequências e verificação
 
 Capacidade do Core, `VISION_CONCURRENCY`, vagas do gateway/provider e duração de
@@ -67,5 +84,7 @@ trabalhos. `tests/test_model_call_executor.py` verifica deadlines, cancelamento,
 saturação, o limite compartilhado por execuções simultâneas em loops de eventos
 separados (#547), retenção de vagas, resultados tardios, `run_blocking` independente,
 locales simultâneos, handlers síncronos/loops transitórios e shutdown/reinício com
-providers bloqueados por eventos. As suítes de agentes, tabelas e cancelamento
-existentes preservam as políticas em torno do mecanismo.
+providers bloqueados por eventos. `tests/test_model_call_capacity.py` e
+`libs/core/tests/test_model_call_admission.py` cobrem a verificação de
+dimensionamento e a semântica de rejeição/razão da #590. As suítes de agentes,
+tabelas e cancelamento existentes preservam as políticas em torno do mecanismo.

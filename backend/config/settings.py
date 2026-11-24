@@ -15,6 +15,11 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+#: Additional pending model calls kept even when the configured jobs would fit
+#: in the workers alone. It is the historical default and leaves room for the
+#: pipeline's inspection calls and scheduling jitter.
+DEFAULT_MODEL_CALL_MAX_PENDING = 4
+
 
 @dataclass
 class Settings:
@@ -102,22 +107,32 @@ class Settings:
     data_agent_timeout_seconds: int = field(
         default_factory=lambda: int(os.getenv("DATA_AGENT_TIMEOUT_SECONDS", "3600"))
     )
+    # How many jobs the UnifiedQueue may run at once. Production keeps one;
+    # raising it is what makes the model-call admission capacity below matter
+    # (#590, #238 W1). The model-call floor is checked at startup.
+    queue_max_concurrent: int = field(
+        default_factory=lambda: int(os.getenv("QUEUE_MAX_CONCURRENT", "1"))
+    )
     # Process-wide model execution capacity, independent of transient loops.
     model_call_workers: int = field(
         default_factory=lambda: int(os.getenv("MODEL_CALL_WORKERS", "4"))
     )
+    # -1 (only when the variable is unset) derives the default from the queue's
+    # concurrency and VISION_CONCURRENCY, so a configured burst fits instead of
+    # being rejected. An explicit value is always honoured; startup warns when
+    # it is too small for the configured jobs.
     model_call_max_pending: int = field(
-        default_factory=lambda: int(os.getenv("MODEL_CALL_MAX_PENDING", "4"))
+        default_factory=lambda: int(os.getenv("MODEL_CALL_MAX_PENDING", "-1"))
     )
     vision_region_max_tokens: int = field(
         default_factory=lambda: int(os.getenv("VISION_REGION_MAX_TOKENS", "2000"))
     )
-    # How many picture descriptions run concurrently inside one job. The
-    # UnifiedQueue already serializes jobs, so this bounds the load on the
-    # model provider: 2 is safe for rate-limited hosted APIs and for a local
-    # Ollama (whose server queues anything beyond its own parallelism). The
-    # formula recognition stage shares the bound because its fallback is the
-    # same vision model.
+    # How many picture descriptions run concurrently inside one job. It bounds
+    # the load on the model provider: 2 is safe for rate-limited hosted APIs
+    # and for a local Ollama (whose server queues anything beyond its own
+    # parallelism). The formula recognition stage shares the bound because its
+    # fallback is the same vision model. Jobs at once multiply this bound, so
+    # MODEL_CALL_MAX_PENDING must cover the product (#590).
     vision_concurrency: int = field(
         default_factory=lambda: int(os.getenv("VISION_CONCURRENCY", "2"))
     )
@@ -593,9 +608,70 @@ class Settings:
                 "SLIDE_VISUAL_COVERAGE must be greater than 0 and at most 1, "
                 f"got {self.slide_visual_coverage}"
             )
+        if self.queue_max_concurrent < 1:
+            raise ValueError(
+                f"QUEUE_MAX_CONCURRENT must be positive, got {self.queue_max_concurrent}"
+            )
+        if self.model_call_workers < 1:
+            raise ValueError(
+                f"MODEL_CALL_WORKERS must be positive, got {self.model_call_workers}"
+            )
+        if self.vision_concurrency < 1:
+            raise ValueError(
+                f"VISION_CONCURRENCY must be positive, got {self.vision_concurrency}"
+            )
+        if self.model_call_max_pending < 0:
+            # -1 is the unset marker: derive the pending floor from the
+            # configured jobs below, instead of keeping a capacity known to be
+            # too small (#590).
+            if self.model_call_max_pending == -1:
+                self.model_call_max_pending = max(
+                    DEFAULT_MODEL_CALL_MAX_PENDING,
+                    self.model_call_admission_floor(),
+                )
+            else:
+                raise ValueError(
+                    "MODEL_CALL_MAX_PENDING must be zero or positive "
+                    f"(or unset), got {self.model_call_max_pending}"
+                )
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+
+    def model_call_admission_floor(self, jobs_at_once: int | None = None) -> int:
+        """Pending calls needed so ``jobs_at_once`` stages fit without rejection.
+
+        Each job may have up to ``VISION_CONCURRENCY`` calls in flight at one
+        stage; the workers run them and the pending FIFO holds the rest. The
+        value is the additional capacity beyond the workers (never negative),
+        not the total. It is the same formula the startup check enforces.
+        """
+        jobs = self.queue_max_concurrent if jobs_at_once is None else jobs_at_once
+        jobs = max(1, jobs)
+        return max(0, jobs * self.vision_concurrency - self.model_call_workers)
+
+    def model_call_capacity_warning(self, jobs_at_once: int | None = None) -> str | None:
+        """Why the model-call capacity cannot admit every configured job, if so.
+
+        The queue's concurrency and ``VISION_CONCURRENCY`` are upper bounds;
+        over capacity is still a degraded mode, not an unsafe one, so the
+        caller warns instead of refusing startup. The message names the exact
+        pending capacity that removes the gap.
+        """
+        jobs = self.queue_max_concurrent if jobs_at_once is None else jobs_at_once
+        jobs = max(1, jobs)
+        required = jobs * self.vision_concurrency
+        admitted = self.model_call_workers + self.model_call_max_pending
+        if required <= admitted:
+            return None
+        return (
+            "model-call admission capacity is below the configured job concurrency: "
+            f"{jobs} job(s) x VISION_CONCURRENCY={self.vision_concurrency} = {required} calls, "
+            f"but MODEL_CALL_WORKERS + MODEL_CALL_MAX_PENDING = {admitted}. "
+            f"Raise MODEL_CALL_MAX_PENDING to at least {self.model_call_admission_floor(jobs)} "
+            "or lower QUEUE_MAX_CONCURRENT/VISION_CONCURRENCY; excess calls are rejected, "
+            "not queued (#590)."
+        )
 
     # Deprecated aliases for the old PMV-prefixed configuration: they warn,
     # and will be removed (see ``deprecated_configuration``).
