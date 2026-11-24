@@ -358,6 +358,9 @@ class PddlAccessibilityOrchestrator:
         # that was never executed and a report of None. Real execution is now the
         # other branch instead of silence.
         loop = asyncio.get_running_loop()
+        # A method that reports its own progress, such as table-enrichment,
+        # runs on the executor's worker thread (#640, M2).
+        ports.services.progress = _thread_status(status_callback, loop)
         manifest, execution_report = await self._run_plan(
             planning.plan,
             planning.planning_manifest,
@@ -812,7 +815,8 @@ def _plan_progress(
     The user sees only the step and its pages; the obligation kind and method
     are internal names, so they go to the debug log.
     """
-    if status_callback is None:
+    send = _thread_status(status_callback, loop)
+    if send is None:
         return None
     page_by_element = {element.id: element.page_number for element in manifest.elements}
     pages_by_obligation = {
@@ -838,13 +842,36 @@ def _plan_progress(
                 total=total,
                 pages=_pages_label(pages, len(manifest.pages)),
             )
+        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
+            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
+            return
+        send(message)
+
+    return report
+
+
+def _thread_status(
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+    loop: asyncio.AbstractEventLoop,
+) -> Callable[[str], None] | None:
+    """Report a progress message from a worker thread through ``status_callback``.
+
+    The callback is a coroutine of ``loop``: the report is scheduled there and
+    awaited from the thread, so the work only goes on once its stage is
+    recorded. A failing report is logged and never fails the work.
+    """
+    if status_callback is None:
+        return None
+
+    def send(message: str) -> None:
+        try:
             asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
                 timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS
             )
-        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
-            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
+        except Exception as exc:  # noqa: BLE001 - progress must not fail the work
+            logger.warning("PDDL: progress not recorded: {}", exc)
 
-    return report
+    return send
 
 
 #: Upper bound on how long a plan step waits for its progress to be recorded.

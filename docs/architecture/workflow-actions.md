@@ -34,7 +34,7 @@ order:
 | Bootstrap | Page limit, before extraction | Rejects a document over `DocumentConfig.max_pages` from the inspection's page count (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extraction | Builds the manifest: elements, then the obligations derived from their types | Toolbox `document.structure.extract` (one or two providers) | `manifest` |
 | Bootstrap | Page limit, after extraction | Checks the limit again against the extracted structure | — | — |
-| Enrichment | Six steps, in a fixed order (below) | | Toolbox and the core's model agents | `enriched`, per object |
+| Enrichment | Four steps before planning, in a fixed order (below); since 0.3.12, steps 5 and 6 run inside the plan (M2) | | Toolbox and the core's model agents | `enriched`, per object, for steps 1–4; the execution checkpoint, per plan step, for 5–6 |
 | Planning | | Compiles the problem from the enriched manifest and plans | — | `plan` |
 
 The enrichment steps (`_enrich_before_planning` until core 0.3.11; since
@@ -52,12 +52,13 @@ M2):
 
 What the steps share is not uniform:
 
-| Resource | Steps | Where it lives today |
+| Resource | Steps | Where it lives (core 0.3.12) |
 |---|---|---|
-| Provider breaker | 1, 2, 4, 5 | a local of `_enrich_before_planning` |
-| Per-object progress (`on_progress`) | 1, 2, 4, 5 | a local, from `checkpoints.enrichment_progress` |
+| Provider breaker | 1, 2, 4, 5 | the run's, `RunPorts.services` (`run_breaker`), shared with the `table-enrichment` method |
+| Per-object progress (`on_progress`) | 1, 2, 4 | a local, from `checkpoints.enrichment_progress`; step 5, inside the plan, has the execution checkpoint of its plan step |
 | Region cache | 1, 2, 4 | from `RunPorts` (`region_cache_for`) |
-| Text-span reader (`_TextSpanReader`) | 3, 6 | a local |
+| Text-span reader (`_TextSpanReader`) | 3, 6 | the run's, `RunPorts.services` (`run_text_spans`); it keeps no manifest |
+| Progress messages | 1, 2, 4, 5 | the status callback before planning; `RunServices.progress` inside the plan |
 | Media inspection | 2 | a bootstrap output |
 | Source file | all | the run context; the manifest records its digest |
 
@@ -262,6 +263,23 @@ like this: its internal steps are not PDDL actions. The obligation is created
 when the manifest is enriched, before the first plan, and only when the
 document has the elements its step works on. That is its gate; the method
 keeps the step's per-element gates.
+
+**What its result means.** The method succeeds when the collective attempt
+ran: the step completed for every target. That is not a claim that every
+element is now enriched. Each element keeps its own outcome (for a table,
+`table_read_failure` with its reason, including the `admission_rejected` of a
+full model-call runner, #590), and the per-element obligations that depend on
+it validate their element. Failing the whole obligation for one element would
+block the elements that are usable. So the method's message reports what
+happened to each element, and it fails only when the step raises.
+
+**Limits, for M0.** The obligation is created once, before the first plan,
+with the elements known then, and the per-element kinds that depend on it are
+a fixed list (`_AFTER_TABLE_ENRICHMENT`). An element added, removed or
+retyped while the plan runs is not reconciled with it. No handler adds or
+retypes a table today, but M0 (#832) must reconcile the targets and the
+dependencies of a document-level obligation, and later migrations must add
+their kinds to that list.
 
 ## Migration order
 

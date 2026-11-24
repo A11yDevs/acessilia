@@ -110,17 +110,32 @@ _Shared = TypeVar("_Shared")
 
 
 class RunServices:
-    """Objects one run shares between its stages and its plan's methods.
+    """Infrastructure one run shares between its stages and its plan's methods.
 
-    Infrastructure, not planning facts (ADR-0029): the vision provider breaker
-    and the text-span reader serve the enrichment before planning and the
-    methods that run it inside the plan (#640, M2), so a provider outage or a
-    page fetched once counts for the whole document. Each object is built the
-    first time it is asked for and lives as long as the run's ports.
+    What belongs here (ADR-0029: infrastructure, not planning facts): the
+    vision provider breaker, the text-span reader and the progress reporter.
+    They serve the enrichment before planning and the methods that run it
+    inside the plan (#640, M2), so a provider outage, a fetched page or a
+    progress message counts for the whole document.
+
+    What does not: planning decisions, managers, or any dependency a method
+    could take as a parameter. Their lifetime is one run of one document: a
+    caller builds one ``RunPorts`` per job (``backend/services/run_ports.py``),
+    and reusing it for another document would give that document the first
+    one's text-span reader.
+
+    ``shared`` builds an object the first time its key is asked for, and
+    returns that same object afterwards, whatever arguments the caller's
+    factory closes over: the first call wins. The run's plan executes one step
+    at a time, so the objects are not shared across threads concurrently.
     """
 
     def __init__(self) -> None:
         self._items: dict[str, Any] = {}
+        #: Reports a progress message from a method running on the executor's
+        #: worker thread; set by the orchestrator once it has its event loop,
+        #: ``None`` outside a run with a status callback.
+        self.progress: Callable[[str], None] | None = None
 
     def shared(self, key: str, build: Callable[[], _Shared]) -> _Shared:
         """The run's object under ``key``, built by ``build`` the first time."""

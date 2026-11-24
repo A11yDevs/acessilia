@@ -272,6 +272,10 @@ msgstr "página {page} de {total_pages}"
 msgid "pages {pages}"
 msgstr "páginas {pages}"
 
+#, python-brace-format
+msgid "{count} pages, from {first} to {last}"
+msgstr "{count} páginas, de {first} a {last}"
+
 msgid "page not identified"
 msgstr "página não identificada"
 
@@ -2435,17 +2439,21 @@ msgstr[1] "Descrições validadas para {count} imagens"
 
 #, python-brace-format
 msgid ""
-"Table enrichment ran for {count} table: {read} read again, {marked} "
-"inline math runs marked"
+"Table enrichment ran for {count} table: {needing} needed a reading, "
+"{structured} got a structure; left as they were: {left}; inline math: "
+"{inline} ({marked} runs marked)"
 msgid_plural ""
-"Table enrichment ran for {count} tables: {read} read again, {marked} "
-"inline math runs marked"
+"Table enrichment ran for {count} tables: {needing} needed a reading, "
+"{structured} got a structure; left as they were: {left}; inline math: "
+"{inline} ({marked} runs marked)"
 msgstr[0] ""
-"Enriquecimento de tabelas rodou para {count} tabela: {read} lida de novo,"
-" {marked} trechos de matemática inline marcados"
+"Enriquecimento de tabelas rodou para {count} tabela: {needing} precisavam"
+" de leitura, {structured} ganharam estrutura; ficaram como estavam: "
+"{left}; matemática inline: {inline} ({marked} trechos marcados)"
 msgstr[1] ""
-"Enriquecimento de tabelas rodou para {count} tabelas: {read} lidas de "
-"novo, {marked} trechos de matemática inline marcados"
+"Enriquecimento de tabelas rodou para {count} tabelas: {needing} "
+"precisavam de leitura, {structured} ganharam estrutura; ficaram como "
+"estavam: {left}; matemática inline: {inline} ({marked} trechos marcados)"
 
 #, python-brace-format
 msgid "Table structure validated for {count} table"

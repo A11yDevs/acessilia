@@ -40,14 +40,20 @@ class _TextSpanReader:
     """The text layer's spans of one document, each page fetched once (#260).
 
     The prose and table steps of the inline math detection run at different
-    points of the pipeline; reading through one reader, a page is requested
-    from the Toolbox once, and a capability that failed is not asked again.
+    points of the pipeline (the table step inside the plan, #640 M2); reading
+    through one reader, a page is requested from the Toolbox once, and a
+    capability that failed is not asked again.
+
+    The reader keeps only what identifies the source (its path and artifact
+    id), not the manifest: the plan's executor works on a copy of it. A step
+    that gets ``None`` records the detection as ``unavailable`` on the
+    manifest it is enriching.
     """
 
     def __init__(
         self, manifest: ProcessingManifest, source_path: Path, toolbox: ToolboxConfig
     ) -> None:
-        self._manifest = manifest
+        self._artifact_id = _source_artifact_id(manifest)
         self._source_path = source_path
         self._toolbox = toolbox
         self._pages: dict[int, dict[str, Any]] = {}
@@ -69,12 +75,11 @@ class _TextSpanReader:
                         self._source_path,
                         missing,
                         toolbox=self._toolbox,
-                        artifact_id=_source_artifact_id(self._manifest),
+                        artifact_id=self._artifact_id,
                     )
                 )
             except ToolboxError as exc:
                 logger.info("Inline math detection skipped: document.text.spans failed ({})", exc)
-                self._manifest.extractor.configuration["inline_math_detection"] = "unavailable"
                 self._failed = True
                 return None
         return self._pages
@@ -84,7 +89,12 @@ def run_text_spans(
     ports: RunPorts, manifest: ProcessingManifest, source_path: Path, toolbox: ToolboxConfig
 ) -> _TextSpanReader:
     """The text-span reader of the run (``ports``), so a page is fetched once
-    for the prose step before planning and the table step inside the plan."""
+    for the prose step before planning and the table step inside the plan.
+
+    One per run: the first call builds it, from its ``manifest``,
+    ``source_path`` and ``toolbox``, and every later call gets that reader
+    whatever it passes (``RunServices.shared``). A run is one document.
+    """
     return ports.services.shared(
         "text-spans", lambda: _TextSpanReader(manifest, source_path, toolbox)
     )
@@ -244,8 +254,8 @@ async def _mark_inline_math(
         return counts
     spans = await text_spans.pages(pages)
     if spans is None:
-        # The reader records it on the manifest it was built with; inside the
-        # plan the executor works on a copy, so record it here too.
+        # The reader keeps no manifest: the step records it on the one it
+        # enriches, the copy the plan's executor returns included.
         manifest.extractor.configuration["inline_math_detection"] = "unavailable"
         return counts
 
@@ -291,8 +301,8 @@ async def _mark_table_inline_math(
         return counts
     spans = await text_spans.pages(pages)
     if spans is None:
-        # The reader records it on the manifest it was built with; inside the
-        # plan the executor works on a copy, so record it here too.
+        # The reader keeps no manifest: the step records it on the one it
+        # enriches, the copy the plan's executor returns included.
         manifest.extractor.configuration["inline_math_detection"] = "unavailable"
         return counts
 

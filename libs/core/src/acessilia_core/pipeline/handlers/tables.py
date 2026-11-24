@@ -10,47 +10,79 @@ accounts them (``docs/architecture/workflow-actions.md``):
 - ``_mark_table_inline_math`` then marks the inline math of every table's
   cells from the text layer.
 
-The breaker and the text-span reader are the run's (``RunPorts.services``),
-the ones the enrichment before planning used, so a provider outage and a
-fetched page count for the whole document. A table that cannot be read is
-recorded on it (``table_read_failure``) and left to ``linearize-table``, as
-before; the method fails only when a step raises.
+The breaker, the text-span reader and the progress reporter are the run's
+(``RunPorts.services``), the ones the enrichment before planning used, so a
+provider outage, a fetched page and a progress message count for the whole
+document.
+
+**What the result means.** ``success`` and ``validated`` say that the
+collective attempt ran: both steps completed for every table. They do not say
+that every table now has a structure. That stays per table, as before: a
+table that could not be read keeps its reason (``table_read_failure``:
+``model_failed``, ``admission_rejected``, ``crop_unavailable``), and its
+``linearize-table`` obligation validates it. Failing the whole obligation for
+one table would block the tables that are usable. The message reports what
+happened to each table, so the execution report never reads as if every table
+were enriched. The method fails only when a step raises.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
-from acessilia_core.i18n import n
-from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.i18n import n, t
+from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_TABLES_OCR
+from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
+from acessilia_core.pipeline.elements import _table_element_has_structured_content
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.inline_math import (
+    _inline_math_enabled,
     _mark_table_inline_math,
     run_text_spans,
 )
-from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
-from acessilia_core.pipeline.handlers.common import (
-    _missing_obligation,
-    _target_elements,
+from acessilia_core.pipeline.enrichment.tables import (
+    _enrich_table_structures,
+    _tables_to_read,
 )
-from acessilia_core.pipeline.handlers.messages import MSG_TABLES_ENRICHED
+from acessilia_core.pipeline.handlers.messages import (
+    MSG_TABLE_NO_TABLE,
+    MSG_TABLES_ENRICHED,
+)
 from acessilia_core.ports import RunPorts
 from acessilia_sdk.runtime import run_sync
 
 
+def _status(ports: RunPorts):
+    """The run's progress reporter as the coroutine the table step awaits."""
+    report = ports.services.progress
+    if report is None:
+        return None
+
+    async def status(message: str) -> None:
+        report(message)
+
+    return status
+
+
 async def _enrich_tables(
     manifest: ProcessingManifest, source: Path, config: CoreConfig, ports: RunPorts
-) -> tuple[int, int]:
+) -> int:
     """Read, then mark: the order of the steps before planning, kept (step 6
-    runs after step 5, which can replace a table's cells)."""
-    read = await _enrich_table_structures(
+    runs after step 5, which can replace a table's cells). Returns the runs of
+    inline math marked."""
+    status = _status(ports)
+    if status is not None:
+        await status(t(STAGE_ENRICHING_TABLES_OCR))
+    await _enrich_table_structures(
         manifest,
         source,
         vision=config.vision,
         toolbox=config.toolbox,
         models=config.models,
+        status_callback=status,
         breaker=run_breaker(ports, config.vision),
     )
     marks = await _mark_table_inline_math(
@@ -59,22 +91,61 @@ async def _enrich_tables(
         config.document,
         run_text_spans(ports, manifest, source, config.toolbox),
     )
-    return read, marks["marked"]
+    return marks["marked"]
+
+
+def _outcome(element: ManifestElement) -> str:
+    """What the reading left on a table that needed one."""
+    failure = element.metadata.get("table_read_failure")
+    if failure:
+        return str(failure)
+    review = element.metadata.get("table_review")
+    if isinstance(review, dict) and review.get("outcome") == "kept":
+        return "kept"
+    if not _table_element_has_structured_content(element):
+        return "unread"
+    hint = element.metadata.get("table_linearization_hint")
+    return "from_text" if hint == "text-heuristic" else "read"
+
+
+def _inline_math_status(manifest: ProcessingManifest, config: CoreConfig) -> str:
+    """``off`` (detection disabled, or not a PDF), ``unavailable`` (the Toolbox
+    could not read the text layer) or ``fonts`` (the marks ran)."""
+    if not _inline_math_enabled(manifest, config.document):
+        return "off"
+    if manifest.extractor.configuration.get("inline_math_detection") == "unavailable":
+        return "unavailable"
+    return "fonts"
 
 
 def _handle_table_enrichment_method(
     manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig, ports: RunPorts
 ) -> MethodResult:
     """Run the document's table enrichment; satisfied once both steps ran."""
-    tables = [element for element in _target_elements(manifest, obligation_id) if element.type == "table"]
+    obligation = next((item for item in manifest.obligations if item.id == obligation_id), None)
+    targets = set(obligation.target_ids) if obligation is not None else set()
+    tables = [
+        element for element in manifest.elements
+        if element.id in targets and element.type == "table"
+    ]
     if not tables:
-        return _missing_obligation(obligation_id)
-    read, marked = run_sync(_enrich_tables(manifest, Path(manifest.source.path), config, ports))
+        return MethodResult(success=False, validated=False, message=t(MSG_TABLE_NO_TABLE))
+    needing, _ = _tables_to_read(manifest, visual_review=config.vision.table_visual_review)
+    needing_ids = [element.id for element in needing]
+    marked = run_sync(_enrich_tables(manifest, Path(manifest.source.path), config, ports))
+    by_id = {element.id: element for element in manifest.elements}
+    outcomes = Counter(_outcome(by_id[element_id]) for element_id in needing_ids)
+    structured = outcomes.pop("read", 0) + outcomes.pop("from_text", 0)
     return MethodResult(
         success=True,
         validated=True,
         message=n(*MSG_TABLES_ENRICHED, len(tables)).format(
-            count=len(tables), read=read, marked=marked
+            count=len(tables),
+            needing=len(needing_ids),
+            structured=structured,
+            left=", ".join(f"{reason}: {count}" for reason, count in sorted(outcomes.items())) or "-",
+            inline=_inline_math_status(manifest, config),
+            marked=marked,
         ),
     )
 

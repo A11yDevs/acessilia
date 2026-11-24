@@ -1,8 +1,8 @@
 """Deterministic handlers that check or finish an element's content.
 
-Picture descriptions and table structure are produced before planning, by the
-enrichment stages; their handlers verify that the work happened instead of
-pretending to do it. Code blocks are normalized in place. Moved verbatim from
+Picture descriptions are produced before planning, and table structures by
+the ``table-enrichment`` method that ``linearize-table`` depends on (#640, M2);
+their handlers verify that the work happened instead of pretending to do it. Code blocks are normalized in place. Moved verbatim from
 the PDDL orchestrator (#402, phase 3, step 6).
 """
 

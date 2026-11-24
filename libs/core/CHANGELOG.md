@@ -19,25 +19,41 @@ linearizes or chooses a source, as before. A per-table method was ruled out:
 it would wait the retry pass once per failing table and lose the recovery of
 the tables read after the breaker opened.
 
-- `RunPorts.services` (`RunServices`) holds what a run's stages and methods
-  share. `run_breaker` and `run_text_spans` give the steps before planning
-  and the method the same breaker and span reader.
+- `RunPorts.services` (`RunServices`) holds the infrastructure a run's stages
+  and methods share, one run of one document: `run_breaker`, `run_text_spans`
+  and `progress`. The text-span reader keeps no manifest; a step that cannot
+  read the text layer records `inline_math_detection = unavailable` on the
+  manifest it enriches, the executor's copy included.
+- **What the method's result means:** the collective attempt ran. Each table
+  keeps its own outcome (`table_read_failure`: `model_failed`,
+  `admission_rejected`, `crop_unavailable`), and its `linearize-table`
+  validates it. The message reports how many tables needed a reading, how
+  many got a structure, what was left and why, and the inline math status
+  (`fonts`, `unavailable` or `off`). An admission rejection (#590) is kept and
+  still spares the breaker inside the plan.
 - `table-enrichment` is `transitional` in `LOCAL_METHODS`: the same
   computation, moved. Its Toolbox calls are conditional, so they are not
   requirements.
-- `_enrich_table_structures` returns how many tables it read.
+- A location label over more than five pages gives the count and the span
+  ("12 pages, from 1 to 12"), so the step over every table does not list
+  them all.
 - A Fast Downward fixture case checks the new order under both planners.
 
 What changes, observably:
-- the "Enriching the tables with OCR" progress message is no longer sent; the
-  executor announces the `table-enrichment` step like any other;
-- for a document with tables, the plan has one more step, and its
-  `problem_sha256` and `plan_id` change;
-- the manifest checkpoint is saved after the four enrichment steps before
+- The progress stays: inside the plan the method reports "Enriching the
+  tables with OCR" and "Recognizing table N of M" through the run's
+  `RunServices.progress`, after the executor's own step message.
+- For a document with tables, the plan has one more step, and its
+  `problem_sha256` and `plan_id` change.
+- The manifest checkpoint is saved after the four enrichment steps before
   planning, not six. Inside the plan the execution checkpoint covers the step
   as a whole, so a crash in the middle of it reads again the tables it had
-  already read in that attempt;
-- a job resumed from a 0.3.11 enrichment checkpoint already has its tables
+  already read in that attempt (follow-up: #836).
+- A step that raises no longer fails the job at once. Like any method, it
+  records a failed attempt, the planner replans with `human-review`, and the
+  job then fails on that critical obligation (with `PDDL_MAX_REPLANS`, one
+  more execution).
+- A job resumed from a 0.3.11 enrichment checkpoint already has its tables
   enriched and gets no obligation; one resumed from an earlier phase gets it.
 
 The picture descriptions (M1) wait for an executor preparation (M0): a

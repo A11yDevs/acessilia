@@ -152,7 +152,7 @@ It finds 64 keys, 19 of them written or read by more than one group.
 | `metadata["vision_institutional_logo"]` | G (region), O | V | Region inspection and picture enrichment record the model's explicit logo answer, and clear it when the answer is absent; page inspection has no such field. V uses it to confirm the letterhead merge. |
 | `metadata["original_type"]` | G, K, O, P | — | Assigned, not set once. When an element is reclassified twice, the last writer decides which original type survives, so the order is part of the behaviour. |
 | `metadata["src"]` | G, P | O | Region and page inspection and the formula crop record the image source; picture enrichment reads it. |
-| `metadata["table_ast"]` | S | E, F, I, Q, S | S writes it before planning. Q's table pass runs after S, because S can replace a table's cells. E, F and I read it during execution. |
+| `metadata["table_ast"]` | S | E, F, I, Q, S | S writes it in the plan's first step over the tables, `table-enrichment` (before planning until core 0.3.11, #640 M2). Q's table pass runs after S, because S can replace a table's cells. E, F and I read it during execution. |
 | `metadata["table_read_failure"]` | S | S, V | S records why a table was not read, and V reports it as a degradation. |
 | `metadata["table_review" / "table_ast_replaced"]` | S | — | S records the latest review verdict (`reason`, `outcome`, accumulated `attempts`) and keeps the first AST a review replaced as evidence; smart-fusion adoption deletes every `table_*` key, discarding both. |
 | `metadata["mathml"]`, `metadata["verbalization"]`, `metadata["latex_normalized"]` | B, B, E | T | T counts a formula as readable from these (`_formula_has_readable_content`), so its delivery check depends on the handlers having run first. |
@@ -173,11 +173,14 @@ It finds 64 keys, 19 of them written or read by more than one group.
 1. P classifies formula regions;
 2. O describes pictures;
 3. Q marks inline math in prose;
-4. P recognizes formulas;
+4. P recognizes formulas.
+
+Since core 0.3.12 (#640, M2) the table steps run inside the plan, as the
+`table-enrichment` method, before the tables' `linearize-table`:
 5. S reads tables;
 6. Q marks inline math in tables.
 
-The plan's handlers (B, E–L) run next. T's status checks and the payload (V, W, X) come last.
+The plan's other handlers (B, E–L) run in the plan's order. T's status checks and the payload (V, W, X) come last.
 
 **Characterization first.** Before a move touches either side of a shared key, a test should pin the pair end to end on one manifest, not each side alone:
 - F, Q and W on `negation_overlay`;

@@ -25,8 +25,10 @@ MSG_VISION_VALIDATED = (
 MSG_TABLE_NO_TABLE = "No table found for the obligation"
 MSG_TABLE_NO_STRUCTURE = "Table without tabular structure: {ids}"
 MSG_TABLES_ENRICHED = (
-    "Table enrichment ran for {count} table: {read} read again, {marked} inline math runs marked",
-    "Table enrichment ran for {count} tables: {read} read again, {marked} inline math runs marked",
+    "Table enrichment ran for {count} table: {needing} needed a reading, {structured} got a "
+    "structure; left as they were: {left}; inline math: {inline} ({marked} runs marked)",
+    "Table enrichment ran for {count} tables: {needing} needed a reading, {structured} got a "
+    "structure; left as they were: {left}; inline math: {inline} ({marked} runs marked)",
 )
 MSG_TABLE_VALIDATED = (
     "Table structure validated for {count} table",

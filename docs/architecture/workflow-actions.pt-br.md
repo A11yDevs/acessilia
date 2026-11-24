@@ -34,7 +34,7 @@ ordem:
 | Bootstrap | Limite de páginas, antes da extração | Recusa um documento acima de `DocumentConfig.max_pages` pela contagem de páginas da inspeção (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extração | Monta o manifesto: elementos, depois as obrigações derivadas dos seus tipos | Toolbox `document.structure.extract` (um ou dois providers) | `manifest` |
 | Bootstrap | Limite de páginas, depois da extração | Confere o limite de novo contra a estrutura extraída | — | — |
-| Enriquecimento | Seis passos, numa ordem fixa (abaixo) | | Toolbox e os agentes de modelo do Core | `enriched`, por objeto |
+| Enriquecimento | Quatro passos antes do planejamento, numa ordem fixa (abaixo); desde a 0.3.12, os passos 5 e 6 rodam dentro do plano (M2) | | Toolbox e os agentes de modelo do Core | `enriched`, por objeto, nos passos 1–4; o checkpoint de execução, por passo do plano, nos 5–6 |
 | Planejamento | | Compila o problema a partir do manifesto enriquecido e planeja | — | `plan` |
 
 Os passos de enriquecimento (`_enrich_before_planning` até o core 0.3.11;
@@ -52,12 +52,13 @@ desde a 0.3.12, os passos 5 e 6 rodam dentro do plano, como o método
 
 O que os passos compartilham não é uniforme:
 
-| Recurso | Passos | Onde vive hoje |
+| Recurso | Passos | Onde vive (core 0.3.12) |
 |---|---|---|
-| Breaker de provider | 1, 2, 4, 5 | uma variável local de `_enrich_before_planning` |
-| Progresso por objeto (`on_progress`) | 1, 2, 4, 5 | uma variável local, de `checkpoints.enrichment_progress` |
+| Breaker de provider | 1, 2, 4, 5 | o da execução, `RunPorts.services` (`run_breaker`), compartilhado com o método `table-enrichment` |
+| Progresso por objeto (`on_progress`) | 1, 2, 4 | uma variável local, de `checkpoints.enrichment_progress`; o passo 5, dentro do plano, tem o checkpoint de execução do seu passo do plano |
 | Cache de regiões | 1, 2, 4 | de `RunPorts` (`region_cache_for`) |
-| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | uma variável local |
+| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | o da execução, `RunPorts.services` (`run_text_spans`); não guarda manifesto |
+| Mensagens de progresso | 1, 2, 4, 5 | o callback de status antes do planejamento; `RunServices.progress` dentro do plano |
 | Inspeção de mídia | 2 | uma saída do bootstrap |
 | Arquivo de origem | todos | o contexto da execução; o manifesto registra seu digest |
 
@@ -271,6 +272,24 @@ PDDL. A obrigação é criada quando o manifesto é enriquecido, antes do primei
 plano, e só quando o documento tem os elementos sobre os quais o passo
 trabalha. Essa é a sua condição; o método mantém as condições por elemento do
 passo.
+
+**O que o resultado significa.** O método tem sucesso quando a tentativa
+coletiva rodou: o passo terminou para todos os alvos. Isso não afirma que todo
+elemento está enriquecido. Cada elemento mantém seu próprio desfecho (para uma
+tabela, `table_read_failure` com o motivo, inclusive o `admission_rejected` de
+um executor de chamadas de modelo cheio, #590), e as obrigações por elemento
+que dependem dela validam o seu elemento. Reprovar a obrigação inteira por um
+elemento bloquearia os elementos utilizáveis. Por isso a mensagem do método
+informa o que aconteceu com cada elemento, e ele só falha quando o passo lança
+uma exceção.
+
+**Limites, para o M0.** A obrigação é criada uma vez, antes do primeiro plano,
+com os elementos conhecidos naquele momento, e os kinds por elemento que
+dependem dela são uma lista fixa (`_AFTER_TABLE_ENRICHMENT`). Um elemento
+acrescentado, removido ou retipado enquanto o plano roda não é reconciliado
+com ela. Nenhum handler acrescenta ou retipa uma tabela hoje, mas o M0 (#832)
+precisa reconciliar os alvos e as dependências de uma obrigação do documento,
+e as próximas migrações precisam acrescentar seus kinds a essa lista.
 
 ## Ordem da migração
 

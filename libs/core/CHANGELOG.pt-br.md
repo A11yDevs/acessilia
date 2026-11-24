@@ -19,26 +19,44 @@ antes de linearizar ou escolher a fonte, como antes. Um método por tabela foi
 descartado: ele esperaria a passada de retry uma vez por tabela que falhasse e
 perderia a recuperação das tabelas lidas depois da abertura do breaker.
 
-- `RunPorts.services` (`RunServices`) guarda o que os estágios e os métodos de
-  uma execução compartilham. `run_breaker` e `run_text_spans` dão aos passos
-  antes do planejamento e ao método o mesmo breaker e o mesmo leitor de spans.
+- `RunPorts.services` (`RunServices`) guarda a infraestrutura que os estágios
+  e os métodos de uma execução compartilham, uma execução de um documento:
+  `run_breaker`, `run_text_spans` e `progress`. O leitor de spans não guarda
+  manifesto; um passo que não consegue ler a camada de texto grava
+  `inline_math_detection = unavailable` no manifesto que enriquece, inclusive
+  na cópia do executor.
+- **O que o resultado do método significa:** a tentativa coletiva rodou. Cada
+  tabela mantém seu próprio desfecho (`table_read_failure`: `model_failed`,
+  `admission_rejected`, `crop_unavailable`), e seu `linearize-table` a
+  valida. A mensagem informa quantas tabelas precisavam de leitura, quantas
+  ganharam estrutura, o que ficou e por quê, e o estado da matemática inline
+  (`fonts`, `unavailable` ou `off`). Uma rejeição de admissão (#590) é mantida
+  e continua poupando o breaker dentro do plano.
 - `table-enrichment` é `transitional` em `LOCAL_METHODS`: a mesma computação,
   mudada de lugar. Suas chamadas à Toolbox são condicionais, então não são
   requisitos.
-- `_enrich_table_structures` devolve quantas tabelas leu.
+- Um rótulo de localização sobre mais de cinco páginas dá a contagem e o
+  intervalo ("12 páginas, de 1 a 12"), para que o passo sobre todas as tabelas
+  não liste todas elas.
 - Um caso de fixture do Fast Downward confere a nova ordem nos dois
   planejadores.
 
 O que muda, de forma observável:
-- a mensagem de progresso "Enriquecendo as tabelas com OCR" não é mais
-  enviada; o executor anuncia o passo `table-enrichment` como qualquer outro;
-- num documento com tabelas, o plano tem um passo a mais, e seus
-  `problem_sha256` e `plan_id` mudam;
-- o checkpoint do manifesto é salvo depois dos quatro passos de enriquecimento
+- O progresso continua: dentro do plano, o método informa "Enriquecendo as
+  tabelas com OCR" e "Reconhecendo a tabela N de M" pelo
+  `RunServices.progress` da execução, depois da mensagem do próprio passo do
+  executor.
+- Num documento com tabelas, o plano tem um passo a mais, e seus
+  `problem_sha256` e `plan_id` mudam.
+- O checkpoint do manifesto é salvo depois dos quatro passos de enriquecimento
   antes do planejamento, não seis. Dentro do plano, o checkpoint de execução
   cobre o passo inteiro, então uma queda no meio dele lê de novo as tabelas que
-  já tinha lido naquela tentativa;
-- um job retomado de um checkpoint de enriquecimento da 0.3.11 já tem as
+  já tinha lido naquela tentativa (follow-up: #836).
+- Um passo que lança exceção não derruba mais o job na hora. Como qualquer
+  método, ele registra uma tentativa falha, o planejador replaneja com
+  `human-review` e o job então falha nessa obrigação crítica (com
+  `PDDL_MAX_REPLANS`, mais uma execução).
+- Um job retomado de um checkpoint de enriquecimento da 0.3.11 já tem as
   tabelas enriquecidas e não ganha a obrigação; um retomado de uma fase
   anterior ganha.
 

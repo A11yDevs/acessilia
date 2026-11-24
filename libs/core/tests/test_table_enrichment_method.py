@@ -15,18 +15,37 @@ from pathlib import Path
 
 import pytest
 from core_config_support import core_config
-from pddl_support import build_element, build_manifest, build_obligation
+from pddl_support import (
+    build_element,
+    build_manifest,
+    build_obligation,
+    build_orchestrator,
+)
+from test_table_inline_math_marking import (
+    _manifest as _math_manifest,
+    spans,  # noqa: F401  (fixture)
+)
 
+from acessilia_core.agents.model_calls import ModelCallRejected
 from acessilia_core.agents.output_schemas import DataOutput
+from acessilia_core.i18n import t
+from acessilia_core.i18n.stage_messages import (
+    STAGE_ENRICHING_TABLES_OCR,
+    STAGE_PAGES,
+    STAGE_PAGES_SPAN,
+)
 from acessilia_core.manifest.models import PageDescriptor
 from acessilia_core.pipeline.enrichment import tables as table_stage
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.inline_math import run_text_spans
 from acessilia_core.pipeline.handlers import tables as table_method
+from acessilia_core.pipeline.handlers.messages import MSG_TABLE_NO_TABLE
+from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     TABLE_ENRICHMENT_KIND,
     TABLE_ENRICHMENT_METHOD,
     TABLE_ENRICHMENT_OBLIGATION_ID,
+    _pages_label,
     add_table_enrichment_obligation,
 )
 from acessilia_core.planning.planner_agent import PlannerAgent
@@ -60,6 +79,46 @@ def _tables_manifest():
     manifest = build_manifest([unread, read, paragraph], obligations)
     manifest.pages = [PageDescriptor(page_number=1, width=600.0, height=800.0, element_ids=[])]
     return manifest
+
+
+FONTS = core_config(
+    vision={"table_visual_review": True, "retry_pass_delay_seconds": 0},
+    document={"inline_math_detection": "fonts"},
+)
+
+
+def _answers(monkeypatch, answers):
+    """The data agent answers the tables in order: a reading, ``None`` (no
+    answer) or an exception to raise."""
+    calls: list[str] = []
+    queue = list(answers)
+
+    class Agent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def process_region(self, **kwargs):
+            calls.append(kwargs["fallback_text"])
+            answer = queue.pop(0) if queue else None
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+    monkeypatch.setattr(table_stage, "DataAgent", Agent)
+    monkeypatch.setattr(
+        table_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (b"img", fallback or 1),
+    )
+    return calls
+
+
+def _in_executor(manifest, config, ports):
+    """Plan and execute ``manifest`` as a run does: the executor works on a copy."""
+    add_table_enrichment_obligation(manifest)
+    executor = build_orchestrator().executor
+    executor.registry = bind_run(build_method_registry(), config, ports)
+    _, plan = PlannerAgent().plan(manifest)
+    return executor.execute(plan, manifest)
 
 
 @pytest.fixture
@@ -161,6 +220,148 @@ def test_the_method_without_tables_fails_instead_of_raising() -> None:
     assert not result.success
 
 
+def test_an_obligation_without_table_targets_says_so() -> None:
+    """The obligation exists; it has no table to enrich (review of #833)."""
+    obligation = build_obligation(TABLE_ENRICHMENT_KIND, ["p"], [TABLE_ENRICHMENT_METHOD])
+    manifest = build_manifest([build_element("p", "paragraph", text="texto")], [obligation])
+
+    result = table_method._handle_table_enrichment_method(
+        manifest, obligation.id, config=CONFIG, ports=RunPorts.none()
+    )
+
+    assert not result.success
+    assert result.message == t(MSG_TABLE_NO_TABLE)
+
+
+# What the result reports (review of #833): the collective attempt ran, and
+# each table keeps its own outcome.
+
+
+def _two_unread_tables():
+    manifest = build_manifest(
+        [build_element("t-1", "table", text="primeira"), build_element("t-2", "table", text="segunda")],
+        [],
+    )
+    manifest.pages = [PageDescriptor(page_number=1, width=600.0, height=800.0, element_ids=[])]
+    return manifest
+
+
+@pytest.mark.parametrize(
+    ("answers", "structured", "left"),
+    [
+        pytest.param([_reading([["A", "B"], ["1", "2"]])] * 2, 2, "-", id="all-read"),
+        pytest.param([_reading([["A", "B"], ["1", "2"]]), None, None], 1, "model_failed: 1", id="partial"),
+        pytest.param([None, None, None, None], 0, "model_failed: 2", id="all-failed"),
+    ],
+)
+def test_the_method_succeeds_and_reports_each_table(monkeypatch, answers, structured, left) -> None:
+    _answers(monkeypatch, answers)
+    manifest = _two_unread_tables()
+    obligation = add_table_enrichment_obligation(manifest)
+
+    result = table_method._handle_table_enrichment_method(
+        manifest, obligation.id, config=CONFIG, ports=RunPorts.none()
+    )
+
+    assert result.success and result.validated
+    assert f"2 needed a reading, {structured} got a structure" in result.message
+    assert f"left as they were: {left}" in result.message
+    failures = [element.metadata.get("table_read_failure") for element in manifest.elements]
+    assert failures.count("model_failed") == (2 - structured)
+
+
+def test_nothing_to_read_calls_no_model(monkeypatch) -> None:
+    calls = _answers(monkeypatch, [])
+    manifest = _tables_manifest()
+    manifest.elements[0].metadata["table_ast"] = deepcopy(_STRUCTURED)
+    obligation = add_table_enrichment_obligation(manifest)
+
+    result = table_method._handle_table_enrichment_method(
+        manifest, obligation.id, config=CONFIG, ports=RunPorts.none()
+    )
+
+    assert calls == []
+    assert "0 needed a reading" in result.message
+
+
+def test_an_admission_rejection_keeps_its_reason_and_spares_the_breaker(monkeypatch) -> None:
+    """#590 with #833: inside the plan, a full model-call runner is recorded as
+    ``admission_rejected`` on the manifest the executor returns, and does not
+    count against the provider (a breaker of threshold 1 would open)."""
+    config = core_config(vision={"breaker_threshold": 1, "retry_pass_delay_seconds": 0})
+    _answers(monkeypatch, [ModelCallRejected("full")] * 4)
+    manifest = _two_unread_tables()
+    ports = RunPorts.none()
+
+    executed, report = _in_executor(manifest, config, ports)
+
+    failures = {e.id: e.metadata.get("table_read_failure") for e in executed.elements}
+    assert failures == {"t-1": "admission_rejected", "t-2": "admission_rejected"}
+    assert run_breaker(ports, config.vision).open is False
+    enrich = next(item for item in executed.obligations if item.kind == TABLE_ENRICHMENT_KIND)
+    assert enrich.status == "satisfied"
+    assert "admission_rejected: 2" in enrich.attempts[-1].message
+
+
+def test_unavailable_text_spans_reach_the_manifest_the_executor_returns(monkeypatch) -> None:
+    """The span reader was built before planning with another manifest; the
+    executor's copy still records the inline math as unavailable."""
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    async def failing(*_args, **_kwargs):
+        raise ToolboxError("document.text.spans is down")
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", failing)
+    manifest = _math_manifest()
+    ports = RunPorts.none()
+    run_text_spans(ports, deepcopy(manifest), Path(manifest.source.path), FONTS.toolbox)
+
+    executed, _ = _in_executor(manifest, FONTS, ports)
+
+    assert executed.extractor.configuration["inline_math_detection"] == "unavailable"
+
+
+def test_the_method_marks_the_inline_math_as_the_steps_before_planning_did(spans) -> None:  # noqa: F811
+    """The differential test with the inline math detection on."""
+    before = _math_manifest()
+    after = deepcopy(before)
+    source = Path(before.source.path)
+
+    async def steps_before_planning():
+        ports = RunPorts.none()
+        await table_method._mark_table_inline_math(
+            before, source, FONTS.document, run_text_spans(ports, before, source, FONTS.toolbox)
+        )
+
+    asyncio.run(steps_before_planning())
+    obligation = add_table_enrichment_obligation(after)
+    result = table_method._handle_table_enrichment_method(
+        after, obligation.id, config=FONTS, ports=RunPorts.none()
+    )
+
+    assert [e.model_dump() for e in after.elements] == [e.model_dump() for e in before.elements]
+    assert "$" in str(after.elements[1].metadata["table_ast"])  # the marks did run
+    assert "inline math: fonts" in result.message
+
+
+def test_the_method_reports_its_progress_through_the_run(fake_reader) -> None:
+    messages: list[str] = []
+    ports = RunPorts.none()
+    ports.services.progress = messages.append
+    manifest = _tables_manifest()
+    obligation = add_table_enrichment_obligation(manifest)
+
+    table_method._handle_table_enrichment_method(manifest, obligation.id, config=CONFIG, ports=ports)
+
+    assert messages[0] == t(STAGE_ENRICHING_TABLES_OCR)
+    assert any(message.startswith("Recognizing table 1 of 1") for message in messages[1:])
+
+
+def test_a_step_over_many_pages_gives_their_span() -> None:
+    assert _pages_label([1, 3, 5, 7, 9], 10) == t(STAGE_PAGES).format(pages="1, 3, 5, 7, 9")
+    assert _pages_label(range(1, 13), 20) == t(STAGE_PAGES_SPAN).format(count=12, first=1, last=12)
+
+
 def test_the_method_uses_the_run_breaker_and_span_reader(monkeypatch) -> None:
     """The same objects the enrichment before planning gets from the run's ports."""
     seen: dict[str, object] = {}
@@ -219,3 +420,59 @@ def test_the_method_leaves_the_tables_as_the_steps_before_planning_did(fake_read
     assert tables(after) == tables(before)
     assert after.extractor.configuration == before.extractor.configuration
     assert len(fake_reader) == 2  # one reading per path
+
+
+# Resume across the migration (review of #833).
+
+
+def _ctx(enriched_state):
+    from types import SimpleNamespace
+
+    saved: dict = {}
+
+    class Checkpoints:
+        def load(self, phase):
+            return enriched_state
+
+        async def save(self, phase, build):
+            saved[phase] = build()
+
+    return SimpleNamespace(
+        checkpoints=Checkpoints(), effective_mode="medio", config=CONFIG, ports=RunPorts.none(),
+        source_path=Path("/tmp/doc.pdf"), status_callback=None,
+    ), saved
+
+
+@pytest.mark.parametrize("with_obligation", [False, True], ids=["0.3.11", "0.3.12"])
+def test_an_enrichment_checkpoint_is_resumed_as_it_was(monkeypatch, with_obligation) -> None:
+    """A 0.3.11 checkpoint already has its tables enriched, so it gets no
+    obligation; a 0.3.12 one keeps the obligation it has."""
+    from acessilia_core.pipeline.checkpointing import manifest_payload
+
+    checkpointed = _tables_manifest()
+    if with_obligation:
+        add_table_enrichment_obligation(checkpointed)
+    ctx, _ = _ctx({"manifest": manifest_payload(checkpointed)})
+
+    resumed = asyncio.run(
+        build_orchestrator()._load_or_enrich_manifest(ctx, _tables_manifest(), None, {})
+    )
+
+    kinds = [item.kind for item in resumed.obligations]
+    assert kinds.count(TABLE_ENRICHMENT_KIND) == (1 if with_obligation else 0)
+
+
+def test_a_fresh_enrichment_adds_the_obligation_before_its_checkpoint(monkeypatch) -> None:
+    async def no_enrichment(*_args, **_kwargs):
+        return None
+
+    orchestrator = build_orchestrator()
+    monkeypatch.setattr(orchestrator, "_enrich_before_planning", no_enrichment)
+    ctx, saved = _ctx(None)
+
+    enriched = asyncio.run(orchestrator._load_or_enrich_manifest(ctx, _tables_manifest(), None, {}))
+
+    assert any(item.kind == TABLE_ENRICHMENT_KIND for item in enriched.obligations)
+    assert any(
+        item["kind"] == TABLE_ENRICHMENT_KIND for item in next(iter(saved.values()))["manifest"]["obligations"]
+    )

@@ -100,6 +100,9 @@ STAGE_PAGE: str = "page {page}"
 STAGE_PAGE_OF: str = "page {page} of {total_pages}"
 #: Location label for work spanning several pages; {pages} is a comma-separated list of page numbers.
 STAGE_PAGES: str = "pages {pages}"
+#: Location label for work spread over many pages, such as a step over every
+#: table of the document (#640, M2): the range and the count, not the list.
+STAGE_PAGES_SPAN: str = "{count} pages, from {first} to {last}"
 #: Location label for work whose page the extraction did not identify.
 STAGE_PAGE_UNKNOWN: str = "page not identified"
 #: Job error that names the stage the job was in when it failed; {error} is the failure and {stage} the last live stage.

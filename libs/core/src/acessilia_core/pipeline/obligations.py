@@ -17,6 +17,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
+    STAGE_PAGES_SPAN,
 )
 from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
 from acessilia_core.manifest.models import (
@@ -64,7 +65,7 @@ def add_table_enrichment_obligation(manifest: ProcessingManifest) -> Obligation 
         kind=TABLE_ENRICHMENT_KIND,
         target_ids=tables,
         admissible_methods=methods,
-        method_costs={method: DEFAULT_METHOD_COSTS[method] for method in methods},
+        method_costs={method: DEFAULT_METHOD_COSTS.get(method, 50) for method in methods},
         rationale=t(MSG_OBLIGATION_TABLE_ENRICHMENT),
     )
     manifest.obligations.append(obligation)
@@ -258,6 +259,10 @@ def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
     return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
 
 
+#: Up to this many pages, a label lists them; beyond, it gives the span.
+_PAGES_LISTED = 5
+
+
 def _pages_label(
     pages: Iterable[int | None], total_pages: int | None = None
 ) -> str:
@@ -268,6 +273,8 @@ def _pages_label(
     that with image or step counters ("image 11 of 37 (page 18 of 42)"), and
     without the total users could read 37 as the page count. Single-page
     documents keep the plain "page 1" label because "of 1" adds nothing.
+    Work over more than ``_PAGES_LISTED`` pages, such as a step over every
+    table of the document, gets its count and span, not the list.
     """
     numbers = sorted({page for page in pages if page})
     if not numbers:
@@ -276,6 +283,8 @@ def _pages_label(
         if total_pages is not None and total_pages > 1:
             return t(STAGE_PAGE_OF).format(page=numbers[0], total_pages=total_pages)
         return t(STAGE_PAGE).format(page=numbers[0])
+    if len(numbers) > _PAGES_LISTED:
+        return t(STAGE_PAGES_SPAN).format(count=len(numbers), first=numbers[0], last=numbers[-1])
     return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
 
 

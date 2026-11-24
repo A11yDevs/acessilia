@@ -290,6 +290,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
+    STAGE_PAGES_SPAN,
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_PREPARING_FILE,
     STAGE_PREPARING_IMAGE,
@@ -598,6 +599,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_PAGE,
     STAGE_PAGE_OF,
     STAGE_PAGES,
+    STAGE_PAGES_SPAN,
     STAGE_PAGE_UNKNOWN,
     STAGE_FAILED_DURING,
     STAGE_RESTART_INTERRUPTED_DURING,
@@ -1105,8 +1107,12 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
         "Descrições validadas para {count} imagens",
     ),
     handler_messages.MSG_TABLES_ENRICHED: (
-        "Enriquecimento de tabelas rodou para {count} tabela: {read} lida de novo, {marked} trechos de matemática inline marcados",
-        "Enriquecimento de tabelas rodou para {count} tabelas: {read} lidas de novo, {marked} trechos de matemática inline marcados",
+        "Enriquecimento de tabelas rodou para {count} tabela: {needing} precisavam de leitura, "
+        "{structured} ganharam estrutura; ficaram como estavam: {left}; matemática inline: "
+        "{inline} ({marked} trechos marcados)",
+        "Enriquecimento de tabelas rodou para {count} tabelas: {needing} precisavam de leitura, "
+        "{structured} ganharam estrutura; ficaram como estavam: {left}; matemática inline: "
+        "{inline} ({marked} trechos marcados)",
     ),
     handler_messages.MSG_TABLE_VALIDATED: (
         "Estrutura tabular validada para {count} tabela",
@@ -1267,6 +1273,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_PAGE: "página {page}",
         STAGE_PAGE_OF: "página {page} de {total_pages}",
         STAGE_PAGES: "páginas {pages}",
+        STAGE_PAGES_SPAN: "{count} páginas, de {first} a {last}",
         STAGE_PAGE_UNKNOWN: "página não identificada",
         STAGE_FAILED_DURING: "{error} (falhou durante: {stage})",
         STAGE_RESTART_INTERRUPTED_DURING: (

@@ -286,7 +286,7 @@ async def test_a_local_admission_rejection_is_not_counted_against_the_provider(m
 
     monkeypatch.setattr(formula_stage, "VisionAgent", RejectingVision)
     monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *a, **k: (b"crop", 1))
-    breaker = pddl.ProviderBreaker(1)
+    breaker = ProviderBreaker(1)
     candidates = build_manifest(
         [
             build_element("element-1", "formula", text="a"),

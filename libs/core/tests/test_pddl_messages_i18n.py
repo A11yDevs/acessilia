@@ -29,6 +29,7 @@ from acessilia_core.pipeline.handlers.formula import _handle_latex_normalizer_me
 from acessilia_core.pipeline.handlers.messages import (
     MSG_BLOCK_COUNT,
     MSG_CODE_NORMALIZED,
+    MSG_TABLES_ENRICHED,
     MSG_VISION_VALIDATED,
 )
 from acessilia_core.pipeline.handlers.text import (
@@ -529,3 +530,27 @@ class TestThePersistedMessageIsLocalized:
             )
 
         assert structure("en_US") == structure("pt_BR")
+
+
+@pytest.mark.parametrize(
+    ("locale", "count", "start"),
+    [
+        ("en_US", 1, "Table enrichment ran for 1 table:"),
+        ("en_US", 3, "Table enrichment ran for 3 tables:"),
+        ("pt_BR", 1, "Enriquecimento de tabelas rodou para 1 tabela:"),
+        ("pt_BR", 3, "Enriquecimento de tabelas rodou para 3 tabelas:"),
+    ],
+)
+def test_the_table_enrichment_message_is_plural_and_localized(locale, count, start) -> None:
+    """#640, M2: the method's message, with every field it reports."""
+    token = set_request_locale(locale)
+    try:
+        message = n(*MSG_TABLES_ENRICHED, count).format(
+            count=count, needing=2, structured=1, left="model_failed: 1",
+            inline="fonts", marked=4,
+        )
+    finally:
+        reset_request_locale(token)
+
+    assert message.startswith(start)
+    assert "model_failed: 1" in message and "fonts" in message and "4" in message

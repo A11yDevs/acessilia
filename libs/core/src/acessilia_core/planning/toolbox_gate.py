@@ -131,7 +131,7 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     # table, so they are not requirements that could rule it out.
     "table-enrichment": ("transitional", "reads tables with the DataAgent model; marks cell math"),
     "vision-description": ("validation", "the picture descriptions made before planning"),
-    "pandoc-table": ("validation", "the table structure extracted before planning"),
+    "pandoc-table": ("validation", "the table structure table-enrichment produced"),
     "human-review": ("symbolic", "the terminal escalation"),
 }
 

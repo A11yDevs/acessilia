@@ -180,7 +180,9 @@ def run_breaker(ports: RunPorts, vision: VisionConfig) -> ProviderBreaker:
     """The vision provider breaker of the run (``ports``).
 
     One per run, shared by the enrichment before planning and the methods that
-    enrich inside the plan, so an outage counts for the whole document.
+    enrich inside the plan, so an outage counts for the whole document. The
+    first call builds it with its ``vision.breaker_threshold``; later calls
+    get that breaker (``RunServices.shared``).
     """
     return ports.services.shared(
         "provider-breaker", lambda: ProviderBreaker(vision.breaker_threshold)
