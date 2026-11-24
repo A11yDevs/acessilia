@@ -332,9 +332,24 @@ def test_the_integration_marker_is_registered() -> None:
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
-    assert set(jobs["delivery"]["needs"]) >= {
-        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated",
+    delivery = jobs["delivery"]
+
+    # The security call is part of the gate: a delivery without the scan would
+    # publish an image the security job has not seen.
+    assert set(delivery["needs"]) == {
+        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated", "security",
     }
+    # `changes` and `detect-changes` are PR-only. A `needs` edge to either
+    # would autoskip delivery on pushes, the exact #644 regression.
+    assert "changes" not in delivery["needs"]
+    assert "detect-changes" not in delivery["needs"]
+    condition = " ".join(delivery["if"].split())
+    assert condition == (
+        "github.event_name == 'push' && ( "
+        "github.ref_name == 'main' || "
+        "github.ref_name == 'develop' || "
+        "startsWith(github.ref_name, 'release/') )"
+    )
     assert "sdk-isolated" in jobs
     assert "docstruct-isolated" in jobs
 
@@ -685,13 +700,33 @@ def test_the_security_audit_pins_uv_and_checks_the_lock() -> None:
 
 
 def test_the_container_scan_is_conditional_on_image_paths() -> None:
+    """#644: the detector must not skip, or the reusable call skips delivery.
+
+    GitHub evaluates a caller's ``needs`` on a reusable workflow by the jobs
+    inside it. A skipped ``image-changes`` job therefore autoskips
+    ``publish verified images`` in ci.yml even when the scan itself succeeded,
+    which is the regression seen on develop on 2026-11-23.
+    """
     workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
     changes = workflow["jobs"]["image-changes"]
     scan = workflow["jobs"]["container-scan"]
+    caller = _workflow()["jobs"]["security"]
 
-    assert changes["if"] == "github.event_name == 'pull_request'"
+    assert "if" not in changes
+    assert workflow["permissions"]["pull-requests"] == "read"
+    assert caller["permissions"]["pull-requests"] == "read"
+    assert changes["permissions"] == {
+        "contents": "read",
+        "pull-requests": "read",
+    }
+    assert changes["outputs"]["image"] == (
+        "${{ steps.filter.outputs.image || steps.assume.outputs.image }}"
+    )
     steps = {step.get("name"): step for step in changes["steps"]}
+    checkout = steps["Check out repository"]
+    assert checkout["if"] == "github.event_name == 'pull_request'"
     filter_step = steps["Filter image paths"]
+    assert filter_step["if"] == "github.event_name == 'pull_request'"
     assert filter_step["uses"] == (
         "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d"
     )
@@ -708,6 +743,9 @@ def test_the_container_scan_is_conditional_on_image_paths() -> None:
         ".github/workflows/security.yml",
     ):
         assert path in filters
+    assume = steps["Report the image as changed outside a pull request"]
+    assert assume["if"] == "github.event_name != 'pull_request'"
+    assert 'echo "image=true" >> "$GITHUB_OUTPUT"' in assume["run"]
     assert scan["needs"] == "image-changes"
     assert scan["if"] == (
         "!cancelled() && (github.event_name != 'pull_request' || "
