@@ -6,9 +6,8 @@ stages, plans with the PDDL planner and executes the plan with the method
 registry, planning again while the execution report asks for it (up to
 ``max_replans``); ``_plan_progress`` reports each step to the job, and
 ``_log_availability`` the Toolbox's availability decision. The stages, the
-handlers and the page judge live in the modules of ``libs/core/src/acessilia_core/pipeline``.
-Moved verbatim from ``backend/agents/pddl_orchestrator.py``, the last move of
-#402's phase 3, step 6; the module itself is gone.
+handlers and the page judge live in the modules of ``libs/core/src/acessilia_core/pipeline``;
+the module was moved verbatim from ``backend/agents/pddl_orchestrator.py`` (#402, phase 3, step 6).
 """
 
 from __future__ import annotations
@@ -56,6 +55,7 @@ from acessilia_core.pipeline.enrichment.formulas import (
 )
 from acessilia_core.pipeline.enrichment.inline_math import (
     _mark_inline_math,
+    _mark_inline_math_after_execution,
     run_text_spans,
 )
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
@@ -385,6 +385,8 @@ class PddlAccessibilityOrchestrator:
             executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
+        # The canonical build converts the spans of the manifest it is given.
+        await _mark_inline_math_after_execution(manifest, ctx.source_path, config.document, ctx.ports, config.toolbox)
 
         payload = build_pddl_structured_payload(
             file_path=file_path,
@@ -612,9 +614,8 @@ class PddlAccessibilityOrchestrator:
 
         The steps run in this order and share the run's provider breaker and
         text-span reader (``RunPorts.services``) with the ``table-enrichment``
-        method, which reads the tables inside the plan (#640, M2).
-
-        The manifest is checkpointed after each step (#407). Each step records
+        method, which reads the tables inside the plan (#640, M2). The manifest
+        is checkpointed after each step (#407). Each step records
         per-object progress in the manifest and skips an object it already
         finished, so a restart repeats at most the step that was running.
         """
@@ -668,7 +669,6 @@ class PddlAccessibilityOrchestrator:
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
         """Plan and execute again while the report asks for it, up to ``max_replans``.
-
         Returns the last manifest, report, plan and comparison. The replan count
         and the plan it produced come from the checkpoint, so a restart after a
         replan neither repeats one nor exceeds the budget.

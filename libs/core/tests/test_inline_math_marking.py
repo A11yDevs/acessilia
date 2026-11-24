@@ -5,11 +5,13 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from core_config_support import document_config, toolbox_config
-from pddl_support import build_element, build_manifest
+from core_config_support import core_config, document_config, toolbox_config
+from pddl_support import build_element, build_manifest, build_orchestrator
 
 from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
+from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
+from acessilia_core.ports import RunPorts
 
 HEIGHT = 792.0
 
@@ -197,3 +199,225 @@ def test_a_box_of_unknown_origin_is_left_out(spans):
         element.provenance[0].bbox.coord_origin = "UNKNOWN"
 
     assert _run(manifest)["marked"] == 0
+
+
+# The second pass, after the plan inserted the blocks `rescue-omitted` restores (#599).
+
+SOURCE = Path("/tmp/amostra.pdf")
+FLAT = "inicial ´ e s 0 ∈ R , h = 0"
+
+
+def _first_pass(manifest, ports, detection="fonts"):
+    """The prose step before planning, through the run's shared reader."""
+    asyncio.run(
+        inline_math_stage._mark_inline_math(
+            manifest,
+            SOURCE,
+            document_config(inline_math_detection=detection),
+            inline_math_stage.run_text_spans(ports, manifest, SOURCE, RUN_TOOLBOX),
+        )
+    )
+
+
+def _after_execution(manifest, ports, detection="fonts"):
+    """What ``execute`` runs after the plan: both steps over the run's reader (#599)."""
+    asyncio.run(
+        inline_math_stage._mark_inline_math_after_execution(
+            manifest,
+            SOURCE,
+            document_config(inline_math_detection=detection),
+            ports,
+            RUN_TOOLBOX,
+        )
+    )
+
+
+def test_the_second_pass_marks_only_the_block_the_plan_added(spans):
+    ports = RunPorts.none()
+    manifest = _manifest()
+    _first_pass(manifest, ports)
+    marked_before, _, _ = manifest.elements
+    text_before = marked_before.text
+    assert marked_before.metadata["inline_math_detection"] == {"marked": 2, "unmatched": 0}
+
+    restored = _element("p2", "paragraph", FLAT, 210, 232, reading_order=4)
+    manifest.elements.append(restored)
+
+    _after_execution(manifest, ports)
+
+    assert marked_before.text == text_before
+    assert marked_before.metadata["inline_math_detection"] == {"marked": 2, "unmatched": 0}
+    assert restored.text == r"inicial ´ e $s_0\in\mathbb{R}$, $h\neq0$"
+    assert restored.metadata["inline_math_detection"] == {"marked": 2, "unmatched": 0}
+    assert spans == [[1]], "the reader reuses the page it already fetched"
+
+
+def test_a_reader_that_failed_is_not_asked_again(monkeypatch):
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    calls = []
+
+    async def failing(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        calls.append(pages)
+        raise ToolboxError("document.text.spans is not in the catalogue")
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", failing)
+    ports = RunPorts.none()
+    planning = _manifest()
+    _first_pass(planning, ports)
+    assert planning.extractor.configuration["inline_math_detection"] == "unavailable"
+    executed = planning.model_copy(deep=True)
+
+    _after_execution(executed, ports)
+
+    assert calls == [[1]], "a capability that failed is not asked again"
+    assert executed.extractor.configuration["inline_math_detection"] == "unavailable"
+
+
+def test_a_page_the_second_pass_cannot_read_is_recorded_on_the_executed_manifest(
+    monkeypatch,
+):
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    calls = []
+
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        calls.append(pages)
+        if pages != [1]:
+            raise ToolboxError("document.text.spans failed after planning")
+        return {1: _page(PARAGRAPH_LINE, DISPLAY_LINE)}
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
+    ports = RunPorts.none()
+    planning = _manifest()
+    _first_pass(planning, ports)
+    assert planning.extractor.configuration["inline_math_detection"] == "fonts"
+
+    executed = planning.model_copy(deep=True)
+    restored = _element("p2", "paragraph", FLAT, 210, 232, reading_order=4)
+    restored.page_number = 2
+    restored.provenance[0].page_number = 2
+    executed.elements.append(restored)
+    executed.pages.append(
+        PageDescriptor(page_number=2, height=HEIGHT, width=612.0, element_ids=["p2"])
+    )
+
+    _after_execution(executed, ports)
+
+    assert calls == [[1], [2]], "page 1 is reused; page 2 is the one that fails"
+    assert restored.text == FLAT
+    assert planning.extractor.configuration["inline_math_detection"] == "fonts"
+    assert executed.extractor.configuration["inline_math_detection"] == "unavailable"
+
+
+def test_the_second_pass_builds_a_reader_when_the_run_resumed(monkeypatch):
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    async def failing(*_args, **_kwargs):
+        raise ToolboxError("document.text.spans is not in the catalogue")
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", failing)
+    manifest = _manifest()
+
+    _after_execution(manifest, RunPorts.none())
+
+    assert manifest.elements[0].text == FLAT
+    assert manifest.extractor.configuration["inline_math_detection"] == "unavailable"
+
+
+def test_off_does_not_call_the_toolbox_in_the_second_pass(spans):
+    manifest = _manifest()
+
+    _after_execution(manifest, RunPorts.none(), detection="off")
+
+    assert spans == []
+    assert manifest.elements[0].text == FLAT
+
+
+def test_the_pipeline_marks_a_block_the_plan_restored(monkeypatch, tmp_path):
+    """Through ``execute``: the block rescue-omitted inserts gets its `$…$` (#599)."""
+    from types import SimpleNamespace
+
+    from acessilia_core.agents.model_calls import current_model_calls
+    from docstruct.canonical import build_canonical_document
+
+    calls = []
+
+    async def fetch(source_path, pages, *, toolbox, artifact_id=None, client=None):
+        calls.append(pages)
+        return {1: _page(PARAGRAPH_LINE, DISPLAY_LINE)}
+
+    async def no_media(*_args, **_kwargs):
+        return None, {}
+
+    async def no_stage(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
+    monkeypatch.setattr(pddl, "_inspect_media", no_media)
+    for name in (
+        "_classify_formula_regions",
+        "_enrich_picture_descriptions",
+        "_enrich_formula_latex",
+    ):
+        monkeypatch.setattr(pddl, name, no_stage)
+
+    planning = _manifest()
+    orchestrator = build_orchestrator()
+    orchestrator.information_structural = SimpleNamespace(process=lambda *_a, **_k: planning)
+
+    async def run_plan(*_args, **_kwargs):
+        executed = planning.model_copy(deep=True)
+        executed.elements.append(
+            _element(
+                "p2", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 210, 232, reading_order=4
+            )
+        )
+        executed.pages[0].element_ids.append("p2")
+        return executed, SimpleNamespace(
+            replan_required=False, status="completed", execution_id="exec-599"
+        )
+
+    monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
+
+    payload = asyncio.run(
+        orchestrator.execute(
+            tmp_path / "amostra.pdf",
+            tmp_path,
+            structured_output=True,
+            config=core_config(),
+            model_calls=current_model_calls(),
+            ports=RunPorts.none(),
+        )
+    )
+
+    restored = next(
+        block for page in payload["pages"] for block in page["blocks"] if block["id"] == "p2"
+    )
+    assert restored["text"] == r"inicial ´ e $s_0\in\mathbb{R}$, $h\neq0$"
+    assert calls == [[1]]
+
+    class _Enricher:
+        def normalize(self, latex):
+            return latex
+
+        def to_mathml(self, latex):
+            return f"<math>{latex}</math>"
+
+        def verbalize(self, latex):
+            return f"Formula: {latex}"
+
+        def verbalize_inline(self, latex):
+            return f"fala {latex}"
+
+    document = build_canonical_document(payload, title="t", math_enricher=_Enricher())
+    block = next(
+        block for section in document["sections"] for block in section["blocks"]
+        if block["id"] == "p2"
+    )
+    entries = block["metadata"]["inline_math"]
+    assert [entry["source"] for entry in entries] == [
+        r"s_0\in\mathbb{R}",
+        r"h\neq0",
+    ]
+    assert all(entry.get("mathml") and entry.get("speech") for entry in entries)

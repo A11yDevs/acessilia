@@ -39,6 +39,8 @@ def _recorders(monkeypatch):
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
                  "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, record(name))
+    # The post-execution inline math pass (#599).
+    monkeypatch.setattr(pddl, "_mark_inline_math_after_execution", record("_mark_inline_math_after_execution"))
     # The table steps run inside the plan, as the ``table-enrichment`` method (#640, M2).
     monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
 
@@ -72,9 +74,10 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, mode="avancado", structured_output=True)
 
     names = [call[0] for call in calls]
-    # Without tables there is no ``enrich-tables`` obligation, so no table step.
+    # Without tables there is no ``enrich-tables`` obligation, so no table step;
+    # the inline math pass runs once more after execution (#599).
     assert names == ["inspect", "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                     "_enrich_formula_latex"]
+                     "_enrich_formula_latex", "_mark_inline_math_after_execution"]
     by_name = {call[0]: call for call in calls}
     breakers = {id(by_name[name][3]["breaker"]) for name in
                 ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex")}
@@ -99,7 +102,8 @@ async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_
 
     names = [call[0] for call in calls]
     assert names == ["inspect", "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                     "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"]
+                     "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math",
+                     "_mark_inline_math_after_execution"]
     by_name = {call[0]: call for call in calls}
     assert by_name["_enrich_table_structures"][3]["breaker"] is by_name["_enrich_formula_latex"][3]["breaker"]
     assert by_name["_enrich_table_structures"][3]["breaker"].threshold == 7

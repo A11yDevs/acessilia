@@ -1,12 +1,13 @@
 """The inline math stage: mark the math runs inside text and table cells.
 
-Runs before planning, when inline math detection is enabled. It reads the
-source's text spans through the core's per-document reader (``_TextSpanReader``,
-which binds ``acessilia_core.toolbox.text_spans`` and records a failure in
-``configuration["inline_math_detection"]``), finds the math runs of each boxed
-element with ``docstruct.text.inline_math``, splices them into the text or the
-table cells, and claims the negation slashes that overlay a relation. Moved
-verbatim from the PDDL orchestrator (#402, phase 3, step 6).
+Runs before planning, when inline math detection is enabled, and again after
+execution over the blocks the plan added (#599). It reads the source's text
+spans through the core's per-document reader (``_TextSpanReader``, which binds
+``acessilia_core.toolbox.text_spans``; a step that gets ``None`` records the
+failure in ``configuration["inline_math_detection"]``), finds the math runs of
+each boxed element with ``docstruct.text.inline_math``, splices them into the
+text or the table cells, and claims the negation slashes that overlay a
+relation. Moved verbatim from the PDDL orchestrator (#402, phase 3, step 6).
 """
 
 from __future__ import annotations
@@ -317,6 +318,35 @@ async def _mark_table_inline_math(
     if counts["elements"]:
         logger.info("Inline math of table cells from the text layer's fonts: {}", counts)
     return counts
+
+
+async def _mark_inline_math_after_execution(
+    manifest: ProcessingManifest,
+    source_path: Path,
+    document: DocumentConfig,
+    ports: RunPorts,
+    toolbox: ToolboxConfig,
+) -> None:
+    """Mark the inline math of the blocks the execution added (#599).
+
+    ``rescue-omitted`` inserts primary-provider blocks while the plan runs,
+    after the prose step before planning. The canonical build only converts the
+    ``$…$`` spans of the manifest it receives, so a restored paragraph would
+    reach the reader as flat text: ``s ( t ) = t 3``, with no MathML and
+    nothing spoken as math. Both steps run again over the executed manifest,
+    before the payload is built.
+
+    The reader is the run's (``RunPorts.services``), the one the prose and table
+    steps used, so a page already fetched is not requested again and a
+    capability that failed is not asked again. The steps skip every element
+    that already carries ``metadata["inline_math_detection"]``, so only the
+    elements the execution added are touched. A page the reader cannot read is
+    recorded as ``unavailable`` on ``manifest``, the copy the executor returned
+    included.
+    """
+    text_spans = run_text_spans(ports, manifest, source_path, toolbox)
+    await _mark_inline_math(manifest, source_path, document, text_spans)
+    await _mark_table_inline_math(manifest, source_path, document, text_spans)
 
 
 def _placements(element: ManifestElement) -> list[Placement]:
