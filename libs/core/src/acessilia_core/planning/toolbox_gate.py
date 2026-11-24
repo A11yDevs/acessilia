@@ -30,7 +30,10 @@ A method's Toolbox calls are of three kinds (#848):
   method per element (a picture left with ``crop_unavailable``, a formula
   read by the vision fallback, a table without its inline math), so it
   never rules the method out. The decision records the missing ones as
-  ``degraded_methods``, which reach the output metadata;
+  ``degraded_methods``, which reach the output metadata. It is per method,
+  not per document: a method whose document never makes the call (a DOCX
+  picture carries its bytes; a DOCX formula is not rendered) is still
+  reported, so it *may* run degraded (#859);
 - none: the method runs in the core alone.
 
 Where a method's implementation lives (``LOCAL_METHODS``' role, such as
@@ -72,12 +75,11 @@ CATALOG_TIMEOUT_SECONDS = 10.0
 _EXTRACT = "document.structure.extract"
 
 def _provider(config: CoreConfig, key: str) -> str:
-    return config.toolbox.providers[key]
-
-
-def _called_provider(config: CoreConfig, key: str) -> str:
     """The provider the client calls: the setting, or the registry default
-    when it is empty (as ``ToolboxCapabilityClient`` resolves it)."""
+    when it is empty, as ``ToolboxCapabilityClient`` resolves it. Required
+    and optional calls resolve it the same way (#856 review): an empty
+    ``TOOLBOX_PDF_PROVIDER`` used to block, under ``enforce``, a method the
+    client runs with the default provider."""
     from acessilia_sdk.toolbox.capabilities import provider_default
 
     return config.toolbox.providers[key] or provider_default(key)
@@ -85,8 +87,10 @@ def _called_provider(config: CoreConfig, key: str) -> str:
 
 #: Method -> Toolbox requirements, resolved from the run's config when
 #: evaluated, so the providers checked are the ones the run calls. Every
-#: method whose handler calls the Toolbox is listed (#789); every other one is
-#: in ``LOCAL_METHODS`` or ``NEVER_AVAILABLE_METHODS`` below.
+#: method whose handler needs the Toolbox to run is listed (#789); one whose
+#: calls only degrade it is in ``METHOD_OPTIONAL_CAPABILITIES`` (#848), and
+#: every method without requirements is in ``LOCAL_METHODS`` or
+#: ``NEVER_AVAILABLE_METHODS`` below.
 METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
     "dual-provider-fusion": lambda config: [
         Requirement(_EXTRACT, _provider(config, "toolbox_provider")),
@@ -127,19 +131,19 @@ METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]
 METHOD_OPTIONAL_CAPABILITIES: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
     # A picture's crop; without it the picture records crop_unavailable.
     "picture-description": lambda config: [
-        Requirement("pdf.render", _called_provider(config, "toolbox_pdf_provider"))
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
     ],
     # math.recognize degrades to the vision fallback; without pdf.render a
     # formula has no crop and records crop_unavailable.
     "formula-recognizer": lambda config: [
-        Requirement("math.recognize", _called_provider(config, "toolbox_math_recognize_provider")),
-        Requirement("pdf.render", _called_provider(config, "toolbox_pdf_provider")),
+        Requirement("math.recognize", _provider(config, "toolbox_math_recognize_provider")),
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider")),
     ],
     # pdf.render only for a table read again; document.text.spans for the
     # cells' inline math, recorded as unavailable without it.
     "table-enrichment": lambda config: [
-        Requirement("pdf.render", _called_provider(config, "toolbox_pdf_provider")),
-        Requirement("document.text.spans", _called_provider(config, "toolbox_pdf_provider")),
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider")),
+        Requirement("document.text.spans", _provider(config, "toolbox_pdf_provider")),
     ],
 }
 
@@ -154,8 +158,8 @@ METHOD_OPTIONAL_CAPABILITIES: dict[str, Callable[[CoreConfig], list[Requirement]
 #: - ``symbolic``: a workflow decision that stays in the core.
 LOCAL_ROLES = ("transitional", "validation", "symbolic")
 
-#: Method -> (role, reason) for every method without Toolbox requirements, so
-#: the catalogue cannot rule it out. An inventory of the current state, kept
+#: Method -> (role, reason) for every method without required Toolbox calls
+#: (it may have optional ones), so the catalogue cannot rule it out. An inventory of the current state, kept
 #: complete by ``tests/test_toolbox_availability_gate.py``.
 LOCAL_METHODS: dict[str, tuple[str, str]] = {
     "deterministic-heading-repair": ("transitional", "docstruct heading repair"),
@@ -206,8 +210,9 @@ class AvailabilityDecision:
     offered: list[tuple[str, str]] | None = None
     #: Requested method -> its optional ``(capability@version, provider)`` pairs (#848).
     optional: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
-    #: Requested methods that will run degraded, with the optional calls the
-    #: snapshot lacks. Whatever the mode, they are never ruled out.
+    #: Requested methods that may run degraded, with the optional calls the
+    #: snapshot lacks: per method, not per document (a document may never
+    #: make the call). Whatever the mode, they are never ruled out.
     degraded: dict[str, list[str]] = field(default_factory=dict)
 
     @property
@@ -333,12 +338,15 @@ def evaluate(
     catalog_error: str | None = None,
 ) -> AvailabilityDecision:
     """Which of ``methods`` cannot run against ``snapshot``, with ``config``'s
-    providers, and which will run degraded (#848)."""
+    providers, and which may run degraded (#848)."""
+    # Read once: both passes below go over it, and a generator would leave
+    # the second empty (#856 review).
+    methods = sorted(set(methods))
     blocked: dict[str, list[str]] = {}
     required: dict[str, list[tuple[str, str]]] = {}
     offered: set[tuple[str, str]] = set()
     optional, degraded = _optional_calls(methods, snapshot, config)
-    for method in sorted(set(methods)):
+    for method in methods:
         requirements = METHOD_TOOLBOX_REQUIREMENTS.get(method)
         if requirements is None:
             continue

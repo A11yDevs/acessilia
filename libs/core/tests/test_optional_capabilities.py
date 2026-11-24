@@ -132,3 +132,124 @@ async def test_a_document_with_only_optional_calls_reads_the_catalogue(monkeypat
 
     assert reads == [1]
     assert list(decision.degraded) == ["picture-description"]
+
+
+# The review of #856.
+
+
+def test_a_generator_of_methods_is_checked_like_a_list() -> None:
+    """Item 1: ``evaluate`` read its argument twice; a generator lost the
+    required checks on the second pass."""
+    snapshot = _snapshot(without=("pdf.render",))
+
+    from_list = toolbox_gate.evaluate(["pymupdf-region"], snapshot, mode="enforce", config=_config("enforce"))
+    from_generator = toolbox_gate.evaluate(
+        (method for method in ["pymupdf-region"]), snapshot, mode="enforce", config=_config("enforce")
+    )
+
+    assert from_generator.blocked == from_list.blocked != {}
+
+
+def test_an_empty_provider_is_the_one_the_client_calls() -> None:
+    """Item 2: an empty provider setting is the registry default, as the
+    client resolves it, for required and optional calls alike; it no longer
+    blocks a method the client runs."""
+    config = replace(
+        core_config(),
+        toolbox=toolbox_config(providers={"toolbox_pdf_provider": ""}, availability_gate="enforce"),
+    )
+
+    decision = toolbox_gate.evaluate(
+        ["pymupdf-region", "picture-description"], _snapshot(), mode="enforce", config=config
+    )
+
+    assert decision.blocked == {}
+    assert decision.requirements["pymupdf-region"] == [("pdf.render@2", "pymupdf-pdf")]
+    assert decision.optional["picture-description"] == [("pdf.render@2", "pymupdf-pdf")]
+
+
+@pytest.mark.asyncio
+async def test_off_reads_no_catalogue_for_optional_calls(monkeypatch) -> None:
+    reads: list[int] = []
+
+    class Cache:
+        last_error = None
+
+        async def get(self):
+            reads.append(1)
+
+    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: Cache())
+    describe = build_obligation("describe-images", ["p-1"], ["picture-description", "human-review"])
+
+    decision = await toolbox_gate.decide(build_manifest([build_element("p-1", "picture")], [describe]), _config("off"))
+
+    assert reads == [] and decision.degraded == {}
+
+
+@pytest.mark.asyncio
+async def test_the_report_is_per_method_not_per_document(monkeypatch) -> None:
+    """Item 3, pinned until #859: a DOCX picture carries its bytes and never
+    needs ``pdf.render``, yet its method is reported as one that *may* run
+    degraded. Change this test only with #859."""
+
+    class Cache:
+        last_error = None
+
+        async def get(self):
+            return _snapshot(without=("pdf.render",))
+
+    monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: Cache())
+    describe = build_obligation("describe-images", ["p-1"], ["picture-description", "human-review"])
+    manifest = build_manifest([build_element("p-1", "picture")], [describe])
+    manifest.source.media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+    decision = await toolbox_gate.decide(manifest, _config("enforce"))
+
+    assert list(decision.degraded) == ["picture-description"]
+
+
+def test_a_degraded_method_reaches_the_output_and_the_log(monkeypatch, tmp_path) -> None:
+    """Item 5: the warning and ``degraded_methods`` in the delivered
+    ``pddl_toolbox_availability``, through a real run."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from pddl_support import build_orchestrator
+
+    from acessilia_core.agents.model_calls import current_model_calls
+    from acessilia_core.pipeline import orchestrator as pddl, preflight
+    from acessilia_core.pipeline.handlers import pictures as picture_method
+    from acessilia_core.ports import RunPorts
+
+    async def nothing(*_args, **_kwargs):
+        return None
+
+    async def decide(manifest, config):
+        return toolbox_gate.evaluate(
+            toolbox_gate.requested_methods(manifest), _snapshot(without=("pdf.render",)),
+            mode="observe", config=config,
+        )
+
+    warnings: list[str] = []
+    monkeypatch.setattr(pddl.logger, "warning", lambda message, *args: warnings.append(message.format(*args)))
+    monkeypatch.setattr(toolbox_gate, "decide", decide)
+    monkeypatch.setattr(preflight, "inspect_source_media", nothing)
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
+        monkeypatch.setattr(pddl, name, nothing)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", nothing)
+    prose = build_element(
+        "prose", "paragraph",
+        text="A paragraph with enough words to make the document read as text, not as a picture.",
+    )
+    manifest = build_manifest([prose, build_element("p-1", "picture", text="A chart")], [])
+    orchestrator = build_orchestrator(max_replans=1)
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
+
+    payload = asyncio.run(orchestrator.execute(
+        tmp_path / "doc.pdf", tmp_path, structured_output=True, config=_config("observe"),
+        model_calls=current_model_calls(), ports=RunPorts.none(),
+    ))
+
+    availability = payload["canonical_metadata"]["pddl_toolbox_availability"]
+    assert list(availability["degraded_methods"]) == ["picture-description"]
+    assert any("may run degraded" in message and "picture-description" in message for message in warnings)
