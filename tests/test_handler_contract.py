@@ -40,6 +40,7 @@ EXPECTED_RUN_PARAMETERS = {
     "vlm-pairwise-judge": ("config",),
     "rescue-omitted": ("config",),
     "pymupdf-region": ("config", "ports"),
+    "table-enrichment": ("config", "ports"),
     "vision-page-inspection": ("config", "ports"),
 }
 

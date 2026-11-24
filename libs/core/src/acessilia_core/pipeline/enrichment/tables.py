@@ -1,6 +1,7 @@
 """The table enrichment stage: read each table's structure with the data agent.
 
-Runs before planning. It chooses the tables to read (no structure, or a
+Runs inside the plan, as the ``table-enrichment`` method (#640, M2), before
+planning until 0.3.11. It chooses the tables to read (no structure, or a
 structure that looks misread), backfills a structure from the text when it
 can, asks the data agent for the rest one table at a time, keeps a new
 reading only when it shares enough words with the old one, records why a table
@@ -161,12 +162,14 @@ async def _enrich_table_structures(
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
-) -> None:
+) -> int:
+    """Read the tables without a usable structure, or garbled ones, from their
+    image; returns how many were enriched."""
     table_elements, garbled = _tables_to_read(
         manifest, visual_review=vision.table_visual_review
     )
     if not table_elements:
-        return
+        return 0
 
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
     reader = _TableReader(
@@ -198,6 +201,7 @@ async def _enrich_table_structures(
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+    return enriched
 
 
 def _tables_to_read(

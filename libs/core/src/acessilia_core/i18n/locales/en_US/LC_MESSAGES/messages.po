@@ -258,6 +258,10 @@ msgstr "page {page} of {total_pages}"
 msgid "pages {pages}"
 msgstr "pages {pages}"
 
+#, python-brace-format
+msgid "{count} pages, from {first} to {last}"
+msgstr "{count} pages, from {first} to {last}"
+
 msgid "page not identified"
 msgstr "page not identified"
 
@@ -666,6 +670,13 @@ msgstr "The image must receive a description or be marked decorative."
 
 msgid "The table must have verifiable headers and reading order."
 msgstr "The table must have verifiable headers and reading order."
+
+msgid ""
+"The document's tables must be read where their structure is missing or "
+"garbled, and their inline math marked."
+msgstr ""
+"The document's tables must be read where their structure is missing or "
+"garbled, and their inline math marked."
 
 msgid ""
 "The formula must carry an accessible mathematical representation plus "
@@ -2394,6 +2405,24 @@ msgid "Picture description validated for {count} picture"
 msgid_plural "Picture descriptions validated for {count} pictures"
 msgstr[0] "Picture description validated for {count} picture"
 msgstr[1] "Picture descriptions validated for {count} pictures"
+
+#, python-brace-format
+msgid ""
+"Table enrichment ran for {count} table: {needing} needed a reading, "
+"{structured} got a structure; left as they were: {left}; inline math: "
+"{inline} ({marked} runs marked)"
+msgid_plural ""
+"Table enrichment ran for {count} tables: {needing} needed a reading, "
+"{structured} got a structure; left as they were: {left}; inline math: "
+"{inline} ({marked} runs marked)"
+msgstr[0] ""
+"Table enrichment ran for {count} table: {needing} needed a reading, "
+"{structured} got a structure; left as they were: {left}; inline math: "
+"{inline} ({marked} runs marked)"
+msgstr[1] ""
+"Table enrichment ran for {count} tables: {needing} needed a reading, "
+"{structured} got a structure; left as they were: {left}; inline math: "
+"{inline} ({marked} runs marked)"
 
 #, python-brace-format
 msgid "Table structure validated for {count} table"

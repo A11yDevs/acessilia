@@ -11,12 +11,15 @@ from typing import TYPE_CHECKING, Any
 
 from acessilia_core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import MSG_OBLIGATION_TABLE_ENRICHMENT
 from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE,
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
+    STAGE_PAGES_SPAN,
 )
+from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
 from acessilia_core.manifest.models import (
     ManifestElement,
     Obligation,
@@ -26,6 +29,56 @@ from docstruct.text.latex import bare_latex as normalize_latex
 
 if TYPE_CHECKING:
     pass
+
+
+#: The document's table enrichment as one planned action (#640, M2,
+#: ``docs/architecture/workflow-actions.md``). One obligation for every table,
+#: so its method keeps the step's document-wide behaviour: one breaker, one
+#: retry pass and one text-span reader for all the tables.
+TABLE_ENRICHMENT_KIND = "enrich-tables"
+TABLE_ENRICHMENT_METHOD = "table-enrichment"
+TABLE_ENRICHMENT_OBLIGATION_ID = "obligation-enrich-tables"
+#: The obligations about a table that must come after its enrichment: its
+#: linearization, and, in dual mode, the choice of its source, which compares
+#: the table as it was read.
+_AFTER_TABLE_ENRICHMENT = frozenset({"linearize-table", "select-table-source"})
+
+
+def add_table_enrichment_obligation(manifest: ProcessingManifest) -> Obligation | None:
+    """Add the ``enrich-tables`` obligation when the document has tables.
+
+    The obligations about those tables (``_AFTER_TABLE_ENRICHMENT``) depend
+    on it. Idempotent: a manifest that already has it is left as it is.
+    Returns the obligation, or ``None`` without tables.
+    """
+    existing = next(
+        (item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND), None
+    )
+    if existing is not None:
+        return existing
+    tables = [element.id for element in manifest.elements if element.type == "table"]
+    if not tables:
+        return None
+    methods = [TABLE_ENRICHMENT_METHOD, "human-review"]
+    obligation = Obligation(
+        id=TABLE_ENRICHMENT_OBLIGATION_ID,
+        kind=TABLE_ENRICHMENT_KIND,
+        target_ids=tables,
+        admissible_methods=methods,
+        method_costs={method: DEFAULT_METHOD_COSTS.get(method, 50) for method in methods},
+        rationale=t(MSG_OBLIGATION_TABLE_ENRICHMENT),
+    )
+    manifest.obligations.append(obligation)
+    table_ids = set(tables)
+    for item in manifest.obligations:
+        if (
+            item.kind in _AFTER_TABLE_ENRICHMENT
+            and table_ids & set(item.target_ids)
+            and obligation.id not in item.dependencies
+        ):
+            item.dependencies.append(obligation.id)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    return obligation
 
 
 def _formula_elements_for_obligation(
@@ -206,6 +259,10 @@ def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
     return t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(unsatisfied="; ".join(groups))
 
 
+#: Up to this many pages, a label lists them; beyond, it gives the span.
+_PAGES_LISTED = 5
+
+
 def _pages_label(
     pages: Iterable[int | None], total_pages: int | None = None
 ) -> str:
@@ -216,6 +273,8 @@ def _pages_label(
     that with image or step counters ("image 11 of 37 (page 18 of 42)"), and
     without the total users could read 37 as the page count. Single-page
     documents keep the plain "page 1" label because "of 1" adds nothing.
+    Work over more than ``_PAGES_LISTED`` pages, such as a step over every
+    table of the document, gets its count and span, not the list.
     """
     numbers = sorted({page for page in pages if page})
     if not numbers:
@@ -224,6 +283,8 @@ def _pages_label(
         if total_pages is not None and total_pages > 1:
             return t(STAGE_PAGE_OF).format(page=numbers[0], total_pages=total_pages)
         return t(STAGE_PAGE).format(page=numbers[0])
+    if len(numbers) > _PAGES_LISTED:
+        return t(STAGE_PAGES_SPAN).format(count=len(numbers), first=numbers[0], last=numbers[-1])
     return t(STAGE_PAGES).format(pages=", ".join(str(page) for page in numbers))
 
 

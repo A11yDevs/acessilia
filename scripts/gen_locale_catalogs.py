@@ -251,6 +251,7 @@ from acessilia_core.i18n.log_messages import (
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_TABLE_ENRICHMENT,
     MSG_OBLIGATION_UNKNOWN,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
@@ -289,6 +290,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
+    STAGE_PAGES_SPAN,
     STAGE_PENDING_UPLOAD_MISSING,
     STAGE_PREPARING_FILE,
     STAGE_PREPARING_IMAGE,
@@ -597,6 +599,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_PAGE,
     STAGE_PAGE_OF,
     STAGE_PAGES,
+    STAGE_PAGES_SPAN,
     STAGE_PAGE_UNKNOWN,
     STAGE_FAILED_DURING,
     STAGE_RESTART_INTERRUPTED_DURING,
@@ -673,6 +676,7 @@ MESSAGES: tuple[str, ...] = (
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_TABLE_ENRICHMENT,
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_UNKNOWN,
@@ -1102,6 +1106,14 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
         "Descrição validada para {count} imagem",
         "Descrições validadas para {count} imagens",
     ),
+    handler_messages.MSG_TABLES_ENRICHED: (
+        "Enriquecimento de tabelas rodou para {count} tabela: {needing} precisavam de leitura, "
+        "{structured} ganharam estrutura; ficaram como estavam: {left}; matemática inline: "
+        "{inline} ({marked} trechos marcados)",
+        "Enriquecimento de tabelas rodou para {count} tabelas: {needing} precisavam de leitura, "
+        "{structured} ganharam estrutura; ficaram como estavam: {left}; matemática inline: "
+        "{inline} ({marked} trechos marcados)",
+    ),
     handler_messages.MSG_TABLE_VALIDATED: (
         "Estrutura tabular validada para {count} tabela",
         "Estruturas tabulares validadas para {count} tabelas",
@@ -1261,6 +1273,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         STAGE_PAGE: "página {page}",
         STAGE_PAGE_OF: "página {page} de {total_pages}",
         STAGE_PAGES: "páginas {pages}",
+        STAGE_PAGES_SPAN: "{count} páginas, de {first} a {last}",
         STAGE_PAGE_UNKNOWN: "página não identificada",
         STAGE_FAILED_DURING: "{error} (falhou durante: {stage})",
         STAGE_RESTART_INTERRUPTED_DURING: (
@@ -1495,6 +1508,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         MSG_OBLIGATION_TABLE: (
             "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
+        ),
+        MSG_OBLIGATION_TABLE_ENRICHMENT: (
+            "As tabelas do documento devem ser lidas onde a estrutura falta ou está embaralhada, e ter a matemática inline marcada."
         ),
         MSG_OBLIGATION_FORMULA: (
             "A fórmula deve possuir representação matemática acessível e verbalização."

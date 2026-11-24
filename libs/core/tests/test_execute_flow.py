@@ -8,6 +8,7 @@ tests/test_structural_extraction_failure.py cover how a run ends.
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -19,6 +20,7 @@ from acessilia_core.pipeline import (
     orchestrator as pddl,
     preflight as pipeline_preflight,
 )
+from acessilia_core.pipeline.handlers import tables as table_method
 from acessilia_core.ports import RunPorts
 
 
@@ -35,15 +37,23 @@ def _recorders(monkeypatch):
         return None
 
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                 "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"):
+                 "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, record(name))
+    # The table steps run inside the plan, as the ``table-enrichment`` method (#640, M2).
+    monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
+
+    async def mark_tables(manifest, source, *args, **kwargs):
+        calls.append(("_mark_table_inline_math", source.name, tuple(args), dict(kwargs)))
+        return {"elements": 0, "marked": 0, "unmatched": 0}
+
+    monkeypatch.setattr(table_method, "_mark_table_inline_math", mark_tables)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     return calls
 
 
-async def _run(monkeypatch, tmp_path, *, config=None, **kwargs):
+async def _run(monkeypatch, tmp_path, *, config=None, elements=None, **kwargs):
     calls = _recorders(monkeypatch)
-    manifest = build_manifest([build_element("h", "heading", text="Titulo")], [])
+    manifest = build_manifest(elements or [build_element("h", "heading", text="Titulo")], [])
     orchestrator = build_orchestrator(max_replans=1)
     run_config = config or core_config()
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
@@ -52,7 +62,8 @@ async def _run(monkeypatch, tmp_path, *, config=None, **kwargs):
     async def status(message):
         statuses.append(message)
 
-    result = await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, status_callback=status, **kwargs, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
+    ports = RunPorts.none()
+    result = await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, status_callback=status, **kwargs, config=run_config, model_calls=current_model_calls(), ports=ports)
     return result, calls, statuses, manifest
 
 
@@ -61,18 +72,41 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, mode="avancado", structured_output=True)
 
     names = [call[0] for call in calls]
+    # Without tables there is no ``enrich-tables`` obligation, so no table step.
     assert names == ["inspect", "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                     "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"]
+                     "_enrich_formula_latex"]
     by_name = {call[0]: call for call in calls}
     breakers = {id(by_name[name][3]["breaker"]) for name in
-                ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex", "_enrich_table_structures")}
+                ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex")}
     assert len(breakers) == 1
-    assert by_name["_mark_inline_math"][2][0] is by_name["_mark_table_inline_math"][2][0]
     assert {by_name[name][3].get("mode") for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
                                                       "_enrich_formula_latex")} == {"avancado"}
     assert "media_inspection" in by_name["_enrich_picture_descriptions"][3]
     assert all(call[1] == "doc.pdf" for call in calls)
     assert manifest.extractor.configuration["region_inspection_mode"] == "avancado"
+
+
+@pytest.mark.asyncio
+async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_span_reader(
+    monkeypatch, tmp_path
+) -> None:
+    """#640, M2: a document with tables gets an ``enrich-tables`` obligation;
+    its ``table-enrichment`` method runs the two table steps, in order, after
+    the steps before planning, with the same breaker and text-span reader."""
+    config = core_config(vision={"breaker_threshold": 7})
+    table = build_element("t", "table", text="a b")
+    _, calls, _, manifest = await _run(monkeypatch, tmp_path, config=config, elements=[table])
+
+    names = [call[0] for call in calls]
+    assert names == ["inspect", "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
+                     "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"]
+    by_name = {call[0]: call for call in calls}
+    assert by_name["_enrich_table_structures"][3]["breaker"] is by_name["_enrich_formula_latex"][3]["breaker"]
+    assert by_name["_enrich_table_structures"][3]["breaker"].threshold == 7
+    assert by_name["_enrich_table_structures"][3]["vision"] is config.vision
+    assert by_name["_mark_table_inline_math"][2][1] is by_name["_mark_inline_math"][2][1]
+    # The method reads the source the manifest records (the extracted file).
+    assert by_name["_enrich_table_structures"][1] == Path(manifest.source.path).name
 
 
 @pytest.mark.asyncio
@@ -83,10 +117,9 @@ async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, t
     _, calls, _, _ = await _run(monkeypatch, tmp_path, config=config)
 
     by_name = {call[0]: call[3] for call in calls}
-    stages = ("_classify_formula_regions", "_enrich_picture_descriptions",
-              "_enrich_formula_latex", "_enrich_table_structures")
+    stages = ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex")
     assert all(by_name[name]["vision"] is config.vision for name in stages)
-    assert by_name["_enrich_table_structures"]["breaker"].threshold == 7
+    assert by_name["_enrich_formula_latex"]["breaker"].threshold == 7
 
 
 @pytest.mark.asyncio
@@ -145,11 +178,9 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
     async def inspect(path, *, toolbox):
         return None
 
-    for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
-                 "_enrich_formula_latex", "_enrich_table_structures"):
+    for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, step)
-    for name in ("_mark_inline_math", "_mark_table_inline_math"):
-        monkeypatch.setattr(pddl, name, no_step)
+    monkeypatch.setattr(pddl, "_mark_inline_math", no_step)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
 
     async def run(threshold):
@@ -174,14 +205,15 @@ async def test_the_progress_messages_come_in_order(monkeypatch, tmp_path) -> Non
     from acessilia_core.i18n.stage_messages import (
         STAGE_ANALYZING_STRUCTURAL,
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
-        STAGE_ENRICHING_TABLES_OCR,
         STAGE_GENERATING_PDDL_PLAN,
     )
 
+    # The tables are enriched inside the plan (#640, M2): the executor
+    # announces that step like any other, after the plan is generated.
     expected = [t(STAGE_ANALYZING_STRUCTURAL), t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS),
-                t(STAGE_ENRICHING_TABLES_OCR), t(STAGE_GENERATING_PDDL_PLAN)]
-    assert statuses[:4] == expected
-    assert len(statuses) >= 5  # then the execution stage and its progress
+                t(STAGE_GENERATING_PDDL_PLAN)]
+    assert statuses[:3] == expected
+    assert len(statuses) >= 4  # then the execution stage and its progress
 
 
 @pytest.mark.asyncio

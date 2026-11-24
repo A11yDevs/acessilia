@@ -21,6 +21,7 @@ from acessilia_core.pipeline import (
     orchestrator as pddl,
     preflight as pipeline_preflight,
 )
+from acessilia_core.pipeline.handlers import tables as _table_method
 from acessilia_core.ports import RunPorts
 from tests.core_config_support import core_config
 from tests.pddl_support import build_orchestrator
@@ -61,7 +62,7 @@ def _record_steps(monkeypatch) -> list[str]:
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", describe)
-    monkeypatch.setattr(pddl, "_enrich_table_structures", describe)
+    monkeypatch.setattr(_table_method, "_enrich_table_structures", describe)
     return calls
 
 

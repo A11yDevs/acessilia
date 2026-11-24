@@ -125,8 +125,13 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     "rescue-omitted": ("transitional", "compares the recorded secondary extraction"),
     "skeleton-order": ("transitional", "compares the recorded secondary extraction"),
     "table-smart-fusion": ("transitional", "compares the recorded secondary extraction"),
+    # Moved from before planning into the plan (#640, M2); not new work in the
+    # core. Its Toolbox calls (pdf.render for a table read again,
+    # document.text.spans for the marks) are conditional and degrade per
+    # table, so they are not requirements that could rule it out.
+    "table-enrichment": ("transitional", "reads tables with the DataAgent model; marks cell math"),
     "vision-description": ("validation", "the picture descriptions made before planning"),
-    "pandoc-table": ("validation", "the table structure extracted before planning"),
+    "pandoc-table": ("validation", "the table structure table-enrichment produced"),
     "human-review": ("symbolic", "the terminal escalation"),
 }
 

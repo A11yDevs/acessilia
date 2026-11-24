@@ -2,6 +2,64 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.12 — the table enrichment is a planned action (#640, M2)
+
+The two table steps that ran before planning move into the plan
+(`docs/architecture/workflow-actions.md`):
+- reading the tables without a usable structure, or garbled ones, with the
+  `DataAgent`;
+- marking their cells' inline math from the text layer.
+
+A document with tables gets one `enrich-tables` obligation, which targets all
+its tables, satisfied by the `table-enrichment` method. That method runs both
+steps as before: one breaker, one retry pass and one text-span reader for the
+whole document. The tables' `linearize-table` and, in dual mode,
+`select-table-source` obligations depend on it, so the plan reads before it
+linearizes or chooses a source, as before. A per-table method was ruled out:
+it would wait the retry pass once per failing table and lose the recovery of
+the tables read after the breaker opened.
+
+- `RunPorts.services` (`RunServices`) holds the infrastructure a run's stages
+  and methods share, one run of one document: `run_breaker`, `run_text_spans`
+  and `progress`. The text-span reader keeps no manifest; a step that cannot
+  read the text layer records `inline_math_detection = unavailable` on the
+  manifest it enriches, the executor's copy included.
+- **What the method's result means:** the collective attempt ran. Each table
+  keeps its own outcome (`table_read_failure`: `model_failed`,
+  `admission_rejected`, `crop_unavailable`), and its `linearize-table`
+  validates it. The message reports how many tables needed a reading, how
+  many got a structure, what was left and why, and the inline math status
+  (`fonts`, `unavailable` or `off`). An admission rejection (#590) is kept and
+  still spares the breaker inside the plan.
+- `table-enrichment` is `transitional` in `LOCAL_METHODS`: the same
+  computation, moved. Its Toolbox calls are conditional, so they are not
+  requirements.
+- A location label over more than five pages gives the count and the span
+  ("12 pages, from 1 to 12"), so the step over every table does not list
+  them all.
+- A Fast Downward fixture case checks the new order under both planners.
+
+What changes, observably:
+- The progress stays: inside the plan the method reports "Enriching the
+  tables with OCR" and "Recognizing table N of M" through the run's
+  `RunServices.progress`, after the executor's own step message.
+- For a document with tables, the plan has one more step, and its
+  `problem_sha256` and `plan_id` change.
+- The manifest checkpoint is saved after the four enrichment steps before
+  planning, not six. Inside the plan the execution checkpoint covers the step
+  as a whole, so a crash in the middle of it reads again the tables it had
+  already read in that attempt (follow-up: #836).
+- A step that raises no longer fails the job at once. Like any method, it
+  records a failed attempt, the planner replans with `human-review`, and the
+  job then fails on that critical obligation (with `PDDL_MAX_REPLANS`, one
+  more execution).
+- A job resumed from a 0.3.11 enrichment checkpoint already has its tables
+  enriched and gets no obligation; one resumed from an earlier phase gets it.
+
+The picture descriptions (M1) wait for an executor preparation (M0): a
+description can retype a picture as a formula, which removes an obligation
+while the plan runs.
+
 ## 0.3.11 — catalogue facts bound to the exact capability version
 
 The requirement facts name each capability at the exact contract version the

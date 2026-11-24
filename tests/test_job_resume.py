@@ -209,8 +209,6 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
-        "_enrich_table_structures",
-        "_mark_table_inline_math",
     ):
         monkeypatch.setattr(pddl, name, enrich)
 
@@ -233,7 +231,8 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("resume-task")
     )
 
-    assert counts == {"inspect": 1, "extract": 1, "enrich": 7}
+    # The table steps run inside the plan since #640 (M2): four steps before it.
+    assert counts == {"inspect": 1, "extract": 1, "enrich": 5}
     assert result["text"]
     assert job_checkpoint.load("resume-task", PHASE_PLAN) is not None
 
@@ -256,8 +255,6 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
         "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
-        "_enrich_table_structures",
-        "_mark_table_inline_math",
     ):
         monkeypatch.setattr(pddl, name, enrich)
 
@@ -544,8 +541,6 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
-        "_enrich_table_structures",
-        "_mark_table_inline_math",
     ):
         monkeypatch.setattr(pddl, name, enrich)
 

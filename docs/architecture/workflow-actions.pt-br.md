@@ -34,10 +34,12 @@ ordem:
 | Bootstrap | Limite de páginas, antes da extração | Recusa um documento acima de `DocumentConfig.max_pages` pela contagem de páginas da inspeção (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extração | Monta o manifesto: elementos, depois as obrigações derivadas dos seus tipos | Toolbox `document.structure.extract` (um ou dois providers) | `manifest` |
 | Bootstrap | Limite de páginas, depois da extração | Confere o limite de novo contra a estrutura extraída | — | — |
-| Enriquecimento | Seis passos, numa ordem fixa (abaixo) | | Toolbox e os agentes de modelo do Core | `enriched`, por objeto |
+| Enriquecimento | Quatro passos antes do planejamento, numa ordem fixa (abaixo); desde a 0.3.12, os passos 5 e 6 rodam dentro do plano (M2) | | Toolbox e os agentes de modelo do Core | `enriched`, por objeto, nos passos 1–4; o checkpoint de execução, por passo do plano, nos 5–6 |
 | Planejamento | | Compila o problema a partir do manifesto enriquecido e planeja | — | `plan` |
 
-Os passos de enriquecimento (`_enrich_before_planning`):
+Os passos de enriquecimento (`_enrich_before_planning` até o core 0.3.11;
+desde a 0.3.12, os passos 5 e 6 rodam dentro do plano, como o método
+`table-enrichment`, M2):
 
 | Passo | Função | Chama | Efeito no manifesto |
 |---|---|---|---|
@@ -50,12 +52,13 @@ Os passos de enriquecimento (`_enrich_before_planning`):
 
 O que os passos compartilham não é uniforme:
 
-| Recurso | Passos | Onde vive hoje |
+| Recurso | Passos | Onde vive (core 0.3.12) |
 |---|---|---|
-| Breaker de provider | 1, 2, 4, 5 | uma variável local de `_enrich_before_planning` |
-| Progresso por objeto (`on_progress`) | 1, 2, 4, 5 | uma variável local, de `checkpoints.enrichment_progress` |
+| Breaker de provider | 1, 2, 4, 5 | o da execução, `RunPorts.services` (`run_breaker`), compartilhado com o método `table-enrichment` |
+| Progresso por objeto (`on_progress`) | 1, 2, 4 | uma variável local, de `checkpoints.enrichment_progress`; o passo 5, dentro do plano, tem o checkpoint de execução do seu passo do plano |
 | Cache de regiões | 1, 2, 4 | de `RunPorts` (`region_cache_for`) |
-| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | uma variável local |
+| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | o da execução, `RunPorts.services` (`run_text_spans`); não guarda manifesto |
+| Mensagens de progresso | 1, 2, 4, 5 | o callback de status antes do planejamento; `RunServices.progress` dentro do plano |
 | Inspeção de mídia | 2 | uma saída do bootstrap |
 | Arquivo de origem | todos | o contexto da execução; o manifesto registra seu digest |
 
@@ -243,24 +246,71 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
 8. **Equivalência primeiro.** Cada migração mantém um teste diferencial do
    manifesto final em documentos de fixture, antes e depois (ADR-0028).
 
+## Obrigações do documento
+
+A primeira migração mostrou que um passo nem sempre vira um método por
+elemento sem perder comportamento. O passo de tabelas lê as tabelas com um
+breaker de provider, faz uma passada de retry para o documento inteiro (espera
+`VISION_RETRY_PASS_DELAY_SECONDS` uma vez e, com o breaker aberto, deixa passar
+uma chamada de teste, que recupera todas as tabelas se o provider voltou) e
+informa seu progresso. Por tabela, cada tabela que falhasse esperaria sozinha,
+e as tabelas depois da abertura do breaker perderiam a recuperação. A descrição
+de imagens, além disso, roda em paralelo (`vision.concurrency`), enquanto o
+executor roda um passo por vez.
+
+Então um passo que trabalha sobre o documento inteiro vira **uma obrigação do
+documento**:
+- ela tem como alvos todos os elementos sobre os quais o passo trabalha;
+- seu método roda o passo como antes, com o breaker e o leitor de spans da
+  execução (`RunPorts.services`);
+- as obrigações por elemento que precisam do resultado dela dependem dela.
+
+O planejador continua escolhendo-a, ordenando-a, contando seu custo,
+descartando-a pelos fatos do catálogo e replanejando quando ela falha. A
+ADR-0029 permite uma ação composta assim: seus passos internos não são ações
+PDDL. A obrigação é criada quando o manifesto é enriquecido, antes do primeiro
+plano, e só quando o documento tem os elementos sobre os quais o passo
+trabalha. Essa é a sua condição; o método mantém as condições por elemento do
+passo.
+
+**O que o resultado significa.** O método tem sucesso quando a tentativa
+coletiva rodou: o passo terminou para todos os alvos. Isso não afirma que todo
+elemento está enriquecido. Cada elemento mantém seu próprio desfecho (para uma
+tabela, `table_read_failure` com o motivo, inclusive o `admission_rejected` de
+um executor de chamadas de modelo cheio, #590), e as obrigações por elemento
+que dependem dela validam o seu elemento. Reprovar a obrigação inteira por um
+elemento bloquearia os elementos utilizáveis. Por isso a mensagem do método
+informa o que aconteceu com cada elemento, e ele só falha quando o passo lança
+uma exceção.
+
+**Limites, para o M0.** A obrigação é criada uma vez, antes do primeiro plano,
+com os elementos conhecidos naquele momento, e os kinds por elemento que
+dependem dela são uma lista fixa (`_AFTER_TABLE_ENRICHMENT`). Um elemento
+acrescentado, removido ou retipado enquanto o plano roda não é reconciliado
+com ela. Nenhum handler acrescenta ou retipa uma tabela hoje, mas o M0 (#832)
+precisa reconciliar os alvos e as dependências de uma obrigação do documento,
+e as próximas migrações precisam acrescentar seus kinds a essa lista.
+
 ## Ordem da migração
 
-Cada passo é um pull request, do menos ao mais estrutural. Os nomes de
-métodos e kinds do M3 e do M4 são propostas, decididas nos seus pull
-requests.
+Cada passo é um pull request. Os nomes de métodos e kinds do M3 e do M4 são
+propostas, decididas nos seus pull requests.
 
-| PR | Passo | Obrigação e método | Mudança de papel | Requisitos de Toolbox | Cria obrigações |
+| PR | Passo | Obrigação e método | Papel | Requisitos de Toolbox | Muda obrigações enquanto o plano roda |
 |---|---|---|---|---|---|
-| M1 | Descrições de imagens | `describe-image`: `vision-description` produz a descrição em vez de conferi-la | `validation` → `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | não |
-| M2 | Estrutura das tabelas e matemática inline das tabelas | `linearize-table`: `pandoc-table` lê a estrutura e marca a matemática das células. Hoje pelo `DataAgent`; depois da #170 por `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `validation` → `transitional` (`DataAgent`); declarado quando chamar `table.recognize` | `document.text.spans`; depois `table.recognize` | não |
+| M2 (feito, core 0.3.12) | Estrutura das tabelas e matemática inline das tabelas | `enrich-tables`, uma por documento com tabelas, método `table-enrichment`; `linearize-table` e `select-table-source` dependem dela. Depois da #170, o método chama `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `transitional` (`DataAgent`) | nenhum declarado: suas chamadas à Toolbox (`pdf.render` para uma tabela lida de novo, `document.text.spans` para as marcas) são condicionais e se degradam por tabela, então não podem descartá-lo | não |
+| M0 | Preparação do executor | Tratar obrigações removidas ou substituídas enquanto o plano roda: pular os passos de obrigações removidas, revalidar o plano remanescente e replanejar para as substitutas (critérios 4 e 5 da restrição 1) | — | — | — |
+| M1 | Descrições de imagens | `describe-images`, uma por documento com imagens (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela | `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
 | M3 | LaTeX das fórmulas | kind novo `recognize-formula`, método `formula-recognizer`, uma dependência de `verbalize-formula` e `normalize-formula` | novo, declarado | `math.recognize`, `pdf.render` | sim: o kind novo, por fórmula |
 | M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`) | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
-O M1 e o M2 não criam obrigações e não precisam nem de mudança no
-replanejamento de descoberta nem no manifesto, então vêm primeiro. O M3 e o
-M4 acrescentam kinds e mudam obrigações, então a evolução do replanejamento
-de descoberta (restrição 1) chega com o M3.
+O M2 veio primeiro porque não muda nenhuma obrigação enquanto o plano roda. O
+M1 estava previsto primeiro, mas seu passo retipa elementos: uma imagem que o
+modelo lê como fórmula vira fórmula, e a reconciliação remove o
+`describe-image` da imagem e acrescenta `verbalize-formula`. Hoje o executor
+só trata obrigações acrescentadas (`_select_discovered`), então o M1 espera o
+M0. O M3 e o M4 também mudam obrigações e se apoiam no M0.
 
 Cada PR:
 - tira seu passo de `_enrich_before_planning`;

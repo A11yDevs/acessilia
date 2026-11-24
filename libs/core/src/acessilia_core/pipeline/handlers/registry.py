@@ -51,6 +51,7 @@ from acessilia_core.pipeline.handlers.order import (
 )
 from acessilia_core.pipeline.handlers.rescue import _handle_rescue_omitted_method
 from acessilia_core.pipeline.handlers.review import _handle_human_review_method
+from acessilia_core.pipeline.handlers.tables import _handle_table_enrichment_method
 from acessilia_core.pipeline.handlers.text import (
     _handle_chunk_verse_method,
     _handle_deterministic_heading_repair_method,
@@ -74,6 +75,8 @@ METHOD_HANDLERS: dict[str, Callable[..., MethodResult]] = {
     # Work done before planning, deterministic work, or one vision model call
     # (pymupdf-region, vision-page-inspection).
     "vision-description": _handle_vision_description_method,
+    # The document's table enrichment, a planned action since #640 (M2).
+    "table-enrichment": _handle_table_enrichment_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
     "pymupdf-region": _handle_pymupdf_region_method,

@@ -256,7 +256,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                 "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math"):
+                 "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, no_step)
     monkeypatch.setattr(toolbox_gate, "decide", decide)
     orchestrator = _orchestrator()
@@ -418,6 +418,9 @@ TRANSITIONAL_BASELINE = frozenset({
     "pandoc-code", "rep-guard", "tailjoin", "tailjoin-positioned", "unicode-repair",
     "verse-chunker", "xycut-order", "agreement-rule", "rescue-omitted", "skeleton-order",
     "table-smart-fusion",
+    # #640 M2: the table enrichment that ran before planning, now a method of
+    # the plan. The same computation, moved, not added.
+    "table-enrichment",
 })
 
 

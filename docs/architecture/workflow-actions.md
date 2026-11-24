@@ -34,10 +34,12 @@ order:
 | Bootstrap | Page limit, before extraction | Rejects a document over `DocumentConfig.max_pages` from the inspection's page count (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extraction | Builds the manifest: elements, then the obligations derived from their types | Toolbox `document.structure.extract` (one or two providers) | `manifest` |
 | Bootstrap | Page limit, after extraction | Checks the limit again against the extracted structure | — | — |
-| Enrichment | Six steps, in a fixed order (below) | | Toolbox and the core's model agents | `enriched`, per object |
+| Enrichment | Four steps before planning, in a fixed order (below); since 0.3.12, steps 5 and 6 run inside the plan (M2) | | Toolbox and the core's model agents | `enriched`, per object, for steps 1–4; the execution checkpoint, per plan step, for 5–6 |
 | Planning | | Compiles the problem from the enriched manifest and plans | — | `plan` |
 
-The enrichment steps (`_enrich_before_planning`):
+The enrichment steps (`_enrich_before_planning` until core 0.3.11; since
+0.3.12, steps 5 and 6 run inside the plan, as the `table-enrichment` method,
+M2):
 
 | Step | Function | Calls | Effect on the manifest |
 |---|---|---|---|
@@ -50,12 +52,13 @@ The enrichment steps (`_enrich_before_planning`):
 
 What the steps share is not uniform:
 
-| Resource | Steps | Where it lives today |
+| Resource | Steps | Where it lives (core 0.3.12) |
 |---|---|---|
-| Provider breaker | 1, 2, 4, 5 | a local of `_enrich_before_planning` |
-| Per-object progress (`on_progress`) | 1, 2, 4, 5 | a local, from `checkpoints.enrichment_progress` |
+| Provider breaker | 1, 2, 4, 5 | the run's, `RunPorts.services` (`run_breaker`), shared with the `table-enrichment` method |
+| Per-object progress (`on_progress`) | 1, 2, 4 | a local, from `checkpoints.enrichment_progress`; step 5, inside the plan, has the execution checkpoint of its plan step |
 | Region cache | 1, 2, 4 | from `RunPorts` (`region_cache_for`) |
-| Text-span reader (`_TextSpanReader`) | 3, 6 | a local |
+| Text-span reader (`_TextSpanReader`) | 3, 6 | the run's, `RunPorts.services` (`run_text_spans`); it keeps no manifest |
+| Progress messages | 1, 2, 4, 5 | the status callback before planning; `RunServices.progress` inside the plan |
 | Media inspection | 2 | a bootstrap output |
 | Source file | all | the run context; the manifest records its digest |
 
@@ -235,23 +238,69 @@ the manifest. **The enrichment migration needs no domain change.**
 8. **Equivalence first.** Each migration keeps a differential test of the final
    manifest on fixture documents, before and after (ADR-0028).
 
+## Document-level obligations
+
+The first migration showed that a step cannot always become a per-element
+method without losing behaviour. The table step reads the tables with one
+provider breaker, makes one retry pass for the whole document (it waits
+`VISION_RETRY_PASS_DELAY_SECONDS` once, and with an open breaker lets one
+probe call through, which recovers every table if the provider came back) and
+reports its progress. Per table, each failing table would wait on its own,
+and the tables after the breaker opened would lose the recovery. The
+description of pictures, in addition, runs concurrently (`vision.concurrency`),
+while the executor runs one step at a time.
+
+So a step that works on the whole document becomes **one obligation of the
+document**:
+- it targets every element the step works on;
+- its method runs the step as before, with the run's breaker and text-span
+  reader (`RunPorts.services`);
+- the per-element obligations that need its result depend on it.
+
+The planner still chooses, orders and accounts it, rules it out through the
+catalogue facts and replans after it fails. ADR-0029 allows a composite action
+like this: its internal steps are not PDDL actions. The obligation is created
+when the manifest is enriched, before the first plan, and only when the
+document has the elements its step works on. That is its gate; the method
+keeps the step's per-element gates.
+
+**What its result means.** The method succeeds when the collective attempt
+ran: the step completed for every target. That is not a claim that every
+element is now enriched. Each element keeps its own outcome (for a table,
+`table_read_failure` with its reason, including the `admission_rejected` of a
+full model-call runner, #590), and the per-element obligations that depend on
+it validate their element. Failing the whole obligation for one element would
+block the elements that are usable. So the method's message reports what
+happened to each element, and it fails only when the step raises.
+
+**Limits, for M0.** The obligation is created once, before the first plan,
+with the elements known then, and the per-element kinds that depend on it are
+a fixed list (`_AFTER_TABLE_ENRICHMENT`). An element added, removed or
+retyped while the plan runs is not reconciled with it. No handler adds or
+retypes a table today, but M0 (#832) must reconcile the targets and the
+dependencies of a document-level obligation, and later migrations must add
+their kinds to that list.
+
 ## Migration order
 
-Each step is one pull request, from the least to the most structural. Method
-and kind names for M3 and M4 are proposals, settled in their pull requests.
+Each step is one pull request. Method and kind names for M3 and M4 are
+proposals, settled in their pull requests.
 
-| PR | Step | Obligation and method | Role move | Toolbox requirements | Creates obligations |
+| PR | Step | Obligation and method | Role | Toolbox requirements | Changes obligations while the plan runs |
 |---|---|---|---|---|---|
-| M1 | Picture descriptions | `describe-image`: `vision-description` produces the description instead of checking it | `validation` → `transitional` (`VisionAgent`) | those `VisionAgent` makes, if any | no |
-| M2 | Table structures and table inline math | `linearize-table`: `pandoc-table` reads the structure and marks the cell math. Today through the `DataAgent`; after #170 through `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `validation` → `transitional` (`DataAgent`); declared once it calls `table.recognize` | `document.text.spans`; then `table.recognize` | no |
+| M2 (done, core 0.3.12) | Table structures and table inline math | `enrich-tables`, one per document with tables, method `table-enrichment`; `linearize-table` and `select-table-source` depend on it. After #170 the method calls `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `transitional` (`DataAgent`) | none declared: its Toolbox calls (`pdf.render` for a table read again, `document.text.spans` for the marks) are conditional and degrade per table, so they must not rule it out | no |
+| M0 | Executor preparation | Handle obligations removed or replaced while the plan runs: skip the steps of removed obligations, revalidate the remaining plan, and replan for the replacements (criteria 4 and 5 of constraint 1) | — | — | — |
+| M1 | Picture descriptions | `describe-images`, one per document with pictures (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it | `transitional` (`VisionAgent`) | those `VisionAgent` makes, if any | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
 | M3 | Formula LaTeX | new kind `recognize-formula`, method `formula-recognizer`, a dependency of `verbalize-formula` and `normalize-formula` | new, declared | `math.recognize`, `pdf.render` | yes: the new kind, per formula |
 | M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`) | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
 | — | Bootstrap | Kept and documented as the 0.3.0 baseline | — | — | — |
 
-M1 and M2 create no obligations and need neither a change to the discovery
-replan nor a manifest change, so they come first. M3 and M4 add kinds and
-change obligations, so the evolution of the discovery replan (constraint 1)
-lands with M3.
+M2 came first because it changes no obligation while the plan runs. M1 was
+planned first, but its step retypes elements: a picture the model reads as a
+formula becomes a formula, and the reconciliation removes the picture's
+`describe-image` and adds `verbalize-formula`. The executor only handles
+added obligations today (`_select_discovered`), so M1 waits for M0. M3 and M4
+change obligations too, and build on M0.
 
 Each PR:
 - removes its step from `_enrich_before_planning`;

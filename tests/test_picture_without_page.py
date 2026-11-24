@@ -35,6 +35,7 @@ from acessilia_core.pipeline.elements import (
 from acessilia_core.pipeline.enrichment import common as enrichment_common
 from acessilia_core.pipeline.enrichment.common import _extract_picture_bytes
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.handlers import tables as _table_method
 from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
 from acessilia_core.ports import RunPorts
 from tests.core_config_support import (
@@ -312,7 +313,7 @@ async def _run(manifest, monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
-    monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
+    monkeypatch.setattr(_table_method, "_enrich_table_structures", noop)
     return await orchestrator.execute(
         tmp_path / "qa_word.docx", tmp_path, structured_output=True,
         config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()

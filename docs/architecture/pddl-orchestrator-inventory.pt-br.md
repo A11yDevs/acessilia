@@ -152,7 +152,7 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 | `metadata["vision_institutional_logo"]` | G (região), O | V | A inspeção de região e o enriquecimento de figuras registram a resposta explícita do modelo sobre o logotipo e a apagam quando a resposta está ausente; a inspeção de página não tem esse campo. V a usa para confirmar a fusão do letterhead. |
 | `metadata["original_type"]` | G, K, O, P | — | Atribuída, e não definida uma vez só. Quando um elemento é reclassificado duas vezes, o último a gravar decide qual tipo original sobrevive, então a ordem faz parte do comportamento. |
 | `metadata["src"]` | G, P | O | A inspeção de região e de página e o recorte de fórmula registram a origem da imagem; o enriquecimento de figuras a lê. |
-| `metadata["table_ast"]` | S | E, F, I, Q, S | S a grava antes do planejamento. A passada de tabelas de Q roda depois de S, porque S pode substituir as células de uma tabela. E, F e I a leem na execução. |
+| `metadata["table_ast"]` | S | E, F, I, Q, S | S a grava no primeiro passo do plano sobre as tabelas, `table-enrichment` (antes do planejamento até o core 0.3.11, #640 M2). A passada de tabelas de Q roda depois de S, porque S pode substituir as células de uma tabela. E, F e I a leem na execução. |
 | `metadata["table_read_failure"]` | S | S, V | S registra por que uma tabela não foi lida, e V a informa como degradação. |
 | `metadata["table_review" / "table_ast_replaced"]` | S | — | S registra o veredito da revisão mais recente (`reason`, `outcome`, `attempts` acumulados) e mantém o primeiro AST que uma revisão substituiu como evidência; a adoção por smart fusion apaga todas as chaves `table_*`, descartando os dois. |
 | `metadata["mathml"]`, `metadata["verbalization"]`, `metadata["latex_normalized"]` | B, B, E | T | T considera uma fórmula legível a partir dessas chaves (`_formula_has_readable_content`), então a sua checagem de entrega depende de os handlers terem rodado antes. |
@@ -173,11 +173,14 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 1. P classifica regiões de fórmula;
 2. O descreve figuras;
 3. Q marca matemática inline na prosa;
-4. P reconhece fórmulas;
+4. P reconhece fórmulas.
+
+Desde o core 0.3.12 (#640, M2) os passos de tabela rodam dentro do plano, como
+o método `table-enrichment`, antes do `linearize-table` das tabelas:
 5. S lê tabelas;
 6. Q marca matemática inline nas tabelas.
 
-Os handlers do plano (B, E–L) vêm em seguida. As checagens de situação de T e o payload (V, W, X) vêm por último.
+Os outros handlers do plano (B, E–L) rodam na ordem do plano. As checagens de situação de T e o payload (V, W, X) vêm por último.
 
 **Caracterização primeiro.** Antes de uma movimentação mexer num dos lados de uma chave compartilhada, um teste deve fixar o par de ponta a ponta num mesmo manifesto, e não cada lado sozinho:
 - F, Q e W em `negation_overlay`;

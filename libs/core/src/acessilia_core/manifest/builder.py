@@ -114,6 +114,9 @@ DEFAULT_METHOD_COSTS = {
     "rescue-omitted": 15,
     "table-smart-fusion": 20,
     "single-provider": 20,
+    # The document's table enrichment (#640, M2): before planning until 0.3.11,
+    # now a planned action; its only alternative is human-review.
+    "table-enrichment": 15,
     # Consomem modelo: custo alto, só admissíveis com a política ativa.
     "vlm-pairwise-judge": 40,
     "table-specialist": 45,

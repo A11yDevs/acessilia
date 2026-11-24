@@ -29,8 +29,13 @@ from acessilia_core.pipeline import (
     orchestrator as pddl,
     preflight as pipeline_preflight,
 )
+from acessilia_core.pipeline.handlers import tables as table_method
 from acessilia_core.pipeline.obligations import _unsatisfied_summary
 from acessilia_core.ports import RunPorts
+
+
+async def _no_tables_read(*_args, **_kwargs) -> int:
+    return 0
 
 
 def _failing(_manifest, _obligation_id):
@@ -108,7 +113,8 @@ async def _run(orchestrator, manifest, monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
-    monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
+    # The tables are read inside the plan, by ``table-enrichment`` (#640, M2).
+    monkeypatch.setattr(table_method, "_enrich_table_structures", _no_tables_read)
     return await orchestrator.execute(
         tmp_path / "doc.pdf", tmp_path, structured_output=True,
         config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none()

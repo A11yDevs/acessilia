@@ -21,7 +21,6 @@ from typing import Any, cast
 
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 from acessilia_core.agents.model_calls import ModelCallRunner, model_call_scope
-from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.blocking import run_blocking
 from acessilia_core.config import (
     CoreConfig,
@@ -40,7 +39,6 @@ from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
-    STAGE_ENRICHING_TABLES_OCR,
     STAGE_EXECUTING_PLAN,
     STAGE_EXECUTING_PLAN_STEP,
     STAGE_GENERATING_PDDL_PLAN,
@@ -51,17 +49,16 @@ from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
+from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.formulas import (
     _classify_formula_regions,
     _enrich_formula_latex,
 )
 from acessilia_core.pipeline.enrichment.inline_math import (
     _mark_inline_math,
-    _mark_table_inline_math,
-    _TextSpanReader,
+    run_text_spans,
 )
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from acessilia_core.pipeline.enrichment.tables import _enrich_table_structures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
@@ -69,6 +66,7 @@ from acessilia_core.pipeline.obligations import (
     _replannable_obligation_ids,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
+    add_table_enrichment_obligation,
 )
 from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from acessilia_core.pipeline.preflight import (
@@ -360,6 +358,9 @@ class PddlAccessibilityOrchestrator:
         # that was never executed and a report of None. Real execution is now the
         # other branch instead of silence.
         loop = asyncio.get_running_loop()
+        # A method that reports its own progress, such as table-enrichment,
+        # runs on the executor's worker thread (#640, M2).
+        ports.services.progress = _thread_status(status_callback, loop)
         manifest, execution_report = await self._run_plan(
             planning.plan,
             planning.planning_manifest,
@@ -462,9 +463,12 @@ class PddlAccessibilityOrchestrator:
             manifest.extractor.configuration.update(media_configuration)
             return manifest
         await self._enrich_before_planning(
-            manifest, ctx.file_path, ctx.source_path, ctx.effective_mode, media_inspection,
+            manifest, ctx.source_path, ctx.effective_mode, media_inspection,
             ctx.status_callback, ctx.config, ctx.ports, ctx.checkpoints,
         )
+        # The tables are enriched inside the plan (#640, M2). A checkpoint from
+        # before that already has its tables enriched, so it gets no obligation.
+        add_table_enrichment_obligation(manifest)
         await ctx.checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
         return manifest
 
@@ -596,7 +600,6 @@ class PddlAccessibilityOrchestrator:
     async def _enrich_before_planning(
         self,
         manifest: ProcessingManifest,
-        file_path: Path,
         source_path: Path,
         effective_mode: str,
         media_inspection: dict[str, Any] | None,
@@ -605,11 +608,11 @@ class PddlAccessibilityOrchestrator:
         ports: RunPorts,
         checkpoints: RunCheckpoints,
     ) -> None:
-        """Describe pictures, recognize formulas and inline math, read tables.
+        """Classify formula regions, describe pictures, recognize inline math and formulas.
 
-        The steps run in this order and share one provider breaker; the inline
-        math of prose and of tables share one text-span reader. ``source_path``
-        is ``file_path`` resolved.
+        The steps run in this order and share the run's provider breaker and
+        text-span reader (``RunPorts.services``) with the ``table-enrichment``
+        method, which reads the tables inside the plan (#640, M2).
 
         The manifest is checkpointed after each step (#407). Each step records
         per-object progress in the manifest and skips an object it already
@@ -619,8 +622,9 @@ class PddlAccessibilityOrchestrator:
             await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
         # Pictures, formulas and tables reach the vision provider from the
         # same pipeline, so one that went down does not get called again for
-        # every remaining object.
-        breaker = ProviderBreaker(config.vision.breaker_threshold)
+        # every remaining object. The tables are read inside the plan, by the
+        # ``table-enrichment`` method, with the same run breaker (#640, M2).
+        breaker = run_breaker(ports, config.vision)
         region_cache = region_cache_for(ports, config.vision)
         progress = checkpoints.enrichment_progress(manifest)
         await _classify_formula_regions(
@@ -636,7 +640,7 @@ class PddlAccessibilityOrchestrator:
             breaker=breaker, on_progress=progress,
         )
         await checkpoints.save_manifest(manifest, enriching=True)
-        text_spans = _TextSpanReader(manifest, source_path, config.toolbox)
+        text_spans = run_text_spans(ports, manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
         await checkpoints.save_manifest(manifest, enriching=True)
         await _enrich_formula_latex(
@@ -645,23 +649,6 @@ class PddlAccessibilityOrchestrator:
             region_cache=region_cache, status_callback=status_callback,
             breaker=breaker, on_progress=progress,
         )
-        await checkpoints.save_manifest(manifest, enriching=True)
-
-        if status_callback:
-            await status_callback(t(STAGE_ENRICHING_TABLES_OCR))
-        await _enrich_table_structures(
-            manifest,
-            file_path.resolve(),
-            vision=config.vision,
-            toolbox=config.toolbox,
-            models=config.models,
-            status_callback=status_callback,
-            breaker=breaker,
-            on_progress=progress,
-        )
-        await checkpoints.save_manifest(manifest, enriching=True)
-        # After the table enrichment, which can replace a table's cells.
-        await _mark_table_inline_math(manifest, source_path, config.document, text_spans)
         await checkpoints.save_manifest(manifest, enriching=True)
 
     async def _replan_until_done(
@@ -828,7 +815,8 @@ def _plan_progress(
     The user sees only the step and its pages; the obligation kind and method
     are internal names, so they go to the debug log.
     """
-    if status_callback is None:
+    send = _thread_status(status_callback, loop)
+    if send is None:
         return None
     page_by_element = {element.id: element.page_number for element in manifest.elements}
     pages_by_obligation = {
@@ -854,13 +842,36 @@ def _plan_progress(
                 total=total,
                 pages=_pages_label(pages, len(manifest.pages)),
             )
+        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
+            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
+            return
+        send(message)
+
+    return report
+
+
+def _thread_status(
+    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
+    loop: asyncio.AbstractEventLoop,
+) -> Callable[[str], None] | None:
+    """Report a progress message from a worker thread through ``status_callback``.
+
+    The callback is a coroutine of ``loop``: the report is scheduled there and
+    awaited from the thread, so the work only goes on once its stage is
+    recorded. A failing report is logged and never fails the work.
+    """
+    if status_callback is None:
+        return None
+
+    def send(message: str) -> None:
+        try:
             asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
                 timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS
             )
-        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
-            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
+        except Exception as exc:  # noqa: BLE001 - progress must not fail the work
+            logger.warning("PDDL: progress not recorded: {}", exc)
 
-    return report
+    return send
 
 
 #: Upper bound on how long a plan step waits for its progress to be recorded.
