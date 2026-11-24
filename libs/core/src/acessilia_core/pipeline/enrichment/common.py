@@ -33,10 +33,14 @@ if TYPE_CHECKING:
     from acessilia_sdk.toolbox.clients.pdf import ClipOrigin, RenderedPage
 
 
-#: Picture failures a second try may fix: the provider gave no answer, or an
-#: empty one (empty answers are never cached, so the try reaches the model). A
-#: crop that could not be rendered will not render the second time either.
-_RETRIED_VISION_FAILURES = frozenset({"model_failed", "empty_description"})
+#: Vision-stage failures a second try may fix (pictures and tables): the
+#: provider gave no answer, an empty picture answer (empty answers are never
+#: cached, so the try reaches the model), or a local admission rejection
+#: (capacity may have freed by the second pass). A crop that could not be
+#: rendered will not render the second time either.
+_RETRIED_VISION_FAILURES = frozenset(
+    {"model_failed", "empty_description", "admission_rejected"}
+)
 
 
 async def _retry_failed(

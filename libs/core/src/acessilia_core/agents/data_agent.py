@@ -10,12 +10,24 @@ The application supplies a shared runner with bounded admission; abandoned
 calls retain its capacity, independently of transient event loops (#276).
 """
 
+from __future__ import annotations
+
+import asyncio
+
 from agno.agent import Agent
 from agno.media import Image
 
 from acessilia_core.agents.ai_client import get_agno_model
-from acessilia_core.agents.model_call_policy import model_call_deadline
-from acessilia_core.agents.model_calls import ModelCallRunner, current_model_calls
+from acessilia_core.agents.model_call_policy import (
+    ADMISSION_RETRIES,
+    ADMISSION_RETRY_SECONDS,
+    model_call_deadline,
+)
+from acessilia_core.agents.model_calls import (
+    ModelCallRejected,
+    ModelCallRunner,
+    current_model_calls,
+)
 from acessilia_core.agents.output_schemas import (
     DATA_SCHEMA_INSTRUCTION,
     DataOutput,
@@ -111,10 +123,20 @@ class DataAgent:
                     images=[Image(content=image_bytes)],
                 )
 
-            response = await self.model_calls.run(
-                _run_data, timeout=model_call_deadline(timeout_seconds),
-                label=f"DataAgent/{classification}/page-{page_num}",
-            )
+            for attempt in range(ADMISSION_RETRIES + 1):
+                try:
+                    response = await self.model_calls.run(
+                        _run_data, timeout=model_call_deadline(timeout_seconds),
+                        label=f"DataAgent/{classification}/page-{page_num}",
+                    )
+                    break
+                except ModelCallRejected:
+                    # Local admission pressure is not the provider failing: it
+                    # gets one retry, like a timeout, and must not be logged as
+                    # a region error (#590).
+                    if attempt >= ADMISSION_RETRIES:
+                        raise
+                    await asyncio.sleep(ADMISSION_RETRY_SECONDS)
             result = validate_structured_run(response, DataOutput)
             if result.kind != classification:
                 raise ValueError(
@@ -122,6 +144,8 @@ class DataAgent:
                 )
             return result
 
+        except ModelCallRejected:
+            raise
         except Exception as error:
             import traceback
             tb = traceback.format_exc()

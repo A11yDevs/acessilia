@@ -18,7 +18,11 @@ class ModelCallTimeout(TimeoutError):
 
 
 class ModelCallRejected(RuntimeError):
-    """Execution capacity is full or the application has closed the runner."""
+    """Execution capacity is full or the application has closed the runner.
+
+    Local admission pressure, not provider health: callers must not count it
+    against a provider breaker, and may retry it once as they do a timeout.
+    """
 
 
 class ModelCallRunner(Protocol):

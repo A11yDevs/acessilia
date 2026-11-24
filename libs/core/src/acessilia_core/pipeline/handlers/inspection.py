@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from acessilia_core.agents.model_calls import ModelCallRejected
 from acessilia_core.agents.output_schemas import PageInspectionOutput, VisionOutput
 from acessilia_core.agents.vision_agent import VisionAgent
 from acessilia_core.config import CoreConfig, ModelConfig, ToolboxConfig
@@ -114,7 +115,13 @@ def _inspect_region(
             total_pages=total_pages, mode=mode, full_budget=True,
         )
 
-    return run_sync(inspect())
+    try:
+        return run_sync(inspect())
+    except ModelCallRejected:
+        # Local admission pressure: the caller records the method as failed,
+        # so the job degrades instead of treating it as a provider outage
+        # (#590). The runner already logged the rejection.
+        return None
 
 
 def _save_region_artifact(

@@ -291,16 +291,23 @@ def build_pddl_structured_payload(
 #: empty description is the model's answer, as is a refused table reading, and
 #: would come back the same, so it neither counts nor keeps a run uncached.
 _RETRYABLE_VISUAL_FAILURES = frozenset(
-    {"crop_unavailable", "image_unavailable", "model_failed"}
+    {"crop_unavailable", "image_unavailable", "model_failed", "admission_rejected"}
 )
 
 #: Why a formula's classification or reading may come out differently on a
 #: rerun (#544 review): the vision model gave no answer, the shared breaker
-#: was open, the crop could not be rendered, or ``math.recognize`` was down.
-#: An answer (``empty_description``, ``classification_uncertain``) would come
-#: back the same and does not count.
+#: was open, the crop could not be rendered, ``math.recognize`` was down, or
+#: the local model-call runner had no admission capacity (#590). An answer
+#: (``empty_description``, ``classification_uncertain``) would come back the
+#: same and does not count.
 _RETRYABLE_FORMULA_FAILURES = frozenset(
-    {"crop_unavailable", "model_failed", "provider_blocked", "recognizer_unavailable"}
+    {
+        "crop_unavailable",
+        "model_failed",
+        "provider_blocked",
+        "recognizer_unavailable",
+        "admission_rejected",
+    }
 )
 
 

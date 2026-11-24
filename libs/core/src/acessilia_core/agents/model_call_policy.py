@@ -12,6 +12,16 @@ until that thread finishes, independently of the caller's event loop.
 
 CALL_DEADLINE_GRACE_SECONDS = 30
 
+#: A local admission rejection (``ModelCallRejected``) gets one retry, like a
+#: call that ran out of time. It says the runner is busy, nothing about the
+#: image or the provider, so it must not consume an answer attempt (#590).
+ADMISSION_RETRIES = 1
+
+#: Seconds before the retry of a rejected call. A worker may finish in this
+#: window and free both the worker and a pending slot; one retry bounds the
+#: extra pressure the retry itself adds.
+ADMISSION_RETRY_SECONDS = 1.0
+
 
 def model_call_deadline(timeout_seconds: float) -> float:
     return timeout_seconds + CALL_DEADLINE_GRACE_SECONDS

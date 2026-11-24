@@ -20,6 +20,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
 
+from acessilia_core.agents.model_calls import ModelCallRejected
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.agents.vision_agent import VisionAgent
@@ -66,9 +67,14 @@ from docstruct.visual_text import (
 #: for the operator: the crop could not be rendered, the source has no page to
 #: render and the extraction embedded no image in the picture (a DOCX or HTML
 #: picture, so the model was never asked), the vision call failed (its error
-#: goes to metadata["vision_failure_detail"]), or the answer had no text.
+#: goes to metadata["vision_failure_detail"]), the answer had no text, or the
+#: local model-call runner had no admission capacity (#590).
 VisionFailureReason = Literal[
-    "crop_unavailable", "image_unavailable", "model_failed", "empty_description"
+    "crop_unavailable",
+    "image_unavailable",
+    "model_failed",
+    "empty_description",
+    "admission_rejected",
 ]
 
 
@@ -185,18 +191,24 @@ class _PictureEnrichment:
             extra_kwargs = (
                 {"surrounding_text": surrounding} if surrounding else {}
             )
-            vision_output = await self.agent.describe_region(
-                image_bytes=image_bytes,
-                # A whole presentation slide gets the page prompt and budget.
-                classification=(
-                    "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
-                ),
-                page_num=page_number,
-                total_pages=self.total_pages,
-                mode=self.mode,
-                errors=errors,
-                **extra_kwargs,
-            )
+            try:
+                vision_output = await self.agent.describe_region(
+                    image_bytes=image_bytes,
+                    # A whole presentation slide gets the page prompt and budget.
+                    classification=(
+                        "full_page_image" if element.metadata.get("slide_visual") else "embedded_image"
+                    ),
+                    page_num=page_number,
+                    total_pages=self.total_pages,
+                    mode=self.mode,
+                    errors=errors,
+                    **extra_kwargs,
+                )
+            except ModelCallRejected as error:
+                # The runner was busy, not the provider: record a distinct,
+                # retryable reason and leave the breaker untouched (#590).
+                _record_vision_failure(element, "admission_rejected", str(error) or None)
+                return False
             self.breaker.record(isinstance(vision_output, VisionOutput))
 
         if not isinstance(vision_output, VisionOutput):
