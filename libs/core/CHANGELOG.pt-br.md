@@ -2,6 +2,83 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.13 — o executor trata obrigações que uma execução muda (#832, M0 da #640)
+
+Uma reclassificação durante o plano, como uma imagem que o modelo de visão lê
+como fórmula, remove as obrigações antigas do elemento e acrescenta novas. O
+executor já selecionava as acrescentadas (#594). Agora ele trata também o
+resto, para que o M1 (as descrições de imagens como ação planejada) possa vir:
+- **Pulado, não falho.** O passo de uma obrigação que esta execução removeu
+  ou substituiu fica `skipped`, com o motivo (`EXE_OBLIGATION_REMOVED`). O
+  mesmo vale para o passo de uma obrigação que agora depende de uma obrigação
+  aberta que este plano não executa antes dele: uma encontrada durante a
+  execução, ou uma planejada e ainda não executada
+  (`EXE_OBLIGATION_WAITS_FOR_OPEN`). O replanejamento ordena as duas. O
+  `complete-job` fica `skipped`, não mais `failed`, enquanto toda obrigação
+  aberta foi encontrada ou adiada por esta execução
+  (`EXE_DISCOVERED_OBLIGATIONS_OPEN`, que as agrupa por kind). Uma que o
+  plano executou e deixou aberta continua sendo falha.
+- **Obsoleta sob o mesmo id.** O passo de uma obrigação mudada sob o mesmo
+  id (outro kind, alvos de outros tipos, ou o método do passo que deixou de
+  ser admissível) também fica `skipped` (`EXE_OBLIGATION_CHANGED`), e o
+  replanejamento decide de novo. Um redirecionamento que mantém os tipos
+  (uma divisão ou uma junção) não é mudança.
+- **Uma remoção religa.** Um handler que remove uma obrigação precisa religar
+  as dependentes dela à substituta, como faz a reconciliação; o manifesto
+  recusa uma dependência pendurada. O executor relata uma que ficou
+  pendurada pelo nome (`EXE_DEPENDENCY_REMOVED`), em vez de um `KeyError`.
+  Antes de a guarda de descoberta ler o estado, o orquestrador recheca as
+  referências de obrigação e o DAG do manifesto que a execução mudou, então
+  uma referência pendurada deixada por um handler em qualquer ponto do grafo
+  faz o job falhar com a mensagem do manifesto, em vez de um `KeyError` da
+  guarda. As mensagens das checagens do grafo (alvos, dependências e
+  artefatos inexistentes, autodependência, ciclo) seguem o idioma, como as
+  do executor.
+- `skipped` já era um status de passo do relatório de execução, então o
+  contrato não muda. Uma execução em que só as obrigações mudaram não tem
+  passo `failed`.
+- **Limite próprio.** Depois de uma execução sem passo falho, o orquestrador
+  replaneja com um limite próprio, `max_discovery_replans`, separado de
+  `max_replans`, que continua contando as falhas. É uma opção do construtor
+  (valores negativos contam como 0), que o serviço lê de
+  `PDDL_MAX_DISCOVERY_REPLANS` (padrão 3). Um valor diferente do padrão entra
+  nas identidades do checkpoint e do cache, então o padrão mantém as da
+  0.3.12. Ele para quando um replanejamento partiria do estado de
+  planejamento de que o anterior partiu (`planning_signature`, tomada depois
+  da reconciliação: alvos, dependências, status e métodos tentados, não só
+  ids). O contador e a assinatura são salvos com o checkpoint de plano
+  (`discoveries`, `previous_signature`) e restaurados na retomada; um
+  checkpoint sem eles retoma como antes.
+- **A falha tem precedência.** Uma execução com passo falho e descoberta é
+  um replanejamento de falha, então o orçamento de descobertas nunca
+  contorna `max_replans`. Com ele esgotado, uma obrigação crítica deixada
+  aberta faz o job falhar. Atender a descoberta sem tentar de novo o
+  trabalho que falhou é a #842.
+- **Obrigações do documento reconciliadas.** `add_table_enrichment_obligation`
+  também roda antes de cada replanejamento:
+  - uma tabela nova entra no enriquecimento aberto, ou ganha um novo
+    (`obligation-enrich-tables-2`) quando os existentes estão fechados:
+    satisfeitos, ou esgotados (`failed`), que não são planejados de novo.
+    Antes de um replanejamento o novo já vem selecionado, então o
+    replanejamento o agenda;
+  - um enriquecimento deixa de lado as tabelas que o documento perdeu, e um
+    que fica sem tabelas é removido junto com as dependências dele
+    (`target_ids` não pode ficar vazio);
+  - toda obrigação aberta cujos alvos incluem uma tabela depende do
+    enriquecimento aberto daquela tabela, e uma aresta para um
+    enriquecimento, aberto ou fechado, com o qual não compartilha mais
+    tabela é removida. É uma regra sobre alvos, no lugar da lista da 0.3.12:
+    além de `linearize-table` e `select-table-source`, ordena as obrigações
+    de página de uma página com tabela depois da leitura, como na 0.3.11, ao
+    custo de serializá-las atrás dela. Uma aresta para um fechado fica
+    enquanto o alvo que a justificou ficar, então um enriquecimento esgotado
+    não bloqueia uma dependente redirecionada para outra tabela.
+- **O enriquecimento de tabelas se restringe aos seus alvos.**
+  `_tables_to_read`, `_enrich_table_structures` e `_mark_table_inline_math`
+  recebem `targets`, então um segundo enriquecimento lê e marca só as
+  próprias tabelas, e a mensagem dele conta só elas.
+- `_plan_progress` e `_thread_status` vão para `pipeline/progress.py`.
+
 ## 0.3.12 — o enriquecimento de tabelas é uma ação planejada (#640, M2)
 
 Os dois passos de tabela que rodavam antes do planejamento passam para dentro

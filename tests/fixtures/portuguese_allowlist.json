@@ -32,7 +32,7 @@
     "libs/core/src/acessilia_core/agents/page_level_agent.py": 39,
     "libs/core/src/acessilia_core/agents/table_specialist_agent.py": 16,
     "libs/core/src/acessilia_core/manifest/builder.py": 15,
-    "libs/core/src/acessilia_core/manifest/models.py": 13,
+    "libs/core/src/acessilia_core/manifest/models.py": 8,
     "libs/core/src/acessilia_core/planning/__init__.py": 1,
     "libs/core/src/acessilia_core/planning/comparison.py": 6,
     "libs/core/src/acessilia_core/planning/domain_bundle.py": 15,

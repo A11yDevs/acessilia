@@ -4,10 +4,12 @@
 page limit, extracts the manifest through the Toolbox, runs the enrichment
 stages, plans with the PDDL planner and executes the plan with the method
 registry, planning again while the execution report asks for it (up to
-``max_replans``); ``_plan_progress`` reports each step to the job, and
-``_log_availability`` the Toolbox's availability decision. The stages, the
-handlers and the page judge live in the modules of ``libs/core/src/acessilia_core/pipeline``;
-the module was moved verbatim from ``backend/agents/pddl_orchestrator.py`` (#402, phase 3, step 6).
+``max_replans`` after a failed step, ``max_discovery_replans`` after a run
+that changed the obligations); ``pipeline/progress.py`` reports each step to
+the job, and ``_log_availability`` the Toolbox's availability decision. The
+stages, the handlers and the page judge live in the modules of
+``libs/core/src/acessilia_core/pipeline``; the module was moved verbatim from
+``backend/agents/pddl_orchestrator.py`` (#402, phase 3, step 6).
 """
 
 from __future__ import annotations
@@ -28,24 +30,19 @@ from acessilia_core.config import (
     PathsConfig,
     ToolboxConfig,
 )
-from acessilia_core.execution.executor import (
-    ExecutionResume,
-    ExecutorAgent,
-    StepProgress,
-)
+from acessilia_core.execution.executor import ExecutionResume, ExecutorAgent
 from acessilia_core.execution.models import ExecutionReport, ExecutionStepResult
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_EXECUTING_PLAN,
-    STAGE_EXECUTING_PLAN_STEP,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_VALIDATING_PLAN_DRY_RUN,
 )
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
 from acessilia_core.pipeline.enrichment.common import run_breaker
@@ -62,11 +59,11 @@ from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descript
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
-    _pages_label,
     _replannable_obligation_ids,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
     add_table_enrichment_obligation,
+    planning_signature,
 )
 from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from acessilia_core.pipeline.preflight import (
@@ -75,6 +72,7 @@ from acessilia_core.pipeline.preflight import (
     _inspect_media,
     _is_presentation,
 )
+from acessilia_core.pipeline.progress import _plan_progress, _thread_status
 from acessilia_core.planning import toolbox_gate
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.engine import (
@@ -92,7 +90,6 @@ from acessilia_core.planning.models import (
     PlannerBackend,
     PlannerSelection,
     PlanningComparison,
-    PlanStep,
 )
 from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.ports import (
@@ -125,6 +122,11 @@ class _RunContext:
     checkpoints: RunCheckpoints
 
 
+#: Replans after a run that changed the obligations without failing (#832); a
+#: run of one document should need one or two.
+DEFAULT_MAX_DISCOVERY_REPLANS = 3
+
+
 @dataclass(frozen=True)
 class _PlanningState:
     """The plan of a run and the planning inputs a replan reuses."""
@@ -135,6 +137,10 @@ class _PlanningState:
     availability: toolbox_gate.AvailabilityDecision
     gated: list[str]
     replans: int
+    #: Replans after obligations changed, apart from ``replans`` (#832).
+    discoveries: int = 0
+    #: The planning signature the last discovery replan started from (#832).
+    previous_signature: str | None = None
 
 
 class PddlAccessibilityOrchestrator:
@@ -153,7 +159,8 @@ class PddlAccessibilityOrchestrator:
             - "toolbox" — ToolboxManifestExtractor (remote via Acessilia Toolbox)
             - "toolbox-layout" / "toolbox_layout" — mapped to "toolbox" (same REST API)
             Defaults to "toolbox".
-        max_replans (int): How many times a run plans again when the executor reports `replan-required`; negative values count as 0; defaults to 2.
+        max_replans (int): How many times a run plans again after a failed step, when the executor reports `replan-required`; negative values count as 0; defaults to 2.
+        max_discovery_replans (int): How many times a run plans again after a run that changed the obligations without failing (found, removed or replaced, #832); a chain of discoveries longer than this ends the job with `replan-required`. Negative values count as 0; defaults to 3.
         planning_engine (PlanningEngine | None): The engine that produces the plans (#632, PR 3). Defaults to None: a `PddlPlanningEngine` built from `planner_backend`, `preferred_plan` and the Fast Downward options at each planning call. Can also be set later through the `planning_engine` property.
     """
 
@@ -161,6 +168,7 @@ class PddlAccessibilityOrchestrator:
     # helpers do) has no planner yet and no injected engine.
     _planner: PlannerAgent | None = None
     _planning_engine: PlanningEngine | None = None
+    max_discovery_replans: int = DEFAULT_MAX_DISCOVERY_REPLANS
 
     def __init__(
         self,
@@ -175,12 +183,14 @@ class PddlAccessibilityOrchestrator:
         extractor_backend: str = "toolbox",
         max_replans: int = 2,
         planning_engine: PlanningEngine | None = None,
+        max_discovery_replans: int = DEFAULT_MAX_DISCOVERY_REPLANS,
     ) -> None:
         self.planning_engine = planning_engine
         self.planner_backend = planner_backend
         self.preferred_plan = preferred_plan
         self.execute_dry_run = execute_dry_run
         self.max_replans = max(0, max_replans)
+        self.max_discovery_replans = max(0, max_discovery_replans)
         self.fast_downward = fast_downward
         self.fast_downward_alias = fast_downward_alias
         self.fast_downward_search = fast_downward_search
@@ -263,6 +273,9 @@ class PddlAccessibilityOrchestrator:
         # checkpoints keep the identity they had before the seam existed.
         if self._planning_engine is not None:
             planner["planning_engine"] = self._planning_engine.identity
+        # Likewise the default bound keeps the checkpoints of 0.3.12.
+        if self.max_discovery_replans != DEFAULT_MAX_DISCOVERY_REPLANS:
+            planner["max_discovery_replans"] = self.max_discovery_replans
         return {"planning": planner, "execution": {**planner, "dry_run": self.execute_dry_run}}
 
     @staticmethod
@@ -382,6 +395,8 @@ class PddlAccessibilityOrchestrator:
             planning_manifest=planning.planning_manifest,
             availability=planning.availability,
             replans=planning.replans,
+            discoveries=planning.discoveries,
+            previous_signature=planning.previous_signature,
             executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
@@ -493,6 +508,8 @@ class PddlAccessibilityOrchestrator:
                 ),
                 gated=list(plan_state.get("gated") or []),
                 replans=int(plan_state.get("replans") or 0),
+                discoveries=int(plan_state.get("discoveries") or 0),
+                previous_signature=plan_state.get("previous_signature"),
             )
         if ctx.status_callback:
             await ctx.status_callback(t(STAGE_GENERATING_PDDL_PLAN))
@@ -652,6 +669,26 @@ class PddlAccessibilityOrchestrator:
         )
         await checkpoints.save_manifest(manifest, enriching=True)
 
+    def _replan_allowed(
+        self,
+        failure: bool,
+        replans: int,
+        discoveries: int,
+        signature: str,
+        previous: str | None,
+    ) -> bool:
+        """Whether one more replan is within its bound (#832).
+
+        A run with a failed step is a failure replan even if it also found
+        obligations: the failure budget is never bypassed through the
+        discovery one. With it spent, the loop stops, and a critical
+        obligation left open (found or failed) fails the job in
+        ``_check_unsatisfied``; nothing is delivered silently.
+        """
+        if failure:
+            return replans < self.max_replans
+        return discoveries < self.max_discovery_replans and signature != previous
+
     async def _replan_until_done(
         self,
         manifest: ProcessingManifest,
@@ -666,9 +703,14 @@ class PddlAccessibilityOrchestrator:
         planning_manifest: ProcessingManifest,
         availability: Any,
         replans: int,
+        discoveries: int = 0,
+        previous_signature: str | None = None,
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
-        """Plan and execute again while the report asks for it, up to ``max_replans``.
+        """Plan and execute again while the report asks for it, within
+        ``max_replans`` (after a failed step) and ``max_discovery_replans``
+        (after a run that changed the obligations).
+
         Returns the last manifest, report, plan and comparison. The replan count
         and the plan it produced come from the checkpoint, so a restart after a
         replan neither repeats one nor exceeds the budget.
@@ -678,11 +720,25 @@ class PddlAccessibilityOrchestrator:
         # loop the status was terminal in production: the pipeline returned a plan
         # it already knew was wrong, and `complete-job` never ran, so no document
         # was produced.
-        while (
-            execution_report.replan_required
-            and replans < self.max_replans
-            and not self.execute_dry_run
-        ):
+        while execution_report.replan_required and not self.execute_dry_run:
+            # A replan after a failed step recovers from it and counts toward
+            # ``max_replans``. One after a run where nothing failed follows
+            # obligations the run changed (found, removed, replaced: #594,
+            # #832): it has its own bound, and stops when the planning state
+            # (`planning_signature`: targets, dependencies, statuses and tried
+            # methods, not only ids) is the one the previous discovery replan
+            # started from, so it cannot repeat a problem. The signature is
+            # saved with the plan, so a resume keeps the guard.
+            failure = any(step.status == "failed" for step in execution_report.steps)
+            # Reconciled first, so the guard and the roots see the same state.
+            # A table the run added is enriched before its own obligations.
+            add_table_enrichment_obligation(manifest, replan=True)
+            # The guard reads the graph: a dangling reference fails here, named.
+            validate_obligation_graph(manifest)
+            signature = planning_signature(manifest)
+            if not self._replan_allowed(failure, replans, discoveries, signature, previous_signature):
+                break
+            previous_signature = None if failure else signature
             # Steps after a failure still run, so one execution can leave an
             # obligation exhausted (no method left) next to another that has an
             # alternative. The planner rejects exhausted obligations, so they are
@@ -696,12 +752,16 @@ class PddlAccessibilityOrchestrator:
             roots = _replannable_obligation_ids(manifest)
             if not roots:
                 break
-            replans += 1
+            if failure:
+                replans += 1
+            else:
+                discoveries += 1
             logger.info(
-                "PDDL: replanning ({}/{}) after {}",
-                replans,
-                self.max_replans,
+                "PDDL: replanning after {} ({}: {}/{})",
                 execution_report.status,
+                "failure" if failure else "changed obligations",
+                replans if failure else discoveries,
+                self.max_replans if failure else self.max_discovery_replans,
             )
             # The new plan applies to the manifest the execution just produced.
             planning_manifest = manifest
@@ -713,7 +773,8 @@ class PddlAccessibilityOrchestrator:
                 catalogue=availability.catalogue_facts() if availability else None,
             )
             await checkpoints.save_plan(
-                plan, comparison, planning_manifest, availability, gated, replans
+                plan, comparison, planning_manifest, availability, gated, replans,
+                discoveries=discoveries, previous_signature=previous_signature,
             )
             # The previous execution checkpoint belongs to the previous plan.
             checkpoints.remove(PHASE_EXECUTION)
@@ -796,86 +857,6 @@ class PddlAccessibilityOrchestrator:
             for method in obligation.admissible_methods
         }
         return sorted(requested - registered)
-
-
-def _plan_progress(
-    manifest: ProcessingManifest,
-    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
-    loop: asyncio.AbstractEventLoop,
-) -> StepProgress | None:
-    """Report each obligation step, with its pages, through ``status_callback``.
-
-    The executor runs on a worker thread while the callback is a coroutine of
-    the event loop, so the report is scheduled on ``loop`` and awaited from the
-    thread: the step only starts once its stage is recorded, which is what lets
-    a job killed mid-step still say which step and page it was on. A failing
-    report, including a broken translation of the label, is logged and never
-    fails the step.
-
-    The user sees only the step and its pages; the obligation kind and method
-    are internal names, so they go to the debug log.
-    """
-    send = _thread_status(status_callback, loop)
-    if send is None:
-        return None
-    page_by_element = {element.id: element.page_number for element in manifest.elements}
-    pages_by_obligation = {
-        obligation.id: [page_by_element.get(target) for target in obligation.target_ids]
-        for obligation in manifest.obligations
-    }
-
-    def report(step: PlanStep, position: int, total: int) -> None:
-        if step.action != "execute-obligation" or step.obligation_id is None:
-            return
-        pages = pages_by_obligation.get(step.obligation_id, [])
-        logger.debug(
-            "PDDL: step {}/{} {} via {}, pages {}",
-            position,
-            total,
-            step.obligation_id,
-            step.method,
-            pages,
-        )
-        try:
-            message = t(STAGE_EXECUTING_PLAN_STEP).format(
-                current=position,
-                total=total,
-                pages=_pages_label(pages, len(manifest.pages)),
-            )
-        except Exception as exc:  # noqa: BLE001 - progress must not fail the plan
-            logger.warning("PDDL: progress of step {} not recorded: {}", position, exc)
-            return
-        send(message)
-
-    return report
-
-
-def _thread_status(
-    status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
-    loop: asyncio.AbstractEventLoop,
-) -> Callable[[str], None] | None:
-    """Report a progress message from a worker thread through ``status_callback``.
-
-    The callback is a coroutine of ``loop``: the report is scheduled there and
-    awaited from the thread, so the work only goes on once its stage is
-    recorded. A failing report is logged and never fails the work.
-    """
-    if status_callback is None:
-        return None
-
-    def send(message: str) -> None:
-        try:
-            asyncio.run_coroutine_threadsafe(status_callback(message), loop).result(
-                timeout=_PROGRESS_REPORT_TIMEOUT_SECONDS
-            )
-        except Exception as exc:  # noqa: BLE001 - progress must not fail the work
-            logger.warning("PDDL: progress not recorded: {}", exc)
-
-    return send
-
-
-#: Upper bound on how long a plan step waits for its progress to be recorded.
-_PROGRESS_REPORT_TIMEOUT_SECONDS = 10.0
 
 
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:

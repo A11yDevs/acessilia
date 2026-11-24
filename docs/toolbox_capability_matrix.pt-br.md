@@ -176,7 +176,9 @@ saudável; desligá-lo pulava a execução em vez de expor a lacuna.
 - **`replan-required` deixou de ser terminal.** `execute()` replaneja até
   `PDDL_MAX_REPLANS` vezes (padrão 2), reutilizando o estado `(tried ?o ?m)` que o
   executor registrou, de modo que um método que falhou passa para o próximo
-  admissível.
+  admissível. Esses são os replanejamentos depois de um passo falho. Os
+  replanejamentos depois de uma execução que mudou as obrigações sem falhar
+  (#832) têm um limite próprio, `PDDL_MAX_DISCOVERY_REPLANS` (padrão 3).
 
 ### P2: obrigações v2.3 baseadas em evidências
 

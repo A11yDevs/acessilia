@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import hashlib
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
 from acessilia_core.agents.agno_support import require_workflow_classes
 from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
+    EXE_DEPENDENCY_REMOVED,
+    EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DOMAIN_DESCRIPTION_CHANGED,
     EXE_DOMAIN_PDDL_CHANGED,
     EXE_DRY_RUN_SIMULATED,
@@ -19,9 +21,12 @@ from acessilia_core.execution.messages import (
     EXE_METHOD_NOT_ADMISSIBLE,
     EXE_NO_HANDLER_REGISTERED,
     EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_CHANGED,
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
+    EXE_OBLIGATION_REMOVED,
+    EXE_OBLIGATION_WAITS_FOR_OPEN,
     EXE_PLAN_DIFFERENT_DOMAIN,
     EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE,
     EXE_PLAN_OTHER_MANIFEST,
@@ -114,6 +119,23 @@ class _ExecutionState:
     failed_step_index: int | None = None
     replan_required: bool = False
     progress: StepProgress | None = None
+    #: The obligations of the manifest the plan was made for, with what made
+    #: their method applicable then (``_applicability``). One the working
+    #: manifest no longer has was removed during this execution; one it has in
+    #: addition was found during it (#594, #832); one whose applicability
+    #: changed under the same id is stale.
+    planned: dict[str, _Applicability] = field(default_factory=dict)
+
+
+class _SkipStep(Exception):
+    """A plan step that no longer applies to the manifest (#832).
+
+    An earlier step of this execution changed the obligations: a
+    reclassification removed or replaced the step's obligation, or made it
+    depend on an obligation found during the execution. The step is recorded
+    ``skipped`` with the reason, not ``failed``: nothing failed, and the
+    replan, when one is needed, orders what changed.
+    """
 
 
 class ExecutorAgent:
@@ -207,6 +229,7 @@ class ExecutorAgent:
             ),
             replan_required=replan_required,
             progress=progress,
+            planned=_planned_applicability(manifest),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -424,6 +447,10 @@ class ExecutorAgent:
                 raise ValueError(
                     t(EXE_UNKNOWN_ACTION).format(action=step.action)
                 )
+        except _SkipStep as skip:
+            status = "skipped"
+            message = str(skip)
+            logger.info("PDDL: step {} ({}) skipped: {}", step.index, step.action, message)
         except Exception as exc:
             status = "failed"
             message = f"{type(exc).__name__}: {exc}"
@@ -468,11 +495,23 @@ class ExecutorAgent:
     def _execute_complete_job(state: _ExecutionState) -> None:
         # `selected`, not the plan's list: it also holds what a
         # handler added during this execution.
-        unsatisfied = [
-            item.id
+        open_items = [
+            item
             for item in state.manifest.obligations
             if item.selected and item.status != "satisfied"
         ]
+        skipped = {result.obligation_id for result in state.results if result.status == "skipped"}
+        if open_items and all(
+            item.id not in state.planned or item.id in skipped for item in open_items
+        ):
+            # Not a failure: every open one was found during this execution or
+            # had its step skipped to wait for one; the replan takes them as
+            # roots (#594, #832). One the plan ran and left open is a failure.
+            state.replan_required = True
+            raise _SkipStep(
+                t(EXE_DISCOVERED_OBLIGATIONS_OPEN).format(open=_by_kind(open_items))
+            )
+        unsatisfied = [item.id for item in open_items]
         if unsatisfied:
             raise ValueError(
                 t(EXE_COMPLETED_OBLIGATIONS_UNSATISFIED).format(
@@ -489,6 +528,62 @@ class ExecutorAgent:
         raise ValueError(
             t(EXE_OBLIGATION_NOT_FOUND).format(obligation_id=obligation_id)
         )
+
+    @classmethod
+    def _planned_obligation(cls, state: _ExecutionState, step: PlanStep) -> Obligation:
+        """The step's obligation, or a skip when this execution changed it (#832).
+
+        Removed or replaced by a reclassification: the step no longer applies.
+        Changed under the same id (another kind, targets of other types, or
+        the step's method no longer admissible): the step is stale and the
+        replan decides again. A retarget that keeps the types (a split or a
+        join remaps the targets, ``handlers/structure.py``) is not a change:
+        the method reads its targets when it runs.
+        Made to depend on an open obligation this plan does not run before it
+        (found during this execution, or planned and not run yet): it waits
+        for the replan, which orders the two. A dependency the plan ran and
+        left open is still a failure (``_check_obligation_preconditions``).
+
+        A removal rewires the removed obligation's dependents to its
+        replacement (``_rewire_removed_dependencies``), and the manifest
+        refuses a dangling dependency. One left dangling is a bug of the
+        handler, reported as such instead of a ``KeyError``.
+        """
+        obligation_id = step.obligation_id or ""
+        if obligation_id in state.planned and all(
+            item.id != obligation_id for item in state.manifest.obligations
+        ):
+            raise _SkipStep(t(EXE_OBLIGATION_REMOVED).format(obligation_id=obligation_id))
+        obligation = cls._find_obligation(state, obligation_id)
+        if obligation_id in state.planned and (
+            _applicability(state.manifest, obligation) != state.planned[obligation_id]
+            or step.method not in obligation.admissible_methods
+        ):
+            state.replan_required = True
+            raise _SkipStep(t(EXE_OBLIGATION_CHANGED).format(obligation_id=obligation_id))
+        by_id = {item.id: item for item in state.manifest.obligations}
+        missing = sorted(set(obligation.dependencies) - by_id.keys())
+        if missing:
+            raise ValueError(
+                t(EXE_DEPENDENCY_REMOVED).format(
+                    obligation_id=obligation_id, missing=", ".join(missing)
+                )
+            )
+        ran = {result.obligation_id for result in state.results if result.status != "skipped"}
+        waiting = sorted(
+            dependency
+            for dependency in obligation.dependencies
+            if by_id[dependency].status != "satisfied"
+            and (dependency not in state.planned or dependency not in ran)
+        )
+        if waiting:
+            state.replan_required = True
+            raise _SkipStep(
+                t(EXE_OBLIGATION_WAITS_FOR_OPEN).format(
+                    obligation_id=obligation_id, waiting=", ".join(waiting)
+                )
+            )
+        return obligation
 
     def _mark_obligation_failed(
         self,
@@ -515,7 +610,7 @@ class ExecutorAgent:
         assert step.obligation_id is not None
         assert step.obligation_kind is not None
         assert step.method is not None
-        obligation = self._find_obligation(state, step.obligation_id)
+        obligation = self._planned_obligation(state, step)
         self._check_obligation_preconditions(obligation, step, state.manifest)
         if state.dry_run:
             obligation.status = "satisfied"
@@ -654,6 +749,32 @@ class ExecutorAgent:
                     unsatisfied=unsatisfied,
                 )
             )
+
+
+#: What made an obligation's method applicable when the plan was made: its
+#: kind and the types of its targets (#832).
+_Applicability = tuple[str, frozenset[str]]
+
+
+def _applicability(manifest: ProcessingManifest, obligation: Obligation) -> _Applicability:
+    targets = set(obligation.target_ids)
+    types = frozenset(element.type for element in manifest.elements if element.id in targets)
+    return obligation.kind, types
+
+
+def _planned_applicability(manifest: ProcessingManifest) -> dict[str, _Applicability]:
+    return {item.id: _applicability(manifest, item) for item in manifest.obligations}
+
+
+def _by_kind(obligations: list[Obligation]) -> str:
+    """The ids grouped by kind, e.g.
+    ``verbalize-formula (o-1, o-2); describe-image (o-3)``."""
+    kinds: dict[str, list[str]] = {}
+    for item in obligations:
+        kinds.setdefault(item.kind, []).append(item.id)
+    return "; ".join(
+        f"{kind} ({', '.join(sorted(ids))})" for kind, ids in sorted(kinds.items())
+    )
 
 
 def _execution_snapshot(plan: NominalPlan, state: _ExecutionState) -> dict[str, Any]:

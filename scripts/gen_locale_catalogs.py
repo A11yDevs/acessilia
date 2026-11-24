@@ -19,6 +19,8 @@ from pathlib import Path
 
 from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
+    EXE_DEPENDENCY_REMOVED,
+    EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DOMAIN_DESCRIPTION_CHANGED,
     EXE_DOMAIN_PDDL_CHANGED,
     EXE_DRY_RUN_SIMULATED,
@@ -29,9 +31,12 @@ from acessilia_core.execution.messages import (
     EXE_METHOD_NOT_ADMISSIBLE,
     EXE_NO_HANDLER_REGISTERED,
     EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_CHANGED,
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
+    EXE_OBLIGATION_REMOVED,
+    EXE_OBLIGATION_WAITS_FOR_OPEN,
     EXE_PLAN_DIFFERENT_DOMAIN,
     EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE,
     EXE_PLAN_OTHER_MANIFEST,
@@ -244,6 +249,12 @@ from acessilia_core.i18n.log_messages import (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
     MSG_HEADING_GAP,
+    MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE,
+    MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS,
+    MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE,
+    MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS,
     MSG_MODEL_CALL_CLOSED,
     MSG_MODEL_CALL_DEADLINE,
     MSG_MODEL_CALL_FULL,
@@ -698,6 +709,10 @@ MESSAGES: tuple[str, ...] = (
     EXE_PLAN_UNKNOWN_OBLIGATIONS,
     EXE_START_JOB_INVALID_STATE,
     EXE_OBLIGATION_NOT_FOUND,
+    EXE_OBLIGATION_REMOVED,
+    EXE_OBLIGATION_WAITS_FOR_OPEN,
+    EXE_DEPENDENCY_REMOVED,
+    EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DRY_RUN_SIMULATED,
     EXE_NO_HANDLER_REGISTERED,
     EXE_RESULT_REJECTED,
@@ -706,6 +721,7 @@ MESSAGES: tuple[str, ...] = (
     EXE_JOB_NOT_PROCESSING,
     EXE_OBLIGATION_NOT_SELECTED,
     EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_CHANGED,
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_METHOD_NOT_ADMISSIBLE,
     EXE_METHOD_ALREADY_TRIED,
@@ -713,6 +729,12 @@ MESSAGES: tuple[str, ...] = (
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
     MSG_VISION_TRUNCATION_NOTICE,
+    MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE,
+    MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS,
+    MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE,
+    MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS,
     MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
@@ -1352,6 +1374,21 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         EXE_START_JOB_INVALID_STATE: "start-job inválido no estado {status}",
         EXE_OBLIGATION_NOT_FOUND: "Obrigação inexistente: {obligation_id}",
+        EXE_OBLIGATION_REMOVED: (
+            "Pulado: a obrigação {obligation_id} foi removida ou substituída durante esta execução"
+        ),
+        EXE_OBLIGATION_CHANGED: (
+            "Pulado: a obrigação {obligation_id} mudou durante esta execução; o replanejamento decide de novo"
+        ),
+        EXE_OBLIGATION_WAITS_FOR_OPEN: (
+            "Pulado: a obrigação {obligation_id} agora depende de {waiting}, ainda abertas; o replanejamento as ordena"
+        ),
+        EXE_DEPENDENCY_REMOVED: (
+            "A obrigação {obligation_id} depende de {missing}, removida durante esta execução sem religar as dependentes"
+        ),
+        EXE_DISCOVERED_OBLIGATIONS_OPEN: (
+            "Pulado: obrigações que esta execução encontrou ou adiou continuam abertas: {open}"
+        ),
         EXE_DRY_RUN_SIMULATED: (
             "Execução simulada; nenhum efeito foi persistido"
         ),
@@ -1538,6 +1575,23 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Interval whose timestamps mix an aware and a naive datetime (manifest models).
         MSG_TIMESTAMPS_MIXED_TIMEZONES: (
             "Os horários de um intervalo devem ter todos fuso horário ou nenhum"
+        ),
+        # Manifest graph validation (references, attempts and the DAG of the obligations).
+        MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS: (
+            "Obrigação {obligation_id} referencia alvos inexistentes: {ids}"
+        ),
+        MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES: (
+            "Obrigação {obligation_id} referencia dependências inexistentes: {ids}"
+        ),
+        MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY: ("Obrigação {obligation_id} depende de si mesma"),
+        MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE: (
+            "Ciclo detectado nas dependências de obrigações: {detail}"
+        ),
+        MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE: (
+            "Tentativa de método não admissível em {obligation_id}: {method}"
+        ),
+        MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS: (
+            "Tentativa em {obligation_id} referencia artefatos inexistentes: {ids}"
         ),
         # Failure for execute-obligation steps missing required execution parameters in NominalPlan validation of PlanSteps.
         MSG_EXECUTE_OBLIGATION_MISSING_FIELDS: (

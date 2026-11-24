@@ -176,6 +176,9 @@ gap.
 - **`replan-required` is no longer terminal.** `execute()` replans up to
   `PDDL_MAX_REPLANS` (default 2) times, reusing the `(tried ?o ?m)` state the
   executor recorded, so a failed method moves to the next admissible one.
+  Those are the replans after a failed step. The replans after a run that
+  changed the obligations without failing (#832) have their own bound,
+  `PDDL_MAX_DISCOVERY_REPLANS` (default 3).
 
 ### P2: evidence-driven v2.3 obligations
 

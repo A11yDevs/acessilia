@@ -317,6 +317,18 @@ API_TOKEN_READ_ONLY: str = "Token allows read-only access"
 MSG_PLANNER_NOT_STARTED: str = "The trial ended before starting"
 #: ValueError text raised by the manifest models when an interval mixes a timezone-aware and a naive timestamp, which cannot be compared; no placeholders.
 MSG_TIMESTAMPS_MIXED_TIMEZONES: str = "Timestamps of an interval must all have a timezone or all lack one"
+#: ValueError text raised by the manifest models when an obligation targets elements the manifest lacks; {obligation_id}, {ids}.
+MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS: str = "Obligation {obligation_id} references unknown targets: {ids}"
+#: ValueError text raised by the manifest models when an obligation depends on obligations the manifest lacks; {obligation_id}, {ids}.
+MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES: str = "Obligation {obligation_id} references unknown dependencies: {ids}"
+#: ValueError text raised by the manifest models when an obligation lists itself as a dependency; {obligation_id}.
+MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY: str = "Obligation {obligation_id} depends on itself"
+#: ValueError text raised by the manifest models when the obligation dependencies form a cycle; {detail} is the cycle found.
+MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE: str = "Cycle in the obligation dependencies: {detail}"
+#: ValueError text raised by the manifest models when an attempt used a method the obligation does not admit; {obligation_id}, {method}.
+MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE: str = "Attempt with a method not admissible for {obligation_id}: {method}"
+#: ValueError text raised by the manifest models when an attempt references artifacts the manifest lacks; {obligation_id}, {ids}.
+MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS: str = "Attempt on {obligation_id} references unknown artifacts: {ids}"
 #: Manifest processing-needs rationale for picture elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_IMAGE: str = "The image must receive a description or be marked decorative."
 #: Manifest processing-needs rationale for table elements, used as the LLM prompt obligation text per element type.

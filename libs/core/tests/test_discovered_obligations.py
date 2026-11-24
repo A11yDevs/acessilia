@@ -85,10 +85,11 @@ def test_a_discovered_obligation_is_selected_and_asks_for_a_replan():
     discovered = next(item for item in updated.obligations if item.id == DISCOVERED)
     assert discovered.selected
     assert report.status == "replan-required"
-    # complete-job waited for it.
+    # complete-job waited for it: skipped, not failed, since nothing failed (#832).
     assert report.steps[-1].action == "complete-job"
-    assert report.steps[-1].status == "failed"
+    assert report.steps[-1].status == "skipped"
     assert DISCOVERED in report.steps[-1].message
+    assert report.failed_step_index is None
     assert _replannable_obligation_ids(updated) == [DISCOVERED]
 
 

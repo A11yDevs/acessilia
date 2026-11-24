@@ -759,6 +759,38 @@ msgstr "start-job invalid in state {status}"
 msgid "Non-existent obligation: {obligation_id}"
 msgstr "Non-existent obligation: {obligation_id}"
 
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} was removed or replaced during this "
+"execution"
+msgstr ""
+"Skipped: obligation {obligation_id} was removed or replaced during this "
+"execution"
+
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} now depends on {waiting}, still open;"
+" the replan orders them"
+msgstr ""
+"Skipped: obligation {obligation_id} now depends on {waiting}, still open;"
+" the replan orders them"
+
+#, python-brace-format
+msgid ""
+"Obligation {obligation_id} depends on {missing}, removed during this "
+"execution without rewiring its dependents"
+msgstr ""
+"Obligation {obligation_id} depends on {missing}, removed during this "
+"execution without rewiring its dependents"
+
+#, python-brace-format
+msgid ""
+"Skipped: obligations this execution found or deferred are still open: "
+"{open}"
+msgstr ""
+"Skipped: obligations this execution found or deferred are still open: "
+"{open}"
+
 msgid "Simulated execution; no effect was persisted"
 msgstr "Simulated execution; no effect was persisted"
 
@@ -788,6 +820,14 @@ msgstr "Obligation not selected: {obligation_id}"
 msgid "Obligation already satisfied: {obligation_id}"
 msgstr "Obligation already satisfied: {obligation_id}"
 
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} changed during this execution; the "
+"replan decides again"
+msgstr ""
+"Skipped: obligation {obligation_id} changed during this execution; the "
+"replan decides again"
+
 msgid "Obligation type diverges from the plan"
 msgstr "Obligation type diverges from the plan"
 
@@ -815,6 +855,30 @@ msgid ""
 msgstr ""
 "Note: this image is informationally very extensive; the description was "
 "limited to the available budget and many details were not described."
+
+#, python-brace-format
+msgid "Attempt with a method not admissible for {obligation_id}: {method}"
+msgstr "Attempt with a method not admissible for {obligation_id}: {method}"
+
+#, python-brace-format
+msgid "Attempt on {obligation_id} references unknown artifacts: {ids}"
+msgstr "Attempt on {obligation_id} references unknown artifacts: {ids}"
+
+#, python-brace-format
+msgid "Cycle in the obligation dependencies: {detail}"
+msgstr "Cycle in the obligation dependencies: {detail}"
+
+#, python-brace-format
+msgid "Obligation {obligation_id} depends on itself"
+msgstr "Obligation {obligation_id} depends on itself"
+
+#, python-brace-format
+msgid "Obligation {obligation_id} references unknown dependencies: {ids}"
+msgstr "Obligation {obligation_id} references unknown dependencies: {ids}"
+
+#, python-brace-format
+msgid "Obligation {obligation_id} references unknown targets: {ids}"
+msgstr "Obligation {obligation_id} references unknown targets: {ids}"
 
 msgid ""
 "The execute-obligation action requires obligation_id, obligation_kind and"

@@ -6,6 +6,8 @@ orchestrator's final check, its replanning and the payload read them.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
@@ -38,47 +40,158 @@ if TYPE_CHECKING:
 TABLE_ENRICHMENT_KIND = "enrich-tables"
 TABLE_ENRICHMENT_METHOD = "table-enrichment"
 TABLE_ENRICHMENT_OBLIGATION_ID = "obligation-enrich-tables"
-#: The obligations about a table that must come after its enrichment: its
-#: linearization, and, in dual mode, the choice of its source, which compares
-#: the table as it was read.
-_AFTER_TABLE_ENRICHMENT = frozenset({"linearize-table", "select-table-source"})
+#: Statuses after which an obligation is not planned again: satisfied, or
+#: exhausted (every automatic method failed).
+_CLOSED = frozenset({"satisfied", "failed"})
 
 
-def add_table_enrichment_obligation(manifest: ProcessingManifest) -> Obligation | None:
-    """Add the ``enrich-tables`` obligation when the document has tables.
+def add_table_enrichment_obligation(
+    manifest: ProcessingManifest, *, replan: bool = False
+) -> Obligation | None:
+    """Cover every table of the document with an ``enrich-tables`` obligation.
 
-    The obligations about those tables (``_AFTER_TABLE_ENRICHMENT``) depend
-    on it. Idempotent: a manifest that already has it is left as it is.
-    Returns the obligation, or ``None`` without tables.
+    Called when the manifest is enriched, before the first plan, and again
+    before each replan (#832), so it reconciles as well as creates:
+
+    - a table no enrichment covers joins the open one, or, when the existing
+      ones are closed (satisfied or exhausted), a new one for the new tables
+      only. Reopening a satisfied one would leave satisfied obligations after
+      an open one; an exhausted one is not planned again, so a table joining
+      it would never be read;
+    - an enrichment drops the tables the document no longer has, and one left
+      without tables is removed, with the dependencies on it (there is
+      nothing left to read, and ``target_ids`` cannot be empty);
+    - every open obligation whose targets include a table depends on the open
+      enrichment of that table, and only on those: an edge to an open
+      enrichment that no longer shares a table with it (the enrichment lost
+      the table, or the obligation was retargeted) is dropped. Only this rule
+      makes edges to an ``enrich-tables`` obligation, so the edges it drops
+      are its own; edges to closed enrichments are history and stay. It is
+      a rule on targets, not a list of kinds: the obligations that target a
+      table today (``linearize-table``, ``select-table-source``) and the page
+      obligations (``refine-reading-order``, ``fuse-providers``,
+      ``adjudicate-page``) of a page with a table, which target the page's
+      elements, are ordered after its reading, the order of 0.3.11, at the
+      cost of serializing the page obligations behind it. A future step that
+      must run *before* the reading (as the bootstrap does) is not an
+      obligation this rule should order: it needs an exclusion here.
+
+    The step that removes an element must also remove or retarget that
+    element's own obligations and the page's ``element_ids``; the manifest
+    refuses dangling targets.
+
+    ``replan`` says the call is before a replan, whose roots are the selected
+    obligations: a new enrichment is then selected. Before the first plan the
+    plan selects it.
+
+    Idempotent. Returns the enrichment of the newest tables, or the first one
+    when nothing changed; ``None`` for a document without tables.
     """
-    existing = next(
-        (item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND), None
-    )
-    if existing is not None:
-        return existing
     tables = [element.id for element in manifest.elements if element.type == "table"]
-    if not tables:
-        return None
+    _drop_lost_tables(manifest, set(tables))
+    enrichments = [item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND]
+    covered = {target for item in enrichments for target in item.target_ids}
+    new = [table for table in tables if table not in covered]
+    target = _cover(manifest, enrichments, new, replan) if new else (enrichments[0] if enrichments else None)
+    _reconcile_edges(manifest)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    return target
+
+
+def _drop_lost_tables(manifest: ProcessingManifest, tables: set[str]) -> None:
+    """Every enrichment keeps only the tables the document has; empty ones go."""
+    emptied: set[str] = set()
+    for item in manifest.obligations:
+        if item.kind == TABLE_ENRICHMENT_KIND:
+            item.target_ids = [target for target in item.target_ids if target in tables]
+            if not item.target_ids:
+                emptied.add(item.id)
+    if not emptied:
+        return
+    manifest.obligations = [item for item in manifest.obligations if item.id not in emptied]
+    for item in manifest.obligations:
+        item.dependencies = [
+            dependency for dependency in item.dependencies if dependency not in emptied
+        ]
+
+
+def _cover(
+    manifest: ProcessingManifest, enrichments: list[Obligation], new: list[str], replan: bool
+) -> Obligation:
+    """The enrichment the ``new`` tables join: the open one, or a new one."""
+    open_one = next((item for item in enrichments if item.status not in _CLOSED), None)
+    if open_one is not None:
+        open_one.target_ids.extend(new)
+        return open_one
+    index = _next_index(enrichments)
+    created = _new_table_enrichment(manifest, new, index=index, selected=replan or index > 0)
+    manifest.obligations.append(created)
+    return created
+
+
+def _next_index(enrichments: list[Obligation]) -> int:
+    """The first free suffix: removing an emptied enrichment frees its id."""
+    ids = {item.id for item in enrichments}
+    index = len(enrichments)
+    while _enrichment_id(index) in ids:
+        index += 1
+    return index
+
+
+def _enrichment_id(index: int) -> str:
+    if index == 0:
+        return TABLE_ENRICHMENT_OBLIGATION_ID
+    return f"{TABLE_ENRICHMENT_OBLIGATION_ID}-{index + 1}"
+
+
+def _new_table_enrichment(
+    manifest: ProcessingManifest, tables: list[str], *, index: int, selected: bool
+) -> Obligation:
     methods = [TABLE_ENRICHMENT_METHOD, "human-review"]
-    obligation = Obligation(
-        id=TABLE_ENRICHMENT_OBLIGATION_ID,
+    return Obligation(
+        id=_enrichment_id(index),
         kind=TABLE_ENRICHMENT_KIND,
-        target_ids=tables,
+        selected=selected,
+        target_ids=list(tables),
         admissible_methods=methods,
         method_costs={method: DEFAULT_METHOD_COSTS.get(method, 50) for method in methods},
         rationale=t(MSG_OBLIGATION_TABLE_ENRICHMENT),
     )
-    manifest.obligations.append(obligation)
-    table_ids = set(tables)
+
+
+def _reconcile_edges(manifest: ProcessingManifest) -> None:
+    """Each open obligation depends on the open enrichments of its tables,
+    and on no enrichment edge whose target it no longer justifies.
+
+    An edge to an enrichment that no longer shares a table with the
+    obligation is dropped, whether the enrichment is open or closed: a closed
+    one is history only while the target that justified it stays, and an edge
+    to a ``failed`` enrichment would block the obligation from being replanned
+    at all. A closed obligation is not planned again, so it is left as it is.
+    """
+    enrichments = {
+        item.id: set(item.target_ids)
+        for item in manifest.obligations
+        if item.kind == TABLE_ENRICHMENT_KIND
+    }
+    open_enrichments = {
+        item.id: set(item.target_ids)
+        for item in manifest.obligations
+        if item.kind == TABLE_ENRICHMENT_KIND and item.status not in _CLOSED
+    }
     for item in manifest.obligations:
-        if (
-            item.kind in _AFTER_TABLE_ENRICHMENT
-            and table_ids & set(item.target_ids)
-            and obligation.id not in item.dependencies
-        ):
-            item.dependencies.append(obligation.id)
-    manifest.summary.obligation_count = len(manifest.obligations)
-    return obligation
+        if item.kind == TABLE_ENRICHMENT_KIND or item.status in _CLOSED:
+            continue
+        targets = set(item.target_ids)
+        kept = [
+            dependency for dependency in item.dependencies
+            if dependency not in enrichments or enrichments[dependency] & targets
+        ]
+        needed = [
+            enrichment for enrichment, tables in open_enrichments.items()
+            if tables & targets and enrichment not in kept
+        ]
+        item.dependencies = kept + needed
 
 
 def _formula_elements_for_obligation(
@@ -208,6 +321,24 @@ def _unsatisfied_selected_obligations(manifest: ProcessingManifest) -> list:
         obligation for obligation in manifest.obligations
         if _is_open_obligation(obligation)
     ]
+
+
+def planning_signature(manifest: ProcessingManifest) -> str:
+    """A digest of what a replan would plan from (#832): each replannable
+    obligation's kind, targets, dependencies, status and the methods already
+    tried. Two states with the same digest give the replan the same problem,
+    so a replan from the second makes no progress; the same ids with other
+    targets or dependencies are a different problem. Nothing volatile (no
+    timestamp, no message) enters it."""
+    by_id = {item.id: item for item in manifest.obligations}
+    state = [
+        [
+            item.id, item.kind, sorted(item.target_ids), sorted(item.dependencies), item.status,
+            sorted({attempt.method for attempt in item.attempts if attempt.status != "succeeded"}),
+        ]
+        for item in (by_id[obligation_id] for obligation_id in sorted(_replannable_obligation_ids(manifest)))
+    ]
+    return hashlib.sha256(json.dumps(state, separators=(",", ":")).encode()).hexdigest()
 
 
 def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:

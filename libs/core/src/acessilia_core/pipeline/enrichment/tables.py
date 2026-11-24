@@ -162,11 +162,13 @@ async def _enrich_table_structures(
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
+    targets: frozenset[str] | None = None,
 ) -> int:
     """Read the tables without a usable structure, or garbled ones, from their
-    image; returns how many were enriched."""
+    image; returns how many were enriched. ``targets`` limits the reading to
+    those tables (an obligation's, #832); ``None`` is the whole document."""
     table_elements, garbled = _tables_to_read(
-        manifest, visual_review=vision.table_visual_review
+        manifest, visual_review=vision.table_visual_review, targets=targets
     )
     if not table_elements:
         return 0
@@ -205,7 +207,7 @@ async def _enrich_table_structures(
 
 
 def _tables_to_read(
-    manifest: ProcessingManifest, *, visual_review: bool
+    manifest: ProcessingManifest, *, visual_review: bool, targets: frozenset[str] | None = None
 ) -> tuple[list[ManifestElement], dict[str, str]]:
     """The tables to read from their image, and why each misread one is read again.
 
@@ -213,11 +215,17 @@ def _tables_to_read(
     (``VisionConfig.table_visual_review``), so is a table read in the wrong shape (rows
     collapsed into one, cells doubled): it has structure but not the right
     one, and ``garbled`` maps its id to the reason (``table_garble_reason``).
+    ``targets`` keeps only those tables; ``None`` keeps every table (an empty
+    set keeps none).
     """
+    tables = [
+        element for element in manifest.elements
+        if element.type == "table" and (targets is None or element.id in targets)
+    ]
     garbled: dict[str, str] = {}
     if visual_review:
-        for element in manifest.elements:
-            if element.type == "table" and _table_element_has_structured_content(element):
+        for element in tables:
+            if _table_element_has_structured_content(element):
                 reason = table_garble_reason(
                     _rows_from_table_ast(element.metadata["table_ast"])
                 )
@@ -225,9 +233,8 @@ def _tables_to_read(
                     garbled[element.id] = reason
     table_elements = [
         element
-        for element in manifest.elements
-        if element.type == "table"
-        and (element.id in garbled or not _table_element_has_structured_content(element))
+        for element in tables
+        if element.id in garbled or not _table_element_has_structured_content(element)
     ]
     return table_elements, garbled
 

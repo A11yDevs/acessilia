@@ -160,6 +160,9 @@ class RunCheckpoints:
         availability: toolbox_gate.AvailabilityDecision,
         gated: Iterable[str],
         replans: int,
+        *,
+        discoveries: int = 0,
+        previous_signature: str | None = None,
     ) -> None:
         await self.save(
             PHASE_PLAN,
@@ -174,6 +177,8 @@ class RunCheckpoints:
                 "availability": availability.to_metadata(),
                 "gated": sorted(gated),
                 "replans": replans,
+                "discoveries": discoveries,
+                "previous_signature": previous_signature,
             },
         )
 
