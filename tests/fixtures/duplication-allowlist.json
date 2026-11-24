@@ -1,0 +1,13 @@
+{
+  "reason": "Accepted remainder: two independent constructors with no shared behaviour. Physical line counts are diagnostic only: comments, blank lines and docstrings must not turn a formatting edit into duplication growth.",
+  "groups": [
+    [
+      "backend/services/operation_registry.py:JobOperations.__init__",
+      "libs/core/src/acessilia_core/pipeline/handlers/text.py:_FurnitureView.__init__"
+    ]
+  ],
+  "totals": {
+    "groups": 1,
+    "functions_in_groups": 2
+  }
+}

@@ -505,6 +505,9 @@ jobs:
             libs/docstruct/src/docstruct libs/sdk/src/acessilia_sdk \
             libs/core/src/acessilia_core
 
+      - name: Check the duplication ratchet
+        run: uv run --locked --extra dev python scripts/check_duplication_ratchet.py
+
       - name: Check the Toolbox capability contract
         env:
           TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
