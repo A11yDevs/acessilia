@@ -573,6 +573,48 @@ def test_a_found_formula_is_read_only_when_its_text_has_no_latex(monkeypatch, tm
     assert events == expected
 
 
+def test_a_formula_read_as_a_picture_is_replanned_end_to_end(monkeypatch, tmp_path) -> None:
+    """The inverse path (#846 acceptance): ``math.recognize`` gives nothing
+    and the vision fallback describes a drawing. The formula becomes a
+    described picture, its ``verbalize-formula`` is replaced by a
+    ``describe-image``, the replan validates it, and the job completes
+    without verbalizing anything."""
+    from pddl_support import install_formula_recognizer
+
+    from acessilia_core.execution.models import MethodResult
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
+
+    install_formula_recognizer(monkeypatch, lambda _image, **_kwargs: [])
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *_a, **_k: (b"crop", 1))
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return _description("A ring of carbon atoms.")
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+    verbalized: list[str] = []
+
+    def mathml(_manifest, obligation_id):
+        verbalized.append(obligation_id)
+        return MethodResult(success=True, validated=True)
+
+    verbalize = build_obligation("verbalize-formula", ["f-1"], ["mathml", "human-review"])
+    verbalize.method_costs = {"mathml": 10, "human-review": 100}
+    manifest = build_manifest(
+        [build_element("prose", "paragraph", text=_PROSE), build_element("f-1", "formula", text="")],
+        [verbalize],
+    )
+
+    payload = _run(monkeypatch, manifest, tmp_path, register={"mathml": mathml}, recognize=True)
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert verbalized == []
+    assert "A ring of carbon atoms." in payload["text"]
+
+
 # Resume across the migration.
 
 

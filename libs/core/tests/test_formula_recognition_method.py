@@ -345,6 +345,42 @@ def test_each_obligation_probes_math_recognize_once(monkeypatch) -> None:
     assert len(calls) == 2 and calls[-1] == "f-3"
 
 
+def test_an_outage_of_math_recognize_falls_back_to_the_vision_model(monkeypatch) -> None:
+    """#846 acceptance: with ``math.recognize`` down, the vision fallback
+    reads the formula, and the message says which method did."""
+    from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    def down(_image, **_kwargs):
+        raise MathCapabilityUnavailable("math.recognize", ToolboxError("down"))
+
+    install_formula_recognizer(monkeypatch, down)
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *_a, **_k: (b"crop", 1))
+    asked: list[str] = []
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **kwargs):
+            asked.append(kwargs.get("classification", ""))
+            return VisionOutput(
+                kind="formula", description="", formula_latex=r"\frac{a}{b}", language="und", confidence=0.9
+            )
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+
+    updated, report = _in_executor(_formulas_manifest(("f-1", "")))
+
+    assert len(asked) == 1
+    formula = _by_id(updated, "f-1")
+    assert formula.text == r"\frac{a}{b}"
+    assert formula.metadata["formula_recognition"]["method"] == "vision"
+    assert _step(report, "obligation-recognize-formulas").message == n(*MSG_FORMULAS_RECOGNIZED, 1).format(
+        count=1, recognized=1, methods="vision: 1", numbered=0, pictures=0, left="-"
+    )
+
+
 def test_the_pending_elements_of_the_document_steps_are_disjoint() -> None:
     """The policy, on the steps' real selections (#851 review, item 3.9):
     no element is pending for two document steps."""
