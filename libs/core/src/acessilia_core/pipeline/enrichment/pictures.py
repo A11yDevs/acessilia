@@ -20,7 +20,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
 
-from acessilia_core.agents.model_calls import ModelCallRejected
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.agents.vision_agent import VisionAgent
@@ -42,9 +42,9 @@ from acessilia_core.manifest.builder import (
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.elements import _element_bbox
 from acessilia_core.pipeline.enrichment.common import (
-    _RETRIED_VISION_FAILURES,
     _extract_picture_bytes,
     _retry_failed,
+    should_retry_vision_failure,
 )
 from acessilia_core.pipeline.obligations import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id
@@ -204,6 +204,8 @@ class _PictureEnrichment:
                     errors=errors,
                     **extra_kwargs,
                 )
+            except ModelCallClosed:
+                raise  # shutdown aborts the stage instead of degrading the object
             except ModelCallRejected as error:
                 # The runner was busy, not the provider: record a distinct,
                 # retryable reason and leave the breaker untouched (#590).
@@ -267,7 +269,7 @@ async def _enrich_picture_descriptions(
         [
             (position, element)
             for position, element in enumerate(pictures, start=1)
-            if element.metadata.get("vision_failure_reason") in _RETRIED_VISION_FAILURES
+            if should_retry_vision_failure(element.metadata.get("vision_failure_reason"))
         ],
         enrichment.describe_one,
         kind="pictures",

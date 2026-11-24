@@ -58,8 +58,8 @@ Agno chat agents are outside this execution path.
 `QUEUE_MAX_CONCURRENT` (default 1) bounds how many jobs the queue runs at
 once. `MODEL_CALL_WORKERS` (default 4) bounds worker reservations across jobs and
 transient loops; `MODEL_CALL_MAX_PENDING` (default 4, or the larger
-`QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` when unset)
-bounds additional waiting calls. These are process setup, not per-run CoreConfig
+`QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` when unset
+or -1) bounds additional waiting calls. These are process setup, not per-run CoreConfig
 values. Only worker reservations reach the ThreadPoolExecutor. Pending calls
 stay in a bounded FIFO that removes cancelled/expired closures promptly; a
 pending call cannot start inference after abandonment. Saturation raises an
@@ -72,7 +72,9 @@ without refusing it: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` must not excee
 pressure, not provider health: the agents retry it once like a timeout, without
 consuming an answer attempt. If it persists, the stage records
 `admission_rejected`, leaves the shared provider breaker untouched, and keeps the
-run out of the cache so a rerun can retry it.
+run out of the cache so a rerun can retry it. Closing the runner raises the
+`ModelCallClosed` subtype instead; agents do not retry it and stages abort,
+because shutdown is lifecycle, not object degradation.
 
 The overall per-attempt deadline includes local queue wait and execution; with
 the Toolbox it also includes the gateway's slot wait. `VISION_CONCURRENCY`
@@ -93,7 +95,7 @@ An expired/cancelled running call still retains its reservation, thread,
 connection and per-call Agent/model client until the provider finishes. Its late
 result is discarded. `asyncio.run()` never joins this application-owned pool.
 API/CLI shutdown uses `close(wait=False)` to close admission, remove pending work
-and wake pending and active awaiters with `ModelCallRejected`. Active provider
+and wake pending and active awaiters with `ModelCallClosed`. Active provider
 threads continue, retain their reservations until they finish, and have their
 late results discarded. Closing does not kill threads or guarantee immediate process
 termination: Python still joins executor threads at interpreter exit. A provider

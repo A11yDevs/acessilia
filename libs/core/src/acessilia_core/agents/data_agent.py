@@ -24,6 +24,7 @@ from acessilia_core.agents.model_call_policy import (
     model_call_deadline,
 )
 from acessilia_core.agents.model_calls import (
+    ModelCallClosed,
     ModelCallRejected,
     ModelCallRunner,
     current_model_calls,
@@ -130,6 +131,8 @@ class DataAgent:
                         label=f"DataAgent/{classification}/page-{page_num}",
                     )
                     break
+                except ModelCallClosed:
+                    raise  # shutdown is lifecycle, not a retryable admission rejection
                 except ModelCallRejected:
                     # Local admission pressure is not the provider failing: it
                     # gets one retry, like a timeout, and must not be logged as

@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from acessilia_core.agents.ai_client import active_model_name, get_agno_model
 
 from acessilia_core.agents.model_call_policy import ADMISSION_RETRIES, ADMISSION_RETRY_SECONDS, model_call_deadline  # isort: skip
-from acessilia_core.agents.model_calls import ModelCallRejected, ModelCallRunner, current_model_calls  # isort: skip
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected, ModelCallRunner, current_model_calls  # isort: skip
 from acessilia_core.agents.output_schemas import (
     PAGE_INSPECTION_INSTRUCTION,
     VISION_SCHEMA_INSTRUCTION,
@@ -459,6 +459,8 @@ class _VisionRetryRunner(Generic[OutputModel]):
                 )
                 return None, True
             raise
+        except ModelCallClosed:
+            raise  # shutdown is lifecycle, not a retryable admission rejection
         except ModelCallRejected:
             # Local admission pressure: one retry like a timeout (#590).
             if self.admission_retries < ADMISSION_RETRIES:

@@ -1,4 +1,4 @@
-"""Deadline margin shared by synchronous VisionAgent and DataAgent calls.
+"""Deadline margin and retry budgets shared by synchronous VisionAgent/DataAgent calls.
 
 The clients' HTTP timeout applies per read, so a trickling provider can keep
 the exchange alive. This margin lets an ordinary HTTP timeout arrive first
@@ -8,6 +8,14 @@ also includes Toolbox VLM gateway slot wait when that backend is selected.
 Timing out does not stop a running thread or release its connection and
 per-call client. The application's dedicated runner retains its reservation
 until that thread finishes, independently of the caller's event loop.
+
+Retry composition (#590 review). The budgets are independent and bounded:
+one admission retry per agent call (``ADMISSION_RETRIES``), one timeout retry,
+two rate-limit retries and the answer/validation attempts in the agent; the
+document-level ``_retry_failed`` pass then gives each failed picture/table one
+more try after ``VISION_RETRY_PASS_DELAY_SECONDS``; a misread table has its own
+reread budget. An admission rejection consumes no answer attempt, does not
+open the provider breaker, and does not create a per-table wait.
 """
 
 CALL_DEADLINE_GRACE_SECONDS = 30

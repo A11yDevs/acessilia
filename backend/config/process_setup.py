@@ -23,13 +23,18 @@ from backend.config.settings import (
 
 
 def setup_process(
-    settings: Settings | None = None, environ: Mapping[str, str] | None = None
+    settings: Settings | None = None,
+    environ: Mapping[str, str] | None = None,
+    *,
+    jobs_at_once: int | None = None,
 ) -> None:
     """Set up the logger (``LOG_LEVEL``, ``LOGS_DIR``), the offered locales
     (``I18N_LOCALES_ACTIVE``) and the server-side locale from ``settings``
     (the service's, by default) and ``environ`` (the process's): ``LOCALE``,
     then the shell's ``LANGUAGE``/``LC_ALL``/``LANG`` and C locale. The core
-    reads no environment (ADR-0016, step 5)."""
+    reads no environment (ADR-0016, step 5). ``jobs_at_once`` lets the entry
+    point pass the queue's actual concurrency to the model-call capacity check;
+    it defaults to ``QUEUE_MAX_CONCURRENT``."""
     from acessilia_core.i18n import (
         configure_locales,
         configure_server_locale,
@@ -46,7 +51,7 @@ def setup_process(
     configure_server_locale(negotiate_server_locale(hints, _process_c_locale()))
     setup_logger(level=s.log_level, logs_dir=s.logs_dir)
     warn_deprecated_configuration(s, environment)
-    warn_model_call_capacity(s)
+    warn_model_call_capacity(s, jobs_at_once=jobs_at_once)
 
 
 #: The deprecation messages this process has logged. The runner and the API

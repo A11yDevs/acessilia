@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from acessilia_core.agents.data_agent import DataAgent
-from acessilia_core.agents.model_calls import ModelCallRejected
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import DataOutput
 from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.blocking import run_blocking
@@ -35,9 +35,9 @@ from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.elements import _table_element_has_structured_content
 from acessilia_core.pipeline.enrichment.common import (
-    _RETRIED_VISION_FAILURES,
     _extract_picture_bytes,
     _retry_failed,
+    should_retry_vision_failure,
 )
 from acessilia_core.pipeline.obligations import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id
@@ -188,7 +188,7 @@ async def _enrich_table_structures(
         [
             (position, element)
             for position, element in enumerate(table_elements, start=1)
-            if element.metadata.get("table_read_failure") in _RETRIED_VISION_FAILURES
+            if should_retry_vision_failure(element.metadata.get("table_read_failure"))
         ],
         reader.read_and_notify,
         kind="tables",
@@ -264,12 +264,15 @@ async def _read_table(
                 page_num=page_number,
                 fallback_text=element.text or "",
             )
+        except ModelCallClosed:
+            raise  # shutdown aborts the stage instead of degrading the table
         except ModelCallRejected as error:
             # Local admission pressure, not the provider: stop the rereads,
             # do not count it toward the breaker, and record a reason a later
             # pass can retry (#590).
             rejected = True
             why = str(error) or "model-call admission rejected"
+            attempt -= 1  # this try made no reading
             break
         # The data agent returns None for any failure, an unusable answer
         # included, so the breaker may count one of those too.

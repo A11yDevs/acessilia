@@ -61,7 +61,7 @@ separados do chat AgentOS ficam fora desse caminho de execução.
 tempo. `MODEL_CALL_WORKERS` (padrão 4) limita as reservas de workers entre jobs e
 loops transitórios; `MODEL_CALL_MAX_PENDING` (padrão 4, ou o maior valor
 `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY − MODEL_CALL_WORKERS` quando não
-definido) limita chamadas adicionais em espera. São configurações do processo,
+definido ou -1) limita chamadas adicionais em espera. São configurações do processo,
 não valores de CoreConfig por execução. Somente reservas de workers chegam ao
 ThreadPoolExecutor. Chamadas pendentes ficam numa fila FIFO limitada que remove
 prontamente as closures canceladas ou expiradas; uma chamada pendente não pode
@@ -75,7 +75,9 @@ sem recusá-la: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` não deve exceder
 local, não saúde do provider: os agentes a tentam de novo uma vez, como um
 timeout, sem consumir uma tentativa de resposta. Se persistir, a etapa registra
 `admission_rejected`, deixa o breaker compartilhado do provider intacto e mantém
-a execução fora do cache para que uma nova execução a retente.
+a execução fora do cache para que uma nova execução a retente. Fechar o runner
+gera o subtipo `ModelCallClosed`; os agentes não o retentam e as etapas abortam,
+porque shutdown é ciclo de vida, não degradação de objeto.
 
 O deadline por tentativa inclui a espera na fila local e a execução; com a
 Toolbox inclui também a espera por uma vaga no gateway. `VISION_CONCURRENCY`
@@ -97,7 +99,7 @@ Uma chamada expirada/cancelada já em execução retém sua reserva, thread,
 conexão e Agent/cliente até o provider terminar. O resultado tardio é descartado.
 `asyncio.run()` nunca aguarda esse pool da aplicação. O shutdown da API/CLI
 usa `close(wait=False)` para fechar a admissão, remover pendências e acordar
-chamadores pendentes e ativos com `ModelCallRejected`. As threads dos providers
+chamadores pendentes e ativos com `ModelCallClosed`. As threads dos providers
 ativos continuam, retêm suas reservas até terminar e têm seus resultados tardios
 descartados. O fechamento não mata
 threads nem garante o término imediato do processo: Python ainda aguarda as

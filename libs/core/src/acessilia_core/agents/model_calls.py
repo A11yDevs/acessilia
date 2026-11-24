@@ -18,10 +18,20 @@ class ModelCallTimeout(TimeoutError):
 
 
 class ModelCallRejected(RuntimeError):
-    """Execution capacity is full or the application has closed the runner.
+    """Execution capacity is full: local admission pressure, not provider health.
 
-    Local admission pressure, not provider health: callers must not count it
-    against a provider breaker, and may retry it once as they do a timeout.
+    Callers must not count it against a provider breaker, and may retry it once
+    as they do a timeout. A closed runner uses the ``ModelCallClosed`` subtype.
+    """
+
+
+class ModelCallClosed(ModelCallRejected):
+    """The application closed the runner: lifecycle, not capacity pressure.
+
+    A closed runner rejects every new call and wakes pending/active awaiters.
+    This subtype lets callers separate the shutdown path from a transient
+    admission rejection: it is not retried and not recorded as a retryable
+    object degradation (#590 review).
     """
 
 

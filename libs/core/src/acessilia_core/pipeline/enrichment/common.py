@@ -43,6 +43,15 @@ _RETRIED_VISION_FAILURES = frozenset(
 )
 
 
+def should_retry_vision_failure(reason: str | None) -> bool:
+    """Whether a picture/table failure reason gets the collective second pass.
+
+    The policy is shared by both stages; keeping the set private and exposing
+    the predicate gives the rule one name and one owner (#590 review).
+    """
+    return reason in _RETRIED_VISION_FAILURES
+
+
 async def _retry_failed(
     failed: list[tuple[int, ManifestElement]],
     attempt: Callable[[int, ManifestElement], Coroutine[Any, Any, bool]],

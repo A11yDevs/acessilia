@@ -14,7 +14,7 @@ import pytest
 from core_config_support import model_config, toolbox_config
 
 from acessilia_core.agents import data_agent, vision_agent
-from acessilia_core.agents.model_calls import ModelCallRejected
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.agents.output_schemas import (
     DataCell,
     DataOutput,
@@ -41,16 +41,17 @@ _DESCRIPTION = VisionOutput(
 
 
 class RejectingRunner:
-    """A runner that rejects the first ``rejections`` calls with local capacity."""
+    """A runner that rejects the first ``rejections`` calls with ``error``."""
 
-    def __init__(self, rejections: int) -> None:
+    def __init__(self, rejections: int, error: type[Exception] = ModelCallRejected) -> None:
         self.rejections = rejections
+        self.error = error
         self.calls = 0
 
     async def run(self, call, *, timeout, label):
         self.calls += 1
         if self.calls <= self.rejections:
-            raise ModelCallRejected("model-call execution capacity is full")
+            raise self.error("model-call execution capacity is full")
         return SimpleNamespace(content="answer")
 
 
@@ -124,3 +125,32 @@ async def test_the_data_agent_raises_the_rejection_instead_of_degrading_to_none(
     with pytest.raises(ModelCallRejected):
         await agent.process_region(b"image", "table")
     assert runner.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_the_vision_agent_does_not_retry_a_closed_runner(monkeypatch):
+    runner = RejectingRunner(rejections=10, error=ModelCallClosed)
+    monkeypatch.setattr(vision_agent, "validate_structured_run", lambda *_a, **_k: _DESCRIPTION)
+    agent = vision_agent.VisionAgent(
+        region_cache=None,
+        toolbox=toolbox_config(),
+        models=model_config(),
+        model_calls=runner,
+    )
+
+    with pytest.raises(ModelCallClosed):
+        await agent.describe_region(b"image", "embedded_image")
+    assert runner.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_the_data_agent_does_not_retry_a_closed_runner(monkeypatch):
+    runner = RejectingRunner(rejections=10, error=ModelCallClosed)
+    monkeypatch.setattr(data_agent, "validate_structured_run", lambda *_a, **_k: _TABLE)
+    agent = data_agent.DataAgent(
+        models=model_config(), toolbox=toolbox_config(), model_calls=runner
+    )
+
+    with pytest.raises(ModelCallClosed):
+        await agent.process_region(b"image", "table")
+    assert runner.calls == 1

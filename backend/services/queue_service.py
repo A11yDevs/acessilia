@@ -15,7 +15,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_WORKER_TASK_STARTING,
 )
 from acessilia_core.logger import logger
-from backend.config.settings import settings
+from backend.config.settings import Settings, settings
 
 
 @dataclass
@@ -157,4 +157,14 @@ class UnifiedQueue:
         }
 
 
-unified_queue = UnifiedQueue(max_concurrent=settings.queue_max_concurrent)
+def create_unified_queue(configured: Settings | None = None) -> UnifiedQueue:
+    """Build a queue with the configured job concurrency.
+
+    Kept as a factory so tests can exercise a custom ``Settings`` without
+    reloading the module; the process owner is built from the service settings.
+    """
+    source = settings if configured is None else configured
+    return UnifiedQueue(max_concurrent=source.queue_max_concurrent)
+
+
+unified_queue = create_unified_queue()

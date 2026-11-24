@@ -109,7 +109,9 @@ class Settings:
     )
     # How many jobs the UnifiedQueue may run at once. Production keeps one;
     # raising it is what makes the model-call admission capacity below matter
-    # (#590, #238 W1). The model-call floor is checked at startup.
+    # (#590, #238 W1). Multi-job execution remains experimental until the W1
+    # fairness and cancellation decisions land; the model-call floor is checked
+    # at startup.
     queue_max_concurrent: int = field(
         default_factory=lambda: int(os.getenv("QUEUE_MAX_CONCURRENT", "1"))
     )
@@ -117,10 +119,11 @@ class Settings:
     model_call_workers: int = field(
         default_factory=lambda: int(os.getenv("MODEL_CALL_WORKERS", "4"))
     )
-    # -1 (only when the variable is unset) derives the default from the queue's
-    # concurrency and VISION_CONCURRENCY, so a configured burst fits instead of
-    # being rejected. An explicit value is always honoured; startup warns when
-    # it is too small for the configured jobs.
+    # -1 (the default when the variable is absent) derives the pending floor
+    # from the queue's concurrency and VISION_CONCURRENCY, so a configured burst
+    # fits instead of being rejected. A non-negative explicit value is honoured;
+    # startup warns when it is too small for the configured jobs. -1 is the
+    # explicit derive sentinel (the variable and this default are equivalent).
     model_call_max_pending: int = field(
         default_factory=lambda: int(os.getenv("MODEL_CALL_MAX_PENDING", "-1"))
     )
