@@ -24,10 +24,16 @@ import random
 from typing import Any
 
 import pytest
+from pddl_support import build_element, build_manifest, build_obligation
 
 import docstruct.canonical as canonical
 from acessilia_core.manifest.models import ManifestElement
-from acessilia_core.pipeline.elements import _element_to_block
+from acessilia_core.pipeline.elements import (
+    _element_to_block,
+    _table_element_has_structured_content,
+)
+from acessilia_core.pipeline.enrichment.tables import _tables_to_read
+from acessilia_core.pipeline.handlers.content import _handle_pandoc_table_method
 from docstruct.export.html import document_to_html
 from docstruct.export.txt import document_to_txt_lines
 from docstruct.tables.ast import table_ast_from_rows
@@ -123,6 +129,37 @@ def test_the_backfill_rows_never_meet_the_difference() -> None:
         rows = rows_from_visual_table_text(text)
         assert rows, text
         assert table_ast_from_rows(rows) == _reference(rows), text
+
+
+@pytest.mark.parametrize(
+    ("rows", "has_content"),
+    [
+        ([["", ""], ["", ""]], False),
+        ([[" ", "\t"], ["", " "]], False),
+        ([[" "]], False),
+        ([["h1", "h2"], ["", ""], ["a", "b"]], True),
+        ([["value", ""]], True),
+    ],
+)
+def test_enrichment_and_validation_agree_on_blank_cells(
+    rows: list[list[str]], has_content: bool
+) -> None:
+    """A structurally valid all-blank grid is not enough to skip reads (#601)."""
+    table_ast = table_ast_from_rows(rows)
+    assert table_ast is not None
+    element = build_element("t-1", "table", metadata={"table_ast": table_ast})
+    obligation = build_obligation(
+        kind="table-structure", targets=[element.id], methods=["pandoc-table"]
+    )
+    manifest = build_manifest([element], [obligation])
+
+    assert _table_element_has_structured_content(element) is has_content
+
+    tables, garbled = _tables_to_read(manifest, visual_review=False)
+    assert (element in tables) is (not has_content)
+    assert garbled == {}
+
+    assert _handle_pandoc_table_method(manifest, obligation.id).success is has_content
 
 
 def _table(text: str, metadata: dict | None = None) -> ManifestElement:

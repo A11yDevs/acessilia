@@ -423,6 +423,12 @@ texto anunciaria rótulos vazios, então `split_header_and_body` mantém essa li
 no corpo, onde ela continua sendo uma posição da grade como qualquer outra linha
 vazia.
 
+O construtor preserva a grade; se a grade carrega conteúdo utilizável é uma
+questão separada. `table_ast_has_structured_content` exige pelo menos uma célula
+não vazia (e rejeita o placeholder localizado), então uma tabela com grade
+estruturalmente válida mas toda vazia é selecionada para releitura e falha na
+validação, em vez de ser considerada pronta (#601).
+
 `normalize_table_ast` lê `rows` com a mesma função, então uma AST de tabela
 construída a partir das linhas é a mesma em qualquer caminho que a leia. O
 construtor de documento canônico (`docstruct.canonical`) a chama quando um

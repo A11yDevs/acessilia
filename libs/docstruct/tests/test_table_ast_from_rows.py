@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from docstruct.canonical import sanitize_canonical_document
 from docstruct.export.html import document_to_html
 from docstruct.export.markdown import document_to_markdown
@@ -32,6 +34,24 @@ def test_a_blank_row_stays_in_the_grid() -> None:
     ast = table_ast_from_rows([["h1", "h2"], ["", " "], ["a", "b"]])
 
     assert _cells(ast) == [["h1", "h2"], ["", ""], ["a", "b"]]
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [
+        ([["", ""], ["", ""]], [["", ""], ["", ""]]),
+        ([[" ", "\t"], ["", " "]], [["", ""], ["", ""]]),
+        ([["h1", "h2"], ["", ""], ["a", "b"]], [["h1", "h2"], ["", ""], ["a", "b"]]),
+        ([["value", ""]], [["value", ""]]),
+    ],
+)
+def test_blank_grids_keep_their_shape(
+    rows: list[list[str]], expected: list[list[str]]
+) -> None:
+    ast = table_ast_from_rows(rows)
+
+    assert ast is not None
+    assert _cells(ast) == expected
 
 
 def test_a_blank_cell_keeps_its_column() -> None:

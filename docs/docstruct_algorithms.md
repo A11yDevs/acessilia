@@ -404,6 +404,12 @@ A blank first row is never promoted to a legacy header: a header with no text
 would announce empty labels, so `split_header_and_body` keeps that row in the
 body, where it remains a grid position like any other blank row.
 
+The builder preserves the grid; whether the grid carries usable content is a
+separate question. `table_ast_has_structured_content` requires at least one
+non-empty cell (and rejects the localized placeholder), so a table with a
+structurally valid but all-blank grid is selected for re-reading and fails
+validation instead of being treated as done (#601).
+
 `normalize_table_ast` reads `rows` with the same function, so a table AST built
 from rows is the same whichever path reads it. The canonical document builder
 (`docstruct.canonical`) calls it when a table block carries `rows` but no
