@@ -42,7 +42,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_VALIDATING_PLAN_DRY_RUN,
 )
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
 from acessilia_core.pipeline.enrichment.common import run_breaker
@@ -669,6 +669,18 @@ class PddlAccessibilityOrchestrator:
         )
         await checkpoints.save_manifest(manifest, enriching=True)
 
+    @staticmethod
+    def _validate_reconciled(manifest: ProcessingManifest) -> None:
+        """Recheck the obligation graph a run changed, before a replan uses it (#832).
+
+        The guard reads the graph, so a handler that removed an obligation
+        without rewiring its dependents used to meet the missing one as a
+        ``KeyError``. Checking the references and the DAG here reports it with
+        the manifest's own message, naming the obligation and the missing
+        dependency, as a resumed run would from the checkpoint.
+        """
+        validate_obligation_graph(manifest)
+
     def _replan_allowed(
         self,
         failure: bool,
@@ -733,6 +745,7 @@ class PddlAccessibilityOrchestrator:
             # Reconciled first, so the guard and the roots see the same state.
             # A table the run added is enriched before its own obligations.
             add_table_enrichment_obligation(manifest, replan=True)
+            self._validate_reconciled(manifest)
             signature = planning_signature(manifest)
             if not self._replan_allowed(failure, replans, discoveries, signature, previous_signature):
                 break

@@ -237,7 +237,11 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      ainda não executada) espera o replanejamento. Uma remoção precisa religar
      as dependentes da obrigação removida (`_rewire_removed_dependencies`); o
      manifesto recusa uma dependência pendurada, e o executor relata uma como
-     bug do handler.
+     bug do handler. Antes de a guarda ler o estado, as referências de
+     obrigação e o DAG do manifesto que a execução mudou são rechecados, então
+     uma referência pendurada deixada por um handler faz o job falhar com a
+     mensagem do manifesto, nomeando a obrigação e a dependência ausente, em
+     vez de um `KeyError`.
    - `PDDL_MAX_DISCOVERY_REPLANS` (padrão 3) define o limite separado; um
      valor diferente do padrão entra nas identidades do checkpoint e do
      cache.
@@ -359,11 +363,12 @@ novo antes de cada replanejamento:
   redireciona as obrigações do próprio elemento e os `element_ids` da página;
 - toda obrigação aberta cujos alvos incluem uma tabela depende do
   enriquecimento aberto daquela tabela, e só desses: uma aresta para um
-  enriquecimento aberto que não compartilha mais tabela com ela (o
-  enriquecimento perdeu a tabela, ou a obrigação foi redirecionada) é
+  enriquecimento, aberto ou fechado, que não compartilha mais tabela com ela
+  (o enriquecimento perdeu a tabela, ou a obrigação foi redirecionada) é
   removida. Só esta regra cria arestas para uma obrigação `enrich-tables`,
-  então as arestas que ela remove são dela; arestas para enriquecimentos
-  fechados são histórico e ficam;
+  então as arestas que ela remove são dela; uma aresta para um fechado fica
+  enquanto o alvo que a justificou ficar. De outro modo, uma aresta para um
+  enriquecimento esgotado bloquearia as dependentes de serem replanejadas;
 - a regra é sobre alvos, não uma lista de kinds: além de `linearize-table` e
   `select-table-source`, ordena as obrigações de página
   (`refine-reading-order`, `fuse-providers`, `adjudicate-page`) de uma página

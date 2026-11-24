@@ -304,6 +304,25 @@ def _validate_summary_counts(manifest: ProcessingManifest) -> None:
             )
 
 
+def validate_obligation_graph(manifest: ProcessingManifest) -> None:
+    """Recheck the obligation references and the DAG of a live manifest (#832).
+
+    The model validates them on construction, not on assignment. A handler
+    that removes or retargets obligations during the execution can leave the
+    graph the replan guard reads invalid, and the checkpoint round trip
+    validates the result only when a plan is saved. The counts and the status
+    invariants are left out: a manifest in the middle of a run may not hold
+    them yet.
+    """
+    _validate_obligation_references(
+        manifest.obligations,
+        known_elements={element.id for element in manifest.elements},
+        known_obligations={obligation.id for obligation in manifest.obligations},
+        known_artifacts={artifact.id for artifact in manifest.artifacts},
+    )
+    _validate_obligation_dag(manifest.obligations)
+
+
 class ProcessingManifest(StrictModel):
     schema_ref: str = Field(default=SCHEMA_ID, alias="$schema")
     schema_version: Literal["1.1.0"] = SCHEMA_VERSION

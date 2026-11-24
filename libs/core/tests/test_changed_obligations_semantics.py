@@ -285,3 +285,30 @@ def test_an_edge_to_a_closed_enrichment_is_history_and_stays() -> None:
     add_table_enrichment_obligation(manifest)
 
     assert lin.dependencies == [enrichment.id]
+
+
+def test_a_stale_edge_to_an_exhausted_enrichment_does_not_block_the_replan() -> None:
+    """An edge to a ``failed`` enrichment blocks its dependents from being
+    replanned, so it cannot outlive the target that justified it: an
+    obligation retargeted to a table with an open enrichment is replannable
+    again."""
+    manifest = _tables("t-1")
+    moved = _obligation("o-moved", "review-structure", ["t-1"])
+    moved.selected = True
+    manifest.obligations.append(moved)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    first = add_table_enrichment_obligation(manifest)
+    first.status = "failed"
+    _by_id(manifest, "lin-t-1").status = "failed"
+    assert moved.dependencies == [first.id]
+    assert "o-moved" not in _replannable_obligation_ids(manifest)
+
+    _add_table(manifest, "t-2")
+    second = add_table_enrichment_obligation(manifest, replan=True)
+    moved.target_ids = ["t-2"]
+    add_table_enrichment_obligation(manifest)
+
+    assert first.id not in moved.dependencies
+    assert moved.dependencies == [second.id]
+    assert "o-moved" in _replannable_obligation_ids(manifest)
+    _valid(manifest)

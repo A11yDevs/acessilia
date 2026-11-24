@@ -161,8 +161,19 @@ def _new_table_enrichment(
 
 def _reconcile_edges(manifest: ProcessingManifest) -> None:
     """Each open obligation depends on the open enrichments of its tables,
-    and on no other open enrichment. A closed obligation is not planned
-    again, so it is left as it is."""
+    and on no enrichment edge whose target it no longer justifies.
+
+    An edge to an enrichment that no longer shares a table with the
+    obligation is dropped, whether the enrichment is open or closed: a closed
+    one is history only while the target that justified it stays, and an edge
+    to a ``failed`` enrichment would block the obligation from being replanned
+    at all. A closed obligation is not planned again, so it is left as it is.
+    """
+    enrichments = {
+        item.id: set(item.target_ids)
+        for item in manifest.obligations
+        if item.kind == TABLE_ENRICHMENT_KIND
+    }
     open_enrichments = {
         item.id: set(item.target_ids)
         for item in manifest.obligations
@@ -174,7 +185,7 @@ def _reconcile_edges(manifest: ProcessingManifest) -> None:
         targets = set(item.target_ids)
         kept = [
             dependency for dependency in item.dependencies
-            if dependency not in open_enrichments or open_enrichments[dependency] & targets
+            if dependency not in enrichments or enrichments[dependency] & targets
         ]
         needed = [
             enrichment for enrichment, tables in open_enrichments.items()

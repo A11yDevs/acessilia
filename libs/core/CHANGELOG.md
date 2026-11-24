@@ -25,7 +25,11 @@ rest, so M1 (the picture descriptions as a planned action) can follow:
 - **A removal rewires.** A handler that removes an obligation must rewire
   its dependents to the replacement, as the reconciliation does; the
   manifest refuses a dangling dependency. The executor reports one left
-  dangling by name (`EXE_DEPENDENCY_REMOVED`) instead of a `KeyError`.
+  dangling by name (`EXE_DEPENDENCY_REMOVED`) instead of a `KeyError`. Before
+  the discovery guard reads the state, the orchestrator rechecks the
+  obligation references and the DAG of the manifest the run changed, so a
+  dangling reference a handler left anywhere in the graph fails the job with
+  the manifest's message instead of a `KeyError` from the guard.
 - `skipped` was already a step status of the execution report, so the
   contract does not change. A run where only obligations changed has no
   `failed` step.
@@ -55,12 +59,14 @@ rest, so M1 (the picture descriptions as a planned action) can follow:
     tables is removed with the dependencies on it (`target_ids` cannot be
     empty);
   - every open obligation whose targets include a table depends on that
-    table's open enrichment, and an edge to an open enrichment it no longer
-    shares a table with is dropped. That is a rule on targets instead of
-    the list of 0.3.12: besides `linearize-table` and
+    table's open enrichment, and an edge to an enrichment, open or closed,
+    that no longer shares a table with it is dropped. That is a rule on
+    targets instead of the list of 0.3.12: besides `linearize-table` and
     `select-table-source`, it orders the page obligations of a page with a
     table after the reading, as in 0.3.11, at the cost of serializing them
-    behind it.
+    behind it. An edge to a closed one stays while the target that justified
+    it does, so an exhausted enrichment does not block a dependency that was
+    retargeted to another table.
 - **The table enrichment keeps to its targets.** `_tables_to_read`,
   `_enrich_table_structures` and `_mark_table_inline_math` take `targets`,
   so a second enrichment reads and marks only its own tables, and its

@@ -431,6 +431,39 @@ def test_a_replan_that_makes_no_progress_is_not_repeated() -> None:
     assert not orchestrator._replan_allowed(True, 2, 0, state, None)
 
 
+def test_a_handler_that_leaves_a_dangling_reference_is_reported_before_the_guard(
+    monkeypatch, tmp_path
+) -> None:
+    """The replan loop revalidates the manifest the run changed (#832).
+
+    A handler that removes an obligation without rewiring its dependents
+    leaves the manifest invalid. The discovery guard reads the dependency
+    graph, so it used to meet the missing obligation as a ``KeyError``; the
+    validation before it names the obligation and the missing dependency, as
+    a resumed run would from the checkpoint.
+    """
+    orchestrator = build_orchestrator(max_replans=1)
+    manifest = _manifest()
+
+    def review(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        if obligation_id == "o-1":
+            m.obligations = [item for item in m.obligations if item.id != "o-2"]
+            found = _obligation("o-found", "review-structure", ["a"])
+            found.selected = True
+            found.dependencies = ["o-2"]
+            m.obligations.append(found)
+            m.summary.obligation_count = len(m.obligations)
+        return MethodResult(success=True, validated=True)
+
+    orchestrator.executor.registry.register("human-review", review)
+
+    with pytest.raises(ValueError) as error:
+        _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    # The manifest's own message names the obligation and the missing dependency.
+    assert "o-found" in str(error.value) and "o-2" in str(error.value)
+
+
 # Document-level obligations reconciled (#832).
 
 

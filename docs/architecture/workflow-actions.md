@@ -233,6 +233,10 @@ the manifest. **The enrichment migration needs no domain change.**
      waits for the replan. A removal must rewire the removed obligation's
      dependents (`_rewire_removed_dependencies`); the manifest refuses a
      dangling dependency, and the executor reports one as the handler's bug.
+     Before the guard reads the state, the obligation references and the DAG
+     of the manifest the run changed are rechecked, so a dangling reference a
+     handler left fails the job with the manifest's message, naming the
+     obligation and the missing dependency, instead of a `KeyError`.
    - `PDDL_MAX_DISCOVERY_REPLANS` (default 3) sets the separate bound; a
      value other than the default enters the checkpoint and cache
      identities.
@@ -345,11 +349,13 @@ runs when the manifest is enriched and again before each replan:
   invalid). The step that removed an element removes or retargets that
   element's own obligations and the page's `element_ids`;
 - every open obligation whose targets include a table depends on that
-  table's open enrichment, and only on those: an edge to an open enrichment
-  that no longer shares a table with it (the enrichment lost the table, or
-  the obligation was retargeted) is dropped. Only this rule makes edges to
-  an `enrich-tables` obligation, so the edges it drops are its own; edges
-  to closed enrichments are history and stay;
+  table's open enrichment, and only on those: an edge to an enrichment,
+  open or closed, that no longer shares a table with it (the enrichment
+  lost the table, or the obligation was retargeted) is dropped. Only this
+  rule makes edges to an `enrich-tables` obligation, so the edges it drops
+  are its own; an edge to a closed one stays while the target that
+  justified it does. Otherwise an edge to an exhausted enrichment would
+  block its dependents from being replanned at all;
 - the rule is on targets, not a list of kinds: besides `linearize-table`
   and `select-table-source`, it orders the page obligations
   (`refine-reading-order`, `fuse-providers`, `adjudicate-page`) of a page

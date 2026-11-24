@@ -27,6 +27,11 @@ resto, para que o M1 (as descrições de imagens como ação planejada) possa vi
   as dependentes dela à substituta, como faz a reconciliação; o manifesto
   recusa uma dependência pendurada. O executor relata uma que ficou
   pendurada pelo nome (`EXE_DEPENDENCY_REMOVED`), em vez de um `KeyError`.
+  Antes de a guarda de descoberta ler o estado, o orquestrador recheca as
+  referências de obrigação e o DAG do manifesto que a execução mudou, então
+  uma referência pendurada deixada por um handler em qualquer ponto do grafo
+  faz o job falhar com a mensagem do manifesto, em vez de um `KeyError` da
+  guarda.
 - `skipped` já era um status de passo do relatório de execução, então o
   contrato não muda. Uma execução em que só as obrigações mudaram não tem
   passo `failed`.
@@ -59,11 +64,13 @@ resto, para que o M1 (as descrições de imagens como ação planejada) possa vi
     (`target_ids` não pode ficar vazio);
   - toda obrigação aberta cujos alvos incluem uma tabela depende do
     enriquecimento aberto daquela tabela, e uma aresta para um
-    enriquecimento aberto com o qual não compartilha mais tabela é removida.
-    É uma regra sobre alvos, no lugar da lista da 0.3.12: além de
-    `linearize-table` e `select-table-source`, ordena as obrigações de página
-    de uma página com tabela depois da leitura, como na 0.3.11, ao custo de
-    serializá-las atrás dela.
+    enriquecimento, aberto ou fechado, com o qual não compartilha mais
+    tabela é removida. É uma regra sobre alvos, no lugar da lista da 0.3.12:
+    além de `linearize-table` e `select-table-source`, ordena as obrigações
+    de página de uma página com tabela depois da leitura, como na 0.3.11, ao
+    custo de serializá-las atrás dela. Uma aresta para um fechado fica
+    enquanto o alvo que a justificou ficar, então um enriquecimento esgotado
+    não bloqueia uma dependente redirecionada para outra tabela.
 - **O enriquecimento de tabelas se restringe aos seus alvos.**
   `_tables_to_read`, `_enrich_table_structures` e `_mark_table_inline_math`
   recebem `targets`, então um segundo enriquecimento lê e marca só as
