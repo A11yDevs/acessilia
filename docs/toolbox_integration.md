@@ -267,10 +267,17 @@ result. Do not add a local implementation behind it (see 2.3).
 - **Dual fusion** (`libs/core/src/acessilia_core/pipeline/fusion.py`): if the capability produces canonical
   blocks, it can participate as a provider in `extract_fused()`.
 - **PDDL method** (`libs/core/src/acessilia_core/planning/toolbox_gate.py`): if a planning method's
-  handler calls the capability, declare it in `METHOD_TOOLBOX_REQUIREMENTS`.
-  Each entry is a function of the run's `CoreConfig` that returns the
-  requirements (capability and provider), so the provider checked is the one the
-  run calls:
+  handler calls the capability, declare it:
+  - in `METHOD_TOOLBOX_REQUIREMENTS` when the method cannot run without it:
+    missing, it rules the method out;
+  - in `METHOD_OPTIONAL_CAPABILITIES` when missing it only degrades the
+    method per element (a picture without its crop, a formula read by the
+    vision fallback), so it never rules the method out (#848).
+
+  A method is in one map or the other, never both. Each entry is a function
+  of the run's `CoreConfig` that returns the calls (capability and provider),
+  so the provider checked is the one the run calls; an empty provider setting
+  resolves to the registry default, as the client does:
 
   ```python
   "my-method": lambda config: [
@@ -281,12 +288,14 @@ result. Do not add a local implementation behind it (see 2.3).
   The availability gate then checks it against the live catalogue before each
   document is planned (see below).
 
-  A method left out of the table is never checked: under `enforce` it stays
-  runnable whatever the catalogue says. So every method, with a cost or a
-  handler, is either declared there or classified next to it in
+  A method left out of `METHOD_TOOLBOX_REQUIREMENTS` is never ruled out:
+  under `enforce` it stays runnable whatever the catalogue says (its optional
+  calls are still checked, for the degradation report). So every method, with
+  a cost or a handler, is either declared there or classified next to it in
   `planning/toolbox_gate.py`, and a test fails for one that is neither (#789):
-  - `LOCAL_METHODS` gives each method without Toolbox requirements a role and
-    a reason. `transitional` is document computation still in the core: the
+  - `LOCAL_METHODS` gives each method without required Toolbox calls a role
+    and a reason; it may still have optional calls. The role says where the
+    implementation lives, a separate dimension from the calls. `transitional` is document computation still in the core: the
     current state, not a permanent allowance. ADR-0028 moves it to Toolbox
     capabilities (#804), and the set only shrinks. `validation` checks work
     done before planning, which becomes a planned action (ADR-0029).
@@ -302,6 +311,14 @@ Before planning a document the orchestrator takes one catalogue snapshot
 published with the exact contract version, and the configured provider must be
 registered and implement it. The catalogue only restricts; it never makes a method
 available.
+
+It also checks each requested method's calls in `METHOD_OPTIONAL_CAPABILITIES`.
+A missing one never removes the method: it is recorded, with the reasons,
+under `degraded_methods` (next to `optional`) in
+`canonical_metadata.pddl_toolbox_availability`, and logged as a method that
+*may* run degraded. The report is per method, not per document: a DOCX
+picture carries its bytes and never needs `pdf.render`, yet its method is
+listed (#859).
 
 The snapshot is read from the capability clients' primary endpoint: the first
 of `TOOLBOX_BASE_URLS`, else `TOOLBOX_BASE_URL`. Every capability call goes

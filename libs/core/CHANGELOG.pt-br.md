@@ -48,6 +48,17 @@ diz por quê). Um documento cujas únicas chamadas ao Toolbox são opcionais
 agora tem o catálogo lido. Um checkpoint de plano de antes não restaura
 chamadas opcionais. Onde um método vive (o papel em `LOCAL_METHODS`)
 continua uma dimensão separada.
+- O relatório é por método, não por documento: um método é listado quando o
+  catálogo não tem uma chamada opcional que ele *pode* fazer, mesmo que este
+  documento nunca a faça (uma imagem de DOCX traz os próprios bytes). O log
+  diz "may run degraded"; informar só as degradações reais é a #859.
+- **Correção:** chamadas obrigatórias e opcionais resolvem um provider
+  configurado vazio para o padrão do registro, como o cliente faz. No
+  `enforce`, um `TOOLBOX_PDF_PROVIDER` vazio excluía um método que o cliente
+  roda.
+- `evaluate` lê `methods` uma só vez, então um gerador não perde mais as
+  checagens obrigatórias.
+- `docs/toolbox_integration.md` (EN/PT) explica onde declarar uma chamada.
 
 ## 0.3.15 — o LaTeX das fórmulas é uma ação planejada (#640, M3, #846)
 

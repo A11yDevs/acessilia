@@ -46,6 +46,16 @@ before. Without a snapshot nothing is reported degraded (`catalog_error`
 says why). A document whose only Toolbox calls are optional now has its
 catalogue read. A plan checkpoint from before restores no optional calls.
 Where a method lives (`LOCAL_METHODS`' role) stays a separate dimension.
+- The report is per method, not per document: a method is listed when the
+  catalogue lacks an optional call it *may* make, even if this document
+  never makes it (a DOCX picture carries its bytes). The log says "may run
+  degraded"; reporting only the real degradations is #859.
+- **Fix:** required and optional calls resolve an empty provider setting to
+  the registry default, as the client does. Under `enforce`, an empty
+  `TOOLBOX_PDF_PROVIDER` used to rule out a method the client runs.
+- `evaluate` reads its `methods` once, so a generator no longer loses the
+  required checks.
+- `docs/toolbox_integration.md` (EN/PT) explains where to declare a call.
 
 ## 0.3.15 — the formula LaTeX is a planned action (#640, M3, #846)
 
