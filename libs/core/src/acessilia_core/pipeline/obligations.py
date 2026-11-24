@@ -38,47 +38,75 @@ if TYPE_CHECKING:
 TABLE_ENRICHMENT_KIND = "enrich-tables"
 TABLE_ENRICHMENT_METHOD = "table-enrichment"
 TABLE_ENRICHMENT_OBLIGATION_ID = "obligation-enrich-tables"
-#: The obligations about a table that must come after its enrichment: its
-#: linearization, and, in dual mode, the choice of its source, which compares
-#: the table as it was read.
-_AFTER_TABLE_ENRICHMENT = frozenset({"linearize-table", "select-table-source"})
-
-
 def add_table_enrichment_obligation(manifest: ProcessingManifest) -> Obligation | None:
-    """Add the ``enrich-tables`` obligation when the document has tables.
+    """Cover every table of the document with an ``enrich-tables`` obligation.
 
-    The obligations about those tables (``_AFTER_TABLE_ENRICHMENT``) depend
-    on it. Idempotent: a manifest that already has it is left as it is.
-    Returns the obligation, or ``None`` without tables.
+    Called when the manifest is enriched, before the first plan, and again
+    before each replan (#832), so it reconciles as well as creates:
+
+    - a table no open enrichment covers joins the open one, or, when the
+      existing one is already satisfied, a new one for the new tables only
+      (reopening it would leave satisfied obligations after an open one);
+    - an open enrichment drops the tables the document no longer has;
+    - every open obligation with a table among its targets depends on the
+      enrichment of that table. That is a rule, not a list of kinds, so a new
+      kind about tables is ordered too, as when the tables were read before
+      planning.
+
+    Idempotent. Returns the enrichment of the newest tables, or the first one
+    when nothing changed; ``None`` for a document without tables.
     """
-    existing = next(
-        (item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND), None
-    )
-    if existing is not None:
-        return existing
     tables = [element.id for element in manifest.elements if element.type == "table"]
-    if not tables:
-        return None
+    enrichments = [item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND]
+    for item in enrichments:
+        if item.status != "satisfied":
+            item.target_ids = [target for target in item.target_ids if target in tables]
+    covered = {target for item in enrichments for target in item.target_ids}
+    new = [table for table in tables if table not in covered]
+    target = _cover(manifest, enrichments, new) if new else (enrichments[0] if enrichments else None)
+    for enrichment in (item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND):
+        _depend_on(manifest, enrichment)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    return target
+
+
+def _cover(manifest: ProcessingManifest, enrichments: list[Obligation], new: list[str]) -> Obligation:
+    """The enrichment the ``new`` tables join: the open one, or a new one."""
+    open_one = next((item for item in enrichments if item.status != "satisfied"), None)
+    if open_one is not None:
+        open_one.target_ids.extend(new)
+        return open_one
+    created = _new_table_enrichment(manifest, new, index=len(enrichments))
+    manifest.obligations.append(created)
+    return created
+
+
+def _new_table_enrichment(
+    manifest: ProcessingManifest, tables: list[str], *, index: int
+) -> Obligation:
     methods = [TABLE_ENRICHMENT_METHOD, "human-review"]
-    obligation = Obligation(
-        id=TABLE_ENRICHMENT_OBLIGATION_ID,
+    return Obligation(
+        id=TABLE_ENRICHMENT_OBLIGATION_ID if index == 0 else f"{TABLE_ENRICHMENT_OBLIGATION_ID}-{index + 1}",
         kind=TABLE_ENRICHMENT_KIND,
-        target_ids=tables,
+        selected=index > 0,
+        target_ids=list(tables),
         admissible_methods=methods,
         method_costs={method: DEFAULT_METHOD_COSTS.get(method, 50) for method in methods},
         rationale=t(MSG_OBLIGATION_TABLE_ENRICHMENT),
     )
-    manifest.obligations.append(obligation)
-    table_ids = set(tables)
+
+
+def _depend_on(manifest: ProcessingManifest, enrichment: Obligation) -> None:
+    """Make every open obligation about one of ``enrichment``'s tables depend on it."""
+    tables = set(enrichment.target_ids)
     for item in manifest.obligations:
         if (
-            item.kind in _AFTER_TABLE_ENRICHMENT
-            and table_ids & set(item.target_ids)
-            and obligation.id not in item.dependencies
+            item.kind != TABLE_ENRICHMENT_KIND
+            and item.status != "satisfied"
+            and tables & set(item.target_ids)
+            and enrichment.id not in item.dependencies
         ):
-            item.dependencies.append(obligation.id)
-    manifest.summary.obligation_count = len(manifest.obligations)
-    return obligation
+            item.dependencies.append(enrichment.id)
 
 
 def _formula_elements_for_obligation(

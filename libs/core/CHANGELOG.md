@@ -2,6 +2,36 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.13 — the executor handles obligations an execution changes (#832, M0 of #640)
+
+A reclassification during the plan, such as a picture the vision model reads
+as a formula, removes the element's old obligations and adds new ones. The
+executor already selected the added ones (#594). Now it also handles the
+rest, so M1 (the picture descriptions as a planned action) can follow:
+- **Skipped, not failed.** The step of an obligation this execution removed
+  or replaced is `skipped`, with the reason (`EXE_OBLIGATION_REMOVED`). So is
+  the step of an obligation that now depends on one found during the
+  execution and still open (`EXE_OBLIGATION_WAITS_FOR_DISCOVERED`); the
+  replan orders the two. `complete-job` is `skipped`, no longer `failed`,
+  while found obligations are open (`EXE_DISCOVERED_OBLIGATIONS_OPEN`).
+  `skipped` was already a step status of the execution report, so the
+  contract does not change. A run where only obligations changed has no
+  `failed` step.
+- **Its own bound.** After a run without a failed step, the orchestrator
+  replans with its own bound, `max_discovery_replans` (default 3), apart from
+  `max_replans`, which keeps counting failures. It stops when a replan would
+  leave the same open obligations. The count is saved with the plan
+  checkpoint (`discoveries`).
+- **Document-level obligations reconciled.** `add_table_enrichment_obligation`
+  also runs before each replan:
+  - a new table joins the open enrichment, or a new one
+    (`obligation-enrich-tables-2`) when the first is satisfied;
+  - an open enrichment drops the tables the document lost;
+  - every open obligation about a table depends on its enrichment. That is a
+    rule instead of the list of 0.3.12, so any kind about tables is ordered
+    after the reading, as before planning.
+- `_plan_progress` and `_thread_status` move to `pipeline/progress.py`.
+
 ## 0.3.12 — the table enrichment is a planned action (#640, M2)
 
 The two table steps that ran before planning move into the plan

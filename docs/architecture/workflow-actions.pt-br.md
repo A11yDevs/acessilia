@@ -197,6 +197,25 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
 
    Uma flag em `MethodResult` ("o estado mudou, replaneje") continua em
    discussão, como evolução do contrato existente.
+
+   **Atendido no core 0.3.13 (M0, #832).**
+   - O gatilho é o existente, `_select_discovered` e `replan_required` (1).
+   - O relatório distingue os motivos sem mudar o schema. Um passo que a
+     mudança tornou obsoleto fica `skipped` com o motivo (`skipped` já era um
+     status de passo), então uma execução em que nada falhou não tem passo
+     `failed`. O orquestrador conta esse replanejamento à parte e registra o
+     motivo no log (2).
+   - `max_replans` conta as falhas e `max_discovery_replans` o resto. Um
+     replanejamento que deixaria as mesmas obrigações abertas não roda (3).
+   - Obrigações removidas, substituídas e religadas estão cobertas (4).
+   - Os passos que elas tornam obsoletos são pulados, não executados (5).
+   - O contador de descobertas fica no checkpoint de plano, e os pulos derivam
+     dos manifestos do plano e do checkpoint, então uma retomada não precisa
+     de mais nada (6).
+   - `tests/test_changed_obligations.py` tem os cenários (7).
+
+   Passos cuja obrigação continua lá mas cujo elemento mudou de tipo ainda não
+   são detectados; o M1 é o primeiro a encontrar esse caso.
 2. **A ordem causal vira dependência, nunca custo.** Custos escolhem entre
    alternativas; não podem impor uma ordem tecnicamente obrigatória. A ordem
    fixa vira `depends-on` entre obrigações do mesmo elemento:
@@ -283,13 +302,18 @@ elemento bloquearia os elementos utilizáveis. Por isso a mensagem do método
 informa o que aconteceu com cada elemento, e ele só falha quando o passo lança
 uma exceção.
 
-**Limites, para o M0.** A obrigação é criada uma vez, antes do primeiro plano,
-com os elementos conhecidos naquele momento, e os kinds por elemento que
-dependem dela são uma lista fixa (`_AFTER_TABLE_ENRICHMENT`). Um elemento
-acrescentado, removido ou retipado enquanto o plano roda não é reconciliado
-com ela. Nenhum handler acrescenta ou retipa uma tabela hoje, mas o M0 (#832)
-precisa reconciliar os alvos e as dependências de uma obrigação do documento,
-e as próximas migrações precisam acrescentar seus kinds a essa lista.
+**Reconciliada antes de cada plano (M0, #832).**
+`add_table_enrichment_obligation` roda quando o manifesto é enriquecido e de
+novo antes de cada replanejamento:
+- uma tabela que nenhum enriquecimento aberto cobre entra no aberto; quando o
+  existente já está satisfeito, as tabelas novas ganham um novo
+  (`obligation-enrich-tables-2`, …), porque reabri-lo deixaria obrigações
+  satisfeitas esperando por uma aberta;
+- um enriquecimento aberto deixa de lado as tabelas que o documento perdeu;
+- toda obrigação aberta que tem uma tabela entre os alvos depende do
+  enriquecimento daquela tabela. É uma regra, não uma lista de kinds, então
+  ordena qualquer kind sobre tabelas como fazia a leitura antes do
+  planejamento.
 
 ## Ordem da migração
 
@@ -299,7 +323,7 @@ propostas, decididas nos seus pull requests.
 | PR | Passo | Obrigação e método | Papel | Requisitos de Toolbox | Muda obrigações enquanto o plano roda |
 |---|---|---|---|---|---|
 | M2 (feito, core 0.3.12) | Estrutura das tabelas e matemática inline das tabelas | `enrich-tables`, uma por documento com tabelas, método `table-enrichment`; `linearize-table` e `select-table-source` dependem dela. Depois da #170, o método chama `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `transitional` (`DataAgent`) | nenhum declarado: suas chamadas à Toolbox (`pdf.render` para uma tabela lida de novo, `document.text.spans` para as marcas) são condicionais e se degradam por tabela, então não podem descartá-lo | não |
-| M0 | Preparação do executor | Tratar obrigações removidas ou substituídas enquanto o plano roda: pular os passos de obrigações removidas, revalidar o plano remanescente e replanejar para as substitutas (critérios 4 e 5 da restrição 1) | — | — | — |
+| M0 (feito, core 0.3.13) | Preparação do executor | O executor pula, e registra como `skipped` com o motivo, o passo de uma obrigação que esta execução removeu ou substituiu, e o de uma que agora espera uma obrigação que ela encontrou. O `complete-job` é pulado enquanto houver obrigações encontradas em aberto. O orquestrador replaneja depois de uma execução assim com um limite próprio (`max_discovery_replans`), separado de `max_replans`, e para quando um replanejamento deixa as mesmas obrigações abertas. As obrigações do documento são reconciliadas antes de cada replanejamento | — | — | — |
 | M1 | Descrições de imagens | `describe-images`, uma por documento com imagens (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela | `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
 | M3 | LaTeX das fórmulas | kind novo `recognize-formula`, método `formula-recognizer`, uma dependência de `verbalize-formula` e `normalize-formula` | novo, declarado | `math.recognize`, `pdf.render` | sim: o kind novo, por fórmula |
 | M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`) | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |

@@ -759,6 +759,26 @@ msgstr "start-job invalid in state {status}"
 msgid "Non-existent obligation: {obligation_id}"
 msgstr "Non-existent obligation: {obligation_id}"
 
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} was removed or replaced during this "
+"execution"
+msgstr ""
+"Skipped: obligation {obligation_id} was removed or replaced during this "
+"execution"
+
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} now depends on {waiting}, found "
+"during this execution"
+msgstr ""
+"Skipped: obligation {obligation_id} now depends on {waiting}, found "
+"during this execution"
+
+#, python-brace-format
+msgid "Skipped: obligations found during this execution are still open: {open}"
+msgstr "Skipped: obligations found during this execution are still open: {open}"
+
 msgid "Simulated execution; no effect was persisted"
 msgstr "Simulated execution; no effect was persisted"
 

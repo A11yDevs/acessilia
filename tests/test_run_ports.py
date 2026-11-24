@@ -386,7 +386,7 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
 
     async def run_plan(*_args, **_kwargs):
         seen.append(dict(checkpoints.phases))
-        return manifest, SimpleNamespace(replan_required=False, status="completed")
+        return manifest, SimpleNamespace(replan_required=False, status="completed", steps=[])
 
     async def no_save(*_args, **_kwargs):
         return None
@@ -399,7 +399,7 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
 
     await orchestrator._replan_until_done(
         manifest,
-        SimpleNamespace(replan_required=True, status="replan-required"),
+        SimpleNamespace(replan_required=True, status="replan-required", steps=[SimpleNamespace(status="failed")]),
         "first-plan",
         None,
         [],

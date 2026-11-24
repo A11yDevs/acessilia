@@ -9,6 +9,7 @@ from typing import Any, Callable
 from acessilia_core.agents.agno_support import require_workflow_classes
 from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
+    EXE_DISCOVERED_OBLIGATIONS_OPEN,
     EXE_DOMAIN_DESCRIPTION_CHANGED,
     EXE_DOMAIN_PDDL_CHANGED,
     EXE_DRY_RUN_SIMULATED,
@@ -22,6 +23,8 @@ from acessilia_core.execution.messages import (
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
+    EXE_OBLIGATION_REMOVED,
+    EXE_OBLIGATION_WAITS_FOR_DISCOVERED,
     EXE_PLAN_DIFFERENT_DOMAIN,
     EXE_PLAN_DOMAIN_VERSION_INCOMPATIBLE,
     EXE_PLAN_OTHER_MANIFEST,
@@ -114,6 +117,21 @@ class _ExecutionState:
     failed_step_index: int | None = None
     replan_required: bool = False
     progress: StepProgress | None = None
+    #: The obligations of the manifest the plan was made for. One the working
+    #: manifest no longer has was removed during this execution; one it has in
+    #: addition was found during it (#594, #832).
+    planned: frozenset[str] = frozenset()
+
+
+class _SkipStep(Exception):
+    """A plan step that no longer applies to the manifest (#832).
+
+    An earlier step of this execution changed the obligations: a
+    reclassification removed or replaced the step's obligation, or made it
+    depend on an obligation found during the execution. The step is recorded
+    ``skipped`` with the reason, not ``failed``: nothing failed, and the
+    replan, when one is needed, orders what changed.
+    """
 
 
 class ExecutorAgent:
@@ -207,6 +225,7 @@ class ExecutorAgent:
             ),
             replan_required=replan_required,
             progress=progress,
+            planned=frozenset(item.id for item in manifest.obligations),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -424,6 +443,10 @@ class ExecutorAgent:
                 raise ValueError(
                     t(EXE_UNKNOWN_ACTION).format(action=step.action)
                 )
+        except _SkipStep as skip:
+            status = "skipped"
+            message = str(skip)
+            logger.info("PDDL: step {} ({}) skipped: {}", step.index, step.action, message)
         except Exception as exc:
             status = "failed"
             message = f"{type(exc).__name__}: {exc}"
@@ -466,6 +489,15 @@ class ExecutorAgent:
 
     @staticmethod
     def _execute_complete_job(state: _ExecutionState) -> None:
+        found_open = sorted(
+            item.id
+            for item in state.manifest.obligations
+            if item.id not in state.planned and item.selected and item.status != "satisfied"
+        )
+        if found_open:
+            # Not a failure: the replan takes them as roots (#594, #832).
+            state.replan_required = True
+            raise _SkipStep(t(EXE_DISCOVERED_OBLIGATIONS_OPEN).format(open=found_open))
         # `selected`, not the plan's list: it also holds what a
         # handler added during this execution.
         unsatisfied = [
@@ -489,6 +521,36 @@ class ExecutorAgent:
         raise ValueError(
             t(EXE_OBLIGATION_NOT_FOUND).format(obligation_id=obligation_id)
         )
+
+    @classmethod
+    def _planned_obligation(cls, state: _ExecutionState, obligation_id: str) -> Obligation:
+        """The step's obligation, or a skip when this execution changed it (#832).
+
+        Removed or replaced by a reclassification: the step no longer applies.
+        Made to depend on an obligation found during this execution and still
+        open: it waits for the replan, which orders the two.
+        """
+        if obligation_id in state.planned and all(
+            item.id != obligation_id for item in state.manifest.obligations
+        ):
+            raise _SkipStep(t(EXE_OBLIGATION_REMOVED).format(obligation_id=obligation_id))
+        obligation = cls._find_obligation(state, obligation_id)
+        by_id = {item.id: item for item in state.manifest.obligations}
+        waiting = sorted(
+            dependency
+            for dependency in obligation.dependencies
+            if dependency not in state.planned
+            and dependency in by_id
+            and by_id[dependency].status != "satisfied"
+        )
+        if waiting:
+            state.replan_required = True
+            raise _SkipStep(
+                t(EXE_OBLIGATION_WAITS_FOR_DISCOVERED).format(
+                    obligation_id=obligation_id, waiting=waiting
+                )
+            )
+        return obligation
 
     def _mark_obligation_failed(
         self,
@@ -515,7 +577,7 @@ class ExecutorAgent:
         assert step.obligation_id is not None
         assert step.obligation_kind is not None
         assert step.method is not None
-        obligation = self._find_obligation(state, step.obligation_id)
+        obligation = self._planned_obligation(state, step.obligation_id)
         self._check_obligation_preconditions(obligation, step, state.manifest)
         if state.dry_run:
             obligation.status = "satisfied"

@@ -2,6 +2,37 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.13 — o executor trata obrigações que uma execução muda (#832, M0 da #640)
+
+Uma reclassificação durante o plano, como uma imagem que o modelo de visão lê
+como fórmula, remove as obrigações antigas do elemento e acrescenta novas. O
+executor já selecionava as acrescentadas (#594). Agora ele trata também o
+resto, para que o M1 (as descrições de imagens como ação planejada) possa vir:
+- **Pulado, não falho.** O passo de uma obrigação que esta execução removeu
+  ou substituiu fica `skipped`, com o motivo (`EXE_OBLIGATION_REMOVED`). O
+  mesmo vale para o passo de uma obrigação que agora depende de uma
+  encontrada durante a execução e ainda aberta
+  (`EXE_OBLIGATION_WAITS_FOR_DISCOVERED`); o replanejamento ordena as duas. O
+  `complete-job` fica `skipped`, não mais `failed`, enquanto houver
+  obrigações encontradas em aberto (`EXE_DISCOVERED_OBLIGATIONS_OPEN`).
+  `skipped` já era um status de passo do relatório de execução, então o
+  contrato não muda. Uma execução em que só as obrigações mudaram não tem
+  passo `failed`.
+- **Limite próprio.** Depois de uma execução sem passo falho, o orquestrador
+  replaneja com um limite próprio, `max_discovery_replans` (padrão 3),
+  separado de `max_replans`, que continua contando as falhas. Ele para quando
+  um replanejamento deixaria as mesmas obrigações abertas. O contador é salvo
+  com o checkpoint de plano (`discoveries`).
+- **Obrigações do documento reconciliadas.** `add_table_enrichment_obligation`
+  também roda antes de cada replanejamento:
+  - uma tabela nova entra no enriquecimento aberto, ou num novo
+    (`obligation-enrich-tables-2`) quando o primeiro já está satisfeito;
+  - um enriquecimento aberto deixa de lado as tabelas que o documento perdeu;
+  - toda obrigação aberta sobre uma tabela depende do enriquecimento dela.
+    Isso é uma regra, no lugar da lista da 0.3.12, então qualquer kind sobre
+    tabelas fica ordenado depois da leitura, como antes do planejamento.
+- `_plan_progress` e `_thread_status` vão para `pipeline/progress.py`.
+
 ## 0.3.12 — o enriquecimento de tabelas é uma ação planejada (#640, M2)
 
 Os dois passos de tabela que rodavam antes do planejamento passam para dentro

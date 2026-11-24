@@ -526,7 +526,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
 
     async def run_plan(*_args, executor, **_kwargs):
         received.append(executor)
-        return manifest, SimpleNamespace(replan_required=False, status="completed")
+        return manifest, SimpleNamespace(replan_required=False, status="completed", steps=[])
 
     async def no_save(*_args, **_kwargs):
         return None
@@ -537,7 +537,7 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
 
     await orchestrator._replan_until_done(
         manifest,
-        SimpleNamespace(replan_required=True, status="replan-required"),
+        SimpleNamespace(replan_required=True, status="replan-required", steps=[SimpleNamespace(status="failed")]),
         "first-plan",
         None,
         [],

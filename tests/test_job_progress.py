@@ -204,7 +204,7 @@ async def test_a_broken_label_translation_does_not_fail_the_step(monkeypatch):
 
     # A catalog entry with a placeholder the code does not pass.
     monkeypatch.setattr(
-        "acessilia_core.pipeline.orchestrator.t", lambda msgid: "{missing} {current}"
+        "acessilia_core.pipeline.progress.t", lambda msgid: "{missing} {current}"
     )
     report = _plan_progress(manifest, status_callback, asyncio.get_running_loop())
     step = PlanStep(

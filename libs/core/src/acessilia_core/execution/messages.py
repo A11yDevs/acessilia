@@ -50,6 +50,21 @@ EXE_PLAN_UNKNOWN_OBLIGATIONS: str = (
 EXE_START_JOB_INVALID_STATE: str = "start-job invalid in state {status}"
 #: Raised when an execute-obligation step names an obligation absent from the manifest.
 EXE_OBLIGATION_NOT_FOUND: str = "Non-existent obligation: {obligation_id}"
+#: A plan step skipped because an earlier step of this execution removed or
+#: replaced its obligation (a reclassification reconciled it, #832).
+EXE_OBLIGATION_REMOVED: str = (
+    "Skipped: obligation {obligation_id} was removed or replaced during this execution"
+)
+#: A plan step skipped because its obligation now waits for obligations an
+#: earlier step of this execution discovered; the replan orders them (#832).
+EXE_OBLIGATION_WAITS_FOR_DISCOVERED: str = (
+    "Skipped: obligation {obligation_id} now depends on {waiting}, found during this execution"
+)
+#: complete-job skipped because obligations found during this execution are
+#: still open; the replan takes them as roots (#594, #832).
+EXE_DISCOVERED_OBLIGATIONS_OPEN: str = (
+    "Skipped: obligations found during this execution are still open: {open}"
+)
 #: Status message recorded on a dry-run step; nothing is persisted.
 EXE_DRY_RUN_SIMULATED: str = (
     "Simulated execution; no effect was persisted"
