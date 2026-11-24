@@ -35,7 +35,8 @@ before each replan (#832):
   exhausted one would block its dependents from being replanned at all.
 
   It is a rule on targets, not a list of kinds: besides the element's own
-  obligations (``linearize-table``, ``describe-image``), it orders the page
+  obligations (``linearize-table``, ``describe-image``, ``verbalize-formula``
+  and ``normalize-formula``), it orders the page
   obligations (``refine-reading-order``, ``fuse-providers``,
   ``adjudicate-page``) of a page with such an element, whose targets are the
   page's elements. That is the order of the releases where the step ran
@@ -50,6 +51,13 @@ before each replan (#832):
   for a future step, the rule follows ``DOCUMENT_STEPS``: a step's
   obligation may depend on an earlier step's that shares an element, never
   on a later one's, so the rule can never make a cycle between them.
+
+  So the order between the steps is not a dependency: the planner breaks
+  the tie (their costs are equal), and ``DOCUMENT_STEPS`` is the order of the
+  reconciliation, not of the plan. The steps share the run's vision
+  breaker, so under a partial provider outage the step the plan runs first
+  spends the breaker's budget first; that is an operational effect, not a
+  data dependency, and no edge forces the order before planning (#853).
 
 The step that removes an element must also remove or retarget that element's
 own obligations and the page's ``element_ids``; the manifest refuses dangling

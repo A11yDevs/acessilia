@@ -415,8 +415,10 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions",
-        "_mark_inline_math"):
+    for name in (
+        "_classify_formula_regions",
+        "_mark_inline_math",
+    ):
         monkeypatch.setattr(pddl, name, no_enrichment)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_enrichment)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
@@ -456,8 +458,10 @@ def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions",
-        "_mark_inline_math"):
+    for name in (
+        "_classify_formula_regions",
+        "_mark_inline_math",
+    ):
         monkeypatch.setattr(pddl, name, no_enrichment)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_enrichment)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)

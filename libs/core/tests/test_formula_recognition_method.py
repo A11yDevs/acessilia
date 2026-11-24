@@ -223,6 +223,148 @@ def test_a_formula_the_fallback_reads_as_a_picture_replaces_its_obligations(monk
     assert _by_id(updated, "f-1").type == "picture"
 
 
+def test_a_formula_selected_for_its_label_is_not_recognized_again(monkeypatch) -> None:
+    """#851 review, item 2: the selection and the execution share one policy.
+    A formula with a recognition record is a target only for its equation
+    label: the label is separated, and the recognizer is not called again
+    nor the record overwritten."""
+    calls = _recognizer(monkeypatch)
+    manifest = _formulas_manifest(("f-1", "s ( t ) = t (2)"))
+    record = {"method": "text-layer", "rejected": {"math.recognize": 0.1}}
+    _by_id(manifest, "f-1").metadata["formula_recognition"] = dict(record)
+    enrichment = reconcile_document_step(manifest, FORMULA_RECOGNITION)
+    handler = build_method_registry().get("formula-recognizer")
+
+    result = handler(manifest, enrichment.id, config=CONFIG, ports=RunPorts.none())
+
+    assert enrichment.target_ids == ["f-1"]
+    assert calls == []
+    formula = _by_id(manifest, "f-1")
+    assert formula.metadata["formula_recognition"] == record
+    assert formula.metadata["equation_number"] == "2"
+    assert result.message == n(*MSG_FORMULAS_RECOGNIZED, 1).format(
+        count=1, recognized=0, methods="-", numbered=1, pictures=0, left="-"
+    )
+
+
+def test_the_step_announces_itself_once(monkeypatch) -> None:
+    """#851 review, item 1: the method and the stage both sent
+    ``STAGE_ENRICHING_FORMULAS``. The method announces the step; each formula
+    then reports its own progress."""
+    from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_FORMULAS
+
+    _recognizer(monkeypatch)
+    ports = RunPorts.none()
+    messages: list[str] = []
+    ports.services.progress = messages.append
+
+    _in_executor(_formulas_manifest(("f-1", "")), ports=ports)
+
+    assert messages.count(t(STAGE_ENRICHING_FORMULAS)) == 1
+    assert len(messages) == 2  # the step, then its one formula
+
+
+@pytest.mark.parametrize(("page", "reason"), [(1, "crop_unavailable"), (0, "no_page")])
+def test_a_formula_without_a_crop_says_why(monkeypatch, page, reason) -> None:
+    """#851 review, item 3.4: a formula whose crop could not be made records
+    the reason, as a picture does, instead of being reported unchanged."""
+    calls = _recognizer(monkeypatch)
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *_a, **_k: (None, page))
+
+    updated, report = _in_executor(_formulas_manifest(("f-1", "")))
+
+    assert calls == []
+    assert _by_id(updated, "f-1").metadata["formula_recognition_failure"] == reason
+    assert _step(report, "obligation-recognize-formulas").message == n(*MSG_FORMULAS_RECOGNIZED, 1).format(
+        count=1, recognized=0, methods="-", numbered=0, pictures=0, left=f"{reason}: 1"
+    )
+
+
+def test_a_formula_left_without_latex_is_not_taken_as_readable(monkeypatch) -> None:
+    """#851 review, item 3.1: the collective attempt succeeds, but a formula
+    it could not read keeps no readable content, so its ``verbalize-formula``
+    stays critical: the step's success never makes it accessible."""
+    from acessilia_core.pipeline.obligations import _formula_has_readable_content
+
+    _recognizer(monkeypatch, latex=None)
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return None
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+
+    updated, report = _in_executor(_formulas_manifest(("f-1", "")))
+
+    assert _step(report, "obligation-recognize-formulas").status == "succeeded"
+    formula = _by_id(updated, "f-1")
+    assert formula.text == "" and formula.metadata["formula_recognition_failure"] == "model_failed"
+    assert not _formula_has_readable_content(_by_id(updated, "verbalize-f-1"), updated)
+
+
+def test_each_obligation_probes_math_recognize_once(monkeypatch) -> None:
+    """#851 review, item 3.3: the outage is paid once per obligation (one
+    batch), not once per formula; a second obligation probes again."""
+    from acessilia_core.toolbox.toolbox_math_tools import MathCapabilityUnavailable
+    from acessilia_sdk.toolbox.errors import ToolboxError
+
+    calls: list[str] = []
+
+    def down(image, **_kwargs):
+        calls.append(image.decode())
+        raise MathCapabilityUnavailable("math.recognize", ToolboxError("down"))
+
+    install_formula_recognizer(monkeypatch, down)
+    monkeypatch.setattr(
+        formula_stage, "_formula_recognition_crop", lambda _source, element, **_kwargs: (element.id.encode(), 1)
+    )
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            return None
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+    manifest = _formulas_manifest(("f-1", ""), ("f-2", ""))
+    first = reconcile_document_step(manifest, FORMULA_RECOGNITION)
+    handler = build_method_registry().get("formula-recognizer")
+    handler(manifest, first.id, config=CONFIG, ports=RunPorts.none())
+    first.status = "satisfied"
+    manifest.elements.append(build_element("f-3", "formula", text=""))
+    manifest.obligations.append(_verbalize("f-3"))
+    manifest.summary.element_count = len(manifest.elements)
+    second = reconcile_document_step(manifest, FORMULA_RECOGNITION, replan=True)
+
+    handler(manifest, second.id, config=CONFIG, ports=RunPorts.none())
+
+    assert len(calls) == 2 and calls[-1] == "f-3"
+
+
+def test_the_pending_elements_of_the_document_steps_are_disjoint() -> None:
+    """The policy, on the steps' real selections (#851 review, item 3.9):
+    no element is pending for two document steps."""
+    manifest = build_manifest(
+        [
+            build_element("prose", "paragraph", text=_PROSE),
+            build_element("p-1", "picture", text=""),
+            build_element("f-1", "formula", text=""),
+            build_element("f-2", "formula", text=r"x \qquad (1)"),
+            build_element("t-1", "table", text="a b"),
+        ],
+        [],
+    )
+
+    pending = [set(step.pending(manifest)) for step in DOCUMENT_STEPS]
+
+    assert all(not (a & b) for i, a in enumerate(pending) for b in pending[i + 1:])
+    assert set().union(*pending) == {"p-1", "f-1", "f-2", "t-1"}
+
+
 def test_the_method_leaves_the_formulas_as_the_step_before_planning_did(monkeypatch) -> None:
     """The differential test of the migration (ADR-0028): the same answers
     give the same elements before planning, as until 0.3.14, and as the

@@ -534,6 +534,45 @@ def test_a_picture_read_as_a_formula_gets_the_formula_steps(monkeypatch, tmp_pat
     assert seen == [("E = mc^{2}", "3")]
 
 
+@pytest.mark.parametrize(
+    ("latex", "read_again"),
+    [("E = mc2", True), (r"E = mc^{2}", False)],
+    ids=["no-markup", "latex"],
+)
+def test_a_found_formula_is_read_only_when_its_text_has_no_latex(monkeypatch, tmp_path, latex, read_again) -> None:
+    """The scope of #846, as the review of #851 asked: a formula the
+    descriptions find gets what the step before planning gave it. Without
+    LaTeX markup, ``math.recognize`` reads it, before its verbalization; with
+    markup it is not read again (a second, independent reading is #852)."""
+    from pddl_support import install_formula_recognizer
+
+    from acessilia_core.execution.models import MethodResult
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
+
+    _answers(monkeypatch, {"p-1": _formula(latex)})
+    events: list[str] = []
+
+    def recognize(_image, **_kwargs):
+        events.append("math.recognize")
+        return [{"latex": latex}]
+
+    install_formula_recognizer(monkeypatch, recognize)
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *_a, **_k: (b"crop", 1))
+
+    def mathml(manifest, obligation_id):
+        formula = next(element for element in manifest.elements if element.id == "p-1")
+        events.append(f"mathml:{formula.metadata.get('formula_recognition', {}).get('method')}")
+        return MethodResult(success=True, validated=True)
+
+    payload = _run(
+        monkeypatch, _pictures_manifest("p-1"), tmp_path, register={"mathml": mathml}, recognize=True
+    )
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    expected = ["math.recognize", "mathml:math.recognize"] if read_again else ["mathml:None"]
+    assert events == expected
+
+
 # Resume across the migration.
 
 

@@ -34,6 +34,14 @@ formula left without keeps its text and its reason
 message reports what happened to each formula. The method fails when the
 step raises, and when none of its targets is in the manifest any more
 (``MSG_MATH_NO_FORMULA``).
+
+**Inside the step the strategy stays fixed:** ``math.recognize`` first, the
+vision model as the fallback, each reading gated by the text layer. The plan
+chooses, orders and accounts the step, not that strategy.
+
+**One probe per obligation.** ``math.recognize``'s outage is paid once per
+call of the method; a second obligation, for formulas found while the plan
+ran, probes again (``_MathRecognizer``).
 """
 
 from __future__ import annotations
@@ -91,13 +99,18 @@ def _snapshot(element: ManifestElement) -> tuple[Any, Any]:
 
 
 def _outcome(element: ManifestElement, before: tuple[Any, Any]) -> str:
-    """What the step left on a formula it worked on."""
-    if element.type != "formula":
+    """What the step left on a formula it worked on: ``picture`` (the
+    fallback read it as one), the recognition method of a new reading,
+    ``text-layer`` (no reading agreed with the text layer, so it kept it),
+    the failure reason, ``not_formula`` (another step's element now, not
+    tried) or ``unchanged`` (nothing to read: its label, at most, moved)."""
+    if element.type == "picture":
         return "picture"
+    if element.type != "formula":
+        return "not_formula"
     recognition = element.metadata.get("formula_recognition")
     if recognition != before[0] and isinstance(recognition, dict):
-        method = str(recognition.get("method"))
-        return method if method != "text-layer" else "text-layer"
+        return str(recognition.get("method"))
     failure = element.metadata.get("formula_recognition_failure")
     return str(failure) if failure else "unchanged"
 

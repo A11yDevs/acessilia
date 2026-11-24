@@ -13,8 +13,9 @@ rótulos de equação e depois lê o LaTeX das fórmulas sem ele, primeiro o
 o breaker e o cache de regiões da execução.
 - **Uma obrigação para o documento,** como as imagens (M1) e as tabelas
   (M2), e não uma por fórmula como proposto antes: o passo compartilha um
-  breaker, uma sondagem do `math.recognize` e seu paralelismo no documento
-  inteiro. Ela tem como alvo as fórmulas com um rótulo a separar e, numa
+  breaker, uma sondagem do `math.recognize` por obrigação (uma segunda, para
+  fórmulas encontradas durante o plano, sonda de novo) e seu paralelismo no
+  documento inteiro. Ela tem como alvo as fórmulas com um rótulo a separar e, numa
   fonte que pode ser renderizada, as sem LaTeX que nenhum reconhecimento
   registrou. `verbalize-formula` e `normalize-formula` dependem dela, assim
   como as obrigações de página de uma página com fórmula. É o terceiro
@@ -23,7 +24,16 @@ o breaker e o cache de regiões da execução.
   como fórmula ganha o passo no replanejamento, pela reconciliação, então o
   seu `verbalize-formula` vê o rótulo da equação separado, como antes do
   planejamento até a 0.3.13. O teste que fixava a lacuna foi invertido:
-  `test_a_picture_read_as_a_formula_gets_the_formula_steps`.
+  `test_a_picture_read_as_a_formula_gets_the_formula_steps`. O alcance é o
+  que o passo fazia: uma fórmula cujo texto do modelo não tem marcação
+  LaTeX é lida pelo `math.recognize` antes da verbalização; o LaTeX que o
+  modelo já deu não é lido de novo (uma segunda leitura independente é a
+  #852).
+- **Uma política para seleção e execução.** Os alvos da obrigação e o
+  trabalho do passo compartilham `formulas_needing_number_separation` e
+  `formulas_needing_recognition`, então uma fórmula selecionada só para
+  separar o rótulo não é lida de novo, nem tem o registro de reconhecimento
+  sobrescrito.
 - **Ele pode mudar obrigações.** Uma fórmula que a alternativa de visão lê
   como imagem vira imagem, então as suas obrigações de fórmula são trocadas
   por um `describe-image`; o executor as pula e replaneja (M0).
@@ -31,7 +41,15 @@ o breaker e o cache de regiões da execução.
   obrigação; uma que ficou sem LaTeX mantém o texto e o motivo
   (`formula_recognition_failure`). A mensagem conta as fórmulas reconhecidas
   por método, os rótulos separados, as lidas como imagem e o motivo de cada
-  uma que ficou como estava.
+  uma que ficou como estava. O passo se anuncia uma vez (o método; a etapa
+  não repete mais `STAGE_ENRICHING_FORMULAS`). Uma fórmula cujo recorte não
+  pôde ser feito agora registra o motivo (`crop_unavailable`, que os avisos
+  entregues contam como o de uma imagem e que tira a execução do cache, ou
+  `no_page`), em vez de ficar sem mudança em silêncio.
+- Os três passos do documento não compartilham elemento, então a ordem
+  deles é o desempate do planejador; numa indisponibilidade parcial do
+  provider, o que roda primeiro gasta primeiro o orçamento do breaker
+  compartilhado (#853).
 - `formula-recognizer` é `transitional` em `LOCAL_METHODS` (sua alternativa
   é o `VisionAgent` do core) e não declara requisito do Toolbox: o
   `math.recognize` degrada para a alternativa e o `pdf.render` por fórmula

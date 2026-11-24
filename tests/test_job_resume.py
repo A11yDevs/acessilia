@@ -216,9 +216,11 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
             raise RuntimeError("the process died during enrichment")
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in ("_classify_formula_regions",
+    for name in (
+        "_classify_formula_regions",
         "_mark_inline_math",
-        "_mark_inline_math_after_execution"):
+        "_mark_inline_math_after_execution",
+    ):
         monkeypatch.setattr(pddl, name, enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
@@ -264,9 +266,11 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in ("_classify_formula_regions",
+    for name in (
+        "_classify_formula_regions",
         "_mark_inline_math",
-        "_mark_inline_math_after_execution"):
+        "_mark_inline_math_after_execution",
+    ):
         monkeypatch.setattr(pddl, name, enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
@@ -549,9 +553,11 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in ("_classify_formula_regions",
+    for name in (
+        "_classify_formula_regions",
         "_mark_inline_math",
-        "_mark_inline_math_after_execution"):
+        "_mark_inline_math_after_execution",
+    ):
         monkeypatch.setattr(pddl, name, enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)

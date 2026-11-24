@@ -1,6 +1,6 @@
 """Enrichment stages of the PDDL pipeline: the work done before planning, and
-the stages the ``picture-description`` and ``table-enrichment`` methods run
-inside the plan (#640, M1 and M2).
+the stages the ``picture-description``, ``formula-recognizer`` and
+``table-enrichment`` methods run inside the plan (#640, M1, M3 and M2).
 
 ``common`` holds what the picture and table stages share; ``pictures``
 describes pictures with the vision model; ``tables`` reads tables with the data
