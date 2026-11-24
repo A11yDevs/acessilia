@@ -141,11 +141,15 @@ controlada.
   causada por ambiente não representado na lista de arquivos.
 - O experimento deve ser repetido quando os jobs de segurança/imagem mudarem; o
   caminho crítico pode voltar para os testes.
-- Em pull requests o scan da imagem agora é condicional a entradas da imagem
-  (`infra/**`, `pyproject.toml`, `uv.lock`, manifestos e locks das bibliotecas,
-  `.dockerignore`, `.python-version`, `.trivyignore`, workflow de segurança);
-  pushes, `workflow_dispatch` e o schedule semanal continuam escaneando
-  incondicionalmente. A auditoria de dependências permanece incondicional.
+- Em pull requests o scan da imagem roda apenas quando o PR envolve um branch
+  de release (`release/*` como base ou head); PRs comuns o pulam. Pushes,
+  `workflow_dispatch` e o schedule semanal continuam escaneando
+  incondicionalmente, e a auditoria de dependências permanece incondicional.
+  O filtro por caminhos e o detector `image-changes` foram removidos em um
+  follow-up: o detector causou o skip de `publish verified images` em
+  2026-11-23 porque o GitHub avalia o `needs` de um workflow reutilizável
+  pelos jobs internos. O scan ainda é pulado em PRs comuns, então nenhum job
+  de PR pode depender da chamada `security` sem um guard explícito de status.
 - `docs/testing.pt-br.md` ainda registra os valores da era #448 (1m59s /
   59s–1m26s). O job absorveu Ruff/Mypy em 2026-11-20 e a suíte cresceu; os
   números aqui são a amostra comparável de 2026-11-23, não uma contradição do

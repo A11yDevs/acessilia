@@ -43,40 +43,21 @@ jobs:
       - name: Audit known vulnerabilities
         run: uvx pip-audit --requirement requirements-audit.txt
 
-  image-changes:
-    name: Detect image changes
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      image: ${{ steps.filter.outputs.image }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Filter image paths
-        id: filter
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
-        with:
-          filters: |
-            image:
-              - 'infra/**'
-              - 'pyproject.toml'
-              - 'uv.lock'
-              - 'libs/**/pyproject.toml'
-              - 'libs/**/uv.lock'
-              - '.dockerignore'
-              - '.python-version'
-              - '.trivyignore'
-              - '.github/workflows/security.yml'
-
   container-scan:
     name: Container image scan
-    needs: image-changes
-    if: "!cancelled() && (github.event_name != 'pull_request' || needs.image-changes.outputs.image != 'false')"
+    # The scan is scoped to release pulls to keep ordinary PRs cheap. It still
+    # runs on pushes, workflow_dispatch and the weekly schedule. GitHub
+    # evaluates a caller's `needs` on a reusable workflow by the jobs inside
+    # it: a skipped scan makes the `security` call count as skipped, so a
+    # future job that needs `security` on an ordinary PR must tolerate that
+    # explicitly (the delivery caller is push-only).
+    if: >
+      !cancelled() &&
+      (
+        github.event_name != 'pull_request' ||
+        startsWith(github.base_ref, 'release/') ||
+        startsWith(github.head_ref, 'release/')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
