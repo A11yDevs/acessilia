@@ -252,6 +252,45 @@ desaparece. Cada wrapper agora tem uma instrução, então o piso de uma instru�
 do detector também se aplica; o checker compartilhado é a extração real, não o
 piso.
 
+## Décima sexta consolidação: os envelopes de ferramentas dos agentes
+
+Os envelopes de seleção de página nos agentes de adjudicação e de página e o
+método de junção final nos agentes de fusão e de página repetiam os mesmos
+corpos. `agents/_tool_mixins.py` agora concentra `select_page_tool`,
+`swap_low_agreement_tool` e `join_tail_tool`; cada método público mantém
+assinatura, docstring e registro Agno e delega ao helper. Os callables usam
+protocolos, então as assinaturas dos processos e do docstruct continuam
+verificadas.
+
+**Delta medido contra a base comum dos três PRs paralelos:** 6 grupos / 13
+funções / 201 linhas → **3 grupos / 7 funções / 63 linhas**. Os três grupos de
+agentes desaparecem.
+
+## Décima sétima consolidação: a exigência de configuração
+
+Os helpers do agente e do exportador repetiam a mesma checagem de configuração
+ausente. `config_helpers._require_config` agora a centraliza; `_tool_config`,
+`_export_config`, `_toolbox_config` e o guard de `fuse_providers` mantêm tipo
+de exceção e mensagem.
+
+**Delta medido contra a base comum dos três PRs paralelos:** 6 grupos / 13
+funções / 201 linhas → **5 grupos / 10 funções / 184 linhas**. O grupo de
+helpers de config desaparece.
+
+## Décima oitava consolidação: o envelope de seleção de tabela
+
+`TableSpecialistAgent.select_table` e `select_greedy` repetiam o mesmo
+empacotamento de decisão/estatísticas. Os dois agora delegam a `_select_tool`;
+assinaturas, docstrings, registro de ferramentas e a conversão de `Counter`
+para `dict` não mudam.
+
+**Delta medido contra a base comum dos três PRs paralelos:** 6 grupos / 13
+funções / 201 linhas → **5 grupos / 11 funções / 161 linhas**. O grupo de
+seleção de tabela desaparece.
+
+Juntos, os três PRs paralelos deixam **1 grupo / 2 funções / 6 linhas**: o par
+trivial de construtores, reclassificado abaixo como sem ação.
+
 ## Classificação dos grupos restantes
 
 Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
@@ -261,21 +300,21 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 0 | Handlers do Telegram `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` (5/39) | **Consolidado:** `_set_mode` compartilhado; textos e aliases não mudam. |
 | 1 | Leitores de dataset gerados do SDK (5/15) | **Consolidado:** o gerador emite `_read` compartilhado; leitores mantêm suas regras. |
 | 2 | Escritores de schema do core `write_*_schema` (4/33) | **Consolidado:** `schema_files.write_schema` compartilhado, com testes de writer/schema. |
-| 3 | Helpers de config do core `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | Adiar: os dataclasses de configuração ao redor diferem. |
+| 3 | Helpers de config do core `_tool_config`, `_export_config`, `_toolbox_config` (3/17) | **Consolidado:** `_require_config` compartilhado; tipo de exceção e mensagem preservados. |
 | 4 | Leitores de resultado do SDK em adjudicate/pdf/pdf_validate (3/48) | **Reclassificado:** falso positivo; o leitor compartilhado já faz a validação. |
 | 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | **Reclassificado:** falso positivo; o inlining é estilo, não extração. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidado neste PR.** |
-| 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | Trivial; sem ação. |
+| 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | **Reclassificado:** atribuições de campos independentes; sem comportamento compartilhado. Aceito como único grupo restante. |
 | 8 | `_is_process_running` do frontend (2/26) | **Consolidado:** um runtime atrás dos dois entry points, com testes da sondagem de PID. |
 | 9 | `acquire_lock` do frontend (2/36) | **Consolidado:** o console script compartilha `frontend.run` e o lock dele. |
 | 10 | `startup` do frontend (2/107) | **Consolidado:** a caracterização cobre composição das interfaces e shutdown. |
 | 11 | `ApiClient._admin_headers` / `_operations_headers` (2/10) | **Consolidado:** `_auth_headers` compartilhado. |
 | 12 | Telegram `cmd_ativar` / `cmd_desativar` (2/20) | **Consolidado:** `_set_pause` compartilhado; textos não mudam. |
-| 13 | `select_page` em adjudication/page-level (2/56) | Sensível a comportamento: caracterizar a política de seleção primeiro. |
-| 14 | `swap_low_agreement` (2/52) | Sensível a comportamento: caracterizar a política de troca primeiro. |
-| 15 | `process_join_tail` em fusion/page-level (2/30) | Avaliar junto com o follow-up dos agentes. |
+| 13 | `select_page` em adjudication/page-level (2/56) | **Consolidado:** `select_page_tool` compartilhado; registro de ferramentas e docstrings não mudam. |
+| 14 | `swap_low_agreement` (2/52) | **Consolidado:** `swap_low_agreement_tool` compartilhado. |
+| 15 | `process_join_tail` em fusion/page-level (2/30) | **Consolidado:** `join_tail_tool` compartilhado. |
 | 16 | Normalizadores de output schema (2/10) | **Consolidado:** `_blank_to_none` compartilhado. |
-| 17 | `select_greedy` / `select_table` do table specialist (2/40) | Sensível a comportamento: testes de seleção de tabela primeiro. |
+| 17 | `select_greedy` / `select_table` do table specialist (2/40) | **Consolidado:** `_select_tool` compartilhado; contrato de decisão/estatísticas não muda. |
 | 18 | `_sha256` do core em builder/domain bundle (2/12) | **Consolidado:** `hashing.file_sha256` compartilhado. |
 | 19 | Wrappers async de math (2/12) | **Consolidado:** ciclo de vida `_with_math_client` compartilhado. |
 | 20 | Pandoc `_contains_math` / `_count_math_nodes` (2/18) | **Consolidado:** caminhada `_math_nodes` compartilhada. |
@@ -288,18 +327,18 @@ as duas funções de depreciação `__getattr__` em `table_ast`/`validators` for
 consolidadas acima; elas eram acompanhadas separadamente das linhas do
 baseline.
 
-Os grupos restantes são menores ou sensíveis a comportamento. A seleção dos
-agentes e a seleção de tabelas precisa de caracterização antes da extração,
-enquanto os helpers de config continuam adiados pelos motivos da tabela. Cada
-consolidação deve manter seu próprio PR focado; os grupos restantes não foram
-alterados aqui.
+O único grupo detectado restante é o par trivial de construtores,
+reclassificado acima. Os grupos de agentes, config e tabela foram consolidados
+em três PRs paralelos; os grupos de planner e depreciação foram consolidados
+antes. O PR 5 pode decidir se o único grupo restante precisa de uma exceção de
+CI ou se o piso do detector já o torna não problemático.
 
 ## Reprodução
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
-python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_reference.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py
+python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_reference.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py libs/core/tests/test_adjudication_agent.py libs/core/tests/test_page_level_agent.py libs/core/tests/test_fusion_agent.py tests/test_core_config.py tests/test_docx_export.py tests/test_pdf_ua_export.py libs/core/tests/test_table_specialist_agent.py tests/test_architecture_layers.py
 ```
 
 O snapshot inicial legível por máquina permanece em [quality-baseline.json](quality-baseline.json). A classificação é intencionalmente sobre candidatos; o PR 5 decidirá quais medidas restantes viram guarda de CI.
