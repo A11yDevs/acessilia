@@ -11,6 +11,7 @@ from acessilia_core.config import (
     PathsConfig,
     ToolboxConfig,
 )
+from acessilia_core.config_helpers import _require_config
 from acessilia_core.manifest.builder import build_processing_manifest
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
@@ -103,8 +104,8 @@ class InformationalStructuralAgent:
 
 def _tool_config(config: CoreConfig | None, tool: str) -> CoreConfig:
     """The agent's ``CoreConfig``, which its Agno tool cannot run without."""
-    if config is None:
-        raise RuntimeError(
-            f"the {tool} tool needs the agent built with config= (ADR-0016, step 3)"
-        )
-    return config
+    return _require_config(
+        config,
+        f"the {tool} tool needs the agent built with config= (ADR-0016, step 3)",
+        RuntimeError,
+    )
