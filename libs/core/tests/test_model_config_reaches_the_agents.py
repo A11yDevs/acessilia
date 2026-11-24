@@ -29,7 +29,10 @@ from acessilia_core.pipeline.enrichment import (
     pictures as picture_stage,
     tables as table_stage,
 )
-from acessilia_core.pipeline.handlers import inspection as inspection_handlers
+from acessilia_core.pipeline.handlers import (
+    formula_recognition as formula_method,
+    inspection as inspection_handlers,
+)
 from acessilia_core.ports import RunPorts
 
 #: The run's model config: its own object, unlike one built from the settings.
@@ -157,8 +160,9 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
 
     stages = ("_classify_formula_regions", "_enrich_picture_descriptions",
               "_enrich_formula_latex", "_enrich_table_structures")
-    for name in ("_classify_formula_regions", "_enrich_formula_latex", "_mark_inline_math"):
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, record(name))
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", record("_enrich_formula_latex"))
     # The picture and table steps run inside the plan, as
     # ``picture-description`` (#640, M1) and ``table-enrichment`` (M2).
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", record("_enrich_picture_descriptions"))
@@ -167,7 +171,7 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
     manifest = build_manifest(
         [build_element("h", "heading", text="Title"), build_element("t", "table", text="a b"),
-         build_element("p", "picture", text="")], []
+         build_element("p", "picture", text=""), build_element("f", "formula", text="x plus y")], []
     )
     orchestrator = build_orchestrator(max_replans=1)
     run_config = replace(core_config(), models=MODELS)

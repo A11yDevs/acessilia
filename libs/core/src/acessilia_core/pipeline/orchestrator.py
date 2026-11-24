@@ -47,10 +47,7 @@ from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
 from acessilia_core.pipeline.document_obligations import reconcile_document_steps
 from acessilia_core.pipeline.enrichment.common import run_breaker
-from acessilia_core.pipeline.enrichment.formulas import (
-    _classify_formula_regions,
-    _enrich_formula_latex,
-)
+from acessilia_core.pipeline.enrichment.formulas import _classify_formula_regions
 from acessilia_core.pipeline.enrichment.inline_math import (
     _mark_inline_math,
     _mark_inline_math_after_execution,
@@ -489,9 +486,9 @@ class PddlAccessibilityOrchestrator:
             manifest, ctx.source_path, ctx.effective_mode, media_inspection,
             ctx.status_callback, ctx.config, ctx.ports, ctx.checkpoints,
         )
-        # The tables (#640, M2) and the pictures (M1) are enriched inside the
-        # plan. A checkpoint from before that already has them enriched, so it
-        # gets no obligation for them.
+        # The tables (#640, M2), the pictures (M1) and the formula LaTeX (M3)
+        # are enriched inside the plan. A checkpoint from before that already
+        # has them enriched, so it gets no obligation for them.
         reconcile_document_steps(manifest)
         await ctx.checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
         return manifest
@@ -634,12 +631,13 @@ class PddlAccessibilityOrchestrator:
         ports: RunPorts,
         checkpoints: RunCheckpoints,
     ) -> None:
-        """Classify formula regions, prepare the pictures, recognize inline math and formulas.
+        """Classify formula regions, prepare the pictures, mark inline math.
 
         The steps run in this order and share the run's provider breaker,
         region cache and text-span reader (``RunPorts``) with the methods that
         enrich inside the plan: ``picture-description`` describes the
-        pictures (#640, M1) and ``table-enrichment`` reads the tables (M2).
+        pictures (#640, M1), ``formula-recognizer`` reads the formulas' LaTeX
+        (M3) and ``table-enrichment`` reads the tables (M2).
         What derives from the media inspection stays here (``_prepare_pictures``).
         The manifest is checkpointed after each step (#407). Each step records
         per-object progress in the manifest and skips an object it already
@@ -664,13 +662,6 @@ class PddlAccessibilityOrchestrator:
         await checkpoints.save_manifest(manifest, enriching=True)
         text_spans = run_text_spans(ports, manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
-        await checkpoints.save_manifest(manifest, enriching=True)
-        await _enrich_formula_latex(
-            manifest, source_path, mode=effective_mode, document=config.document,
-            vision=config.vision, toolbox=config.toolbox, models=config.models,
-            region_cache=region_cache, status_callback=status_callback,
-            breaker=breaker, on_progress=progress,
-        )
         await checkpoints.save_manifest(manifest, enriching=True)
 
     def _replan_allowed(

@@ -35,6 +35,7 @@ from acessilia_core.pipeline.document_obligations import (
     reconcile_document_steps,
 )
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.handlers import formula_recognition as formula_method
 from acessilia_core.pipeline.handlers.messages import (
     MSG_PICTURES_DESCRIBED,
     MSG_VISION_NO_PICTURE,
@@ -374,9 +375,10 @@ def test_the_method_leaves_the_pictures_as_the_step_before_planning_did(monkeypa
 
     It compares the step, not the whole pipeline. The intended differences
     are listed in the 0.3.14 changelog: a formula or a table is never
-    described, a document whose pictures are all described does not move on
-    to its placeholder visuals, and a picture read as a formula misses the
-    formula LaTeX step until M3 (``test_a_picture_read_as_a_formula_misses_the_formula_steps_until_m3``)."""
+    described, and a document whose pictures are all described does not move
+    on to its placeholder visuals. A picture read as a formula gets the
+    formula LaTeX step on the replan since 0.3.15 (M3,
+    ``test_a_picture_read_as_a_formula_gets_the_formula_steps``)."""
     answers = {
         "p-1": _description("A bar chart of sales."),
         "p-2": _formula(r"\frac{a}{b}"),
@@ -470,33 +472,16 @@ def test_a_picture_read_as_a_formula_replaces_its_obligation(monkeypatch) -> Non
     assert "verbalize-formula" in kinds and "describe-image" not in kinds
 
 
-def test_a_picture_read_as_a_formula_misses_the_formula_steps_until_m3(monkeypatch) -> None:
-    """The known gap, pinned (#846): picture, then formula, keeps the model's
-    LaTeX but neither the recognition nor the separation of its equation
-    number, which the step before planning gave it until 0.3.13, because
-    the formula LaTeX step ran after it.
-
-    It pins today's behaviour instead of an ``xfail``, which the CI counts as
-    a skipped test and refuses. When M3 makes the recognition the formula's
-    own obligation, this test fails: invert it to require the equation
-    number, picture, then formula, then recognition and verbalization."""
-    _answers(monkeypatch, {"p-1": _formula(r"E = mc^{2} \qquad (3)")})
-
-    updated, _ = _in_executor(_pictures_manifest("p-1"))
-
-    formula = next(element for element in updated.elements if element.id == "p-1")
-    assert formula.type == "formula"
-    assert "equation_number" not in formula.metadata
-    assert formula.text.endswith("(3)")
-
-
-def _run(monkeypatch, manifest, tmp_path, *, register):
+def _run(monkeypatch, manifest, tmp_path, *, register, recognize=False):
+    """``recognize`` runs the real formula LaTeX step inside the plan."""
     async def nothing(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    for name in ("_classify_formula_regions", "_mark_inline_math", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, nothing)
+    if not recognize:
+        monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
     orchestrator = build_orchestrator(max_replans=1)
     for method, handler in register.items():
         orchestrator.executor.registry.register(method, handler)
@@ -523,6 +508,30 @@ def test_a_run_plans_the_formula_a_picture_became(monkeypatch, tmp_path) -> None
 
     assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
     assert len(verbalized) == 1
+
+
+def test_a_picture_read_as_a_formula_gets_the_formula_steps(monkeypatch, tmp_path) -> None:
+    """The gap of M1 closed (#846): picture, then formula, then the formula
+    LaTeX step, then the verbalization. The replan gives the formula a
+    ``recognize-formulas`` obligation its ``verbalize-formula`` waits for,
+    so the verbalization sees the equation number separated, as the step
+    before planning gave it until 0.3.14."""
+    from acessilia_core.execution.models import MethodResult
+
+    _answers(monkeypatch, {"p-1": _formula(r"E = mc^{2} \qquad (3)")})
+    seen: list[tuple[str, str | None]] = []
+
+    def mathml(manifest, obligation_id):
+        formula = next(element for element in manifest.elements if element.id == "p-1")
+        seen.append((formula.text, formula.metadata.get("equation_number")))
+        return MethodResult(success=True, validated=True)
+
+    payload = _run(
+        monkeypatch, _pictures_manifest("p-1"), tmp_path, register={"mathml": mathml}, recognize=True
+    )
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert seen == [("E = mc^{2}", "3")]
 
 
 # Resume across the migration.

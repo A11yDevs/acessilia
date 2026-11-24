@@ -72,7 +72,10 @@ class MemoryCheckpoints:
 def _stopped_before_execution(monkeypatch, counts):
     """An orchestrator whose stages are stubs and whose plan run stops the job."""
     from acessilia_core.pipeline import orchestrator as pddl
-    from acessilia_core.pipeline.handlers import pictures as picture_method
+    from acessilia_core.pipeline.handlers import (
+        formula_recognition as formula_method,
+        pictures as picture_method,
+    )
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -93,11 +96,9 @@ def _stopped_before_execution(monkeypatch, counts):
         return build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_classify_formula_regions", "_mark_inline_math",
-        "_enrich_formula_latex",
-    ):
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
     orchestrator = build_orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=extract)
@@ -290,7 +291,7 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
         return stage
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions",):
         monkeypatch.setattr(pddl, name, recording(name))
     monkeypatch.setattr(pddl, "_mark_inline_math", recording("_mark_inline_math"))
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
@@ -316,14 +317,13 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     expected = cache if enabled else None
     assert caches == {
         "_classify_formula_regions": expected,
-        "_enrich_formula_latex": expected,
         # The steps without a vision agent take no cache.
         "_mark_inline_math": ...,
     }
     [executor] = received
     # The picture descriptions run inside the plan (#640, M1): their method
     # takes the region cache from the ports, like the inspection handlers.
-    for method in ("pymupdf-region", "vision-page-inspection", "picture-description"):
+    for method in ("pymupdf-region", "vision-page-inspection", "picture-description", "formula-recognizer"):
         assert executor.registry.get(method).keywords["ports"] is ports
 
 
@@ -354,10 +354,11 @@ def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
 
 @pytest.mark.asyncio
 async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp_path) -> None:
-    """After each of the four enrichment steps before planning the manifest
+    """After each of the three enrichment steps before planning the manifest
     checkpoint is written again (#407), so a restart repeats at most the step
-    that ran. The table steps run inside the plan since #640 (M2), where the
-    execution checkpoint covers them."""
+    that ran. The picture descriptions (#640, M1), the formula LaTeX (M3) and
+    the table steps (M2) run inside the plan, where the execution checkpoint
+    covers them."""
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
     checkpoints = MemoryCheckpoints()
@@ -370,7 +371,7 @@ async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp
         )
 
     # One after the extraction, then one after each enrichment step.
-    assert checkpoints.saved.count("manifest") == 1 + 4
+    assert checkpoints.saved.count("manifest") == 1 + 3
 
 
 @pytest.mark.asyncio

@@ -18,7 +18,10 @@ from acessilia_core.execution.executor import (
 from acessilia_core.execution.models import ExecutionStepResult, MethodResult
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline import orchestrator as pddl
-from acessilia_core.pipeline.handlers import pictures as picture_method
+from acessilia_core.pipeline.handlers import (
+    formula_recognition as formula_method,
+    pictures as picture_method,
+)
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.ports import (
@@ -213,13 +216,11 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
             raise RuntimeError("the process died during enrichment")
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_classify_formula_regions",
+    for name in ("_classify_formula_regions",
         "_mark_inline_math",
-        "_enrich_formula_latex",
-        "_mark_inline_math_after_execution",
-    ):
+        "_mark_inline_math_after_execution"):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
 
     orchestrator = build_orchestrator()
@@ -241,11 +242,11 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("resume-task")
     )
 
-    # The tables (#640, M2) and the pictures (M1) are enriched inside the
-    # plan: the crashed run stopped at its first step, the resume ran the
-    # three steps before the plan, then the inline math pass over the
-    # executed manifest (#599).
-    assert counts == {"inspect": 1, "extract": 1, "enrich": 5}
+    # The tables (#640, M2), the pictures (M1) and the formula LaTeX (M3)
+    # are enriched inside the plan: the crashed run stopped at its first
+    # step, the resume ran the two steps before the plan it stubs, then the
+    # inline math pass over the executed manifest (#599).
+    assert counts == {"inspect": 1, "extract": 1, "enrich": 4}
     assert result["text"]
     assert job_checkpoint.load("resume-task", PHASE_PLAN) is not None
 
@@ -263,13 +264,11 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_classify_formula_regions",
+    for name in ("_classify_formula_regions",
         "_mark_inline_math",
-        "_enrich_formula_latex",
-        "_mark_inline_math_after_execution",
-    ):
+        "_mark_inline_math_after_execution"):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
 
     orchestrator = build_orchestrator()
@@ -550,13 +549,11 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_classify_formula_regions",
+    for name in ("_classify_formula_regions",
         "_mark_inline_math",
-        "_enrich_formula_latex",
-        "_mark_inline_math_after_execution",
-    ):
+        "_mark_inline_math_after_execution"):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
 
     orchestrator = build_orchestrator()

@@ -173,7 +173,7 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 1. P classifica regiões de fórmula;
 2. O prepara as figuras (a figura injetada e a posse);
 3. Q marca matemática inline na prosa;
-4. P reconhece fórmulas.
+4. P reconhece fórmulas (dentro do plano desde o core 0.3.15, abaixo).
 
 Desde o core 0.3.12 (#640, M2) os passos de tabela rodam dentro do plano, como
 o método `table-enrichment`, antes do `linearize-table` das tabelas:
@@ -182,6 +182,10 @@ o método `table-enrichment`, antes do `linearize-table` das tabelas:
 
 Desde o core 0.3.14 (#640, M1) O descreve as figuras dentro do plano, como o
 método `picture-description`, antes do `describe-image` das figuras.
+
+Desde o core 0.3.15 (#640, M3) P reconhece as fórmulas dentro do plano, como
+o método `formula-recognizer`, antes do `verbalize-formula` e do
+`normalize-formula` das fórmulas.
 
 Os outros handlers do plano (B, E–L) rodam na ordem do plano. As checagens de situação de T e o payload (V, W, X) vêm por último.
 

@@ -11,7 +11,10 @@ from pddl_support import build_element, build_manifest, build_orchestrator
 from acessilia_core.manifest.models import BoundingBox, PageDescriptor, Provenance
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
-from acessilia_core.pipeline.handlers import pictures as picture_method
+from acessilia_core.pipeline.handlers import (
+    formula_recognition as formula_method,
+    pictures as picture_method,
+)
 from acessilia_core.ports import RunPorts
 
 HEIGHT = 792.0
@@ -358,11 +361,9 @@ def test_the_pipeline_marks_a_block_the_plan_restored(monkeypatch, tmp_path):
 
     monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in (
-        "_classify_formula_regions",
-        "_enrich_formula_latex",
-    ):
+    for name in ("_classify_formula_regions",):
         monkeypatch.setattr(pddl, name, no_stage)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_stage)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_stage)
 
     planning = _manifest()

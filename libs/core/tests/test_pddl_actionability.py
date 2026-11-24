@@ -633,6 +633,12 @@ class TestEveryHandlerIsCallable:
             "describe-images",
             [_element("el-1", "picture", text="A chart", metadata={"vision_description_complete": True})],
         ),
+        # The document's formula LaTeX (#640, M3). A formula that already has
+        # LaTeX and no equation label is left as it is, without a call.
+        "formula-recognizer": (
+            "recognize-formulas",
+            [_element("el-1", "formula", text=r"\frac{a}{b}")],
+        ),
         "pandoc-code": (
             "preserve-code-semantics",
             [_element("el-1", "code", text="def  f( ):\n  return  1")],

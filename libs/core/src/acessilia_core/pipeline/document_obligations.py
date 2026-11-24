@@ -6,10 +6,12 @@ it works on, instead of one per element: a per-element method would wait the
 retry pass once per failing element, and the elements after the breaker
 opened would lose the recovery (``docs/architecture/workflow-actions.md``).
 
-Two steps are planned this way:
+Three steps are planned this way:
 - the table enrichment (``enrich-tables``, method ``table-enrichment``, M2);
 - the picture descriptions (``describe-images``, method
-  ``picture-description``, M1).
+  ``picture-description``, M1);
+- the formula LaTeX (``recognize-formulas``, method ``formula-recognizer``,
+  M3).
 
 Each one is a :class:`DocumentStep`, and :func:`reconcile_document_step`
 creates its obligation when the manifest is enriched and reconciles it again
@@ -43,7 +45,8 @@ before each replan (#832):
 
   Between the document's steps, the policy is explicit (#845 review): the
   steps do not share elements (the descriptions never take a table or a
-  formula, ``is_describable``), so neither depends on the other. As a guard
+  formula, ``is_describable``; the formula LaTeX takes only formulas, the
+  table step only tables), so none depends on another. As a guard
   for a future step, the rule follows ``DOCUMENT_STEPS``: a step's
   obligation may depend on an earlier step's that shares an element, never
   on a later one's, so the rule can never make a cycle between them.
@@ -60,6 +63,7 @@ from dataclasses import dataclass
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
+    MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
 )
@@ -69,6 +73,7 @@ from acessilia_core.manifest.models import (
     Obligation,
     ProcessingManifest,
 )
+from acessilia_core.pipeline.enrichment.formulas import formulas_to_recognize
 from acessilia_core.pipeline.enrichment.pictures import (
     description_candidates,
     is_describable,
@@ -136,8 +141,29 @@ PICTURE_DESCRIPTION = DocumentStep(
     pending=_pictures_pending,
 )
 
-#: In the order the enrichment before planning ran them until 0.3.13.
-DOCUMENT_STEPS: tuple[DocumentStep, ...] = (PICTURE_DESCRIPTION, TABLE_ENRICHMENT)
+#: The document's formula LaTeX (M3, #846): the formulas with an equation
+#: label to separate or, in a source that can be rendered, without LaTeX and
+#: not recognized yet. A formula the descriptions find while the plan runs
+#: gets one on the replan, so its ``verbalize-formula`` and
+#: ``normalize-formula`` wait for its recognition, as before planning until
+#: 0.3.14. A formula the recognition reads as a picture becomes one, which the
+#: step no longer applies to.
+FORMULA_RECOGNITION = DocumentStep(
+    kind="recognize-formulas",
+    method="formula-recognizer",
+    obligation_id="obligation-recognize-formulas",
+    rationale=MSG_OBLIGATION_FORMULA_RECOGNITION,
+    applies=lambda element: element.type == "formula",
+    pending=formulas_to_recognize,
+)
+
+#: In the order the enrichment before planning ran them: the descriptions,
+#: which can find formulas, then the formula LaTeX, then the tables.
+DOCUMENT_STEPS: tuple[DocumentStep, ...] = (
+    PICTURE_DESCRIPTION,
+    FORMULA_RECOGNITION,
+    TABLE_ENRICHMENT,
+)
 
 
 def reconcile_document_step(
@@ -273,6 +299,7 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
 __all__ = [
     "CLOSED_STATUSES",
     "DOCUMENT_STEPS",
+    "FORMULA_RECOGNITION",
     "PICTURE_DESCRIPTION",
     "TABLE_ENRICHMENT",
     "DocumentStep",

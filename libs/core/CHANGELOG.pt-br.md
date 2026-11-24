@@ -2,6 +2,48 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.15 — o LaTeX das fórmulas é uma ação planejada (#640, M3, #846)
+
+Até a 0.3.14 o orquestrador lia o LaTeX das fórmulas antes do planejamento.
+Agora um documento com fórmulas a reconhecer, ou rótulos de equação a
+separar, ganha uma obrigação `recognize-formulas`, satisfeita pelo método
+`formula-recognizer`, que roda o mesmo passo dentro do plano: separa os
+rótulos de equação e depois lê o LaTeX das fórmulas sem ele, primeiro o
+`math.recognize` e o modelo de visão como alternativa, com seu paralelismo,
+o breaker e o cache de regiões da execução.
+- **Uma obrigação para o documento,** como as imagens (M1) e as tabelas
+  (M2), e não uma por fórmula como proposto antes: o passo compartilha um
+  breaker, uma sondagem do `math.recognize` e seu paralelismo no documento
+  inteiro. Ela tem como alvo as fórmulas com um rótulo a separar e, numa
+  fonte que pode ser renderizada, as sem LaTeX que nenhum reconhecimento
+  registrou. `verbalize-formula` e `normalize-formula` dependem dela, assim
+  como as obrigações de página de uma página com fórmula. É o terceiro
+  `DocumentStep`, e não compartilha elemento com os outros dois.
+- **A lacuna do M1 está fechada (#846).** Uma imagem que as descrições leem
+  como fórmula ganha o passo no replanejamento, pela reconciliação, então o
+  seu `verbalize-formula` vê o rótulo da equação separado, como antes do
+  planejamento até a 0.3.13. O teste que fixava a lacuna foi invertido:
+  `test_a_picture_read_as_a_formula_gets_the_formula_steps`.
+- **Ele pode mudar obrigações.** Uma fórmula que a alternativa de visão lê
+  como imagem vira imagem, então as suas obrigações de fórmula são trocadas
+  por um `describe-image`; o executor as pula e replaneja (M0).
+- O método tem sucesso quando o passo rodou para todas as fórmulas da
+  obrigação; uma que ficou sem LaTeX mantém o texto e o motivo
+  (`formula_recognition_failure`). A mensagem conta as fórmulas reconhecidas
+  por método, os rótulos separados, as lidas como imagem e o motivo de cada
+  uma que ficou como estava.
+- `formula-recognizer` é `transitional` em `LOCAL_METHODS` (sua alternativa
+  é o `VisionAgent` do core) e não declara requisito do Toolbox: o
+  `math.recognize` degrada para a alternativa e o `pdf.render` por fórmula
+  (#848).
+- Antes do planejamento a execução agora classifica regiões de fórmula,
+  prepara as imagens e marca a matemática inline da prosa. Um checkpoint de
+  enriquecimento da 0.3.14 já leu suas fórmulas e não ganha obrigação.
+- Testes: a obrigação e seus alvos, a ordem no plano (também no Fast
+  Downward), a mensagem e o escopo do método, uma fórmula lida como imagem,
+  o fluxo de ponta a ponta imagem → fórmula → rótulo → verbalização e um
+  teste diferencial dos elementos antes e depois da migração.
+
 ## 0.3.14 — as descrições de imagens são uma ação planejada (#640, M1)
 
 Até a 0.3.13 o orquestrador descrevia as imagens antes do planejamento.

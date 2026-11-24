@@ -34,6 +34,9 @@ from acessilia_core.pipeline.handlers.formula import (
     _handle_latex_verbalizer_method,
     _handle_mathml_method,
 )
+from acessilia_core.pipeline.handlers.formula_recognition import (
+    _handle_formula_recognizer_method,
+)
 from acessilia_core.pipeline.handlers.fusion import (
     _handle_agreement_rule_method,
     _handle_dual_provider_fusion_method,
@@ -80,6 +83,8 @@ METHOD_HANDLERS: dict[str, Callable[..., MethodResult]] = {
     "table-enrichment": _handle_table_enrichment_method,
     # The document's picture descriptions, a planned action since #640 (M1).
     "picture-description": _handle_picture_description_method,
+    # The document's formula LaTeX, a planned action since #640 (M3).
+    "formula-recognizer": _handle_formula_recognizer_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
     "pymupdf-region": _handle_pymupdf_region_method,

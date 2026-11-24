@@ -120,6 +120,9 @@ DEFAULT_METHOD_COSTS = {
     # The document's picture descriptions (#640, M1): before planning until
     # 0.3.13, now a planned action; its only alternative is human-review.
     "picture-description": 15,
+    # The document's formula LaTeX (#640, M3): before planning until 0.3.14,
+    # now a planned action; its only alternative is human-review.
+    "formula-recognizer": 15,
     # Consomem modelo: custo alto, só admissíveis com a política ativa.
     "vlm-pairwise-judge": 40,
     "table-specialist": 45,
