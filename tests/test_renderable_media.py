@@ -13,7 +13,7 @@ from pathlib import Path
 import fitz
 import pytest
 
-from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.pipeline.enrichment import formulas as formula_stage
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from tests.core_config_support import (
@@ -85,7 +85,7 @@ DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 async def test_the_formula_steps_skip_a_source_the_toolbox_cannot_render(monkeypatch, media_type) -> None:
     crops = _record_crops(monkeypatch)
     manifest = _formula_manifest(media_type)
-    breaker = pddl.ProviderBreaker(3)
+    breaker = ProviderBreaker(3)
 
     await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     await formula_stage._enrich_formula_latex(manifest, Path("source.x"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
@@ -101,6 +101,6 @@ async def test_the_formula_classification_asks_for_a_crop_of_a_renderable_source
     manifest = _formula_manifest(media_type)
 
     await formula_stage._classify_formula_regions(manifest, Path("source.x"), mode="medio",
-                                                  breaker=pddl.ProviderBreaker(3), vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
+                                                  breaker=ProviderBreaker(3), vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     assert len(crops) == 1

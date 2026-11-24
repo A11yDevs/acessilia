@@ -619,6 +619,13 @@ class TestEveryHandlerIsCallable:
             "linearize-table",
             [_element("el-1", "table", metadata={"table_ast": {"rows": []}})],
         ),
+        # The document's table enrichment (#640, M2). A table that already has
+        # a structure is not read again, and without boxes there is no text
+        # layer to read, so it succeeds without calling anything.
+        "table-enrichment": (
+            "enrich-tables",
+            [_element("el-1", "table", metadata={"table_ast": {"body": [{"cells": [{"text": "Value"}]}]}})],
+        ),
         "pandoc-code": (
             "preserve-code-semantics",
             [_element("el-1", "code", text="def  f( ):\n  return  1")],

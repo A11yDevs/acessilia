@@ -16,6 +16,7 @@ from core_config_support import model_config, toolbox_config, vision_config
 from pddl_support import build_element, build_manifest
 
 from acessilia_core.agents.output_schemas import DataOutput
+from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.manifest.models import PageDescriptor
 from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import tables as table_stage
@@ -167,7 +168,7 @@ def test_a_breaker_that_opens_between_readings_stops_the_rereads(run) -> None:
         "header": [{"cells": [{"text": text, "scope": "col"} for text in rows[0]]}],
         "body": [{"cells": [{"text": text} for text in rows[1]]}],
     }})
-    breaker = pddl.ProviderBreaker(1)
+    breaker = ProviderBreaker(1)
 
     _, calls = run([misread], {"all": [None]}, breaker=breaker)
 

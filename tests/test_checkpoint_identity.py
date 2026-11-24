@@ -72,7 +72,6 @@ def _counting_orchestrator(monkeypatch, counts):
     monkeypatch.setattr(pddl, "_classify_formula_regions", enrich)
     for name in (
         "_enrich_picture_descriptions", "_mark_inline_math", "_enrich_formula_latex",
-        "_enrich_table_structures", "_mark_table_inline_math",
     ):
         monkeypatch.setattr(pddl, name, noop)
     monkeypatch.setattr(pddl.toolbox_gate, "decide", decide)

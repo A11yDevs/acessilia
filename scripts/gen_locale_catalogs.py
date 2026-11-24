@@ -251,6 +251,7 @@ from acessilia_core.i18n.log_messages import (
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_TABLE_ENRICHMENT,
     MSG_OBLIGATION_UNKNOWN,
     MSG_OBLIGATION_UNSTRUCTURED_PAGE,
     MSG_OBSERVATION_PAGE_WITHOUT_STRUCTURE,
@@ -673,6 +674,7 @@ MESSAGES: tuple[str, ...] = (
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_TABLE_ENRICHMENT,
     MSG_OBLIGATION_FORMULA,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_UNKNOWN,
@@ -1102,6 +1104,10 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
         "Descrição validada para {count} imagem",
         "Descrições validadas para {count} imagens",
     ),
+    handler_messages.MSG_TABLES_ENRICHED: (
+        "Enriquecimento de tabelas rodou para {count} tabela: {read} lida de novo, {marked} trechos de matemática inline marcados",
+        "Enriquecimento de tabelas rodou para {count} tabelas: {read} lidas de novo, {marked} trechos de matemática inline marcados",
+    ),
     handler_messages.MSG_TABLE_VALIDATED: (
         "Estrutura tabular validada para {count} tabela",
         "Estruturas tabulares validadas para {count} tabelas",
@@ -1495,6 +1501,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         MSG_OBLIGATION_TABLE: (
             "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
+        ),
+        MSG_OBLIGATION_TABLE_ENRICHMENT: (
+            "As tabelas do documento devem ser lidas onde a estrutura falta ou está embaralhada, e ter a matemática inline marcada."
         ),
         MSG_OBLIGATION_FORMULA: (
             "A fórmula deve possuir representação matemática acessível e verbalização."

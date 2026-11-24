@@ -15,8 +15,8 @@ from core_config_support import model_config, toolbox_config, vision_config
 from pddl_support import build_element, build_manifest, build_obligation
 
 from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.manifest.models import PageDescriptor
-from acessilia_core.pipeline import orchestrator as pddl
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
 
 
@@ -173,7 +173,7 @@ async def test_failures_are_recorded_with_their_reason(fakes) -> None:
 @pytest.mark.asyncio
 async def test_an_open_breaker_skips_the_calls_and_the_retry_probes_once() -> None:
     manifest = _manifest([build_element("a", "picture"), build_element("b", "picture")])
-    breaker = pddl.ProviderBreaker(1)
+    breaker = ProviderBreaker(1)
     breaker.record(False)
 
     await _run(manifest, breaker=breaker)

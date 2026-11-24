@@ -24,6 +24,10 @@ MSG_VISION_VALIDATED = (
 
 MSG_TABLE_NO_TABLE = "No table found for the obligation"
 MSG_TABLE_NO_STRUCTURE = "Table without tabular structure: {ids}"
+MSG_TABLES_ENRICHED = (
+    "Table enrichment ran for {count} table: {read} read again, {marked} inline math runs marked",
+    "Table enrichment ran for {count} tables: {read} read again, {marked} inline math runs marked",
+)
 MSG_TABLE_VALIDATED = (
     "Table structure validated for {count} table",
     "Table structures validated for {count} tables",
@@ -186,6 +190,7 @@ MSG_JUDGE_CONFIRMS = "VLM judge confirms the applied page: {pages}"
 
 MSG_TABLES: tuple[tuple[str, str], ...] = (
     MSG_VISION_VALIDATED,
+    MSG_TABLES_ENRICHED,
     MSG_TABLE_VALIDATED,
     MSG_CODE_NORMALIZED,
     MSG_CODE_NORMALIZED_PARTIAL,

@@ -23,6 +23,7 @@ from acessilia_core.manifest.slides import is_slide_heading
 from acessilia_core.manifest.toolbox_extractor import ToolboxExtraction
 from acessilia_core.pipeline import preflight as pipeline_preflight
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
+from acessilia_core.pipeline.handlers import tables as _table_method
 from acessilia_core.ports import RunPorts
 from tests.core_config_support import (
     core_config,
@@ -421,7 +422,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     orchestrator.information_structural = SimpleNamespace(process=process)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
     monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
-    monkeypatch.setattr(pddl, "_enrich_table_structures", noop)
+    monkeypatch.setattr(_table_method, "_enrich_table_structures", noop)
 
     payload = await orchestrator.execute(source, tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
 

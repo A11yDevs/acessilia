@@ -321,6 +321,10 @@ MSG_TIMESTAMPS_MIXED_TIMEZONES: str = "Timestamps of an interval must all have a
 MSG_OBLIGATION_IMAGE: str = "The image must receive a description or be marked decorative."
 #: Manifest processing-needs rationale for table elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_TABLE: str = "The table must have verifiable headers and reading order."
+#: Manifest processing-needs rationale for the document's table enrichment (#640, M2): one obligation for every table of the document.
+MSG_OBLIGATION_TABLE_ENRICHMENT: str = (
+    "The document's tables must be read where their structure is missing or garbled, and their inline math marked."
+)
 #: Manifest processing-needs rationale for formula elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_FORMULA: str = (
     "The formula must carry an accessible mathematical representation plus verbalization."

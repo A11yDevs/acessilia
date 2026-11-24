@@ -2,6 +2,48 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.12 — the table enrichment is a planned action (#640, M2)
+
+The two table steps that ran before planning move into the plan
+(`docs/architecture/workflow-actions.md`):
+- reading the tables without a usable structure, or garbled ones, with the
+  `DataAgent`;
+- marking their cells' inline math from the text layer.
+
+A document with tables gets one `enrich-tables` obligation, which targets all
+its tables, satisfied by the `table-enrichment` method. That method runs both
+steps as before: one breaker, one retry pass and one text-span reader for the
+whole document. The tables' `linearize-table` and, in dual mode,
+`select-table-source` obligations depend on it, so the plan reads before it
+linearizes or chooses a source, as before. A per-table method was ruled out:
+it would wait the retry pass once per failing table and lose the recovery of
+the tables read after the breaker opened.
+
+- `RunPorts.services` (`RunServices`) holds what a run's stages and methods
+  share. `run_breaker` and `run_text_spans` give the steps before planning
+  and the method the same breaker and span reader.
+- `table-enrichment` is `transitional` in `LOCAL_METHODS`: the same
+  computation, moved. Its Toolbox calls are conditional, so they are not
+  requirements.
+- `_enrich_table_structures` returns how many tables it read.
+- A Fast Downward fixture case checks the new order under both planners.
+
+What changes, observably:
+- the "Enriching the tables with OCR" progress message is no longer sent; the
+  executor announces the `table-enrichment` step like any other;
+- for a document with tables, the plan has one more step, and its
+  `problem_sha256` and `plan_id` change;
+- the manifest checkpoint is saved after the four enrichment steps before
+  planning, not six. Inside the plan the execution checkpoint covers the step
+  as a whole, so a crash in the middle of it reads again the tables it had
+  already read in that attempt;
+- a job resumed from a 0.3.11 enrichment checkpoint already has its tables
+  enriched and gets no obligation; one resumed from an earlier phase gets it.
+
+The picture descriptions (M1) wait for an executor preparation (M0): a
+description can retype a picture as a formula, which removes an obligation
+while the plan runs.
+
 ## 0.3.11 — catalogue facts bound to the exact capability version
 
 The requirement facts name each capability at the exact contract version the

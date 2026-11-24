@@ -15,7 +15,8 @@ from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from acessilia_core.config import ToolboxConfig
+from acessilia_core.agents.provider_breaker import ProviderBreaker
+from acessilia_core.config import ToolboxConfig, VisionConfig
 from acessilia_core.i18n import n, t
 from acessilia_core.i18n.log_messages import (
     LOG_PDDL_ELEMENT_CROP_FAILED,
@@ -25,6 +26,7 @@ from acessilia_core.i18n.log_messages import (
 from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.pipeline.toolbox import _toolbox_render
+from acessilia_core.ports import RunPorts
 from docstruct.data_uri import decode_data_uri
 from docstruct.geometry.boxes import best_effort_clip
 
@@ -159,3 +161,14 @@ def _extract_picture_bytes(
             t(LOG_PDDL_ELEMENT_CROP_FAILED).format(element_id=element.id)
         )
         return None, page_number
+
+
+def run_breaker(ports: RunPorts, vision: VisionConfig) -> ProviderBreaker:
+    """The vision provider breaker of the run (``ports``).
+
+    One per run, shared by the enrichment before planning and the methods that
+    enrich inside the plan, so an outage counts for the whole document.
+    """
+    return ports.services.shared(
+        "provider-breaker", lambda: ProviderBreaker(vision.breaker_threshold)
+    )

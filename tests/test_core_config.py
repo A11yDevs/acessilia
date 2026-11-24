@@ -416,8 +416,6 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
         "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
-        "_enrich_table_structures",
-        "_mark_table_inline_math",
     ):
         monkeypatch.setattr(pddl, name, no_enrichment)
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
@@ -457,8 +455,6 @@ def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
         "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
-        "_enrich_table_structures",
-        "_mark_table_inline_math",
     ):
         monkeypatch.setattr(pddl, name, no_enrichment)
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])

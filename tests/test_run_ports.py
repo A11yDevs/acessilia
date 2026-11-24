@@ -94,7 +94,7 @@ def _stopped_before_execution(monkeypatch, counts):
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
     for name in (
         "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-        "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math",
+        "_enrich_formula_latex",
     ):
         monkeypatch.setattr(pddl, name, enrich)
     orchestrator = build_orchestrator()
@@ -290,8 +290,7 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, recording(name))
-    for name in ("_mark_inline_math", "_enrich_table_structures", "_mark_table_inline_math"):
-        monkeypatch.setattr(pddl, name, recording(name))
+    monkeypatch.setattr(pddl, "_mark_inline_math", recording("_mark_inline_math"))
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
     received = []
 
@@ -319,8 +318,6 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
         "_enrich_formula_latex": expected,
         # The steps without a vision agent take no cache.
         "_mark_inline_math": ...,
-        "_enrich_table_structures": ...,
-        "_mark_table_inline_math": ...,
     }
     [executor] = received
     for method in ("pymupdf-region", "vision-page-inspection"):
@@ -354,8 +351,10 @@ def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
 
 @pytest.mark.asyncio
 async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp_path) -> None:
-    """After each of the six enrichment steps the manifest checkpoint is
-    written again (#407), so a restart repeats at most the step that ran."""
+    """After each of the four enrichment steps before planning the manifest
+    checkpoint is written again (#407), so a restart repeats at most the step
+    that ran. The table steps run inside the plan since #640 (M2), where the
+    execution checkpoint covers them."""
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
     checkpoints = MemoryCheckpoints()
@@ -368,7 +367,7 @@ async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp
         )
 
     # One after the extraction, then one after each enrichment step.
-    assert checkpoints.saved.count("manifest") == 1 + 6
+    assert checkpoints.saved.count("manifest") == 1 + 4
 
 
 @pytest.mark.asyncio

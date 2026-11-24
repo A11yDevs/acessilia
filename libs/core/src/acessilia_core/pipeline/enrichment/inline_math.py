@@ -20,6 +20,7 @@ from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.elements import _OVERLAY_HOST_TOLERANCE, _bbox
 from acessilia_core.pipeline.toolbox import _source_artifact_id
+from acessilia_core.ports import RunPorts
 from docstruct.geometry.boxes import holds_point
 from docstruct.tables.ast import TABLE_SECTIONS
 from docstruct.text.inline_math import (
@@ -77,6 +78,16 @@ class _TextSpanReader:
                 self._failed = True
                 return None
         return self._pages
+
+
+def run_text_spans(
+    ports: RunPorts, manifest: ProcessingManifest, source_path: Path, toolbox: ToolboxConfig
+) -> _TextSpanReader:
+    """The text-span reader of the run (``ports``), so a page is fetched once
+    for the prose step before planning and the table step inside the plan."""
+    return ports.services.shared(
+        "text-spans", lambda: _TextSpanReader(manifest, source_path, toolbox)
+    )
 
 
 def _inline_math_enabled(manifest: ProcessingManifest, document: DocumentConfig) -> bool:
@@ -233,6 +244,9 @@ async def _mark_inline_math(
         return counts
     spans = await text_spans.pages(pages)
     if spans is None:
+        # The reader records it on the manifest it was built with; inside the
+        # plan the executor works on a copy, so record it here too.
+        manifest.extractor.configuration["inline_math_detection"] = "unavailable"
         return counts
 
     heights = {page.page_number: page.height for page in manifest.pages}
@@ -277,6 +291,9 @@ async def _mark_table_inline_math(
         return counts
     spans = await text_spans.pages(pages)
     if spans is None:
+        # The reader records it on the manifest it was built with; inside the
+        # plan the executor works on a copy, so record it here too.
+        manifest.extractor.configuration["inline_math_detection"] = "unavailable"
         return counts
 
     heights = {page.page_number: page.height for page in manifest.pages}

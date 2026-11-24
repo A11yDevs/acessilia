@@ -79,3 +79,26 @@ def test_fast_downward_plans_without_a_catalogue():
     assert report.outcomes["fast-downward"].status == "solved"
     assert report.comparison.verdict in {"identical", "equivalent"}
     assert _methods(plans["fast-downward"]) == ["m-b"]
+
+
+def test_fast_downward_orders_a_document_level_obligation_first():
+    """#640, M2: the document's ``enrich-tables`` precedes the tables' own
+    obligations, through ``depends-on``, under both planners."""
+    from pddl_support import build_element, build_manifest, build_obligation
+
+    from acessilia_core.pipeline.obligations import add_table_enrichment_obligation
+
+    linearize = build_obligation("linearize-table", ["t-1"], ["pandoc-table", "human-review"])
+    linearize.id = "o-linearize"
+    # The manifest's real costs: equal ones would let the planners break the
+    # tie differently, which is not what this case checks.
+    linearize.method_costs = {"pandoc-table": 15, "human-review": 100}
+    manifest = build_manifest([build_element("t-1", "table")], [linearize])
+    enrich = add_table_enrichment_obligation(manifest)
+
+    plans, report = _compare(manifest, None)
+
+    assert report.outcomes["fast-downward"].status == "solved"
+    assert report.comparison.verdict in {"identical", "equivalent"}
+    order = [step.obligation_id for step in plans["fast-downward"].steps if step.method]
+    assert order.index(enrich.id) < order.index("o-linearize")

@@ -191,13 +191,21 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     async def no_inspection(*_args, **_kwargs):
         return None
 
+    async def no_marks(*_args, **_kwargs):
+        return {"elements": 0, "marked": 0, "unmatched": 0}
+
     for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
-                 "_enrich_formula_latex", "_enrich_table_structures"):
+                 "_enrich_formula_latex", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, record(name))
-    for name in ("_mark_inline_math", "_mark_table_inline_math"):
-        monkeypatch.setattr(pddl, name, record(name))
+    # The table step runs inside the plan, as ``table-enrichment`` (#640, M2).
+    from acessilia_core.pipeline.handlers import tables as table_method
+
+    monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
+    monkeypatch.setattr(table_method, "_mark_table_inline_math", no_marks)
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
-    manifest = build_manifest([build_element("h", "heading", text="Title")], [])
+    manifest = build_manifest(
+        [build_element("h", "heading", text="Title"), build_element("t", "table", text="a b")], []
+    )
     orchestrator = build_orchestrator(max_replans=1)
     run_config = replace(core_config(), toolbox=RUN)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)

@@ -156,12 +156,14 @@ async def _enrich_table_structures(
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
-) -> None:
+) -> int:
+    """Read the tables without a usable structure, or garbled ones, from their
+    image; returns how many were enriched."""
     table_elements, garbled = _tables_to_read(
         manifest, visual_review=vision.table_visual_review
     )
     if not table_elements:
-        return
+        return 0
 
     breaker = breaker or ProviderBreaker(vision.breaker_threshold)
     reader = _TableReader(
@@ -193,6 +195,7 @@ async def _enrich_table_structures(
 
     if enriched:
         logger.info(t(LOG_PDDL_TABLES_ENRICHED).format(count=enriched))
+    return enriched
 
 
 def _tables_to_read(

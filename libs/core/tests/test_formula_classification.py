@@ -16,7 +16,7 @@ from pddl_support import (
 )
 
 from acessilia_core.agents.output_schemas import VisionOutput
-from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.agents.provider_breaker import ProviderBreaker
 from acessilia_core.pipeline.elements import _element_to_block
 from acessilia_core.pipeline.enrichment import (
     formulas as formula_stage,
@@ -56,7 +56,7 @@ async def test_drawing_is_reclassified_and_description_is_not_requested_twice(mo
     calls = install_vision(monkeypatch, VisionOutput(
         kind="description", description="A ring with labelled oxygen atoms.", language="en", confidence=0.9,
     ))
-    breaker = pddl.ProviderBreaker(3)
+    breaker = ProviderBreaker(3)
     await formula_stage._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
 
     def unexpected(*args, **kwargs):
@@ -87,7 +87,7 @@ async def test_mathematical_formula_still_uses_math_recognize(monkeypatch):
         return [{"latex": r"x=\frac{a}{b}", "confidence": 0.9}]
 
     install_formula_recognizer(monkeypatch, recognize)
-    breaker = pddl.ProviderBreaker(3)
+    breaker = ProviderBreaker(3)
     await formula_stage._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     assert manifest.elements[0].type == "formula"
@@ -108,7 +108,7 @@ async def test_unresolved_classification_keeps_source_and_requires_review(monkey
         pytest.fail("An unresolved region must not reach mathematical recognition")
 
     install_formula_recognizer(monkeypatch, unexpected)
-    breaker = pddl.ProviderBreaker(3)
+    breaker = ProviderBreaker(3)
     await formula_stage._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     await formula_stage._enrich_formula_latex(manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     assert manifest.elements[0].text == "original text"
@@ -127,7 +127,7 @@ async def test_existing_latex_does_not_pay_for_classification(monkeypatch):
     manifest = manifest_for(r"\frac{a}{b}")
     calls = install_vision(monkeypatch, None)
     await formula_stage._classify_formula_regions(
-        manifest, Path("source.pdf"), mode="medio", breaker=pddl.ProviderBreaker(3),
+        manifest, Path("source.pdf"), mode="medio", breaker=ProviderBreaker(3),
         vision=vision_config(),
         toolbox=toolbox_config(),
         models=model_config(), region_cache=None
@@ -143,7 +143,7 @@ async def test_a_classification_without_an_answer_keeps_the_formula_path(monkeyp
     instead of sending every formula of the document to human review."""
     manifest = manifest_for("original text")
     calls = install_vision(monkeypatch, None)
-    breaker = pddl.ProviderBreaker(1)
+    breaker = ProviderBreaker(1)
     if failure == "open_breaker":
         breaker.record(False)
     elif failure == "missing_crop":
@@ -173,7 +173,7 @@ async def test_a_classification_without_an_answer_keeps_the_formula_path(monkeyp
     monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *a, **k: (b"crop", 1))
     install_formula_recognizer(monkeypatch, recognize)
     await formula_stage._enrich_formula_latex(
-        manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=pddl.ProviderBreaker(3),
+        manifest, Path("source.pdf"), mode="medio", document=document_config(), breaker=ProviderBreaker(3),
         vision=vision_config(),
         toolbox=toolbox_config(),
         models=model_config(), region_cache=None
@@ -196,7 +196,7 @@ async def test_a_reclassified_drawing_leaves_no_formula_obligation_behind(monkey
     ))
 
     await formula_stage._classify_formula_regions(
-        manifest, Path("source.pdf"), mode="medio", breaker=pddl.ProviderBreaker(3),
+        manifest, Path("source.pdf"), mode="medio", breaker=ProviderBreaker(3),
         vision=vision_config(),
         toolbox=toolbox_config(),
         models=model_config(), region_cache=None
@@ -229,7 +229,7 @@ async def test_an_unresolved_region_drops_its_normalization(monkeypatch):
     ))
 
     await formula_stage._classify_formula_regions(
-        manifest, Path("source.pdf"), mode="medio", breaker=pddl.ProviderBreaker(3),
+        manifest, Path("source.pdf"), mode="medio", breaker=ProviderBreaker(3),
         vision=vision_config(),
         toolbox=toolbox_config(),
         models=model_config(), region_cache=None
@@ -246,7 +246,7 @@ async def test_the_recognition_fallback_records_its_own_reclassification(monkeyp
     install_vision(monkeypatch, VisionOutput(
         kind="formula", formula_latex="x", language="und", confidence=0.9,
     ))
-    breaker = pddl.ProviderBreaker(3)
+    breaker = ProviderBreaker(3)
     await formula_stage._classify_formula_regions(manifest, Path("source.pdf"), mode="medio", breaker=breaker, vision=vision_config(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
     assert manifest.elements[0].metadata["formula_classification"]["status"] == "math"
 

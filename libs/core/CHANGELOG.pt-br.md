@@ -2,6 +2,50 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.12 — o enriquecimento de tabelas é uma ação planejada (#640, M2)
+
+Os dois passos de tabela que rodavam antes do planejamento passam para dentro
+do plano (`docs/architecture/workflow-actions.pt-br.md`):
+- ler, com o `DataAgent`, as tabelas sem estrutura utilizável ou
+  embaralhadas;
+- marcar a matemática inline das células a partir da camada de texto.
+
+Um documento com tabelas ganha uma obrigação `enrich-tables`, que tem como
+alvo todas as suas tabelas e é satisfeita pelo método `table-enrichment`. Esse
+método roda os dois passos como antes: um breaker, uma passada de retry e um
+leitor de spans para o documento inteiro. As obrigações `linearize-table` das
+tabelas e, no modo dual, `select-table-source` dependem dela, então o plano lê
+antes de linearizar ou escolher a fonte, como antes. Um método por tabela foi
+descartado: ele esperaria a passada de retry uma vez por tabela que falhasse e
+perderia a recuperação das tabelas lidas depois da abertura do breaker.
+
+- `RunPorts.services` (`RunServices`) guarda o que os estágios e os métodos de
+  uma execução compartilham. `run_breaker` e `run_text_spans` dão aos passos
+  antes do planejamento e ao método o mesmo breaker e o mesmo leitor de spans.
+- `table-enrichment` é `transitional` em `LOCAL_METHODS`: a mesma computação,
+  mudada de lugar. Suas chamadas à Toolbox são condicionais, então não são
+  requisitos.
+- `_enrich_table_structures` devolve quantas tabelas leu.
+- Um caso de fixture do Fast Downward confere a nova ordem nos dois
+  planejadores.
+
+O que muda, de forma observável:
+- a mensagem de progresso "Enriquecendo as tabelas com OCR" não é mais
+  enviada; o executor anuncia o passo `table-enrichment` como qualquer outro;
+- num documento com tabelas, o plano tem um passo a mais, e seus
+  `problem_sha256` e `plan_id` mudam;
+- o checkpoint do manifesto é salvo depois dos quatro passos de enriquecimento
+  antes do planejamento, não seis. Dentro do plano, o checkpoint de execução
+  cobre o passo inteiro, então uma queda no meio dele lê de novo as tabelas que
+  já tinha lido naquela tentativa;
+- um job retomado de um checkpoint de enriquecimento da 0.3.11 já tem as
+  tabelas enriquecidas e não ganha a obrigação; um retomado de uma fase
+  anterior ganha.
+
+As descrições de imagens (M1) esperam uma preparação do executor (M0): uma
+descrição pode retipar uma imagem como fórmula, o que remove uma obrigação
+enquanto o plano roda.
+
 ## 0.3.11 — fatos de catálogo ligados à versão exata da capacidade
 
 Os fatos de requisito nomeiam cada capacidade na versão exata de contrato que o

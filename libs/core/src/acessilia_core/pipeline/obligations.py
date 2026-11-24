@@ -11,12 +11,14 @@ from typing import TYPE_CHECKING, Any
 
 from acessilia_core.execution.messages import EXE_COMPLETED_OBLIGATIONS_UNSATISFIED
 from acessilia_core.i18n import t
+from acessilia_core.i18n.log_messages import MSG_OBLIGATION_TABLE_ENRICHMENT
 from acessilia_core.i18n.stage_messages import (
     STAGE_PAGE,
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
     STAGE_PAGES,
 )
+from acessilia_core.manifest.builder import DEFAULT_METHOD_COSTS
 from acessilia_core.manifest.models import (
     ManifestElement,
     Obligation,
@@ -26,6 +28,56 @@ from docstruct.text.latex import bare_latex as normalize_latex
 
 if TYPE_CHECKING:
     pass
+
+
+#: The document's table enrichment as one planned action (#640, M2,
+#: ``docs/architecture/workflow-actions.md``). One obligation for every table,
+#: so its method keeps the step's document-wide behaviour: one breaker, one
+#: retry pass and one text-span reader for all the tables.
+TABLE_ENRICHMENT_KIND = "enrich-tables"
+TABLE_ENRICHMENT_METHOD = "table-enrichment"
+TABLE_ENRICHMENT_OBLIGATION_ID = "obligation-enrich-tables"
+#: The obligations about a table that must come after its enrichment: its
+#: linearization, and, in dual mode, the choice of its source, which compares
+#: the table as it was read.
+_AFTER_TABLE_ENRICHMENT = frozenset({"linearize-table", "select-table-source"})
+
+
+def add_table_enrichment_obligation(manifest: ProcessingManifest) -> Obligation | None:
+    """Add the ``enrich-tables`` obligation when the document has tables.
+
+    The obligations about those tables (``_AFTER_TABLE_ENRICHMENT``) depend
+    on it. Idempotent: a manifest that already has it is left as it is.
+    Returns the obligation, or ``None`` without tables.
+    """
+    existing = next(
+        (item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND), None
+    )
+    if existing is not None:
+        return existing
+    tables = [element.id for element in manifest.elements if element.type == "table"]
+    if not tables:
+        return None
+    methods = [TABLE_ENRICHMENT_METHOD, "human-review"]
+    obligation = Obligation(
+        id=TABLE_ENRICHMENT_OBLIGATION_ID,
+        kind=TABLE_ENRICHMENT_KIND,
+        target_ids=tables,
+        admissible_methods=methods,
+        method_costs={method: DEFAULT_METHOD_COSTS[method] for method in methods},
+        rationale=t(MSG_OBLIGATION_TABLE_ENRICHMENT),
+    )
+    manifest.obligations.append(obligation)
+    table_ids = set(tables)
+    for item in manifest.obligations:
+        if (
+            item.kind in _AFTER_TABLE_ENRICHMENT
+            and table_ids & set(item.target_ids)
+            and obligation.id not in item.dependencies
+        ):
+            item.dependencies.append(obligation.id)
+    manifest.summary.obligation_count = len(manifest.obligations)
+    return obligation
 
 
 def _formula_elements_for_obligation(

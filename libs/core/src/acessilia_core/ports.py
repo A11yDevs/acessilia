@@ -12,9 +12,9 @@ checkpoints and no registered operations.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from typing import Any, Literal, Protocol, TypeVar
 
 from acessilia_core.config import VisionConfig
 
@@ -106,6 +106,29 @@ class NoRegionCache:
         return None
 
 
+_Shared = TypeVar("_Shared")
+
+
+class RunServices:
+    """Objects one run shares between its stages and its plan's methods.
+
+    Infrastructure, not planning facts (ADR-0029): the vision provider breaker
+    and the text-span reader serve the enrichment before planning and the
+    methods that run it inside the plan (#640, M2), so a provider outage or a
+    page fetched once counts for the whole document. Each object is built the
+    first time it is asked for and lives as long as the run's ports.
+    """
+
+    def __init__(self) -> None:
+        self._items: dict[str, Any] = {}
+
+    def shared(self, key: str, build: Callable[[], _Shared]) -> _Shared:
+        """The run's object under ``key``, built by ``build`` the first time."""
+        if key not in self._items:
+            self._items[key] = build()
+        return self._items[key]
+
+
 @dataclass(frozen=True)
 class RunPorts:
     """The service state one run reaches, built by its caller for that job."""
@@ -116,6 +139,8 @@ class RunPorts:
     #: ``None`` outside a job: the remote calls are neither registered nor
     #: labelled with an operation id, as before ADR-0019.
     operations: RemoteOperations | None
+    #: What the run's stages and methods share; a new run gets its own.
+    services: RunServices = field(default_factory=RunServices)
 
     @classmethod
     def none(cls) -> RunPorts:
@@ -142,5 +167,6 @@ __all__ = [
     "RegionCache",
     "RemoteOperations",
     "RunPorts",
+    "RunServices",
     "region_cache_for",
 ]
