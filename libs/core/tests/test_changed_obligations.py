@@ -423,12 +423,12 @@ def test_replans_for_changed_obligations_are_bounded(monkeypatch, tmp_path) -> N
 
 def test_a_replan_that_makes_no_progress_is_not_repeated() -> None:
     orchestrator = build_orchestrator(max_replans=2)
-    open_now = frozenset({"o-x"})
+    state = "signature-of-a-state"
 
-    assert orchestrator._replan_allowed(False, 0, 0, open_now, None)
-    assert not orchestrator._replan_allowed(False, 0, 1, open_now, open_now)
-    assert orchestrator._replan_allowed(True, 1, 0, open_now, open_now)
-    assert not orchestrator._replan_allowed(True, 2, 0, open_now, None)
+    assert orchestrator._replan_allowed(False, 0, 0, state, None)
+    assert not orchestrator._replan_allowed(False, 0, 1, state, state)
+    assert orchestrator._replan_allowed(True, 1, 0, state, state)
+    assert not orchestrator._replan_allowed(True, 2, 0, state, None)
 
 
 # Document-level obligations reconciled (#832).
@@ -671,10 +671,31 @@ def test_the_discovery_count_survives_a_resume() -> None:
     config = core_config()
     checkpoints = RunCheckpoints(_Store(), config)
     availability = toolbox_gate.AvailabilityDecision.from_metadata({}, config.toolbox)
-    asyncio.run(checkpoints.save_plan(_plan(manifest), None, manifest, availability, [], 1, discoveries=2))
+    asyncio.run(checkpoints.save_plan(
+        _plan(manifest), None, manifest, availability, [], 1, discoveries=2, previous_signature="abc",
+    ))
     assert checkpoints.load(PHASE_PLAN)["discoveries"] == 2
 
     ctx = SimpleNamespace(checkpoints=checkpoints, config=config, status_callback=None)
     state = asyncio.run(build_orchestrator()._load_or_build_plan(ctx, manifest))
 
-    assert (state.replans, state.discoveries) == (1, 2)
+    assert (state.replans, state.discoveries, state.previous_signature) == (1, 2, "abc")
+
+
+def test_a_plan_checkpoint_of_0_3_12_resumes_without_a_signature() -> None:
+    """Backward compatible: a checkpoint written before the guard was saved
+    has neither ``discoveries`` nor ``previous_signature``."""
+    manifest = _manifest()
+    config = core_config()
+    store = _Store()
+    checkpoints = RunCheckpoints(store, config)
+    availability = toolbox_gate.AvailabilityDecision.from_metadata({}, config.toolbox)
+    asyncio.run(checkpoints.save_plan(_plan(manifest), None, manifest, availability, [], 1))
+    for payload in store.payloads.values():
+        payload.pop("discoveries", None)
+        payload.pop("previous_signature", None)
+
+    ctx = SimpleNamespace(checkpoints=checkpoints, config=config, status_callback=None)
+    state = asyncio.run(build_orchestrator()._load_or_build_plan(ctx, manifest))
+
+    assert (state.replans, state.discoveries, state.previous_signature) == (1, 0, None)

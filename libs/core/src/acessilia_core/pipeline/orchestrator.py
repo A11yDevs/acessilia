@@ -63,6 +63,7 @@ from acessilia_core.pipeline.obligations import (
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
     add_table_enrichment_obligation,
+    planning_signature,
 )
 from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from acessilia_core.pipeline.preflight import (
@@ -138,6 +139,8 @@ class _PlanningState:
     replans: int
     #: Replans after obligations changed, apart from ``replans`` (#832).
     discoveries: int = 0
+    #: The planning signature the last discovery replan started from (#832).
+    previous_signature: str | None = None
 
 
 class PddlAccessibilityOrchestrator:
@@ -393,6 +396,7 @@ class PddlAccessibilityOrchestrator:
             availability=planning.availability,
             replans=planning.replans,
             discoveries=planning.discoveries,
+            previous_signature=planning.previous_signature,
             executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
@@ -505,6 +509,7 @@ class PddlAccessibilityOrchestrator:
                 gated=list(plan_state.get("gated") or []),
                 replans=int(plan_state.get("replans") or 0),
                 discoveries=int(plan_state.get("discoveries") or 0),
+                previous_signature=plan_state.get("previous_signature"),
             )
         if ctx.status_callback:
             await ctx.status_callback(t(STAGE_GENERATING_PDDL_PLAN))
@@ -669,13 +674,20 @@ class PddlAccessibilityOrchestrator:
         failure: bool,
         replans: int,
         discoveries: int,
-        open_now: frozenset[str],
-        previous_open: frozenset[str] | None,
+        signature: str,
+        previous: str | None,
     ) -> bool:
-        """Whether one more replan is within its bound (#832)."""
+        """Whether one more replan is within its bound (#832).
+
+        A run with a failed step is a failure replan even if it also found
+        obligations: the failure budget is never bypassed through the
+        discovery one. With it spent, the loop stops, and a critical
+        obligation left open (found or failed) fails the job in
+        ``_check_unsatisfied``; nothing is delivered silently.
+        """
         if failure:
             return replans < self.max_replans
-        return discoveries < self.max_discovery_replans and open_now != previous_open
+        return discoveries < self.max_discovery_replans and signature != previous
 
     async def _replan_until_done(
         self,
@@ -692,6 +704,7 @@ class PddlAccessibilityOrchestrator:
         availability: Any,
         replans: int,
         discoveries: int = 0,
+        previous_signature: str | None = None,
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport, Any, Any]:
         """Plan and execute again while the report asks for it, within
@@ -707,19 +720,23 @@ class PddlAccessibilityOrchestrator:
         # loop the status was terminal in production: the pipeline returned a plan
         # it already knew was wrong, and `complete-job` never ran, so no document
         # was produced.
-        previous_open: frozenset[str] | None = None
         while execution_report.replan_required and not self.execute_dry_run:
             # A replan after a failed step recovers from it and counts toward
             # ``max_replans``. One after a run where nothing failed follows
             # obligations the run changed (found, removed, replaced: #594,
-            # #832): it has its own bound, and stops when the open
-            # obligations are the ones the previous one left, so it cannot
-            # cycle without progress.
+            # #832): it has its own bound, and stops when the planning state
+            # (`planning_signature`: targets, dependencies, statuses and tried
+            # methods, not only ids) is the one the previous discovery replan
+            # started from, so it cannot repeat a problem. The signature is
+            # saved with the plan, so a resume keeps the guard.
             failure = any(step.status == "failed" for step in execution_report.steps)
-            open_now = frozenset(_replannable_obligation_ids(manifest))
-            if not self._replan_allowed(failure, replans, discoveries, open_now, previous_open):
+            # Reconciled first, so the guard and the roots see the same state.
+            # A table the run added is enriched before its own obligations.
+            add_table_enrichment_obligation(manifest, replan=True)
+            signature = planning_signature(manifest)
+            if not self._replan_allowed(failure, replans, discoveries, signature, previous_signature):
                 break
-            previous_open = None if failure else open_now
+            previous_signature = None if failure else signature
             # Steps after a failure still run, so one execution can leave an
             # obligation exhausted (no method left) next to another that has an
             # alternative. The planner rejects exhausted obligations, so they are
@@ -730,8 +747,6 @@ class PddlAccessibilityOrchestrator:
             ]
             if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
-            # A table the run added is enriched before its own obligations (#832).
-            add_table_enrichment_obligation(manifest, replan=True)
             roots = _replannable_obligation_ids(manifest)
             if not roots:
                 break
@@ -757,7 +772,7 @@ class PddlAccessibilityOrchestrator:
             )
             await checkpoints.save_plan(
                 plan, comparison, planning_manifest, availability, gated, replans,
-                discoveries=discoveries,
+                discoveries=discoveries, previous_signature=previous_signature,
             )
             # The previous execution checkpoint belongs to the previous plan.
             checkpoints.remove(PHASE_EXECUTION)

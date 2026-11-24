@@ -17,6 +17,11 @@ rest, so M1 (the picture descriptions as a planned action) can follow:
   obligation was found or deferred by this execution
   (`EXE_DISCOVERED_OBLIGATIONS_OPEN`, which names them by kind). One the plan
   ran and left open is still a failure.
+- **Stale under the same id.** A step whose obligation changed under its id
+  (another kind, targets of other types, or the step's method no longer
+  admissible) is `skipped` too (`EXE_OBLIGATION_CHANGED`), and the replan
+  decides again. A retarget that keeps the types (a split or a join) is not
+  a change.
 - **A removal rewires.** A handler that removes an obligation must rewire
   its dependents to the replacement, as the reconciliation does; the
   manifest refuses a dangling dependency. The executor reports one left
@@ -30,23 +35,36 @@ rest, so M1 (the picture descriptions as a planned action) can follow:
   (negative values count as 0), set by the service from
   `PDDL_MAX_DISCOVERY_REPLANS` (default 3). A value other than the default
   enters the checkpoint and cache identities, so the default keeps those of
-  0.3.12. It stops when a replan would leave the same open obligations. The
-  count is saved with the plan checkpoint (`discoveries`) and restored on
-  resume.
+  0.3.12. It stops when a replan would start from the planning state the
+  previous one started from (`planning_signature`, taken after the
+  reconciliation: targets, dependencies, statuses and tried methods, not
+  only ids). The count and the signature are saved with the plan checkpoint
+  (`discoveries`, `previous_signature`) and restored on resume; a
+  checkpoint without them resumes as before.
+- **A failure takes precedence.** A run with a failed step and a discovery
+  is a failure replan, so the discovery budget never bypasses
+  `max_replans`. With it spent, a critical obligation left open fails the
+  job. Serving the discovery without retrying the failed work is #842.
 - **Document-level obligations reconciled.** `add_table_enrichment_obligation`
   also runs before each replan:
   - a new table joins the open enrichment, or gets a new one
     (`obligation-enrich-tables-2`) when the existing ones are closed:
     satisfied, or exhausted (`failed`), which is not planned again. Before a
     replan the new one is selected, so the replan schedules it;
-  - an open enrichment drops the tables the document lost, and one left
-    without tables is removed with the dependencies on it (`target_ids`
-    cannot be empty);
+  - an enrichment drops the tables the document lost, and one left without
+    tables is removed with the dependencies on it (`target_ids` cannot be
+    empty);
   - every open obligation whose targets include a table depends on that
-    table's open enrichment. That is a rule on targets instead of the list
-    of 0.3.12: besides `linearize-table` and `select-table-source`, it orders
-    the page obligations of a page with a table after the reading, as in
-    0.3.11, at the cost of serializing them behind it.
+    table's open enrichment, and an edge to an open enrichment it no longer
+    shares a table with is dropped. That is a rule on targets instead of
+    the list of 0.3.12: besides `linearize-table` and
+    `select-table-source`, it orders the page obligations of a page with a
+    table after the reading, as in 0.3.11, at the cost of serializing them
+    behind it.
+- **The table enrichment keeps to its targets.** `_tables_to_read`,
+  `_enrich_table_structures` and `_mark_table_inline_math` take `targets`,
+  so a second enrichment reads and marks only its own tables, and its
+  message counts only them.
 - `_plan_progress` and `_thread_status` move to `pipeline/progress.py`.
 
 ## 0.3.12 — the table enrichment is a planned action (#640, M2)

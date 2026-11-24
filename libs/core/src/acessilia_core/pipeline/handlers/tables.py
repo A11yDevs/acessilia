@@ -68,11 +68,20 @@ def _status(ports: RunPorts):
 
 
 async def _enrich_tables(
-    manifest: ProcessingManifest, source: Path, config: CoreConfig, ports: RunPorts
+    manifest: ProcessingManifest,
+    source: Path,
+    config: CoreConfig,
+    ports: RunPorts,
+    targets: frozenset[str],
 ) -> int:
     """Read, then mark: the order of the steps before planning, kept (step 6
     runs after step 5, which can replace a table's cells). Returns the runs of
-    inline math marked."""
+    inline math marked.
+
+    Both steps keep to ``targets``, the obligation's tables: a second
+    enrichment (``obligation-enrich-tables-2``, #832) reads and marks only its
+    new tables, never the ones an earlier enrichment owns. The breaker, the
+    span reader and the progress stay the run's."""
     status = _status(ports)
     if status is not None:
         await status(t(STAGE_ENRICHING_TABLES_OCR))
@@ -84,12 +93,14 @@ async def _enrich_tables(
         models=config.models,
         status_callback=status,
         breaker=run_breaker(ports, config.vision),
+        targets=targets,
     )
     marks = await _mark_table_inline_math(
         manifest,
         source,
         config.document,
         run_text_spans(ports, manifest, source, config.toolbox),
+        targets=targets,
     )
     return marks["marked"]
 
@@ -123,16 +134,18 @@ def _handle_table_enrichment_method(
 ) -> MethodResult:
     """Run the document's table enrichment; satisfied once both steps ran."""
     obligation = next((item for item in manifest.obligations if item.id == obligation_id), None)
-    targets = set(obligation.target_ids) if obligation is not None else set()
+    targets = frozenset(obligation.target_ids) if obligation is not None else frozenset()
     tables = [
         element for element in manifest.elements
         if element.id in targets and element.type == "table"
     ]
     if not tables:
         return MethodResult(success=False, validated=False, message=t(MSG_TABLE_NO_TABLE))
-    needing, _ = _tables_to_read(manifest, visual_review=config.vision.table_visual_review)
+    needing, _ = _tables_to_read(
+        manifest, visual_review=config.vision.table_visual_review, targets=targets
+    )
     needing_ids = [element.id for element in needing]
-    marked = run_sync(_enrich_tables(manifest, Path(manifest.source.path), config, ports))
+    marked = run_sync(_enrich_tables(manifest, Path(manifest.source.path), config, ports, targets))
     by_id = {element.id: element for element in manifest.elements}
     outcomes = Counter(_outcome(by_id[element_id]) for element_id in needing_ids)
     structured = outcomes.pop("read", 0) + outcomes.pop("from_text", 0)

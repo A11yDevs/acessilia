@@ -834,6 +834,14 @@ msgstr "Obrigação não selecionada: {obligation_id}"
 msgid "Obligation already satisfied: {obligation_id}"
 msgstr "Obrigação já satisfeita: {obligation_id}"
 
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} changed during this execution; the "
+"replan decides again"
+msgstr ""
+"Pulado: a obrigação {obligation_id} mudou durante esta execução; o "
+"replanejamento decide de novo"
+
 msgid "Obligation type diverges from the plan"
 msgstr "Tipo da obrigação diverge do plano"
 

@@ -28,7 +28,7 @@ from test_table_inline_math_marking import (
 
 from acessilia_core.agents.model_calls import ModelCallRejected
 from acessilia_core.agents.output_schemas import DataOutput
-from acessilia_core.i18n import t
+from acessilia_core.i18n import n, t
 from acessilia_core.i18n.stage_messages import (
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_PAGES,
@@ -39,7 +39,10 @@ from acessilia_core.pipeline.enrichment import tables as table_stage
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.inline_math import run_text_spans
 from acessilia_core.pipeline.handlers import tables as table_method
-from acessilia_core.pipeline.handlers.messages import MSG_TABLE_NO_TABLE
+from acessilia_core.pipeline.handlers.messages import (
+    MSG_TABLE_NO_TABLE,
+    MSG_TABLES_ENRICHED,
+)
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     TABLE_ENRICHMENT_KIND,
@@ -366,12 +369,14 @@ def test_the_method_uses_the_run_breaker_and_span_reader(monkeypatch) -> None:
     """The same objects the enrichment before planning gets from the run's ports."""
     seen: dict[str, object] = {}
 
-    async def read(manifest, source, *, breaker, **_kwargs):
+    async def read(manifest, source, *, breaker, targets, **_kwargs):
         seen["breaker"] = breaker
+        seen["read_targets"] = targets
         return 0
 
-    async def mark(manifest, source, document, text_spans):
+    async def mark(manifest, source, document, text_spans, *, targets):
         seen["text_spans"] = text_spans
+        seen["mark_targets"] = targets
         return {"elements": 0, "marked": 0, "unmatched": 0}
 
     monkeypatch.setattr(table_method, "_enrich_table_structures", read)
@@ -385,6 +390,7 @@ def test_the_method_uses_the_run_breaker_and_span_reader(monkeypatch) -> None:
 
     assert seen["breaker"] is run_breaker(ports, CONFIG.vision)
     assert seen["text_spans"] is run_text_spans(ports, manifest, source, CONFIG.toolbox)
+    assert seen["read_targets"] == seen["mark_targets"] == frozenset(obligation.target_ids)
 
 
 def test_each_run_has_its_own_breaker() -> None:
@@ -476,3 +482,55 @@ def test_a_fresh_enrichment_adds_the_obligation_before_its_checkpoint(monkeypatc
     assert any(
         item["kind"] == TABLE_ENRICHMENT_KIND for item in next(iter(saved.values()))["manifest"]["obligations"]
     )
+
+
+# The scope of a second enrichment (#832).
+
+
+def test_a_second_enrichment_reads_only_its_own_tables(fake_reader) -> None:
+    """``obligation-enrich-tables-2`` covers only the table found later. A
+    table of the first enrichment that is still eligible for a reading (t-1
+    has no structure) is neither read nor changed by the second."""
+    manifest = _tables_manifest()
+    first = add_table_enrichment_obligation(manifest)
+    first.status = "satisfied"
+    for item in manifest.obligations:
+        if item.id != first.id and "t-1" not in item.target_ids:
+            item.status = "satisfied"
+    found = build_element("t-3", "table", text="a tabela encontrada depois")
+    manifest.elements.append(found)
+    manifest.summary.element_count = len(manifest.elements)
+    t1_before = next(e for e in manifest.elements if e.id == "t-1").model_dump()
+    second = add_table_enrichment_obligation(manifest, replan=True)
+    assert second.target_ids == ["t-3"]
+
+    result = table_method._handle_table_enrichment_method(
+        manifest, second.id, config=CONFIG, ports=RunPorts.none()
+    )
+
+    assert fake_reader == ["a tabela encontrada depois"]
+    assert next(e for e in manifest.elements if e.id == "t-1").model_dump() == t1_before
+    assert "table_ast" in found.metadata
+    assert result.message == n(*MSG_TABLES_ENRICHED, 1).format(
+        count=1, needing=1, structured=1, left="-",
+        inline=table_method._inline_math_status(manifest, CONFIG), marked=0,
+    )
+
+
+def test_the_marks_keep_to_the_obligation_tables(spans) -> None:  # noqa: F811
+    """The inline math of a table is marked only by its own enrichment."""
+    outside = _math_manifest()
+    inside = _math_manifest()
+    source = Path(outside.source.path)
+
+    async def mark(manifest, targets):
+        ports = RunPorts.none()
+        return await table_method._mark_table_inline_math(
+            manifest, source, FONTS.document,
+            run_text_spans(ports, manifest, source, FONTS.toolbox), targets=targets,
+        )
+
+    assert asyncio.run(mark(outside, frozenset({"another-table"})))["marked"] == 0
+    assert "$" not in str(outside.elements[1].metadata["table_ast"])
+    assert asyncio.run(mark(inside, frozenset({"t1"})))["marked"] > 0
+    assert "$" in str(inside.elements[1].metadata["table_ast"])

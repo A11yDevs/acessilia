@@ -31,6 +31,7 @@ from acessilia_core.execution.messages import (
     EXE_METHOD_NOT_ADMISSIBLE,
     EXE_NO_HANDLER_REGISTERED,
     EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_CHANGED,
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
@@ -714,6 +715,7 @@ MESSAGES: tuple[str, ...] = (
     EXE_JOB_NOT_PROCESSING,
     EXE_OBLIGATION_NOT_SELECTED,
     EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_CHANGED,
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_METHOD_NOT_ADMISSIBLE,
     EXE_METHOD_ALREADY_TRIED,
@@ -1362,6 +1364,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         EXE_OBLIGATION_NOT_FOUND: "Obrigação inexistente: {obligation_id}",
         EXE_OBLIGATION_REMOVED: (
             "Pulado: a obrigação {obligation_id} foi removida ou substituída durante esta execução"
+        ),
+        EXE_OBLIGATION_CHANGED: (
+            "Pulado: a obrigação {obligation_id} mudou durante esta execução; o replanejamento decide de novo"
         ),
         EXE_OBLIGATION_WAITS_FOR_OPEN: (
             "Pulado: a obrigação {obligation_id} agora depende de {waiting}, ainda abertas; o replanejamento as ordena"

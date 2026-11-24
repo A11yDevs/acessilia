@@ -48,9 +48,9 @@ def _record(monkeypatch, stage) -> dict[str, list]:
         tables_to_read = stage._tables_to_read
         seen["visual_review"] = []
 
-        def record_tables(manifest, *, visual_review):
+        def record_tables(manifest, *, visual_review, targets=None):
             seen["visual_review"].append(visual_review)
-            return tables_to_read(manifest, visual_review=visual_review)
+            return tables_to_read(manifest, visual_review=visual_review, targets=targets)
 
         monkeypatch.setattr(stage, "_tables_to_read", record_tables)
 

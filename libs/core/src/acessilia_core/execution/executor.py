@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -21,6 +21,7 @@ from acessilia_core.execution.messages import (
     EXE_METHOD_NOT_ADMISSIBLE,
     EXE_NO_HANDLER_REGISTERED,
     EXE_OBLIGATION_ALREADY_SATISFIED,
+    EXE_OBLIGATION_CHANGED,
     EXE_OBLIGATION_KIND_MISMATCH,
     EXE_OBLIGATION_NOT_FOUND,
     EXE_OBLIGATION_NOT_SELECTED,
@@ -118,10 +119,12 @@ class _ExecutionState:
     failed_step_index: int | None = None
     replan_required: bool = False
     progress: StepProgress | None = None
-    #: The obligations of the manifest the plan was made for. One the working
+    #: The obligations of the manifest the plan was made for, with what made
+    #: their method applicable then (``_applicability``). One the working
     #: manifest no longer has was removed during this execution; one it has in
-    #: addition was found during it (#594, #832).
-    planned: frozenset[str] = frozenset()
+    #: addition was found during it (#594, #832); one whose applicability
+    #: changed under the same id is stale.
+    planned: dict[str, _Applicability] = field(default_factory=dict)
 
 
 class _SkipStep(Exception):
@@ -226,7 +229,7 @@ class ExecutorAgent:
             ),
             replan_required=replan_required,
             progress=progress,
-            planned=frozenset(item.id for item in manifest.obligations),
+            planned=_planned_applicability(manifest),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -527,10 +530,15 @@ class ExecutorAgent:
         )
 
     @classmethod
-    def _planned_obligation(cls, state: _ExecutionState, obligation_id: str) -> Obligation:
+    def _planned_obligation(cls, state: _ExecutionState, step: PlanStep) -> Obligation:
         """The step's obligation, or a skip when this execution changed it (#832).
 
         Removed or replaced by a reclassification: the step no longer applies.
+        Changed under the same id (another kind, targets of other types, or
+        the step's method no longer admissible): the step is stale and the
+        replan decides again. A retarget that keeps the types (a split or a
+        join remaps the targets, ``handlers/structure.py``) is not a change:
+        the method reads its targets when it runs.
         Made to depend on an open obligation this plan does not run before it
         (found during this execution, or planned and not run yet): it waits
         for the replan, which orders the two. A dependency the plan ran and
@@ -541,11 +549,18 @@ class ExecutorAgent:
         refuses a dangling dependency. One left dangling is a bug of the
         handler, reported as such instead of a ``KeyError``.
         """
+        obligation_id = step.obligation_id or ""
         if obligation_id in state.planned and all(
             item.id != obligation_id for item in state.manifest.obligations
         ):
             raise _SkipStep(t(EXE_OBLIGATION_REMOVED).format(obligation_id=obligation_id))
         obligation = cls._find_obligation(state, obligation_id)
+        if obligation_id in state.planned and (
+            _applicability(state.manifest, obligation) != state.planned[obligation_id]
+            or step.method not in obligation.admissible_methods
+        ):
+            state.replan_required = True
+            raise _SkipStep(t(EXE_OBLIGATION_CHANGED).format(obligation_id=obligation_id))
         by_id = {item.id: item for item in state.manifest.obligations}
         missing = sorted(set(obligation.dependencies) - by_id.keys())
         if missing:
@@ -595,7 +610,7 @@ class ExecutorAgent:
         assert step.obligation_id is not None
         assert step.obligation_kind is not None
         assert step.method is not None
-        obligation = self._planned_obligation(state, step.obligation_id)
+        obligation = self._planned_obligation(state, step)
         self._check_obligation_preconditions(obligation, step, state.manifest)
         if state.dry_run:
             obligation.status = "satisfied"
@@ -734,6 +749,21 @@ class ExecutorAgent:
                     unsatisfied=unsatisfied,
                 )
             )
+
+
+#: What made an obligation's method applicable when the plan was made: its
+#: kind and the types of its targets (#832).
+_Applicability = tuple[str, frozenset[str]]
+
+
+def _applicability(manifest: ProcessingManifest, obligation: Obligation) -> _Applicability:
+    targets = set(obligation.target_ids)
+    types = frozenset(element.type for element in manifest.elements if element.id in targets)
+    return obligation.kind, types
+
+
+def _planned_applicability(manifest: ProcessingManifest) -> dict[str, _Applicability]:
+    return {item.id: _applicability(manifest, item) for item in manifest.obligations}
 
 
 def _by_kind(obligations: list[Obligation]) -> str:

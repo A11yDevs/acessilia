@@ -214,7 +214,19 @@ the manifest. **The enrichment migration needs no domain change.**
      a step status), so a run where nothing failed has no `failed` step. The
      orchestrator counts that replan apart and logs its reason (2).
    - `max_replans` counts failures and `max_discovery_replans` the rest. A
-     replan that would leave the same open obligations does not run (3).
+     discovery replan whose planning state is the one the previous one
+     started from does not run (3). The state is `planning_signature`,
+     taken after the reconciliation: each replannable obligation's kind,
+     targets, dependencies, status and tried methods, so the same ids with
+     other targets or dependencies are progress. It is saved with the plan
+     checkpoint (`previous_signature`), so a resume keeps the guard; a
+     checkpoint without it resumes as before.
+   - A run with a failure and a discovery is a failure replan: the
+     discovery budget never bypasses the failure one. With `max_replans`
+     spent the loop stops, and a critical obligation left open, found or
+     failed, fails the job instead of being delivered silently. Replanning
+     for a discovery after the failure budget is spent, without retrying
+     the failed work, is a follow-up (#842).
    - Removed, replaced and rewired obligations are covered (4). A step
      whose obligation now depends on an open obligation this plan does not
      run before it (found during the execution, or planned and not run yet)
@@ -224,16 +236,23 @@ the manifest. **The enrichment migration needs no domain change.**
    - `PDDL_MAX_DISCOVERY_REPLANS` (default 3) sets the separate bound; a
      value other than the default enters the checkpoint and cache
      identities.
-   - The steps they make obsolete are skipped, not run (5).
+   - The steps they make obsolete are skipped, not run (5). That includes an
+     obligation changed under its id: another kind, targets of other types,
+     or the step's method no longer admissible. The executor compares each
+     step with what made its method applicable in the plan's manifest; a
+     retarget that keeps the types (a split or a join remaps targets) is
+     not a change. Ids are unique in a manifest; one freed by a removal may
+     come back in a later plan, never inside one execution's comparison.
+     Changes of the elements' content under the same type are not compared
+     (element revisions are #840).
    - The discovery count is in the plan checkpoint, and the skips derive from
      the plan's and the checkpoint's manifests, so a resume needs nothing
      else (6).
-   - `tests/test_changed_obligations.py` has the scenarios (7), including a
-     reclassification inside a real handler, a failure with an alternative
-     and the resume of the discovery count.
-
-   Steps whose obligation is still there but whose element changed type are
-   not detected yet; M1 meets that case first.
+   - `tests/test_changed_obligations.py` and
+     `tests/test_changed_obligations_semantics.py` have the scenarios (7),
+     including a reclassification inside a real handler, a failure with an
+     alternative, a failure next to a discovery, and the resume of the
+     discovery count and the guard.
 2. **Causal order becomes dependencies, never costs.** Costs choose between
    alternatives; they must not force a technically required order. The
    fixed order turns into `depends-on` between obligations of the same
@@ -326,12 +345,26 @@ runs when the manifest is enriched and again before each replan:
   invalid). The step that removed an element removes or retargets that
   element's own obligations and the page's `element_ids`;
 - every open obligation whose targets include a table depends on that
-  table's open enrichment. This is a rule on targets, not a list of kinds:
-  besides `linearize-table` and `select-table-source`, it orders the page
-  obligations (`refine-reading-order`, `fuse-providers`, `adjudicate-page`)
-  of a page with a table, whose targets are the page's elements. That is the
-  order of 0.3.11, where the tables were read before planning, at the cost
-  of serializing those page obligations behind the reading.
+  table's open enrichment, and only on those: an edge to an open enrichment
+  that no longer shares a table with it (the enrichment lost the table, or
+  the obligation was retargeted) is dropped. Only this rule makes edges to
+  an `enrich-tables` obligation, so the edges it drops are its own; edges
+  to closed enrichments are history and stay;
+- the rule is on targets, not a list of kinds: besides `linearize-table`
+  and `select-table-source`, it orders the page obligations
+  (`refine-reading-order`, `fuse-providers`, `adjudicate-page`) of a page
+  with a table, whose targets are the page's elements. That is the order of
+  0.3.11, where the tables were read before planning, at the cost of
+  serializing those page obligations behind the reading. A future step that
+  must run before the reading is not one this rule should order; it needs an
+  exclusion in the rule.
+
+**Scoped to its targets.** The method reads and marks only its obligation's
+tables (`targets` in `_tables_to_read`, `_enrich_table_structures` and
+`_mark_table_inline_math`), so a second enrichment never reads again or
+changes a table an earlier one owns, even one still eligible for a reading,
+and its message counts only its own tables. The breaker, the span reader and
+the progress stay the run's.
 
 ## Migration order
 
@@ -341,7 +374,7 @@ proposals, settled in their pull requests.
 | PR | Step | Obligation and method | Role | Toolbox requirements | Changes obligations while the plan runs |
 |---|---|---|---|---|---|
 | M2 (done, core 0.3.12) | Table structures and table inline math | `enrich-tables`, one per document with tables, method `table-enrichment`; `linearize-table` and `select-table-source` depend on it. After #170 the method calls `table.recognize`, whose providers compete (`docling-table`, `mineru-table`, the VLM) | `transitional` (`DataAgent`) | none declared: its Toolbox calls (`pdf.render` for a table read again, `document.text.spans` for the marks) are conditional and degrade per table, so they must not rule it out | no |
-| M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an open obligation the plan does not run before it. `complete-job` is skipped while every open obligation was found or deferred; one the plan ran and left open is a failure. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan leaves the same open obligations. Document-level obligations are reconciled before each replan | — | — | — |
+| M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an open obligation the plan does not run before it. `complete-job` is skipped while every open obligation was found or deferred; one the plan ran and left open is a failure. A step whose obligation changed under its id is skipped too. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan would start from the same planning state. Document-level obligations are reconciled before each replan, and the table enrichment keeps to its targets | — | — | — |
 | M1 | Picture descriptions | `describe-images`, one per document with pictures (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it | `transitional` (`VisionAgent`) | those `VisionAgent` makes, if any | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
 | M3 | Formula LaTeX | new kind `recognize-formula`, method `formula-recognizer`, a dependency of `verbalize-formula` and `normalize-formula` | new, declared | `math.recognize`, `pdf.render` | yes: the new kind, per formula |
 | M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`), replacing the post-execution pass of #599 | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |

@@ -6,6 +6,8 @@ orchestrator's final check, its replanning and the payload read them.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
@@ -60,13 +62,19 @@ def add_table_enrichment_obligation(
       without tables is removed, with the dependencies on it (there is
       nothing left to read, and ``target_ids`` cannot be empty);
     - every open obligation whose targets include a table depends on the open
-      enrichment of that table. That is a rule, not a list of kinds: any
-      obligation that targets a table is ordered after its reading, as when
-      the tables were read before planning. Page obligations
-      (``refine-reading-order``, ``fuse-providers``, ``adjudicate-page``)
-      target the page's elements, so a page with a table waits for the
-      reading too; that is the order of 0.3.11, at the cost of serializing
-      them behind it.
+      enrichment of that table, and only on those: an edge to an open
+      enrichment that no longer shares a table with it (the enrichment lost
+      the table, or the obligation was retargeted) is dropped. Only this rule
+      makes edges to an ``enrich-tables`` obligation, so the edges it drops
+      are its own; edges to closed enrichments are history and stay. It is
+      a rule on targets, not a list of kinds: the obligations that target a
+      table today (``linearize-table``, ``select-table-source``) and the page
+      obligations (``refine-reading-order``, ``fuse-providers``,
+      ``adjudicate-page``) of a page with a table, which target the page's
+      elements, are ordered after its reading, the order of 0.3.11, at the
+      cost of serializing the page obligations behind it. A future step that
+      must run *before* the reading (as the bootstrap does) is not an
+      obligation this rule should order: it needs an exclusion here.
 
     The step that removes an element must also remove or retarget that
     element's own obligations and the page's ``element_ids``; the manifest
@@ -85,9 +93,7 @@ def add_table_enrichment_obligation(
     covered = {target for item in enrichments for target in item.target_ids}
     new = [table for table in tables if table not in covered]
     target = _cover(manifest, enrichments, new, replan) if new else (enrichments[0] if enrichments else None)
-    for enrichment in (item for item in manifest.obligations if item.kind == TABLE_ENRICHMENT_KIND):
-        if enrichment.status not in _CLOSED:
-            _depend_on(manifest, enrichment)
+    _reconcile_edges(manifest)
     manifest.summary.obligation_count = len(manifest.obligations)
     return target
 
@@ -153,18 +159,28 @@ def _new_table_enrichment(
     )
 
 
-def _depend_on(manifest: ProcessingManifest, enrichment: Obligation) -> None:
-    """Make every open obligation about one of ``enrichment``'s tables depend
-    on it. A closed one is not planned again, so it gains no dependency."""
-    tables = set(enrichment.target_ids)
+def _reconcile_edges(manifest: ProcessingManifest) -> None:
+    """Each open obligation depends on the open enrichments of its tables,
+    and on no other open enrichment. A closed obligation is not planned
+    again, so it is left as it is."""
+    open_enrichments = {
+        item.id: set(item.target_ids)
+        for item in manifest.obligations
+        if item.kind == TABLE_ENRICHMENT_KIND and item.status not in _CLOSED
+    }
     for item in manifest.obligations:
-        if (
-            item.kind != TABLE_ENRICHMENT_KIND
-            and item.status not in _CLOSED
-            and tables & set(item.target_ids)
-            and enrichment.id not in item.dependencies
-        ):
-            item.dependencies.append(enrichment.id)
+        if item.kind == TABLE_ENRICHMENT_KIND or item.status in _CLOSED:
+            continue
+        targets = set(item.target_ids)
+        kept = [
+            dependency for dependency in item.dependencies
+            if dependency not in open_enrichments or open_enrichments[dependency] & targets
+        ]
+        needed = [
+            enrichment for enrichment, tables in open_enrichments.items()
+            if tables & targets and enrichment not in kept
+        ]
+        item.dependencies = kept + needed
 
 
 def _formula_elements_for_obligation(
@@ -294,6 +310,24 @@ def _unsatisfied_selected_obligations(manifest: ProcessingManifest) -> list:
         obligation for obligation in manifest.obligations
         if _is_open_obligation(obligation)
     ]
+
+
+def planning_signature(manifest: ProcessingManifest) -> str:
+    """A digest of what a replan would plan from (#832): each replannable
+    obligation's kind, targets, dependencies, status and the methods already
+    tried. Two states with the same digest give the replan the same problem,
+    so a replan from the second makes no progress; the same ids with other
+    targets or dependencies are a different problem. Nothing volatile (no
+    timestamp, no message) enters it."""
+    by_id = {item.id: item for item in manifest.obligations}
+    state = [
+        [
+            item.id, item.kind, sorted(item.target_ids), sorted(item.dependencies), item.status,
+            sorted({attempt.method for attempt in item.attempts if attempt.status != "succeeded"}),
+        ]
+        for item in (by_id[obligation_id] for obligation_id in sorted(_replannable_obligation_ids(manifest)))
+    ]
+    return hashlib.sha256(json.dumps(state, separators=(",", ":")).encode()).hexdigest()
 
 
 def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:

@@ -162,6 +162,7 @@ class RunCheckpoints:
         replans: int,
         *,
         discoveries: int = 0,
+        previous_signature: str | None = None,
     ) -> None:
         await self.save(
             PHASE_PLAN,
@@ -177,6 +178,7 @@ class RunCheckpoints:
                 "gated": sorted(gated),
                 "replans": replans,
                 "discoveries": discoveries,
+                "previous_signature": previous_signature,
             },
         )
 

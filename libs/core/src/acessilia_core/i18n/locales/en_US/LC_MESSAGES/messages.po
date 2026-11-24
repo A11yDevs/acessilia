@@ -820,6 +820,14 @@ msgstr "Obligation not selected: {obligation_id}"
 msgid "Obligation already satisfied: {obligation_id}"
 msgstr "Obligation already satisfied: {obligation_id}"
 
+#, python-brace-format
+msgid ""
+"Skipped: obligation {obligation_id} changed during this execution; the "
+"replan decides again"
+msgstr ""
+"Skipped: obligation {obligation_id} changed during this execution; the "
+"replan decides again"
+
 msgid "Obligation type diverges from the plan"
 msgstr "Obligation type diverges from the plan"
 

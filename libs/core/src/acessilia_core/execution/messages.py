@@ -55,6 +55,12 @@ EXE_OBLIGATION_NOT_FOUND: str = "Non-existent obligation: {obligation_id}"
 EXE_OBLIGATION_REMOVED: str = (
     "Skipped: obligation {obligation_id} was removed or replaced during this execution"
 )
+#: A plan step skipped because an earlier step of this execution changed its
+#: obligation under the same id: another kind, targets of other types, or the
+#: step's method no longer admissible. The replan decides again (#832).
+EXE_OBLIGATION_CHANGED: str = (
+    "Skipped: obligation {obligation_id} changed during this execution; the replan decides again"
+)
 #: A plan step skipped because an earlier step of this execution made its
 #: obligation depend on open obligations this plan does not run before it:
 #: found during the execution, or planned and not run yet. The replan orders

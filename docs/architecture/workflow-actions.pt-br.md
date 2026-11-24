@@ -218,7 +218,19 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      `failed`. O orquestrador conta esse replanejamento à parte e registra o
      motivo no log (2).
    - `max_replans` conta as falhas e `max_discovery_replans` o resto. Um
-     replanejamento que deixaria as mesmas obrigações abertas não roda (3).
+     replanejamento de descoberta cujo estado de planejamento é aquele de que
+     o anterior partiu não roda (3). O estado é `planning_signature`, tomado
+     depois da reconciliação: kind, alvos, dependências, status e métodos
+     tentados de cada obrigação replanejável, então os mesmos ids com outros
+     alvos ou dependências são progresso. Ele fica no checkpoint de plano
+     (`previous_signature`), então uma retomada mantém a guarda; um checkpoint
+     sem ele retoma como antes.
+   - Uma execução com falha e descoberta é um replanejamento de falha: o
+     orçamento de descobertas nunca contorna o de falhas. Com `max_replans`
+     esgotado o laço para, e uma obrigação crítica deixada aberta, encontrada
+     ou falha, faz o job falhar em vez de ser entregue em silêncio.
+     Replanejar por uma descoberta depois que o orçamento de falhas acabou,
+     sem tentar de novo o trabalho que falhou, é um acompanhamento (#842).
    - Obrigações removidas, substituídas e religadas estão cobertas (4). Um
      passo cuja obrigação agora depende de uma obrigação aberta que este plano
      não executa antes dele (encontrada durante a execução, ou planejada e
@@ -229,16 +241,23 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    - `PDDL_MAX_DISCOVERY_REPLANS` (padrão 3) define o limite separado; um
      valor diferente do padrão entra nas identidades do checkpoint e do
      cache.
-   - Os passos que elas tornam obsoletos são pulados, não executados (5).
+   - Os passos que elas tornam obsoletos são pulados, não executados (5). Isso
+     inclui uma obrigação mudada sob o mesmo id: outro kind, alvos de outros
+     tipos, ou o método do passo que deixou de ser admissível. O executor
+     compara cada passo com o que tornava o método aplicável no manifesto do
+     plano; um redirecionamento que mantém os tipos (uma divisão ou uma junção
+     remapeia alvos) não é mudança. Os ids são únicos num manifesto; um
+     liberado por uma remoção pode voltar num plano seguinte, nunca dentro da
+     comparação de uma execução. Mudanças do conteúdo dos elementos sob o
+     mesmo tipo não são comparadas (revisões de elementos são a #840).
    - O contador de descobertas fica no checkpoint de plano, e os pulos derivam
      dos manifestos do plano e do checkpoint, então uma retomada não precisa
      de mais nada (6).
-   - `tests/test_changed_obligations.py` tem os cenários (7), incluindo uma
-     reclassificação dentro de um handler real, uma falha com alternativa e a
-     retomada do contador de descobertas.
-
-   Passos cuja obrigação continua lá mas cujo elemento mudou de tipo ainda não
-   são detectados; o M1 é o primeiro a encontrar esse caso.
+   - `tests/test_changed_obligations.py` e
+     `tests/test_changed_obligations_semantics.py` têm os cenários (7),
+     incluindo uma reclassificação dentro de um handler real, uma falha com
+     alternativa, uma falha ao lado de uma descoberta, e a retomada do
+     contador de descobertas e da guarda.
 2. **A ordem causal vira dependência, nunca custo.** Custos escolhem entre
    alternativas; não podem impor uma ordem tecnicamente obrigatória. A ordem
    fixa vira `depends-on` entre obrigações do mesmo elemento:
@@ -339,13 +358,27 @@ novo antes de cada replanejamento:
   `target_ids` vazio é inválido). O passo que removeu um elemento remove ou
   redireciona as obrigações do próprio elemento e os `element_ids` da página;
 - toda obrigação aberta cujos alvos incluem uma tabela depende do
-  enriquecimento aberto daquela tabela. É uma regra sobre alvos, não uma lista
-  de kinds: além de `linearize-table` e `select-table-source`, ordena as
-  obrigações de página (`refine-reading-order`, `fuse-providers`,
-  `adjudicate-page`) de uma página com tabela, cujos alvos são os elementos da
-  página. É a ordem do 0.3.11, em que as tabelas eram lidas antes do
-  planejamento, ao custo de serializar essas obrigações de página atrás da
-  leitura.
+  enriquecimento aberto daquela tabela, e só desses: uma aresta para um
+  enriquecimento aberto que não compartilha mais tabela com ela (o
+  enriquecimento perdeu a tabela, ou a obrigação foi redirecionada) é
+  removida. Só esta regra cria arestas para uma obrigação `enrich-tables`,
+  então as arestas que ela remove são dela; arestas para enriquecimentos
+  fechados são histórico e ficam;
+- a regra é sobre alvos, não uma lista de kinds: além de `linearize-table` e
+  `select-table-source`, ordena as obrigações de página
+  (`refine-reading-order`, `fuse-providers`, `adjudicate-page`) de uma página
+  com tabela, cujos alvos são os elementos da página. É a ordem do 0.3.11, em
+  que as tabelas eram lidas antes do planejamento, ao custo de serializar
+  essas obrigações de página atrás da leitura. Um passo futuro que precise
+  rodar antes da leitura não é um que esta regra deva ordenar; ele precisa de
+  uma exclusão na regra.
+
+**Restrito aos seus alvos.** O método lê e marca só as tabelas da sua
+obrigação (`targets` em `_tables_to_read`, `_enrich_table_structures` e
+`_mark_table_inline_math`), então um segundo enriquecimento nunca relê nem
+altera uma tabela de um anterior, mesmo uma ainda elegível para leitura, e a
+mensagem dele conta só as próprias tabelas. O breaker, o leitor de spans e o
+progresso continuam sendo os da execução.
 
 ## Ordem da migração
 
@@ -355,7 +388,7 @@ propostas, decididas nos seus pull requests.
 | PR | Passo | Obrigação e método | Papel | Requisitos de Toolbox | Muda obrigações enquanto o plano roda |
 |---|---|---|---|---|---|
 | M2 (feito, core 0.3.12) | Estrutura das tabelas e matemática inline das tabelas | `enrich-tables`, uma por documento com tabelas, método `table-enrichment`; `linearize-table` e `select-table-source` dependem dela. Depois da #170, o método chama `table.recognize`, cujos providers competem (`docling-table`, `mineru-table`, o VLM) | `transitional` (`DataAgent`) | nenhum declarado: suas chamadas à Toolbox (`pdf.render` para uma tabela lida de novo, `document.text.spans` para as marcas) são condicionais e se degradam por tabela, então não podem descartá-lo | não |
-| M0 (feito, core 0.3.13) | Preparação do executor | O executor pula, e registra como `skipped` com o motivo, o passo de uma obrigação que esta execução removeu ou substituiu, e o de uma que agora espera uma obrigação aberta que o plano não executa antes dele. O `complete-job` é pulado enquanto toda obrigação aberta foi encontrada ou adiada; uma que o plano executou e deixou aberta é falha. O orquestrador replaneja depois de uma execução assim com um limite próprio (`max_discovery_replans`), separado de `max_replans`, e para quando um replanejamento deixa as mesmas obrigações abertas. As obrigações do documento são reconciliadas antes de cada replanejamento | — | — | — |
+| M0 (feito, core 0.3.13) | Preparação do executor | O executor pula, e registra como `skipped` com o motivo, o passo de uma obrigação que esta execução removeu ou substituiu, e o de uma que agora espera uma obrigação aberta que o plano não executa antes dele. O `complete-job` é pulado enquanto toda obrigação aberta foi encontrada ou adiada; uma que o plano executou e deixou aberta é falha. O orquestrador replaneja depois de uma execução assim com um limite próprio (`max_discovery_replans`), separado de `max_replans`, e para quando um replanejamento partiria do mesmo estado de planejamento. O passo de uma obrigação mudada sob o mesmo id também é pulado. As obrigações do documento são reconciliadas antes de cada replanejamento, e o enriquecimento de tabelas se restringe aos seus alvos | — | — | — |
 | M1 | Descrições de imagens | `describe-images`, uma por documento com imagens (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela | `transitional` (`VisionAgent`) | os que o `VisionAgent` fizer, se houver | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
 | M3 | LaTeX das fórmulas | kind novo `recognize-formula`, método `formula-recognizer`, uma dependência de `verbalize-formula` e `normalize-formula` | novo, declarado | `math.recognize`, `pdf.render` | sim: o kind novo, por fórmula |
 | M4 | Regiões de fórmula e matemática inline da prosa | kinds novos `classify-formula-region` (método `formula-region-classifier`) e `mark-inline-math` (método `inline-math-marker`), substituindo a passagem pós-execução da #599 | novos: `transitional` (`VisionAgent`) e declarado | `pdf.render`; `document.text.spans` | sim: a reclassificação reconcilia obrigações |

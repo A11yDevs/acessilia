@@ -279,6 +279,8 @@ async def _mark_table_inline_math(
     source_path: Path,
     document: DocumentConfig,
     text_spans: _TextSpanReader,
+    *,
+    targets: frozenset[str] | None = None,
 ) -> dict[str, int]:
     """Write the inline math of PDF table cells as ``$…$`` (#260).
 
@@ -288,6 +290,8 @@ async def _mark_table_inline_math(
     whose text holds it, and each cell is spliced on its own. A fraction set
     in a header cell (two stacked script-size lines) becomes ``\\frac``.
     Returns ``{elements, marked, unmatched}``, skipping as the prose step does.
+    ``targets`` limits the marks to those tables (an obligation's, #832);
+    ``None`` is every table. The overlays stay the whole document's context.
     """
     counts = {"elements": 0, "marked": 0, "unmatched": 0}
     if not _inline_math_enabled(manifest, document):
@@ -296,6 +300,7 @@ async def _mark_table_inline_math(
         element
         for element in manifest.elements
         if _is_table_inline_math_candidate(element)
+        and (targets is None or element.id in targets)
     ]
     pages = _boxed_pages(tables)
     if not pages:
