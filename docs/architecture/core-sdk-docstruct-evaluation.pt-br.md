@@ -186,8 +186,17 @@ seu pull request:
   título regrediu, mas a causa é a extração da Toolbox
   (acessilia-toolbox#162): os manifestos do core são idênticos antes e depois
   da mudança.
-- **Em aberto:** o caso 006 (slides) não foi comparado no staging desde a
-  mudança.
+- **O caso 006 (slides) agora tem uma comparação repetível no staging.** O deck
+  de 42 slides já está no acessilia-dataset (`input/006.pdf`) com o ground
+  truth em `input/presentation-reference/`, e o serviço mantém uma cópia
+  byte-idêntica em `tests/fixtures/presentations/`.
+  `tests/test_slide_case_e2e.py` o envia para o core implantado e pontua o TXT
+  e o PDF/UA entregues com `scripts/bench/slide_case.py`: 42 títulos de slide,
+  cada objeto de texto, tabela e fórmula no seu slide, a ausência de padrões de
+  fallback e um piso de imagens. Ele roda com `CORE_BASE_URL` e o clone do
+  dataset. **Em aberto:** rodá-lo no staging e registrar os scorecards na #615;
+  o scorecard pré-migração não foi arquivado como arquivo, então a conferência
+  usa o ground truth do dataset.
 
 ## Consequências observadas
 
@@ -223,6 +232,7 @@ seu pull request:
 3. **Dar uso às operações:** um comando `judge` na linha de comando do SDK, e
    o benchmark de matemática (`scripts/bench`) sobre a cadeia de fórmula em vez
    do core.
-4. **Comparar o caso 006 no staging** depois da mudança.
+4. **Rodar a comparação do caso 006 no staging** depois da mudança
+   (`tests/test_slide_case_e2e.py`) e registrar os scorecards na #615.
 5. **Decidir se a pilha de agentes deve ser um extra do core,** caso algum
    chamador precise do core sem agentes. Nada pede isso hoje.

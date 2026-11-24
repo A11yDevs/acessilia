@@ -142,6 +142,11 @@ corpus para o checkout.
   baseados em referência são pulados.
 - `test_math_case_e2e.py` lê `input/math-reference/` do branch
   `feat/036-velocidade-instantanea` do dataset; ele não está na `main`.
+- `test_slide_case_e2e.py` lê `input/presentation-reference/` (o deck 006,
+  issue #615) da `main` do dataset e envia a cópia byte-idêntica em
+  `fixtures/presentations/`. Ele faz um job do deck inteiro, então
+  `CORE_SLIDE_TIMEOUT` (padrão 1500 s) limita a espera; os scorecards e as
+  saídas ficam em `var/bench/slides/e2e/`.
 
 Para rodar esses casos contra um clone mantido no checkout principal:
 

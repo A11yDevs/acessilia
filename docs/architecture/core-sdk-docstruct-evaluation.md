@@ -187,7 +187,17 @@ request:
   heading regressed, but the cause is the Toolbox's extraction
   (acessilia-toolbox#162): the core's manifests are identical before and
   after the move.
-- **Open:** case 006 (slides) has not been compared on staging since the move.
+- **Case 006 (slides) now has a repeatable staging comparison.** The 42-slide
+  deck is already in acessilia-dataset (`input/006.pdf`) with its
+  `input/presentation-reference/` ground truth, and the service keeps a
+  byte-identical copy in `tests/fixtures/presentations/`.
+  `tests/test_slide_case_e2e.py` uploads it to the deployed core and scores
+  the delivered TXT and PDF/UA with `scripts/bench/slide_case.py`: 42 slide
+  headings and titles, every text, table and formula object in its slide, the
+  absence of fallback patterns, and a picture floor. It runs with
+  `CORE_BASE_URL` and the dataset clone. **Open:** run it against staging and
+  record the scorecards in #615; the pre-migration scorecard was not archived
+  as a file, so the check uses the dataset's ground truth.
 
 ## Consequences observed
 
@@ -223,6 +233,7 @@ request:
 3. **Give the operations users:** a `judge` command in the SDK's command line,
    and the math benchmark (`scripts/bench`) on the formula chain instead of
    the core.
-4. **Compare case 006 on staging** after the move.
+4. **Run the case 006 comparison on staging** after the move
+   (`tests/test_slide_case_e2e.py`) and record its scorecards in #615.
 5. **Decide whether the agent stack should be an extra of the core**, if a
    caller needs the core without agents. Nothing asks for it today.

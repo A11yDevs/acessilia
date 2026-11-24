@@ -47,6 +47,7 @@ from typing import Any, Literal
 from scripts.bench.math_case import dataset_dir
 
 CASE_DIR = Path("input") / "presentation-reference"
+CASE_PDF = "006.pdf"
 
 #: A slide heading as the exporters write it, in pt-BR or English. A page
 #: break also starts a line: ``pdftotext -raw`` may end the previous page with

@@ -138,6 +138,11 @@ It is a separate clone, ignored by Git, placed at `tests/dataset/`; point
   reference-based cases are skipped.
 - `test_math_case_e2e.py` reads `input/math-reference/` from the dataset branch
   `feat/036-velocidade-instantanea`; it is not on the dataset's `main`.
+- `test_slide_case_e2e.py` reads `input/presentation-reference/` (the 006
+  deck, issue #615) from the dataset's `main` and uploads the byte-identical
+  copy in `fixtures/presentations/`. It makes one full-deck job, so
+  `CORE_SLIDE_TIMEOUT` (default 1500 s) bounds the wait; its scorecards and
+  outputs go to `var/bench/slides/e2e/`.
 
 To run those cases against a clone kept in the main checkout:
 

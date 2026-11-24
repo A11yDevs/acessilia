@@ -4,6 +4,9 @@ from urllib.parse import urlsplit
 
 import pytest
 
+# The deployed-core E2E suites share one health-checked client (CORE_BASE_URL).
+from tests.core_api_support import core_client  # noqa: F401
+
 # Pages and regions are rendered by the Toolbox (pdf.render@2); this fixture
 # answers those requests with real pixels behind mocked HTTP.
 from tests.toolbox_render_fake import fake_toolbox_render  # noqa: F401

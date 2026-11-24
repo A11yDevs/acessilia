@@ -195,6 +195,38 @@ done
 uv run python -m scripts.bench.math_case run --pdf /tmp/036-base.pdf --out var/bench/math-reference/base
 ```
 
+## Presentation reference case
+
+`python -m scripts.bench.slide_case` scores the accessible outputs of
+`006.pdf`, a 42-slide chemistry deck (id `006` in
+[acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset), under
+`input/presentation-reference/`). The ground truth lists the text, pictures,
+tables and formulas expected on each slide; `expectations.json` holds the
+slide count, the deck and slide titles, and the patterns that must never reach
+a reader (an undescribed picture, folded labels, raw LaTeX, a collapsed table
+row, text read across two slides). The input copy in
+`tests/fixtures/presentations/grandezas-e-medidas-42pgs.pdf` is byte-identical
+to the dataset's.
+
+```bash
+# Score the TXT or PDF/UA a job delivered (PDF/UA needs pdftotext)
+uv run python -m scripts.bench.slide_case score --pdf-ua 006.pdf_ua.pdf --out var/bench/slides/<run>
+uv run python -m scripts.bench.slide_case score --txt 006.txt --out var/bench/slides/<run>
+
+# The slides that got worse between two outputs
+uv run python -m scripts.bench.slide_case compare base.pdf_ua.pdf candidate.pdf_ua.pdf
+```
+
+The scorecard splits the output into one section per slide heading and checks
+every object inside its slide: text passages, the terms a picture's
+description must hold, table headers and rows whole and in order, formulas,
+and the forbidden patterns. A table row the layout interleaves may still be
+found in the PDF/UA's content-stream order, and the report counts those
+separately. Like the other cases, the numbers track deltas between runs.
+`tests/test_slide_case_e2e.py` processes the deck through the deployed core
+(`CORE_BASE_URL`) and locks the slide count, titles, text, tables, formulas
+and the absence of fallbacks; see [tests/README.md](../tests/README.md#end-to-end-tests).
+
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)
