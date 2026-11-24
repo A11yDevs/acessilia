@@ -710,8 +710,11 @@ def test_the_container_scan_is_conditional_on_image_paths() -> None:
     workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
     changes = workflow["jobs"]["image-changes"]
     scan = workflow["jobs"]["container-scan"]
+    caller = _workflow()["jobs"]["security"]
 
     assert "if" not in changes
+    assert workflow["permissions"]["pull-requests"] == "read"
+    assert caller["permissions"]["pull-requests"] == "read"
     assert changes["permissions"] == {
         "contents": "read",
         "pull-requests": "read",

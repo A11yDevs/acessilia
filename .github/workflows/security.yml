@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  pull-requests: read
 
 concurrency:
   group: security-${{ github.event.pull_request.number || github.ref }}

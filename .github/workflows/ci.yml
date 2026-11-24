@@ -980,6 +980,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      pull-requests: read
 
   delivery:
     name: publish verified images
