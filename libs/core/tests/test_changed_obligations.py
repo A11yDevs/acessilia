@@ -36,6 +36,9 @@ from acessilia_core.execution.messages import (
 )
 from acessilia_core.execution.models import ExecutionStepResult, MethodResult
 from acessilia_core.i18n import reset_request_locale, set_request_locale, t
+from acessilia_core.i18n.log_messages import (
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES,
+)
 from acessilia_core.manifest.builder import (
     reconcile_reclassified_element_processing_needs,
 )
@@ -460,8 +463,10 @@ def test_a_handler_that_leaves_a_dangling_reference_is_reported_before_the_guard
     with pytest.raises(ValueError) as error:
         _run(orchestrator, manifest, tmp_path, monkeypatch)
 
-    # The manifest's own message names the obligation and the missing dependency.
-    assert "o-found" in str(error.value) and "o-2" in str(error.value)
+    # The manifest's own message, localized, names the obligation and the missing dependency.
+    assert str(error.value) == t(MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES).format(
+        obligation_id="o-found", ids=["o-2"]
+    )
 
 
 # Document-level obligations reconciled (#832).

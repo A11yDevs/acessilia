@@ -31,7 +31,9 @@ resto, para que o M1 (as descrições de imagens como ação planejada) possa vi
   referências de obrigação e o DAG do manifesto que a execução mudou, então
   uma referência pendurada deixada por um handler em qualquer ponto do grafo
   faz o job falhar com a mensagem do manifesto, em vez de um `KeyError` da
-  guarda.
+  guarda. As mensagens das checagens do grafo (alvos, dependências e
+  artefatos inexistentes, autodependência, ciclo) seguem o idioma, como as
+  do executor.
 - `skipped` já era um status de passo do relatório de execução, então o
   contrato não muda. Uma execução em que só as obrigações mudaram não tem
   passo `failed`.

@@ -8,6 +8,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
+    MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE,
+    MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS,
+    MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE,
+    MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS,
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
 )
@@ -225,14 +231,16 @@ def _validate_obligation_attempts(
     for attempt in obligation.attempts:
         if attempt.method not in obligation.admissible_methods:
             raise ValueError(
-                f"Tentativa de método não admissível em {obligation.id}: "
-                f"{attempt.method}"
+                t(MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE).format(
+                    obligation_id=obligation.id, method=attempt.method
+                )
             )
         unknown_artifacts = set(attempt.artifact_ids) - known_artifacts
         if unknown_artifacts:
             raise ValueError(
-                f"Tentativa em {obligation.id} referencia artefatos "
-                f"inexistentes: {sorted(unknown_artifacts)}"
+                t(MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS).format(
+                    obligation_id=obligation.id, ids=sorted(unknown_artifacts)
+                )
             )
 
 
@@ -247,17 +255,21 @@ def _validate_obligation_references(
         unknown_targets = set(obligation.target_ids) - known_elements
         if unknown_targets:
             raise ValueError(
-                f"Obrigação {obligation.id} referencia alvos inexistentes: "
-                f"{sorted(unknown_targets)}"
+                t(MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS).format(
+                    obligation_id=obligation.id, ids=sorted(unknown_targets)
+                )
             )
         unknown_dependencies = set(obligation.dependencies) - known_obligations
         if unknown_dependencies:
             raise ValueError(
-                f"Obrigação {obligation.id} referencia dependências inexistentes: "
-                f"{sorted(unknown_dependencies)}"
+                t(MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES).format(
+                    obligation_id=obligation.id, ids=sorted(unknown_dependencies)
+                )
             )
         if obligation.id in obligation.dependencies:
-            raise ValueError(f"Obrigação {obligation.id} depende de si mesma")
+            raise ValueError(
+                t(MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY).format(obligation_id=obligation.id)
+            )
         _validate_obligation_attempts(obligation, known_artifacts)
 
 
@@ -269,7 +281,7 @@ def _validate_obligation_dag(obligations: list[Obligation]) -> None:
         dependency_closure(dependency_graph, dependency_graph)
     except DependencyCycleError as error:
         raise ValueError(
-            f"Ciclo detectado nas dependências de obrigações: {error}"
+            t(MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE).format(detail=error)
         ) from error
 
 

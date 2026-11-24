@@ -870,6 +870,30 @@ msgstr ""
 "Observação: esta imagem é informativamente muito extensa; a descrição foi"
 " limitada ao orçamento disponível e muitos detalhes não foram descritos."
 
+#, python-brace-format
+msgid "Attempt with a method not admissible for {obligation_id}: {method}"
+msgstr "Tentativa de método não admissível em {obligation_id}: {method}"
+
+#, python-brace-format
+msgid "Attempt on {obligation_id} references unknown artifacts: {ids}"
+msgstr "Tentativa em {obligation_id} referencia artefatos inexistentes: {ids}"
+
+#, python-brace-format
+msgid "Cycle in the obligation dependencies: {detail}"
+msgstr "Ciclo detectado nas dependências de obrigações: {detail}"
+
+#, python-brace-format
+msgid "Obligation {obligation_id} depends on itself"
+msgstr "Obrigação {obligation_id} depende de si mesma"
+
+#, python-brace-format
+msgid "Obligation {obligation_id} references unknown dependencies: {ids}"
+msgstr "Obrigação {obligation_id} referencia dependências inexistentes: {ids}"
+
+#, python-brace-format
+msgid "Obligation {obligation_id} references unknown targets: {ids}"
+msgstr "Obrigação {obligation_id} referencia alvos inexistentes: {ids}"
+
 msgid ""
 "The execute-obligation action requires obligation_id, obligation_kind and"
 " method"

@@ -29,7 +29,9 @@ rest, so M1 (the picture descriptions as a planned action) can follow:
   the discovery guard reads the state, the orchestrator rechecks the
   obligation references and the DAG of the manifest the run changed, so a
   dangling reference a handler left anywhere in the graph fails the job with
-  the manifest's message instead of a `KeyError` from the guard.
+  the manifest's message instead of a `KeyError` from the guard. The
+  messages of the graph checks (unknown targets, dependencies and artifacts,
+  a self-dependency, a cycle) follow the locale, like the executor's.
 - `skipped` was already a step status of the execution report, so the
   contract does not change. A run where only obligations changed has no
   `failed` step.

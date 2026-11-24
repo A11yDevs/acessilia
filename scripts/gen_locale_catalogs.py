@@ -249,6 +249,12 @@ from acessilia_core.i18n.log_messages import (
     LOG_WORKER_TASK_ERROR,
     LOG_WORKER_TASK_STARTING,
     MSG_HEADING_GAP,
+    MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE,
+    MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS,
+    MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE,
+    MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS,
     MSG_MODEL_CALL_CLOSED,
     MSG_MODEL_CALL_DEADLINE,
     MSG_MODEL_CALL_FULL,
@@ -723,6 +729,12 @@ MESSAGES: tuple[str, ...] = (
     MSG_PLANNER_NOT_STARTED,
     MSG_TIMESTAMPS_MIXED_TIMEZONES,
     MSG_VISION_TRUNCATION_NOTICE,
+    MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE,
+    MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS,
+    MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE,
+    MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES,
+    MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS,
     MSG_EXECUTE_OBLIGATION_MISSING_FIELDS,
     MSG_ACTION_REJECTS_EXECUTION_PARAMETERS,
     MSG_PLAN_INDICES_CONSECUTIVE_FROM_ZERO,
@@ -1563,6 +1575,23 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Interval whose timestamps mix an aware and a naive datetime (manifest models).
         MSG_TIMESTAMPS_MIXED_TIMEZONES: (
             "Os horários de um intervalo devem ter todos fuso horário ou nenhum"
+        ),
+        # Manifest graph validation (references, attempts and the DAG of the obligations).
+        MSG_MANIFEST_OBLIGATION_UNKNOWN_TARGETS: (
+            "Obrigação {obligation_id} referencia alvos inexistentes: {ids}"
+        ),
+        MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES: (
+            "Obrigação {obligation_id} referencia dependências inexistentes: {ids}"
+        ),
+        MSG_MANIFEST_OBLIGATION_SELF_DEPENDENCY: ("Obrigação {obligation_id} depende de si mesma"),
+        MSG_MANIFEST_OBLIGATION_DEPENDENCY_CYCLE: (
+            "Ciclo detectado nas dependências de obrigações: {detail}"
+        ),
+        MSG_MANIFEST_ATTEMPT_METHOD_NOT_ADMISSIBLE: (
+            "Tentativa de método não admissível em {obligation_id}: {method}"
+        ),
+        MSG_MANIFEST_ATTEMPT_UNKNOWN_ARTIFACTS: (
+            "Tentativa em {obligation_id} referencia artefatos inexistentes: {ids}"
         ),
         # Failure for execute-obligation steps missing required execution parameters in NominalPlan validation of PlanSteps.
         MSG_EXECUTE_OBLIGATION_MISSING_FIELDS: (

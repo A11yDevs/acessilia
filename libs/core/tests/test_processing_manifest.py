@@ -220,7 +220,7 @@ def test_manifest_rejects_unknown_target(tmp_path: Path):
 
     errors = validate_manifest(payload)
 
-    assert any("alvos inexistentes" in error for error in errors)
+    assert any("unknown targets" in error for error in errors)
 
 
 def test_a_non_toolbox_extraction_is_refused(tmp_path: Path):
