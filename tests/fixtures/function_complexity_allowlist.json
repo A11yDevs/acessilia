@@ -35,7 +35,7 @@
       "complexity": 20
     },
     "libs/docstruct/src/docstruct/canonical.py::_sanitize_structured_blocks": {
-      "complexity": 23
+      "complexity": 18
     },
     "libs/docstruct/src/docstruct/canonical.py::_sanitize_table_ast": {
       "complexity": 21

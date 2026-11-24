@@ -73,7 +73,7 @@ def normalize_table_ast(raw: Any) -> dict[str, Any] | None:
         return None
 
     if isinstance(candidate, list):
-        return table_ast_from_rows(_rows_from_mixed(candidate))
+        return table_ast_from_rows(candidate)
 
     if not isinstance(candidate, dict):
         return None
@@ -102,7 +102,7 @@ def normalize_table_ast(raw: Any) -> dict[str, Any] | None:
     if isinstance(rows_only, list) and not any(
         section in candidate for section in ("header", "body", "footer")
     ):
-        return table_ast_from_rows(_rows_from_mixed(rows_only), caption=result.get("caption"))
+        return table_ast_from_rows(rows_only, caption=result.get("caption"))
 
     cells_only = candidate.get("cells")
     if isinstance(cells_only, list) and not any(
@@ -136,21 +136,27 @@ def normalize_table_ast(raw: Any) -> dict[str, Any] | None:
 
 
 def table_ast_from_rows(rows: Any, *, caption: str | None = None) -> dict[str, Any] | None:
-    normalized_rows = _rows_from_mixed(rows)
-    if not normalized_rows:
-        return None
+    """Build a canonical table AST from rows of cells.
+
+    A blank cell is a grid position, not an absent one: its text is stripped
+    to ``""`` and the cell stays, so the columns of the row keep their place.
+    A row whose cells are all blank is kept for the same reason (#601). Only a
+    row that carries no cell at all is left out; the whole table is ``None``
+    when no row with a cell remains. Callers that already sanitized the cells
+    (the canonical builder) may pass them as they are: stripping is idempotent.
+    """
+    normalized_rows = _rows_from_mixed(rows, keep_blank_rows=True)
     body = [
         {
             "cells": [
                 {
-                    "text": str(cell).strip(),
+                    "text": cell,
                 }
                 for cell in row
             ]
         }
         for row in normalized_rows
     ]
-    body = [row for row in body if row["cells"]]
     if not body:
         return None
     result: dict[str, Any] = {"body": body}
@@ -486,6 +492,11 @@ def _row_has_explicit_row_scope(row: dict[str, Any]) -> bool:
     )
 
 
+def _row_is_blank(row: dict[str, Any]) -> bool:
+    """A row with no text cannot be a header: it carries no label."""
+    return not any(_row_texts(row))
+
+
 def _project_section_rows(
     rows: list[dict[str, Any]],
 ) -> list[tuple[int, int]]:
@@ -568,6 +579,7 @@ def split_header_and_body(
         and infer_legacy_header
         and len(body) >= 2
         and not _row_has_explicit_row_scope(body[0])
+        and not _row_is_blank(body[0])
     ):
         header = [body[0]]
         body = body[1:]
@@ -733,6 +745,9 @@ def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
 
     rows_field = row_obj.get("rows")
     if isinstance(rows_field, list):
+        # The projection takes the first row that carries text: an all-blank
+        # nested row has nothing to project into a single row (unlike a
+        # top-level row, which still occupies a grid position).
         rows = _rows_from_mixed(rows_field)
         if rows:
             return {"cells": [{"text": value} for value in rows[0]]}
@@ -785,21 +800,26 @@ def _normalize_cell(raw_cell: Any) -> dict[str, Any] | None:
     return cell
 
 
-def _rows_from_mixed(raw_rows: Any) -> list[list[str]]:
+def _rows_from_mixed(raw_rows: Any, *, keep_blank_rows: bool = False) -> list[list[str]]:
+    """Read rows of cells from lists, dicts or objects.
+
+    ``keep_blank_rows`` keeps a row whose cells are all blank: a blank cell is
+    still a grid position. Rows with no cells are left out either way.
+    """
     if not isinstance(raw_rows, list):
         return []
     rows: list[list[str]] = []
     for raw_row in raw_rows:
         if isinstance(raw_row, list):
             values = [str(cell).strip() for cell in raw_row]
-            if any(values):
+            if values and (keep_blank_rows or any(values)):
                 rows.append(values)
             continue
 
         row_dict = _normalize_row(raw_row)
         if row_dict is not None:
             values = _row_texts(row_dict)
-            if any(values):
+            if values and (keep_blank_rows or any(values)):
                 rows.append(values)
     return rows
 

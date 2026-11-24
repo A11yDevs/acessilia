@@ -11,7 +11,7 @@ from copy import deepcopy
 from typing import Any, Callable, Iterator
 
 from docstruct.blocks.parser import parse_text_to_blocks
-from docstruct.tables.ast import raw_rows_from_table_ast
+from docstruct.tables.ast import raw_rows_from_table_ast, table_ast_from_rows
 from docstruct.text.equations import (
     equation_number,
     numbered_speech,
@@ -453,17 +453,7 @@ def _sanitize_structured_blocks(
             ]
 
         if block_type == "table" and isinstance(clean.get("rows"), list):
-            rows: list[list[str]] = []
-            for row in clean["rows"]:
-                if not isinstance(row, list):
-                    continue
-                rows.append([
-                    sanitize_block_text(str(cell), block_type="table_cell")
-                    for cell in row
-                ])
-            clean["rows"] = rows
-            if rows and not isinstance(clean.get("table_ast"), dict):
-                clean["table_ast"] = _table_ast_from_rows(rows)
+            _sanitize_table_rows(clean)
 
         if block_type == "table" and isinstance(clean.get("table_ast"), dict):
             table_ast = _sanitize_table_ast(clean["table_ast"])
@@ -478,6 +468,23 @@ def _sanitize_structured_blocks(
 
         sanitized_blocks.append(clean)
     return sanitized_blocks
+
+
+def _sanitize_table_rows(block: dict[str, Any]) -> None:
+    """Sanitize a table block's rows, then build its AST if it has none."""
+    rows: list[list[str]] = []
+    for row in block["rows"]:
+        if not isinstance(row, list):
+            continue
+        rows.append([
+            sanitize_block_text(str(cell), block_type="table_cell")
+            for cell in row
+        ])
+    block["rows"] = rows
+    if rows and not isinstance(block.get("table_ast"), dict):
+        table_ast = table_ast_from_rows(rows, caption=block.get("caption"))
+        if table_ast is not None:
+            block["table_ast"] = table_ast
 
 
 def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
@@ -534,16 +541,6 @@ def _sanitize_table_ast(raw: dict[str, Any]) -> dict[str, Any]:
         table_ast["metadata"] = metadata
 
     return table_ast
-
-
-def _table_ast_from_rows(rows: list[list[str]]) -> dict[str, Any]:
-    """Build a table AST from rows the caller has already sanitized."""
-    body = []
-    for row in rows:
-        cells = [{"text": str(cell)} for cell in row]
-        if cells:
-            body.append({"cells": cells})
-    return {"body": body}
 
 
 def _make_id(prefix: str, text: str, counter: int) -> str:
