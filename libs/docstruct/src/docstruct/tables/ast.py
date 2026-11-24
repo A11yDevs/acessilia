@@ -150,13 +150,12 @@ def table_ast_from_rows(rows: Any, *, caption: str | None = None) -> dict[str, A
         {
             "cells": [
                 {
-                    "text": str(cell).strip(),
+                    "text": cell,
                 }
                 for cell in row
             ]
         }
         for row in normalized_rows
-        if row
     ]
     if not body:
         return None
@@ -493,6 +492,11 @@ def _row_has_explicit_row_scope(row: dict[str, Any]) -> bool:
     )
 
 
+def _row_is_blank(row: dict[str, Any]) -> bool:
+    """A row with no text cannot be a header: it carries no label."""
+    return not any(_row_texts(row))
+
+
 def _project_section_rows(
     rows: list[dict[str, Any]],
 ) -> list[tuple[int, int]]:
@@ -575,6 +579,7 @@ def split_header_and_body(
         and infer_legacy_header
         and len(body) >= 2
         and not _row_has_explicit_row_scope(body[0])
+        and not _row_is_blank(body[0])
     ):
         header = [body[0]]
         body = body[1:]
@@ -740,6 +745,9 @@ def _normalize_row(raw_row: Any) -> dict[str, Any] | None:
 
     rows_field = row_obj.get("rows")
     if isinstance(rows_field, list):
+        # The projection takes the first row that carries text: an all-blank
+        # nested row has nothing to project into a single row (unlike a
+        # top-level row, which still occupies a grid position).
         rows = _rows_from_mixed(rows_field)
         if rows:
             return {"cells": [{"text": value} for value in rows[0]]}

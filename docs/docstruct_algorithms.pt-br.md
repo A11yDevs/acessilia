@@ -418,6 +418,11 @@ extratores relatam (linhas com o texto das células). Ela:
   entre rejeitar ou manter o bloco;
 - adiciona `caption` apenas quando ele não é vazio.
 
+Uma primeira linha vazia nunca é promovida a cabeçalho legado: um cabeçalho sem
+texto anunciaria rótulos vazios, então `split_header_and_body` mantém essa linha
+no corpo, onde ela continua sendo uma posição da grade como qualquer outra linha
+vazia.
+
 `normalize_table_ast` lê `rows` com a mesma função, então uma AST de tabela
 construída a partir das linhas é a mesma em qualquer caminho que a leia. O
 construtor de documento canônico (`docstruct.canonical`) a chama quando um
@@ -449,7 +454,8 @@ mudança visível de comportamento sem ganho de acessibilidade.
 
 - `libs/docstruct/tests/test_table_ast_from_rows.py` verifica o contrato acima,
   incluindo que `normalize_table_ast` e o construtor canônico retornam a mesma
-  AST que a função pública para as mesmas linhas.
+  AST que a função pública para as mesmas linhas, que uma primeira linha vazia
+  não é promovida a cabeçalho legado e que os exportadores concordam nisso.
 - `libs/core/tests/test_table_ast_from_rows_parity.py` verifica a referência
   congelada do core sobre linhas aleatórias (incluindo linhas vazias), a tabela
   só com espaços que o construtor de payload passa, e que `docstruct.canonical`
@@ -457,7 +463,8 @@ mudança visível de comportamento sem ganho de acessibilidade.
 - Caracterização da exportação: a tabela dos snapshots de exportação é definida
   por `table_ast`, não construída a partir de linhas, então seus bytes de
   TXT/HTML/Markdown/Pandoc não mudam. O corpus de aceitação do gate estrito
-  (`tests/fixtures/export_schema_gate`) não tem bloco de tabela, então os 68
+  (`tests/fixtures/export_schema_gate`) tem uma tabela só de linhas
+  (`numeric-table-rows`), mas nenhuma tabela com linhas vazias, então os 68
   resultados de linha de base TXT/HTML/DOCX/PDF-UA não mudam;
   `libs/core/tests/test_export_schema_gate.py` continua comparando-os.
 

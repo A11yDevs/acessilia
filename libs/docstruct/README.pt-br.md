@@ -221,7 +221,7 @@ Parser leve para saída `middle_json` do MinerU:
 ### AST de Tabelas e Complexidade (`docstruct.tables.ast`)
 
 Análise pura de grades e conversão em AST:
-- `table_ast_from_rows(rows, caption=None)`: Constrói uma `TableAST` canônica apenas de corpo a partir de linhas de texto de células. Uma célula vazia e uma linha de células vazias permanecem, porque são posições da grade; uma linha sem célula e uma tabela vazia ficam de fora (`None`) (#601). O construtor canônico usa esta única implementação.
+- `table_ast_from_rows(rows, *, caption=None)`: Constrói uma `TableAST` canônica apenas de corpo a partir de linhas de texto de células. Uma célula vazia e uma linha de células vazias permanecem, porque são posições da grade; uma linha sem célula e uma tabela vazia ficam de fora (`None`) (#601). O construtor canônico usa esta única implementação.
 - `table_ast_from_docling_grid(grid_or_cells, caption=None)`: Constrói uma `TableAST` canônica a partir de células do Docling (`start_row_offset_idx`, `start_col_offset_idx`, spans de linhas e colunas).
 - `analyze_table_complexity(table_ast_or_cells)`: Avalia métricas de complexidade retornando `TableComplexityMetrics` (`has_spans`, `max_rowspan`, `max_colspan`, `spanned_cell_count`, `is_complex`).
 

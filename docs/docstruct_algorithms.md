@@ -400,6 +400,10 @@ report (rows of cell text). It:
   whether to reject or keep the block;
 - adds `caption` only when it is not blank.
 
+A blank first row is never promoted to a legacy header: a header with no text
+would announce empty labels, so `split_header_and_body` keeps that row in the
+body, where it remains a grid position like any other blank row.
+
 `normalize_table_ast` reads `rows` with the same function, so a table AST built
 from rows is the same whichever path reads it. The canonical document builder
 (`docstruct.canonical`) calls it when a table block carries `rows` but no
@@ -429,7 +433,8 @@ behavior change with no accessibility benefit.
 
 - `libs/docstruct/tests/test_table_ast_from_rows.py` checks the contract above,
   including that `normalize_table_ast` and the canonical builder return the same
-  AST as the public function for the same rows.
+  AST as the public function for the same rows, that a blank first row is not
+  promoted to a legacy header, and that the exporters agree on it.
 - `libs/core/tests/test_table_ast_from_rows_parity.py` checks the core's frozen
   reference over random rows (including blank rows), the whitespace-only table
   the payload builder passes, and that `docstruct.canonical` has no private
@@ -437,7 +442,8 @@ behavior change with no accessibility benefit.
 - Export characterization: the export snapshots' table is defined by
   `table_ast`, not built from rows, so its TXT/HTML/Markdown/Pandoc bytes are
   unchanged. The strict-gate acceptance corpus
-  (`tests/fixtures/export_schema_gate`) has no table block at all, so all 68
+  (`tests/fixtures/export_schema_gate`) has a rows-only table
+  (`numeric-table-rows`), but no table with blank rows, so all 68
   TXT/HTML/DOCX/PDF-UA baseline outcomes are unchanged;
   `libs/core/tests/test_export_schema_gate.py` continues to compare them.
 

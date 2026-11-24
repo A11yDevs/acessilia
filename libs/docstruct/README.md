@@ -218,7 +218,7 @@ Lightweight parser for MinerU `middle_json` output:
 ### Table AST & Complexity (`docstruct.tables.ast`)
 
 Pure grid analysis and AST conversion:
-- `table_ast_from_rows(rows, caption=None)`: Builds a canonical body-only `TableAST` from rows of cell text. A blank cell and a row of blank cells stay, because they are grid positions; a row with no cell and an empty table are left out (`None`) (#601). The canonical builder uses this single implementation.
+- `table_ast_from_rows(rows, *, caption=None)`: Builds a canonical body-only `TableAST` from rows of cell text. A blank cell and a row of blank cells stay, because they are grid positions; a row with no cell and an empty table are left out (`None`) (#601). The canonical builder uses this single implementation.
 - `table_ast_from_docling_grid(grid_or_cells, caption=None)`: Builds a canonical `TableAST` from Docling grid cells (`start_row_offset_idx`, `start_col_offset_idx`, row and column spans).
 - `analyze_table_complexity(table_ast_or_cells)`: Evaluates table complexity returning `TableComplexityMetrics` (`has_spans`, `max_rowspan`, `max_colspan`, `spanned_cell_count`, `is_complex`).
 

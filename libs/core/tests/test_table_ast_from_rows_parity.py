@@ -9,9 +9,11 @@ the canonical reading: a blank cell, and a row of blank cells, is still a grid
 position, so both keep it. Only a row with no cell at all is left out, and the
 table is ``None`` when no row with a cell remains.
 
-The reference below is the behavior the canonical path had before #601, frozen
-so the contract stays checked: cells are stripped, blank rows stay, rows that
-are not lists are skipped, and no row left means ``None``.
+The reference below is the contract agreed in #601, frozen so it stays checked:
+cells are stripped, blank rows stay, rows that are not lists are skipped, a row
+with no cell is left out, and no row with a cell means ``None``. It is not the
+old canonical function, which returned ``{"body": []}`` when no row was left and
+did not strip cells (its inputs were already sanitized).
 """
 
 from __future__ import annotations
@@ -23,10 +25,11 @@ from typing import Any
 
 import pytest
 
+import docstruct.canonical as canonical
 from acessilia_core.manifest.models import ManifestElement
 from acessilia_core.pipeline.elements import _element_to_block
-from docstruct.canonical import build_canonical_document
 from docstruct.export.html import document_to_html
+from docstruct.export.txt import document_to_txt_lines
 from docstruct.tables.ast import table_ast_from_rows
 from docstruct.tables.text_rows import rows_from_visual_table_text
 
@@ -91,14 +94,12 @@ def test_a_cells_row_that_is_not_a_list_is_read_now() -> None:
 
 def test_canonical_has_no_private_builder() -> None:
     """The canonical path builds its table AST with the public function."""
-    import docstruct.canonical as canonical
-
     assert not hasattr(canonical, "_table_ast_from_rows")
 
 
 def test_canonical_and_the_public_function_build_the_same_ast() -> None:
     rows = [["h1", "h2"], ["", ""], ["a", "b"]]
-    document = build_canonical_document(
+    document = canonical.build_canonical_document(
         {
             "pages": [
                 {
@@ -131,13 +132,19 @@ def _table(text: str, metadata: dict | None = None) -> ManifestElement:
     )
 
 
-def _exported(block: dict) -> tuple[dict, str]:
-    document = build_canonical_document({"pages": [{"blocks": [block]}]}, id_factory=lambda: "d")
+def _exported(block: dict) -> tuple[dict, str, str]:
+    document = canonical.build_canonical_document(
+        {"pages": [{"blocks": [block]}]}, id_factory=lambda: "d"
+    )
     tables = [
         item for section in document["sections"] for item in section["blocks"]
         if item["type"] == "table"
     ]
-    return tables[0], document_to_html(document, profile="html")
+    return (
+        tables[0],
+        document_to_html(document, profile="html"),
+        "\n".join(document_to_txt_lines(document)),
+    )
 
 
 @pytest.mark.parametrize(
@@ -154,6 +161,11 @@ def test_a_whitespace_table_keeps_its_blank_cell_and_exports_the_same(
     block = _element_to_block(_table(text, copy.deepcopy(metadata)))
     assert block["table_ast"] == {"body": [{"cells": [{"text": ""}]}]}
     assert block["rows"] == [[text]]
+
+    table, html, txt = _exported(block)
+    assert table["table_ast"] == {"body": [{"cells": [{"text": ""}]}]}
+    assert '<table id="element-000001"><tbody><tr><td></td></tr></tbody></table>' in html
+    assert txt == "Row 1: "
 
     before = dict(block, table_ast=None)
 

@@ -482,7 +482,7 @@ def _sanitize_table_rows(block: dict[str, Any]) -> None:
         ])
     block["rows"] = rows
     if rows and not isinstance(block.get("table_ast"), dict):
-        table_ast = table_ast_from_rows(rows)
+        table_ast = table_ast_from_rows(rows, caption=block.get("caption"))
         if table_ast is not None:
             block["table_ast"] = table_ast
 

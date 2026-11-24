@@ -10,7 +10,15 @@ and is left out; the table is ``None`` only when no row with a cell remains.
 from __future__ import annotations
 
 from docstruct.canonical import sanitize_canonical_document
-from docstruct.tables.ast import normalize_table_ast, table_ast_from_rows
+from docstruct.export.html import document_to_html
+from docstruct.export.markdown import document_to_markdown
+from docstruct.export.txt import document_to_txt_lines
+from docstruct.tables.ast import (
+    linearize_table_for_text,
+    normalize_table_ast,
+    split_header_and_body,
+    table_ast_from_rows,
+)
 
 
 def _cells(ast: dict) -> list[list[str]]:
@@ -62,6 +70,20 @@ def test_normalize_table_ast_reads_rows_with_the_same_builder() -> None:
     )
 
 
+def test_a_blank_first_row_is_not_promoted_to_a_header() -> None:
+    ast = table_ast_from_rows([["", ""], ["a", "b"]])
+
+    header, body, footer = split_header_and_body(ast)
+
+    assert header == []
+    assert body == ast["body"]
+    assert footer == []
+    assert linearize_table_for_text({"type": "table", "table_ast": ast}) == [
+        "Row 1:  | ",
+        "Row 2: a | b",
+    ]
+
+
 def test_the_canonical_path_uses_the_same_builder() -> None:
     rows = [["h1", "h2"], ["", ""], ["a", "b"]]
     document = {
@@ -79,3 +101,75 @@ def test_the_canonical_path_uses_the_same_builder() -> None:
 
     assert table["table_ast"] == table_ast_from_rows(rows)
     assert table["rows"] == rows
+
+
+def test_the_canonical_path_keeps_the_block_caption() -> None:
+    document = {
+        "sections": [
+            {
+                "id": "s1",
+                "title": "T",
+                "level": 1,
+                "blocks": [
+                    {"id": "t1", "type": "table", "rows": [["a"]], "caption": " T "}
+                ],
+            }
+        ]
+    }
+
+    table = sanitize_canonical_document(document)["sections"][0]["blocks"][0]
+
+    assert table["table_ast"] == table_ast_from_rows([["a"]], caption="T")
+    assert table["table_ast"]["caption"] == "T"
+
+
+def test_canonical_table_with_only_empty_rows_has_no_ast() -> None:
+    """`rows: [[], []]` would have produced the schema-invalid {"body": []}."""
+    document = {
+        "sections": [
+            {
+                "id": "s1",
+                "title": "T",
+                "level": 1,
+                "blocks": [{"id": "t1", "type": "table", "rows": [[], []]}],
+            }
+        ]
+    }
+
+    table = sanitize_canonical_document(document)["sections"][0]["blocks"][0]
+
+    assert table["rows"] == [[], []]
+    assert "table_ast" not in table
+
+
+def _rows_document(rows: list[list[str]]) -> dict:
+    return {
+        "schema_version": "1.0.0",
+        "id": "d",
+        "title": "T",
+        "language": "pt-BR",
+        "audience": ["reader"],
+        "verbosity": "detailed",
+        "sections": [
+            {
+                "id": "s1",
+                "title": "T",
+                "level": 1,
+                "blocks": [{"id": "t1", "type": "table", "rows": rows}],
+            }
+        ],
+    }
+
+
+def test_exporters_do_not_make_a_blank_first_row_a_header() -> None:
+    document = _rows_document([["", ""], ["a", "b"]])
+    body = "<tbody><tr><td></td><td></td></tr><tr><td>a</td><td>b</td></tr></tbody>"
+
+    html = document_to_html(document, profile="html")
+    markdown = document_to_markdown(document)
+
+    assert "<thead>" not in html
+    assert body in html
+    assert "<thead>" not in markdown
+    assert body in markdown
+    assert document_to_txt_lines(document) == ["T", "Row 1:  | ", "Row 2: a | b"]
