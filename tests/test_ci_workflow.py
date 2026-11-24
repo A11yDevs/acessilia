@@ -332,9 +332,24 @@ def test_the_integration_marker_is_registered() -> None:
 def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     """Images are published only after the core, SDK-alone and docstruct-alone jobs."""
     jobs = _workflow()["jobs"]
-    assert set(jobs["delivery"]["needs"]) >= {
-        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated",
+    delivery = jobs["delivery"]
+
+    # The security call is part of the gate: a delivery without the scan would
+    # publish an image the security job has not seen.
+    assert set(delivery["needs"]) == {
+        "tests", "sdk-isolated", "core-isolated", "docstruct-isolated", "security",
     }
+    # `changes` and `detect-changes` are PR-only. A `needs` edge to either
+    # would autoskip delivery on pushes, the exact #644 regression.
+    assert "changes" not in delivery["needs"]
+    assert "detect-changes" not in delivery["needs"]
+    condition = " ".join(delivery["if"].split())
+    assert condition == (
+        "github.event_name == 'push' && ( "
+        "github.ref_name == 'main' || "
+        "github.ref_name == 'develop' || "
+        "startsWith(github.ref_name, 'release/') )"
+    )
     assert "sdk-isolated" in jobs
     assert "docstruct-isolated" in jobs
 
@@ -684,34 +699,28 @@ def test_the_security_audit_pins_uv_and_checks_the_lock() -> None:
     assert "uv export --locked" in steps["Export locked dependencies"]["run"]
 
 
-def test_the_container_scan_is_conditional_on_image_paths() -> None:
-    workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
-    changes = workflow["jobs"]["image-changes"]
-    scan = workflow["jobs"]["container-scan"]
+def test_the_container_scan_runs_for_release_pulls_and_pushes() -> None:
+    """The scan is scoped to release pulls; pushes and schedules still scan.
 
-    assert changes["if"] == "github.event_name == 'pull_request'"
-    steps = {step.get("name"): step for step in changes["steps"]}
-    filter_step = steps["Filter image paths"]
-    assert filter_step["uses"] == (
-        "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d"
-    )
-    filters = filter_step["with"]["filters"]
-    for path in (
-        "infra/**",
-        "pyproject.toml",
-        "uv.lock",
-        "libs/**/pyproject.toml",
-        "libs/**/uv.lock",
-        ".dockerignore",
-        ".python-version",
-        ".trivyignore",
-        ".github/workflows/security.yml",
-    ):
-        assert path in filters
-    assert scan["needs"] == "image-changes"
-    assert scan["if"] == (
-        "!cancelled() && (github.event_name != 'pull_request' || "
-        "needs.image-changes.outputs.image != 'false')"
+    Removing the image-path detector also removes the reusable-workflow skip
+    trap that autoskipped `publish verified images` on develop (2026-11-23).
+    The scan still skips on ordinary PRs, which is safe while no PR job needs
+    the `security` call; the workflow comment keeps that caveat visible.
+    """
+    workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
+    scan = workflow["jobs"]["container-scan"]
+    caller = _workflow()["jobs"]["security"]
+
+    assert "image-changes" not in workflow["jobs"]
+    assert "needs" not in scan
+    assert workflow["permissions"].get("pull-requests") is None
+    assert caller["permissions"].get("pull-requests") is None
+    condition = " ".join(scan["if"].split())
+    assert condition == (
+        "!cancelled() && ( "
+        "github.event_name != 'pull_request' || "
+        "startsWith(github.base_ref, 'release/') || "
+        "startsWith(github.head_ref, 'release/') )"
     )
     audit = workflow["jobs"]["dependency-audit"]
     assert "if" not in audit
