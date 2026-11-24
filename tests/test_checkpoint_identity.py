@@ -23,6 +23,7 @@ from acessilia_core.pipeline.checkpointing import (
     RunCheckpoints,
     manifest_payload,
 )
+from acessilia_core.pipeline.handlers import pictures as picture_method
 from acessilia_core.ports import CHECKPOINT_PHASES, NoRegionCache, RunPorts
 from acessilia_core.run_identity import PROCESSING_FIELDS, STAGE_FIELDS, stage_identity
 from tests.core_config_support import core_config
@@ -70,10 +71,10 @@ def _counting_orchestrator(monkeypatch, counts):
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
     monkeypatch.setattr(pddl, "_classify_formula_regions", enrich)
-    for name in (
-        "_enrich_picture_descriptions", "_mark_inline_math", "_enrich_formula_latex",
+    for name in ( "_mark_inline_math", "_enrich_formula_latex",
     ):
         monkeypatch.setattr(pddl, name, noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl.toolbox_gate, "decide", decide)
     orchestrator = build_orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=extract)

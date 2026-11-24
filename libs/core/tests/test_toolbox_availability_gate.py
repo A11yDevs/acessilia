@@ -238,6 +238,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
     from types import SimpleNamespace
 
     from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline.handlers import pictures as picture_method
 
     class Stop(Exception):
         pass
@@ -255,9 +256,9 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
         return None, {}
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                 "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_mark_inline_math", "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, no_step)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_step)
     monkeypatch.setattr(toolbox_gate, "decide", decide)
     orchestrator = _orchestrator()
     run_config = _config(gate="enforce")
@@ -421,6 +422,8 @@ TRANSITIONAL_BASELINE = frozenset({
     # #640 M2: the table enrichment that ran before planning, now a method of
     # the plan. The same computation, moved, not added.
     "table-enrichment",
+    # #640 M1: the picture descriptions, moved the same way.
+    "picture-description",
 })
 
 

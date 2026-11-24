@@ -17,7 +17,7 @@ from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import STAGE_EXECUTING_PLAN_STEP
 from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ProcessingManifest
-from acessilia_core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.page_labels import _pages_label
 from acessilia_core.planning.models import PlanStep
 
 

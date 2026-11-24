@@ -25,11 +25,11 @@ from acessilia_core.i18n.stage_messages import (
 from acessilia_core.logger import logger
 from acessilia_core.manifest.builder import _derive_processing_needs
 from acessilia_core.manifest.models import Obligation
-from acessilia_core.pipeline import (
-    orchestrator as pddl,
-    preflight as pipeline_preflight,
+from acessilia_core.pipeline import preflight as pipeline_preflight
+from acessilia_core.pipeline.handlers import (
+    pictures as picture_method,
+    tables as table_method,
 )
-from acessilia_core.pipeline.handlers import tables as table_method
 from acessilia_core.pipeline.obligations import _unsatisfied_summary
 from acessilia_core.ports import RunPorts
 
@@ -112,7 +112,7 @@ async def _run(orchestrator, manifest, monkeypatch, tmp_path):
         return None
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     # The tables are read inside the plan, by ``table-enrichment`` (#640, M2).
     monkeypatch.setattr(table_method, "_enrich_table_structures", _no_tables_read)
     return await orchestrator.execute(

@@ -6,12 +6,12 @@ import pytest
 
 from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.pipeline import (
-    orchestrator as pddl,
     payload as pipeline_payload,
     preflight as pipeline_preflight,
 )
 from acessilia_core.pipeline.handlers import (
     content as content_handlers,
+    pictures as picture_method,
     tables as _table_method,
 )
 from acessilia_core.ports import RunPorts
@@ -108,7 +108,7 @@ async def test_orchestration_rejects_failed_or_exhausted_plan(monkeypatch, tmp_p
         return None
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(_table_method, "_enrich_table_structures", noop)
     with pytest.raises(RuntimeError, match="linearize-table"):
         await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())
@@ -134,7 +134,7 @@ async def test_failed_plan_marks_api_job_error_without_caching_or_download(
         pytest.fail("A failed plan must not be cached or published")
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(_table_method, "_enrich_table_structures", noop)
     monkeypatch.setattr(service, "agente", orchestrator)
     monkeypatch.setattr(service, "get_cached", noop)

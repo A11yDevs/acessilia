@@ -626,6 +626,13 @@ class TestEveryHandlerIsCallable:
             "enrich-tables",
             [_element("el-1", "table", metadata={"table_ast": {"body": [{"cells": [{"text": "Value"}]}]}})],
         ),
+        # The document's picture descriptions (#640, M1). A picture already
+        # described is not described again, so it succeeds without calling
+        # the vision model.
+        "picture-description": (
+            "describe-images",
+            [_element("el-1", "picture", text="A chart", metadata={"vision_description_complete": True})],
+        ),
         "pandoc-code": (
             "preserve-code-semantics",
             [_element("el-1", "code", text="def  f( ):\n  return  1")],

@@ -117,6 +117,9 @@ DEFAULT_METHOD_COSTS = {
     # The document's table enrichment (#640, M2): before planning until 0.3.11,
     # now a planned action; its only alternative is human-review.
     "table-enrichment": 15,
+    # The document's picture descriptions (#640, M1): before planning until
+    # 0.3.13, now a planned action; its only alternative is human-review.
+    "picture-description": 15,
     # Consomem modelo: custo alto, só admissíveis com a política ativa.
     "vlm-pairwise-judge": 40,
     "table-specialist": 45,

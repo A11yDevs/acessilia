@@ -171,7 +171,7 @@ It finds 64 keys, 19 of them written or read by more than one group.
 
 **Order of `execute`.** Before planning it runs:
 1. P classifies formula regions;
-2. O describes pictures;
+2. O prepares the pictures (the injected picture and the ownership);
 3. Q marks inline math in prose;
 4. P recognizes formulas.
 
@@ -179,6 +179,9 @@ Since core 0.3.12 (#640, M2) the table steps run inside the plan, as the
 `table-enrichment` method, before the tables' `linearize-table`:
 5. S reads tables;
 6. Q marks inline math in tables.
+
+Since core 0.3.14 (#640, M1) O describes the pictures inside the plan, as
+the `picture-description` method, before the pictures' `describe-image`.
 
 The plan's other handlers (B, E–L) run in the plan's order. T's status checks and the payload (V, W, X) come last.
 

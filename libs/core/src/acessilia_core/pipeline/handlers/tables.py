@@ -47,24 +47,13 @@ from acessilia_core.pipeline.enrichment.tables import (
     _enrich_table_structures,
     _tables_to_read,
 )
+from acessilia_core.pipeline.handlers.common import run_status
 from acessilia_core.pipeline.handlers.messages import (
     MSG_TABLE_NO_TABLE,
     MSG_TABLES_ENRICHED,
 )
 from acessilia_core.ports import RunPorts
 from acessilia_sdk.runtime import run_sync
-
-
-def _status(ports: RunPorts):
-    """The run's progress reporter as the coroutine the table step awaits."""
-    report = ports.services.progress
-    if report is None:
-        return None
-
-    async def status(message: str) -> None:
-        report(message)
-
-    return status
 
 
 async def _enrich_tables(
@@ -82,7 +71,7 @@ async def _enrich_tables(
     enrichment (``obligation-enrich-tables-2``, #832) reads and marks only its
     new tables, never the ones an earlier enrichment owns. The breaker, the
     span reader and the progress stay the run's."""
-    status = _status(ports)
+    status = run_status(ports)
     if status is not None:
         await status(t(STAGE_ENRICHING_TABLES_OCR))
     await _enrich_table_structures(

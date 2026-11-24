@@ -12,13 +12,29 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
+from collections.abc import Callable, Coroutine
 from pathlib import Path
+from typing import Any
 
 from acessilia_core.agents.fusion_agent import FusionAgent
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
 from acessilia_core.manifest.models import Artifact, ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.handlers.messages import MSG_HANDLER_OBLIGATION_NOT_FOUND
+from acessilia_core.ports import RunPorts
+
+
+def run_status(ports: RunPorts) -> Callable[[str], Coroutine[Any, Any, None]] | None:
+    """The run's progress reporter as the coroutine a document-wide step
+    awaits (``table-enrichment``, ``picture-description``); ``None`` without one."""
+    report = ports.services.progress
+    if report is None:
+        return None
+
+    async def status(message: str) -> None:
+        report(message)
+
+    return status
 
 
 def _fusion_agent() -> FusionAgent:

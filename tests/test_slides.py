@@ -395,8 +395,8 @@ async def test_media_inspection_decides_the_structure_before_extraction(
 ):
     from types import SimpleNamespace
 
-    from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline.canonical_builder import build_canonical_document
+    from acessilia_core.pipeline.handlers import pictures as picture_method
     from docstruct.validation import validate_canonical_document
     from tests.pddl_support import build_orchestrator
 
@@ -421,7 +421,7 @@ async def test_media_inspection_decides_the_structure_before_extraction(
     orchestrator = build_orchestrator(max_replans=0)
     orchestrator.information_structural = SimpleNamespace(process=process)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(_table_method, "_enrich_table_structures", noop)
 
     payload = await orchestrator.execute(source, tmp_path, structured_output=True, config=core_config(), model_calls=current_model_calls(), ports=RunPorts.none())

@@ -102,3 +102,29 @@ def test_fast_downward_orders_a_document_level_obligation_first():
     assert report.comparison.verdict in {"identical", "equivalent"}
     order = [step.obligation_id for step in plans["fast-downward"].steps if step.method]
     assert order.index(enrich.id) < order.index("o-linearize")
+
+
+def test_fast_downward_describes_the_pictures_before_it_validates_them():
+    """#640, M1: the document's ``describe-images`` precedes the pictures'
+    ``describe-image``, through ``depends-on``, under both planners."""
+    from pddl_support import build_element, build_manifest, build_obligation
+
+    from acessilia_core.pipeline.document_obligations import (
+        PICTURE_DESCRIPTION,
+        reconcile_document_step,
+    )
+
+    describe = build_obligation("describe-image", ["p-1"], ["vision-description", "human-review"])
+    describe.id = "o-describe"
+    # The manifest's real costs: equal ones would let the planners break the
+    # tie differently, which is not what this case checks.
+    describe.method_costs = {"vision-description": 20, "human-review": 100}
+    manifest = build_manifest([build_element("p-1", "picture", text="")], [describe])
+    enrichment = reconcile_document_step(manifest, PICTURE_DESCRIPTION)
+
+    plans, report = _compare(manifest, None)
+
+    assert report.outcomes["fast-downward"].status == "solved"
+    assert report.comparison.verdict in {"identical", "equivalent"}
+    order = [step.obligation_id for step in plans["fast-downward"].steps if step.method]
+    assert order.index(enrichment.id) < order.index("o-describe")

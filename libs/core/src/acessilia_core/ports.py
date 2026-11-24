@@ -136,6 +136,12 @@ class RunServices:
         #: worker thread; set by the orchestrator once it has its event loop,
         #: ``None`` outside a run with a status callback.
         self.progress: Callable[[str], None] | None = None
+        #: The run's media inspection, the bootstrap's result, which the
+        #: orchestrator loads or computes on every run. The
+        #: ``picture-description`` method annotates the text ownership with
+        #: it again after it retypes elements (#640, M1), as the stage did
+        #: before planning. Not a planning fact: the planner never reads it.
+        self.media_inspection: dict[str, Any] | None = None
 
     def shared(self, key: str, build: Callable[[], _Shared]) -> _Shared:
         """The run's object under ``key``, built by ``build`` the first time."""

@@ -24,10 +24,7 @@ from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.i18n import t
 from acessilia_core.manifest.models import Obligation
-from acessilia_core.pipeline import (
-    orchestrator as pddl,
-    preflight as pipeline_preflight,
-)
+from acessilia_core.pipeline import preflight as pipeline_preflight
 from acessilia_core.pipeline.elements import (
     MSG_UNDESCRIBED_PICTURE_ALT,
     _element_to_block,
@@ -35,7 +32,10 @@ from acessilia_core.pipeline.elements import (
 from acessilia_core.pipeline.enrichment import common as enrichment_common
 from acessilia_core.pipeline.enrichment.common import _extract_picture_bytes
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
-from acessilia_core.pipeline.handlers import tables as _table_method
+from acessilia_core.pipeline.handlers import (
+    pictures as picture_method,
+    tables as _table_method,
+)
 from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
 from acessilia_core.ports import RunPorts
 from tests.core_config_support import (
@@ -312,7 +312,7 @@ async def _run(manifest, monkeypatch, tmp_path):
         return None
 
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", noop)
-    monkeypatch.setattr(pddl, "_enrich_picture_descriptions", noop)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(_table_method, "_enrich_table_structures", noop)
     return await orchestrator.execute(
         tmp_path / "qa_word.docx", tmp_path, structured_output=True,

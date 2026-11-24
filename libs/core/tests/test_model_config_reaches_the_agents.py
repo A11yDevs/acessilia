@@ -137,7 +137,10 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
     from pddl_support import build_orchestrator
 
     from acessilia_core.pipeline import orchestrator as pddl, preflight
-    from acessilia_core.pipeline.handlers import tables as table_method
+    from acessilia_core.pipeline.handlers import (
+        pictures as picture_method,
+        tables as table_method,
+    )
 
     seen: dict[str, object] = {}
 
@@ -154,14 +157,17 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
 
     stages = ("_classify_formula_regions", "_enrich_picture_descriptions",
               "_enrich_formula_latex", "_enrich_table_structures")
-    for name in (*stages[:3], "_mark_inline_math"):
+    for name in ("_classify_formula_regions", "_enrich_formula_latex", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, record(name))
-    # The table step runs inside the plan, as ``table-enrichment`` (#640, M2).
+    # The picture and table steps run inside the plan, as
+    # ``picture-description`` (#640, M1) and ``table-enrichment`` (M2).
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", record("_enrich_picture_descriptions"))
     monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
     monkeypatch.setattr(table_method, "_mark_table_inline_math", no_marks)
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
     manifest = build_manifest(
-        [build_element("h", "heading", text="Title"), build_element("t", "table", text="a b")], []
+        [build_element("h", "heading", text="Title"), build_element("t", "table", text="a b"),
+         build_element("p", "picture", text="")], []
     )
     orchestrator = build_orchestrator(max_replans=1)
     run_config = replace(core_config(), models=MODELS)

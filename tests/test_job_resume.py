@@ -18,6 +18,7 @@ from acessilia_core.execution.executor import (
 from acessilia_core.execution.models import ExecutionStepResult, MethodResult
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline import orchestrator as pddl
+from acessilia_core.pipeline.handlers import pictures as picture_method
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.planner_agent import PlannerAgent
 from acessilia_core.ports import (
@@ -51,7 +52,15 @@ def data_dir(tmp_path, monkeypatch):
 def _sample_manifest(obligations: int = 1) -> ProcessingManifest:
     from tests.pddl_support import build_obligation
 
-    elements = [build_element("h", "heading", text="Titulo")]
+    # Enough prose that the document is not mostly visual, so its heading is
+    # not one the picture descriptions would describe (#640, M1).
+    elements = [
+        build_element("h", "heading", text="Titulo"),
+        build_element(
+            "p", "paragraph",
+            text="A paragraph with enough words to make the document read as text, not as a picture.",
+        ),
+    ]
     built = []
     for index in range(obligations):
         obligation = build_obligation("describe-image", ["h"], ["human-review"])
@@ -206,12 +215,12 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
     for name in (
         "_classify_formula_regions",
-        "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
         "_mark_inline_math_after_execution",
     ):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
 
     orchestrator = build_orchestrator()
     orchestrator.executor.registry.register(
@@ -232,9 +241,11 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("resume-task")
     )
 
-    # The table steps run inside the plan since #640 (M2): four steps before it,
-    # plus the inline math pass over the executed manifest (#599).
-    assert counts == {"inspect": 1, "extract": 1, "enrich": 6}
+    # The tables (#640, M2) and the pictures (M1) are enriched inside the
+    # plan: the crashed run stopped at its first step, the resume ran the
+    # three steps before the plan, then the inline math pass over the
+    # executed manifest (#599).
+    assert counts == {"inspect": 1, "extract": 1, "enrich": 5}
     assert result["text"]
     assert job_checkpoint.load("resume-task", PHASE_PLAN) is not None
 
@@ -254,12 +265,12 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
     for name in (
         "_classify_formula_regions",
-        "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
         "_mark_inline_math_after_execution",
     ):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
 
     orchestrator = build_orchestrator()
     orchestrator.executor.registry.register(
@@ -541,12 +552,12 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
     for name in (
         "_classify_formula_regions",
-        "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
         "_mark_inline_math_after_execution",
     ):
         monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
 
     orchestrator = build_orchestrator()
     orchestrator.executor.registry.register("human-review", handler)

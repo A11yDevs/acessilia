@@ -399,6 +399,7 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
 ) -> None:
     """Through ``execute``: the plan runs on the run's executor, not the unbound one."""
     from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline.handlers import pictures as picture_method
     from tests.pddl_support import build_element, build_manifest
 
     class Stop(Exception):
@@ -413,11 +414,11 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
     for name in (
         "_classify_formula_regions",
-        "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
     ):
         monkeypatch.setattr(pddl, name, no_enrichment)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
     received = []
 
@@ -441,6 +442,7 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
 
 def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
     from acessilia_core.pipeline import orchestrator as pddl
+    from acessilia_core.pipeline.handlers import pictures as picture_method
     from tests.pddl_support import build_element, build_manifest
 
     async def no_media(*_args, **_kwargs):
@@ -452,11 +454,11 @@ def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
     for name in (
         "_classify_formula_regions",
-        "_enrich_picture_descriptions",
         "_mark_inline_math",
         "_enrich_formula_latex",
     ):
         monkeypatch.setattr(pddl, name, no_enrichment)
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
 

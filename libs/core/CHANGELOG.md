@@ -2,6 +2,59 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.14 — the picture descriptions are a planned action (#640, M1)
+
+Until 0.3.13 the orchestrator described the pictures before planning. Now a
+document with pictures to describe gets one `describe-images` obligation,
+satisfied by the `picture-description` method, which runs the same step
+inside the plan: the vision model, with its concurrency, the run's breaker
+and region cache, one retry pass, and the ownership annotation again after
+the descriptions.
+- **One obligation for the document.** It targets the pictures not described
+  yet; without pictures, in a mostly visual document, its placeholder
+  visuals, or the first element of a one-page one, as the step chose them.
+  Each picture's `describe-image` keeps `vision-description`, which checks
+  the result, and depends on it, as do the page obligations of a page with a
+  picture. The only alternative is `human-review`. The method succeeds when
+  the step ran for every picture; a picture left undescribed keeps its
+  reason (`vision_failure_reason`), and its `describe-image` validates it.
+  Its message counts the pictures described, read as formulas, already
+  described, and the reason of each one left.
+- **It changes obligations while the plan runs.** A picture the model reads
+  as a formula becomes a formula, so its `describe-image` is replaced by
+  `verbalize-formula`; a placeholder visual it describes becomes a picture
+  with a `describe-image`. The executor skips the replaced step and replans
+  for the new ones, within `max_discovery_replans` (M0).
+- **What stays before planning.** What derives from the media inspection: the
+  injected full-page picture and the first ownership annotation
+  (`_prepare_pictures`), so the plan's obligations include the injected
+  picture's. The method annotates again with the inspection the orchestrator
+  gives the run's services (`RunServices.media_inspection`). The progress
+  message before planning is now the formulas' (`STAGE_ENRICHING_FORMULAS`);
+  the method announces the descriptions inside the plan.
+- **One rule for both document steps.** The rules of 0.3.13 for the table
+  enrichment (cover, drop the lost targets, reconcile the edges, select a new
+  obligation before a replan) move to `pipeline/document_obligations.py` and
+  hold for both steps (`DocumentStep`, `reconcile_document_steps`).
+  `add_table_enrichment_obligation` and the table constants keep their names.
+- **Known gap until M3.** The formula LaTeX step runs before planning, so it
+  no longer sees a picture the model reads as a formula: that formula keeps
+  the model's LaTeX, without the recognizer's second reading or the
+  separation of its equation number. M3 makes the recognition the formula's
+  own obligation.
+- A manifest whose pictures are all described, such as an enrichment
+  checkpoint from 0.3.13, gets no `describe-images`, so a resume describes
+  nothing again. The candidates are chosen before the described ones are
+  left out, so a document whose pictures are all described no longer moves
+  on to its placeholder visuals, as the step did on a resume.
+- `picture-description` is `transitional` in `LOCAL_METHODS` (its model call
+  is the core's `VisionAgent`) and declares no Toolbox requirement: its
+  `pdf.render` crop is per picture and degrades to `crop_unavailable`.
+- Tests: the obligation, the plan order (also under Fast Downward), the
+  method's scope and message, a picture read as a formula replanned end to
+  end, the resume of a 0.3.13 checkpoint, and a differential test of the
+  elements before and after the migration.
+
 ## 0.3.13 — the executor handles obligations an execution changes (#832, M0 of #640)
 
 A reclassification during the plan, such as a picture the vision model reads

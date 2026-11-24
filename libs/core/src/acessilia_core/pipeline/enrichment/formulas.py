@@ -53,7 +53,7 @@ from acessilia_core.manifest.builder import (
     separate_equation_number,
 )
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
-from acessilia_core.pipeline.obligations import _pages_label
+from acessilia_core.pipeline.page_labels import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id, _toolbox_formula_crop
 from acessilia_core.ports import RegionCache
 from acessilia_core.toolbox.toolbox_math_tools import (

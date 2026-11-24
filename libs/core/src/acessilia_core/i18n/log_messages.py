@@ -337,6 +337,10 @@ MSG_OBLIGATION_TABLE: str = "The table must have verifiable headers and reading 
 MSG_OBLIGATION_TABLE_ENRICHMENT: str = (
     "The document's tables must be read where their structure is missing or garbled, and their inline math marked."
 )
+#: Manifest processing-needs rationale for the document's picture descriptions (#640, M1): one obligation for the pictures to describe.
+MSG_OBLIGATION_PICTURE_DESCRIPTION: str = (
+    "The document's pictures must be described by the vision model, or read as formulas where they are formulas."
+)
 #: Manifest processing-needs rationale for formula elements, used as the LLM prompt obligation text per element type.
 MSG_OBLIGATION_FORMULA: str = (
     "The formula must carry an accessible mathematical representation plus verbalization."

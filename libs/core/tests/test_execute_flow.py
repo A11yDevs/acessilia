@@ -13,14 +13,22 @@ from types import SimpleNamespace
 
 import pytest
 from core_config_support import core_config
-from pddl_support import build_element, build_manifest, build_orchestrator
+from pddl_support import (
+    build_element,
+    build_manifest,
+    build_obligation,
+    build_orchestrator,
+)
 
 from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.pipeline import (
     orchestrator as pddl,
     preflight as pipeline_preflight,
 )
-from acessilia_core.pipeline.handlers import tables as table_method
+from acessilia_core.pipeline.handlers import (
+    pictures as picture_method,
+    tables as table_method,
+)
 from acessilia_core.ports import RunPorts
 
 
@@ -36,9 +44,18 @@ def _recorders(monkeypatch):
         calls.append(("inspect", path.name, (), {}))
         return None
 
-    for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
-                 "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_mark_inline_math", "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, record(name))
+    # The pictures are described inside the plan, as ``picture-description``
+    # (#640, M1); the recorder describes them, so their ``describe-image`` holds.
+    async def describe(manifest, source, *args, **kwargs):
+        calls.append(("_enrich_picture_descriptions", source.name, tuple(args), dict(kwargs)))
+        for element in manifest.elements:
+            if element.id in kwargs["targets"]:
+                element.text = "A description"
+                element.metadata["vision_description_complete"] = True
+
+    monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", describe)
     # The post-execution inline math pass (#599) takes the executed and the
     # planning manifests before the source.
     async def after_execution(manifest, planning_manifest, source, *args, **kwargs):
@@ -57,9 +74,20 @@ def _recorders(monkeypatch):
     return calls
 
 
-async def _run(monkeypatch, tmp_path, *, config=None, elements=None, **kwargs):
+#: Enough text that the document is not mostly visual: a mostly visual one
+#: without pictures has its first element described (``description_candidates``).
+_PROSE = build_element(
+    "prose", "paragraph",
+    text="A paragraph with enough words to make the document read as text, not as a picture.",
+)
+
+
+async def _run(monkeypatch, tmp_path, *, config=None, elements=None, obligations=None, **kwargs):
     calls = _recorders(monkeypatch)
-    manifest = build_manifest(elements or [build_element("h", "heading", text="Titulo")], [])
+    manifest = build_manifest(
+        [*(elements or [build_element("h", "heading", text="Titulo")]), _PROSE.model_copy(deep=True)],
+        obligations or [],
+    )
     orchestrator = build_orchestrator(max_replans=1)
     run_config = config or core_config()
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
@@ -78,17 +106,16 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, mode="avancado", structured_output=True)
 
     names = [call[0] for call in calls]
-    # Without tables there is no ``enrich-tables`` obligation, so no table step;
-    # the inline math pass runs once more after execution (#599).
-    assert names == ["inspect", "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
+    # Without tables or pictures there is no ``enrich-tables`` or
+    # ``describe-images`` obligation, so no step inside the plan; the inline
+    # math pass runs once more after execution (#599).
+    assert names == ["inspect", "_classify_formula_regions", "_mark_inline_math",
                      "_enrich_formula_latex", "_mark_inline_math_after_execution"]
     by_name = {call[0]: call for call in calls}
-    breakers = {id(by_name[name][3]["breaker"]) for name in
-                ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex")}
+    breakers = {id(by_name[name][3]["breaker"]) for name in ("_classify_formula_regions", "_enrich_formula_latex")}
     assert len(breakers) == 1
-    assert {by_name[name][3].get("mode") for name in ("_classify_formula_regions", "_enrich_picture_descriptions",
+    assert {by_name[name][3].get("mode") for name in ("_classify_formula_regions",
                                                       "_enrich_formula_latex")} == {"avancado"}
-    assert "media_inspection" in by_name["_enrich_picture_descriptions"][3]
     assert all(call[1] == "doc.pdf" for call in calls)
     assert manifest.extractor.configuration["region_inspection_mode"] == "avancado"
 
@@ -105,7 +132,7 @@ async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, config=config, elements=[table])
 
     names = [call[0] for call in calls]
-    assert names == ["inspect", "_classify_formula_regions", "_enrich_picture_descriptions", "_mark_inline_math",
+    assert names == ["inspect", "_classify_formula_regions", "_mark_inline_math",
                      "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math",
                      "_mark_inline_math_after_execution"]
     by_name = {call[0]: call for call in calls}
@@ -118,6 +145,39 @@ async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_
 
 
 @pytest.mark.asyncio
+async def test_the_pictures_are_described_inside_the_plan_with_the_run_breaker_and_mode(
+    monkeypatch, tmp_path
+) -> None:
+    """#640, M1: a document with pictures gets a ``describe-images``
+    obligation; its ``picture-description`` method describes them inside the
+    plan, before their ``describe-image`` is validated, with the run's
+    breaker, the mode the run recorded and the media inspection."""
+    config = core_config(vision={"breaker_threshold": 7})
+    picture = build_element("p", "picture", text="")
+    describe_image = build_obligation("describe-image", ["p"], ["vision-description", "human-review"])
+    describe_image.method_costs = {"vision-description": 20, "human-review": 100}
+    _, calls, _, manifest = await _run(
+        monkeypatch, tmp_path, config=config, elements=[picture], obligations=[describe_image],
+        mode="avancado",
+    )
+
+    names = [call[0] for call in calls]
+    assert names[:5] == ["inspect", "_classify_formula_regions", "_mark_inline_math",
+                         "_enrich_formula_latex", "_enrich_picture_descriptions"]
+    by_name = {call[0]: call for call in calls}
+    describe = by_name["_enrich_picture_descriptions"][3]
+    assert describe["breaker"] is by_name["_enrich_formula_latex"][3]["breaker"]
+    assert describe["breaker"].threshold == 7
+    assert describe["vision"] is config.vision
+    assert describe["mode"] == "avancado"
+    assert describe["targets"] == frozenset({"p"})
+    assert "media_inspection" in describe
+    enrichment = next(item for item in manifest.obligations if item.kind == "describe-images")
+    assert enrichment.target_ids == ["p"]
+    assert enrichment.id in describe_image.dependencies
+
+
+@pytest.mark.asyncio
 async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, tmp_path) -> None:
     """ADR-0016 step 3: the run's ``VisionConfig``, not the settings, reaches each stage."""
     config = core_config(vision={"breaker_threshold": 7, "concurrency": 3})
@@ -125,7 +185,7 @@ async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, t
     _, calls, _, _ = await _run(monkeypatch, tmp_path, config=config)
 
     by_name = {call[0]: call[3] for call in calls}
-    stages = ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex")
+    stages = ("_classify_formula_regions", "_enrich_formula_latex")
     assert all(by_name[name]["vision"] is config.vision for name in stages)
     assert by_name["_enrich_formula_latex"]["breaker"].threshold == 7
 
@@ -186,7 +246,7 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
     async def inspect(path, *, toolbox):
         return None
 
-    for name in ("_classify_formula_regions", "_enrich_picture_descriptions", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_enrich_formula_latex"):
         monkeypatch.setattr(pddl, name, step)
     monkeypatch.setattr(pddl, "_mark_inline_math", no_step)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
@@ -212,13 +272,14 @@ async def test_the_progress_messages_come_in_order(monkeypatch, tmp_path) -> Non
     from acessilia_core.i18n import t
     from acessilia_core.i18n.stage_messages import (
         STAGE_ANALYZING_STRUCTURAL,
-        STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
+        STAGE_ENRICHING_FORMULAS,
         STAGE_GENERATING_PDDL_PLAN,
     )
 
-    # The tables are enriched inside the plan (#640, M2): the executor
-    # announces that step like any other, after the plan is generated.
-    expected = [t(STAGE_ANALYZING_STRUCTURAL), t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS),
+    # The pictures (#640, M1) and the tables (M2) are enriched inside the
+    # plan: the executor announces those steps like any other, after the plan
+    # is generated. The formulas are still enriched before it.
+    expected = [t(STAGE_ANALYZING_STRUCTURAL), t(STAGE_ENRICHING_FORMULAS),
                 t(STAGE_GENERATING_PDDL_PLAN)]
     assert statuses[:3] == expected
     assert len(statuses) >= 4  # then the execution stage and its progress

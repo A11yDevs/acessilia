@@ -35,7 +35,7 @@ from acessilia_core.execution.models import ExecutionReport, ExecutionStepResult
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
-    STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
+    STAGE_ENRICHING_FORMULAS,
     STAGE_EXECUTING_PLAN,
     STAGE_GENERATING_PDDL_PLAN,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
@@ -45,6 +45,7 @@ from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
+from acessilia_core.pipeline.document_obligations import reconcile_document_steps
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.formulas import (
     _classify_formula_regions,
@@ -55,14 +56,13 @@ from acessilia_core.pipeline.enrichment.inline_math import (
     _mark_inline_math_after_execution,
     run_text_spans,
 )
-from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
+from acessilia_core.pipeline.enrichment.pictures import _prepare_pictures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
     _replannable_obligation_ids,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
-    add_table_enrichment_obligation,
     planning_signature,
 )
 from acessilia_core.pipeline.payload import build_pddl_structured_payload
@@ -420,9 +420,14 @@ class PddlAccessibilityOrchestrator:
     async def _load_or_inspect_media(
         self, ctx: _RunContext
     ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-        """The media inspection and configuration, from the checkpoint or a new run."""
+        """The media inspection and configuration, from the checkpoint or a new run.
+
+        The inspection is also given to the run's services, for the
+        ``picture-description`` method (#640, M1).
+        """
         media_state = ctx.checkpoints.load(PHASE_MEDIA)
         if media_state is not None:
+            ctx.ports.services.media_inspection = media_state.get("inspection")
             return media_state.get("inspection"), dict(media_state.get("configuration") or {})
         # media.inspect runs first: a slide deck is extracted and structured
         # slide by slide, which has to be decided before extraction.
@@ -433,6 +438,7 @@ class PddlAccessibilityOrchestrator:
             PHASE_MEDIA,
             lambda: {"inspection": media_inspection, "configuration": media_configuration},
         )
+        ctx.ports.services.media_inspection = media_inspection
         return media_inspection, media_configuration
 
     async def _load_or_extract_manifest(
@@ -483,9 +489,10 @@ class PddlAccessibilityOrchestrator:
             manifest, ctx.source_path, ctx.effective_mode, media_inspection,
             ctx.status_callback, ctx.config, ctx.ports, ctx.checkpoints,
         )
-        # The tables are enriched inside the plan (#640, M2). A checkpoint from
-        # before that already has its tables enriched, so it gets no obligation.
-        add_table_enrichment_obligation(manifest)
+        # The tables (#640, M2) and the pictures (M1) are enriched inside the
+        # plan. A checkpoint from before that already has them enriched, so it
+        # gets no obligation for them.
+        reconcile_document_steps(manifest)
         await ctx.checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
         return manifest
 
@@ -627,21 +634,23 @@ class PddlAccessibilityOrchestrator:
         ports: RunPorts,
         checkpoints: RunCheckpoints,
     ) -> None:
-        """Classify formula regions, describe pictures, recognize inline math and formulas.
+        """Classify formula regions, prepare the pictures, recognize inline math and formulas.
 
-        The steps run in this order and share the run's provider breaker and
-        text-span reader (``RunPorts.services``) with the ``table-enrichment``
-        method, which reads the tables inside the plan (#640, M2). The manifest
-        is checkpointed after each step (#407). Each step records
+        The steps run in this order and share the run's provider breaker,
+        region cache and text-span reader (``RunPorts``) with the methods that
+        enrich inside the plan: ``picture-description`` describes the
+        pictures (#640, M1) and ``table-enrichment`` reads the tables (M2).
+        What derives from the media inspection stays here (``_prepare_pictures``).
+        The manifest is checkpointed after each step (#407). Each step records
         per-object progress in the manifest and skips an object it already
         finished, so a restart repeats at most the step that was running.
         """
         if status_callback:
-            await status_callback(t(STAGE_ENRICHING_IMAGE_DESCRIPTIONS))
+            await status_callback(t(STAGE_ENRICHING_FORMULAS))
         # Pictures, formulas and tables reach the vision provider from the
         # same pipeline, so one that went down does not get called again for
-        # every remaining object. The tables are read inside the plan, by the
-        # ``table-enrichment`` method, with the same run breaker (#640, M2).
+        # every remaining object; the methods inside the plan get the same
+        # run breaker.
         breaker = run_breaker(ports, config.vision)
         region_cache = region_cache_for(ports, config.vision)
         progress = checkpoints.enrichment_progress(manifest)
@@ -651,12 +660,7 @@ class PddlAccessibilityOrchestrator:
             breaker=breaker, on_progress=progress,
         )
         await checkpoints.save_manifest(manifest, enriching=True)
-        await _enrich_picture_descriptions(
-            manifest, source_path, mode=effective_mode, vision=config.vision,
-            toolbox=config.toolbox, models=config.models, region_cache=region_cache,
-            media_inspection=media_inspection, status_callback=status_callback,
-            breaker=breaker, on_progress=progress,
-        )
+        _prepare_pictures(manifest, media_inspection)
         await checkpoints.save_manifest(manifest, enriching=True)
         text_spans = run_text_spans(ports, manifest, source_path, config.toolbox)
         await _mark_inline_math(manifest, source_path, config.document, text_spans)
@@ -732,7 +736,7 @@ class PddlAccessibilityOrchestrator:
             failure = any(step.status == "failed" for step in execution_report.steps)
             # Reconciled first, so the guard and the roots see the same state.
             # A table the run added is enriched before its own obligations.
-            add_table_enrichment_obligation(manifest, replan=True)
+            reconcile_document_steps(manifest, replan=True)
             # The guard reads the graph: a dangling reference fails here, named.
             validate_obligation_graph(manifest)
             signature = planning_signature(manifest)

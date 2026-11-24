@@ -41,6 +41,7 @@ EXPECTED_RUN_PARAMETERS = {
     "rescue-omitted": ("config",),
     "pymupdf-region": ("config", "ports"),
     "table-enrichment": ("config", "ports"),
+    "picture-description": ("config", "ports"),
     "vision-page-inspection": ("config", "ports"),
 }
 
