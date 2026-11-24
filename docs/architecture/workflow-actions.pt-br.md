@@ -372,9 +372,14 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    mesmo plano recomeça esse passo dele, e os filtros por objeto do passo
    (`vision_description_complete`, a estrutura de uma tabela, o registro de
    reconhecimento de uma fórmula) pulam os objetos já feitos, então as
-   chamadas de modelo que eles custam não são pagas de novo. O progresso de
-   um passo que o plano não roda em seguida nunca é usado, e o próximo passo
-   terminado o descarta. A recuperação coletiva continua do passo: um
+   chamadas de modelo que eles custam não são pagas de novo. As obrigações
+   que os objetos terminados do passo interrompido acrescentaram (uma imagem
+   lida como fórmula ganha `verbalize-formula`) são selecionadas na
+   restauração, como o executor faria quando o handler retornasse, então o
+   replanejamento as planeja. O checkpoint de uma execução retomada parte do
+   snapshot que ela retomou, então uma segunda queda no mesmo passo também
+   mantém o progresso da retomada. O progresso de um passo que o plano não
+   roda em seguida nunca é usado, e o próximo passo terminado o descarta. A recuperação coletiva continua do passo: um
    breaker, uma passada de retry. As mensagens de progresso passam pelo
    `RunServices.progress`, ligadas ao job.
 8. **Equivalência primeiro.** Cada migração mantém um teste diferencial do

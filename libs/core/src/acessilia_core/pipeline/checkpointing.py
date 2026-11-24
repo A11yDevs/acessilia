@@ -192,14 +192,20 @@ class RunCheckpoints:
         """The ``on_progress`` callback of the enrichment steps (#407)."""
         return _EnrichmentCheckpoint(self, manifest).save
 
-    def execution_saver(self, plan: NominalPlan) -> _ExecutionCheckpoint:
+    def execution_saver(
+        self, plan: NominalPlan, *, resumed: dict[str, Any] | None = None
+    ) -> _ExecutionCheckpoint:
         """A callback the executor calls after each step, writing the checkpoint.
 
         It also takes the progress of the step running (:meth:`step_progress`,
-        #836), so it becomes the run's current execution checkpoint."""
+        #836), so it becomes the run's current execution checkpoint.
+        ``resumed`` is the execution checkpoint a resumed run starts from: its
+        last finished step is the snapshot the step's progress extends, so a
+        second crash in the same step keeps what the resumed run did (#857
+        review)."""
         if self._checkpoints is None:
             raise RuntimeError("an execution checkpoint needs the job's checkpoints")
-        self._execution = _ExecutionCheckpoint(self, plan)
+        self._execution = _ExecutionCheckpoint(self, plan, resumed=resumed)
         return self._execution
 
     def step_progress(self, obligation_id: str, manifest: dict[str, Any]) -> None:
@@ -229,8 +235,28 @@ def resumed_manifest(execution_state: dict[str, Any], plan: NominalPlan) -> dict
     results = execution_state.get("results") or []
     if isinstance(progress, dict) and len(results) < len(plan.steps):
         if plan.steps[len(results)].obligation_id == progress.get("obligation_id"):
-            return progress["manifest"]
+            return _with_discoveries_selected(progress["manifest"], execution_state["manifest"])
     return execution_state["manifest"]
+
+
+def _with_discoveries_selected(progress: dict[str, Any], before: dict[str, Any]) -> dict[str, Any]:
+    """``progress`` with the obligations the interrupted step added selected.
+
+    The step's finished objects may have added obligations (a picture read
+    as a formula gets ``verbalize-formula``). In a run that is not
+    interrupted, ``_select_discovered`` selects them once the handler
+    returns; the crash came first, so the resumed step would see them as
+    known and never select them, and the job would finish without them (#857
+    review). They are selected here, as the executor would have done; one
+    still open then asks for the replan (``_sync_selection``).
+    """
+    known = {item["id"] for item in before.get("obligations") or []}
+    manifest = dict(progress)
+    manifest["obligations"] = [
+        item if item["id"] in known else {**item, "selected": True}
+        for item in progress.get("obligations") or []
+    ]
+    return manifest
 
 
 class _ExecutionCheckpoint:
@@ -240,14 +266,25 @@ class _ExecutionCheckpoint:
     The progress is the last finished snapshot plus ``step_progress``: the
     step's obligation and the manifest its method is enriching. The next
     finished step writes a snapshot without it, so it never outlives its
-    step. Before the first finished step there is no snapshot to extend, and
-    the progress is not written.
+    step. A resumed run starts from the snapshot it resumed (``resumed``), so
+    its first step's progress is written too. Before the plan's first
+    finished step there is no snapshot to extend, and the progress is not
+    written.
     """
 
-    def __init__(self, run: RunCheckpoints, plan: NominalPlan) -> None:
+    def __init__(
+        self, run: RunCheckpoints, plan: NominalPlan, *, resumed: dict[str, Any] | None = None
+    ) -> None:
         self._run = run
         self._plan = plan
         self._last: dict[str, Any] | None = None
+        if resumed is not None and resumed.get("plan_id") == plan.plan_id:
+            # The last finished step of the run this one resumes; its own
+            # progress and identity are rewritten with the next write.
+            self._last = {
+                key: value for key, value in resumed.items()
+                if key not in (STEP_PROGRESS_KEY, IDENTITY_KEY)
+            }
 
     def __call__(self, snapshot: dict[str, Any]) -> None:
         if snapshot.get("plan_id") != self._plan.plan_id:

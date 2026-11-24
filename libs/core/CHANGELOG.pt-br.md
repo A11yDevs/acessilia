@@ -21,11 +21,23 @@ chamadas de modelo dos objetos já terminados. Agora:
   feito: uma imagem descrita, uma tabela lida, uma fórmula reconhecida. O
   progresso de um passo que o plano não roda em seguida nunca é usado, e o
   próximo passo terminado o descarta.
+- **O que o passo interrompido encontrou é mantido.** As obrigações que os
+  objetos terminados dele acrescentaram (uma imagem lida como fórmula ganha
+  `verbalize-formula`) são selecionadas na restauração, como o executor faz
+  quando um handler retorna, então o replanejamento as planeja; do contrário
+  um job retomado poderia terminar sem elas. Isso também cobre uma queda
+  depois que o handler retornou, antes de o checkpoint do passo ser gravado.
+- **Uma segunda queda mantém o progresso da retomada.** O checkpoint de
+  execução de uma execução retomada parte do snapshot que ela retomou, então
+  o progresso do primeiro passo dela também é gravado.
 - A recuperação coletiva (um breaker, uma passada de retry) e as mensagens
   de progresso (`RunServices.progress`) não mudam.
-- Testes: uma queda na quarta de cinco imagens retoma só com a quarta e a
-  quinta; na sexta de oito tabelas, só com as três últimas; na terceira de
-  quatro fórmulas, só com as duas últimas.
+- Testes: quedas no meio do passo com imagens, muitas tabelas e fórmulas
+  retomam só com o que o progresso salvo deixou (em que objeto a queda cai
+  depende do timing, então os testes conferem esse contrato, não uma lista
+  fixa); uma segunda queda no mesmo passo; uma queda depois de uma imagem
+  lida como fórmula, no meio do passo e entre o handler e o checkpoint do
+  passo.
 
 ## 0.3.16 — capacidades opcionais do Toolbox (#848)
 

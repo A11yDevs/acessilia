@@ -583,7 +583,7 @@ class PddlAccessibilityOrchestrator:
                 replan_required=bool(execution_state.get("replan_required")),
             )
         on_step = (
-            checkpoints.execution_saver(plan)
+            checkpoints.execution_saver(plan, resumed=execution_state)
             if checkpoints.active and not self.execute_dry_run
             else None
         )

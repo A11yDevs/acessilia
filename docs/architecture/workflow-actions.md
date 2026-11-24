@@ -360,8 +360,14 @@ the manifest. **The enrichment migration needs no domain change.**
    execution of the same plan starts that step again from it, and the step's
    per-object gates (`vision_description_complete`, a table's structure, a
    formula's recognition record) skip the objects already done, so the model
-   calls they cost are not paid again. The progress of a step the plan does
-   not run next is never used, and the next finished step drops it. The
+   calls they cost are not paid again. The obligations the interrupted
+   step's finished objects added (a picture read as a formula gets
+   `verbalize-formula`) are selected on the restore, as the executor would
+   have done once the handler returned, so the replan plans them. A resumed
+   run's checkpoint starts from the snapshot it resumed, so a second crash in
+   the same step keeps the resumed run's progress too. The progress of a
+   step the plan does not run next is never used, and the next finished
+   step drops it. The
    collective recovery stays the step's: one breaker, one retry pass. The
    progress messages go through `RunServices.progress`, tied to the job.
 8. **Equivalence first.** Each migration keeps a differential test of the final

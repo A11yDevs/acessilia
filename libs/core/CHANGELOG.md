@@ -20,11 +20,22 @@ the objects it had finished. Now:
   a described picture, a read table, a recognized formula. The progress of a
   step the plan does not run next is never used, and the next finished step
   drops it.
+- **What the interrupted step found is kept.** The obligations its finished
+  objects added (a picture read as a formula gets `verbalize-formula`) are
+  selected on the restore, as the executor does once a handler returns, so
+  the replan plans them; otherwise a resumed job could finish without them.
+  This also covers a crash after the handler returned, before its step's
+  checkpoint was written.
+- **A second crash keeps the resumed progress.** A resumed run's execution
+  checkpoint starts from the snapshot it resumed, so its first step's
+  progress is saved too.
 - The collective recovery (one breaker, one retry pass) and the progress
   messages (`RunServices.progress`) are unchanged.
-- Tests: a crash on the fourth of five pictures resumes with the fourth and
-  fifth only; on the sixth of eight tables, with the last three; on the
-  third of four formulas, with the last two.
+- Tests: crashes mid-step on pictures, many tables and formulas resume
+  with only what the saved progress left (which object the crash hits
+  depends on timing, so the tests check that contract, not a fixed list); a
+  second crash in the same step; a crash after a picture was read as a
+  formula, mid-step and between the handler and its step's checkpoint.
 
 ## 0.3.16 — optional Toolbox capabilities (#848)
 

@@ -259,6 +259,132 @@ def test_a_crash_mid_step_resumes_without_recognizing_the_formulas_again(monkeyp
     assert calls == left
 
 
+# The review of #857.
+
+
+def test_a_second_crash_in_the_same_step_keeps_the_resumed_progress(monkeypatch) -> None:
+    """Item 2: the resumed run's progress is saved from its first object,
+    so a second crash in the same step loses nothing the resumed run did."""
+    checkpoints = MemoryCheckpoints()
+    _vision(monkeypatch, crash_on="p-3")
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _pictures(5), checkpoints)
+    first_left = _left(checkpoints, "p-", "vision_description_complete")
+    assert first_left[0] == "p-3"
+
+    second = _vision(monkeypatch, crash_on="p-5")
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _pictures(5), checkpoints)
+    second_left = _left(checkpoints, "p-", "vision_description_complete")
+
+    assert second[:2] == ["p-3", "p-4"]
+    assert second_left[0] == "p-5"  # p-3 and p-4, described on the resume, were saved
+
+    third = _vision(monkeypatch, crash_on=None)
+    payload = _run(monkeypatch, _pictures(5), checkpoints)
+
+    assert third == second_left
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+
+
+def _formula_first(monkeypatch, *, crash_on: str | None):
+    """The vision model reads ``p-1`` as a formula and describes the rest."""
+    calls: list[str] = []
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            element_id = image_bytes.decode()
+            calls.append(element_id)
+            if element_id == crash_on:
+                raise Crash()
+            if element_id == "p-1":
+                return VisionOutput(kind="formula", description="", formula_latex=r"\frac{a}{b}",
+                                    language="und", confidence=0.9)
+            return VisionOutput(kind="description", description=f"Picture {element_id}.", language="en", confidence=0.9)
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(
+        picture_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (element.id.encode(), fallback or 1),
+    )
+    return calls
+
+
+def _verbalizing(monkeypatch):
+    from acessilia_core.execution.models import MethodResult
+
+    verbalized: list[str] = []
+
+    def mathml(_manifest, obligation_id):
+        verbalized.append(obligation_id)
+        return MethodResult(success=True, validated=True)
+
+    real = pddl.PddlAccessibilityOrchestrator._run_executor
+
+    def run_executor(self, config, ports):
+        executor = real(self, config, ports)
+        executor.registry.register("mathml", mathml)
+        return executor
+
+    monkeypatch.setattr(pddl.PddlAccessibilityOrchestrator, "_run_executor", run_executor)
+
+    async def nothing(*_args, **_kwargs):
+        return 0
+
+    from acessilia_core.pipeline.handlers import formula_recognition as formula_method
+
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
+    return verbalized
+
+
+def test_an_obligation_the_interrupted_step_found_is_planned_on_the_resume(monkeypatch) -> None:
+    """Item 1: ``p-1`` read as a formula gets ``verbalize-formula``, then the
+    process dies on ``p-3``. The resumed run selects that obligation, as the
+    step would have, so it is planned and verbalized instead of being left
+    out of a job reported as completed."""
+    checkpoints = MemoryCheckpoints()
+    verbalized = _verbalizing(monkeypatch)
+    _formula_first(monkeypatch, crash_on="p-3")
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _pictures(3), checkpoints)
+    progress = checkpoints.phases[PHASE_EXECUTION][STEP_PROGRESS_KEY]["manifest"]
+    assert any(item["kind"] == "verbalize-formula" for item in progress["obligations"])
+
+    _formula_first(monkeypatch, crash_on=None)
+    payload = _run(monkeypatch, _pictures(3), checkpoints)
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert verbalized == ["obligation-verbalize-formula-p-1"]
+
+
+def test_a_crash_between_the_handler_and_its_step_checkpoint_loses_no_discovery(monkeypatch) -> None:
+    """Item 3: the step finished (every object saved in its progress), and
+    the process died writing the step's own checkpoint, before the
+    selection ``_select_discovered`` made reached it."""
+    checkpoints = MemoryCheckpoints()
+    verbalized = _verbalizing(monkeypatch)
+    _formula_first(monkeypatch, crash_on=None)
+    save = checkpoints.save
+
+    def dies_on_the_step_checkpoint(phase, payload):
+        if phase == PHASE_EXECUTION and len(payload.get("results") or []) == 2 and STEP_PROGRESS_KEY not in payload:
+            raise Crash()
+        save(phase, payload)
+
+    checkpoints.save = dies_on_the_step_checkpoint
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _pictures(3), checkpoints)
+    checkpoints.save = save
+
+    payload = _run(monkeypatch, _pictures(3), checkpoints)
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert verbalized == ["obligation-verbalize-formula-p-1"]
+
+
 def test_the_progress_of_another_step_is_never_resumed_from() -> None:
     """Only the step the plan runs next resumes from the saved progress."""
     plan = SimpleNamespace(steps=[
@@ -269,6 +395,6 @@ def test_the_progress_of_another_step_is_never_resumed_from() -> None:
     state = {"manifest": {"m": "finished"}, "results": [{}],
              STEP_PROGRESS_KEY: {"obligation_id": "obligation-describe-images", "manifest": {"m": "mid-step"}}}
 
-    assert resumed_manifest(state, plan) == {"m": "mid-step"}
+    assert resumed_manifest(state, plan)["m"] == "mid-step"
     assert resumed_manifest({**state, "results": [{}, {}]}, plan) == {"m": "finished"}
     assert resumed_manifest({"manifest": {"m": "finished"}, "results": [{}]}, plan) == {"m": "finished"}
