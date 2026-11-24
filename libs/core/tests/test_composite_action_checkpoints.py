@@ -62,6 +62,20 @@ class MemoryCheckpoints:
         self.phases.pop(phase, None)
 
 
+def _left(checkpoints, prefix: str, done: str) -> list[str]:
+    """The elements the saved step progress has not finished, in document order.
+
+    What a crash interrupts is a matter of timing: with the concurrency at 1
+    the next object can still start while the crash cancels the step. So the
+    tests check the contract instead of a fixed list: the resumed run does
+    exactly what the saved progress left, never what it finished."""
+    progress = checkpoints.phases[PHASE_EXECUTION][STEP_PROGRESS_KEY]
+    return [
+        element["id"] for element in progress["manifest"]["elements"]
+        if element["id"].startswith(prefix) and not element["metadata"].get(done)
+    ]
+
+
 def _run(monkeypatch, manifest, checkpoints):
     async def nothing(*_args, **_kwargs):
         return None
@@ -115,26 +129,23 @@ def _vision(monkeypatch, *, crash_on: str | None):
 
 def test_a_crash_mid_step_resumes_without_describing_the_pictures_again(monkeypatch) -> None:
     """Five pictures; the process dies on the fourth. The resumed run
-    describes only the fourth and the fifth, and completes."""
+    describes only what the saved progress left (the fourth, and the fifth
+    unless it finished before the crash cancelled the step), and completes."""
     checkpoints = MemoryCheckpoints()
     first = _vision(monkeypatch, crash_on="p-4")
 
     with pytest.raises((Crash, BaseExceptionGroup)):
         _run(monkeypatch, _pictures(5), checkpoints)
 
-    assert first == ["p-1", "p-2", "p-3", "p-4"]
-    progress = checkpoints.phases[PHASE_EXECUTION][STEP_PROGRESS_KEY]
-    assert progress["obligation_id"] == "obligation-describe-images"
-    described = [
-        element["id"] for element in progress["manifest"]["elements"]
-        if element["metadata"].get("vision_description_complete")
-    ]
-    assert described == ["p-1", "p-2", "p-3"]
+    assert first[:4] == ["p-1", "p-2", "p-3", "p-4"]
+    assert checkpoints.phases[PHASE_EXECUTION][STEP_PROGRESS_KEY]["obligation_id"] == "obligation-describe-images"
+    left = _left(checkpoints, "p-", "vision_description_complete")
+    assert left[0] == "p-4"
 
     second = _vision(monkeypatch, crash_on=None)
     payload = _run(monkeypatch, _pictures(5), checkpoints)
 
-    assert second == ["p-4", "p-5"]
+    assert second == left
     assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
     assert STEP_PROGRESS_KEY not in checkpoints.phases.get(PHASE_EXECUTION, {})
 
@@ -180,18 +191,21 @@ def _reader(monkeypatch, *, crash_on: str | None):
 
 def test_a_crash_mid_step_resumes_without_reading_the_tables_again(monkeypatch) -> None:
     """A document with many tables (#836's acceptance): eight tables, the
-    process dies on the sixth; the resumed run reads only the last three."""
+    process dies on the sixth; the resumed run reads only what the saved
+    progress left."""
     checkpoints = MemoryCheckpoints()
     first = _reader(monkeypatch, crash_on="cells of t-6")
 
     with pytest.raises((Crash, BaseExceptionGroup)):
         _run(monkeypatch, _tables(8), checkpoints)
 
-    assert len(first) == 6
+    assert first[:6] == [f"cells of t-{index}" for index in range(1, 7)]
+    left = _left(checkpoints, "t-", "table_ast")
+    assert left[0] == "t-6"
     second = _reader(monkeypatch, crash_on=None)
     payload = _run(monkeypatch, _tables(8), checkpoints)
 
-    assert second == ["cells of t-6", "cells of t-7", "cells of t-8"]
+    assert second == [f"cells of {element_id}" for element_id in left]
     assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
 
 
@@ -208,7 +222,8 @@ def _formulas(count: int):
 
 
 def test_a_crash_mid_step_resumes_without_recognizing_the_formulas_again(monkeypatch) -> None:
-    """The formula LaTeX (M3): four formulas, the process dies on the third."""
+    """The formula LaTeX (M3): four formulas, the process dies on the third;
+    the resumed run reads only what the saved progress left."""
     from pddl_support import install_formula_recognizer
 
     from acessilia_core.pipeline.enrichment import formulas as formula_stage
@@ -232,14 +247,16 @@ def test_a_crash_mid_step_resumes_without_recognizing_the_formulas_again(monkeyp
     with pytest.raises((Crash, BaseExceptionGroup)):
         _run(monkeypatch, _formulas(4), checkpoints)
 
-    assert calls == ["f-1", "f-2", "f-3"]
+    assert calls[:3] == ["f-1", "f-2", "f-3"]
+    left = _left(checkpoints, "f-", "formula_recognition")
+    assert left[0] == "f-3"
     calls.clear()
     crash["on"] = None
     # The verbalizations escalate to human review; with readable LaTeX they
     # do not fail the job, which is not what this test is about.
     _run(monkeypatch, _formulas(4), checkpoints)
 
-    assert calls == ["f-3", "f-4"]
+    assert calls == left
 
 
 def test_the_progress_of_another_step_is_never_resumed_from() -> None:
