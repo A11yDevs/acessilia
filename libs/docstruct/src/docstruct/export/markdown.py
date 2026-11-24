@@ -115,7 +115,12 @@ def _text(block: dict[str, Any]) -> str:
 
 
 def render_table(block: dict[str, Any]) -> str:
-    """Render a canonical table block as HTML (provider HTML kept as is)."""
+    """Render a canonical table block as HTML (provider HTML kept as is).
+
+    Benchmark Markdown keeps the AST's sections as they are. The legacy
+    first-row header inference that the accessible exporters apply is not
+    repeated here.
+    """
     raw_html = block.get("html")
     if isinstance(raw_html, str) and "<table" in raw_html.lower():
         return raw_html.strip()

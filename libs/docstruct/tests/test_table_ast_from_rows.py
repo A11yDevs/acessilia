@@ -46,6 +46,12 @@ def test_cells_are_stripped() -> None:
     assert _cells(ast) == [["a", "b"]]
 
 
+def test_non_string_cells_are_text() -> None:
+    ast = table_ast_from_rows([[1, None, True]])
+
+    assert _cells(ast) == [["1", "None", "True"]]
+
+
 def test_a_row_without_cells_is_left_out() -> None:
     ast = table_ast_from_rows([["x"], [], ["y"]])
 
