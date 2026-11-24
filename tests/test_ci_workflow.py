@@ -699,57 +699,28 @@ def test_the_security_audit_pins_uv_and_checks_the_lock() -> None:
     assert "uv export --locked" in steps["Export locked dependencies"]["run"]
 
 
-def test_the_container_scan_is_conditional_on_image_paths() -> None:
-    """#644: the detector must not skip, or the reusable call skips delivery.
+def test_the_container_scan_runs_for_release_pulls_and_pushes() -> None:
+    """The scan is scoped to release pulls; pushes and schedules still scan.
 
-    GitHub evaluates a caller's ``needs`` on a reusable workflow by the jobs
-    inside it. A skipped ``image-changes`` job therefore autoskips
-    ``publish verified images`` in ci.yml even when the scan itself succeeded,
-    which is the regression seen on develop on 2026-11-23.
+    Removing the image-path detector also removes the reusable-workflow skip
+    trap that autoskipped `publish verified images` on develop (2026-11-23).
+    The scan still skips on ordinary PRs, which is safe while no PR job needs
+    the `security` call; the workflow comment keeps that caveat visible.
     """
     workflow = yaml.safe_load(SECURITY.read_text(encoding="utf-8"))
-    changes = workflow["jobs"]["image-changes"]
     scan = workflow["jobs"]["container-scan"]
     caller = _workflow()["jobs"]["security"]
 
-    assert "if" not in changes
-    assert workflow["permissions"]["pull-requests"] == "read"
-    assert caller["permissions"]["pull-requests"] == "read"
-    assert changes["permissions"] == {
-        "contents": "read",
-        "pull-requests": "read",
-    }
-    assert changes["outputs"]["image"] == (
-        "${{ steps.filter.outputs.image || steps.assume.outputs.image }}"
-    )
-    steps = {step.get("name"): step for step in changes["steps"]}
-    checkout = steps["Check out repository"]
-    assert checkout["if"] == "github.event_name == 'pull_request'"
-    filter_step = steps["Filter image paths"]
-    assert filter_step["if"] == "github.event_name == 'pull_request'"
-    assert filter_step["uses"] == (
-        "dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d"
-    )
-    filters = filter_step["with"]["filters"]
-    for path in (
-        "infra/**",
-        "pyproject.toml",
-        "uv.lock",
-        "libs/**/pyproject.toml",
-        "libs/**/uv.lock",
-        ".dockerignore",
-        ".python-version",
-        ".trivyignore",
-        ".github/workflows/security.yml",
-    ):
-        assert path in filters
-    assume = steps["Report the image as changed outside a pull request"]
-    assert assume["if"] == "github.event_name != 'pull_request'"
-    assert 'echo "image=true" >> "$GITHUB_OUTPUT"' in assume["run"]
-    assert scan["needs"] == "image-changes"
-    assert scan["if"] == (
-        "!cancelled() && (github.event_name != 'pull_request' || "
-        "needs.image-changes.outputs.image != 'false')"
+    assert "image-changes" not in workflow["jobs"]
+    assert "needs" not in scan
+    assert workflow["permissions"].get("pull-requests") is None
+    assert caller["permissions"].get("pull-requests") is None
+    condition = " ".join(scan["if"].split())
+    assert condition == (
+        "!cancelled() && ( "
+        "github.event_name != 'pull_request' || "
+        "startsWith(github.base_ref, 'release/') || "
+        "startsWith(github.head_ref, 'release/') )"
     )
     audit = workflow["jobs"]["dependency-audit"]
     assert "if" not in audit

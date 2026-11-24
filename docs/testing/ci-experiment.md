@@ -138,15 +138,15 @@ needs a larger representative set and a controlled comparison.
   caused by an environment not represented in the file list.
 - The experiment must be repeated after the security/image jobs change; the
   critical path may move back to the tests.
-- On pull requests the container image scan is now conditional on image inputs
-  (`infra/**`, `pyproject.toml`, `uv.lock`, library manifests and locks,
-  `.dockerignore`, `.python-version`, `.trivyignore`, the security workflow);
-  pushes, `workflow_dispatch` and the weekly schedule still scan
-  unconditionally. The dependency audit remains unconditional. The
-  `image-changes` detector itself runs on every event: GitHub evaluates a
-  caller's `needs` on a reusable workflow by its internal jobs, so a detector
-  skipped outside pull requests would autoskip `publish verified images` even
-  when the scan passed (the regression observed in the 2026-11-23 run).
+- On pull requests the container image scan runs only when the PR involves a
+  release branch (`release/*` as base or head); ordinary PRs skip it. Pushes,
+  `workflow_dispatch` and the weekly schedule still scan unconditionally, and
+  the dependency audit remains unconditional. The image-path filter and its
+  `image-changes` detector were removed in a follow-up: the detector caused
+  the 2026-11-23 skip of `publish verified images` because GitHub evaluates a
+  caller's `needs` on a reusable workflow by its internal jobs. The scan still
+  skips on ordinary PRs, so no PR job may `needs` the `security` call without
+  an explicit status guard.
 - `docs/testing.md` still records the #448-era 1m59s / 59s–1m26s figures. The
   job absorbed Ruff/Mypy on 2026-11-20 and the suite grew; the numbers here are
   the comparable 2026-11-23 sample, not a contradiction of the historical
