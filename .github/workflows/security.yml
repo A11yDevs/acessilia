@@ -45,11 +45,17 @@ jobs:
 
   image-changes:
     name: Detect image changes
-    if: github.event_name == 'pull_request'
+    # This job must run on every event, not only on pull requests. GitHub
+    # evaluates a caller's `needs` on a reusable workflow by the individual
+    # jobs inside it: a job skipped here makes the whole `security` call count
+    # as skipped, and `publish verified images` in ci.yml is then skipped
+    # without a failure (the regression from #644 on 2026-11-23). Outside a
+    # pull request the filter step is skipped and the output is "true"; the
+    # scan ignores that output for those events anyway.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      image: ${{ steps.filter.outputs.image }}
+      image: ${{ steps.filter.outputs.image || steps.assume.outputs.image }}
 
     steps:
       - name: Check out repository
@@ -59,6 +65,7 @@ jobs:
 
       - name: Filter image paths
         id: filter
+        if: github.event_name == 'pull_request'
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
           filters: |
@@ -72,6 +79,11 @@ jobs:
               - '.python-version'
               - '.trivyignore'
               - '.github/workflows/security.yml'
+
+      - name: Report the image as changed outside a pull request
+        id: assume
+        if: github.event_name != 'pull_request'
+        run: echo "image=true" >> "$GITHUB_OUTPUT"
 
   container-scan:
     name: Container image scan

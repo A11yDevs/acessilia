@@ -145,7 +145,11 @@ controlada.
   (`infra/**`, `pyproject.toml`, `uv.lock`, manifestos e locks das bibliotecas,
   `.dockerignore`, `.python-version`, `.trivyignore`, workflow de segurança);
   pushes, `workflow_dispatch` e o schedule semanal continuam escaneando
-  incondicionalmente. A auditoria de dependências permanece incondicional.
+  incondicionalmente. A auditoria de dependências permanece incondicional. O
+  detector `image-changes` roda em todo evento: o GitHub avalia o `needs` de
+  um workflow reutilizável pelos jobs internos, então um detector pulado fora
+  de pull requests pularia também `publish verified images` mesmo com o scan
+  aprovado (a regressão corrigida depois da execução de 2026-11-23).
 - `docs/testing.pt-br.md` ainda registra os valores da era #448 (1m59s /
   59s–1m26s). O job absorveu Ruff/Mypy em 2026-11-20 e a suíte cresceu; os
   números aqui são a amostra comparável de 2026-11-23, não uma contradição do
