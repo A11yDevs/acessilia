@@ -37,6 +37,15 @@ Three facts do not match that intent yet:
   `document.structure.extract` only the language and the cache flag. The
   options that keep the suites structural live in the Toolbox's registry and
   the providers' defaults, and the manifest does not record them.
+- **Tables are recognized inside the structure capability.** Docling runs
+  TableFormer (`accurate`) and MinerU its table model during
+  `document.structure.extract`. The specialized capability already exists:
+  `table.recognize@1`, with one provider, the VLM `qwen3-vl-8b`. Its contract
+  is shaped for a VLM. The input is a crop (`artifact/image@1`), and the
+  output, `table-candidates@1`, requires a greedy generation, seeded samples,
+  `temperature`, `top_p` and `model`. The core reads a table with a model
+  (`DataAgent`) only when the extraction left it without a usable structure,
+  or garbled.
 - **The provider is fixed per deployment.** `CoreConfig.toolbox.providers`
   holds one provider per key, with defaults in the SDK registry. The Toolbox,
   however, already registers competing providers:
@@ -54,19 +63,85 @@ Three facts do not match that intent yet:
 ### The structure suites stay structural
 
 - In `document.structure.extract`, a suite must deliver structure:
-  - layout detection, with labels and boxes;
+  - layout detection, with labels and boxes, tables included as regions;
   - the reading order;
-  - the OCR the text needs;
-  - the table structure.
+  - the OCR the text needs.
 
-  Its options that produce other content stay off there: formula
-  recognition, picture description and classification, and code enrichment.
+  Its options that produce other content stay off there: table recognition
+  (the cells), formula recognition, picture description and classification,
+  and code enrichment.
 - A suite's other abilities are used **per capability**: the suite becomes a
   provider of that capability (as `docling-math` is for `math.recognize`),
   never an extra bundled into the structure extraction.
 - The pipeline options the core relies on are explicit and recorded. The
   extraction reports the options it actually ran with, and the manifest keeps
   them as provenance.
+
+### Tables are a specialized capability
+
+- A table's cells come from `table.recognize`, whose providers compete like
+  any other. Docling and MinerU can be two of them (`docling-table`,
+  `mineru-table`), next to the VLM. Both services already accept an image and
+  run their table model, and the Toolbox already translates both suites'
+  tables into one canonical table AST: Docling's grid and MinerU's HTML.
+- `table.recognize` needs a provider-neutral contract version. A deterministic
+  recognizer returns one table, not generations at a temperature. The output
+  carries the table as the canonical table AST (cells, spans, headers), which
+  the core already reads as `table_ast`, and its provenance. The generations
+  stay optional, for the VLM. The criteria for that contract are in
+  acessilia-toolbox#170:
+  - a canonical core of cells, row and column indices, spans and headers, with
+    no field that only a VLM can fill;
+  - provenance: the provider, the contract and model versions, the options it
+    ran with, and where the cells' text came from (text layer or OCR);
+  - geometry and confidence as optional, so that no provider invents values;
+  - a region input: a versioned artifact reference, the page, the box and its
+    coordinate system (orientation and units), with the image input kept for
+    scanned pages;
+  - an explicit migration from `@1`, with no silent break for its consumers.
+- The input should keep the PDF's text layer when there is one: a region of
+  the source page, not only an image. In a born-digital PDF, TableFormer
+  takes the cells' text from the page's own text. On a crop image it falls
+  back to OCR, which is worse.
+- **The bootstrap keeps delivering tables, as regions.** With cell recognition
+  out of `document.structure.extract`, the manifest still knows each table's
+  existence and location. A table is in one of four states, which the
+  manifest's existing fields express:
+  - **region detected:** a table element with no `table_ast`;
+  - **structure recognized:** a `table_ast`, with its provenance;
+  - **structure suspect or invalid:** a `table_ast` that needs validation,
+    repair or another recognition. `table_garble_reason` detects it, and
+    `table_review` records its review;
+  - **recognition unavailable or failed:** `table_read_failure`. It is not an
+    empty table.
+
+  The invariant: **a table region without recognized cells produces a
+  plannable obligation**. It is never treated as a table already processed.
+- **What is already recognized is reused.** The core reuses, validates,
+  repairs or recognizes a table's structure according to its observed state,
+  its provenance and the pending obligations. A valid structure with a
+  compatible provenance is not recognized again: not in every run, and not on
+  resume. Today `_enrich_table_structures` reads a table only when it lacks a
+  usable structure or looks garbled, and that rule carries over. Manifests and
+  checkpoints with structures recognized inside the extraction stay valid;
+  their provenance is the extraction.
+- Order, so that quality and cost do not regress:
+  1. Docling and MinerU become providers of `table.recognize` (contract
+     version 2);
+  2. the validation compares them per table, against the VLM and against
+     today's in-extraction tables. It measures TEDS, and also:
+     - the preservation of text, headers, spans and merged cells;
+     - the latency per document, not only per table;
+     - CPU, GPU and memory, and the number of remote calls;
+     - the cost of repeating layout detection and OCR on tables already
+       located;
+     - the reuse of intermediate artifacts and regions, and batching;
+  3. only then is table recognition turned off in
+     `document.structure.extract`. From then on, the tables that are not yet
+     recognized go to `table.recognize`.
+
+  If one call per table costs too much, the Toolbox can offer a composite or
+  batched capability. The planning stays in the core.
 
 ### Providers compete per capability
 
@@ -92,7 +167,31 @@ Three facts do not match that intent yet:
 - **acessilia-toolbox#169:** turn MinerU's formula recognition off in
   `document.structure.extract`, document what MinerU 4's `--tier basic`
   enables, and report the effective options in the extraction's
-  `configuration`.
+  `configuration`. The tables follow the order above, through
+  acessilia-toolbox#170.
+- **acessilia-toolbox#170:** `table.recognize@2`, provider-neutral, with
+  `docling-table` and `mineru-table` as providers and an input that keeps the
+  text layer.
+- **Responsibilities around a table** (ADR-0028, ADR-0029):
+  - **The core decides:** whether and when to recognize a table again, which
+    providers to ask, whether to compare their candidates, and whether a
+    result satisfies the obligation. It keeps the symbolic state and
+    coordinates the replanning.
+  - **The Toolbox executes:** the recognition, and the comparison of
+    candidates when the core asks for it.
+  - **Docstruct provides** the pure, deterministic algorithms that the Toolbox
+    reuses: normalization, comparison and evaluation of table structures.
+
+  Today the core reads a table with a model call (`DataAgent`), and the table
+  specialist picks the medoid of the candidates by similarity
+  (`TableSpecialistAgent`). Picking the medoid is document computation. The
+  policy of asking for an adjudication stays in the core, but the algorithm
+  does not stay there because it is attached to that agent today. It migrates
+  with #804 and #640, and comparing candidates per table becomes the first
+  concrete form of competition per capability.
+- **Cost:** one call per table, each running its own detection, costs more
+  than a table recognized inside the extraction. The benchmark weighs that
+  against the quality.
 - **The core gates stay meaningful.** With the suites structural, a formula
   with LaTeX or a table with structure in the extraction means the suite
   delivered structure, not a recognition that bypassed the specialized
