@@ -2,6 +2,30 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.17 — checkpoints inside a composite action (#836)
+
+The picture descriptions (M1), the formula LaTeX (M3) and the table
+enrichment (M2) are each one planned action over many elements. To the
+planner each is atomic; its persistence no longer is. Until now a crash in
+the middle of one resumed the whole step, paying again the model calls of
+the objects it had finished. Now:
+- **After each finished object** the method saves the manifest it is
+  enriching into the run's execution checkpoint, as `step_progress` next to
+  the last finished step: the stage's `on_progress`, coalesced as before
+  planning (one write at a time, the latest manifest), serialized on the
+  stage's event loop. It goes through `RunServices.step_checkpoint`, which
+  the orchestrator sets to its execution checkpoint; no new checkpoint phase.
+- **A resumed execution of the same plan** starts that step again from it
+  (`resumed_manifest`), and the step's per-object gates skip what was done:
+  a described picture, a read table, a recognized formula. The progress of a
+  step the plan does not run next is never used, and the next finished step
+  drops it.
+- The collective recovery (one breaker, one retry pass) and the progress
+  messages (`RunServices.progress`) are unchanged.
+- Tests: a crash on the fourth of five pictures resumes with the fourth and
+  fifth only; on the sixth of eight tables, with the last three; on the
+  third of four formulas, with the last two.
+
 ## 0.3.16 — optional Toolbox capabilities (#848)
 
 A method's Toolbox calls are now of three kinds:

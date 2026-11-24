@@ -81,6 +81,8 @@ class RunCheckpoints:
         # Set once a phase is redone: the phases after it were built on the
         # old one, so none of them is reused either.
         self._stale = False
+        # The plan run's execution checkpoint, once it starts (#836).
+        self._execution: _ExecutionCheckpoint | None = None
 
     @property
     def active(self) -> bool:
@@ -190,26 +192,87 @@ class RunCheckpoints:
         """The ``on_progress`` callback of the enrichment steps (#407)."""
         return _EnrichmentCheckpoint(self, manifest).save
 
-    def execution_saver(self, plan: NominalPlan) -> Callable[[dict[str, Any]], None]:
-        """A callback the executor calls after each step, writing the checkpoint."""
-        checkpoints = self._checkpoints
-        if checkpoints is None:
+    def execution_saver(self, plan: NominalPlan) -> _ExecutionCheckpoint:
+        """A callback the executor calls after each step, writing the checkpoint.
+
+        It also takes the progress of the step running (:meth:`step_progress`,
+        #836), so it becomes the run's current execution checkpoint."""
+        if self._checkpoints is None:
             raise RuntimeError("an execution checkpoint needs the job's checkpoints")
+        self._execution = _ExecutionCheckpoint(self, plan)
+        return self._execution
 
-        def save(snapshot: dict[str, Any]) -> None:
-            if snapshot.get("plan_id") != plan.plan_id:
-                # A snapshot from another plan must never overwrite this one.
-                return
-            try:
-                checkpoints.save(
-                    PHASE_EXECUTION, self._stamp(dict(snapshot), PHASE_STAGES[PHASE_EXECUTION])
-                )
-            except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail a step
-                logger.warning(
-                    "Job {}: execution checkpoint not written: {}", checkpoints.job_id, exc
-                )
+    def step_progress(self, obligation_id: str, manifest: dict[str, Any]) -> None:
+        """Persist the manifest a composite method is enriching, mid-step (#836).
 
-        return save
+        A no-op outside a plan run with checkpoints. Blocking: a method calls
+        it off its event loop, with the manifest already serialized."""
+        if self._execution is not None:
+            self._execution.step_progress(obligation_id, manifest)
+
+
+#: The key of the execution checkpoint that holds the step running (#836).
+STEP_PROGRESS_KEY = "step_progress"
+
+
+def resumed_manifest(execution_state: dict[str, Any], plan: NominalPlan) -> dict[str, Any]:
+    """The manifest a resumed execution starts from (#836).
+
+    The one after the last finished step, unless the checkpoint also holds
+    the progress of the step after it: a composite method (picture
+    descriptions, formula LaTeX, tables) saves the manifest it is enriching
+    after each object, and its step starts again from that manifest, so its
+    per-object gates skip what was already done. The progress of a step the
+    plan does not run next is never used.
+    """
+    progress = execution_state.get(STEP_PROGRESS_KEY)
+    results = execution_state.get("results") or []
+    if isinstance(progress, dict) and len(results) < len(plan.steps):
+        if plan.steps[len(results)].obligation_id == progress.get("obligation_id"):
+            return progress["manifest"]
+    return execution_state["manifest"]
+
+
+class _ExecutionCheckpoint:
+    """The execution checkpoint of one plan: one write after each step, and
+    the progress of the step running in between (#836).
+
+    The progress is the last finished snapshot plus ``step_progress``: the
+    step's obligation and the manifest its method is enriching. The next
+    finished step writes a snapshot without it, so it never outlives its
+    step. Before the first finished step there is no snapshot to extend, and
+    the progress is not written.
+    """
+
+    def __init__(self, run: RunCheckpoints, plan: NominalPlan) -> None:
+        self._run = run
+        self._plan = plan
+        self._last: dict[str, Any] | None = None
+
+    def __call__(self, snapshot: dict[str, Any]) -> None:
+        if snapshot.get("plan_id") != self._plan.plan_id:
+            # A snapshot from another plan must never overwrite this one.
+            return
+        self._last = dict(snapshot)
+        self._write(self._last)
+
+    def step_progress(self, obligation_id: str, manifest: dict[str, Any]) -> None:
+        if self._last is None:
+            return
+        self._write({**self._last, STEP_PROGRESS_KEY: {"obligation_id": obligation_id, "manifest": manifest}})
+
+    def _write(self, snapshot: dict[str, Any]) -> None:
+        checkpoints = self._run._checkpoints
+        if checkpoints is None:
+            return
+        try:
+            checkpoints.save(
+                PHASE_EXECUTION, self._run._stamp(dict(snapshot), PHASE_STAGES[PHASE_EXECUTION])
+            )
+        except Exception as exc:  # noqa: BLE001 - a checkpoint must not fail a step
+            logger.warning(
+                "Job {}: execution checkpoint not written: {}", checkpoints.job_id, exc
+            )
 
 
 class _EnrichmentCheckpoint:
@@ -243,8 +306,10 @@ class _EnrichmentCheckpoint:
 
 __all__ = [
     "ENRICHING_STAGES",
+    "STEP_PROGRESS_KEY",
     "IDENTITY_KEY",
     "PHASE_STAGES",
     "RunCheckpoints",
     "manifest_payload",
+    "resumed_manifest",
 ]

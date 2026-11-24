@@ -44,7 +44,11 @@ from acessilia_core.i18n.stage_messages import (
 from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
-from acessilia_core.pipeline.checkpointing import RunCheckpoints, manifest_payload
+from acessilia_core.pipeline.checkpointing import (
+    RunCheckpoints,
+    manifest_payload,
+    resumed_manifest,
+)
 from acessilia_core.pipeline.document_obligations import reconcile_document_steps
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.formulas import _classify_formula_regions
@@ -117,6 +121,12 @@ class _RunContext:
     config: CoreConfig
     ports: RunPorts
     checkpoints: RunCheckpoints
+
+    def __post_init__(self) -> None:
+        # A composite method saves its progress mid-step through the run's
+        # services, into this run's execution checkpoint (#836).
+        if self.checkpoints.active:
+            self.ports.services.step_checkpoint = self.checkpoints.step_progress
 
 
 #: Replans after a run that changed the obligations without failing (#832); a
@@ -564,7 +574,8 @@ class PddlAccessibilityOrchestrator:
         resume = None
         if execution_state is not None:
             resume = ExecutionResume(
-                manifest=ProcessingManifest.model_validate(execution_state["manifest"]),
+                # The progress of the step that was running, when there is one (#836).
+                manifest=ProcessingManifest.model_validate(resumed_manifest(execution_state, plan)),
                 results=[
                     ExecutionStepResult.model_validate(item)
                     for item in execution_state.get("results") or []

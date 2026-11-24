@@ -2,6 +2,31 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.17 — checkpoints dentro de uma ação composta (#836)
+
+As descrições de imagens (M1), o LaTeX das fórmulas (M3) e o enriquecimento
+de tabelas (M2) são cada um uma ação planejada sobre muitos elementos. Para
+o planejador cada uma é atômica; a persistência dela não é mais. Até agora
+uma queda no meio de uma delas retomava o passo inteiro, pagando de novo as
+chamadas de modelo dos objetos já terminados. Agora:
+- **Depois de cada objeto terminado** o método grava o manifesto que está
+  enriquecendo no checkpoint de execução da execução, como `step_progress`
+  ao lado do último passo terminado: o `on_progress` da etapa, agrupado como
+  antes do planejamento (uma escrita por vez, o manifesto mais recente),
+  serializado no laço de eventos da etapa. Ele passa pelo
+  `RunServices.step_checkpoint`, que o orquestrador liga ao seu checkpoint
+  de execução; sem fase de checkpoint nova.
+- **Uma execução retomada do mesmo plano** recomeça esse passo dele
+  (`resumed_manifest`), e os filtros por objeto do passo pulam o que foi
+  feito: uma imagem descrita, uma tabela lida, uma fórmula reconhecida. O
+  progresso de um passo que o plano não roda em seguida nunca é usado, e o
+  próximo passo terminado o descarta.
+- A recuperação coletiva (um breaker, uma passada de retry) e as mensagens
+  de progresso (`RunServices.progress`) não mudam.
+- Testes: uma queda na quarta de cinco imagens retoma só com a quarta e a
+  quinta; na sexta de oito tabelas, só com as três últimas; na terceira de
+  quatro fórmulas, só com as duas últimas.
+
 ## 0.3.16 — capacidades opcionais do Toolbox (#848)
 
 As chamadas de um método ao Toolbox agora são de três tipos:

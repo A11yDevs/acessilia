@@ -1,0 +1,257 @@
+"""Checkpoints inside a composite action (#836).
+
+The document's picture descriptions, formula LaTeX and table enrichment are
+each one planned action over many elements. To the planner each is atomic;
+its persistence is not: after each finished object the method saves the
+manifest it is enriching into the run's execution checkpoint, and a crash
+in the middle of the step resumes from it, so the work already done is not
+paid again.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from copy import deepcopy
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from core_config_support import core_config
+from pddl_support import (
+    build_element,
+    build_manifest,
+    build_obligation,
+    build_orchestrator,
+)
+
+from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.agents.output_schemas import DataOutput, VisionOutput
+from acessilia_core.pipeline import orchestrator as pddl, preflight
+from acessilia_core.pipeline.checkpointing import STEP_PROGRESS_KEY, resumed_manifest
+from acessilia_core.pipeline.enrichment import (
+    pictures as picture_stage,
+    tables as table_stage,
+)
+from acessilia_core.ports import PHASE_EXECUTION, NoRegionCache, RunPorts
+
+#: Serial, and no wait before the retry pass, so the calls are in order.
+CONFIG = core_config(vision={"concurrency": 1, "retry_pass_delay_seconds": 0})
+_PROSE = "A paragraph with enough words to make the document read as text, not as a picture."
+
+
+class Crash(BaseException):
+    """The process dying: not an error any step handles."""
+
+
+class MemoryCheckpoints:
+    """A ``JobCheckpoints`` kept in memory, as the service's would be on disk."""
+
+    job_id = "memory-job"
+    options: dict = {}
+
+    def __init__(self) -> None:
+        self.phases: dict[str, dict] = {}
+
+    def load(self, phase):
+        return deepcopy(self.phases.get(phase))
+
+    def save(self, phase, payload):
+        self.phases[phase] = deepcopy(payload)
+
+    def remove(self, phase):
+        self.phases.pop(phase, None)
+
+
+def _run(monkeypatch, manifest, checkpoints):
+    async def nothing(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(preflight, "inspect_source_media", nothing)
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
+        monkeypatch.setattr(pddl, name, nothing)
+    orchestrator = build_orchestrator(max_replans=1)
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: deepcopy(manifest))
+    return asyncio.run(orchestrator.execute(
+        Path("/tmp/doc.pdf"), Path("/tmp"),
+        structured_output=True, config=CONFIG, model_calls=current_model_calls(),
+        ports=RunPorts(region_cache=NoRegionCache(), checkpoints=checkpoints, operations=None),
+    ))
+
+
+def _pictures(count: int):
+    ids = [f"p-{index}" for index in range(1, count + 1)]
+    obligations = []
+    for element_id in ids:
+        obligation = build_obligation("describe-image", [element_id], ["vision-description", "human-review"])
+        obligation.id = f"describe-{element_id}"
+        obligation.method_costs = {"vision-description": 20, "human-review": 100}
+        obligations.append(obligation)
+    elements = [build_element("prose", "paragraph", text=_PROSE)]
+    elements += [build_element(element_id, "picture", text="") for element_id in ids]
+    return build_manifest(elements, obligations)
+
+
+def _vision(monkeypatch, *, crash_on: str | None):
+    calls: list[str] = []
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            element_id = image_bytes.decode()
+            calls.append(element_id)
+            if element_id == crash_on:
+                raise Crash()
+            return VisionOutput(kind="description", description=f"Picture {element_id}.", language="en", confidence=0.9)
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(
+        picture_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (element.id.encode(), fallback or 1),
+    )
+    return calls
+
+
+def test_a_crash_mid_step_resumes_without_describing_the_pictures_again(monkeypatch) -> None:
+    """Five pictures; the process dies on the fourth. The resumed run
+    describes only the fourth and the fifth, and completes."""
+    checkpoints = MemoryCheckpoints()
+    first = _vision(monkeypatch, crash_on="p-4")
+
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _pictures(5), checkpoints)
+
+    assert first == ["p-1", "p-2", "p-3", "p-4"]
+    progress = checkpoints.phases[PHASE_EXECUTION][STEP_PROGRESS_KEY]
+    assert progress["obligation_id"] == "obligation-describe-images"
+    described = [
+        element["id"] for element in progress["manifest"]["elements"]
+        if element["metadata"].get("vision_description_complete")
+    ]
+    assert described == ["p-1", "p-2", "p-3"]
+
+    second = _vision(monkeypatch, crash_on=None)
+    payload = _run(monkeypatch, _pictures(5), checkpoints)
+
+    assert second == ["p-4", "p-5"]
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert STEP_PROGRESS_KEY not in checkpoints.phases.get(PHASE_EXECUTION, {})
+
+
+def _tables(count: int):
+    ids = [f"t-{index}" for index in range(1, count + 1)]
+    obligations = []
+    for element_id in ids:
+        obligation = build_obligation("linearize-table", [element_id], ["pandoc-table", "human-review"])
+        obligation.id = f"linearize-{element_id}"
+        obligation.method_costs = {"pandoc-table": 15, "human-review": 100}
+        obligations.append(obligation)
+    elements = [build_element("prose", "paragraph", text=_PROSE)]
+    elements += [build_element(element_id, "table", text=f"cells of {element_id}") for element_id in ids]
+    return build_manifest(elements, obligations)
+
+
+def _reader(monkeypatch, *, crash_on: str | None):
+    calls: list[str] = []
+
+    class Agent:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def process_region(self, **kwargs):
+            text = kwargs["fallback_text"]
+            calls.append(text)
+            if text == crash_on:
+                raise Crash()
+            return DataOutput(
+                kind="table",
+                rows=[{"cells": [{"text": "Name", "scope": "col"}]}, {"cells": [{"text": text, "scope": "none"}]}],
+                language="en", confidence=0.85, warnings=[],
+            )
+
+    monkeypatch.setattr(table_stage, "DataAgent", Agent)
+    monkeypatch.setattr(
+        table_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (b"img", fallback or 1),
+    )
+    return calls
+
+
+def test_a_crash_mid_step_resumes_without_reading_the_tables_again(monkeypatch) -> None:
+    """A document with many tables (#836's acceptance): eight tables, the
+    process dies on the sixth; the resumed run reads only the last three."""
+    checkpoints = MemoryCheckpoints()
+    first = _reader(monkeypatch, crash_on="cells of t-6")
+
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _tables(8), checkpoints)
+
+    assert len(first) == 6
+    second = _reader(monkeypatch, crash_on=None)
+    payload = _run(monkeypatch, _tables(8), checkpoints)
+
+    assert second == ["cells of t-6", "cells of t-7", "cells of t-8"]
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+
+
+def _formulas(count: int):
+    ids = [f"f-{index}" for index in range(1, count + 1)]
+    obligations = []
+    for element_id in ids:
+        obligation = build_obligation("verbalize-formula", [element_id], ["human-review"])
+        obligation.id = f"verbalize-{element_id}"
+        obligations.append(obligation)
+    elements = [build_element("prose", "paragraph", text=_PROSE)]
+    elements += [build_element(element_id, "formula", text="") for element_id in ids]
+    return build_manifest(elements, obligations)
+
+
+def test_a_crash_mid_step_resumes_without_recognizing_the_formulas_again(monkeypatch) -> None:
+    """The formula LaTeX (M3): four formulas, the process dies on the third."""
+    from pddl_support import install_formula_recognizer
+
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
+
+    calls: list[str] = []
+    crash = {"on": "f-3"}
+
+    def recognize(image, **_kwargs):
+        element_id = image.decode()
+        calls.append(element_id)
+        if element_id == crash["on"]:
+            raise Crash()
+        return [{"latex": r"\frac{a}{b}"}]
+
+    install_formula_recognizer(monkeypatch, recognize)
+    monkeypatch.setattr(
+        formula_stage, "_formula_recognition_crop", lambda _source, element, **_kwargs: (element.id.encode(), 1)
+    )
+    checkpoints = MemoryCheckpoints()
+
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, _formulas(4), checkpoints)
+
+    assert calls == ["f-1", "f-2", "f-3"]
+    calls.clear()
+    crash["on"] = None
+    # The verbalizations escalate to human review; with readable LaTeX they
+    # do not fail the job, which is not what this test is about.
+    _run(monkeypatch, _formulas(4), checkpoints)
+
+    assert calls == ["f-3", "f-4"]
+
+
+def test_the_progress_of_another_step_is_never_resumed_from() -> None:
+    """Only the step the plan runs next resumes from the saved progress."""
+    plan = SimpleNamespace(steps=[
+        SimpleNamespace(obligation_id=None),
+        SimpleNamespace(obligation_id="obligation-describe-images"),
+        SimpleNamespace(obligation_id="describe-p-1"),
+    ])
+    state = {"manifest": {"m": "finished"}, "results": [{}],
+             STEP_PROGRESS_KEY: {"obligation_id": "obligation-describe-images", "manifest": {"m": "mid-step"}}}
+
+    assert resumed_manifest(state, plan) == {"m": "mid-step"}
+    assert resumed_manifest({**state, "results": [{}, {}]}, plan) == {"m": "finished"}
+    assert resumed_manifest({"manifest": {"m": "finished"}, "results": [{}]}, plan) == {"m": "finished"}

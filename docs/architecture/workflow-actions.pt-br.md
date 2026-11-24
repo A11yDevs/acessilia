@@ -57,7 +57,7 @@ O que os passos compartilham não é uniforme:
 | Recurso | Passos | Onde vive (core 0.3.12) |
 |---|---|---|
 | Breaker de provider | 1, 2, 4, 5 | o da execução, `RunPorts.services` (`run_breaker`), compartilhado com os métodos `picture-description`, `formula-recognizer` e `table-enrichment`. A ordem deles é o desempate do planejador, então numa indisponibilidade parcial o passo que o plano roda primeiro gasta primeiro o orçamento do breaker (#853) |
-| Progresso por objeto (`on_progress`) | 1, 2, 4 | uma variável local, de `checkpoints.enrichment_progress`; os passos 2, 4 e 5, dentro do plano, têm o checkpoint de execução do seu passo do plano (checkpoints por objeto dentro de um passo planejado: #836) |
+| Progresso por objeto (`on_progress`) | 1, 2, 4 | uma variável local, de `checkpoints.enrichment_progress`; os passos 2, 4 e 5, dentro do plano, gravam o manifesto que estão enriquecendo depois de cada objeto no checkpoint de execução (`step_progress`, #836), e uma queda no meio do passo retoma dele |
 | Cache de regiões | 1, 2, 4 | de `RunPorts` (`region_cache_for`) |
 | Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | o da execução, `RunPorts.services` (`run_text_spans`); não guarda manifesto |
 | Mensagens de progresso | 1, 2, 4, 5 | o callback de status antes do planejamento; `RunServices.progress` dentro do plano |
@@ -361,6 +361,22 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    terminou. Como método, o mesmo registro torna barato um passo do plano
    executado de novo, e o checkpoint de execução registra quais passos
    rodaram.
+
+   **Dentro de uma ação composta (#836).** A atomicidade do planejador não é
+   a granularidade da persistência. Um método composto
+   (`picture-description`, `formula-recognizer`, `table-enrichment`) grava o
+   manifesto que está enriquecendo depois de cada objeto terminado, agrupado
+   como antes do planejamento, no checkpoint de execução, como
+   `step_progress` ao lado do último passo terminado (pelo
+   `RunServices.step_checkpoint`; sem fase nova). Uma execução retomada do
+   mesmo plano recomeça esse passo dele, e os filtros por objeto do passo
+   (`vision_description_complete`, a estrutura de uma tabela, o registro de
+   reconhecimento de uma fórmula) pulam os objetos já feitos, então as
+   chamadas de modelo que eles custam não são pagas de novo. O progresso de
+   um passo que o plano não roda em seguida nunca é usado, e o próximo passo
+   terminado o descarta. A recuperação coletiva continua do passo: um
+   breaker, uma passada de retry. As mensagens de progresso passam pelo
+   `RunServices.progress`, ligadas ao job.
 8. **Equivalência primeiro.** Cada migração mantém um teste diferencial do
    manifesto final em documentos de fixture, antes e depois (ADR-0028).
 

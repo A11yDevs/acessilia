@@ -57,7 +57,7 @@ from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_FORMULAS
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.formulas import _enrich_formula_latex
-from acessilia_core.pipeline.handlers.common import run_status
+from acessilia_core.pipeline.handlers.common import run_status, step_checkpoint
 from acessilia_core.pipeline.handlers.messages import (
     MSG_FORMULAS_RECOGNIZED,
     MSG_MATH_NO_FORMULA,
@@ -72,6 +72,7 @@ async def _recognize_formulas(
     config: CoreConfig,
     ports: RunPorts,
     targets: frozenset[str],
+    obligation_id: str,
 ) -> None:
     """Recognize the obligation's ``targets``: a second obligation
     (``obligation-recognize-formulas-2``, #832) never reads again a formula
@@ -91,6 +92,8 @@ async def _recognize_formulas(
         status_callback=status,
         breaker=run_breaker(ports, config.vision),
         targets=targets,
+        # Each finished object is saved into the execution checkpoint (#836).
+        on_progress=step_checkpoint(ports, manifest, obligation_id),
     )
 
 
@@ -125,7 +128,7 @@ def _handle_formula_recognizer_method(
     if not formulas:
         return MethodResult(success=False, validated=False, message=t(MSG_MATH_NO_FORMULA))
     before = {element.id: _snapshot(element) for element in formulas}
-    run_sync(_recognize_formulas(manifest, Path(manifest.source.path), config, ports, targets))
+    run_sync(_recognize_formulas(manifest, Path(manifest.source.path), config, ports, targets, obligation_id))
     outcomes = Counter(_outcome(element, before[element.id]) for element in formulas)
     numbered = sum(
         element.metadata.get("equation_number") is not None and before[element.id][1] is None
