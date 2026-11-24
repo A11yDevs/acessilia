@@ -26,6 +26,7 @@ from acessilia_core.pipeline import (
     preflight as pipeline_preflight,
 )
 from acessilia_core.pipeline.handlers import (
+    formula_recognition as formula_method,
     pictures as picture_method,
     tables as table_method,
 )
@@ -44,8 +45,9 @@ def _recorders(monkeypatch):
         calls.append(("inspect", path.name, (), {}))
         return None
 
-    for name in ("_classify_formula_regions", "_mark_inline_math", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, record(name))
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", record("_enrich_formula_latex"))
     # The pictures are described inside the plan, as ``picture-description``
     # (#640, M1); the recorder describes them, so their ``describe-image`` holds.
     async def describe(manifest, source, *args, **kwargs):
@@ -106,16 +108,13 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, mode="avancado", structured_output=True)
 
     names = [call[0] for call in calls]
-    # Without tables or pictures there is no ``enrich-tables`` or
-    # ``describe-images`` obligation, so no step inside the plan; the inline
-    # math pass runs once more after execution (#599).
+    # Without tables, pictures or formulas there is no ``enrich-tables``,
+    # ``describe-images`` or ``recognize-formulas`` obligation, so no step
+    # inside the plan; the inline math pass runs once more after execution (#599).
     assert names == ["inspect", "_classify_formula_regions", "_mark_inline_math",
-                     "_enrich_formula_latex", "_mark_inline_math_after_execution"]
+                     "_mark_inline_math_after_execution"]
     by_name = {call[0]: call for call in calls}
-    breakers = {id(by_name[name][3]["breaker"]) for name in ("_classify_formula_regions", "_enrich_formula_latex")}
-    assert len(breakers) == 1
-    assert {by_name[name][3].get("mode") for name in ("_classify_formula_regions",
-                                                      "_enrich_formula_latex")} == {"avancado"}
+    assert by_name["_classify_formula_regions"][3].get("mode") == "avancado"
     assert all(call[1] == "doc.pdf" for call in calls)
     assert manifest.extractor.configuration["region_inspection_mode"] == "avancado"
 
@@ -133,10 +132,10 @@ async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_
 
     names = [call[0] for call in calls]
     assert names == ["inspect", "_classify_formula_regions", "_mark_inline_math",
-                     "_enrich_formula_latex", "_enrich_table_structures", "_mark_table_inline_math",
+                     "_enrich_table_structures", "_mark_table_inline_math",
                      "_mark_inline_math_after_execution"]
     by_name = {call[0]: call for call in calls}
-    assert by_name["_enrich_table_structures"][3]["breaker"] is by_name["_enrich_formula_latex"][3]["breaker"]
+    assert by_name["_enrich_table_structures"][3]["breaker"] is by_name["_classify_formula_regions"][3]["breaker"]
     assert by_name["_enrich_table_structures"][3]["breaker"].threshold == 7
     assert by_name["_enrich_table_structures"][3]["vision"] is config.vision
     assert by_name["_mark_table_inline_math"][2][1] is by_name["_mark_inline_math"][2][1]
@@ -162,11 +161,11 @@ async def test_the_pictures_are_described_inside_the_plan_with_the_run_breaker_a
     )
 
     names = [call[0] for call in calls]
-    assert names[:5] == ["inspect", "_classify_formula_regions", "_mark_inline_math",
-                         "_enrich_formula_latex", "_enrich_picture_descriptions"]
+    assert names[:4] == ["inspect", "_classify_formula_regions", "_mark_inline_math",
+                         "_enrich_picture_descriptions"]
     by_name = {call[0]: call for call in calls}
     describe = by_name["_enrich_picture_descriptions"][3]
-    assert describe["breaker"] is by_name["_enrich_formula_latex"][3]["breaker"]
+    assert describe["breaker"] is by_name["_classify_formula_regions"][3]["breaker"]
     assert describe["breaker"].threshold == 7
     assert describe["vision"] is config.vision
     assert describe["mode"] == "avancado"
@@ -178,6 +177,38 @@ async def test_the_pictures_are_described_inside_the_plan_with_the_run_breaker_a
 
 
 @pytest.mark.asyncio
+async def test_the_formulas_are_recognized_inside_the_plan_with_the_run_breaker_and_mode(
+    monkeypatch, tmp_path
+) -> None:
+    """#640, M3: a document with formulas to recognize gets a
+    ``recognize-formulas`` obligation; its ``formula-recognizer`` method reads
+    them inside the plan, before their ``verbalize-formula``, with the run's
+    breaker, document config and the mode the run recorded."""
+    config = core_config(vision={"breaker_threshold": 7})
+    formula = build_element("f", "formula", text="x plus y")
+    verbalize = build_obligation("verbalize-formula", ["f"], ["human-review"])
+    _, calls, _, manifest = await _run(
+        monkeypatch, tmp_path, config=config, elements=[formula], obligations=[verbalize],
+        mode="avancado",
+    )
+
+    names = [call[0] for call in calls]
+    assert names[:4] == ["inspect", "_classify_formula_regions", "_mark_inline_math",
+                         "_enrich_formula_latex"]
+    by_name = {call[0]: call for call in calls}
+    recognize = by_name["_enrich_formula_latex"][3]
+    assert recognize["breaker"] is by_name["_classify_formula_regions"][3]["breaker"]
+    assert recognize["breaker"].threshold == 7
+    assert recognize["vision"] is config.vision
+    assert recognize["document"] is config.document
+    assert recognize["mode"] == "avancado"
+    assert recognize["targets"] == frozenset({"f"})
+    enrichment = next(item for item in manifest.obligations if item.kind == "recognize-formulas")
+    assert enrichment.target_ids == ["f"]
+    assert enrichment.id in verbalize.dependencies
+
+
+@pytest.mark.asyncio
 async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, tmp_path) -> None:
     """ADR-0016 step 3: the run's ``VisionConfig``, not the settings, reaches each stage."""
     config = core_config(vision={"breaker_threshold": 7, "concurrency": 3})
@@ -185,9 +216,8 @@ async def test_the_vision_stages_get_the_vision_config_of_the_run(monkeypatch, t
     _, calls, _, _ = await _run(monkeypatch, tmp_path, config=config)
 
     by_name = {call[0]: call[3] for call in calls}
-    stages = ("_classify_formula_regions", "_enrich_formula_latex")
-    assert all(by_name[name]["vision"] is config.vision for name in stages)
-    assert by_name["_enrich_formula_latex"]["breaker"].threshold == 7
+    assert by_name["_classify_formula_regions"]["vision"] is config.vision
+    assert by_name["_classify_formula_regions"]["breaker"].threshold == 7
 
 
 @pytest.mark.asyncio
@@ -224,7 +254,7 @@ async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_p
     assert inspected == [config.toolbox]
     assert processed == [config.toolbox, config.paths]
     assert processed[1] is config.paths
-    assert by_name["_enrich_formula_latex"][3]["toolbox"] is config.toolbox
+    assert by_name["_classify_formula_regions"][3]["toolbox"] is config.toolbox
     assert by_name["_mark_inline_math"][2][1]._toolbox is config.toolbox
     assert manifest.extractor.configuration["media_inspection"] == "disabled"
 
@@ -246,8 +276,9 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
     async def inspect(path, *, toolbox):
         return None
 
-    for name in ("_classify_formula_regions", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions",):
         monkeypatch.setattr(pddl, name, step)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", step)
     monkeypatch.setattr(pddl, "_mark_inline_math", no_step)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
 

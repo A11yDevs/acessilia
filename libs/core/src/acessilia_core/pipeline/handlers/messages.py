@@ -27,6 +27,12 @@ MSG_PICTURES_DESCRIBED = (
     "Picture description ran for {count} pictures: {described} described, {formulas} read as "
     "formulas, {already} already described; left undescribed: {left}",
 )
+MSG_FORMULAS_RECOGNIZED = (
+    "Formula recognition ran for {count} formula: {recognized} recognized ({methods}), "
+    "{numbered} equation numbers separated, {pictures} read as pictures; left as they were: {left}",
+    "Formula recognition ran for {count} formulas: {recognized} recognized ({methods}), "
+    "{numbered} equation numbers separated, {pictures} read as pictures; left as they were: {left}",
+)
 
 MSG_TABLE_NO_TABLE = "No table found for the obligation"
 MSG_TABLE_NO_STRUCTURE = "Table without tabular structure: {ids}"
@@ -199,6 +205,7 @@ MSG_JUDGE_CONFIRMS = "VLM judge confirms the applied page: {pages}"
 MSG_TABLES: tuple[tuple[str, str], ...] = (
     MSG_VISION_VALIDATED,
     MSG_PICTURES_DESCRIBED,
+    MSG_FORMULAS_RECOGNIZED,
     MSG_TABLES_ENRICHED,
     MSG_TABLE_VALIDATED,
     MSG_CODE_NORMALIZED,

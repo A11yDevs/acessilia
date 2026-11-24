@@ -3,7 +3,9 @@
 Before planning, ``_classify_formula_regions`` asks the vision model whether
 each formula crop without LaTeX holds mathematics, a drawing or nothing it can
 tell, and reclassifies or escalates it. ``_enrich_formula_latex`` then reads
-the LaTeX of the mathematical ones: ``math.recognize`` first (through the SDK's
+the LaTeX of the mathematical ones, inside the plan since core 0.3.15, as the
+``formula-recognizer`` method of the document's ``recognize-formulas``
+obligation (#640, M3, #846): ``math.recognize`` first (through the SDK's
 formula steps, ADR-0017), each candidate gated by its agreement with the text
 layer, then the vision model as the fallback. The crop never falls back to the
 whole page, and an outage of ``math.recognize`` is paid once per document.
@@ -42,10 +44,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_PDDL_FORMULAS_FELL_BACK_TO_VISION,
     LOG_PDDL_FORMULAS_RECOGNIZED,
 )
-from acessilia_core.i18n.stage_messages import (
-    STAGE_ENRICHING_FORMULAS,
-    STAGE_RECOGNIZING_FORMULA,
-)
+from acessilia_core.i18n.stage_messages import STAGE_RECOGNIZING_FORMULA
 from acessilia_core.logger import logger
 from acessilia_core.manifest.builder import (
     TYPE_BOUND_V23_KINDS,
@@ -278,10 +277,68 @@ async def _classify_formula_regions(
             group.create_task(classify_and_notify(element))
 
 
-def _separate_equation_numbers(manifest: ProcessingManifest) -> None:
-    """Move trailing equation labels into ``metadata.equation_number`` in place."""
+def _separate_equation_numbers(
+    manifest: ProcessingManifest, targets: frozenset[str] | None = None
+) -> int:
+    """Move trailing equation labels into ``metadata.equation_number`` in place.
+
+    Only ``targets`` when given. Returns how many labels moved."""
+    moved = 0
     for element in manifest.elements:
+        if targets is not None and element.id not in targets:
+            continue
+        before = element.text
         separate_equation_number(element)
+        moved += element.text != before
+    return moved
+
+
+def _has_separable_number(element: ManifestElement) -> bool:
+    """Whether ``separate_equation_number`` would move a label of ``element``."""
+    probe = element.model_copy(update={"metadata": dict(element.metadata)})
+    separate_equation_number(probe)
+    return probe.text != element.text
+
+
+def formulas_needing_number_separation(manifest: ProcessingManifest) -> list[ManifestElement]:
+    """The formulas with an equation label still to separate."""
+    return [
+        element for element in manifest.elements
+        if element.type == "formula" and _has_separable_number(element)
+    ]
+
+
+def formulas_needing_recognition(manifest: ProcessingManifest) -> list[ManifestElement]:
+    """The formulas to recognize: in a source that can be rendered, the ones
+    without LaTeX (``_formulas_needing_latex``) that no recognition has
+    recorded yet. The obligation's selection and the step's execution share
+    it (#851 review), so a formula selected only to separate its label is
+    never recognized again, nor its recognition record overwritten."""
+    if manifest.source.media_type not in RENDER_MEDIA_TYPES:
+        return []
+    return [
+        element for element in _formulas_needing_latex(manifest)
+        if "formula_recognition" not in element.metadata
+    ]
+
+
+def formulas_to_recognize(manifest: ProcessingManifest) -> list[str]:
+    """The formulas the formula LaTeX step still has work on, in document order:
+    a label to separate (``formulas_needing_number_separation``) or a reading
+    to make (``formulas_needing_recognition``).
+
+    A formula the vision model found while the plan ran (a picture it read
+    as a formula) is one of them when it has either, so it gets what the step
+    before planning gave it until 0.3.14 (#846): its label separated and, when
+    the model's text has no LaTeX markup, a reading. One whose model LaTeX
+    has markup is not read again: a second, independent reading of LaTeX the
+    model already gave is not what the step did, and is #852.
+    """
+    work = {
+        element.id
+        for element in (*formulas_needing_number_separation(manifest), *formulas_needing_recognition(manifest))
+    }
+    return [element.id for element in manifest.elements if element.id in work]
 
 
 def _formulas_needing_latex(manifest: ProcessingManifest) -> list[ManifestElement]:
@@ -324,25 +381,32 @@ async def _enrich_formula_latex(
     status_callback: Callable[[str], Coroutine[Any, Any, None]] | None = None,
     breaker: ProviderBreaker | None = None,
     on_progress: Callable[[], Awaitable[None]] | None = None,
-) -> None:
-    """Give LaTeX to formulas the extractor delivered without it.
+    targets: frozenset[str] | None = None,
+) -> int:
+    """Give LaTeX to formulas the extractor delivered without it; returns how
+    many were recognized.
 
-    Runs ``_separate_equation_numbers`` across the manifest first, then
-    delegates recognition of renderable candidates to :class:`_FormulaEnrichment`
-    (which documents the ``metadata["formula_recognition"]`` contract and the
-    text-layer gating, outage, breaker, and concurrency semantics).
+    Runs ``_separate_equation_numbers`` first, then delegates recognition of
+    renderable candidates to :class:`_FormulaEnrichment` (which documents the
+    ``metadata["formula_recognition"]`` contract and the text-layer gating,
+    outage, breaker, and concurrency semantics). ``targets`` keeps both to an
+    obligation's formulas (``None``: the whole document).
     """
     from acessilia_sdk.toolbox.capabilities import provider_default
 
-    _separate_equation_numbers(manifest)
-    formulas = _formulas_needing_latex(manifest)
-    # Without a page to render there is no crop to recognize. DOCX/PPTX
-    # formulas stay as the extractor delivered them instead of paying one
-    # failed render per formula.
-    if not formulas or manifest.source.media_type not in RENDER_MEDIA_TYPES:
-        return
-    if status_callback:
-        await status_callback(t(STAGE_ENRICHING_FORMULAS))
+    _separate_equation_numbers(manifest, targets)
+    # The same selection as the obligation's, after the labels are separated
+    # (a label written as LaTeX marks the formula as LaTeX). Without a page to
+    # render there is no crop to recognize: DOCX/PPTX formulas stay as the
+    # extractor delivered them instead of paying one failed render per formula.
+    formulas = [
+        element for element in formulas_needing_recognition(manifest)
+        if targets is None or element.id in targets
+    ]
+    if not formulas:
+        return 0
+    # The step announces itself (the ``formula-recognizer`` method, once per
+    # obligation); each formula then reports its own progress.
 
     # Resolved like ``ToolboxCapabilityClient``: an empty setting means the
     # registry default, which is the provider the request actually asked.
@@ -365,7 +429,7 @@ async def _enrich_formula_latex(
         agreement_min=document.formula_text_agreement_min,
         on_progress=on_progress,
     )
-    await enrichment.run_batch(formulas)
+    return await enrichment.run_batch(formulas)
 
 
 class _FormulaEnrichment:
@@ -375,9 +439,10 @@ class _FormulaEnrichment:
     is the PDF text layer (``s(t) = s0 + v0t + 1 2 at2``): ``has_latex_markup``
     tells them apart. ``math.recognize`` (PP-FormulaNet) runs first; the vision
     model is the fallback, so a Toolbox outage degrades gracefully instead of
-    leaving formulas without content. Recognition runs before planning, like the
-    picture descriptions, so ``mathml`` and ``latex-verbalizer`` work on real
-    LaTeX.
+    leaving formulas without content. Recognition runs before the formula's
+    ``verbalize-formula`` and ``normalize-formula``, which depend on its
+    ``recognize-formulas`` obligation (#640, M3), so ``mathml`` and
+    ``latex-verbalizer`` work on real LaTeX.
 
     When a formula has text-layer text, a recognition must agree with it
     (``latex_text_agreement`` >= ``FORMULA_TEXT_AGREEMENT_MIN``): PP-FormulaNet
@@ -439,7 +504,7 @@ class _FormulaEnrichment:
         #: Crops ``math.recognize`` answered without LaTeX, outside an outage.
         self.empty_answers = 0
 
-    async def run_batch(self, formulas: list[ManifestElement]) -> None:
+    async def run_batch(self, formulas: list[ManifestElement]) -> int:
         # The fold touches only its own element and runs without awaits, so
         # concurrent folds cannot interleave. The TaskGroup cancels the sibling
         # crops when one of them fails and re-raises as an ExceptionGroup, like the
@@ -460,6 +525,7 @@ class _FormulaEnrichment:
                     provider=self.recognize_provider,
                 )
             )
+        return recognized
 
     async def enrich_and_notify(self, position: int, element: ManifestElement) -> bool:
         """Recognize one formula, then let the caller persist its outcome (#407)."""
@@ -573,6 +639,12 @@ class _FormulaEnrichment:
                 toolbox=self.toolbox,
             )
             if not image_bytes:
+                # Said, as for a picture (#851 review): a box the Toolbox
+                # could not render is retryable; a formula without a page has
+                # nothing to render.
+                element.metadata["formula_recognition_failure"] = (
+                    "crop_unavailable" if page_number >= 1 else "no_page"
+                )
                 return False
 
             original_text = element.text or ""
@@ -608,13 +680,18 @@ class _FormulaEnrichment:
 
 
 class _MathRecognizer:
-    """``math.recognize`` for one document, whose outage is paid once.
+    """``math.recognize`` for one batch, whose outage is paid once.
 
     The first call is serialized and every other crop waits for its answer,
     so a batch that starts with the capability down pays the outage once
     instead of once per crop; after it succeeds, the remaining calls only read
     the flag and run concurrently. The first ``MathCapabilityUnavailable``
-    turns ``available`` off for the rest of the document.
+    turns ``available`` off for the rest of the batch.
+
+    A batch is one call of the step: one ``recognize-formulas`` obligation
+    (#640, M3). A second obligation, for formulas found while the plan ran,
+    probes again, deliberately: the replan comes after other steps, and the
+    capability may have come back (#851 review).
     """
 
     def __init__(self, toolbox: ToolboxConfig) -> None:

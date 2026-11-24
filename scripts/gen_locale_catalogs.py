@@ -260,6 +260,7 @@ from acessilia_core.i18n.log_messages import (
     MSG_MODEL_CALL_FULL,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
+    MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE,
@@ -688,6 +689,7 @@ MESSAGES: tuple[str, ...] = (
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
     MSG_OBLIGATION_FORMULA,
@@ -1130,6 +1132,14 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
         "Descrição validada para {count} imagem",
         "Descrições validadas para {count} imagens",
     ),
+    handler_messages.MSG_FORMULAS_RECOGNIZED: (
+        "Reconhecimento de fórmulas rodou para {count} fórmula: {recognized} reconhecidas "
+        "({methods}), {numbered} números de equação separados, {pictures} lidas como imagens; "
+        "ficaram como estavam: {left}",
+        "Reconhecimento de fórmulas rodou para {count} fórmulas: {recognized} reconhecidas "
+        "({methods}), {numbered} números de equação separados, {pictures} lidas como imagens; "
+        "ficaram como estavam: {left}",
+    ),
     handler_messages.MSG_PICTURES_DESCRIBED: (
         "Descrição de imagens rodou para {count} imagem: {described} descritas, {formulas} lidas "
         "como fórmulas, {already} já descritas; ficaram sem descrição: {left}",
@@ -1553,6 +1563,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         MSG_OBLIGATION_TABLE: (
             "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
+        ),
+        MSG_OBLIGATION_FORMULA_RECOGNITION: (
+            "As fórmulas do documento devem ter o LaTeX lido e os números de equação separados."
         ),
         MSG_OBLIGATION_PICTURE_DESCRIPTION: (
             "As imagens do documento devem ser descritas pelo modelo de visão, ou lidas como fórmulas onde forem fórmulas."

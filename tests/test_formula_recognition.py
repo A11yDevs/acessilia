@@ -458,7 +458,7 @@ async def test_a_vision_description_reclassifies_the_formula(monkeypatch, croppe
 
 
 @pytest.mark.asyncio
-async def test_formula_progress_reports_the_stage_and_each_formula(monkeypatch, cropped):
+async def test_formula_progress_reports_each_formula(monkeypatch, cropped):
     manifest = _formula_manifest(None, None)
     install_formula_recognizer(
         monkeypatch,
@@ -487,9 +487,11 @@ async def test_formula_progress_reports_the_stage_and_each_formula(monkeypatch, 
         )
         for current in (1, 2)
     ]
-    # Concurrency leaves the per-formula order free; only the stage is first.
-    assert messages[0] == t(STAGE_ENRICHING_FORMULAS)
-    assert sorted(messages[1:]) == sorted(expected)
+    # Concurrency leaves the per-formula order free. The step itself is
+    # announced by its method, ``formula-recognizer``, once (#851 review), so
+    # the stage reports only each formula.
+    assert t(STAGE_ENRICHING_FORMULAS) not in messages
+    assert sorted(messages) == sorted(expected)
 
 
 TEXT_LAYER = "s(t) = s0 + v0t + 1\n2\nat2, t > 0,"

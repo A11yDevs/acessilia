@@ -135,6 +135,11 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     # picture and degrades to crop_unavailable, so it is not a requirement
     # that could rule it out.
     "picture-description": ("transitional", "describes pictures with the VisionAgent model"),
+    # Moved from before planning into the plan (#640, M3). Its Toolbox calls
+    # (math.recognize, pdf.render for the crop) degrade per formula, to the
+    # vision fallback or to the text layer, so they are not requirements that
+    # could rule it out (#848).
+    "formula-recognizer": ("transitional", "reads formula LaTeX, with the VisionAgent model as fallback"),
     "vision-description": ("validation", "the picture descriptions picture-description made"),
     "pandoc-table": ("validation", "the table structure table-enrichment produced"),
     "human-review": ("symbolic", "the terminal escalation"),

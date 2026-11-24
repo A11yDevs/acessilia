@@ -45,7 +45,10 @@ from acessilia_core.manifest.builder import (
 from acessilia_core.manifest.models import Obligation, ProcessingManifest
 from acessilia_core.pipeline import orchestrator as pddl, preflight
 from acessilia_core.pipeline.checkpointing import PHASE_PLAN, RunCheckpoints
-from acessilia_core.pipeline.handlers import pictures as picture_method
+from acessilia_core.pipeline.handlers import (
+    formula_recognition as formula_method,
+    pictures as picture_method,
+)
 from acessilia_core.pipeline.obligations import (
     TABLE_ENRICHMENT_KIND,
     _replannable_obligation_ids,
@@ -374,8 +377,9 @@ def _run(orchestrator, manifest, tmp_path, monkeypatch):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    for name in ("_classify_formula_regions", "_mark_inline_math", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, nothing)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", nothing)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
     return asyncio.run(orchestrator.execute(

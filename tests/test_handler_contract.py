@@ -42,6 +42,7 @@ EXPECTED_RUN_PARAMETERS = {
     "pymupdf-region": ("config", "ports"),
     "table-enrichment": ("config", "ports"),
     "picture-description": ("config", "ports"),
+    "formula-recognizer": ("config", "ports"),
     "vision-page-inspection": ("config", "ports"),
 }
 

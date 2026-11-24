@@ -2,6 +2,63 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.15 — the formula LaTeX is a planned action (#640, M3, #846)
+
+Until 0.3.14 the orchestrator read the formulas' LaTeX before planning. Now a
+document with formulas to recognize, or equation labels to separate, gets
+one `recognize-formulas` obligation, satisfied by the `formula-recognizer`
+method, which runs the same step inside the plan: it separates the equation
+labels, then reads the LaTeX of the formulas without it, `math.recognize`
+first and the vision model as the fallback, with its concurrency, the run's
+breaker and region cache.
+- **One obligation for the document,** like the pictures (M1) and the
+  tables (M2), and not one per formula as first proposed: the step shares
+  one breaker, one `math.recognize` probe per obligation (a second one,
+  for formulas found during the plan, probes again) and its concurrency
+  across the document. It targets the formulas with a label to separate and, in a
+  source that can be rendered, the ones without LaTeX that no recognition
+  has recorded. `verbalize-formula` and `normalize-formula` depend on it, as
+  do the page obligations of a page with a formula. It is the third
+  `DocumentStep`, and shares no element with the other two.
+- **The gap of M1 is closed (#846).** A picture the descriptions read as a
+  formula gets the step on the replan, through the reconciliation, so its
+  `verbalize-formula` sees the equation label separated, as before planning
+  until 0.3.13. The test that pinned the gap is inverted:
+  `test_a_picture_read_as_a_formula_gets_the_formula_steps`. The scope is
+  what the step did: a formula whose model text has no LaTeX markup is read
+  by `math.recognize` before its verbalization; LaTeX the model already
+  gave is not read again (an independent second reading is #852).
+- **One policy for selection and execution.** The obligation's targets and
+  the step's work share `formulas_needing_number_separation` and
+  `formulas_needing_recognition`, so a formula selected only to separate
+  its label is not read again, nor its recognition record overwritten.
+- **It can change obligations.** A formula the vision fallback reads as a
+  picture becomes one, so its formula obligations are replaced by a
+  `describe-image`; the executor skips them and replans (M0).
+- The method succeeds when the step ran for every formula of the
+  obligation; one left without LaTeX keeps its text and its reason
+  (`formula_recognition_failure`). Its message counts the formulas
+  recognized per method, the labels separated, the ones read as pictures,
+  and the reason of each one left. The step announces itself once (the
+  method; the stage no longer repeats `STAGE_ENRICHING_FORMULAS`). A formula
+  whose crop could not be made now records why (`crop_unavailable`, which
+  the delivered warnings count like a picture's and keeps the run out of
+  the cache, or `no_page`), instead of being left unchanged in silence.
+- The three document steps share no element, so their order is the
+  planner's tie-break; under a partial provider outage, the one that runs
+  first spends the shared breaker's budget first (#853).
+- `formula-recognizer` is `transitional` in `LOCAL_METHODS` (its fallback is
+  the core's `VisionAgent`) and declares no Toolbox requirement:
+  `math.recognize` degrades to the fallback and `pdf.render` per formula
+  (#848).
+- Before planning the run now classifies formula regions, prepares the
+  pictures and marks prose inline math. An enrichment checkpoint from 0.3.14
+  read its formulas already and gets no obligation.
+- Tests: the obligation and its targets, the plan order (also under Fast
+  Downward), the method's message and scope, a formula read as a picture,
+  the end-to-end picture → formula → label → verbalization, and a
+  differential test of the elements before and after the migration.
+
 ## 0.3.14 — the picture descriptions are a planned action (#640, M1)
 
 Until 0.3.13 the orchestrator described the pictures before planning. Now a

@@ -128,3 +128,29 @@ def test_fast_downward_describes_the_pictures_before_it_validates_them():
     assert report.comparison.verdict in {"identical", "equivalent"}
     order = [step.obligation_id for step in plans["fast-downward"].steps if step.method]
     assert order.index(enrichment.id) < order.index("o-describe")
+
+
+def test_fast_downward_recognizes_the_formulas_before_it_verbalizes_them():
+    """#640, M3: the document's ``recognize-formulas`` precedes the formulas'
+    ``verbalize-formula``, through ``depends-on``, under both planners."""
+    from pddl_support import build_element, build_manifest, build_obligation
+
+    from acessilia_core.pipeline.document_obligations import (
+        FORMULA_RECOGNITION,
+        reconcile_document_step,
+    )
+
+    verbalize = build_obligation("verbalize-formula", ["f-1"], ["mathml", "human-review"])
+    verbalize.id = "o-verbalize"
+    # The manifest's real costs: equal ones would let the planners break the
+    # tie differently, which is not what this case checks.
+    verbalize.method_costs = {"mathml": 20, "human-review": 100}
+    manifest = build_manifest([build_element("f-1", "formula", text="")], [verbalize])
+    enrichment = reconcile_document_step(manifest, FORMULA_RECOGNITION)
+
+    plans, report = _compare(manifest, None)
+
+    assert report.outcomes["fast-downward"].status == "solved"
+    assert report.comparison.verdict in {"identical", "equivalent"}
+    order = [step.obligation_id for step in plans["fast-downward"].steps if step.method]
+    assert order.index(enrichment.id) < order.index("o-verbalize")

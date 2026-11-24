@@ -238,7 +238,10 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
     from types import SimpleNamespace
 
     from acessilia_core.pipeline import orchestrator as pddl
-    from acessilia_core.pipeline.handlers import pictures as picture_method
+    from acessilia_core.pipeline.handlers import (
+        formula_recognition as formula_method,
+        pictures as picture_method,
+    )
 
     class Stop(Exception):
         pass
@@ -256,8 +259,9 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
         return None, {}
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions", "_mark_inline_math", "_enrich_formula_latex"):
+    for name in ("_classify_formula_regions", "_mark_inline_math"):
         monkeypatch.setattr(pddl, name, no_step)
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_step)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_step)
     monkeypatch.setattr(toolbox_gate, "decide", decide)
     orchestrator = _orchestrator()
@@ -424,6 +428,8 @@ TRANSITIONAL_BASELINE = frozenset({
     "table-enrichment",
     # #640 M1: the picture descriptions, moved the same way.
     "picture-description",
+    # #640 M3: the formula LaTeX, moved the same way.
+    "formula-recognizer",
 })
 
 
