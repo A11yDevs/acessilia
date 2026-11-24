@@ -12,7 +12,13 @@ and region cache, one retry pass, and the ownership annotation again after
 the descriptions.
 - **One obligation for the document.** It targets the pictures not described
   yet; without pictures, in a mostly visual document, its placeholder
-  visuals, or the first element of a one-page one, as the step chose them.
+  visuals, or the first element of a one-page one, as the step chose them,
+  but never a formula: the candidates and the elements the step keeps share
+  one test (`is_describable`), so it never takes one it would then drop.
+  Between the two document steps the edges follow `DOCUMENT_STEPS`:
+  `enrich-tables` may depend on `describe-images` when they share an element
+  (a one-page document whose first element is a table), never the reverse,
+  so they make no cycle.
   Each picture's `describe-image` keeps `vision-description`, which checks
   the result, and depends on it, as do the page obligations of a page with a
   picture. The only alternative is `human-review`. The method succeeds when

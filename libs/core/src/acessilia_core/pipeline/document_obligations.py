@@ -41,6 +41,12 @@ before each replan (#832):
   it. A future step that must run *before* it is not one this rule should
   order: it needs an exclusion here.
 
+  Between the document's steps, the rule follows ``DOCUMENT_STEPS``: a
+  step's obligation may depend on an earlier step's that shares an element,
+  never on a later one's. Applied in both directions, the rule would make a
+  cycle when the two steps share an element (a one-page mostly visual
+  document whose first element, the one the descriptions take, is a table).
+
 The step that removes an element must also remove or retarget that element's
 own obligations and the page's ``element_ids``; the manifest refuses dangling
 targets.
@@ -62,7 +68,10 @@ from acessilia_core.manifest.models import (
     Obligation,
     ProcessingManifest,
 )
-from acessilia_core.pipeline.enrichment.pictures import description_candidates
+from acessilia_core.pipeline.enrichment.pictures import (
+    description_candidates,
+    is_describable,
+)
 
 #: Statuses after which an obligation is not planned again: satisfied, or
 #: exhausted (every automatic method failed).
@@ -114,13 +123,15 @@ TABLE_ENRICHMENT = DocumentStep(
 #: all described (an enrichment checkpoint from before 0.3.14) gets none. A
 #: picture the model reads as a formula becomes a formula, which the step no
 #: longer applies to; the element's ``describe-image`` is then replaced by the
-#: formula's obligations, which the replan plans.
+#: formula's obligations, which the replan plans. ``applies`` and the
+#: candidates share ``is_describable``, so the step never takes an element it
+#: would then drop.
 PICTURE_DESCRIPTION = DocumentStep(
     kind="describe-images",
     method="picture-description",
     obligation_id="obligation-describe-images",
     rationale=MSG_OBLIGATION_PICTURE_DESCRIPTION,
-    applies=lambda element: element.type != "formula",
+    applies=is_describable,
     pending=_pictures_pending,
 )
 
@@ -228,8 +239,11 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
     a closed one is history only while the element that justified it stays,
     and an edge to a ``failed`` one would block the dependent from being
     replanned at all. A closed dependent is not planned again, so it is left
-    as it is.
+    as it is, and so are the obligations of this step and of the earlier
+    ones of ``DOCUMENT_STEPS`` (the module docstring).
     """
+    order = [item.kind for item in DOCUMENT_STEPS]
+    skipped = set(order[: order.index(step.kind) + 1]) if step.kind in order else {step.kind}
     own = {item.id: set(item.target_ids) for item in manifest.obligations if item.kind == step.kind}
     open_own = {
         item.id: set(item.target_ids)
@@ -237,7 +251,7 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
         if item.kind == step.kind and item.status not in CLOSED_STATUSES
     }
     for item in manifest.obligations:
-        if item.kind == step.kind or item.status in CLOSED_STATUSES:
+        if item.kind in skipped or item.status in CLOSED_STATUSES:
             continue
         targets = set(item.target_ids)
         kept = [

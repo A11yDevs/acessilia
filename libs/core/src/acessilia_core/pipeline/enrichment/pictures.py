@@ -304,6 +304,13 @@ def _prepare_pictures(
     _annotate_visual_text_ownership(manifest, media_inspection)
 
 
+def is_describable(element: ManifestElement) -> bool:
+    """Whether the picture descriptions may take ``element``: anything but a
+    formula, which the formula steps read (#845 review). The candidates and
+    the obligation's ``applies`` share it, so they never disagree."""
+    return element.type != "formula"
+
+
 def description_candidates(manifest: ProcessingManifest) -> list[ManifestElement]:
     """The elements the picture descriptions work on, described or not.
 
@@ -311,16 +318,22 @@ def description_candidates(manifest: ProcessingManifest) -> list[ManifestElement
     stand in for visual content (``is_placeholder_visual``); and without
     those either, in a one-page mostly visual document, its first element
     that is not an unstructured-page placeholder (a page inspection reads
-    that one).
+    that one). Never a formula (``is_describable``).
     """
     elements = manifest.elements
     pictures = [element for element in elements if element.type == "picture"]
     if pictures or not is_mostly_visual(elements):
         return pictures
-    placeholders = [element for element in elements if is_placeholder_visual(element)]
+    placeholders = [
+        element for element in elements
+        if is_placeholder_visual(element) and is_describable(element)
+    ]
     if placeholders or len(manifest.pages) != 1:
         return placeholders
-    return [element for element in elements if not is_unstructured_page_placeholder(element)][:1]
+    return [
+        element for element in elements
+        if not is_unstructured_page_placeholder(element) and is_describable(element)
+    ][:1]
 
 
 def _pictures_to_describe(

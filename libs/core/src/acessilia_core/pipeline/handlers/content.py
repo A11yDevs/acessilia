@@ -1,7 +1,8 @@
 """Deterministic handlers that check or finish an element's content.
 
-Picture descriptions are produced before planning, and table structures by
-the ``table-enrichment`` method that ``linearize-table`` depends on (#640, M2);
+Picture descriptions are produced by the ``picture-description`` method that
+``describe-image`` depends on (#640, M1), and table structures by the
+``table-enrichment`` method that ``linearize-table`` depends on (M2);
 their handlers verify that the work happened instead of pretending to do it. Code blocks are normalized in place. Moved verbatim from
 the PDDL orchestrator (#402, phase 3, step 6).
 """
@@ -37,8 +38,9 @@ def _handle_vision_description_method(
 ) -> MethodResult:
     """Require every picture target to already carry a description.
 
-    The description itself is produced before planning (`_enrich_picture_descriptions`
-    asks the vision model), so this method validates that the work the planner is
+    The description itself is produced by the `picture-description` method this
+    obligation depends on (`_enrich_picture_descriptions` asks the vision model,
+    #640 M1), so this method validates that the work the planner is
     asking for actually happened instead of pretending to perform it. A picture
     that is still undescribed is a real failure and keeps the next admissible
     method available; `describe-image` is non-critical, so it does not fail the job.

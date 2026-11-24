@@ -349,13 +349,24 @@ both:
 | Step | Kind and method | Targets | Dropped from its targets | Depends on it |
 |---|---|---|---|---|
 | Table enrichment (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | every table | an element no longer a table | `linearize-table`, `select-table-source`, and the page obligations of a page with a table |
-| Picture descriptions (M1, 0.3.14) | `describe-images`, `picture-description` | the pictures not described yet; without pictures, in a mostly visual document, its placeholder visuals, or the first element of a one-page one | an element that became a formula | `describe-image`, and the page obligations of a page with a picture |
+| Picture descriptions (M1, 0.3.14) | `describe-images`, `picture-description` | the pictures not described yet; without pictures, in a mostly visual document, its placeholder visuals, or the first element of a one-page one; never a formula | an element that became a formula | `describe-image`, and the page obligations of a page with a picture |
 
 A manifest whose pictures are all described (an enrichment checkpoint from
 0.3.13) gets no `describe-images`. The candidates are chosen before the
 described ones are left out, so a document whose pictures are all described
 no longer moves on to its placeholder visuals, as the step before planning
-did on a resume.
+did on a resume. The candidates and the elements the step keeps share one
+test (`is_describable`), so the step never takes an element it would then
+drop: a formula, which the one-page fallback used to take, is left to the
+formula steps.
+
+Between the two steps, the edges follow `DOCUMENT_STEPS`: a step's
+obligation may depend on an earlier step's that shares an element, never on
+a later one's. They share one in a one-page mostly visual document whose
+first element is a table: the descriptions take it as their fallback and
+the table step as its table. Then `enrich-tables` depends on
+`describe-images`, the order before planning until 0.3.13; applied in both
+directions, the rule made a cycle.
 
 **What its result means.** The method succeeds when the collective attempt
 ran: the step completed for every target. That is not a claim that every

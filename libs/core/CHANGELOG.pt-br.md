@@ -12,8 +12,14 @@ breaker e o cache de regiões da execução, uma passada de retry e a anotação
 de posse de novo depois das descrições.
 - **Uma obrigação para o documento.** Ela tem como alvo as imagens ainda não
   descritas; sem imagens, num documento majoritariamente visual, seus
-  visuais substitutos, ou o primeiro elemento de um de uma página, como o
-  passo os escolhia. O `describe-image` de cada imagem mantém o
+  visuais substitutos, ou o primeiro elemento de um documento de uma
+  página, como o passo os escolhia, mas nunca uma fórmula: os candidatos e
+  os elementos que o passo mantém compartilham um só teste
+  (`is_describable`), então ele nunca pega um que depois deixaria de lado.
+  Entre os dois passos do documento, as arestas seguem `DOCUMENT_STEPS`:
+  `enrich-tables` pode depender de `describe-images` quando compartilham um
+  elemento (um documento de uma página cujo primeiro elemento é uma tabela),
+  nunca o contrário, então não fazem ciclo. O `describe-image` de cada imagem mantém o
   `vision-description`, que confere o resultado, e depende dela, assim como
   as obrigações de página de uma página com imagem. A única alternativa é
   `human-review`. O método tem sucesso quando o passo rodou para todas as

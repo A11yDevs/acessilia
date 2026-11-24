@@ -27,7 +27,8 @@ reason (``vision_failure_reason``: ``model_failed``, ``admission_rejected``,
 ``crop_unavailable``, …), and its ``describe-image`` obligation validates it.
 Failing the whole obligation for one picture would block the pictures that
 are described. The message reports what happened to each picture. The method
-fails only when the step raises.
+fails when the step raises, and when none of its targets is in the manifest
+any more (``MSG_VISION_NO_PICTURE``), as ``table-enrichment`` does.
 """
 
 from __future__ import annotations
@@ -79,10 +80,8 @@ async def _describe_pictures(
     )
 
 
-def _outcome(element: ManifestElement | None) -> str:
+def _outcome(element: ManifestElement) -> str:
     """What the step left on a picture it was asked to describe."""
-    if element is None:
-        return "removed"
     if element.metadata.get("vision_description_complete"):
         return "formula" if element.type == "formula" else "described"
     return str(element.metadata.get("vision_failure_reason") or "undescribed")
@@ -101,10 +100,7 @@ def _handle_picture_description_method(
         element.id for element in pictures if element.metadata.get("vision_description_complete")
     }
     run_sync(_describe_pictures(manifest, Path(manifest.source.path), config, ports, targets))
-    by_id = {element.id: element for element in manifest.elements}
-    outcomes = Counter(
-        _outcome(by_id.get(element.id)) for element in pictures if element.id not in already
-    )
+    outcomes = Counter(_outcome(element) for element in pictures if element.id not in already)
     described = outcomes.pop("described", 0)
     formulas = outcomes.pop("formula", 0)
     return MethodResult(

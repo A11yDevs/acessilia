@@ -358,13 +358,24 @@ os dois:
 | Passo | Tipo e método | Alvos | Sai dos alvos | Dependem dela |
 |---|---|---|---|---|
 | Enriquecimento de tabelas (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | todas as tabelas | um elemento que deixou de ser tabela | `linearize-table`, `select-table-source` e as obrigações de página de uma página com tabela |
-| Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um de uma página | um elemento que virou fórmula | `describe-image` e as obrigações de página de uma página com imagem |
+| Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um documento de uma página; nunca uma fórmula | um elemento que virou fórmula | `describe-image` e as obrigações de página de uma página com imagem |
 
 Um manifesto com todas as imagens descritas (um checkpoint de enriquecimento
 da 0.3.13) não ganha `describe-images`. Os candidatos são escolhidos antes de
 deixar de lado os já descritos, então um documento com todas as imagens
 descritas não passa mais para os seus visuais substitutos, como o passo
-antes do planejamento fazia numa retomada.
+antes do planejamento fazia numa retomada. Os candidatos e os elementos que
+o passo mantém compartilham um só teste (`is_describable`), então o passo
+nunca pega um elemento que depois deixaria de lado: uma fórmula, que a
+alternativa de uma página pegava, fica para os passos de fórmula.
+
+Entre os dois passos, as arestas seguem `DOCUMENT_STEPS`: a obrigação de um
+passo pode depender da de um passo anterior que compartilha um elemento,
+nunca da de um posterior. Eles compartilham um num documento de uma página,
+majoritariamente visual, cujo primeiro elemento é uma tabela: as descrições
+o pegam como alternativa, e o passo de tabelas como sua tabela. Então
+`enrich-tables` depende de `describe-images`, a ordem antes do planejamento
+até a 0.3.13; aplicada nos dois sentidos, a regra fazia um ciclo.
 
 **O que o resultado significa.** O método tem sucesso quando a tentativa
 coletiva rodou: o passo terminou para todos os alvos. Isso não afirma que todo

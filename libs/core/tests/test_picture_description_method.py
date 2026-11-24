@@ -26,7 +26,7 @@ from acessilia_core.agents.model_calls import current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.i18n import n, t
 from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_IMAGE_DESCRIPTIONS
-from acessilia_core.manifest.models import ProcessingManifest
+from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
 from acessilia_core.pipeline import orchestrator as pddl, preflight
 from acessilia_core.pipeline.document_obligations import (
     PICTURE_DESCRIPTION,
@@ -172,6 +172,62 @@ def test_the_plan_describes_the_pictures_before_it_validates_them() -> None:
 
     order = [step.obligation_id for step in plan.steps if step.method]
     assert order.index("obligation-describe-images") < order.index("describe-p-1")
+
+
+def _lone_table() -> ProcessingManifest:
+    """A one-page mostly visual document whose only element is a table: the
+    descriptions take it (the first element), and so does the table step."""
+    linearize = build_obligation("linearize-table", ["t-1"], ["pandoc-table", "human-review"])
+    linearize.id = "o-linearize"
+    return build_manifest([build_element("t-1", "table", text="a b")], [linearize])
+
+
+@pytest.mark.parametrize("table_first", [False, True], ids=["together", "tables-first"])
+def test_two_document_steps_on_one_element_make_no_cycle(table_first) -> None:
+    """#845 review, item 1: the rule applied in both directions made
+    ``describe-images`` and ``enrich-tables`` depend on each other. The
+    descriptions come first, as before planning until 0.3.13."""
+    manifest = _lone_table()
+    if table_first:
+        reconcile_document_step(manifest, TABLE_ENRICHMENT)
+
+    reconcile_document_steps(manifest)
+    reconcile_document_steps(manifest, replan=True)
+
+    validate_obligation_graph(manifest)
+    by_kind = {item.kind: item for item in manifest.obligations}
+    describe, enrich = by_kind[PICTURE_DESCRIPTION.kind], by_kind[TABLE_ENRICHMENT.kind]
+    assert describe.target_ids == enrich.target_ids == ["t-1"]
+    assert describe.dependencies == []
+    assert describe.id in enrich.dependencies
+    _, plan = PlannerAgent().plan(manifest)
+    order = [step.obligation_id for step in plan.steps if step.method]
+    assert order.index(describe.id) < order.index(enrich.id) < order.index("o-linearize")
+
+
+def test_a_formula_is_never_a_picture_to_describe() -> None:
+    """#845 review, item 2: the one-page fallback took a formula the step
+    then dropped (``applies``), and recreated on the next reconciliation."""
+    verbalize = build_obligation("verbalize-formula", ["f-1"], ["mathml", "human-review"])
+    manifest = build_manifest([build_element("f-1", "formula", text="")], [verbalize])
+
+    assert reconcile_document_step(manifest, PICTURE_DESCRIPTION) is None
+    assert verbalize.dependencies == []
+
+
+@pytest.mark.parametrize("elements", [
+    [("h", "heading", "Titulo")],
+    [("t-1", "table", "a b")],
+    [("f-1", "formula", ""), ("h", "heading", "Titulo")],
+    [("p-1", "picture", ""), ("prose", "paragraph", _PROSE)],
+])
+def test_the_step_applies_to_every_element_it_takes(elements) -> None:
+    manifest = build_manifest([build_element(i, kind, text=text) for i, kind, text in elements], [])
+    by_id = {element.id: element for element in manifest.elements}
+
+    pending = PICTURE_DESCRIPTION.pending(manifest)
+
+    assert pending and all(PICTURE_DESCRIPTION.applies(by_id[item]) for item in pending)
 
 
 def test_the_two_document_steps_keep_to_their_own_elements() -> None:
@@ -392,6 +448,10 @@ def test_an_enrichment_checkpoint_from_before_the_migration_gets_no_obligation()
         build_orchestrator()._load_or_enrich_manifest(ctx, _pictures_manifest("p-1"), None, {})
     )
 
+    assert not any(item.kind == PICTURE_DESCRIPTION.kind for item in resumed.obligations)
+    # Nor does the reconciliation before a replan (#845 review, item 3):
+    # its pictures are described.
+    reconcile_document_steps(resumed, replan=True)
     assert not any(item.kind == PICTURE_DESCRIPTION.kind for item in resumed.obligations)
 
 
