@@ -41,8 +41,25 @@ enriquecimento, menos a preparação das imagens, agora roda dentro do plano.
 - Testes: a obrigação e seus alvos, as conversões esperando por ela (também
   no Fast Downward), o método e sua mensagem, a invalidação só depois de uma
   conversão, uma tabela obsoleta, uma execução concluída com um bloco
-  acrescentado (replanejada, job reaberto) ou sem nada novo, o bloco
+  acrescentado (replanejada) ou sem nada novo, o bloco
   restaurado pelo `execute` e o `document.text.spans` opcional.
+- **Da revisão do #867:**
+  - Um job só é reaberto quando o seu replanejamento é permitido. Com o
+    orçamento de descobertas gasto, o trabalho que uma execução concluída
+    deixou é julgado como em qualquer execução: uma obrigação crítica falha
+    o job em vez de sair em silêncio, e um refinamento deixa um aviso,
+    mantendo o job concluído.
+  - Uma tabela marcada obsoleta de novo depois de o passo marcá-la entra
+    numa obrigação nova (`DocumentStep.renewed`); uma esgotada ainda a
+    cobre.
+  - Um bloco de prosa sem caixas que já traz `$…$` (um parágrafo resgatado)
+    entra no passo, que o pesa para a invalidação, como fazia a passada da
+    #599; com a detecção desligada, o passo é planejado também para isso.
+  - Uma `mark-inline-math` esgotada não segura mais as conversões que
+    esperavam por ela (`DocumentStep.critical=False`).
+  - O status da detecção dos dois passos vem de um helper só
+    (`inline_math_detection_status`), e a documentação (ADR-0011,
+    `workflow-actions`, o inventário) descreve o passo planejado.
 
 ## 0.3.19 — a classificação de regiões de fórmula é uma ação planejada (#640, M4a)
 

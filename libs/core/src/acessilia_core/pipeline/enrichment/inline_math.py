@@ -43,10 +43,10 @@ _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "fo
 class _TextSpanReader:
     """The text layer's spans of one document, each page fetched once (#260).
 
-    The prose and table steps of the inline math detection run at different
-    points of the pipeline (the table step inside the plan, #640 M2); reading
-    through one reader, a page is requested from the Toolbox once, and a
-    capability that failed is not asked again.
+    The prose and table steps of the inline math detection run as different
+    planned methods (``inline-math-marker`` and ``table-enrichment``, #640
+    M4b and M2); reading through one reader, a page is requested from the
+    Toolbox once, and a capability that failed is not asked again.
 
     The reader keeps only what identifies the source (its path and artifact
     id), not the manifest: the plan's executor works on a copy of it. A step
@@ -93,7 +93,7 @@ def run_text_spans(
     ports: RunPorts, manifest: ProcessingManifest, source_path: Path, toolbox: ToolboxConfig
 ) -> _TextSpanReader:
     """The text-span reader of the run (``ports``), so a page is fetched once
-    for the prose step before planning and the table step inside the plan.
+    for the prose step and the table step, both inside the plan.
 
     One per run: the first call builds it, from its ``manifest``,
     ``source_path`` and ``toolbox``, and every later call gets that reader
@@ -109,6 +109,17 @@ def _inline_math_enabled(manifest: ProcessingManifest, document: DocumentConfig)
         document.inline_math_detection == "fonts"
         and manifest.source.media_type == "application/pdf"
     )
+
+
+def inline_math_detection_status(manifest: ProcessingManifest, document: DocumentConfig) -> str:
+    """How the detection ran, for the steps' messages: ``off`` (disabled, or
+    not a PDF), ``unavailable`` (the Toolbox could not read the text layer)
+    or ``fonts`` (the marks ran)."""
+    if not _inline_math_enabled(manifest, document):
+        return "off"
+    if manifest.extractor.configuration.get("inline_math_detection") == "unavailable":
+        return "unavailable"
+    return "fonts"
 
 
 def _boxed_pages(elements: Iterable[ManifestElement]) -> list[int]:
@@ -361,22 +372,57 @@ def _invalidate_formula_conversions(manifest: ProcessingManifest) -> None:
 def inline_math_pending(manifest: ProcessingManifest) -> list[str]:
     """The elements the inline math step still has work on, in document order.
 
-    In a PDF, the prose elements with boxes and text that no detection has
-    marked yet, and the tables whose marks went stale (``inline_math_stale``:
-    the select-table-source step adopted the secondary provider's cells after
-    the table enrichment marked the primary's). A block the plan added (a
-    ``rescue-omitted`` paragraph) is one of them, so it gets its marks on the
-    replan (#640, M4b) instead of in a pass after execution (#599). Whether
-    the detection is on is the run's config, not the manifest's: the step
-    with it off does nothing.
+    In a PDF:
+    - the prose elements with boxes and text that no detection has marked
+      yet, which the detection marks;
+    - the prose elements without boxes that already carry a ``$…$`` span: the
+      detection cannot read them, but they are variable evidence the formula
+      conversions may not have seen, which the step's invalidation weighs;
+    - the tables whose marks went stale (``inline_math_renewed``).
+
+    A block the plan added (a ``rescue-omitted`` paragraph) is one of them,
+    so it gets the step on the replan (#640, M4b) instead of in a pass after
+    execution (#599). Whether the detection is on is the run's config, not
+    the manifest's: with it off the step marks nothing, but still weighs the
+    evidence a block already carries, as the pass after execution did.
     """
     if manifest.source.media_type != "application/pdf":
         return []
+    renewed = inline_math_renewed(manifest)
     return [
         element.id for element in manifest.elements
         if _is_prose_inline_math_candidate(element)
-        or (element.metadata.get("inline_math_stale") and _is_table_inline_math_candidate(element))
+        or _carries_unread_inline_math(element)
+        or element.id in renewed
     ]
+
+
+def inline_math_renewed(manifest: ProcessingManifest) -> set[str]:
+    """The tables whose inline math marks went stale (``inline_math_stale``):
+    the select-table-source step adopted the secondary provider's cells after
+    they were marked.
+
+    The step clears the flag when it marks a table, so a flagged table that a
+    satisfied obligation of the step covers was adopted again after it: its
+    earlier marks no longer hold, and it joins a new obligation
+    (``DocumentStep.renewed``)."""
+    if manifest.source.media_type != "application/pdf":
+        return set()
+    return {
+        element.id for element in manifest.elements
+        if element.metadata.get("inline_math_stale") and _is_table_inline_math_candidate(element)
+    }
+
+
+def _carries_unread_inline_math(element: ManifestElement) -> bool:
+    """A prose element the detection cannot read (no boxes) that already
+    carries ``$…$``, and that no detection has marked."""
+    return (
+        element.type in _INLINE_MATH_ELEMENT_TYPES
+        and "inline_math_detection" not in element.metadata
+        and not any(provenance.bbox is not None for provenance in element.provenance)
+        and _carries_inline_math(element)
+    )
 
 
 async def _enrich_inline_math(

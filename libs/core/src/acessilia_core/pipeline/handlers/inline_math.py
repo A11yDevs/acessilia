@@ -37,8 +37,8 @@ from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.pipeline.enrichment.inline_math import (
     _carries_inline_math,
     _enrich_inline_math,
-    _inline_math_enabled,
     _invalidate_formula_conversions,
+    inline_math_detection_status,
     run_text_spans,
 )
 from acessilia_core.pipeline.handlers.common import run_status
@@ -63,14 +63,6 @@ async def _mark(
         manifest, source, config.document, run_text_spans(ports, manifest, source, config.toolbox),
         targets=targets,
     )
-
-
-def _detection(manifest: ProcessingManifest, config: CoreConfig) -> str:
-    """``off`` (disabled, or not a PDF), ``unavailable`` (the Toolbox could not
-    read the text layer) or ``fonts`` (the marks ran)."""
-    if not _inline_math_enabled(manifest, config.document):
-        return "off"
-    return str(manifest.extractor.configuration.get("inline_math_detection") or "fonts")
 
 
 def _handle_inline_math_marker_method(
@@ -100,7 +92,7 @@ def _handle_inline_math_marker_method(
             marked=counts["marked"],
             elements=counts["elements"],
             unmatched=counts["unmatched"],
-            detection=_detection(manifest, config),
+            detection=inline_math_detection_status(manifest, config.document),
         ),
     )
 

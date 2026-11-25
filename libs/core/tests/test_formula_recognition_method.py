@@ -154,8 +154,10 @@ def test_the_plan_recognizes_the_formulas_before_it_verbalizes_them() -> None:
 def test_two_document_steps_share_an_element_only_in_their_order(element_type) -> None:
     """The policy between the document steps (#845 review, M4): two steps
     share an element only when the first must run before the second, and
-    ``DOCUMENT_STEPS`` lists them so. Today only a formula is shared: the
-    region classification, then the formula LaTeX."""
+    ``DOCUMENT_STEPS`` lists them so. Today a formula is shared by the region
+    classification, then the formula LaTeX; a paragraph of a mostly visual
+    document by the descriptions, then the inline math; and a stale table by
+    the table enrichment, then the inline math (M4b)."""
     from acessilia_core.pipeline.document_obligations import (
         FORMULA_CLASSIFICATION,
         INLINE_MATH,

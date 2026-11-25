@@ -271,10 +271,12 @@ the manifest. **The enrichment migration needs no domain change.**
    - formula LaTeX comes before `verbalize-formula` and `normalize-formula`;
    - the table structure comes before the table's inline math.
 
-   No data dependency was found between prose inline math and the formula
-   steps (they read different elements), between pictures and tables, or
-   between formula LaTeX and tables. Each migration confirms this for its own
-   step.
+   No element-level data dependency was found between prose inline math and
+   the formula steps (they read different elements), between pictures and
+   tables, or between formula LaTeX and tables. Each migration confirms this
+   for its own step. M4b revises it for the formula conversions: they read
+   the variables the prose's marks give, a dependency across the document
+   rather than on a shared element (below).
 
    **M1 (core 0.3.14).** The descriptions now run after steps 3 and 4.
    Prose inline math reads paragraphs, list items, captions and footnotes,
@@ -335,9 +337,44 @@ the manifest. **The enrichment migration needs no domain change.**
    declares them as `waiting_kinds`, a minimal declared dependency (#865
    proposes predecessors in general). It shares a paragraph with the
    descriptions (a mostly visual document) and a stale table with the table
-   enrichment, and comes after both. They
-   share the vision breaker, so under a partial provider outage the order
-   changes which step degrades; that is documented, not forced (#853).
+   enrichment, and comes after both. It calls no model, so the vision
+   breaker does not order it; the steps that share that breaker
+   (descriptions, formula classification and LaTeX, tables) are ordered by
+   it only operationally, under a partial provider outage; that is
+   documented, not forced (#853).
+
+   The #867 review fixed four points of that design:
+   - *A stale table marked again.* A satisfied obligation does not cover an
+     element whose result the run invalidated since (`DocumentStep.renewed`):
+     a table flagged `inline_math_stale` after the step marked it joins a new
+     obligation. An exhausted obligation still covers it, so a degraded
+     attempt is not reopened forever.
+   - *Evidence the detection cannot read.* A prose block without boxes that
+     already carries `$…$` (a rescued paragraph) joins the step too: the
+     step marks nothing in it, but weighs it to drop the conversions made
+     before it, as the pass after execution of #599 did. With
+     `INLINE_MATH_DETECTION=off` the step is still planned for the same
+     reason, marks nothing and reports `detection: off`.
+   - *A non-critical step.* `mark-inline-math` is non-critical
+     (`DocumentStep.critical=False`): when it is exhausted, the conversions
+     that waited for it lose that edge and run without its variables,
+     instead of being left out of the replan and failing the job.
+   - *The work a completed run leaves.* Finding it does not reopen the job:
+     the replan loop does, only once the replan is allowed. With the
+     discovery budget spent, the job keeps its status, and
+     `_check_unsatisfied` judges what was found as for any run: a critical
+     obligation fails the job, a refinement leaves a warning.
+
+   When the step drops a conversion, the `verbalize-formula` or
+   `normalize-formula` obligation stays `satisfied`: the step's method ran
+   and its evidence holds. The canonical build regenerates `mathml` and
+   `verbalization` from the final manifest (`_enrich_math_blocks`, with the
+   run's math enricher: the same Toolbox conversions, and the variables of
+   every formula and inline span); without them the formula keeps its
+   LaTeX, as when the planned methods degrade. The
+   regeneration is a projection of the final manifest, not a new semantic
+   decision, so it stays outside the plan. Reopening the obligations
+   instead, with selective invalidation and provenance, is #871.
 3. **Infrastructure stays out of the domain** (ADR-0029). The region cache is
    already in `RunPorts`. The breaker, the progress hook and the text-span
    reader are locals today. The proposal is to make them a per-run

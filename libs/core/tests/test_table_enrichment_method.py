@@ -37,7 +37,10 @@ from acessilia_core.i18n.stage_messages import (
 from acessilia_core.manifest.models import PageDescriptor
 from acessilia_core.pipeline.enrichment import tables as table_stage
 from acessilia_core.pipeline.enrichment.common import run_breaker
-from acessilia_core.pipeline.enrichment.inline_math import run_text_spans
+from acessilia_core.pipeline.enrichment.inline_math import (
+    inline_math_detection_status,
+    run_text_spans,
+)
 from acessilia_core.pipeline.handlers import tables as table_method
 from acessilia_core.pipeline.handlers.messages import (
     MSG_TABLE_NO_TABLE,
@@ -513,7 +516,7 @@ def test_a_second_enrichment_reads_only_its_own_tables(fake_reader) -> None:
     assert "table_ast" in found.metadata
     assert result.message == n(*MSG_TABLES_ENRICHED, 1).format(
         count=1, needing=1, structured=1, left="-",
-        inline=table_method._inline_math_status(manifest, CONFIG), marked=0,
+        inline=inline_math_detection_status(manifest, CONFIG.document), marked=0,
     )
 
 

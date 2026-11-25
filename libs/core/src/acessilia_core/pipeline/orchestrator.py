@@ -48,15 +48,13 @@ from acessilia_core.pipeline.checkpointing import (
     manifest_payload,
     resumed_manifest,
 )
-from acessilia_core.pipeline.document_obligations import (
-    CLOSED_STATUSES,
-    DOCUMENT_STEPS,
-    reconcile_document_steps,
-)
+from acessilia_core.pipeline.document_obligations import reconcile_document_steps
 from acessilia_core.pipeline.enrichment.pictures import _prepare_pictures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
+    _document_work_found,
+    _reopen,
     _replannable_obligation_ids,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
@@ -729,6 +727,7 @@ class PddlAccessibilityOrchestrator:
             roots = _replannable_obligation_ids(manifest)
             if not roots:
                 break
+            _reopen(manifest)  # only now, with the replan allowed (M4b)
             if failure:
                 replans += 1
             else:
@@ -772,29 +771,38 @@ class PddlAccessibilityOrchestrator:
 
         A run that did not complete fails when nothing is open (the failure is
         elsewhere) or a critical obligation is; with only refinements open, the
-        document is delivered with a technical warning.
+        document is delivered with a technical warning. A completed run is
+        held to the same policy for what it left open (the work found after
+        it with the discovery budget spent). A dry run is not checked.
         """
-        if execution_report.status not in {"completed", "dry-run-completed"}:
-            unsatisfied = _unsatisfied_selected_obligations(manifest)
-            critical = [
-                obligation for obligation in unsatisfied
-                if _blocks_delivery(obligation, manifest)
-            ]
-            if not unsatisfied or critical:
-                # The ids name every target element and run to kilobytes on a
-                # long document, so they go to the log; the job error, which
-                # reaches the user by e-mail, says what is open and where.
-                logger.warning(
-                    "PDDL: unsatisfied obligations: {}",
-                    ", ".join(obligation.id for obligation in unsatisfied),
-                )
-                raise RuntimeError(_unsatisfied_summary(manifest))
-            # Only refinements are left open; the extracted content is still
-            # complete, so the document is delivered with a technical warning.
+        if execution_report.status == "dry-run-completed":
+            return
+        completed = execution_report.status == "completed"
+        unsatisfied = _unsatisfied_selected_obligations(manifest)
+        # A completed run can still leave obligations open: the ones the
+        # reconciliation found after its complete-job (M4b) when the
+        # discovery budget was spent. They follow the same policy.
+        if completed and not unsatisfied:
+            return
+        critical = [
+            obligation for obligation in unsatisfied
+            if _blocks_delivery(obligation, manifest)
+        ]
+        if not unsatisfied or critical:
+            # The ids name every target element and run to kilobytes on a
+            # long document, so they go to the log; the job error, which
+            # reaches the user by e-mail, says what is open and where.
             logger.warning(
-                "PDDL: finishing with non-critical obligations open: {}",
+                "PDDL: unsatisfied obligations: {}",
                 ", ".join(obligation.id for obligation in unsatisfied),
             )
+            raise RuntimeError(_unsatisfied_summary(manifest))
+        # Only refinements are left open; the extracted content is still
+        # complete, so the document is delivered with a technical warning.
+        logger.warning(
+            "PDDL: finishing with non-critical obligations open: {}",
+            ", ".join(obligation.id for obligation in unsatisfied),
+        )
 
     def _build_plan(
         self,
@@ -834,29 +842,6 @@ class PddlAccessibilityOrchestrator:
             for method in obligation.admissible_methods
         }
         return sorted(requested - registered)
-
-
-def _document_work_found(manifest: ProcessingManifest) -> bool:
-    """Whether a run left work for the document steps that no plan has (#640, M4b).
-
-    A step can add elements without adding obligations: ``rescue-omitted``
-    restores a paragraph, ``select-table-source`` adopts a table's cells. The
-    reconciliation gives them the document step they need (the inline math,
-    a picture's description), so a run that completed still replans for
-    them, as a discovery; this replaced the pass after execution of #599.
-    A job the run completed is reopened for that replan.
-    """
-    reconcile_document_steps(manifest, replan=True)
-    kinds = {step.kind for step in DOCUMENT_STEPS}
-    found = any(
-        item.kind in kinds and item.selected and item.status not in CLOSED_STATUSES and not item.attempts
-        for item in manifest.obligations
-    )
-    if found and manifest.status == "completed":
-        # The run's complete-job closed a job that still had work: it is
-        # reopened, and the replan's own complete-job closes it again.
-        manifest.status = "processing"
-    return found
 
 
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:

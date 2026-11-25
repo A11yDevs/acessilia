@@ -106,9 +106,9 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, mode="avancado", structured_output=True)
 
     names = [call[0] for call in calls]
-    # Without tables, pictures or formulas there is no document step inside
-    # the plan (#640, M1–M4); the inline math pass runs once more after
-    # execution (#599).
+    # Without tables, pictures, formulas or prose with boxes there is no
+    # document step inside the plan (#640, M1–M4b), and nothing runs after
+    # execution: the pass of #599 is the M4b step now.
     assert names == ["inspect"]
     assert all(call[1] == "doc.pdf" for call in calls)
     assert manifest.extractor.configuration["region_inspection_mode"] == "avancado"
@@ -120,7 +120,7 @@ async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_
 ) -> None:
     """#640, M2: a document with tables gets an ``enrich-tables`` obligation;
     its ``table-enrichment`` method runs the two table steps, in order, after
-    the steps before planning, with the same breaker and text-span reader."""
+    the media inspection, with the run's breaker and text-span reader."""
     config = core_config(vision={"breaker_threshold": 7})
     table = build_element("t", "table", text="a b")
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, config=config, elements=[table])

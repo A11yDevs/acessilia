@@ -27,7 +27,10 @@ before each replan (#832):
   the open one, or, when the existing ones are closed (satisfied or
   exhausted), a new one for the new elements only. Reopening a satisfied one
   would leave satisfied obligations after an open one; an exhausted one is
-  not planned again, so an element joining it would never be worked on;
+  not planned again, so an element joining it would never be worked on. A
+  satisfied obligation does not cover an element whose result the run
+  invalidated since (``DocumentStep.renewed``: M4b's stale tables), which
+  joins a new one the same way;
 - an obligation drops the elements the step no longer applies to (removed
   from the document, or of another type now), and one left without elements
   is removed, with the dependencies on it (``target_ids`` cannot be empty);
@@ -56,9 +59,11 @@ before each replan (#832):
   obligation may depend on an earlier step's that shares an element, never
   on a later one's, so it can never make a cycle between them. Today the
   formula region classification and the formula LaTeX share the formulas
-  (M4: the recognition waits for the classification); the descriptions
-  never take a table or a formula (``is_describable``), and the table step
-  only tables, so no other pair shares one.
+  (M4: the recognition waits for the classification); the inline math
+  (M4b) shares a paragraph with the descriptions (in a mostly visual
+  document) and a stale table with the table enrichment, after both. The
+  descriptions never take a table or a formula (``is_describable``), and the
+  table step only tables, so no other pair shares one.
 
   So the order between the steps is not a dependency: the planner breaks
   the tie (their costs are equal), and ``DOCUMENT_STEPS`` is the order of the
@@ -95,7 +100,10 @@ from acessilia_core.pipeline.enrichment.formulas import (
     formulas_to_classify,
     formulas_to_recognize,
 )
-from acessilia_core.pipeline.enrichment.inline_math import inline_math_pending
+from acessilia_core.pipeline.enrichment.inline_math import (
+    inline_math_pending,
+    inline_math_renewed,
+)
 from acessilia_core.pipeline.enrichment.pictures import (
     description_candidates,
     is_describable,
@@ -129,6 +137,17 @@ class DocumentStep:
     #: the variables the prose's inline math marks). A minimal, declared
     #: dependency; declaring predecessors between steps in general is #865.
     waiting_kinds: frozenset[str] = frozenset()
+    #: The pending elements whose earlier result the run invalidated: a
+    #: satisfied obligation of the step no longer covers them, so they join
+    #: a new one (M4b: a table whose inline math marks went stale after the
+    #: step marked it). An open or exhausted obligation still covers them,
+    #: so a degraded attempt is not reopened forever.
+    renewed: Callable[[ProcessingManifest], set[str]] = lambda _manifest: set()
+    #: Whether the step's result is needed to deliver: with ``False``, an
+    #: exhausted obligation of the step is a degradation, and the obligations
+    #: that waited for it are planned without it (M4b: a formula conversion
+    #: reads fewer variables, as with the detection off).
+    critical: bool = True
 
 
 def _pictures_pending(manifest: ProcessingManifest) -> list[str]:
@@ -214,6 +233,8 @@ INLINE_MATH = DocumentStep(
     applies=lambda element: element.type in {"paragraph", "list_item", "caption", "footnote", "table"},
     pending=inline_math_pending,
     waiting_kinds=frozenset({"verbalize-formula", "normalize-formula"}),
+    renewed=inline_math_renewed,
+    critical=False,
 )
 
 #: The formula region classification, the descriptions (which can find
@@ -247,9 +268,15 @@ def reconcile_document_step(
     """
     _drop_lost(manifest, step)
     own = [item for item in manifest.obligations if item.kind == step.kind]
-    covered = {target for item in own for target in item.target_ids}
+    renewed = step.renewed(manifest)
+    covered = {
+        target for item in own for target in item.target_ids
+        if target not in renewed or item.status != "satisfied"
+    }
     new = [element_id for element_id in step.pending(manifest) if element_id not in covered]
     target = _cover(manifest, step, own, new, replan) if new else (own[0] if own else None)
+    if not step.critical:
+        _release_exhausted(manifest, step)
     _reconcile_edges(manifest, step)
     manifest.summary.obligation_count = len(manifest.obligations)
     return target
@@ -346,7 +373,10 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
     and an edge to a ``failed`` one would block the dependent from being
     replanned at all. A closed dependent is not planned again, so it is left
     as it is, and so are the obligations of this step and of the earlier
-    ones of ``DOCUMENT_STEPS`` (the module docstring).
+    ones of ``DOCUMENT_STEPS`` (the module docstring). An edge to an
+    exhausted obligation of a non-critical step goes even while the element
+    stays (``_release_exhausted``, run before this rule, which never adds
+    one back: it links open obligations only).
     """
     order = [item.kind for item in DOCUMENT_STEPS]
     skipped = set(order[: order.index(step.kind) + 1]) if step.kind in order else {step.kind}
@@ -370,6 +400,25 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
             if (waits or elements & targets) and obligation not in kept
         ]
         item.dependencies = kept + needed
+
+
+def _release_exhausted(manifest: ProcessingManifest, step: DocumentStep) -> None:
+    """Drop the open obligations' edges to an exhausted obligation of a step
+    the delivery does not need (``critical=False``). The replan leaves out an
+    obligation that depends on an exhausted one
+    (``_replannable_obligation_ids``), so a critical formula conversion would
+    otherwise fail the job for a missing refinement."""
+    exhausted = {
+        item.id for item in manifest.obligations
+        if item.kind == step.kind and item.status == "failed"
+    }
+    if not exhausted:
+        return
+    for item in manifest.obligations:
+        if item.status not in CLOSED_STATUSES:
+            item.dependencies = [
+                dependency for dependency in item.dependencies if dependency not in exhausted
+            ]
 
 
 __all__ = [

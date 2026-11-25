@@ -278,10 +278,13 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      `normalize-formula`;
    - a estrutura da tabela vem antes da matemática inline da tabela.
 
-   Não se encontrou dependência de dados entre a matemática inline da prosa e
-   os passos de fórmula (eles leem elementos diferentes), entre imagens e
-   tabelas, nem entre o LaTeX das fórmulas e as tabelas. Cada migração
-   confirma isso para o seu passo.
+   Não se encontrou dependência de dados por elemento entre a matemática
+   inline da prosa e os passos de fórmula (eles leem elementos diferentes),
+   entre imagens e tabelas, nem entre o LaTeX das fórmulas e as tabelas. Cada
+   migração confirma isso para o seu passo. O M4b revê isso para as
+   conversões de fórmula: elas leem as variáveis que as marcas da prosa dão,
+   uma dependência através do documento, não de um elemento compartilhado
+   (abaixo).
 
    **M1 (core 0.3.14).** As descrições agora rodam depois dos passos 3 e 4.
    A matemática inline da prosa lê parágrafos, itens de lista, legendas e
@@ -344,10 +347,45 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    passo as declara como `waiting_kinds`, uma dependência declarada mínima (a
    #865 propõe predecessores em geral). Ela compartilha um parágrafo com as
    descrições (um documento majoritariamente visual) e uma tabela obsoleta
-   com o enriquecimento de tabelas, e vem depois dos dois. Eles
-   compartilham o breaker de visão, então numa indisponibilidade parcial do
-   provider a ordem muda qual passo degrada; isso está documentado, não
-   imposto (#853).
+   com o enriquecimento de tabelas, e vem depois dos dois. Ela não chama
+   modelo, então o breaker de visão não a ordena; os passos que compartilham
+   esse breaker (descrições, classificação e LaTeX das fórmulas, tabelas) só
+   são ordenados por ele operacionalmente, numa indisponibilidade parcial do
+   provider; isso está documentado, não imposto (#853).
+
+   A revisão do #867 corrigiu quatro pontos desse desenho:
+   - *Uma tabela obsoleta marcada de novo.* Uma obrigação satisfeita não
+     cobre um elemento cujo resultado a execução invalidou depois
+     (`DocumentStep.renewed`): uma tabela marcada `inline_math_stale` depois
+     de o passo marcá-la entra numa obrigação nova. Uma obrigação esgotada
+     ainda a cobre, então uma tentativa degradada não é reaberta para sempre.
+   - *Evidência que a detecção não lê.* Um bloco de prosa sem caixas que já
+     traz `$…$` (um parágrafo resgatado) também entra no passo: o passo não
+     marca nada nele, mas o pesa para descartar as conversões feitas antes
+     dele, como fazia a passada depois da execução da #599. Com
+     `INLINE_MATH_DETECTION=off` o passo ainda é planejado pelo mesmo motivo,
+     não marca nada e informa `detection: off`.
+   - *Um passo não crítico.* `mark-inline-math` é não crítica
+     (`DocumentStep.critical=False`): quando ela se esgota, as conversões que
+     esperavam por ela perdem essa aresta e rodam sem as suas variáveis, em
+     vez de ficarem fora do replanejamento e falharem o job.
+   - *O trabalho que uma execução concluída deixa.* Encontrá-lo não reabre o
+     job: o laço de replanejamento o reabre, só quando o replanejamento é
+     permitido. Com o orçamento de descobertas gasto, o job mantém o seu
+     status, e `_check_unsatisfied` julga o que foi encontrado como em
+     qualquer execução: uma obrigação crítica falha o job, um refinamento
+     deixa um aviso.
+
+   Quando o passo descarta uma conversão, a obrigação `verbalize-formula` ou
+   `normalize-formula` continua `satisfied`: o método dela rodou e a sua
+   evidência vale. A construção canônica regenera `mathml` e `verbalization`
+   a partir do manifesto final (`_enrich_math_blocks`, com o enriquecedor
+   matemático da execução: as mesmas conversões do Toolbox, e as variáveis
+   de todas as fórmulas e trechos inline); sem elas a fórmula mantém o seu
+   LaTeX, como quando os métodos planejados degradam. A regeneração é uma projeção do
+   manifesto final, não uma nova decisão semântica, então fica fora do
+   plano. Reabrir as obrigações em vez disso, com invalidação seletiva e
+   proveniência, é a #871.
 3. **A infraestrutura fica fora do domínio** (ADR-0029). O cache de regiões já
    está em `RunPorts`. O breaker, o gancho de progresso e o leitor de spans de
    texto são variáveis locais hoje. A proposta é torná-los um **serviço de

@@ -41,8 +41,24 @@ the plan.
 - Tests: the obligation and its targets, the conversions waiting for it
   (also under Fast Downward), the method and its message, the invalidation
   only after a conversion, a stale table, a completed run with an added
-  block (replanned, job reopened) or with nothing new, the restored block
+  block (replanned) or with nothing new, the restored block
   through `execute`, and the optional `document.text.spans`.
+- **From the #867 review:**
+  - A job is reopened only once its replan is allowed. With the discovery
+    budget spent, the work a completed run left is judged as for any run: a
+    critical obligation fails the job instead of shipping silently, and a
+    refinement leaves a warning while the job stays completed.
+  - A table flagged stale again after the step marked it joins a new
+    obligation (`DocumentStep.renewed`); an exhausted one still covers it.
+  - A prose block without boxes that already carries `$…$` (a rescued
+    paragraph) joins the step, which weighs it for the invalidation, as the
+    pass of #599 did; with the detection off, the step is planned for that
+    too.
+  - An exhausted `mark-inline-math` no longer holds back the conversions
+    that waited for it (`DocumentStep.critical=False`).
+  - The detection status of both steps comes from one helper
+    (`inline_math_detection_status`), and the docs (ADR-0011,
+    `workflow-actions`, the inventory) describe the planned step.
 
 ## 0.3.19 — the formula region classification is a planned action (#640, M4a)
 
