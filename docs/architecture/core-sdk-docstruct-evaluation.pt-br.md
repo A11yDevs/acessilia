@@ -186,8 +186,26 @@ seu pull request:
   título regrediu, mas a causa é a extração da Toolbox
   (acessilia-toolbox#162): os manifestos do core são idênticos antes e depois
   da mudança.
-- **Em aberto:** o caso 006 (slides) não foi comparado no staging desde a
-  mudança.
+- **O caso 006 (slides) agora tem uma comparação repetível no staging.** O deck
+  de 42 slides já está no acessilia-dataset (`input/006.pdf`) com o ground
+  truth em `input/presentation-reference/`, e o serviço mantém uma cópia
+  byte-idêntica em `tests/fixtures/presentations/`.
+  `tests/test_slide_case_e2e.py` o envia para o core implantado e pontua o TXT
+  e o PDF/UA entregues com `scripts/bench/slide_case.py`: 42 títulos de slide,
+  pisos para texto, tabelas e fórmulas, a ausência de padrões de fallback e
+  pisos de imagens/estruturas químicas. Ele roda com `CORE_BASE_URL` e o clone
+  do dataset.
+  **Observado em 2026-11-25 no staging `d2714cd` com o dataset auditado
+  (`acessilia-dataset` `8e51a1f`, 304 anotações / 292 avaliáveis):** PDF/UA
+  244/292 (texto 125/140, linhas de tabela 67/96, imagens 29/31, estruturas
+  químicas 4/5, fórmulas 12/12, 0 violações de padrão); TXT 243/292 com o
+  inventário conhecido de `english-table-row`/`label-list-alt` (#869). O
+  veraPDF reporta falha de glyph `.notdef` (#868); as linhas perdidas em
+  slides só-imagem são #870. Os doze objetos `table` não são pontuados pelo
+  avaliador legado. O deck completo é uma execução manual/slow
+  (`CORE_SLIDE_CASE=1`), não um gate agendado. O scorecard pré-migração não
+  foi arquivado, então os pisos são um baseline prospectivo, não prova de
+  paridade histórica.
 
 ## Consequências observadas
 
@@ -223,6 +241,8 @@ seu pull request:
 3. **Dar uso às operações:** um comando `judge` na linha de comando do SDK, e
    o benchmark de matemática (`scripts/bench`) sobre a cadeia de fórmula em vez
    do core.
-4. **Comparar o caso 006 no staging** depois da mudança.
+4. ~~**Rodar a comparação do caso 006 no staging** depois da mudança
+   (`tests/test_slide_case_e2e.py`).~~ Feito em 2026-11-25 em `d2714cd`;
+   acompanhar as lacunas de produto nas #868, #869 e #870.
 5. **Decidir se a pilha de agentes deve ser um extra do core,** caso algum
    chamador precise do core sem agentes. Nada pede isso hoje.

@@ -187,7 +187,25 @@ request:
   heading regressed, but the cause is the Toolbox's extraction
   (acessilia-toolbox#162): the core's manifests are identical before and
   after the move.
-- **Open:** case 006 (slides) has not been compared on staging since the move.
+- **Case 006 (slides) now has a repeatable staging comparison.** The 42-slide
+  deck is already in acessilia-dataset (`input/006.pdf`) with its
+  `input/presentation-reference/` ground truth, and the service keeps a
+  byte-identical copy in `tests/fixtures/presentations/`.
+  `tests/test_slide_case_e2e.py` uploads it to the deployed core and scores
+  the delivered TXT and PDF/UA with `scripts/bench/slide_case.py`: 42 slide
+  headings and titles, floors for text, tables and formulas, the absence of
+  fallback patterns, and picture/chemical-structure floors. It runs with
+  `CORE_BASE_URL` and the dataset clone.
+  **Observed on 2026-11-25 at staging `d2714cd` with the audited dataset
+  (`acessilia-dataset` `8e51a1f`, 304 annotations / 292 evaluable):** PDF/UA
+  244/292 (text 125/140, table rows 67/96, images 29/31, chemical structures
+  4/5, formulas 12/12, 0 pattern violations); TXT 243/292 with the known
+  `english-table-row`/`label-list-alt` inventory (#869). veraPDF reports a
+  `.notdef` glyph failure (#868); the missing image-only table rows are #870.
+  The twelve `table` objects are not scored by the legacy evaluator. The full
+  deck is a manual/slow run (`CORE_SLIDE_CASE=1`), not a scheduled gate. The
+  pre-migration scorecard was not archived, so the floors are a prospective
+  baseline, not proof of historical parity.
 
 ## Consequences observed
 
@@ -223,6 +241,8 @@ request:
 3. **Give the operations users:** a `judge` command in the SDK's command line,
    and the math benchmark (`scripts/bench`) on the formula chain instead of
    the core.
-4. **Compare case 006 on staging** after the move.
+4. ~~**Run the case 006 comparison on staging** after the move
+   (`tests/test_slide_case_e2e.py`).~~ Done on 2026-11-25 at `d2714cd`; follow
+   the product gaps in #868, #869 and #870.
 5. **Decide whether the agent stack should be an extra of the core**, if a
    caller needs the core without agents. Nothing asks for it today.

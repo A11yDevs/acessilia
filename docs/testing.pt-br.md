@@ -416,7 +416,9 @@ Passe `--timeout=900`. Os clientes E2E admitem operações isoladas de até 300
 segundos, e o `CORE_JOB_TIMEOUT` tem padrão de 600 segundos por espera de
 processamento; o limite global de 180 segundos da suíte interromperia um teste
 válido antes do limite previsto pelo próprio teste. O job agendado de E2E usa o
-mesmo valor.
+mesmo valor. O caso do deck completo é manual: use `CORE_SLIDE_CASE=1`;
+ele permite 4200 segundos e usa `CORE_SLIDE_TIMEOUT` (padrão 3600) para a
+própria espera.
 
 Veja o [README dos testes](../tests/README.pt-br.md#testes-end-to-end) para as
 variáveis da API do Core e o corpus opcional. O E2E também é uma validação
