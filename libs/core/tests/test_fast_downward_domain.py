@@ -182,3 +182,35 @@ def test_fast_downward_classifies_the_formula_regions_before_reading_them():
         < order.index("obligation-recognize-formulas")
         < order.index("o-verbalize")
     )
+
+
+def test_fast_downward_marks_the_inline_math_before_the_formula_conversions():
+    """#640, M4b: the formula conversions wait for the document's
+    ``mark-inline-math`` although they share no element, under both
+    planners."""
+    from pddl_support import build_element, build_manifest, build_obligation
+    from test_inline_math_marking import _element
+
+    from acessilia_core.pipeline.document_obligations import (
+        INLINE_MATH,
+        reconcile_document_step,
+    )
+
+    verbalize = build_obligation("verbalize-formula", ["f-1"], ["mathml", "human-review"])
+    verbalize.id = "o-verbalize"
+    # The manifest's real costs: equal ones would let the planners break the
+    # tie differently, which is not what this case checks.
+    verbalize.method_costs = {"mathml": 10, "human-review": 100}
+    manifest = build_manifest(
+        [_element("p-1", "paragraph", "s ( t ) = t 3", 210, 232),
+         build_element("f-1", "formula", text=r"\frac{a}{b}")],
+        [verbalize],
+    )
+    marking = reconcile_document_step(manifest, INLINE_MATH)
+
+    plans, report = _compare(manifest, None)
+
+    assert report.outcomes["fast-downward"].status == "solved"
+    assert report.comparison.verdict in {"identical", "equivalent"}
+    order = [step.obligation_id for step in plans["fast-downward"].steps if step.method]
+    assert order.index(marking.id) < order.index("o-verbalize")

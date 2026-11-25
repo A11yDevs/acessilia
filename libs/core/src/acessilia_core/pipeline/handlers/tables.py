@@ -39,8 +39,8 @@ from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.elements import _table_element_has_structured_content
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.inline_math import (
-    _inline_math_enabled,
     _mark_table_inline_math,
+    inline_math_detection_status,
     run_text_spans,
 )
 from acessilia_core.pipeline.enrichment.tables import (
@@ -111,16 +111,6 @@ def _outcome(element: ManifestElement) -> str:
     return "from_text" if hint == "text-heuristic" else "read"
 
 
-def _inline_math_status(manifest: ProcessingManifest, config: CoreConfig) -> str:
-    """``off`` (detection disabled, or not a PDF), ``unavailable`` (the Toolbox
-    could not read the text layer) or ``fonts`` (the marks ran)."""
-    if not _inline_math_enabled(manifest, config.document):
-        return "off"
-    if manifest.extractor.configuration.get("inline_math_detection") == "unavailable":
-        return "unavailable"
-    return "fonts"
-
-
 def _handle_table_enrichment_method(
     manifest: ProcessingManifest, obligation_id: str, *, config: CoreConfig, ports: RunPorts
 ) -> MethodResult:
@@ -149,7 +139,7 @@ def _handle_table_enrichment_method(
             needing=len(needing_ids),
             structured=structured,
             left=", ".join(f"{reason}: {count}" for reason, count in sorted(outcomes.items())) or "-",
-            inline=_inline_math_status(manifest, config),
+            inline=inline_math_detection_status(manifest, config.document),
             marked=marked,
         ),
     )

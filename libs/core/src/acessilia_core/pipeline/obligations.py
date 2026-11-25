@@ -19,8 +19,11 @@ from acessilia_core.manifest.models import (
     ProcessingManifest,
 )
 from acessilia_core.pipeline.document_obligations import (
+    CLOSED_STATUSES,
+    DOCUMENT_STEPS,
     TABLE_ENRICHMENT,
     reconcile_document_step,
+    reconcile_document_steps,
 )
 from acessilia_core.pipeline.page_labels import _pages_label
 from docstruct.text.latex import bare_latex as normalize_latex
@@ -86,6 +89,10 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         # text and the result e-mail names its page. Unless no picture at all
         # was described: see _blocks_delivery.
         "describe-image",
+        # The prose's inline math (#640, M4b): a block left without its
+        # marks keeps its text as the extractor gave it, as when the
+        # detection is off, so it degrades the reading, not the content.
+        "mark-inline-math",
     }
 )
 
@@ -280,3 +287,33 @@ def _unsatisfied_obligations(manifest: ProcessingManifest) -> list[dict[str, Any
             }
         )
     return unsatisfied
+
+
+def _document_work_found(manifest: ProcessingManifest) -> bool:
+    """Whether a run left work for the document steps that no plan has (#640, M4b).
+
+    A step can add elements without adding obligations: ``rescue-omitted``
+    restores a paragraph, ``select-table-source`` adopts a table's cells. The
+    reconciliation gives them the document step they need (the inline math,
+    a picture's description), so a run that completed still replans for
+    them, as a discovery; this replaced the pass after execution of #599.
+
+    Its one effect is that reconciliation, which the replan loop runs anyway;
+    it does not reopen the job. The loop does that (``_reopen``) once the
+    replan is allowed; with the budget spent, the job keeps its status and
+    ``_check_unsatisfied`` judges what was found.
+    """
+    reconcile_document_steps(manifest, replan=True)
+    kinds = {step.kind for step in DOCUMENT_STEPS}
+    return any(
+        item.kind in kinds and item.selected and item.status not in CLOSED_STATUSES and not item.attempts
+        for item in manifest.obligations
+    )
+
+
+def _reopen(manifest: ProcessingManifest) -> None:
+    """Reopen a job the run's ``complete-job`` closed while work was left
+    (M4b): the planner refuses a completed manifest, and the replan's own
+    ``complete-job`` closes it again."""
+    if manifest.status == "completed":
+        manifest.status = "processing"

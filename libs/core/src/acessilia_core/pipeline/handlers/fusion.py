@@ -119,13 +119,15 @@ def _adopt_secondary_table(
     for key in [k for k in element.metadata if k.startswith("table_")]:
         del element.metadata[key]
     # The inline math marked Docling's cells; the adopted cells are new, so the
-    # mark is stale and kept the table out of the post-execution pass (#599).
+    # mark is stale: the table is flagged, and the inline math step marks it
+    # again on the replan (#640, M4b; the pass after execution until 0.3.19).
     # The element keeps the primary's boxes, the table's region on the page;
     # assign_runs_to_cells only gives a run to a cell whose text holds it, so a
     # run that the adopted text does not carry is left out. A detached-slash
     # claim stays: it is about the source's overlay, and keeping it keeps the
     # bar out of the payload.
     element.metadata.pop("inline_math_detection", None)
+    element.metadata["inline_math_stale"] = True
     if chosen.get("text"):
         element.text = chosen["text"]
     chosen_meta = chosen.get("metadata") or {}

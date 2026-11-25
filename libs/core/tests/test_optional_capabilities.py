@@ -21,7 +21,13 @@ from acessilia_core.planning import toolbox_gate
 from acessilia_sdk.toolbox import TOOLBOX_CAPABILITIES, snapshot_from_payloads
 
 CONTRACT_SNAPSHOT = Path(__file__).parent / "fixtures" / "toolbox-contract.json"
-OPTIONAL = ("picture-description", "formula-recognizer", "table-enrichment", "formula-region-classifier")
+OPTIONAL = (
+    "picture-description", "formula-recognizer", "table-enrichment", "formula-region-classifier",
+    "inline-math-marker",
+)
+#: The ones whose optional calls include ``pdf.render``: the inline math only
+#: reads the text layer (``document.text.spans``).
+RENDERING = tuple(method for method in OPTIONAL if method != "inline-math-marker")
 
 
 def _snapshot(*, without: tuple[str, ...] = ()):
@@ -57,19 +63,30 @@ def test_the_staging_catalogue_degrades_nothing() -> None:
 
 @pytest.mark.parametrize("mode", ["observe", "enforce"])
 def test_a_missing_optional_capability_degrades_without_ruling_out(mode) -> None:
-    """Without ``pdf.render`` the three methods run degraded; none is
+    """Without ``pdf.render`` the methods that render run degraded; none is
     blocked, none gets a requirement, so the planner keeps them."""
     decision = toolbox_gate.evaluate(
         OPTIONAL, _snapshot(without=("pdf.render",)), mode=mode, config=_config(mode)
     )
 
-    assert set(decision.degraded) == set(OPTIONAL)
+    assert set(decision.degraded) == set(RENDERING)
     assert all("pdf.render" in " ".join(reasons) for reasons in decision.degraded.values())
     assert decision.blocked == {}
     assert not set(decision.catalogue_facts().requirements) & set(OPTIONAL)
     metadata = decision.to_metadata()
-    assert set(metadata["degraded_methods"]) == set(OPTIONAL)
+    assert set(metadata["degraded_methods"]) == set(RENDERING)
     assert metadata["applied"] is False
+
+
+def test_without_the_text_layer_the_inline_math_and_the_tables_degrade() -> None:
+    """``document.text.spans`` is optional for the inline math (M4b) and for
+    the tables' cell marks."""
+    decision = toolbox_gate.evaluate(
+        OPTIONAL, _snapshot(without=("document.text.spans",)), mode="enforce", config=_config("enforce")
+    )
+
+    assert set(decision.degraded) == {"inline-math-marker", "table-enrichment"}
+    assert decision.blocked == {}
 
 
 def test_only_the_method_that_calls_it_is_degraded() -> None:
@@ -237,7 +254,6 @@ def test_a_degraded_method_reaches_the_output_and_the_log(monkeypatch, tmp_path)
     monkeypatch.setattr(pddl.logger, "warning", lambda message, *args: warnings.append(message.format(*args)))
     monkeypatch.setattr(toolbox_gate, "decide", decide)
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", nothing)
     prose = build_element(

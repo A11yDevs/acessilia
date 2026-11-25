@@ -97,7 +97,6 @@ def _stopped_before_execution(monkeypatch, counts):
         return build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    monkeypatch.setattr(pddl, "_mark_inline_math", enrich)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
@@ -292,7 +291,6 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
         return stage
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    monkeypatch.setattr(pddl, "_mark_inline_math", recording("_mark_inline_math"))
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
     received = []
 
@@ -313,9 +311,9 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
             model_calls=current_model_calls(), ports=ports,
         )
 
-    # Every vision step runs inside the plan since #640 (M1, M3, M4): the one
-    # left before planning has no vision agent and takes no cache.
-    assert caches == {"_mark_inline_math": ...}
+    # Every enrichment step runs inside the plan since #640 (M1–M4b): none
+    # before planning takes a cache.
+    assert caches == {}
     # The methods take the run's cache through the ports, or none when the
     # run's config turns it off.
     config = core_config(vision={"region_cache_enabled": enabled})
@@ -325,7 +323,7 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
     # takes the region cache from the ports, like the inspection handlers.
     for method in (
         "pymupdf-region", "vision-page-inspection", "picture-description", "formula-recognizer",
-        "formula-region-classifier",
+        "formula-region-classifier", "inline-math-marker",
     ):
         assert executor.registry.get(method).keywords["ports"] is ports
 
@@ -357,12 +355,11 @@ def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
 
 @pytest.mark.asyncio
 async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp_path) -> None:
-    """After each of the two enrichment steps left before planning (the
-    pictures' preparation, the prose's inline math) the manifest checkpoint
-    is written again (#407), so a restart repeats at most the step that ran.
-    The formula regions (#640, M4a), the picture descriptions (M1), the
-    formula LaTeX (M3) and the table steps (M2) run inside the plan, where
-    the execution checkpoint covers them."""
+    """After the one enrichment step left before planning (the pictures'
+    preparation) the manifest checkpoint is written again (#407). The
+    formula regions (#640, M4a), the picture descriptions (M1), the inline
+    math (M4b), the formula LaTeX (M3) and the table steps (M2) run inside
+    the plan, where the execution checkpoint covers them."""
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
     checkpoints = MemoryCheckpoints()
@@ -375,7 +372,7 @@ async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp
         )
 
     # One after the extraction, then one after each enrichment step.
-    assert checkpoints.saved.count("manifest") == 1 + 2
+    assert checkpoints.saved.count("manifest") == 1 + 1
 
 
 @pytest.mark.asyncio
@@ -387,7 +384,10 @@ async def test_a_replan_drops_the_execution_checkpoint_of_the_old_plan(monkeypat
     orchestrator = build_orchestrator(max_replans=1)
     obligation = build_obligation("describe-image", ["p-1"], ["human-review"])
     obligation.selected = True
-    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [obligation])
+    # Enough prose that the document is not mostly visual, so a completed run
+    # leaves no document step to plan (#640, M4b).
+    prose = "A paragraph with enough words to make the document read as text, not as a picture."
+    manifest = build_manifest([build_element("p-1", "paragraph", text=prose)], [obligation])
     checkpoints = MemoryCheckpoints()
     checkpoints.phases["execution"] = {"plan_id": "first-plan", "results": []}
     seen = []

@@ -46,6 +46,9 @@ from acessilia_core.pipeline.handlers.fusion import (
     _handle_single_provider_method,
     _handle_table_smart_fusion_method,
 )
+from acessilia_core.pipeline.handlers.inline_math import (
+    _handle_inline_math_marker_method,
+)
 from acessilia_core.pipeline.handlers.inspection import (
     _handle_pymupdf_region_method,
     _handle_vision_page_inspection_method,
@@ -90,6 +93,8 @@ METHOD_HANDLERS: dict[str, Callable[..., MethodResult]] = {
     "formula-recognizer": _handle_formula_recognizer_method,
     # The document's formula region classification, a planned action since #640 (M4).
     "formula-region-classifier": _handle_formula_region_classifier_method,
+    # The document's prose inline math, a planned action since #640 (M4b).
+    "inline-math-marker": _handle_inline_math_marker_method,
     "pandoc-table": _handle_pandoc_table_method,
     "pandoc-code": _handle_pandoc_code_method,
     "pymupdf-region": _handle_pymupdf_region_method,

@@ -34,7 +34,7 @@ ordem:
 | Bootstrap | Limite de páginas, antes da extração | Recusa um documento acima de `DocumentConfig.max_pages` pela contagem de páginas da inspeção (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extração | Monta o manifesto: elementos, depois as obrigações derivadas dos seus tipos | Toolbox `document.structure.extract` (um ou dois providers) | `manifest` |
 | Bootstrap | Limite de páginas, depois da extração | Confere o limite de novo contra a estrutura extraída | — | — |
-| Enriquecimento | Passos antes do planejamento, numa ordem fixa (abaixo); desde a 0.3.12, os passos 5 e 6 rodam dentro do plano (M2), desde a 0.3.14 as descrições do passo 2 (M1), desde a 0.3.15 o passo 4 (M3), e desde a 0.3.19 o passo 1 (M4a) | | Toolbox e os agentes de modelo do Core | `enriched` no passo 3 e na preparação do passo 2; o checkpoint de execução, por passo do plano, no 1, nas descrições, no 4 e nos 5–6 |
+| Enriquecimento | Passos antes do planejamento, numa ordem fixa (abaixo); desde a 0.3.12, os passos 5 e 6 rodam dentro do plano (M2), desde a 0.3.14 as descrições do passo 2 (M1), desde a 0.3.15 o passo 4 (M3), desde a 0.3.19 o passo 1 (M4a), e desde a 0.3.20 o passo 3 (M4b): antes do planejamento resta só a preparação do passo 2 | | Toolbox e os agentes de modelo do Core | `enriched` na preparação do passo 2; o checkpoint de execução, por passo do plano, no resto |
 | Planejamento | | Compila o problema a partir do manifesto enriquecido e planeja | — | `plan` |
 
 Os passos de enriquecimento (`_enrich_before_planning` até o core 0.3.11;
@@ -42,13 +42,14 @@ desde a 0.3.12, os passos 5 e 6 rodam dentro do plano, como o método
 `table-enrichment`, M2; desde a 0.3.14, as descrições do passo 2, como o
 método `picture-description`, M1; desde a 0.3.15, o passo 4, como o método
 `formula-recognizer`, M3; desde a 0.3.19, o passo 1, como o método
-`formula-region-classifier`, M4a):
+`formula-region-classifier`, M4a; desde a 0.3.20, o passo 3, como o método
+`inline-math-marker`, M4b):
 
 | Passo | Função | Chama | Efeito no manifesto |
 |---|---|---|---|
 | 1. Regiões de fórmula | `_classify_formula_regions`, dentro do plano desde a 0.3.19 | Toolbox `pdf.render` (o recorte da fórmula); `VisionAgent` | confere os rótulos de fórmula do extrator. Um desenho é descrito uma vez e vira imagem, o que reconcilia suas obrigações (`reconcile_reclassified_element`); um candidato incerto vai para revisão humana |
 | 2. Descrições de imagens | `_prepare_pictures` antes do planejamento; `_enrich_picture_descriptions` dentro do plano desde a 0.3.14 | `VisionAgent` | primeiro injeta uma imagem de página inteira para uma imagem raster isolada e anota a posse do texto visual, ambas a partir da inspeção de mídia (essas ficam antes do planejamento); depois uma descrição por imagem, e a posse anotada de novo |
-| 3. Matemática inline | `_mark_inline_math` | Toolbox `document.text.spans` | marca a matemática na prosa |
+| 3. Matemática inline | `_mark_inline_math` (dentro do plano desde a 0.3.20, `_enrich_inline_math`) | Toolbox `document.text.spans` | marca a matemática na prosa |
 | 4. LaTeX das fórmulas | `_enrich_formula_latex`, dentro do plano desde a 0.3.15 | Toolbox `math.recognize`, `pdf.render`; `VisionAgent` como alternativa | separa os números de equação, depois o LaTeX de cada fórmula |
 | 5. Estrutura das tabelas | `_enrich_table_structures` | `DataAgent` | uma AST estruturada por tabela |
 | 6. Matemática inline das tabelas | `_mark_table_inline_math` | Toolbox `document.text.spans` | marca a matemática nas células (depois do passo 5, que pode substituir células) |
@@ -60,21 +61,22 @@ O que os passos compartilham não é uniforme:
 | Breaker de provider | 1, 2, 4, 5 | o da execução, `RunPorts.services` (`run_breaker`), compartilhado com os métodos `formula-region-classifier`, `picture-description`, `formula-recognizer` e `table-enrichment`. A ordem deles é o desempate do planejador, então numa indisponibilidade parcial o passo que o plano roda primeiro gasta primeiro o orçamento do breaker (#853) |
 | Progresso por objeto (`on_progress`) | 1, 2, 4 | uma variável local, de `checkpoints.enrichment_progress`; os passos 1, 2, 4 e 5, dentro do plano, gravam o manifesto que estão enriquecendo depois de cada objeto no checkpoint de execução (`step_progress`, #836), e uma queda no meio do passo retoma dele |
 | Cache de regiões | 1, 2, 4 | de `RunPorts` (`region_cache_for`) |
-| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | o da execução, `RunPorts.services` (`run_text_spans`); não guarda manifesto |
-| Mensagens de progresso | 1, 2, 4, 5 | o callback de status antes do planejamento; `RunServices.progress` dentro do plano |
+| Leitor de spans de texto (`_TextSpanReader`) | 3, 6 | o da execução, `RunPorts.services` (`run_text_spans`), compartilhado pelos métodos `inline-math-marker` e `table-enrichment`; não guarda manifesto |
+| Mensagens de progresso | 1–6 | `RunServices.progress`, dentro do plano: cada método anuncia seu passo |
 | Inspeção de mídia | 2 | uma saída do bootstrap; dentro do plano, `RunServices.media_inspection`, que o orquestrador preenche ao carregar ou fazer a inspeção |
 | Arquivo de origem | todos | o contexto da execução; o manifesto registra seu digest |
 
-Até M4, os passos 3 e 6 também rodam uma vez depois da execução, antes do
-build canônico, sobre o manifesto executado: o `rescue-omitted` acrescenta
-blocos enquanto o plano roda, e o build canônico só converte os spans que o
-manifesto carrega (#599). A passagem reusa o leitor de spans da execução, então
-nenhuma página já buscada nessa execução é pedida de novo, e é uma exceção
-transitória à ADR-0029: a obrigação `mark-inline-math` da M4 (depois da
-preparação do executor na M0, #832) a substitui. Ela
-também descarta uma `inline_math_detection` obsoleta de uma tabela adotada do
-provedor secundário e invalida as conversões planejadas das fórmulas quando um
-bloco adicionado durante o plano carrega matemática inline.
+Até o core 0.3.19, os passos 3 e 6 também rodavam uma vez depois da
+execução, antes do build canônico, sobre o manifesto executado (#599): o
+`rescue-omitted` acrescenta blocos enquanto o plano roda, e o build canônico
+só converte os spans que o manifesto carrega. Desde a 0.3.20 (M4b) essa
+passada não existe mais. Um bloco que o plano acrescenta ganha a obrigação
+`mark-inline-math` pela reconciliação, e uma execução que terminou com esse
+trabalho replaneja para ele, como uma descoberta, com o job reaberto para
+esse replanejamento. Uma tabela adotada do provedor secundário é marcada como
+`inline_math_stale`, e o mesmo passo a marca de novo. Quando o passo marca um
+bloco depois que uma conversão de fórmula já rodou, ele descarta essa
+conversão, para que o build canônico a refaça com as variáveis finais.
 
 O plano então trabalha sobre o que o enriquecimento produziu. Alguns métodos
 só conferem esse trabalho: `vision-description` confere as descrições e
@@ -276,10 +278,13 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      `normalize-formula`;
    - a estrutura da tabela vem antes da matemática inline da tabela.
 
-   Não se encontrou dependência de dados entre a matemática inline da prosa e
-   os passos de fórmula (eles leem elementos diferentes), entre imagens e
-   tabelas, nem entre o LaTeX das fórmulas e as tabelas. Cada migração
-   confirma isso para o seu passo.
+   Não se encontrou dependência de dados por elemento entre a matemática
+   inline da prosa e os passos de fórmula (eles leem elementos diferentes),
+   entre imagens e tabelas, nem entre o LaTeX das fórmulas e as tabelas. Cada
+   migração confirma isso para o seu passo. O M4b revê isso para as
+   conversões de fórmula: elas leem as variáveis que as marcas da prosa dão,
+   uma dependência através do documento, não de um elemento compartilhado
+   (abaixo).
 
    **M1 (core 0.3.14).** As descrições agora rodam depois dos passos 3 e 4.
    A matemática inline da prosa lê parágrafos, itens de lista, legendas e
@@ -333,11 +338,54 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    como nos outros passos compostos; `math` e `unresolved` são decisões. Uma
    fórmula compartilhada faz o lote inteiro do reconhecimento esperar o lote
    da classificação: o custo da granularidade de documento, aceito para a
-   0.3.0 (sublotes são pesquisa da #619). A matemática inline da prosa, ainda
-   antes do planejamento até o M4b, lê outros elementos. Eles
-   compartilham o breaker de visão, então numa indisponibilidade parcial do
-   provider a ordem muda qual passo degrada; isso está documentado, não
-   imposto (#853).
+   0.3.0 (sublotes são pesquisa da #619).
+
+   **M4b (core 0.3.20).** A matemática inline da prosa roda dentro do plano,
+   como a obrigação do documento `mark-inline-math`. As conversões de fórmula
+   (`verbalize-formula`, `normalize-formula`) leem as variáveis que suas
+   marcas dão, então esperam por ela embora não compartilhem elemento: o
+   passo as declara como `waiting_kinds`, uma dependência declarada mínima (a
+   #865 propõe predecessores em geral). Ela compartilha um parágrafo com as
+   descrições (um documento majoritariamente visual) e uma tabela obsoleta
+   com o enriquecimento de tabelas, e vem depois dos dois. Ela não chama
+   modelo, então o breaker de visão não a ordena; os passos que compartilham
+   esse breaker (descrições, classificação e LaTeX das fórmulas, tabelas) só
+   são ordenados por ele operacionalmente, numa indisponibilidade parcial do
+   provider; isso está documentado, não imposto (#853).
+
+   A revisão do #867 corrigiu quatro pontos desse desenho:
+   - *Uma tabela obsoleta marcada de novo.* Uma obrigação satisfeita não
+     cobre um elemento cujo resultado a execução invalidou depois
+     (`DocumentStep.renewed`): uma tabela marcada `inline_math_stale` depois
+     de o passo marcá-la entra numa obrigação nova. Uma obrigação esgotada
+     ainda a cobre, então uma tentativa degradada não é reaberta para sempre.
+   - *Evidência que a detecção não lê.* Um bloco de prosa sem caixas que já
+     traz `$…$` (um parágrafo resgatado) também entra no passo: o passo não
+     marca nada nele, mas o pesa para descartar as conversões feitas antes
+     dele, como fazia a passada depois da execução da #599. Com
+     `INLINE_MATH_DETECTION=off` o passo ainda é planejado pelo mesmo motivo,
+     não marca nada e informa `detection: off`.
+   - *Um passo não crítico.* `mark-inline-math` é não crítica
+     (`DocumentStep.critical=False`): quando ela se esgota, as conversões que
+     esperavam por ela perdem essa aresta e rodam sem as suas variáveis, em
+     vez de ficarem fora do replanejamento e falharem o job.
+   - *O trabalho que uma execução concluída deixa.* Encontrá-lo não reabre o
+     job: o laço de replanejamento o reabre, só quando o replanejamento é
+     permitido. Com o orçamento de descobertas gasto, o job mantém o seu
+     status, e `_check_unsatisfied` julga o que foi encontrado como em
+     qualquer execução: uma obrigação crítica falha o job, um refinamento
+     deixa um aviso.
+
+   Quando o passo descarta uma conversão, a obrigação `verbalize-formula` ou
+   `normalize-formula` continua `satisfied`: o método dela rodou e a sua
+   evidência vale. A construção canônica regenera `mathml` e `verbalization`
+   a partir do manifesto final (`_enrich_math_blocks`, com o enriquecedor
+   matemático da execução: as mesmas conversões do Toolbox, e as variáveis
+   de todas as fórmulas e trechos inline); sem elas a fórmula mantém o seu
+   LaTeX, como quando os métodos planejados degradam. A regeneração é uma projeção do
+   manifesto final, não uma nova decisão semântica, então fica fora do
+   plano. Reabrir as obrigações em vez disso, com invalidação seletiva e
+   proveniência, é a #871.
 3. **A infraestrutura fica fora do domínio** (ADR-0029). O cache de regiões já
    está em `RunPorts`. O breaker, o gancho de progresso e o leitor de spans de
    texto são variáveis locais hoje. A proposta é torná-los um **serviço de
@@ -430,13 +478,14 @@ plano, e só quando o documento tem os elementos sobre os quais o passo
 trabalha. Essa é a sua condição; o método mantém as condições por elemento do
 passo.
 
-Quatro passos são planejados assim, cada um um `DocumentStep` de
+Cinco passos são planejados assim, cada um um `DocumentStep` de
 `pipeline/document_obligations.py`, que guarda as regras abaixo uma vez para
 todos:
 
 | Passo | Tipo e método | Alvos | Sai dos alvos | Dependem dela |
 |---|---|---|---|---|
 | Enriquecimento de tabelas (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | todas as tabelas | um elemento que deixou de ser tabela | `linearize-table`, `select-table-source` e as obrigações de página de uma página com tabela |
+| Matemática inline da prosa (M4b, 0.3.20) | `mark-inline-math`, `inline-math-marker` | num PDF, a prosa (parágrafos, itens de lista, legendas, notas de rodapé) com caixas e texto que nenhuma detecção marcou, e as tabelas cujas marcas ficaram obsoletas (`inline_math_stale`) | um elemento que deixou de ser prosa ou tabela | as obrigações de página de uma página com esse elemento e, quais forem seus alvos, `verbalize-formula` e `normalize-formula` (`waiting_kinds`) |
 | Classificação de regiões de fórmula (M4a, 0.3.19) | `classify-formula-regions`, `formula-region-classifier` | numa fonte que pode ser renderizada, as fórmulas sem marcação LaTeX que nenhuma classificação decidiu, menos uma que as descrições transformaram em fórmula | um elemento que deixou de ser fórmula (um desenho que ela descreveu é imagem) | `recognize-formulas` (eles compartilham a fórmula), `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
 | LaTeX das fórmulas (M3, 0.3.15) | `recognize-formulas`, `formula-recognizer` | as fórmulas com um rótulo de equação a separar e, numa fonte que pode ser renderizada, as sem LaTeX que nenhum reconhecimento registrou | um elemento que deixou de ser fórmula (o reconhecimento o leu como imagem) | `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
 | Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um documento de uma página; nunca uma fórmula nem uma tabela | um elemento que virou fórmula ou tabela | `describe-image` e as obrigações de página de uma página com imagem |
@@ -458,8 +507,12 @@ um passo pode depender da de um passo anterior que compartilha um elemento,
 nunca da de um posterior), então nunca fazem ciclo. Antes da revisão da
 #845 as descrições e as tabelas podiam compartilhar a tabela de um documento
 de uma página, e a regra de alvos, aplicada por cada passo, fazia um
-depender do outro. Hoje só a classificação de regiões de fórmula e o LaTeX
-das fórmulas compartilham elementos (M4a). As arestas são reconciliadas mais
+depender do outro. Hoje a classificação de regiões de fórmula e o LaTeX das
+fórmulas compartilham fórmulas (M4a), e a matemática inline compartilha um
+parágrafo com as descrições e uma tabela obsoleta com o enriquecimento de
+tabelas (M4b); em cada par o primeiro roda antes. Além dos alvos, um passo
+pode declarar `waiting_kinds`: kinds de obrigação que esperam por ele quais
+forem seus alvos (M4b: as conversões de fórmula). As arestas são reconciliadas mais
 uma vez depois que as obrigações de todos os passos existem, então o
 primeiro plano já ordena dois passos que compartilham um elemento.
 
@@ -537,8 +590,7 @@ cada uma que ficou sem descrição.
 ## Ordem da migração
 
 Cada passo é um pull request; o M4 são dois (M4a, M4b), porque seus dois
-passos são independentes. Os nomes de métodos e kinds do M4b são propostas,
-decididas no seu pull request.
+passos são independentes.
 
 | PR | Passo | Obrigação e método | Papel | Requisitos de Toolbox | Muda obrigações enquanto o plano roda |
 |---|---|---|---|---|---|
@@ -547,7 +599,7 @@ decididas no seu pull request.
 | M1 (feito, core 0.3.14) | Descrições de imagens | `describe-images`, uma por documento com imagens a descrever (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela. A imagem injetada e a primeira anotação de posse ficam antes do planejamento | `transitional` (`VisionAgent`) | opcional (#848): `pdf.render` para o recorte de uma imagem degrada para `crop_unavailable` | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
 | M3 (feito, core 0.3.15) | LaTeX das fórmulas | `recognize-formulas`, uma por documento com fórmulas a reconhecer ou rótulos de equação a separar, método `formula-recognizer`, que roda o passo com seu paralelismo; `verbalize-formula` e `normalize-formula` dependem dela. Uma obrigação do documento, como no M1 e no M2, não uma por fórmula como proposto antes: o passo compartilha um breaker, uma sondagem do `math.recognize` por obrigação e seu paralelismo no documento inteiro | `transitional` (`VisionAgent`, a alternativa) | opcionais (#848): o `math.recognize` degrada para a alternativa de visão e o `pdf.render` por fórmula, então nunca o excluem | sim: a alternativa pode ler uma fórmula como imagem, o que troca suas obrigações de fórmula por `describe-image`; e uma fórmula que as descrições encontram ganha o passo no replanejamento |
 | M4a (feito, core 0.3.19) | Regiões de fórmula | `classify-formula-regions`, uma por documento com regiões de fórmula a conferir, método `formula-region-classifier`, que roda o passo com seu paralelismo; `recognize-formulas` depende dela nas fórmulas que compartilham. Do documento, como M1–M3, não uma por região como proposto antes (`classify-formula-region`) | `transitional` (`VisionAgent`) | opcional (#848): `pdf.render` para o recorte de uma região | sim: um desenho vira imagem descrita (as obrigações de fórmula trocadas por `describe-image`), e uma região incerta vai para revisão humana (`verbalize-formula` fica só com `human-review`, `normalize-formula` é retirada) |
-| M4b | Matemática inline da prosa | kind novo `mark-inline-math` (método `inline-math-marker`), substituindo a passada pós-execução da #599 | declarado | `document.text.spans` | sim: os blocos que um plano acrescenta a ganham no replanejamento |
+| M4b (feito, core 0.3.20) | Matemática inline da prosa | `mark-inline-math`, uma por PDF com prosa a marcar, método `inline-math-marker`; `verbalize-formula` e `normalize-formula` esperam por ela (`waiting_kinds`). Substitui a passada pós-execução da #599: um bloco que o plano acrescenta a ganha num replanejamento, que uma execução concluída agora faz para esse trabalho | `transitional` (a detecção roda no core, `docstruct`) | opcional (#848): `document.text.spans` | sim: um bloco que o plano acrescenta, e uma tabela adotada do provedor secundário, ganham o passo no replanejamento |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
 O M2 veio primeiro porque não muda nenhuma obrigação enquanto o plano roda. O
@@ -557,7 +609,8 @@ modelo lê como fórmula vira fórmula, e a reconciliação remove o
 só tratava obrigações acrescentadas (`_select_discovered`), então o M1 esperou
 o M0 e veio depois dele, no core 0.3.14. O M3 veio na 0.3.15 e fechou a
 lacuna que o M1 deixou para uma fórmula encontrada durante o plano (#846). O
-M4a veio na 0.3.19; o M4b também muda obrigações e se apoia no M0.
+M4a veio na 0.3.19 e o M4b na 0.3.20: todo passo de enriquecimento, menos a
+preparação das imagens, agora roda dentro do plano.
 
 Cada PR:
 - tira seu passo de `_enrich_before_planning`;

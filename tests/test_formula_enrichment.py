@@ -682,10 +682,10 @@ def test_a_late_inline_mark_invalidates_the_planned_formula_conversion(
 
     The handler ran with no evidence that h is a variable, so it sent
     ``h(12+h)`` as a function call. The restored paragraph later marked by the
-    second pass adds ``h \\neq 0``; the canonical build must redo the formula
-    with the final variables instead of reusing the stale conversion.
+    inline math step of the replan (#640, M4b; the pass after execution until
+    0.3.19) adds ``h \\neq 0``; the canonical build must redo the formula with
+    the final variables instead of reusing the stale conversion.
     """
-    import asyncio
     from pathlib import Path
     from types import SimpleNamespace
 
@@ -696,7 +696,6 @@ def test_a_late_inline_mark_invalidates_the_planned_formula_conversion(
         Provenance,
     )
     from acessilia_core.pipeline import canonical_builder
-    from acessilia_core.pipeline.enrichment import inline_math as inline_math_stage
     from acessilia_core.pipeline.payload import build_pddl_structured_payload
     from acessilia_core.ports import RunPorts
 
@@ -705,8 +704,6 @@ def test_a_late_inline_mark_invalidates_the_planned_formula_conversion(
         manifest, 'o-f', config=core_config()
     ).success
     assert toolbox_math[capability] == ['h(12+h)']
-    baseline = manifest.model_copy(deep=True)
-
     restored = ManifestElement(
         id='restored', type='paragraph', raw_label='paragraph',
         reading_order=2, hierarchy_level=1, text='h = 0', page_number=1,
@@ -737,10 +734,20 @@ def test_a_late_inline_mark_invalidates_the_planned_formula_conversion(
 
     monkeypatch.setattr('acessilia_core.toolbox.text_spans.fetch_text_spans', fetch)
 
-    asyncio.run(inline_math_stage._mark_inline_math_after_execution(
-        manifest, baseline, Path('/tmp/f.pdf'), core_config().document,
-        RunPorts.none(), toolbox_config(),
-    ))
+    # The executor records the formula's obligation as satisfied; the inline
+    # math step of the replan then marks the restored block.
+    manifest.obligations[0].status = 'satisfied'
+    from acessilia_core.pipeline.document_obligations import (
+        INLINE_MATH,
+        reconcile_document_step,
+    )
+    from acessilia_core.pipeline.handlers.registry import build_method_registry
+
+    marking = reconcile_document_step(manifest, INLINE_MATH, replan=True)
+    assert marking.target_ids == ['restored']
+    build_method_registry().get('inline-math-marker')(
+        manifest, marking.id, config=core_config(), ports=RunPorts.none()
+    )
 
     formula = manifest.elements[0]
     assert restored.text == r'$h\neq0$'

@@ -263,6 +263,7 @@ from acessilia_core.i18n.log_messages import (
     MSG_OBLIGATION_FORMULA_CLASSIFICATION,
     MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_IMAGE,
+    MSG_OBLIGATION_INLINE_MATH,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
@@ -696,6 +697,7 @@ MESSAGES: tuple[str, ...] = (
     MSG_OBLIGATION_TABLE,
     MSG_OBLIGATION_FORMULA_CLASSIFICATION,
     MSG_OBLIGATION_FORMULA_RECOGNITION,
+    MSG_OBLIGATION_INLINE_MATH,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
     MSG_OBLIGATION_FORMULA,
@@ -1137,6 +1139,12 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
     handler_messages.MSG_VISION_VALIDATED: (
         "Descrição validada para {count} imagem",
         "Descrições validadas para {count} imagens",
+    ),
+    handler_messages.MSG_INLINE_MATH_MARKED: (
+        "Matemática inline rodou para {count} elemento: {marked} trechos marcados em {elements} "
+        "elementos, {unmatched} sem correspondência; detecção: {detection}",
+        "Matemática inline rodou para {count} elementos: {marked} trechos marcados em {elements} "
+        "elementos, {unmatched} sem correspondência; detecção: {detection}",
     ),
     handler_messages.MSG_FORMULA_REGIONS_CLASSIFIED: (
         "Classificação de regiões de fórmula rodou para {count} fórmula: {math} matemáticas, "
@@ -1582,6 +1590,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         MSG_OBLIGATION_FORMULA_CLASSIFICATION: (
             "As regiões de fórmula do documento devem ser conferidas como matemática, desenho ou caso para uma pessoa."
+        ),
+        MSG_OBLIGATION_INLINE_MATH: (
+            "A matemática dentro do texto do documento deve ser marcada, para ser lida como matemática."
         ),
         MSG_OBLIGATION_FORMULA_RECOGNITION: (
             "As fórmulas do documento devem ter o LaTeX lido e os números de equação separados."

@@ -144,7 +144,7 @@ It finds 64 keys, 19 of them written or read by more than one group.
 
 | Key | Written by | Read by | What the current order guarantees |
 |---|---|---|---|
-| `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, before planning, claims a detached negation bar for inline math only if no one has claimed it. F, during execution, skips claimed bars and marks the ones it composes. W leaves claimed bars out of the payload. Q's claim therefore wins, and F is idempotent. |
+| `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, inside the plan since core 0.3.20 (M4b), claims a detached negation bar for inline math only if no one has claimed it; the bar and its paragraph are Q's targets, so an obligation of F that targets them waits for Q (the document steps' shared-target rule). F, during execution, skips claimed bars and marks the ones it composes. W leaves claimed bars out of the payload. Q's claim therefore wins, and F is idempotent. |
 | `metadata["vision_description_complete"]` | G, O, P | E, O, X | G sets it when a region or page inspection describes an element and clears that element's failure keys. O sets it on a description and clears it when it records a failure. P sets it when a formula region turns out to be a described picture. E's vision handler skips complete pictures, and X uses it to decide which picture text the payload keeps. |
 | `metadata["vision_failure_reason" / "vision_failure_detail"]` | G, O | E, O, V | O records the cause and its retry reads it. G clears both keys when a region or page inspection describes the element. E's handler reads the reason. V reports it as a visible degradation (`records_visual_failures`). |
 | `metadata["vision_confidence" / "vision_language" / "vision_warnings"]` | G, O, P | — | Three writers of the same description fields: G for region and page inspection, O for pictures, P for the vision fallback of formulas. They must keep one shape. |
@@ -169,13 +169,16 @@ It finds 64 keys, 19 of them written or read by more than one group.
 - the `elements` list by G, L and O;
 - the `obligations` list by O and P.
 
-**Order of `execute`.** Before planning it runs:
-2. O prepares the pictures (the injected picture and the ownership);
-3. Q marks inline math in prose.
+**Order of `execute`.** Before planning it runs one step (numbered 2, as
+in the earlier releases): O prepares the pictures (the injected picture and
+the ownership).
 
-Two steps that ran here now run inside the plan (below):
+Three steps that ran here now run inside the plan (below):
 - step 1, P classifies formula regions: until core 0.3.18; inside the plan
   since 0.3.19 (M4a), before the formulas' recognition;
+- step 3, Q marks inline math in prose: until core 0.3.19, with a second pass
+  after execution (#599); inside the plan since 0.3.20 (M4b), before the
+  formulas' conversions, and again on a replan for a block the plan adds;
 - step 4, P recognizes formulas: until core 0.3.14; inside the plan since
   0.3.15 (M3).
 

@@ -144,7 +144,7 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 
 | Chave | Gravada por | Lida por | O que a ordem atual garante |
 |---|---|---|---|
-| `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, antes do planejamento, reivindica uma barra de negação solta para matemática inline só se ninguém a reivindicou. F, na execução, pula barras reivindicadas e marca as que compõe. W deixa barras reivindicadas fora do payload. A reivindicação de Q, portanto, prevalece, e F é idempotente. |
+| `metadata["negation_overlay"]` | F, Q | F, Q, W | Q, dentro do plano desde o core 0.3.20 (M4b), reivindica uma barra de negação solta para matemática inline só se ninguém a reivindicou; a barra e o seu parágrafo são alvos de Q, então uma obrigação de F que os tenha como alvo espera por Q (a regra de alvos compartilhados dos passos do documento). F, na execução, pula barras reivindicadas e marca as que compõe. W deixa barras reivindicadas fora do payload. A reivindicação de Q, portanto, prevalece, e F é idempotente. |
 | `metadata["vision_description_complete"]` | G, O, P | E, O, X | G a define quando uma inspeção de região ou página descreve um elemento e apaga as chaves de falha dele. O a define numa descrição e a apaga quando registra uma falha. P a define quando uma região de fórmula se revela uma figura descrita. O handler de visão de E pula figuras completas, e X a usa para decidir qual texto de figura o payload mantém. |
 | `metadata["vision_failure_reason" / "vision_failure_detail"]` | G, O | E, O, V | O registra a causa e a nova tentativa dele a lê. G apaga as duas chaves quando uma inspeção de região ou página descreve o elemento. O handler de E lê a razão. V a informa como degradação visível (`records_visual_failures`). |
 | `metadata["vision_confidence" / "vision_language" / "vision_warnings"]` | G, O, P | — | Três gravadores dos mesmos campos de descrição: G para inspeção de região e página, O para figuras, P para o fallback de visão das fórmulas. Eles precisam manter um só formato. |
@@ -169,13 +169,17 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 - a lista `elements` por G, L e O;
 - a lista `obligations` por O e P.
 
-**Ordem do `execute`.** Antes do planejamento ele roda:
-2. O prepara as figuras (a figura injetada e a posse);
-3. Q marca matemática inline na prosa.
+**Ordem do `execute`.** Antes do planejamento ele roda um passo (o 2, como
+nas versões anteriores): O prepara as figuras (a figura injetada e a
+posse).
 
-Dois passos que rodavam aqui agora rodam dentro do plano (abaixo):
+Três passos que rodavam aqui agora rodam dentro do plano (abaixo):
 - o passo 1, P classifica regiões de fórmula: até o core 0.3.18; dentro do
   plano desde a 0.3.19 (M4a), antes do reconhecimento das fórmulas;
+- o passo 3, Q marca matemática inline na prosa: até o core 0.3.19, com uma
+  segunda passada depois da execução (#599); dentro do plano desde a 0.3.20
+  (M4b), antes das conversões das fórmulas, e de novo num replanejamento para
+  um bloco que o plano acrescenta;
 - o passo 4, P reconhece fórmulas: até o core 0.3.14; dentro do plano desde
   a 0.3.15 (M3).
 

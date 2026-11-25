@@ -140,7 +140,7 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
 ) -> None:
     from pddl_support import build_orchestrator
 
-    from acessilia_core.pipeline import orchestrator as pddl, preflight
+    from acessilia_core.pipeline import preflight
     from acessilia_core.pipeline.handlers import (
         pictures as picture_method,
         tables as table_method,
@@ -161,7 +161,6 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
 
     stages = ("_classify_formula_regions", "_enrich_picture_descriptions",
               "_enrich_formula_latex", "_enrich_table_structures")
-    monkeypatch.setattr(pddl, "_mark_inline_math", record("_mark_inline_math"))
     monkeypatch.setattr(regions_method, "_classify_formula_regions", record("_classify_formula_regions"))
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", record("_enrich_formula_latex"))
     # The picture and table steps run inside the plan, as

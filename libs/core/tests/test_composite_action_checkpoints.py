@@ -83,7 +83,6 @@ def _run(monkeypatch, manifest, checkpoints, *, classify=False):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
     if not classify:
         monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     orchestrator = build_orchestrator(max_replans=1)

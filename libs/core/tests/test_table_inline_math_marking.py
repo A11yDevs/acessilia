@@ -171,6 +171,8 @@ def test_a_table_replaced_by_the_secondary_provider_is_marked_again(spans):
     _adopt_secondary_table(table, {"text": "", "metadata": {"table_ast": flat_ast}})
 
     assert "inline_math_detection" not in table.metadata
+    # Flagged, so the inline math step of the replan marks it again (#640, M4b).
+    assert table.metadata["inline_math_stale"] is True
     assert table.provenance == provenance
     assert _texts(table)[0] == "h = 0"
 

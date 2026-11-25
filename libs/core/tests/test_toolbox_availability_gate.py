@@ -260,7 +260,6 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
         return None, {}
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    monkeypatch.setattr(pddl, "_mark_inline_math", no_step)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", no_step)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_step)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_step)
@@ -433,6 +432,8 @@ TRANSITIONAL_BASELINE = frozenset({
     "formula-recognizer",
     # #640 M4: the formula region classification, moved the same way.
     "formula-region-classifier",
+    # #640 M4b: the prose's inline math, moved the same way.
+    "inline-math-marker",
 })
 
 

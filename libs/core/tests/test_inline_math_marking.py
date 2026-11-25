@@ -225,15 +225,17 @@ def _first_pass(manifest, ports, detection="fonts"):
 
 
 def _after_execution(manifest, ports, baseline=None, detection="fonts"):
-    """What ``execute`` runs after the plan: both steps over the run's reader (#599)."""
+    """The inline math step a replan runs for the blocks the plan added
+    (#640, M4b; the pass after execution of #599 until 0.3.19), over the
+    run's reader. ``baseline`` is kept for the callers' readability: the step
+    marks what has no detection yet, so the blocks already marked are left."""
+    del baseline
     asyncio.run(
-        inline_math_stage._mark_inline_math_after_execution(
+        inline_math_stage._enrich_inline_math(
             manifest,
-            baseline or manifest,
             SOURCE,
             document_config(inline_math_detection=detection),
-            ports,
-            RUN_TOOLBOX,
+            inline_math_stage.run_text_spans(ports, manifest, SOURCE, RUN_TOOLBOX),
         )
     )
 
@@ -342,7 +344,8 @@ def test_off_does_not_call_the_toolbox_in_the_second_pass(spans):
 
 
 def test_the_pipeline_marks_a_block_the_plan_restored(monkeypatch, tmp_path):
-    """Through ``execute``: the block rescue-omitted inserts gets its `$…$` (#599)."""
+    """Through ``execute``: the block rescue-omitted inserts gets its `$…$`
+    (#599), now on the replan, from the inline math step (#640, M4b)."""
     from types import SimpleNamespace
 
     from acessilia_core.agents.model_calls import current_model_calls
@@ -370,17 +373,23 @@ def test_the_pipeline_marks_a_block_the_plan_restored(monkeypatch, tmp_path):
     orchestrator = build_orchestrator()
     orchestrator.information_structural = SimpleNamespace(process=lambda *_a, **_k: planning)
 
-    async def run_plan(*_args, **_kwargs):
-        executed = planning.model_copy(deep=True)
-        executed.elements.append(
-            _element(
-                "p2", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 210, 232, reading_order=4
+    real_run_plan = orchestrator._run_plan
+    runs = []
+
+    async def run_plan(plan, planning_manifest, *args, **kwargs):
+        """The first plan runs and, like rescue-omitted, adds a block; the
+        replan (the inline math step for that block) runs for real."""
+        manifest, report = await real_run_plan(plan, planning_manifest, *args, **kwargs)
+        if not runs:
+            manifest.elements.append(
+                _element(
+                    "p2", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 210, 232, reading_order=4
+                )
             )
-        )
-        executed.pages[0].element_ids.append("p2")
-        return executed, SimpleNamespace(
-            replan_required=False, status="completed", execution_id="exec-599"
-        )
+            manifest.pages[0].element_ids.append("p2")
+            manifest.summary.element_count = len(manifest.elements)
+        runs.append(plan.plan_id)
+        return manifest, report
 
     monkeypatch.setattr(orchestrator, "_run_plan", run_plan)
 

@@ -645,6 +645,12 @@ class TestEveryHandlerIsCallable:
             "classify-formula-regions",
             [_element("el-1", "formula", text=r"\frac{a}{b}")],
         ),
+        # The document's prose inline math (#640, M4b). Without boxes there
+        # is no text layer to read, so it changes nothing.
+        "inline-math-marker": (
+            "mark-inline-math",
+            [_element("el-1", "paragraph", text="s ( t ) = t 3")],
+        ),
         "pandoc-code": (
             "preserve-code-semantics",
             [_element("el-1", "code", text="def  f( ):\n  return  1")],

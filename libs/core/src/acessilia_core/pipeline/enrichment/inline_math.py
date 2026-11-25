@@ -1,7 +1,10 @@
 """The inline math stage: mark the math runs inside text and table cells.
 
-Runs before planning, when inline math detection is enabled, and again after
-execution over the blocks the plan added (#599). It reads the source's text
+Runs inside the plan since core 0.3.20, as the ``inline-math-marker`` method
+of the document's ``mark-inline-math`` obligation (#640, M4b): it marks the
+prose, and the tables whose marks went stale; a block the plan adds gets its
+marks on the replan, which replaced the pass after execution of #599. The
+table enrichment marks its tables' cells. It reads the source's text
 spans through the core's per-document reader (``_TextSpanReader``, which binds
 ``acessilia_core.toolbox.text_spans``; a step that gets ``None`` records the
 failure in ``configuration["inline_math_detection"]``), finds the math runs of
@@ -40,10 +43,10 @@ _INLINE_MATH_ELEMENT_TYPES = frozenset({"paragraph", "list_item", "caption", "fo
 class _TextSpanReader:
     """The text layer's spans of one document, each page fetched once (#260).
 
-    The prose and table steps of the inline math detection run at different
-    points of the pipeline (the table step inside the plan, #640 M2); reading
-    through one reader, a page is requested from the Toolbox once, and a
-    capability that failed is not asked again.
+    The prose and table steps of the inline math detection run as different
+    planned methods (``inline-math-marker`` and ``table-enrichment``, #640
+    M4b and M2); reading through one reader, a page is requested from the
+    Toolbox once, and a capability that failed is not asked again.
 
     The reader keeps only what identifies the source (its path and artifact
     id), not the manifest: the plan's executor works on a copy of it. A step
@@ -90,7 +93,7 @@ def run_text_spans(
     ports: RunPorts, manifest: ProcessingManifest, source_path: Path, toolbox: ToolboxConfig
 ) -> _TextSpanReader:
     """The text-span reader of the run (``ports``), so a page is fetched once
-    for the prose step before planning and the table step inside the plan.
+    for the prose step and the table step, both inside the plan.
 
     One per run: the first call builds it, from its ``manifest``,
     ``source_path`` and ``toolbox``, and every later call gets that reader
@@ -106,6 +109,17 @@ def _inline_math_enabled(manifest: ProcessingManifest, document: DocumentConfig)
         document.inline_math_detection == "fonts"
         and manifest.source.media_type == "application/pdf"
     )
+
+
+def inline_math_detection_status(manifest: ProcessingManifest, document: DocumentConfig) -> str:
+    """How the detection ran, for the steps' messages: ``off`` (disabled, or
+    not a PDF), ``unavailable`` (the Toolbox could not read the text layer)
+    or ``fonts`` (the marks ran)."""
+    if not _inline_math_enabled(manifest, document):
+        return "off"
+    if manifest.extractor.configuration.get("inline_math_detection") == "unavailable":
+        return "unavailable"
+    return "fonts"
 
 
 def _boxed_pages(elements: Iterable[ManifestElement]) -> list[int]:
@@ -224,6 +238,8 @@ async def _mark_inline_math(
     source_path: Path,
     document: DocumentConfig,
     text_spans: _TextSpanReader,
+    *,
+    targets: frozenset[str] | None = None,
 ) -> dict[str, int]:
     """Write the inline math of PDF prose as ``$…$``, from the text layer's fonts (#265).
 
@@ -249,6 +265,7 @@ async def _mark_inline_math(
         element
         for element in manifest.elements
         if _is_prose_inline_math_candidate(element)
+        and (targets is None or element.id in targets)
     ]
     pages = _boxed_pages(candidates)
     if not pages:
@@ -340,7 +357,7 @@ def _invalidate_formula_conversions(manifest: ProcessingManifest) -> None:
     The ``mathml`` and ``latex-verbalizer`` handlers mark implicit products
     with the variables the manifest had when they ran. A block added during the
     plan can carry variable evidence they never saw, either already written as
-    ``$…$`` or marked by the second pass. The canonical build reuses
+    ``$…$`` or marked by the inline math step on the replan (#640, M4b). The canonical build reuses
     ``metadata["mathml"]`` and ``metadata["verbalization"]`` when present, so
     keeping them would ship a conversion made with the old variables; dropping
     them makes the build redo every formula with the final manifest. The LaTeX
@@ -352,56 +369,91 @@ def _invalidate_formula_conversions(manifest: ProcessingManifest) -> None:
             element.metadata.pop("verbalization", None)
 
 
-async def _mark_inline_math_after_execution(
+def inline_math_pending(manifest: ProcessingManifest) -> list[str]:
+    """The elements the inline math step still has work on, in document order.
+
+    In a PDF:
+    - the prose elements with boxes and text that no detection has marked
+      yet, which the detection marks;
+    - the prose elements without boxes that already carry a ``$…$`` span: the
+      detection cannot read them, but they are variable evidence the formula
+      conversions may not have seen, which the step's invalidation weighs;
+    - the tables whose marks went stale (``inline_math_renewed``).
+
+    A block the plan added (a ``rescue-omitted`` paragraph) is one of them,
+    so it gets the step on the replan (#640, M4b) instead of in a pass after
+    execution (#599). Whether the detection is on is the run's config, not
+    the manifest's: with it off the step marks nothing, but still weighs the
+    evidence a block already carries, as the pass after execution did.
+    """
+    if manifest.source.media_type != "application/pdf":
+        return []
+    renewed = inline_math_renewed(manifest)
+    return [
+        element.id for element in manifest.elements
+        if _is_prose_inline_math_candidate(element)
+        or _carries_unread_inline_math(element)
+        or element.id in renewed
+    ]
+
+
+def inline_math_renewed(manifest: ProcessingManifest) -> set[str]:
+    """The tables whose inline math marks went stale (``inline_math_stale``):
+    the select-table-source step adopted the secondary provider's cells after
+    they were marked.
+
+    The step clears the flag when it marks a table, so a flagged table that a
+    satisfied obligation of the step covers was adopted again after it: its
+    earlier marks no longer hold, and it joins a new obligation
+    (``DocumentStep.renewed``)."""
+    if manifest.source.media_type != "application/pdf":
+        return set()
+    return {
+        element.id for element in manifest.elements
+        if element.metadata.get("inline_math_stale") and _is_table_inline_math_candidate(element)
+    }
+
+
+def _carries_unread_inline_math(element: ManifestElement) -> bool:
+    """A prose element the detection cannot read (no boxes) that already
+    carries ``$…$``, and that no detection has marked."""
+    return (
+        element.type in _INLINE_MATH_ELEMENT_TYPES
+        and "inline_math_detection" not in element.metadata
+        and not any(provenance.bbox is not None for provenance in element.provenance)
+        and _carries_inline_math(element)
+    )
+
+
+async def _enrich_inline_math(
     manifest: ProcessingManifest,
-    planning_manifest: ProcessingManifest,
     source_path: Path,
     document: DocumentConfig,
-    ports: RunPorts,
-    toolbox: ToolboxConfig,
-) -> None:
-    """Mark the inline math of the blocks the execution added (#599).
+    text_spans: _TextSpanReader,
+    *,
+    targets: frozenset[str] | None = None,
+) -> dict[str, int]:
+    """Mark the inline math of ``targets`` (``None``: every candidate): the
+    prose, then the stale tables, whose flag is cleared once tried. Returns
+    the sum of both steps' ``{elements, marked, unmatched}``.
 
-    ``rescue-omitted`` inserts primary-provider blocks while the plan runs,
-    after the prose step before planning. The canonical build only converts the
-    ``$…$`` spans of the manifest it receives, so a restored paragraph would
-    reach the reader as flat text: ``s ( t ) = t 3``, with no MathML and
-    nothing spoken as math. Both steps run again over the executed manifest,
-    before the payload is built.
-
-    The reader is the run's (``RunPorts.services``), the one the prose and table
-    steps used, so a page already fetched in this run is not requested again
-    and a capability that failed is not asked again; a resumed run rebuilds
-    that in-memory cache. The steps skip every element that already carries
-    ``metadata["inline_math_detection"]``; elements that never got a mark stay
-    candidates. A page the reader cannot read is recorded as ``unavailable`` on
-    ``manifest``, the copy the executor returned included.
-
-    ``planning_manifest`` is the manifest the plan ran from, before any handler
-    added a block. A block added during the plan can carry variable evidence
-    the planned formula handlers never saw (already written as ``$…$``, or
-    marked here). Those formulas are converted with the old variables, so their
-    planned conversions are dropped and the canonical build redoes them with
-    the final manifest (``_invalidate_formula_conversions``).
+    The run's text-span reader (``RunPorts.services``) is the one the table
+    enrichment uses, so a page already fetched is not requested again and a
+    capability that failed is not asked again.
     """
-    planned = {element.id for element in planning_manifest.elements}
-    added = [
-        element
-        for element in manifest.elements
-        if element.id not in planned
-        and element.type in _INLINE_MATH_ELEMENT_TYPES | {"table"}
-    ]
-    text_spans = run_text_spans(ports, manifest, source_path, toolbox)
-    counts = await _mark_inline_math(manifest, source_path, document, text_spans)
-    table_counts = await _mark_table_inline_math(
-        manifest, source_path, document, text_spans
+    prose = await _mark_inline_math(manifest, source_path, document, text_spans, targets=targets)
+    stale = frozenset(
+        element.id for element in manifest.elements
+        if element.metadata.get("inline_math_stale") and (targets is None or element.id in targets)
     )
-    if (
-        counts["marked"]
-        or table_counts["marked"]
-        or any(_carries_inline_math(element) for element in added)
-    ):
-        _invalidate_formula_conversions(manifest)
+    tables = (
+        await _mark_table_inline_math(manifest, source_path, document, text_spans, targets=stale)
+        if stale else {"elements": 0, "marked": 0, "unmatched": 0}
+    )
+    for element in manifest.elements:
+        if element.id in stale:
+            element.metadata.pop("inline_math_stale", None)
+    return {key: prose[key] + tables[key] for key in prose}
 
 
 def _placements(element: ManifestElement) -> list[Placement]:
