@@ -14,13 +14,18 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 ## API pública
 
 A tabela lista os **destaques** de cada módulo, e não o `__all__` completo: os
-nomes que quem lê provavelmente precisa, não todos os nomes exportados. Todo
-nome não qualificado em uma **lista de símbolos** é exportado pelo módulo da
-primeira coluna, e um nome de outro módulo nessa lista é escrito com o caminho
-completo do módulo (por exemplo `docstruct.text.paragraphs.PAGE_HEADING`); a
-prosa depois dos símbolos é descritiva. `tests/test_docstruct_readme_sync.py`
-guarda as duas regras, para que uma linha não mantenha um nome que o módulo
-deixou de exportar.
+nomes que quem lê provavelmente precisa, não todos os nomes exportados. Uma
+**lista de símbolos** é a sequência inicial de nomes entre crases, separados por
+vírgulas, no começo de uma célula ou de um grupo separado por `;`; a prosa ao
+redor é descritiva. Todo nome não qualificado em uma lista de símbolos é
+exportado pelo módulo da primeira coluna, e um nome de outro módulo nessa lista
+é escrito com o caminho completo do módulo (por exemplo
+`docstruct.text.paragraphs.PAGE_HEADING`). Para um módulo que antecede o
+`__all__`, seu namespace público, excluindo módulos e importações de
+infraestrutura, é a lista de exportações. A linha de compatibilidade legada é
+verificada contra os módulos que ela nomeia. `tests/test_docstruct_readme_sync.py`
+guarda essas regras, além de toda referência `docstruct.*` em uma linha, para
+que uma linha não mantenha um nome que o módulo deixou de exportar.
 
 | Módulo | Símbolos |
 |---|---|
