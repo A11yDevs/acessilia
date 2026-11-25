@@ -18,12 +18,16 @@ alinhados (veja [A guarda](#a-guarda)).
 ## Resumo
 
 Medido em `develop` no `82424b34`, com uma varredura AST que inclui imports
-dentro de funções e instruções `import docstruct.x` (a mesma da guarda).
+dentro de funções e instruções `import docstruct.x` (a mesma da guarda); os
+números abaixo foram remedidos depois que a #636 removeu o último import
+direto de `docstruct.imaging` no Core (`toolbox/vision_payload` agora pede o
+plano de redução ao SDK).
 
-- **50 arquivos** importam **57 módulos** do Docstruct.
-- **45 arquivos** importam computação (algoritmo ou operação). A ADR-0028
-  traz 43; a diferença são `pipeline/judge` e `pipeline/handlers/judge`, que
-  importam `docstruct.fusion.judge`, classificado aqui como algoritmo (veja
+- **49 arquivos** importam **56 módulos** do Docstruct.
+- **44 arquivos** importam computação (algoritmo ou operação): os 43 da
+  ADR-0028, mais `pipeline/judge` e `pipeline/handlers/judge` (que importam
+  `docstruct.fusion.judge`, classificado aqui como algoritmo), menos
+  `toolbox/vision_payload`, cujo último import direto a #636 removeu (veja
   [A regra de classificação](#a-regra-de-classificação)).
 - **5 arquivos** importam só contratos, validação ou política:
   - só contrato: `export/catalog`, `manifest/document_adapter`,
@@ -31,8 +35,8 @@ dentro de funções e instruções `import docstruct.x` (a mesma da guarda).
   - só validação: `pipeline/validators`;
   - só política: `manifest/toolbox_extractor`.
 - A ADR-0028 conta 46 arquivos no `46f2fe7e`. A mesma varredura encontra 50
-  ali, os mesmos arquivos de hoje: a diferença está na contagem, e nenhum
-  arquivo passou a importar o Docstruct desde então.
+  ali, os mesmos arquivos do `82424b34`: a diferença está na contagem, e
+  nenhum arquivo passou a importar o Docstruct desde então.
 
 | Classe | Módulos | O que é | Destino |
 |---|---|---|---|
@@ -40,7 +44,7 @@ dentro de funções e instruções `import docstruct.x` (a mesma da guarda).
 | validação | 1 | Verificação de um documento contra um schema ou regras | Transitória, fixada: a validação de schema fica perto da camada de interoperabilidade; a auditoria do documento vira capacidade |
 | política | 2 | Regras de decisão que o Core usa para coordenar | Transitória, fixada: a parte estratégica vai para o Core (ADR-0029); os parâmetros dos algoritmos ficam com a Toolbox |
 | operação | 10 | Composições: montagem canônica, renderização de exportação, fusão de payloads, especialista de tabelas | Uma capacidade composta da Toolbox, por trás de uma ação planejada |
-| algoritmo | 42 | Algoritmos estruturais sobre o conteúdo do documento e os tipos internos a eles | Uma capacidade atômica da Toolbox, migrada com o método do plano ou o agente que a usa |
+| algoritmo | 41 | Algoritmos estruturais sobre o conteúdo do documento e os tipos internos a eles | Uma capacidade atômica da Toolbox, migrada com o método do plano ou o agente que a usa |
 
 Toda classe, exceto contrato, é fixada: cada importador e cada nome que ele
 importa ficam listados, e a lista só diminui.
@@ -161,7 +165,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | Montagem do payload e do documento canônico | `pipeline/payload`, `pipeline/canonical_builder`, `pipeline/elements`, `pipeline/obligations` | Montagem canônica e texto das páginas: a composição por trás da exportação acessível |
 | Exportação acessível (`export/*`) | renderers, exporters, exportador Pandoc, markers, catalog | Renderização, por trás da capacidade de exportação (`document.export.*`) |
 | Construção do manifesto (`manifest/*`) | builder, detectores de layout e texto, slides | Ordem de leitura, junção final, verso e normalização durante a construção do manifesto |
-| Coordenação e fronteira | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `toolbox/vision_payload`, `manifest/toolbox_extractor` | Fusão de payloads, recorte de regiões e o limiar do juiz; a política de fusão é política |
+| Coordenação e fronteira | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `manifest/toolbox_extractor` | Fusão de payloads, recorte de regiões e o limiar do juiz; a política de fusão é política |
 | Shims de compatibilidade | `pipeline/table_ast`, `formula_tools`, `pipeline/validators` | Reexportações mantidas para imports antigos (`import docstruct.x`); saem quando seus chamadores saírem |
 | Serviço (`backend/service.py`) | `backend/service` | `merge_broken_paragraphs` (algoritmo) e `verbosity_for_mode` (política) |
 
@@ -202,7 +206,6 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | `docstruct.fusion.xycut` | algoritmo | `xycut_order` | `agents/fusion_agent`, `agents/order_adjudication_agent`, `manifest/detectors/layout` |
 | `docstruct.geometry` | algoritmo | `OrientedBox`, `ReadingItem`, `is_bottom_left`, `order_reading_items`, `reading_role`, `union` | `manifest/builder`, `manifest/detectors/types`, `manifest/slides`, `pipeline/elements`, `pipeline/payload`, `pipeline/secondary` |
 | `docstruct.geometry.boxes` | algoritmo | `PageBox`, `best_effort_clip`, `box_contains_center`, `box_distance`, `boxes_overlap`, `boxes_side_by_side`, `downward_edges`, `expand_box`, `holds_point`, `spans_horizontally`, `union_area` | `manifest/slides`, `pipeline/enrichment/common`, `pipeline/enrichment/inline_math`, `pipeline/handlers/unicode_repair`, `pipeline/toolbox` |
-| `docstruct.imaging` | algoritmo | `image_dimensions` | `toolbox/vision_payload` |
 | `docstruct.imaging.policy` | algoritmo | `decide_orientation`, `upscale_factor` | `agents/page_level_agent` |
 | `docstruct.placeholders` | algoritmo | `UNSTRUCTURED_PAGE_FLAG`, `UNSTRUCTURED_PAGE_LABEL`, `has_meaningful_text`, `is_mostly_visual`, `is_placeholder_visual`, `is_unstructured_page_placeholder` | `manifest/builder`, `pipeline/enrichment/pictures`, `pipeline/handlers/content`, `pipeline/payload` |
 | `docstruct.regions.classify` | algoritmo | `classify_region`, `region_needs_vision`, `region_prompt_key` | `agents/fusion_agent`, `agents/vision_agent` |
@@ -328,7 +331,8 @@ Cada migração, por método do plano ou por agente (ADR-0028):
 4. acrescenta um teste diferencial de regressão;
 5. remove do fixture os arquivos e nomes obsoletos e, quando o último
    importador de um módulo sai, sua linha desta página;
-6. atualiza os indicadores acima.
+6. remede o resumo acima, que acompanha o código; os indicadores mantêm a
+   linha de base do `82424b34`.
 
 Uma capacidade segue a semântica dos métodos do plano e dos agentes. Nem
 toda função utilitária vira uma chamada remota: algoritmos de baixo nível

@@ -23,12 +23,21 @@ async def test_context_recovery_resizes_raster_images_on_the_toolbox(format_name
 
 
 @pytest.mark.asyncio
-async def test_invalid_or_unshrinkable_images_do_not_call_the_toolbox(fake_toolbox_render):
+async def test_invalid_or_unshrinkable_images_do_not_build_a_client_or_call_the_toolbox(
+    fake_toolbox_render, monkeypatch
+):
+    from acessilia_core.toolbox import vision_payload
+
+    built = []
+    monkeypatch.setattr(
+        vision_payload, "make_toolbox_client", lambda *_a, **_kw: built.append(True)
+    )
     source = BytesIO()
     Image.new("RGB", (1, 1), "white").save(source, format="PNG")
 
     assert await downscale_image(b"not an image", toolbox=toolbox_config()) is None
     assert await downscale_image(source.getvalue(), toolbox=toolbox_config()) is None
+    assert built == []
     assert fake_toolbox_render.requests == []
 
 
