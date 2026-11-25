@@ -118,13 +118,31 @@ def test_the_tests_check_aggregates_all_component_jobs() -> None:
     assert "needs.component-tests.result" in verify["env"]["COMPONENTS"]
     assert "needs.planning-backends.result" in verify["env"]["BACKENDS"]
     assert "needs.app-integration.result" in verify["env"]["APP_INTEGRATION"]
+    assert verify["env"]["EVENT_NAME"] == "${{ github.event_name }}"
     # The loop entry is what makes a failed backend job fail the aggregator.
     assert '"planning-backends:$BACKENDS"' in verify["run"]
     assert "APP_INTEGRATION" in verify["run"]
     assert '!= "success"' in verify["run"]
+    # A skipped integration suite is tolerated only on pull requests; every
+    # other event must have run it.
+    assert 'if [ "$EVENT_NAME" != "pull_request" ]' in verify["run"]
+    assert '&& [ "$APP_INTEGRATION" != "success" ]' in verify["run"]
     assert "scripts/check_coverage_thresholds.py" in steps[
         "Check per-component coverage thresholds"
     ]["run"]
+
+
+def test_every_tests_dependency_is_verified_by_the_aggregator() -> None:
+    """A new provider cannot join tests.needs without Verify reading its result."""
+    job = _workflow()["jobs"]["tests"]
+    steps = {step.get("name"): step for step in job["steps"]}
+    verify = steps["Verify provider jobs"]
+    results = " ".join(verify["env"].values())
+    missing = [
+        dependency for dependency in job["needs"]
+        if f"needs.{dependency}.result" not in results
+    ]
+    assert missing == []
 
 
 def test_both_planning_backends_run_on_the_current_domain() -> None:
@@ -345,13 +363,21 @@ def test_delivery_waits_for_tests_and_isolation_jobs() -> None:
     assert "detect-changes" not in delivery["needs"]
     condition = " ".join(delivery["if"].split())
     assert condition == (
-        "github.event_name == 'push' && ( "
+        "!cancelled() && github.event_name == 'push' && ( "
         "github.ref_name == 'main' || "
         "github.ref_name == 'develop' || "
-        "startsWith(github.ref_name, 'release/') )"
+        "startsWith(github.ref_name, 'release/') ) && "
+        "needs.tests.result == 'success' && "
+        "needs.sdk-isolated.result == 'success' && "
+        "needs.core-isolated.result == 'success' && "
+        "needs.docstruct-isolated.result == 'success' && "
+        "needs.security.result == 'success'"
     )
-    assert "sdk-isolated" in jobs
-    assert "docstruct-isolated" in jobs
+    # `changes` is the PR-only ancestor skipped on pushes; app-integration and
+    # tests override it, but GitHub still propagates the skip to delivery
+    # unless the caller removes the default success check. The relationship is
+    # pinned by test_app_integration_runs_only_for_relevant_pull_requests and
+    # test_the_tests_check_aggregates_all_component_jobs.
 
 
 def test_docstruct_runs_alone_from_its_wheel() -> None:
