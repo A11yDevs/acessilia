@@ -2,7 +2,7 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
-## 0.3.17 — the downscale plan comes from the SDK (#636)
+## 0.3.18 — the downscale plan comes from the SDK (#636)
 
 The vision payload's context recovery no longer repeats the SDK's rule for
 when downscaling is worth it. `toolbox/vision_payload` now asks
@@ -13,6 +13,41 @@ invalid `scale`, unknown bytes and an unshrinkable image still return `None`
 without touching the Toolbox, and a Toolbox failure still returns `None` after
 closing the client. The core no longer imports `docstruct.imaging`, and it now
 requires SDK 0.7.
+
+## 0.3.17 — checkpoints inside a composite action (#836)
+
+The picture descriptions (M1), the formula LaTeX (M3) and the table
+enrichment (M2) are each one planned action over many elements. To the
+planner each is atomic; its persistence no longer is. Until now a crash in
+the middle of one resumed the whole step, paying again the model calls of
+the objects it had finished. Now:
+- **After each finished object** the method saves the manifest it is
+  enriching into the run's execution checkpoint, as `step_progress` next to
+  the last finished step: the stage's `on_progress`, coalesced as before
+  planning (one write at a time, the latest manifest), serialized on the
+  stage's event loop. It goes through `RunServices.step_checkpoint`, which
+  the orchestrator sets to its execution checkpoint; no new checkpoint phase.
+- **A resumed execution of the same plan** starts that step again from it
+  (`resumed_manifest`), and the step's per-object gates skip what was done:
+  a described picture, a read table, a recognized formula. The progress of a
+  step the plan does not run next is never used, and the next finished step
+  drops it.
+- **What the interrupted step found is kept.** The obligations its finished
+  objects added (a picture read as a formula gets `verbalize-formula`) are
+  selected on the restore, as the executor does once a handler returns, so
+  the replan plans them; otherwise a resumed job could finish without them.
+  This also covers a crash after the handler returned, before its step's
+  checkpoint was written.
+- **A second crash keeps the resumed progress.** A resumed run's execution
+  checkpoint starts from the snapshot it resumed, so its first step's
+  progress is saved too.
+- The collective recovery (one breaker, one retry pass) and the progress
+  messages (`RunServices.progress`) are unchanged.
+- Tests: crashes mid-step on pictures, many tables and formulas resume
+  with only what the saved progress left (which object the crash hits
+  depends on timing, so the tests check that contract, not a fixed list); a
+  second crash in the same step; a crash after a picture was read as a
+  formula, mid-step and between the handler and its step's checkpoint.
 
 ## 0.3.16 — optional Toolbox capabilities (#848)
 

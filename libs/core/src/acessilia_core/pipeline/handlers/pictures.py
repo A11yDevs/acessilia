@@ -50,7 +50,7 @@ from acessilia_core.pipeline.enrichment.pictures import (
     _enrich_picture_descriptions,
     is_describable,
 )
-from acessilia_core.pipeline.handlers.common import run_status
+from acessilia_core.pipeline.handlers.common import run_status, step_checkpoint
 from acessilia_core.pipeline.handlers.messages import (
     MSG_PICTURES_DESCRIBED,
     MSG_VISION_NO_PICTURE,
@@ -65,6 +65,7 @@ async def _describe_pictures(
     config: CoreConfig,
     ports: RunPorts,
     targets: frozenset[str],
+    obligation_id: str,
 ) -> None:
     """Describe the obligation's ``targets``: a second obligation
     (``obligation-describe-images-2``, #832) never describes again a picture
@@ -85,6 +86,8 @@ async def _describe_pictures(
         breaker=run_breaker(ports, config.vision),
         targets=targets,
         inject=False,
+        # Each finished object is saved into the execution checkpoint (#836).
+        on_progress=step_checkpoint(ports, manifest, obligation_id),
     )
 
 
@@ -110,7 +113,7 @@ def _handle_picture_description_method(
     already = {
         element.id for element in pictures if element.metadata.get("vision_description_complete")
     }
-    run_sync(_describe_pictures(manifest, Path(manifest.source.path), config, ports, targets))
+    run_sync(_describe_pictures(manifest, Path(manifest.source.path), config, ports, targets, obligation_id))
     outcomes = Counter(_outcome(element) for element in pictures if element.id not in already)
     described = outcomes.pop("described", 0)
     formulas = outcomes.pop("formula", 0)

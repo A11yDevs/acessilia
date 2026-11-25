@@ -9,14 +9,16 @@ phase 3, step 6); ``write_atomic_artifact`` is the writer the evidence handlers
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 import tempfile
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
 from typing import Any
 
 from acessilia_core.agents.fusion_agent import FusionAgent
+from acessilia_core.blocking import run_blocking
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import t
 from acessilia_core.manifest.models import Artifact, ManifestElement, ProcessingManifest
@@ -35,6 +37,46 @@ def run_status(ports: RunPorts) -> Callable[[str], Coroutine[Any, Any, None]] | 
         report(message)
 
     return status
+
+
+def step_checkpoint(
+    ports: RunPorts, manifest: ProcessingManifest, obligation_id: str
+) -> Callable[[], Awaitable[None]] | None:
+    """The ``on_progress`` a composite method gives its stage (#836): after
+    each object, the manifest it is enriching goes into the run's execution
+    checkpoint, so a crash mid-step resumes from it and the stage's
+    per-object gates skip the objects already done. ``None`` outside a job."""
+    save = ports.services.step_checkpoint
+    if save is None:
+        return None
+    return _StepCheckpoint(save, manifest, obligation_id).save
+
+
+class _StepCheckpoint:
+    """Coalesced step checkpoints, like the enrichment's before planning
+    (#407): one write at a time, and a burst of finished objects during a
+    write gives one more write with the latest manifest. The manifest is
+    serialized on the event loop, where the stage folds its objects, so the
+    write never races with them."""
+
+    def __init__(
+        self, save: Callable[[str, dict[str, Any]], None], manifest: ProcessingManifest, obligation_id: str
+    ) -> None:
+        self._save = save
+        self._manifest = manifest
+        self._obligation_id = obligation_id
+        self._lock = asyncio.Lock()
+        self._pending = 0
+
+    async def save(self) -> None:
+        self._pending += 1
+        if self._lock.locked():
+            return
+        async with self._lock:
+            while self._pending:
+                self._pending = 0
+                payload = self._manifest.model_dump(mode="json", by_alias=True)
+                await run_blocking(self._save, self._obligation_id, payload)
 
 
 def _fusion_agent() -> FusionAgent:
