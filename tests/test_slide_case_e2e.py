@@ -25,8 +25,10 @@ Requires:
 - The dataset clone at ``tests/dataset`` (or ``ACESSILIA_TEST_DATASET_DIR``)
 - ``pdftotext`` (poppler-utils) for the PDF/UA
 
-``CORE_SLIDE_TIMEOUT`` (seconds, default 2400) bounds the job wait; the test
-adds 600 seconds so the wait fails with its own message first::
+``CORE_SLIDE_TIMEOUT`` (seconds, default 10800) bounds the job wait; the test
+adds 600 seconds so the wait fails with its own message first. The deck has 36
+images and takes well over 40 minutes on staging, so this is a manual/slow
+case, not part of the scheduled gate::
 
     CORE_BASE_URL=https://www.acessilia3.inf.ufg.br/api/v1 \
         uv run pytest -m e2e tests/test_slide_case_e2e.py -v
@@ -52,7 +54,7 @@ SLIDE_PDF = (
     / "presentations"
     / "grandezas-e-medidas-42pgs.pdf"
 )
-SLIDE_TIMEOUT = float(os.getenv("CORE_SLIDE_TIMEOUT", "2400"))
+SLIDE_TIMEOUT = float(os.getenv("CORE_SLIDE_TIMEOUT", "10800"))
 OUT = Path(__file__).resolve().parents[1] / "var" / "bench" / "slides" / "e2e"
 
 pytestmark = [
