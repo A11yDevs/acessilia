@@ -132,6 +132,19 @@ def test_the_tests_check_aggregates_all_component_jobs() -> None:
     ]["run"]
 
 
+def test_every_tests_dependency_is_verified_by_the_aggregator() -> None:
+    """A new provider cannot join tests.needs without Verify reading its result."""
+    job = _workflow()["jobs"]["tests"]
+    steps = {step.get("name"): step for step in job["steps"]}
+    verify = steps["Verify provider jobs"]
+    results = " ".join(verify["env"].values())
+    missing = [
+        dependency for dependency in job["needs"]
+        if f"needs.{dependency}.result" not in results
+    ]
+    assert missing == []
+
+
 def test_both_planning_backends_run_on_the_current_domain() -> None:
     """#790: Fast Downward from one pinned image, and every listed case must pass."""
     job = _workflow()["jobs"]["planning-backends"]
