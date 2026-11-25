@@ -27,6 +27,12 @@ MSG_PICTURES_DESCRIBED = (
     "Picture description ran for {count} pictures: {described} described, {formulas} read as "
     "formulas, {already} already described; left undescribed: {left}",
 )
+MSG_INLINE_MATH_MARKED = (
+    "Inline math ran for {count} element: {marked} runs marked in {elements} elements, "
+    "{unmatched} left unmatched; detection: {detection}",
+    "Inline math ran for {count} elements: {marked} runs marked in {elements} elements, "
+    "{unmatched} left unmatched; detection: {detection}",
+)
 MSG_FORMULA_REGIONS_CLASSIFIED = (
     "Formula region classification ran for {count} formula: {math} mathematical, {pictures} "
     "drawings described as pictures, {unresolved} sent to human review, {already} decided "
@@ -213,6 +219,7 @@ MSG_JUDGE_CONFIRMS = "VLM judge confirms the applied page: {pages}"
 MSG_TABLES: tuple[tuple[str, str], ...] = (
     MSG_VISION_VALIDATED,
     MSG_PICTURES_DESCRIBED,
+    MSG_INLINE_MATH_MARKED,
     MSG_FORMULA_REGIONS_CLASSIFIED,
     MSG_FORMULAS_RECOGNIZED,
     MSG_TABLES_ENRICHED,

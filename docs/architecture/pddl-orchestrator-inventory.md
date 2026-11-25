@@ -170,12 +170,14 @@ It finds 64 keys, 19 of them written or read by more than one group.
 - the `obligations` list by O and P.
 
 **Order of `execute`.** Before planning it runs:
-2. O prepares the pictures (the injected picture and the ownership);
-3. Q marks inline math in prose.
+2. O prepares the pictures (the injected picture and the ownership).
 
-Two steps that ran here now run inside the plan (below):
+Three steps that ran here now run inside the plan (below):
 - step 1, P classifies formula regions: until core 0.3.18; inside the plan
   since 0.3.19 (M4a), before the formulas' recognition;
+- step 3, Q marks inline math in prose: until core 0.3.19, with a second pass
+  after execution (#599); inside the plan since 0.3.20 (M4b), before the
+  formulas' conversions, and again on a replan for a block the plan adds;
 - step 4, P recognizes formulas: until core 0.3.14; inside the plan since
   0.3.15 (M3).
 

@@ -37,7 +37,6 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
     STAGE_EXECUTING_PLAN,
     STAGE_GENERATING_PDDL_PLAN,
-    STAGE_MARKING_INLINE_MATH,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_VALIDATING_PLAN_DRY_RUN,
 )
@@ -49,11 +48,10 @@ from acessilia_core.pipeline.checkpointing import (
     manifest_payload,
     resumed_manifest,
 )
-from acessilia_core.pipeline.document_obligations import reconcile_document_steps
-from acessilia_core.pipeline.enrichment.inline_math import (
-    _mark_inline_math,
-    _mark_inline_math_after_execution,
-    run_text_spans,
+from acessilia_core.pipeline.document_obligations import (
+    CLOSED_STATUSES,
+    DOCUMENT_STEPS,
+    reconcile_document_steps,
 )
 from acessilia_core.pipeline.enrichment.pictures import _prepare_pictures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
@@ -404,8 +402,6 @@ class PddlAccessibilityOrchestrator:
             executor=executor,
         )
         self._check_unsatisfied(manifest, execution_report)
-        # The canonical build converts the spans of the manifest it is given.
-        await _mark_inline_math_after_execution(manifest, planning.planning_manifest, ctx.source_path, config.document, ctx.ports, config.toolbox)
 
         payload = build_pddl_structured_payload(
             file_path=file_path,
@@ -489,10 +485,7 @@ class PddlAccessibilityOrchestrator:
             manifest.extractor.configuration["region_inspection_mode"] = ctx.effective_mode
             manifest.extractor.configuration.update(media_configuration)
             return manifest
-        await self._enrich_before_planning(
-            manifest, ctx.source_path, media_inspection,
-            ctx.status_callback, ctx.config, ctx.ports, ctx.checkpoints,
-        )
+        await self._enrich_before_planning(manifest, media_inspection, ctx.checkpoints)
         # The formula regions (#640, M4a), the pictures (M1), the formula
         # LaTeX (M3) and the tables (M2) are enriched inside the plan. A
         # checkpoint from before that already has them enriched, so it gets
@@ -632,30 +625,26 @@ class PddlAccessibilityOrchestrator:
     async def _enrich_before_planning(
         self,
         manifest: ProcessingManifest,
-        source_path: Path,
         media_inspection: dict[str, Any] | None,
-        status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
-        config: CoreConfig,
-        ports: RunPorts,
         checkpoints: RunCheckpoints,
     ) -> None:
-        """Prepare the pictures, then mark the inline math of the prose.
+        """Prepare the pictures: what derives from the media inspection.
 
-        What derives from the media inspection stays here
-        (``_prepare_pictures``); the inline math shares the run's text-span
-        reader (``RunPorts.services``) with the table method. Everything else
-        runs inside the plan, with the run's breaker and region cache:
-        ``formula-region-classifier`` (#640, M4), ``picture-description``
-        (M1), ``formula-recognizer`` (M3) and ``table-enrichment`` (M2). The
-        manifest is checkpointed after each step (#407).
+        Everything else runs inside the plan (#640), with the run's breaker,
+        region cache and text-span reader: ``formula-region-classifier``
+        (M4a), ``picture-description`` (M1), ``inline-math-marker`` (M4b),
+        ``formula-recognizer`` (M3) and ``table-enrichment`` (M2).
         """
-        if status_callback:
-            await status_callback(t(STAGE_MARKING_INLINE_MATH))
         _prepare_pictures(manifest, media_inspection)
         await checkpoints.save_manifest(manifest, enriching=True)
-        text_spans = run_text_spans(ports, manifest, source_path, config.toolbox)
-        await _mark_inline_math(manifest, source_path, config.document, text_spans)
-        await checkpoints.save_manifest(manifest, enriching=True)
+
+    def _replan_needed(self, report: ExecutionReport, manifest: ProcessingManifest) -> bool:
+        """Whether the run plans again: the executor asked for it, or a run
+        that completed left work for the document steps (#640, M4b). A dry
+        run never replans."""
+        if self.execute_dry_run:
+            return False
+        return report.replan_required or _document_work_found(manifest)
 
     def _replan_allowed(
         self,
@@ -708,7 +697,7 @@ class PddlAccessibilityOrchestrator:
         # loop the status was terminal in production: the pipeline returned a plan
         # it already knew was wrong, and `complete-job` never ran, so no document
         # was produced.
-        while execution_report.replan_required and not self.execute_dry_run:
+        while self._replan_needed(execution_report, manifest):
             # A replan after a failed step recovers from it and counts toward
             # ``max_replans``. One after a run where nothing failed follows
             # obligations the run changed (found, removed, replaced: #594,
@@ -845,6 +834,29 @@ class PddlAccessibilityOrchestrator:
             for method in obligation.admissible_methods
         }
         return sorted(requested - registered)
+
+
+def _document_work_found(manifest: ProcessingManifest) -> bool:
+    """Whether a run left work for the document steps that no plan has (#640, M4b).
+
+    A step can add elements without adding obligations: ``rescue-omitted``
+    restores a paragraph, ``select-table-source`` adopts a table's cells. The
+    reconciliation gives them the document step they need (the inline math,
+    a picture's description), so a run that completed still replans for
+    them, as a discovery; this replaced the pass after execution of #599.
+    A job the run completed is reopened for that replan.
+    """
+    reconcile_document_steps(manifest, replan=True)
+    kinds = {step.kind for step in DOCUMENT_STEPS}
+    found = any(
+        item.kind in kinds and item.selected and item.status not in CLOSED_STATUSES and not item.attempts
+        for item in manifest.obligations
+    )
+    if found and manifest.status == "completed":
+        # The run's complete-job closed a job that still had work: it is
+        # reopened, and the replan's own complete-job closes it again.
+        manifest.status = "processing"
+    return found
 
 
 def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:

@@ -44,6 +44,7 @@ EXPECTED_RUN_PARAMETERS = {
     "picture-description": ("config", "ports"),
     "formula-recognizer": ("config", "ports"),
     "formula-region-classifier": ("config", "ports"),
+    "inline-math-marker": ("config", "ports"),
     "vision-page-inspection": ("config", "ports"),
 }
 

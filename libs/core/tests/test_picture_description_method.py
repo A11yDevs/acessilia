@@ -481,7 +481,6 @@ def _run(monkeypatch, manifest, tmp_path, *, register, recognize=False):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     if not recognize:
         monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)

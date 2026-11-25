@@ -2,6 +2,48 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.20 — the prose's inline math is a planned action (#640, M4b)
+
+Until 0.3.19 the orchestrator marked the prose's inline math before
+planning, and again in a pass after execution over the blocks the plan added
+(#599). Now a PDF with prose to mark gets one `mark-inline-math` obligation,
+satisfied by the `inline-math-marker` method, which finds each run of math
+from the text layer's fonts and writes it as `$…$`, with the run's text-span
+reader. Every enrichment step but the pictures' preparation now runs inside
+the plan.
+- **The pass after execution is gone.** A block the plan adds (a
+  `rescue-omitted` paragraph) gets the step through the reconciliation. A run
+  that completed and left work for the document steps replans for it, as a
+  discovery, its completed job reopened for that replan. This trigger serves
+  every document step, not only the inline math. A table adopted from the
+  secondary provider is flagged `inline_math_stale` where its cells change,
+  and the step marks it again.
+- **The formula conversions wait for it.** `verbalize-formula` and
+  `normalize-formula` read the variables the prose's marks give, so they
+  depend on `mark-inline-math` although they share no element: a
+  `DocumentStep` can declare `waiting_kinds`, a minimal declared dependency
+  (declaring predecessors in general is #865). When the step marks a block
+  after a conversion already ran (a replan), it drops that conversion, so
+  the canonical build redoes it with the final variables. Before any
+  conversion ran, nothing is dropped, so a conversion the extractor gave
+  stays.
+- It comes last in `DOCUMENT_STEPS`: it shares a paragraph with the
+  descriptions (a mostly visual document) and a stale table with the table
+  enrichment, and runs after both.
+- The step is non-critical: a block left without its marks keeps the
+  extractor's text, as with the detection off. It is `transitional` (the
+  detection runs in the core, `docstruct`), with `document.text.spans` as
+  an optional call (#848). With the detection off, or another medium, it
+  changes nothing; its message names the detection (`fonts`, `off`,
+  `unavailable`).
+- Before planning the run only prepares the pictures, with no progress
+  message of its own; each method announces its step inside the plan.
+- Tests: the obligation and its targets, the conversions waiting for it
+  (also under Fast Downward), the method and its message, the invalidation
+  only after a conversion, a stale table, a completed run with an added
+  block (replanned, job reopened) or with nothing new, the restored block
+  through `execute`, and the optional `document.text.spans`.
+
 ## 0.3.19 — the formula region classification is a planned action (#640, M4a)
 
 Until 0.3.18 the orchestrator checked the extractor's formula labels before

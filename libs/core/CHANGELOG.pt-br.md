@@ -2,6 +2,48 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.20 — a matemática inline da prosa é uma ação planejada (#640, M4b)
+
+Até a 0.3.19 o orquestrador marcava a matemática inline da prosa antes do
+planejamento, e de novo numa passada depois da execução sobre os blocos que
+o plano acrescentou (#599). Agora um PDF com prosa a marcar ganha uma
+obrigação `mark-inline-math`, satisfeita pelo método `inline-math-marker`,
+que acha cada trecho de matemática pelas fontes da camada de texto e o
+escreve como `$…$`, com o leitor de spans da execução. Todo passo de
+enriquecimento, menos a preparação das imagens, agora roda dentro do plano.
+- **A passada depois da execução acabou.** Um bloco que o plano acrescenta
+  (um parágrafo do `rescue-omitted`) ganha o passo pela reconciliação. Uma
+  execução que terminou e deixou trabalho para os passos do documento
+  replaneja para ele, como uma descoberta, com o job concluído reaberto para
+  esse replanejamento. Esse gatilho serve a todo passo do documento, não só
+  à matemática inline. Uma tabela adotada do provedor secundário é marcada
+  como `inline_math_stale` onde suas células mudam, e o passo a marca de
+  novo.
+- **As conversões de fórmula esperam por ela.** `verbalize-formula` e
+  `normalize-formula` leem as variáveis que as marcas da prosa dão, então
+  dependem de `mark-inline-math` embora não compartilhem elemento: um
+  `DocumentStep` pode declarar `waiting_kinds`, uma dependência declarada
+  mínima (declarar predecessores em geral é a #865). Quando o passo marca um
+  bloco depois que uma conversão já rodou (um replanejamento), ele descarta
+  essa conversão, para que o build canônico a refaça com as variáveis
+  finais. Antes de qualquer conversão rodar, nada é descartado, então uma
+  conversão que o extrator deu fica.
+- Ela vem por último em `DOCUMENT_STEPS`: compartilha um parágrafo com as
+  descrições (um documento majoritariamente visual) e uma tabela obsoleta
+  com o enriquecimento de tabelas, e roda depois dos dois.
+- O passo não é crítico: um bloco que ficou sem marcas mantém o texto do
+  extrator, como com a detecção desligada. Ele é `transitional` (a detecção
+  roda no core, `docstruct`), com `document.text.spans` como chamada
+  opcional (#848). Com a detecção desligada, ou outro formato, ele não muda
+  nada; sua mensagem nomeia a detecção (`fonts`, `off`, `unavailable`).
+- Antes do planejamento a execução só prepara as imagens, sem mensagem de
+  progresso própria; cada método anuncia seu passo dentro do plano.
+- Testes: a obrigação e seus alvos, as conversões esperando por ela (também
+  no Fast Downward), o método e sua mensagem, a invalidação só depois de uma
+  conversão, uma tabela obsoleta, uma execução concluída com um bloco
+  acrescentado (replanejada, job reaberto) ou sem nada novo, o bloco
+  restaurado pelo `execute` e o `document.text.spans` opcional.
+
 ## 0.3.19 — a classificação de regiões de fórmula é uma ação planejada (#640, M4a)
 
 Até a 0.3.18 o orquestrador conferia os rótulos de fórmula do extrator antes

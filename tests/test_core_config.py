@@ -416,7 +416,6 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    monkeypatch.setattr(pddl, "_mark_inline_math", no_enrichment)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", no_enrichment)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_enrichment)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
@@ -457,7 +456,6 @@ def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    monkeypatch.setattr(pddl, "_mark_inline_math", no_enrichment)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", no_enrichment)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_enrichment)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
@@ -524,7 +522,10 @@ async def test_a_replan_runs_on_the_executor_of_its_run(monkeypatch) -> None:
     orchestrator = build_orchestrator(max_replans=1)
     obligation = build_obligation("describe-image", ["p-1"], ["human-review"])
     obligation.selected = True  # open and selected: a new plan can still satisfy it
-    manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [obligation])
+    # Enough prose that the document is not mostly visual, so a completed run
+    # leaves no document step to plan (#640, M4b).
+    prose = "A paragraph with enough words to make the document read as text, not as a picture."
+    manifest = build_manifest([build_element("p-1", "paragraph", text=prose)], [obligation])
     run_executor = orchestrator._run_executor(core_config(), RunPorts.none())
     received = []
 

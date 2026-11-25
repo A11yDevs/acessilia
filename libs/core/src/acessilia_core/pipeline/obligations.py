@@ -86,6 +86,10 @@ NON_CRITICAL_OBLIGATION_KINDS = frozenset(
         # text and the result e-mail names its page. Unless no picture at all
         # was described: see _blocks_delivery.
         "describe-image",
+        # The prose's inline math (#640, M4b): a block left without its
+        # marks keeps its text as the extractor gave it, as when the
+        # detection is off, so it degrades the reading, not the content.
+        "mark-inline-math",
     }
 )
 

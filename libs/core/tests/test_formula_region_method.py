@@ -27,7 +27,7 @@ from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
 from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
-from acessilia_core.pipeline import orchestrator as pddl, preflight
+from acessilia_core.pipeline import preflight
 from acessilia_core.pipeline.document_obligations import (
     FORMULA_CLASSIFICATION,
     FORMULA_RECOGNITION,
@@ -234,7 +234,6 @@ def test_a_run_replans_the_picture_a_region_became(monkeypatch, tmp_path) -> Non
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
     orchestrator = build_orchestrator(max_replans=1)
     orchestrator.executor.registry.register(
@@ -348,7 +347,6 @@ def test_a_placeholder_the_descriptions_read_as_a_formula_is_not_classified_agai
         return MethodResult(success=True, validated=True)
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
     orchestrator = build_orchestrator(max_replans=1)
     orchestrator.executor.registry.register("mathml", mathml)
     manifest = build_manifest([build_element("x", element_type, text=text)], [])

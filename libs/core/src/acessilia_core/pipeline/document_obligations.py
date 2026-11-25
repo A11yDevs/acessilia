@@ -6,14 +6,18 @@ it works on, instead of one per element: a per-element method would wait the
 retry pass once per failing element, and the elements after the breaker
 opened would lose the recovery (``docs/architecture/workflow-actions.md``).
 
-Four steps are planned this way, in ``DOCUMENT_STEPS`` order:
+Five steps are planned this way, in ``DOCUMENT_STEPS`` order:
 - the formula region classification (``classify-formula-regions``, method
   ``formula-region-classifier``, M4a);
 - the picture descriptions (``describe-images``, method
   ``picture-description``, M1);
 - the formula LaTeX (``recognize-formulas``, method ``formula-recognizer``,
   M3);
-- the table enrichment (``enrich-tables``, method ``table-enrichment``, M2).
+- the table enrichment (``enrich-tables``, method ``table-enrichment``, M2);
+- the prose's inline math (``mark-inline-math``, method
+  ``inline-math-marker``, M4b), last: a table it marks again went stale
+  after its enrichment, and the formula conversions wait for it whatever
+  their targets (``waiting_kinds``).
 
 Each one is a :class:`DocumentStep`, and :func:`reconcile_document_step`
 creates its obligation when the manifest is enriched and reconciles it again
@@ -77,6 +81,7 @@ from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
     MSG_OBLIGATION_FORMULA_CLASSIFICATION,
     MSG_OBLIGATION_FORMULA_RECOGNITION,
+    MSG_OBLIGATION_INLINE_MATH,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
 )
@@ -90,6 +95,7 @@ from acessilia_core.pipeline.enrichment.formulas import (
     formulas_to_classify,
     formulas_to_recognize,
 )
+from acessilia_core.pipeline.enrichment.inline_math import inline_math_pending
 from acessilia_core.pipeline.enrichment.pictures import (
     description_candidates,
     is_describable,
@@ -117,6 +123,12 @@ class DocumentStep:
     #: The elements that need the step, in document order: the ones an
     #: uncovered element joins the step with.
     pending: Callable[[ProcessingManifest], list[str]]
+    #: Obligation kinds that wait for the step's open obligations whatever
+    #: their targets: the step's result is evidence they read across the
+    #: document, not on their own elements (M4b: the formula conversions read
+    #: the variables the prose's inline math marks). A minimal, declared
+    #: dependency; declaring predecessors between steps in general is #865.
+    waiting_kinds: frozenset[str] = frozenset()
 
 
 def _pictures_pending(manifest: ProcessingManifest) -> list[str]:
@@ -188,16 +200,36 @@ FORMULA_CLASSIFICATION = DocumentStep(
     pending=formulas_to_classify,
 )
 
-#: In the order the enrichment before planning ran them: the formula region
-#: classification, the descriptions (which can find formulas), the formula
-#: LaTeX, then the tables. Two steps share elements only when the first must
-#: run before the second (the classification, then the formula LaTeX); this
-#: order makes that dependency, and never the reverse.
+#: The document's prose inline math (M4b): in a PDF, the prose elements no
+#: detection has marked yet and the tables whose marks went stale. A block
+#: the plan adds gets it on the replan, which replaced the pass after
+#: execution of #599. The formula conversions wait for it whatever their
+#: targets (``waiting_kinds``): they mark implicit products with the
+#: variables the prose's inline math gives, as before planning until 0.3.19.
+INLINE_MATH = DocumentStep(
+    kind="mark-inline-math",
+    method="inline-math-marker",
+    obligation_id="obligation-mark-inline-math",
+    rationale=MSG_OBLIGATION_INLINE_MATH,
+    applies=lambda element: element.type in {"paragraph", "list_item", "caption", "footnote", "table"},
+    pending=inline_math_pending,
+    waiting_kinds=frozenset({"verbalize-formula", "normalize-formula"}),
+)
+
+#: The formula region classification, the descriptions (which can find
+#: formulas), the formula LaTeX, the tables, then the prose's inline math.
+#: Two steps share elements only when the first must run before the second:
+#: the classification, then the formula LaTeX, on a formula; the
+#: descriptions, then the inline math, on a paragraph of a mostly visual
+#: document; the table enrichment, then the inline math, on a table whose
+#: marks went stale. This order makes those dependencies, and never the
+#: reverse.
 DOCUMENT_STEPS: tuple[DocumentStep, ...] = (
     FORMULA_CLASSIFICATION,
     PICTURE_DESCRIPTION,
     FORMULA_RECOGNITION,
     TABLE_ENRICHMENT,
+    INLINE_MATH,
 )
 
 
@@ -328,13 +360,14 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
         if item.kind in skipped or item.status in CLOSED_STATUSES:
             continue
         targets = set(item.target_ids)
+        waits = item.kind in step.waiting_kinds
         kept = [
             dependency for dependency in item.dependencies
-            if dependency not in own or own[dependency] & targets
+            if dependency not in own or waits or own[dependency] & targets
         ]
         needed = [
             obligation for obligation, elements in open_own.items()
-            if elements & targets and obligation not in kept
+            if (waits or elements & targets) and obligation not in kept
         ]
         item.dependencies = kept + needed
 
@@ -344,6 +377,7 @@ __all__ = [
     "DOCUMENT_STEPS",
     "FORMULA_CLASSIFICATION",
     "FORMULA_RECOGNITION",
+    "INLINE_MATH",
     "PICTURE_DESCRIPTION",
     "TABLE_ENRICHMENT",
     "DocumentStep",

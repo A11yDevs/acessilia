@@ -50,9 +50,6 @@ def _counting_orchestrator(monkeypatch, counts):
         counts["extraction"] += 1
         return build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
 
-    async def enrich(*_args, **_kwargs):
-        counts["enrichment"] += 1
-
     async def noop(*_args, **_kwargs):
         return None
 
@@ -74,8 +71,12 @@ def _counting_orchestrator(monkeypatch, counts):
         raise Stop
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    # The one enrichment step left before planning (#640, M1–M4a).
-    monkeypatch.setattr(pddl, "_mark_inline_math", enrich)
+    # The one enrichment step left before planning (#640, M1–M4b): the
+    # pictures' preparation, which is synchronous.
+    def prepare(*_args, **_kwargs):
+        counts["enrichment"] += 1
+
+    monkeypatch.setattr(pddl, "_prepare_pictures", prepare)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", noop)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", noop)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)

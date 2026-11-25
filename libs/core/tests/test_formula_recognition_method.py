@@ -156,13 +156,26 @@ def test_two_document_steps_share_an_element_only_in_their_order(element_type) -
     share an element only when the first must run before the second, and
     ``DOCUMENT_STEPS`` lists them so. Today only a formula is shared: the
     region classification, then the formula LaTeX."""
-    from acessilia_core.pipeline.document_obligations import FORMULA_CLASSIFICATION
+    from acessilia_core.pipeline.document_obligations import (
+        FORMULA_CLASSIFICATION,
+        INLINE_MATH,
+        PICTURE_DESCRIPTION,
+        TABLE_ENRICHMENT,
+    )
 
     element = build_element("x", element_type, text="")
     taking = [step for step in DOCUMENT_STEPS if step.applies(element)]
 
-    if element_type == "formula":
-        assert taking == [FORMULA_CLASSIFICATION, FORMULA_RECOGNITION]
+    # M4b: the inline math takes the prose (a paragraph the descriptions
+    # may take first, in a mostly visual document) and a table whose marks
+    # went stale after its enrichment.
+    expected = {
+        "formula": [FORMULA_CLASSIFICATION, FORMULA_RECOGNITION],
+        "paragraph": [PICTURE_DESCRIPTION, INLINE_MATH],
+        "table": [TABLE_ENRICHMENT, INLINE_MATH],
+    }
+    if element_type in expected:
+        assert taking == expected[element_type]
     else:
         assert len(taking) <= 1
 

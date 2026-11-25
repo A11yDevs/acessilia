@@ -21,13 +21,11 @@ from pddl_support import (
 )
 
 from acessilia_core.agents.model_calls import current_model_calls
-from acessilia_core.pipeline import (
-    orchestrator as pddl,
-    preflight as pipeline_preflight,
-)
+from acessilia_core.pipeline import preflight as pipeline_preflight
 from acessilia_core.pipeline.handlers import (
     formula_recognition as formula_method,
     formula_regions as regions_method,
+    inline_math as inline_method,
     pictures as picture_method,
     tables as table_method,
 )
@@ -46,7 +44,12 @@ def _recorders(monkeypatch):
         calls.append(("inspect", path.name, (), {}))
         return None
 
-    monkeypatch.setattr(pddl, "_mark_inline_math", record("_mark_inline_math"))
+    # The prose's inline math runs inside the plan (#640, M4b).
+    async def mark_inline_math(manifest, source, *args, **kwargs):
+        calls.append(("_enrich_inline_math", source.name, tuple(args), dict(kwargs)))
+        return {"elements": 0, "marked": 0, "unmatched": 0}
+
+    monkeypatch.setattr(inline_method, "_enrich_inline_math", mark_inline_math)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", record("_classify_formula_regions"))
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", record("_enrich_formula_latex"))
     # The pictures are described inside the plan, as ``picture-description``
@@ -59,12 +62,6 @@ def _recorders(monkeypatch):
                 element.metadata["vision_description_complete"] = True
 
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", describe)
-    # The post-execution inline math pass (#599) takes the executed and the
-    # planning manifests before the source.
-    async def after_execution(manifest, planning_manifest, source, *args, **kwargs):
-        calls.append(("_mark_inline_math_after_execution", source.name, tuple(args), dict(kwargs)))
-
-    monkeypatch.setattr(pddl, "_mark_inline_math_after_execution", after_execution)
     # The table steps run inside the plan, as the ``table-enrichment`` method (#640, M2).
     monkeypatch.setattr(table_method, "_enrich_table_structures", record("_enrich_table_structures"))
 
@@ -112,7 +109,7 @@ async def test_the_steps_run_in_order_and_share_the_breaker_and_the_span_reader(
     # Without tables, pictures or formulas there is no document step inside
     # the plan (#640, M1–M4); the inline math pass runs once more after
     # execution (#599).
-    assert names == ["inspect", "_mark_inline_math", "_mark_inline_math_after_execution"]
+    assert names == ["inspect"]
     assert all(call[1] == "doc.pdf" for call in calls)
     assert manifest.extractor.configuration["region_inspection_mode"] == "avancado"
 
@@ -129,13 +126,10 @@ async def test_the_tables_are_enriched_inside_the_plan_with_the_run_breaker_and_
     _, calls, _, manifest = await _run(monkeypatch, tmp_path, config=config, elements=[table])
 
     names = [call[0] for call in calls]
-    assert names == ["inspect", "_mark_inline_math",
-                     "_enrich_table_structures", "_mark_table_inline_math",
-                     "_mark_inline_math_after_execution"]
+    assert names == ["inspect", "_enrich_table_structures", "_mark_table_inline_math"]
     by_name = {call[0]: call for call in calls}
     assert by_name["_enrich_table_structures"][3]["breaker"].threshold == 7
     assert by_name["_enrich_table_structures"][3]["vision"] is config.vision
-    assert by_name["_mark_table_inline_math"][2][1] is by_name["_mark_inline_math"][2][1]
     # The method reads the source the manifest records (the extracted file).
     assert by_name["_enrich_table_structures"][1] == Path(manifest.source.path).name
 
@@ -158,7 +152,7 @@ async def test_the_pictures_are_described_inside_the_plan_with_the_run_breaker_a
     )
 
     names = [call[0] for call in calls]
-    assert names[:3] == ["inspect", "_mark_inline_math", "_enrich_picture_descriptions"]
+    assert names[:2] == ["inspect", "_enrich_picture_descriptions"]
     by_name = {call[0]: call for call in calls}
     describe = by_name["_enrich_picture_descriptions"][3]
     assert describe["breaker"].threshold == 7
@@ -189,7 +183,7 @@ async def test_the_formulas_are_recognized_inside_the_plan_with_the_run_breaker_
     )
 
     names = [call[0] for call in calls]
-    assert names[:4] == ["inspect", "_mark_inline_math", "_classify_formula_regions",
+    assert names[:3] == ["inspect", "_classify_formula_regions",
                          "_enrich_formula_latex"]
     by_name = {call[0]: call for call in calls}
     classify = by_name["_classify_formula_regions"][3]
@@ -204,6 +198,32 @@ async def test_the_formulas_are_recognized_inside_the_plan_with_the_run_breaker_
     enrichment = next(item for item in manifest.obligations if item.kind == "recognize-formulas")
     assert enrichment.target_ids == ["f"]
     assert enrichment.id in verbalize.dependencies
+
+
+@pytest.mark.asyncio
+async def test_the_inline_math_is_marked_inside_the_plan_before_the_formula_conversions(
+    monkeypatch, tmp_path
+) -> None:
+    """#640, M4b: a PDF paragraph with boxes gets a ``mark-inline-math``
+    obligation; its ``inline-math-marker`` method marks it inside the plan,
+    and a formula's ``verbalize-formula`` waits for it although they share no
+    element (the conversion reads the prose's variables)."""
+    from acessilia_core.manifest.models import BoundingBox, Provenance
+
+    paragraph = build_element("p", "paragraph", text="s ( t ) = t 3")
+    paragraph.provenance = [Provenance(page_number=1, bbox=BoundingBox(
+        left=50, top=100, right=500, bottom=120, coord_origin="TOPLEFT",
+    ))]
+    formula = build_element("f", "formula", text=r"\frac{a}{b}")
+    verbalize = build_obligation("verbalize-formula", ["f"], ["human-review"])
+    _, calls, _, manifest = await _run(
+        monkeypatch, tmp_path, elements=[paragraph, formula], obligations=[verbalize],
+    )
+
+    mark = next(call for call in calls if call[0] == "_enrich_inline_math")
+    assert mark[3]["targets"] == frozenset({"p"})
+    marking = next(item for item in manifest.obligations if item.kind == "mark-inline-math")
+    assert marking.id in verbalize.dependencies
 
 
 @pytest.mark.asyncio
@@ -228,7 +248,7 @@ async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_p
     from core_config_support import toolbox_config
 
     config = replace(core_config(), toolbox=toolbox_config(use_remote_cache=False, media_inspect_enabled=False))
-    calls = _recorders(monkeypatch)
+    _recorders(monkeypatch)
     inspected = []
 
     async def inspect(path, *, toolbox):
@@ -250,11 +270,9 @@ async def test_the_toolbox_options_of_the_run_reach_each_step(monkeypatch, tmp_p
 
     await orchestrator.execute(tmp_path / "doc.pdf", tmp_path, config=run_config, model_calls=current_model_calls(), ports=RunPorts.none())
 
-    by_name = {call[0]: call for call in calls}
     assert inspected == [config.toolbox]
     assert processed == [config.toolbox, config.paths]
     assert processed[1] is config.paths
-    assert by_name["_mark_inline_math"][2][1]._toolbox is config.toolbox
     assert manifest.extractor.configuration["media_inspection"] == "disabled"
 
 
@@ -279,7 +297,6 @@ async def test_two_runs_at_once_each_get_their_own_vision_config(monkeypatch, tm
 
     monkeypatch.setattr(regions_method, "_classify_formula_regions", step)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", step)
-    monkeypatch.setattr(pddl, "_mark_inline_math", no_step)
     monkeypatch.setattr(pipeline_preflight, "inspect_source_media", inspect)
 
     async def run(threshold):
@@ -305,17 +322,13 @@ async def test_the_progress_messages_come_in_order(monkeypatch, tmp_path) -> Non
     from acessilia_core.i18n.stage_messages import (
         STAGE_ANALYZING_STRUCTURAL,
         STAGE_GENERATING_PDDL_PLAN,
-        STAGE_MARKING_INLINE_MATH,
     )
 
-    # The pictures (#640, M1), the formulas (M3, M4) and the tables (M2) are
-    # enriched inside the plan: the executor announces those steps like any
-    # other, after the plan is generated. The prose's inline math is still
-    # marked before it.
-    expected = [t(STAGE_ANALYZING_STRUCTURAL), t(STAGE_MARKING_INLINE_MATH),
-                t(STAGE_GENERATING_PDDL_PLAN)]
-    assert statuses[:3] == expected
-    assert len(statuses) >= 4  # then the execution stage and its progress
+    # Every enrichment step runs inside the plan (#640, M1–M4b): the executor
+    # announces each like any other, after the plan is generated.
+    expected = [t(STAGE_ANALYZING_STRUCTURAL), t(STAGE_GENERATING_PDDL_PLAN)]
+    assert statuses[:2] == expected
+    assert len(statuses) >= 3  # then the execution stage and its progress
 
 
 @pytest.mark.asyncio

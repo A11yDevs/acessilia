@@ -228,7 +228,7 @@ def test_restores_the_primary_block_a_routed_page_lost(tmp_path):
     assert manifest.summary.element_count == 5
 
 
-def test_the_restored_block_is_marked_by_the_post_execution_pass(tmp_path, monkeypatch):
+def test_the_restored_block_is_marked_by_the_inline_math_step(tmp_path, monkeypatch):
     """#599: the real rescue handler restores a block the second pass marks."""
     text = "The relation h = 0 holds."
     elements = [
@@ -242,7 +242,6 @@ def test_the_restored_block_is_marked_by_the_post_execution_pass(tmp_path, monke
         _row("d-3", "paragraph", text, LOWER, 3),
     ]}
     manifest = _manifest(tmp_path, elements, replaced=replaced)
-    planning = manifest.model_copy(deep=True)
     _rescue(manifest)
 
     def span(value, font, x, baseline=450.0, size=11.96):
@@ -267,9 +266,10 @@ def test_the_restored_block_is_marked_by_the_post_execution_pass(tmp_path, monke
 
     monkeypatch.setattr("acessilia_core.toolbox.text_spans.fetch_text_spans", fetch)
 
-    asyncio.run(inline_math_stage._mark_inline_math_after_execution(
-        manifest, planning, tmp_path / "doc.pdf", document_config(),
-        RunPorts.none(), toolbox_config(),
+    # The inline math step of the replan (#640, M4b) marks the restored block.
+    asyncio.run(inline_math_stage._enrich_inline_math(
+        manifest, tmp_path / "doc.pdf", document_config(),
+        inline_math_stage.run_text_spans(RunPorts.none(), manifest, tmp_path / "doc.pdf", toolbox_config()),
     ))
 
     rescued = next(e for e in manifest.elements if e.text and "relation" in e.text)

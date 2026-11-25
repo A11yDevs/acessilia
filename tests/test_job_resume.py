@@ -212,16 +212,16 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         return manifest
 
     async def enrich(*_args, **_kwargs):
+        return None
+
+    def prepare(*_args, **_kwargs):
+        # The one step left before planning (#640, M1–M4b).
         counts["enrich"] += 1
         if crash["armed"]:
             raise RuntimeError("the process died during enrichment")
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_mark_inline_math",
-        "_mark_inline_math_after_execution",
-    ):
-        monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(pddl, "_prepare_pictures", prepare)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
@@ -245,11 +245,10 @@ async def test_the_pipeline_skips_phases_recorded_before_the_restart(
         config=core_config(), model_calls=current_model_calls(), ports=service_run_ports("resume-task")
     )
 
-    # The tables (#640, M2), the pictures (M1) and the formulas (M3, M4a)
-    # are enriched inside the plan: the crashed run stopped at the inline
-    # math, the one step left before the plan; the resume ran it, then the
-    # inline math pass over the executed manifest (#599).
-    assert counts == {"inspect": 1, "extract": 1, "enrich": 3}
+    # Every enrichment step but the pictures' preparation runs inside the
+    # plan (#640, M1–M4b), and the pass after execution of #599 is gone: the
+    # crashed run stopped at the preparation, and the resume ran it again.
+    assert counts == {"inspect": 1, "extract": 1, "enrich": 2}
     assert result["text"]
     assert job_checkpoint.load("resume-task", PHASE_PLAN) is not None
 
@@ -267,11 +266,6 @@ async def test_outside_a_job_the_pipeline_writes_no_checkpoint(monkeypatch, tmp_
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_mark_inline_math",
-        "_mark_inline_math_after_execution",
-    ):
-        monkeypatch.setattr(pddl, name, enrich)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
@@ -554,11 +548,6 @@ async def test_an_interrupted_plan_continues_from_the_next_step(
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in (
-        "_mark_inline_math",
-        "_mark_inline_math_after_execution",
-    ):
-        monkeypatch.setattr(pddl, name, enrich)
     monkeypatch.setattr(regions_method, "_classify_formula_regions", enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)

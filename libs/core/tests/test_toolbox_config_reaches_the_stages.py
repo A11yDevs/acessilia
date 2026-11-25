@@ -183,7 +183,7 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
 ) -> None:
     from pddl_support import build_orchestrator
 
-    from acessilia_core.pipeline import orchestrator as pddl, preflight
+    from acessilia_core.pipeline import preflight
 
     seen: dict[str, object] = {}
 
@@ -198,7 +198,6 @@ async def test_the_orchestrator_gives_every_toolbox_stage_the_run_config(
     async def no_marks(*_args, **_kwargs):
         return {"elements": 0, "marked": 0, "unmatched": 0}
 
-    monkeypatch.setattr(pddl, "_mark_inline_math", record("_mark_inline_math"))
     monkeypatch.setattr(regions_method, "_classify_formula_regions", record("_classify_formula_regions"))
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", record("_enrich_formula_latex"))
     # The picture and table steps run inside the plan, as
