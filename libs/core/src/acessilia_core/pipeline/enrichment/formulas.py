@@ -285,11 +285,22 @@ def formulas_needing_classification(manifest: ProcessingManifest) -> list[Manife
     """The formulas the region classification asks the vision model about.
 
     In a source that can be rendered, the extractor's formulas without LaTeX
-    markup that no classification has recorded yet. A formula the vision
-    model already read as one (a picture it described as a formula, so its
-    ``original_type`` is ``picture``) is not asked again: the descriptions
-    ran after the classification until 0.3.13, so it never was. The
-    obligation's selection and the step's execution share it.
+    markup that no classification has decided yet. The obligation's
+    selection and the step's execution share it.
+
+    - **Read by the vision model already.** An element the descriptions
+      turned into a formula (a picture, or a placeholder visual of a mostly
+      visual document) carries ``vision_description_complete`` and its
+      ``original_type``. It is not asked again: the descriptions ran after
+      the classification until 0.3.13, so it never was, and a second answer
+      could read it as a drawing and drop the formula the descriptions
+      gave (#862 review).
+    - **Decided or tried.** ``math`` and ``unresolved`` are decisions, and a
+      drawing is a picture now. A classification that got no answer
+      (``unclassified``: no crop, an open breaker, a model failure, an empty
+      answer) is tried again when the step runs again, as the other
+      composite steps retry an object that failed; within one run the
+      obligation that tried it is closed, so it is not asked twice.
     """
     if manifest.source.media_type not in RENDER_MEDIA_TYPES:
         return []
@@ -298,9 +309,14 @@ def formulas_needing_classification(manifest: ProcessingManifest) -> list[Manife
         if element.type == "formula"
         and not has_latex_markup(element.text)
         and not element.metadata.get("latex_markup")
-        and "formula_classification" not in element.metadata
-        and element.metadata.get("original_type") != "picture"
+        and (element.metadata.get("formula_classification") or {}).get("status") not in _DECIDED
+        and not element.metadata.get("vision_description_complete")
+        and not element.metadata.get("original_type")
     ]
+
+
+#: The classification statuses that decide a region; ``unclassified`` does not.
+_DECIDED = frozenset({"math", "unresolved"})
 
 
 def formulas_to_classify(manifest: ProcessingManifest) -> list[str]:

@@ -317,10 +317,15 @@ the manifest. **The enrichment migration needs no domain change.**
    after it (the classification decides whether a region is mathematics), so
    `recognize-formulas` depends on `classify-formula-regions` for the
    formulas they share: `DOCUMENT_STEPS` lists the classification first, and
-   the edge rule follows it. A formula the vision model already read as one
-   (a picture it described as a formula) is not classified: the
+   the edge rule follows it. An element the descriptions turned into a
+   formula (a picture or a placeholder visual) is not classified: the
    descriptions ran after the classification before planning, so it never
-   was. Prose inline math, still before planning until M4b, reads other
+   was, and a second answer could drop the formula they gave. A
+   classification that got no answer (`unclassified`) is tried again when
+   the step runs again, like the other composite steps; `math` and
+   `unresolved` are decisions. A shared formula makes the whole recognition
+   batch wait for the classification batch: the cost of document-level
+   granularity, accepted for 0.3.0 (sub-batches are #619 research). Prose inline math, still before planning until M4b, reads other
    elements. They
    share the vision breaker, so under a partial provider outage the order
    changes which step degrades; that is documented, not forced (#853).
@@ -418,7 +423,7 @@ all of them:
 | Step | Kind and method | Targets | Dropped from its targets | Depends on it |
 |---|---|---|---|---|
 | Table enrichment (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | every table | an element no longer a table | `linearize-table`, `select-table-source`, and the page obligations of a page with a table |
-| Formula region classification (M4a, 0.3.18) | `classify-formula-regions`, `formula-region-classifier` | in a source that can be rendered, the formulas without LaTeX markup that no classification has recorded, except one the vision model read as a formula | an element no longer a formula (a drawing it described is a picture) | `recognize-formulas` (they share the formula), `verbalize-formula`, `normalize-formula`, and the page obligations of a page with a formula |
+| Formula region classification (M4a, 0.3.18) | `classify-formula-regions`, `formula-region-classifier` | in a source that can be rendered, the formulas without LaTeX markup that no classification has decided, except one the descriptions turned into a formula | an element no longer a formula (a drawing it described is a picture) | `recognize-formulas` (they share the formula), `verbalize-formula`, `normalize-formula`, and the page obligations of a page with a formula |
 | Formula LaTeX (M3, 0.3.15) | `recognize-formulas`, `formula-recognizer` | the formulas with an equation label to separate and, in a source that can be rendered, the ones without LaTeX that no recognition has recorded | an element no longer a formula (the recognition read it as a picture) | `verbalize-formula`, `normalize-formula`, and the page obligations of a page with a formula |
 | Picture descriptions (M1, 0.3.14) | `describe-images`, `picture-description` | the pictures not described yet; without pictures, in a mostly visual document, its placeholder visuals, or the first element of a one-page one; never a formula or a table | an element that became a formula or a table | `describe-image`, and the page obligations of a page with a picture |
 

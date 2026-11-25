@@ -285,6 +285,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_CANCELLATION_WAITING,
     STAGE_CANCELLED_BY_USER,
     STAGE_CANCELLED_IN_QUEUE,
+    STAGE_CLASSIFYING_FORMULA_REGIONS,
     STAGE_DESCRIBING_IMAGE,
     STAGE_DOCUMENT_TOO_MANY_PAGES,
     STAGE_ENQUEUED_WAITING,
@@ -602,6 +603,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_DOCUMENT_TOO_MANY_PAGES,
     STAGE_ENRICHING_FORMULAS,
+    STAGE_CLASSIFYING_FORMULA_REGIONS,
     STAGE_MARKING_INLINE_MATH,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
@@ -1138,11 +1140,11 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
     ),
     handler_messages.MSG_FORMULA_REGIONS_CLASSIFIED: (
         "Classificação de regiões de fórmula rodou para {count} fórmula: {math} matemáticas, "
-        "{pictures} desenhos descritos como imagens, {unresolved} enviadas para revisão humana; "
-        "ficaram sem classificação: {left}",
+        "{pictures} desenhos descritos como imagens, {unresolved} enviadas para revisão humana, "
+        "{already} decididas antes desta tentativa; ficaram sem classificação: {left}",
         "Classificação de regiões de fórmula rodou para {count} fórmulas: {math} matemáticas, "
-        "{pictures} desenhos descritos como imagens, {unresolved} enviadas para revisão humana; "
-        "ficaram sem classificação: {left}",
+        "{pictures} desenhos descritos como imagens, {unresolved} enviadas para revisão humana, "
+        "{already} decididas antes desta tentativa; ficaram sem classificação: {left}",
     ),
     handler_messages.MSG_FORMULAS_RECOGNIZED: (
         "Reconhecimento de fórmulas rodou para {count} fórmula: {recognized} reconhecidas "
@@ -1311,6 +1313,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "O documento tem {page_count} páginas, mais que o limite de {max_pages}."
         ),
         STAGE_ENRICHING_FORMULAS: "Enriquecendo as fórmulas...",
+        STAGE_CLASSIFYING_FORMULA_REGIONS: "Conferindo quais regiões de fórmula contêm matemática...",
         STAGE_MARKING_INLINE_MATH: "Marcando a matemática no texto...",
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS: ("Enriquecendo as descrições de imagens..."),
         STAGE_ENRICHING_TABLES_OCR: ("Enriquecendo as tabelas com OCR (fallback)..."),

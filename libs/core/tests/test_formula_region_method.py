@@ -179,7 +179,7 @@ def test_the_method_classifies_each_region_and_reports_it(monkeypatch) -> None:
     assert sorted(calls) == ["f-math", "f-none", "f-unsure"]
     assert _step(report, "obligation-classify-formula-regions").message == n(
         *MSG_FORMULA_REGIONS_CLASSIFIED, 3
-    ).format(count=3, math=1, pictures=0, unresolved=1, left="model_failed: 1")
+    ).format(count=3, math=1, pictures=0, unresolved=1, already=0, left="model_failed: 1")
     assert _by_id(updated, "f-math").metadata["formula_classification"]["status"] == "math"
 
 
@@ -204,7 +204,7 @@ def test_a_drawing_is_described_as_a_picture_and_its_obligations_replaced(monkey
 
     assert _step(report, "obligation-classify-formula-regions").message == n(
         *MSG_FORMULA_REGIONS_CLASSIFIED, 1
-    ).format(count=1, math=0, pictures=1, unresolved=0, left="-")
+    ).format(count=1, math=0, pictures=1, unresolved=0, already=0, left="-")
     assert _step(report, "verbalize-f-1").status == "skipped"
     assert report.status == "replan-required"
     picture = _by_id(updated, "f-1")
@@ -287,3 +287,147 @@ def test_a_formula_the_vision_model_read_is_not_classified_again(step) -> None:
     obligation = reconcile_document_step(manifest, step)
 
     assert (obligation is None) == (step is FORMULA_CLASSIFICATION)
+
+
+# The review of #862.
+
+
+@pytest.mark.parametrize(
+    ("element_type", "text"),
+    [("paragraph", ""), ("unknown", ""), ("group", ""), ("heading", "Titulo")],
+    ids=["paragraph-placeholder", "unknown-placeholder", "group-placeholder", "one-page-fallback"],
+)
+def test_a_placeholder_the_descriptions_read_as_a_formula_is_not_classified_again(
+    monkeypatch, tmp_path, element_type, text
+) -> None:
+    """Item 1 (blocking): a placeholder visual of a mostly visual document,
+    or the first element of a one-page one, that the descriptions (M1) read
+    as a formula is not classified on the replan. Asked again, the model
+    could read it as a drawing and drop the formula; here it would, so the
+    test sees that call never happens, the formula is read and verbalized,
+    and the delivered text keeps it."""
+    from pddl_support import install_formula_recognizer
+
+    from acessilia_core.pipeline.enrichment import pictures as picture_stage
+
+    described: list[str] = []
+    classified: list[str] = []
+    verbalized: list[str] = []
+
+    class PictureVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            described.append(image_bytes.decode())
+            return VisionOutput(kind="formula", description="", formula_latex="E = mc2", language="und", confidence=0.9)
+
+    class RegionVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            classified.append(image_bytes.decode())
+            return _drawing()  # the contradiction a second answer could bring
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", PictureVision)
+    monkeypatch.setattr(
+        picture_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (element.id.encode(), fallback or 1),
+    )
+    monkeypatch.setattr(formula_stage, "VisionAgent", RegionVision)
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda _s, element, **_k: (element.id.encode(), 1))
+    install_formula_recognizer(monkeypatch, lambda _image, **_kwargs: [{"latex": "E = mc2"}])
+
+    async def nothing(*_args, **_kwargs):
+        return None
+
+    def mathml(manifest, obligation_id):
+        element = next(item for item in manifest.elements if item.id == "x")
+        verbalized.append(f"{element.type}:{element.text}")
+        return MethodResult(success=True, validated=True)
+
+    monkeypatch.setattr(preflight, "inspect_source_media", nothing)
+    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
+    orchestrator = build_orchestrator(max_replans=1)
+    orchestrator.executor.registry.register("mathml", mathml)
+    manifest = build_manifest([build_element("x", element_type, text=text)], [])
+    orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
+
+    payload = asyncio.run(orchestrator.execute(
+        tmp_path / "doc.pdf", tmp_path, structured_output=True,
+        config=CONFIG, model_calls=current_model_calls(), ports=RunPorts.none(),
+    ))
+
+    assert described == ["x"]
+    assert classified == []
+    assert verbalized == ["formula:E = mc2"]
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert "E = mc2" in payload["text"] and "A ring of atoms." not in payload["text"]
+
+
+def test_a_classification_that_got_no_answer_is_tried_again() -> None:
+    """Item 2: ``unclassified`` is an attempt, not a decision, so a step that
+    runs again retries it, as the other composite steps retry a failed
+    object; ``math`` and ``unresolved`` are decisions."""
+    manifest = _manifest(("f-failed", "a b"), ("f-math", "c d"), ("f-unsure", "e f"))
+    _by_id(manifest, "f-failed").metadata["formula_classification"] = {"status": "unclassified", "reason": "model_failed"}
+    _by_id(manifest, "f-math").metadata["formula_classification"] = {"status": "math"}
+    _by_id(manifest, "f-unsure").metadata["formula_classification"] = {"status": "unresolved"}
+
+    assert formula_stage.formulas_to_classify(manifest) == ["f-failed"]
+
+
+def test_a_region_without_a_crop_stays_unclassified_and_takes_the_formula_path(monkeypatch) -> None:
+    """Item 2.3: without ``pdf.render`` (no crop) the classification records
+    ``crop_unavailable``: no evidence against mathematics, so the formula's
+    recognition still runs."""
+    _answers(monkeypatch, {})
+    monkeypatch.setattr(formula_stage, "_formula_recognition_crop", lambda *_a, **_k: (None, 1))
+
+    updated, report = _in_executor(_manifest(("f-1", "x plus y")))
+
+    assert _by_id(updated, "f-1").metadata["formula_classification"] == {
+        "status": "unclassified", "reason": "crop_unavailable", "confidence": None, "warnings": [],
+    }
+    assert _step(report, "obligation-classify-formula-regions").message == n(
+        *MSG_FORMULA_REGIONS_CLASSIFIED, 1
+    ).format(count=1, math=0, pictures=0, unresolved=0, already=0, left="crop_unavailable: 1")
+    assert _step(report, "obligation-recognize-formulas").status == "succeeded"
+
+
+def test_the_classification_announces_itself_apart_from_the_recognition(monkeypatch) -> None:
+    """Item 4: the two steps send their own progress message."""
+    from acessilia_core.i18n.stage_messages import (
+        STAGE_CLASSIFYING_FORMULA_REGIONS,
+        STAGE_ENRICHING_FORMULAS,
+    )
+
+    _answers(monkeypatch, {"f-1": _math()})
+    ports = RunPorts.none()
+    messages: list[str] = []
+    ports.services.progress = messages.append
+    reconcile_document_steps(manifest := _manifest(("f-1", "x plus y")))
+    handler = build_method_registry().get("formula-region-classifier")
+
+    handler(manifest, "obligation-classify-formula-regions", config=CONFIG, ports=ports)
+
+    assert messages == [t(STAGE_CLASSIFYING_FORMULA_REGIONS)]
+    assert t(STAGE_CLASSIFYING_FORMULA_REGIONS) != t(STAGE_ENRICHING_FORMULAS)
+
+
+def test_a_resumed_attempt_counts_the_regions_decided_before_it(monkeypatch) -> None:
+    """Item 4: the message counts this attempt's work; regions a crash left
+    decided are counted apart."""
+    calls = _answers(monkeypatch, {"f-2": _math()})
+    manifest = _manifest(("f-1", "x plus y"), ("f-2", "a b"))
+    enrichment = reconcile_document_step(manifest, FORMULA_CLASSIFICATION)
+    _by_id(manifest, "f-1").metadata["formula_classification"] = {"status": "math"}
+    handler = build_method_registry().get("formula-region-classifier")
+
+    result = handler(manifest, enrichment.id, config=CONFIG, ports=RunPorts.none())
+
+    assert calls == ["f-2"]
+    assert result.message == n(*MSG_FORMULA_REGIONS_CLASSIFIED, 2).format(
+        count=2, math=1, pictures=0, unresolved=0, already=1, left="-"
+    )

@@ -6,14 +6,14 @@ it works on, instead of one per element: a per-element method would wait the
 retry pass once per failing element, and the elements after the breaker
 opened would lose the recovery (``docs/architecture/workflow-actions.md``).
 
-Four steps are planned this way:
+Four steps are planned this way, in ``DOCUMENT_STEPS`` order:
 - the formula region classification (``classify-formula-regions``, method
-  ``formula-region-classifier``, M4);
-- the table enrichment (``enrich-tables``, method ``table-enrichment``, M2);
+  ``formula-region-classifier``, M4a);
 - the picture descriptions (``describe-images``, method
   ``picture-description``, M1);
 - the formula LaTeX (``recognize-formulas``, method ``formula-recognizer``,
-  M3).
+  M3);
+- the table enrichment (``enrich-tables``, method ``table-enrichment``, M2).
 
 Each one is a :class:`DocumentStep`, and :func:`reconcile_document_step`
 creates its obligation when the manifest is enriched and reconciles it again
@@ -173,9 +173,9 @@ FORMULA_RECOGNITION = DocumentStep(
     pending=formulas_to_recognize,
 )
 
-#: The document's formula region classification (M4): the formulas without
-#: LaTeX in a source that can be rendered, not classified yet, and not read
-#: as a formula by the vision model already. It shares the formulas with the
+#: The document's formula region classification (M4a): the formulas without
+#: LaTeX in a source that can be rendered, not decided yet, and not turned
+#: into a formula by the descriptions (``formulas_needing_classification``). It shares the formulas with the
 #: formula LaTeX, which comes after it in ``DOCUMENT_STEPS``, so their
 #: recognition waits for it, as before planning until 0.3.17. A drawing it
 #: describes becomes a picture, which it no longer applies to.

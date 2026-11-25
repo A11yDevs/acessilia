@@ -13,11 +13,15 @@ matemática, um desenho ou algo que ele não consegue dizer, com seu
 paralelismo, o breaker e o cache de regiões da execução.
 - **Do documento,** como M1–M3, não uma por região como proposto antes.
   Ela tem como alvo, numa fonte que pode ser renderizada, as fórmulas sem
-  marcação LaTeX que nenhuma classificação registrou. A seleção e a execução
-  compartilham `formulas_needing_classification`. Uma fórmula que o modelo
-  de visão já leu como fórmula (uma imagem que ele descreveu como fórmula)
-  não é classificada: as descrições rodavam depois dela antes do
-  planejamento, então ela nunca era.
+  marcação LaTeX que nenhuma classificação decidiu. A seleção e a execução
+  compartilham `formulas_needing_classification`. Um elemento que as
+  descrições transformaram em fórmula (uma imagem, ou um visual substituto
+  de um documento majoritariamente visual) não é classificado: as
+  descrições rodavam depois dela antes do planejamento, então ele nunca
+  era, e uma segunda resposta poderia lê-lo como desenho e descartar a
+  fórmula que elas deram. Uma classificação que não teve resposta
+  (`unclassified`) é tentada de novo quando o passo roda de novo, como nos
+  outros passos compostos; `math` e `unresolved` são decisões.
 - **Ela compartilha as fórmulas com o LaTeX das fórmulas (M3),** que deve
   vir depois dela. `DOCUMENT_STEPS` lista a classificação primeiro, então
   `recognize-formulas` depende de `classify-formula-regions` nas fórmulas
@@ -37,8 +41,10 @@ paralelismo, o breaker e o cache de regiões da execução.
   `normalize-formula` é retirada). O executor pula os passos que mudaram e
   replaneja (M0).
 - A mensagem do método conta as regiões achadas como matemática, os
-  desenhos, as enviadas para revisão humana e o motivo de cada uma que
-  ficou sem classificação. Cada região classificada é gravada no checkpoint
+  desenhos, as enviadas para revisão humana, as decididas antes desta
+  tentativa (um passo retomado) e o motivo de cada uma que ficou sem
+  classificação. O passo se anuncia com uma mensagem própria,
+  `STAGE_CLASSIFYING_FORMULA_REGIONS`. Cada região classificada é gravada no checkpoint
   de execução (#836). Ele é `transitional` (sua chamada de modelo é o
   `VisionAgent` do core), com `pdf.render` como chamada opcional (#848).
 - Antes do planejamento a execução agora só prepara as imagens e marca a
@@ -48,8 +54,10 @@ paralelismo, o breaker e o cache de regiões da execução.
   (M4b) vem em seguida.
 - Testes: a obrigação e seus alvos, a ordem com o reconhecimento (também no
   Fast Downward), a mensagem do método, um desenho e uma região incerta no
-  executor e de ponta a ponta, uma queda no meio do passo e um teste
-  diferencial dos elementos antes e depois.
+  executor e de ponta a ponta, um visual substituto lido como fórmula de
+  ponta a ponta (não classificado de novo), uma queda no meio do passo e
+  uma queda depois que a classificação mudou obrigações, o `pdf.render`
+  opcional e um teste diferencial dos elementos antes e depois.
 
 ## 0.3.17 — checkpoints dentro de uma ação composta (#836)
 

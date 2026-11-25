@@ -13,11 +13,14 @@ mathematics, a drawing, or nothing it can tell, with its concurrency, the
 run's breaker and region cache.
 - **Document-level,** like M1–M3, not one per region as first proposed. It
   targets, in a source that can be rendered, the formulas without LaTeX
-  markup that no classification has recorded. The selection and the
-  execution share `formulas_needing_classification`. A formula the vision
-  model already read as one (a picture it described as a formula) is not
-  classified: the descriptions ran after it before planning, so it never
-  was.
+  markup that no classification has decided. The selection and the
+  execution share `formulas_needing_classification`. An element the
+  descriptions turned into a formula (a picture, or a placeholder visual of
+  a mostly visual document) is not classified: the descriptions ran after it
+  before planning, so it never was, and a second answer could read it as a
+  drawing and drop the formula they gave. A classification that got no
+  answer (`unclassified`) is tried again when the step runs again, like the
+  other composite steps; `math` and `unresolved` are decisions.
 - **It shares the formulas with the formula LaTeX (M3),** which must come
   after it. `DOCUMENT_STEPS` lists the classification first, so
   `recognize-formulas` depends on `classify-formula-regions` for the formulas
@@ -35,8 +38,10 @@ run's breaker and region cache.
   `normalize-formula` is dropped). The executor skips the changed steps and
   replans (M0).
 - The method's message counts the regions found to be mathematics, the
-  drawings, the ones sent to human review, and the reason of each one left
-  unclassified. Each classified region is saved into the execution
+  drawings, the ones sent to human review, the ones decided before this
+  attempt (a resumed step), and the reason of each one left unclassified.
+  The step announces itself with its own message,
+  `STAGE_CLASSIFYING_FORMULA_REGIONS`. Each classified region is saved into the execution
   checkpoint (#836). It is `transitional` (its model call is the core's
   `VisionAgent`), with `pdf.render` as an optional call (#848).
 - Before planning the run now only prepares the pictures and marks the
@@ -44,8 +49,10 @@ run's breaker and region cache.
 - M4 is split in two pull requests: the prose's inline math (M4b) follows.
 - Tests: the obligation and its targets, the order with the recognition
   (also under Fast Downward), the method's message, a drawing and an
-  uncertain region in the executor and end to end, a crash mid-step, and a
-  differential test of the elements before and after.
+  uncertain region in the executor and end to end, a placeholder read as a
+  formula end to end (not classified again), a crash mid-step and a crash
+  after the classification changed obligations, the optional `pdf.render`,
+  and a differential test of the elements before and after.
 
 ## 0.3.17 — checkpoints inside a composite action (#836)
 

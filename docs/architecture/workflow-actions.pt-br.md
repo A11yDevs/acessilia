@@ -324,10 +324,16 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    vir depois dela (a classificação decide se uma região é matemática),
    então `recognize-formulas` depende de `classify-formula-regions` nas
    fórmulas que eles compartilham: `DOCUMENT_STEPS` lista a classificação
-   primeiro, e a regra de arestas o segue. Uma fórmula que o modelo de visão
-   já leu como fórmula (uma imagem que ele descreveu como fórmula) não é
-   classificada: as descrições rodavam depois da classificação antes do
-   planejamento, então ela nunca era. A matemática inline da prosa, ainda
+   primeiro, e a regra de arestas o segue. Um elemento que as descrições
+   transformaram em fórmula (uma imagem ou um visual substituto) não é
+   classificado: as descrições rodavam depois da classificação antes do
+   planejamento, então ele nunca era, e uma segunda resposta poderia
+   descartar a fórmula que elas deram. Uma classificação que não teve
+   resposta (`unclassified`) é tentada de novo quando o passo roda de novo,
+   como nos outros passos compostos; `math` e `unresolved` são decisões. Uma
+   fórmula compartilhada faz o lote inteiro do reconhecimento esperar o lote
+   da classificação: o custo da granularidade de documento, aceito para a
+   0.3.0 (sublotes são pesquisa da #619). A matemática inline da prosa, ainda
    antes do planejamento até o M4b, lê outros elementos. Eles
    compartilham o breaker de visão, então numa indisponibilidade parcial do
    provider a ordem muda qual passo degrada; isso está documentado, não
@@ -431,7 +437,7 @@ todos:
 | Passo | Tipo e método | Alvos | Sai dos alvos | Dependem dela |
 |---|---|---|---|---|
 | Enriquecimento de tabelas (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | todas as tabelas | um elemento que deixou de ser tabela | `linearize-table`, `select-table-source` e as obrigações de página de uma página com tabela |
-| Classificação de regiões de fórmula (M4a, 0.3.18) | `classify-formula-regions`, `formula-region-classifier` | numa fonte que pode ser renderizada, as fórmulas sem marcação LaTeX que nenhuma classificação registrou, menos uma que o modelo de visão leu como fórmula | um elemento que deixou de ser fórmula (um desenho que ela descreveu é imagem) | `recognize-formulas` (eles compartilham a fórmula), `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
+| Classificação de regiões de fórmula (M4a, 0.3.18) | `classify-formula-regions`, `formula-region-classifier` | numa fonte que pode ser renderizada, as fórmulas sem marcação LaTeX que nenhuma classificação decidiu, menos uma que as descrições transformaram em fórmula | um elemento que deixou de ser fórmula (um desenho que ela descreveu é imagem) | `recognize-formulas` (eles compartilham a fórmula), `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
 | LaTeX das fórmulas (M3, 0.3.15) | `recognize-formulas`, `formula-recognizer` | as fórmulas com um rótulo de equação a separar e, numa fonte que pode ser renderizada, as sem LaTeX que nenhum reconhecimento registrou | um elemento que deixou de ser fórmula (o reconhecimento o leu como imagem) | `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
 | Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um documento de uma página; nunca uma fórmula nem uma tabela | um elemento que virou fórmula ou tabela | `describe-image` e as obrigações de página de uma página com imagem |
 

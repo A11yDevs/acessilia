@@ -490,12 +490,13 @@ class PddlAccessibilityOrchestrator:
             manifest.extractor.configuration.update(media_configuration)
             return manifest
         await self._enrich_before_planning(
-            manifest, ctx.source_path, ctx.effective_mode, media_inspection,
+            manifest, ctx.source_path, media_inspection,
             ctx.status_callback, ctx.config, ctx.ports, ctx.checkpoints,
         )
-        # The tables (#640, M2), the pictures (M1) and the formula LaTeX (M3)
-        # are enriched inside the plan. A checkpoint from before that already
-        # has them enriched, so it gets no obligation for them.
+        # The formula regions (#640, M4a), the pictures (M1), the formula
+        # LaTeX (M3) and the tables (M2) are enriched inside the plan. A
+        # checkpoint from before that already has them enriched, so it gets
+        # no obligation for them.
         reconcile_document_steps(manifest)
         await ctx.checkpoints.save(PHASE_ENRICHED, lambda: {"manifest": manifest_payload(manifest)})
         return manifest
@@ -632,7 +633,6 @@ class PddlAccessibilityOrchestrator:
         self,
         manifest: ProcessingManifest,
         source_path: Path,
-        effective_mode: str,
         media_inspection: dict[str, Any] | None,
         status_callback: Callable[[str], Coroutine[Any, Any, None]] | None,
         config: CoreConfig,

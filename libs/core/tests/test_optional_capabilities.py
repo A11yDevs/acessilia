@@ -21,7 +21,7 @@ from acessilia_core.planning import toolbox_gate
 from acessilia_sdk.toolbox import TOOLBOX_CAPABILITIES, snapshot_from_payloads
 
 CONTRACT_SNAPSHOT = Path(__file__).parent / "fixtures" / "toolbox-contract.json"
-OPTIONAL = ("picture-description", "formula-recognizer", "table-enrichment")
+OPTIONAL = ("picture-description", "formula-recognizer", "table-enrichment", "formula-region-classifier")
 
 
 def _snapshot(*, without: tuple[str, ...] = ()):

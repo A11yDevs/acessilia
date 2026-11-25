@@ -38,7 +38,7 @@ from pathlib import Path
 from acessilia_core.config import CoreConfig
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.i18n import n, t
-from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_FORMULAS
+from acessilia_core.i18n.stage_messages import STAGE_CLASSIFYING_FORMULA_REGIONS
 from acessilia_core.manifest.models import ManifestElement, ProcessingManifest
 from acessilia_core.pipeline.enrichment.common import run_breaker
 from acessilia_core.pipeline.enrichment.formulas import _classify_formula_regions
@@ -63,7 +63,7 @@ async def _classify(
     again about a formula an earlier one owns."""
     status = run_status(ports)
     if status is not None:
-        await status(t(STAGE_ENRICHING_FORMULAS))
+        await status(t(STAGE_CLASSIFYING_FORMULA_REGIONS))
     await _classify_formula_regions(
         manifest,
         source,
@@ -103,8 +103,12 @@ def _handle_formula_region_classifier_method(
     formulas = [element for element in manifest.elements if element.id in targets]
     if not formulas:
         return MethodResult(success=False, validated=False, message=t(MSG_MATH_NO_FORMULA))
+    # A resumed step finds some regions decided by the attempt a crash cut
+    # short (#836): they are counted apart, so the message counts this
+    # attempt's work, not the obligation's total.
+    already = {element.id for element in formulas if _outcome(element) in {"math", "unresolved"}}
     run_sync(_classify(manifest, Path(manifest.source.path), config, ports, targets, obligation_id))
-    outcomes = Counter(_outcome(element) for element in formulas)
+    outcomes = Counter(_outcome(element) for element in formulas if element.id not in already)
     math, pictures, unresolved = (outcomes.pop(key, 0) for key in ("math", "picture", "unresolved"))
     return MethodResult(
         success=True,
@@ -114,6 +118,7 @@ def _handle_formula_region_classifier_method(
             math=math,
             pictures=pictures,
             unresolved=unresolved,
+            already=len(already),
             left=", ".join(f"{reason}: {count}" for reason, count in sorted(outcomes.items())) or "-",
         ),
     )

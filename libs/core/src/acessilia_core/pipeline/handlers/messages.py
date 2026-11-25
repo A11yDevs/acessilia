@@ -29,9 +29,11 @@ MSG_PICTURES_DESCRIBED = (
 )
 MSG_FORMULA_REGIONS_CLASSIFIED = (
     "Formula region classification ran for {count} formula: {math} mathematical, {pictures} "
-    "drawings described as pictures, {unresolved} sent to human review; left unclassified: {left}",
+    "drawings described as pictures, {unresolved} sent to human review, {already} decided "
+    "before this attempt; left unclassified: {left}",
     "Formula region classification ran for {count} formulas: {math} mathematical, {pictures} "
-    "drawings described as pictures, {unresolved} sent to human review; left unclassified: {left}",
+    "drawings described as pictures, {unresolved} sent to human review, {already} decided "
+    "before this attempt; left unclassified: {left}",
 )
 MSG_FORMULAS_RECOGNIZED = (
     "Formula recognition ran for {count} formula: {recognized} recognized ({methods}), "
