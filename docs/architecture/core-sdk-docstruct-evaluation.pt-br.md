@@ -192,11 +192,17 @@ seu pull request:
   byte-idêntica em `tests/fixtures/presentations/`.
   `tests/test_slide_case_e2e.py` o envia para o core implantado e pontua o TXT
   e o PDF/UA entregues com `scripts/bench/slide_case.py`: 42 títulos de slide,
-  cada objeto de texto, tabela e fórmula no seu slide, a ausência de padrões de
-  fallback e um piso de imagens. Ele roda com `CORE_BASE_URL` e o clone do
-  dataset. **Em aberto:** rodá-lo no staging e registrar os scorecards na #615;
-  o scorecard pré-migração não foi arquivado como arquivo, então a conferência
-  usa o ground truth do dataset.
+  pisos para texto, tabelas e fórmulas, a ausência de padrões de fallback e
+  pisos de imagens/estruturas químicas. Ele roda com `CORE_BASE_URL` e o clone
+  do dataset.
+  **Observado em 2026-11-25 no staging `d2714cd`:** PDF/UA 187/225 objetos
+  (texto 65/72, linhas de tabela 66/95, imagens 30/31, estruturas químicas 5/5,
+  fórmulas 10/10, 0 violações de padrão); TXT 183/225 com 10 violações
+  conhecidas `english-table-row`. O veraPDF reporta falha de glyph `.notdef`
+  (#868); as linhas perdidas em slides só-imagem são #870 e a linearização do
+  TXT é #869. O deck completo é uma execução manual/slow, não um gate
+  agendado. O scorecard pré-migração não foi arquivado, então os pisos usam o
+  score atual do staging mais o ground truth do dataset.
 
 ## Consequências observadas
 
@@ -232,7 +238,8 @@ seu pull request:
 3. **Dar uso às operações:** um comando `judge` na linha de comando do SDK, e
    o benchmark de matemática (`scripts/bench`) sobre a cadeia de fórmula em vez
    do core.
-4. **Rodar a comparação do caso 006 no staging** depois da mudança
-   (`tests/test_slide_case_e2e.py`) e registrar os scorecards na #615.
+4. ~~**Rodar a comparação do caso 006 no staging** depois da mudança
+   (`tests/test_slide_case_e2e.py`).~~ Feito em 2026-11-25 em `d2714cd`;
+   acompanhar as lacunas de produto nas #868, #869 e #870.
 5. **Decidir se a pilha de agentes deve ser um extra do core,** caso algum
    chamador precise do core sem agentes. Nada pede isso hoje.

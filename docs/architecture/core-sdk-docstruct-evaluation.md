@@ -193,11 +193,17 @@ request:
   byte-identical copy in `tests/fixtures/presentations/`.
   `tests/test_slide_case_e2e.py` uploads it to the deployed core and scores
   the delivered TXT and PDF/UA with `scripts/bench/slide_case.py`: 42 slide
-  headings and titles, every text, table and formula object in its slide, the
-  absence of fallback patterns, and a picture floor. It runs with
-  `CORE_BASE_URL` and the dataset clone. **Open:** run it against staging and
-  record the scorecards in #615; the pre-migration scorecard was not archived
-  as a file, so the check uses the dataset's ground truth.
+  headings and titles, floors for text, tables and formulas, the absence of
+  fallback patterns, and picture/chemical-structure floors. It runs with
+  `CORE_BASE_URL` and the dataset clone.
+  **Observed on 2026-11-25 at staging `d2714cd`:** PDF/UA 187/225 objects
+  (text 65/72, table rows 66/95, images 30/31, chemical structures 5/5,
+  formulas 10/10, 0 pattern violations); TXT 183/225 with 10 known
+  `english-table-row` violations. veraPDF reports a `.notdef` glyph failure
+  (#868); the missing image-only table rows are #870 and the TXT linearization
+  is #869. The full deck is a manual/slow run, not a scheduled gate. The
+  pre-migration scorecard was not archived, so the floors use the current
+  staging score plus the dataset ground truth.
 
 ## Consequences observed
 
@@ -233,7 +239,8 @@ request:
 3. **Give the operations users:** a `judge` command in the SDK's command line,
    and the math benchmark (`scripts/bench`) on the formula chain instead of
    the core.
-4. **Run the case 006 comparison on staging** after the move
-   (`tests/test_slide_case_e2e.py`) and record its scorecards in #615.
+4. ~~**Run the case 006 comparison on staging** after the move
+   (`tests/test_slide_case_e2e.py`).~~ Done on 2026-11-25 at `d2714cd`; follow
+   the product gaps in #868, #869 and #870.
 5. **Decide whether the agent stack should be an extra of the core**, if a
    caller needs the core without agents. Nothing asks for it today.
