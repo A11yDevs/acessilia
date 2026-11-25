@@ -430,6 +430,9 @@ def test_replans_for_changed_obligations_are_bounded(monkeypatch, tmp_path) -> N
 
 
 def test_a_replan_that_makes_no_progress_is_not_repeated() -> None:
+    """The signature guard is the discovery replans': a failure replan within
+    ``max_replans`` is repeated even from the same state (its budget bounds
+    it), and a discovery replan never starts twice from the same state."""
     orchestrator = build_orchestrator(max_replans=2)
     state = "signature-of-a-state"
 

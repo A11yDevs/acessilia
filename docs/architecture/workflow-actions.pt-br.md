@@ -238,9 +238,15 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      trabalho que nenhuma falha toca (`_discovered_roots`): nunca tentado e
      sem obrigação aberta e já tentada entre as suas dependências. As
      obrigações que falharam e o que espera por elas ficam fora dessa rodada
-     e de todas as seguintes, então as suas alternativas nunca rodam. Uma
-     obrigação crítica deixada aberta, encontrada ou falha, ainda faz o job
-     falhar em vez de ser entregue em silêncio.
+     e de todas as seguintes, então as suas alternativas nunca rodam. Ficar
+     fora de um plano não é ser cancelada: o executor seleciona só as
+     obrigações do plano, então depois de cada execução os objetivos que o
+     plano deixou de fora são selecionados de novo (`_restore_goals`, a
+     partir do manifesto de planejamento, que o checkpoint do plano salva
+     para uma retomada). Uma obrigação crítica deixada aberta, encontrada,
+     falha ou à espera de trabalho falho, ainda faz o job falhar em vez de
+     ser entregue em silêncio, e um refinamento é entregue com aviso e sem
+     cache.
    - Obrigações removidas, substituídas e religadas estão cobertas (4). Um
      passo cuja obrigação agora depende de uma obrigação aberta que este plano
      não executa antes dele (encontrada durante a execução, ou planejada e

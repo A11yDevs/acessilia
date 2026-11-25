@@ -18,7 +18,7 @@ import asyncio
 from collections.abc import Callable, Coroutine, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from acessilia_core.agents.informational_structural import InformationalStructuralAgent
 from acessilia_core.agents.model_calls import ModelCallRunner, model_call_scope
@@ -61,6 +61,7 @@ from acessilia_core.pipeline.obligations import (
     _document_work_found,
     _reopen,
     _replannable_obligation_ids,
+    _restore_goals,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
     planning_signature,
@@ -564,7 +565,10 @@ class PddlAccessibilityOrchestrator:
         *,
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
-        """Execute ``plan`` with the run's ``executor``, continuing from ``execution_state`` when it exists."""
+        """Execute ``plan`` with the run's ``executor``, continuing from ``execution_state`` when it exists.
+
+        The executor selects only the plan's obligations; the job's goals that
+        the plan left out stay selected (``_restore_goals``, #842 review)."""
         resume = None
         if execution_state is not None:
             resume = ExecutionResume(
@@ -581,7 +585,7 @@ class PddlAccessibilityOrchestrator:
             if checkpoints.active and not self.execute_dry_run
             else None
         )
-        return await run_blocking(
+        manifest, report = await run_blocking(
             executor.execute,
             plan,
             planning_manifest,
@@ -590,6 +594,8 @@ class PddlAccessibilityOrchestrator:
             resume=resume,
             on_step=on_step,
         )
+        _restore_goals(manifest, planning_manifest)
+        return manifest, report
 
     async def _extract_structure(
         self,
@@ -656,7 +662,7 @@ class PddlAccessibilityOrchestrator:
         discoveries: int,
         signature: str,
         previous: str | None,
-    ) -> str | None:
+    ) -> Literal["failure", "discovery"] | None:
         """The replan one more round would be, within its bound: ``failure``,
         ``discovery``, or ``None`` to stop (#832, #842).
 

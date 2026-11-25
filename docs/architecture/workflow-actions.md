@@ -232,8 +232,13 @@ the manifest. **The enrichment migration needs no domain change.**
      (`_discovered_roots`): never tried, with no open, tried obligation
      among its dependencies. The failed obligations and what waits for them
      are left out of that round and of every later one, so their
-     alternatives never run. A critical obligation left open, found or
-     failed, still fails the job instead of being delivered silently.
+     alternatives never run. Left out of a plan is not cancelled: the
+     executor selects only the plan's obligations, so after every run the
+     goals the plan left out are selected again (`_restore_goals`, from the
+     planning manifest, which the plan checkpoint saves for a resume). A
+     critical obligation left open, found, failed or waiting for failed
+     work, still fails the job instead of being delivered silently, and a
+     refinement is delivered with a warning and no cache.
    - Removed, replaced and rewired obligations are covered (4). A step
      whose obligation now depends on an open obligation this plan does not
      run before it (found during the execution, or planned and not run yet)
