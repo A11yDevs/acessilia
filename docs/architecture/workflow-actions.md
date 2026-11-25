@@ -224,12 +224,16 @@ the manifest. **The enrichment migration needs no domain change.**
      other targets or dependencies are progress. It is saved with the plan
      checkpoint (`previous_signature`), so a resume keeps the guard; a
      checkpoint without it resumes as before.
-   - A run with a failure and a discovery is a failure replan: the
-     discovery budget never bypasses the failure one. With `max_replans`
-     spent the loop stops, and a critical obligation left open, found or
-     failed, fails the job instead of being delivered silently. Replanning
-     for a discovery after the failure budget is spent, without retrying
-     the failed work, is a follow-up (#842).
+   - A run with a failure and a discovery is a failure replan while
+     `max_replans` lasts: the discovery budget never bypasses the failure
+     one. Since core 0.3.22 (#842), with `max_replans` spent, the run can
+     still be a discovery replan, within `max_discovery_replans` and the
+     signature guard, but only for the work no failure touches
+     (`_discovered_roots`): never tried, with no open, tried obligation
+     among its dependencies. The failed obligations and what waits for them
+     are left out of that round and of every later one, so their
+     alternatives never run. A critical obligation left open, found or
+     failed, still fails the job instead of being delivered silently.
    - Removed, replaced and rewired obligations are covered (4). A step
      whose obligation now depends on an open obligation this plan does not
      run before it (found during the execution, or planned and not run yet)

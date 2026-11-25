@@ -57,6 +57,7 @@ from acessilia_core.pipeline.enrichment.pictures import _prepare_pictures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
+    _discovered_roots,
     _document_work_found,
     _reopen,
     _replannable_obligation_ids,
@@ -648,25 +649,31 @@ class PddlAccessibilityOrchestrator:
             return False
         return report.replan_required or _document_work_found(manifest)
 
-    def _replan_allowed(
+    def _replan_kind(
         self,
         failure: bool,
         replans: int,
         discoveries: int,
         signature: str,
         previous: str | None,
-    ) -> bool:
-        """Whether one more replan is within its bound (#832).
+    ) -> str | None:
+        """The replan one more round would be, within its bound: ``failure``,
+        ``discovery``, or ``None`` to stop (#832, #842).
 
-        A run with a failed step is a failure replan even if it also found
-        obligations: the failure budget is never bypassed through the
-        discovery one. With it spent, the loop stops, and a critical
-        obligation left open (found or failed) fails the job in
-        ``_check_unsatisfied``; nothing is delivered silently.
+        A run with a failed step is a failure replan while ``max_replans``
+        lasts, even if it also found obligations. With that budget spent, it
+        can still be a discovery replan, within ``max_discovery_replans`` and
+        the signature guard, but only for the work no failure touches
+        (``_discovered_roots``): the failed obligations and their dependents
+        are left out, so their alternatives never run and the discovery
+        budget is no way around the failure one. What is left open then is
+        judged by ``_check_unsatisfied``: a critical obligation fails the job.
         """
-        if failure:
-            return replans < self.max_replans
-        return discoveries < self.max_discovery_replans and signature != previous
+        if failure and replans < self.max_replans:
+            return "failure"
+        if discoveries < self.max_discovery_replans and signature != previous:
+            return "discovery"
+        return None
 
     async def _replan_until_done(
         self,
@@ -715,9 +722,10 @@ class PddlAccessibilityOrchestrator:
             # The guard reads the graph: a dangling reference fails here, named.
             validate_obligation_graph(manifest)
             signature = planning_signature(manifest)
-            if not self._replan_allowed(failure, replans, discoveries, signature, previous_signature):
+            kind = self._replan_kind(failure, replans, discoveries, signature, previous_signature)
+            if kind is None:
                 break
-            previous_signature = None if failure else signature
+            previous_signature = None if kind == "failure" else signature
             # Steps after a failure still run, so one execution can leave an
             # obligation exhausted (no method left) next to another that has an
             # alternative. The planner rejects exhausted obligations, so they are
@@ -728,20 +736,19 @@ class PddlAccessibilityOrchestrator:
             ]
             if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
-            roots = _replannable_obligation_ids(manifest)
+            spent = kind == "discovery" and replans >= self.max_replans  # no failed work again (#842)
+            roots = _discovered_roots(manifest) if spent else _replannable_obligation_ids(manifest)
             if not roots:
                 break
             _reopen(manifest)  # only now, with the replan allowed (M4b)
-            if failure:
-                replans += 1
-            else:
-                discoveries += 1
+            replans += kind == "failure"
+            discoveries += kind == "discovery"
             logger.info(
                 "PDDL: replanning after {} ({}: {}/{})",
                 execution_report.status,
-                "failure" if failure else "changed obligations",
-                replans if failure else discoveries,
-                self.max_replans if failure else self.max_discovery_replans,
+                "failure" if kind == "failure" else "changed obligations",
+                replans if kind == "failure" else discoveries,
+                self.max_replans if kind == "failure" else self.max_discovery_replans,
             )
             # The new plan applies to the manifest the execution just produced.
             planning_manifest = manifest

@@ -2,6 +2,26 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.22 — uma descoberta é atendida depois de esgotado o orçamento de falhas (#842)
+
+Uma execução com um passo falho e uma descoberta era um replanejamento de
+falha; com `max_replans` esgotado o laço parava, e uma obrigação crítica que
+a execução encontrou fazia o job falhar por causa de uma falha independente e
+não crítica.
+- Com `max_replans` esgotado, essa execução agora é um replanejamento de
+  descoberta, dentro de `max_discovery_replans` e da guarda de assinatura,
+  só para o trabalho que nenhuma falha toca (`_discovered_roots`: nunca
+  tentado e sem obrigação aberta e já tentada entre as suas dependências). As
+  obrigações que falharam e as suas dependentes ficam fora dessa rodada e de
+  todas as seguintes, então as suas alternativas nunca rodam; o orçamento de
+  descobertas não é um caminho em volta do de falhas. `_replan_allowed`
+  virou `_replan_kind` (`failure`, `discovery` ou parar); os contadores e a
+  assinatura são salvos com o plano como antes.
+- Testes: uma descoberta crítica ao lado de uma falha independente é atendida
+  e o trabalho que falhou não é tentado de novo, nessa rodada nem numa
+  seguinte; uma descoberta que depende do trabalho que falhou ainda faz o job
+  falhar; as raízes e os tipos isoladamente.
+
 ## 0.3.21 — o manifesto entregue é validado (#844)
 
 O laço de replanejamento revalidava o grafo de obrigações (referências e DAG)

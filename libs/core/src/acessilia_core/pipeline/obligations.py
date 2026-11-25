@@ -225,6 +225,28 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
     ]
 
 
+def _discovered_roots(manifest: ProcessingManifest) -> list[str]:
+    """The replannable obligations no failure touches (#842): never tried,
+    and with no open, tried obligation among their dependencies, directly or
+    not. A discovery replan after the failure budget is spent serves only
+    these, so the failed work and what waits for it are not retried."""
+    by_id = {obligation.id: obligation for obligation in manifest.obligations}
+
+    def touched(obligation_id: str, seen: set[str]) -> bool:
+        if obligation_id in seen:
+            return False
+        seen.add(obligation_id)
+        obligation = by_id[obligation_id]
+        if obligation.status != "satisfied" and obligation.attempts:
+            return True
+        return any(touched(dependency, seen) for dependency in obligation.dependencies)
+
+    return [
+        obligation_id for obligation_id in _replannable_obligation_ids(manifest)
+        if not touched(obligation_id, set())
+    ]
+
+
 def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
     """The open obligations grouped by kind with their pages.
 

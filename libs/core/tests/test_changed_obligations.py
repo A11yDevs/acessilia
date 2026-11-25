@@ -433,10 +433,13 @@ def test_a_replan_that_makes_no_progress_is_not_repeated() -> None:
     orchestrator = build_orchestrator(max_replans=2)
     state = "signature-of-a-state"
 
-    assert orchestrator._replan_allowed(False, 0, 0, state, None)
-    assert not orchestrator._replan_allowed(False, 0, 1, state, state)
-    assert orchestrator._replan_allowed(True, 1, 0, state, state)
-    assert not orchestrator._replan_allowed(True, 2, 0, state, None)
+    assert orchestrator._replan_kind(False, 0, 0, state, None) == "discovery"
+    assert orchestrator._replan_kind(False, 0, 1, state, state) is None
+    assert orchestrator._replan_kind(True, 1, 0, state, state) == "failure"
+    # The failure budget spent: a discovery replan, of untouched work only (#842).
+    assert orchestrator._replan_kind(True, 2, 0, state, None) == "discovery"
+    assert orchestrator._replan_kind(True, 2, 0, state, state) is None
+    assert orchestrator._replan_kind(True, 2, 3, state, None) is None
 
 
 def test_a_handler_that_leaves_a_dangling_reference_is_reported_before_the_guard(

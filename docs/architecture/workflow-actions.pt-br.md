@@ -230,12 +230,17 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      alvos ou dependências são progresso. Ele fica no checkpoint de plano
      (`previous_signature`), então uma retomada mantém a guarda; um checkpoint
      sem ele retoma como antes.
-   - Uma execução com falha e descoberta é um replanejamento de falha: o
-     orçamento de descobertas nunca contorna o de falhas. Com `max_replans`
-     esgotado o laço para, e uma obrigação crítica deixada aberta, encontrada
-     ou falha, faz o job falhar em vez de ser entregue em silêncio.
-     Replanejar por uma descoberta depois que o orçamento de falhas acabou,
-     sem tentar de novo o trabalho que falhou, é um acompanhamento (#842).
+   - Uma execução com falha e descoberta é um replanejamento de falha
+     enquanto `max_replans` dura: o orçamento de descobertas nunca contorna o
+     de falhas. Desde o core 0.3.22 (#842), com `max_replans` esgotado, a
+     execução ainda pode ser um replanejamento de descoberta, dentro de
+     `max_discovery_replans` e da guarda de assinatura, mas só para o
+     trabalho que nenhuma falha toca (`_discovered_roots`): nunca tentado e
+     sem obrigação aberta e já tentada entre as suas dependências. As
+     obrigações que falharam e o que espera por elas ficam fora dessa rodada
+     e de todas as seguintes, então as suas alternativas nunca rodam. Uma
+     obrigação crítica deixada aberta, encontrada ou falha, ainda faz o job
+     falhar em vez de ser entregue em silêncio.
    - Obrigações removidas, substituídas e religadas estão cobertas (4). Um
      passo cuja obrigação agora depende de uma obrigação aberta que este plano
      não executa antes dele (encontrada durante a execução, ou planejada e

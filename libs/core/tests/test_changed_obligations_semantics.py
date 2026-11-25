@@ -210,21 +210,66 @@ def test_a_failure_and_a_discovery_with_both_budgets_left_recover_both(monkeypat
     assert "o-found-1" in calls and "o-bad:alternative" in calls
 
 
-def test_a_discovery_does_not_bypass_a_spent_failure_budget(monkeypatch, tmp_path) -> None:
-    """A non-critical failure next to a critical discovery, with
-    ``max_replans=0``: the run is a failure replan, so it does not replan. The
-    critical found obligation is open, and the job fails instead of
-    delivering it silently."""
+def test_a_discovery_is_served_without_retrying_the_failed_work(monkeypatch, tmp_path) -> None:
+    """#842: a non-critical failure next to a critical discovery, with
+    ``max_replans=0``. The failure budget is spent, so ``o-bad``'s
+    alternative never runs, not even in a later round; the discovery budget
+    still serves ``o-found-1``, which no failure touches. The job is
+    delivered, with ``o-bad`` left open as a refinement."""
     calls: list[str] = []
     orchestrator, manifest = _failing_and_finding(
         calls, max_replans=0, failing_kind="repair-heading-hierarchy"
     )
+
+    _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert "o-found-1" in calls
+    assert "o-bad:alternative" not in calls
+    assert calls.count("o-bad:first") == 1
+
+
+def test_a_discovery_that_waits_for_the_failed_work_still_stops(monkeypatch, tmp_path) -> None:
+    """A found obligation that depends on the failed one is touched by the
+    failure: with the failure budget spent it is not replanned, and, being
+    critical, it fails the job instead of being delivered silently."""
+    calls: list[str] = []
+    orchestrator, manifest = _failing_and_finding(
+        calls, max_replans=0, failing_kind="repair-heading-hierarchy"
+    )
+    review = orchestrator.executor.registry.get("human-review")
+
+    def finding_a_dependent(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        result = review(m, obligation_id)
+        for item in m.obligations:
+            if item.id.startswith("o-found") and "o-bad" not in item.dependencies:
+                item.dependencies.append("o-bad")
+        return result
+
+    orchestrator.executor.registry.register("human-review", finding_a_dependent)
 
     with pytest.raises(RuntimeError, match="review-structure"):
         _run(orchestrator, manifest, tmp_path, monkeypatch)
 
     assert "o-found-1" not in calls
     assert "o-bad:alternative" not in calls
+
+
+def test_the_discovery_roots_leave_out_what_a_failure_touches() -> None:
+    from acessilia_core.pipeline.obligations import _discovered_roots
+
+    manifest = build_manifest(
+        [build_element("a", "paragraph", text="a")],
+        [_obligation(name, "review-structure", ["a"]) for name in ("o-bad", "o-after", "o-free", "o-done")],
+    )
+    by_id = {item.id: item for item in manifest.obligations}
+    for item in manifest.obligations:
+        item.selected = True
+    by_id["o-bad"].attempts = [{"method": "human-review", "status": "failed"}]
+    by_id["o-after"].dependencies = ["o-bad"]
+    by_id["o-done"].status = "satisfied"
+    by_id["o-free"].dependencies = ["o-done"]
+
+    assert _discovered_roots(manifest) == ["o-free"]
 
 
 # The enrichment's edges follow the targets.

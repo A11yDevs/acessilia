@@ -2,6 +2,24 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.22 — a discovery is served after the failure budget is spent (#842)
+
+A run with a failed step and a discovery was a failure replan, so with
+`max_replans` spent the loop stopped, and a critical obligation the run
+found failed the job because of an independent, non-critical failure.
+- With `max_replans` spent, such a run is now a discovery replan, within
+  `max_discovery_replans` and the signature guard, for the work no failure
+  touches only (`_discovered_roots`: never tried, with no open, tried
+  obligation among its dependencies). The failed obligations and their
+  dependents are left out of that round and of every later one, so their
+  alternatives never run; the discovery budget is no way around the failure
+  one. `_replan_allowed` became `_replan_kind` (`failure`, `discovery` or
+  stop); the counters and the signature are saved with the plan as before.
+- Tests: a critical discovery next to an independent failure is served and
+  the failed work is not retried, in that round or a later one; a discovery
+  that depends on the failed work still fails the job; the roots and the
+  kinds on their own.
+
 ## 0.3.21 — the delivered manifest is validated (#844)
 
 The replan loop revalidated the obligation graph (references and DAG) only
