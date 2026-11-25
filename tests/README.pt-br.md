@@ -127,7 +127,8 @@ uv run pytest -m e2e -v --timeout=900
 
 `--timeout=900` substitui o limite global de 180 segundos da suíte: operações
 E2E podem levar até 300 segundos e uma espera de job do core, até 600. O job
-agendado de E2E usa o mesmo valor.
+agendado de E2E usa o mesmo valor. O caso do deck completo é a exceção: usa
+`CORE_SLIDE_TIMEOUT` (padrão 3600 s) e se marca para essa espera mais 600 s.
 
 O workflow `Scheduled test monitoring` roda a suíte E2E semanalmente quando as
 variáveis do repositório `TOOLBOX_BASE_URL` ou `CORE_BASE_URL` estão
@@ -151,6 +152,13 @@ corpus para o checkout.
   baseados em referência são pulados.
 - `test_math_case_e2e.py` lê `input/math-reference/` do branch
   `feat/036-velocidade-instantanea` do dataset; ele não está na `main`.
+- `test_slide_case_e2e.py` lê o `input/presentation-reference/` auditado
+  (o deck 006, issue #615) e envia a cópia byte-idêntica em
+  `fixtures/presentations/`. É um caso manual/slow: use
+  `CORE_SLIDE_CASE=1` para rodá-lo. O teste fixa a revisão do dataset
+  `8e51a1f` por hash dos arquivos e `CORE_SLIDE_TIMEOUT` (padrão 3600 s)
+  limita a espera; cada execução grava saídas, scorecards e `run.json` em um
+  diretório exclusivo em `var/bench/slides/e2e/`.
 
 Para rodar esses casos contra um clone mantido no checkout principal:
 

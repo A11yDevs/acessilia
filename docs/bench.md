@@ -195,6 +195,45 @@ done
 uv run python -m scripts.bench.math_case run --pdf /tmp/036-base.pdf --out var/bench/math-reference/base
 ```
 
+## Presentation reference case
+
+`python -m scripts.bench.slide_case` scores the accessible outputs of
+`006.pdf`, a 42-slide chemistry deck (id `006` in
+[acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset), under
+`input/presentation-reference/`). The ground truth lists the text, pictures,
+tables and formulas expected on each slide; `expectations.json` holds the
+slide count, the deck and slide titles, and the patterns that must never reach
+a reader (an undescribed picture, folded labels, raw LaTeX, a collapsed table
+row, text read across two slides). The input copy in
+`tests/fixtures/presentations/grandezas-e-medidas-42pgs.pdf` is byte-identical
+to the dataset's.
+
+```bash
+# Score the TXT or PDF/UA a job delivered (PDF/UA needs pdftotext)
+uv run python -m scripts.bench.slide_case score --pdf-ua 006.pdf_ua.pdf --out var/bench/slides/<run>
+uv run python -m scripts.bench.slide_case score --txt 006.txt --out var/bench/slides/<run>
+
+# The slides that got worse between two outputs
+uv run python -m scripts.bench.slide_case compare base.pdf_ua.pdf candidate.pdf_ua.pdf
+```
+
+The scorecard splits the output into one section per slide heading and checks
+every object inside its slide: text passages, the terms a picture's
+description must hold, table headers and rows whole and in order, formulas,
+and the forbidden patterns. A table row the layout interleaves may still be
+found in the PDF/UA's content-stream order, and the report counts those
+separately. Like the other cases, the numbers track deltas between runs.
+
+The reference is the audited dataset revision `8e51a1f` (acessilia-dataset#12):
+304 annotations, 292 evaluable by the legacy scorer. The scorer does not yet
+consume `audit.chart_data`, `audit.table_semantics`, `audit.object_associations`
+or the twelve `table` objects; its results are lexical/structural proxies, not
+semantic approval. `tests/test_slide_case_e2e.py` is a manual/slow case
+(`CORE_SLIDE_CASE=1`) against the deployed core, pinned by dataset and PDF
+hashes; it applies per-format regression floors and tracks the known product
+gaps in #868, #869 and #870. See
+[tests/README.md](../tests/README.md#end-to-end-tests).
+
 ## Dr.DocBench experiment snapshot
 
 The shared-task experiment code (fusion variants, Slurm jobs, frozen replay)

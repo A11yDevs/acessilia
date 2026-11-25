@@ -37,9 +37,10 @@ apenas as suítes.
   completa de testes (início das pernas até o fim do agregador) leva cerca de
   **1,47m**, não 1,22 + 0,20. O check `tests (Python 3.12)` deixou de ser o job
   de teste mais lento.
-- O modo A também rodava Ruff/Mypy/Mypy 3.11 (~39s) dentro do job; agora isso
-  fica em `quality`. A parte puramente de suítes era ~131s sequencial em A
-  contra a perna mais longa de 73s em B.
+- O modo A também rodava Ruff/Mypy/Mypy 3.11 (~39s) dentro do job; o Ruff e o
+  Mypy foram para o `quality`, e o passe 3.11 das bibliotecas foi desativado
+  (#654). A parte puramente de suítes era ~131s sequencial em A contra a perna
+  mais longa de 73s em B.
 - O tempo de parede de ponta a ponta caiu de **3m07s para 2m21s** neste par.
 - O total de job-minutes subiu de **7,47 para 8,47** porque cinco jobs provedores
   repetem checkout/install. O paralelismo reduziu latência, não consumo.

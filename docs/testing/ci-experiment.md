@@ -38,9 +38,9 @@ consumption, not only the test suites.
   end-to-end test chain (legs start to aggregator finish) is about **1.47m**,
   not 1.22 + 0.20. The `tests (Python 3.12)` check itself is no longer the
   slowest test job.
-- Mode A also ran Ruff/Mypy/Mypy 3.11 (~39s) inside the job; those now run in
-  `quality`. The pure suite portion was ~131s sequential in A versus the 73s
-  longest leg in B.
+- Mode A also ran Ruff/Mypy/Mypy 3.11 (~39s) inside the job; Ruff and Mypy
+  moved to `quality`, and the 3.11 library pass was retired (#654). The pure
+  suite portion was ~131s sequential in A versus the 73s longest leg in B.
 - End-to-end wall-clock dropped from **3m07s to 2m21s** in this pair.
 - Aggregate job-minutes rose from **7.47 to 8.47** because five provider jobs
   repeat checkout/install. Parallelism reduced latency but not consumption.

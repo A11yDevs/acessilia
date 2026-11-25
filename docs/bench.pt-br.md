@@ -201,6 +201,47 @@ done
 uv run python -m scripts.bench.math_case run --pdf /tmp/036-base.pdf --out var/bench/math-reference/base
 ```
 
+## Caso de referência de apresentação
+
+`python -m scripts.bench.slide_case` pontua as saídas acessíveis de `006.pdf`,
+um deck de química de 42 slides (id `006` no
+[acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset), em
+`input/presentation-reference/`). O ground truth lista o texto, as imagens, as
+tabelas e as fórmulas esperados em cada slide; `expectations.json` guarda a
+contagem de slides, o título do deck e os títulos dos slides, além dos padrões
+que nunca podem chegar ao leitor (uma imagem sem descrição, rótulos dobrados,
+LaTeX cru, uma linha de tabela colapsada, texto lido atravessando dois slides).
+A cópia da entrada em
+`tests/fixtures/presentations/grandezas-e-medidas-42pgs.pdf` é byte-idêntica à
+do dataset.
+
+```bash
+# Pontuar o TXT ou o PDF/UA entregue por um job (o PDF/UA precisa de pdftotext)
+uv run python -m scripts.bench.slide_case score --pdf-ua 006.pdf_ua.pdf --out var/bench/slides/<run>
+uv run python -m scripts.bench.slide_case score --txt 006.txt --out var/bench/slides/<run>
+
+# Os slides que pioraram entre duas saídas
+uv run python -m scripts.bench.slide_case compare base.pdf_ua.pdf candidate.pdf_ua.pdf
+```
+
+O scorecard divide a saída em uma seção por título de slide e verifica cada
+objeto dentro do seu slide: trechos de texto, os termos que a descrição de uma
+imagem precisa conter, cabeçalhos e linhas de tabela inteiros e em ordem,
+fórmulas e os padrões proibidos. Uma linha de tabela que o layout intercala
+ainda pode ser encontrada na ordem do fluxo de conteúdo do PDF/UA, e o
+relatório conta esses casos à parte. Como nos outros casos, os números
+acompanham deltas entre execuções.
+
+A referência é a revisão auditada `8e51a1f` do dataset (acessilia-dataset#12):
+304 anotações, 292 avaliáveis pelo scorer legado. O scorer ainda não consome
+`audit.chart_data`, `audit.table_semantics`, `audit.object_associations` nem os
+doze objetos `table`; os resultados são proxies lexicais/estruturais, não
+aprovação semântica. `tests/test_slide_case_e2e.py` é um caso manual/slow
+(`CORE_SLIDE_CASE=1`) contra o core implantado, fixado por hashes do dataset e
+do PDF; ele aplica pisos de regressão por formato e acompanha os gaps conhecidos
+nas #868, #869 e #870. Veja
+[tests/README.pt-br.md](../tests/README.pt-br.md#testes-end-to-end).
+
 ## Snapshot dos experimentos do Dr.DocBench
 
 O código dos experimentos da shared task (variantes de fusão, jobs Slurm,
