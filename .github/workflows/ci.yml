@@ -785,6 +785,7 @@ jobs:
               "test_fast_downward_orders_a_document_level_obligation_first",
               "test_fast_downward_describes_the_pictures_before_it_validates_them",
               "test_fast_downward_recognizes_the_formulas_before_it_verbalizes_them",
+              "test_fast_downward_classifies_the_formula_regions_before_reading_them",
           }
           report = Path("var/test-results/planning-backends.xml")
           cases = list(ElementTree.parse(report).getroot().iter("testcase"))

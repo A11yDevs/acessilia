@@ -35,7 +35,10 @@ from acessilia_core.pipeline.document_obligations import (
     reconcile_document_steps,
 )
 from acessilia_core.pipeline.enrichment import pictures as picture_stage
-from acessilia_core.pipeline.handlers import formula_recognition as formula_method
+from acessilia_core.pipeline.handlers import (
+    formula_recognition as formula_method,
+    formula_regions as regions_method,
+)
 from acessilia_core.pipeline.handlers.messages import (
     MSG_PICTURES_DESCRIBED,
     MSG_VISION_NO_PICTURE,
@@ -478,8 +481,8 @@ def _run(monkeypatch, manifest, tmp_path, *, register, recognize=False):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, nothing)
+    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     if not recognize:
         monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
     orchestrator = build_orchestrator(max_replans=1)

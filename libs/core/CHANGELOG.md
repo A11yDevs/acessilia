@@ -2,6 +2,58 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.19 — the formula region classification is a planned action (#640, M4a)
+
+Until 0.3.18 the orchestrator checked the extractor's formula labels before
+planning. Now a document with formula regions to check gets one
+`classify-formula-regions` obligation, satisfied by the
+`formula-region-classifier` method, which runs the same step inside the
+plan: the vision model asks whether each formula crop without LaTeX holds
+mathematics, a drawing, or nothing it can tell, with its concurrency, the
+run's breaker and region cache.
+- **Document-level,** like M1–M3, not one per region as first proposed. It
+  targets, in a source that can be rendered, the formulas without LaTeX
+  markup that no classification has decided. The selection and the
+  execution share `formulas_needing_classification`. An element the
+  descriptions turned into a formula (a picture, or a placeholder visual of
+  a mostly visual document) is not classified: the descriptions ran after it
+  before planning, so it never was, and a second answer could read it as a
+  drawing and drop the formula they gave. A classification that got no
+  answer (`unclassified`) is tried again when the step runs again, like the
+  other composite steps; `math` and `unresolved` are decisions.
+- **It shares the formulas with the formula LaTeX (M3),** which must come
+  after it. `DOCUMENT_STEPS` lists the classification first, so
+  `recognize-formulas` depends on `classify-formula-regions` for the formulas
+  they share, as do the formulas' own obligations. The policy between the
+  document steps is now: two steps share elements only when the first must
+  run before the second, in `DOCUMENT_STEPS` order.
+- **Fix:** `reconcile_document_steps` reconciles the edges once more after
+  every step's obligations exist. A step's pass links only the obligations
+  that exist then, so the recognition's edge to the classification, created
+  in a later pass, waited for the next reconciliation, and the first plan
+  could run them in either order.
+- **It changes obligations.** A drawing becomes a described picture (its
+  formula obligations replaced by `describe-image`); an uncertain region
+  goes to human review (`verbalize-formula` keeps only `human-review`,
+  `normalize-formula` is dropped). The executor skips the changed steps and
+  replans (M0).
+- The method's message counts the regions found to be mathematics, the
+  drawings, the ones sent to human review, the ones decided before this
+  attempt (a resumed step), and the reason of each one left unclassified.
+  The step announces itself with its own message,
+  `STAGE_CLASSIFYING_FORMULA_REGIONS`. Each classified region is saved into the execution
+  checkpoint (#836). It is `transitional` (its model call is the core's
+  `VisionAgent`), with `pdf.render` as an optional call (#848).
+- Before planning the run now only prepares the pictures and marks the
+  prose's inline math, announced as `STAGE_MARKING_INLINE_MATH` (new).
+- M4 is split in two pull requests: the prose's inline math (M4b) follows.
+- Tests: the obligation and its targets, the order with the recognition
+  (also under Fast Downward), the method's message, a drawing and an
+  uncertain region in the executor and end to end, a placeholder read as a
+  formula end to end (not classified again), a crash mid-step and a crash
+  after the classification changed obligations, the optional `pdf.render`,
+  and a differential test of the elements before and after.
+
 ## 0.3.18 — the downscale plan comes from the SDK (#636)
 
 The vision payload's context recovery no longer repeats the SDK's rule for

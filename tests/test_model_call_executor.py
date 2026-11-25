@@ -301,7 +301,8 @@ def test_a_run_installs_its_runner_and_restores_the_scope(monkeypatch, tmp_path,
     async def no_inspection(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(pddl, "_classify_formula_regions", stage)
+    # The first stage before planning, under the run's scope.
+    monkeypatch.setattr(pddl, "_mark_inline_math", stage)
     monkeypatch.setattr(preflight, "inspect_source_media", no_inspection)
     orchestrator = build_orchestrator()
     manifest = build_manifest([build_element("h", "heading", text="Title")], [])

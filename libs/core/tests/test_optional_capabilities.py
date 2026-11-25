@@ -21,7 +21,7 @@ from acessilia_core.planning import toolbox_gate
 from acessilia_sdk.toolbox import TOOLBOX_CAPABILITIES, snapshot_from_payloads
 
 CONTRACT_SNAPSHOT = Path(__file__).parent / "fixtures" / "toolbox-contract.json"
-OPTIONAL = ("picture-description", "formula-recognizer", "table-enrichment")
+OPTIONAL = ("picture-description", "formula-recognizer", "table-enrichment", "formula-region-classifier")
 
 
 def _snapshot(*, without: tuple[str, ...] = ()):
@@ -218,7 +218,10 @@ def test_a_degraded_method_reaches_the_output_and_the_log(monkeypatch, tmp_path)
 
     from acessilia_core.agents.model_calls import current_model_calls
     from acessilia_core.pipeline import orchestrator as pddl, preflight
-    from acessilia_core.pipeline.handlers import pictures as picture_method
+    from acessilia_core.pipeline.handlers import (
+        formula_regions as regions_method,
+        pictures as picture_method,
+    )
     from acessilia_core.ports import RunPorts
 
     async def nothing(*_args, **_kwargs):
@@ -234,8 +237,8 @@ def test_a_degraded_method_reaches_the_output_and_the_log(monkeypatch, tmp_path)
     monkeypatch.setattr(pddl.logger, "warning", lambda message, *args: warnings.append(message.format(*args)))
     monkeypatch.setattr(toolbox_gate, "decide", decide)
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, nothing)
+    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", nothing)
     prose = build_element(
         "prose", "paragraph",
