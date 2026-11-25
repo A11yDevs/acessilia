@@ -12,6 +12,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
+WORKFLOWS = ROOT / ".github/workflows"
+ACTIONS = ROOT / ".github/actions"
 SECURITY = ROOT / ".github/workflows/security.yml"
 SCHEDULED = ROOT / ".github/workflows/scheduled-tests.yml"
 PRODUCTION = ROOT / ".github/workflows/production-deployment.yml"
@@ -19,6 +21,11 @@ RELEASE = ROOT / ".github/workflows/release.yml"
 RULESETS = ROOT / ".github/rulesets"
 SETUP_ACTION = ROOT / ".github/actions/setup-root/action.yml"
 BYPASS_FILTER = ROOT / "scripts/rulesets-bypass.jq"
+
+# A standalone Python 3.11 mention, whatever the quoting and the placement:
+# `'3.11'`, `["3.11", "3.12"]`, `--python-version=3.11`, `python:3.11-slim`.
+# The lookarounds keep `1.3.11`, `0.3.11`, `83.11` and `3.115` out.
+PYTHON_311 = re.compile(r"(?<![\d.])3\.11(?![\d.])")
 
 # The single CodeQL pin shared by every workflow. Update both values together.
 CODEQL_ACTION_SHA = "33d7b85da1a04171e211befe2c739303b9a4c066"
@@ -65,10 +72,62 @@ def test_ci_jobs_use_python_312() -> None:
     assert jobs["component-tests"]["env"]["UV_PYTHON"] == "3.12"
     assert _rendered_job_names(jobs["tests"]) == {"tests (Python 3.12)"}
     assert _rendered_job_names(jobs["sdk-isolated"]) == {"SDK alone (Python 3.12)"}
-    # The runtime is 3.12 only (#654): a 3.11 leg must not come back.
-    workflow = WORKFLOW.read_text(encoding="utf-8")
-    assert '"3.11"' not in workflow
-    assert "--python-version 3.11" not in workflow
+
+
+def test_no_workflow_or_action_targets_python_311() -> None:
+    """The runtime is Python 3.12 only (#654; see docs/testing.md).
+
+    Every workflow and composite action is scanned, with the quoting and the
+    placement ignored, so a leg added to a workflow other than `ci.yml` — the
+    release of the library that still declares 3.11, say — is refused too.
+    """
+    paths = sorted(
+        [
+            *WORKFLOWS.glob("*.yml"),
+            *WORKFLOWS.glob("*.yaml"),
+            *ACTIONS.rglob("action.yml"),
+            *ACTIONS.rglob("action.yaml"),
+        ]
+    )
+    offenders = [
+        f"{path.relative_to(ROOT)}:{number}: {line.strip()}"
+        for path in paths
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if PYTHON_311.search(line)
+    ]
+    assert not offenders, (
+        "The runtime is Python 3.12 only (#654; see docs/testing.md), but a "
+        f"Python 3.11 leg is back: {offenders}"
+    )
+
+
+def test_the_python_311_guard_recognizes_each_spelling() -> None:
+    """A broken regex would pass every workflow: pin what it must catch."""
+    caught = (
+        "python-version: '3.11'",
+        'python-version: "3.11"',
+        "python-version: 3.11",
+        'UV_PYTHON: "3.11"',
+        'python-version: ["3.11", "3.12"]',
+        "--python-version 3.11",
+        "--python-version=3.11",
+        "uv run --python 3.11",
+        "image: python:3.11-slim",
+    )
+    for line in caught:
+        assert PYTHON_311.search(line), line
+    allowed = (
+        "python-version: '3.12'",
+        'UV_PYTHON: "3.12"',
+        "ruff==0.17.6",
+        "uv-0.11.17",
+        "1.3.11",
+        "83.11",
+        "3.115",
+        "# v4.39.3",
+    )
+    for line in allowed:
+        assert not PYTHON_311.search(line), line
 
 
 def test_the_container_scan_builds_without_layer_cache() -> None:
