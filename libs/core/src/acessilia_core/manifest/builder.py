@@ -123,6 +123,9 @@ DEFAULT_METHOD_COSTS = {
     # The document's formula LaTeX (#640, M3): before planning until 0.3.14,
     # now a planned action; its only alternative is human-review.
     "formula-recognizer": 15,
+    # The document's formula region classification (#640, M4): before
+    # planning until 0.3.17, now a planned action.
+    "formula-region-classifier": 15,
     # Consomem modelo: custo alto, só admissíveis com a política ativa.
     "vlm-pairwise-judge": 40,
     "table-specialist": 45,

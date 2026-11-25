@@ -35,9 +35,9 @@ from acessilia_core.execution.models import ExecutionReport, ExecutionStepResult
 from acessilia_core.i18n import t
 from acessilia_core.i18n.stage_messages import (
     STAGE_ANALYZING_STRUCTURAL,
-    STAGE_ENRICHING_FORMULAS,
     STAGE_EXECUTING_PLAN,
     STAGE_GENERATING_PDDL_PLAN,
+    STAGE_MARKING_INLINE_MATH,
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_VALIDATING_PLAN_DRY_RUN,
 )
@@ -50,8 +50,6 @@ from acessilia_core.pipeline.checkpointing import (
     resumed_manifest,
 )
 from acessilia_core.pipeline.document_obligations import reconcile_document_steps
-from acessilia_core.pipeline.enrichment.common import run_breaker
-from acessilia_core.pipeline.enrichment.formulas import _classify_formula_regions
 from acessilia_core.pipeline.enrichment.inline_math import (
     _mark_inline_math,
     _mark_inline_math_after_execution,
@@ -101,7 +99,6 @@ from acessilia_core.ports import (
     PHASE_PLAN,
     RemoteOperations,
     RunPorts,
-    region_cache_for,
 )
 from acessilia_sdk.toolbox import ToolboxError
 
@@ -642,33 +639,18 @@ class PddlAccessibilityOrchestrator:
         ports: RunPorts,
         checkpoints: RunCheckpoints,
     ) -> None:
-        """Classify formula regions, prepare the pictures, mark inline math.
+        """Prepare the pictures, then mark the inline math of the prose.
 
-        The steps run in this order and share the run's provider breaker,
-        region cache and text-span reader (``RunPorts``) with the methods that
-        enrich inside the plan: ``picture-description`` describes the
-        pictures (#640, M1), ``formula-recognizer`` reads the formulas' LaTeX
-        (M3) and ``table-enrichment`` reads the tables (M2).
-        What derives from the media inspection stays here (``_prepare_pictures``).
-        The manifest is checkpointed after each step (#407). Each step records
-        per-object progress in the manifest and skips an object it already
-        finished, so a restart repeats at most the step that was running.
+        What derives from the media inspection stays here
+        (``_prepare_pictures``); the inline math shares the run's text-span
+        reader (``RunPorts.services``) with the table method. Everything else
+        runs inside the plan, with the run's breaker and region cache:
+        ``formula-region-classifier`` (#640, M4), ``picture-description``
+        (M1), ``formula-recognizer`` (M3) and ``table-enrichment`` (M2). The
+        manifest is checkpointed after each step (#407).
         """
         if status_callback:
-            await status_callback(t(STAGE_ENRICHING_FORMULAS))
-        # Pictures, formulas and tables reach the vision provider from the
-        # same pipeline, so one that went down does not get called again for
-        # every remaining object; the methods inside the plan get the same
-        # run breaker.
-        breaker = run_breaker(ports, config.vision)
-        region_cache = region_cache_for(ports, config.vision)
-        progress = checkpoints.enrichment_progress(manifest)
-        await _classify_formula_regions(
-            manifest, source_path, mode=effective_mode, vision=config.vision,
-            toolbox=config.toolbox, models=config.models, region_cache=region_cache,
-            breaker=breaker, on_progress=progress,
-        )
-        await checkpoints.save_manifest(manifest, enriching=True)
+            await status_callback(t(STAGE_MARKING_INLINE_MATH))
         _prepare_pictures(manifest, media_inspection)
         await checkpoints.save_manifest(manifest, enriching=True)
         text_spans = run_text_spans(ports, manifest, source_path, config.toolbox)

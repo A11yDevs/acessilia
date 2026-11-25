@@ -215,6 +215,9 @@ msgstr "The document has {page_count} pages, more than the limit of {max_pages}.
 msgid "Enriching the formulas..."
 msgstr "Enriching the formulas..."
 
+msgid "Marking the math in the text..."
+msgstr "Marking the math in the text..."
+
 msgid "Enriching the image descriptions..."
 msgstr "Enriching the image descriptions..."
 
@@ -670,6 +673,13 @@ msgstr "The image must receive a description or be marked decorative."
 
 msgid "The table must have verifiable headers and reading order."
 msgstr "The table must have verifiable headers and reading order."
+
+msgid ""
+"The document's formula regions must be checked as mathematics, a drawing,"
+" or a case for a person."
+msgstr ""
+"The document's formula regions must be checked as mathematics, a drawing,"
+" or a case for a person."
 
 msgid ""
 "The document's formulas must get their LaTeX read and their equation "
@@ -2501,6 +2511,24 @@ msgstr[1] ""
 "Picture description ran for {count} pictures: {described} described, "
 "{formulas} read as formulas, {already} already described; left "
 "undescribed: {left}"
+
+#, python-brace-format
+msgid ""
+"Formula region classification ran for {count} formula: {math} "
+"mathematical, {pictures} drawings described as pictures, {unresolved} "
+"sent to human review; left unclassified: {left}"
+msgid_plural ""
+"Formula region classification ran for {count} formulas: {math} "
+"mathematical, {pictures} drawings described as pictures, {unresolved} "
+"sent to human review; left unclassified: {left}"
+msgstr[0] ""
+"Formula region classification ran for {count} formula: {math} "
+"mathematical, {pictures} drawings described as pictures, {unresolved} "
+"sent to human review; left unclassified: {left}"
+msgstr[1] ""
+"Formula region classification ran for {count} formulas: {math} "
+"mathematical, {pictures} drawings described as pictures, {unresolved} "
+"sent to human review; left unclassified: {left}"
 
 #, python-brace-format
 msgid ""

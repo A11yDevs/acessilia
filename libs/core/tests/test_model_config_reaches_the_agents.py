@@ -31,6 +31,7 @@ from acessilia_core.pipeline.enrichment import (
 )
 from acessilia_core.pipeline.handlers import (
     formula_recognition as formula_method,
+    formula_regions as regions_method,
     inspection as inspection_handlers,
 )
 from acessilia_core.ports import RunPorts
@@ -160,8 +161,8 @@ async def test_the_orchestrator_gives_every_agent_stage_the_run_models(
 
     stages = ("_classify_formula_regions", "_enrich_picture_descriptions",
               "_enrich_formula_latex", "_enrich_table_structures")
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, record(name))
+    monkeypatch.setattr(pddl, "_mark_inline_math", record("_mark_inline_math"))
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", record("_classify_formula_regions"))
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", record("_enrich_formula_latex"))
     # The picture and table steps run inside the plan, as
     # ``picture-description`` (#640, M1) and ``table-enrichment`` (M2).

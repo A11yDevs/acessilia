@@ -32,6 +32,7 @@ from acessilia_core.pipeline.enrichment import (
     pictures as picture_stage,
     tables as table_stage,
 )
+from acessilia_core.pipeline.handlers import formula_regions as regions_method
 from acessilia_core.ports import PHASE_EXECUTION, NoRegionCache, RunPorts
 
 #: Serial, and no wait before the retry pass, so the calls are in order.
@@ -76,13 +77,15 @@ def _left(checkpoints, prefix: str, done: str) -> list[str]:
     ]
 
 
-def _run(monkeypatch, manifest, checkpoints):
+def _run(monkeypatch, manifest, checkpoints, *, classify=False):
+    """One job run; ``classify`` runs the real formula region step (M4)."""
     async def nothing(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, nothing)
+    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
+    if not classify:
+        monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     orchestrator = build_orchestrator(max_replans=1)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: deepcopy(manifest))
     return asyncio.run(orchestrator.execute(
@@ -255,6 +258,53 @@ def test_a_crash_mid_step_resumes_without_recognizing_the_formulas_again(monkeyp
     # The verbalizations escalate to human review; with readable LaTeX they
     # do not fail the job, which is not what this test is about.
     _run(monkeypatch, _formulas(4), checkpoints)
+
+    assert calls == left
+
+
+def test_a_crash_mid_step_resumes_without_classifying_the_regions_again(monkeypatch) -> None:
+    """The formula region classification (M4): five regions, the process
+    dies on the third; the resumed run asks only about what was left."""
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
+    from acessilia_core.pipeline.handlers import formula_recognition as formula_method
+
+    calls: list[str] = []
+    crash = {"on": "f-3"}
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            element_id = image_bytes.decode()
+            calls.append(element_id)
+            if element_id == crash["on"]:
+                raise Crash()
+            return VisionOutput(kind="formula", description="", formula_latex="x", language="und", confidence=0.9)
+
+    async def nothing(*_args, **_kwargs):
+        return 0
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(
+        formula_stage, "_formula_recognition_crop", lambda _source, element, **_kwargs: (element.id.encode(), 1)
+    )
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
+    manifest = _formulas(5)
+    for element in manifest.elements:
+        if element.type == "formula":
+            element.text = "x plus y"
+    checkpoints = MemoryCheckpoints()
+
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, manifest, checkpoints, classify=True)
+
+    assert calls[:3] == ["f-1", "f-2", "f-3"]
+    left = _left(checkpoints, "f-", "formula_classification")
+    assert left[0] == "f-3"
+    calls.clear()
+    crash["on"] = None
+    _run(monkeypatch, manifest, checkpoints, classify=True)
 
     assert calls == left
 

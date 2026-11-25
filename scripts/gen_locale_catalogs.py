@@ -260,6 +260,7 @@ from acessilia_core.i18n.log_messages import (
     MSG_MODEL_CALL_FULL,
     MSG_OBLIGATION_CODE,
     MSG_OBLIGATION_FORMULA,
+    MSG_OBLIGATION_FORMULA_CLASSIFICATION,
     MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
@@ -299,6 +300,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_FAILED_DURING,
     STAGE_GENERATING_AUDIO,
     STAGE_GENERATING_PDDL_PLAN,
+    STAGE_MARKING_INLINE_MATH,
     STAGE_PAGE,
     STAGE_PAGE_OF,
     STAGE_PAGE_UNKNOWN,
@@ -600,6 +602,7 @@ MESSAGES: tuple[str, ...] = (
     STAGE_STRUCTURAL_EXTRACTION_FAILED,
     STAGE_DOCUMENT_TOO_MANY_PAGES,
     STAGE_ENRICHING_FORMULAS,
+    STAGE_MARKING_INLINE_MATH,
     STAGE_ENRICHING_IMAGE_DESCRIPTIONS,
     STAGE_ENRICHING_TABLES_OCR,
     STAGE_GENERATING_PDDL_PLAN,
@@ -689,6 +692,7 @@ MESSAGES: tuple[str, ...] = (
     # Manifest/planner internal diagnostic strings surfaced in logs or model validation errors.
     MSG_OBLIGATION_IMAGE,
     MSG_OBLIGATION_TABLE,
+    MSG_OBLIGATION_FORMULA_CLASSIFICATION,
     MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
@@ -1132,6 +1136,14 @@ HANDLER_PLURAL_TRANSLATIONS: dict[tuple[str, str], tuple[str, str]] = {
         "Descrição validada para {count} imagem",
         "Descrições validadas para {count} imagens",
     ),
+    handler_messages.MSG_FORMULA_REGIONS_CLASSIFIED: (
+        "Classificação de regiões de fórmula rodou para {count} fórmula: {math} matemáticas, "
+        "{pictures} desenhos descritos como imagens, {unresolved} enviadas para revisão humana; "
+        "ficaram sem classificação: {left}",
+        "Classificação de regiões de fórmula rodou para {count} fórmulas: {math} matemáticas, "
+        "{pictures} desenhos descritos como imagens, {unresolved} enviadas para revisão humana; "
+        "ficaram sem classificação: {left}",
+    ),
     handler_messages.MSG_FORMULAS_RECOGNIZED: (
         "Reconhecimento de fórmulas rodou para {count} fórmula: {recognized} reconhecidas "
         "({methods}), {numbered} números de equação separados, {pictures} lidas como imagens; "
@@ -1299,6 +1311,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "O documento tem {page_count} páginas, mais que o limite de {max_pages}."
         ),
         STAGE_ENRICHING_FORMULAS: "Enriquecendo as fórmulas...",
+        STAGE_MARKING_INLINE_MATH: "Marcando a matemática no texto...",
         STAGE_ENRICHING_IMAGE_DESCRIPTIONS: ("Enriquecendo as descrições de imagens..."),
         STAGE_ENRICHING_TABLES_OCR: ("Enriquecendo as tabelas com OCR (fallback)..."),
         STAGE_GENERATING_PDDL_PLAN: ("Gerando o plano nominal com PDDL..."),
@@ -1563,6 +1576,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         MSG_OBLIGATION_TABLE: (
             "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
+        ),
+        MSG_OBLIGATION_FORMULA_CLASSIFICATION: (
+            "As regiões de fórmula do documento devem ser conferidas como matemática, desenho ou caso para uma pessoa."
         ),
         MSG_OBLIGATION_FORMULA_RECOGNITION: (
             "As fórmulas do documento devem ter o LaTeX lido e os números de equação separados."

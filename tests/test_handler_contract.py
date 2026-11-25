@@ -43,6 +43,7 @@ EXPECTED_RUN_PARAMETERS = {
     "table-enrichment": ("config", "ports"),
     "picture-description": ("config", "ports"),
     "formula-recognizer": ("config", "ports"),
+    "formula-region-classifier": ("config", "ports"),
     "vision-page-inspection": ("config", "ports"),
 }
 

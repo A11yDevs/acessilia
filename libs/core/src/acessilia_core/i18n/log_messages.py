@@ -341,6 +341,10 @@ MSG_OBLIGATION_TABLE_ENRICHMENT: str = (
 MSG_OBLIGATION_PICTURE_DESCRIPTION: str = (
     "The document's pictures must be described by the vision model, or read as formulas where they are formulas."
 )
+#: Manifest processing-needs rationale for the document's formula region classification (#640, M4): one obligation for the formulas to check.
+MSG_OBLIGATION_FORMULA_CLASSIFICATION: str = (
+    "The document's formula regions must be checked as mathematics, a drawing, or a case for a person."
+)
 #: Manifest processing-needs rationale for the document's formula LaTeX (#640, M3): one obligation for the formulas to recognize.
 MSG_OBLIGATION_FORMULA_RECOGNITION: str = (
     "The document's formulas must get their LaTeX read and their equation numbers separated."

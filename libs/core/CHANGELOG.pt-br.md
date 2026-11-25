@@ -2,6 +2,55 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.18 — a classificação de regiões de fórmula é uma ação planejada (#640, M4a)
+
+Até a 0.3.17 o orquestrador conferia os rótulos de fórmula do extrator antes
+do planejamento. Agora um documento com regiões de fórmula a conferir ganha
+uma obrigação `classify-formula-regions`, satisfeita pelo método
+`formula-region-classifier`, que roda o mesmo passo dentro do plano: o
+modelo de visão pergunta se cada recorte de fórmula sem LaTeX contém
+matemática, um desenho ou algo que ele não consegue dizer, com seu
+paralelismo, o breaker e o cache de regiões da execução.
+- **Do documento,** como M1–M3, não uma por região como proposto antes.
+  Ela tem como alvo, numa fonte que pode ser renderizada, as fórmulas sem
+  marcação LaTeX que nenhuma classificação registrou. A seleção e a execução
+  compartilham `formulas_needing_classification`. Uma fórmula que o modelo
+  de visão já leu como fórmula (uma imagem que ele descreveu como fórmula)
+  não é classificada: as descrições rodavam depois dela antes do
+  planejamento, então ela nunca era.
+- **Ela compartilha as fórmulas com o LaTeX das fórmulas (M3),** que deve
+  vir depois dela. `DOCUMENT_STEPS` lista a classificação primeiro, então
+  `recognize-formulas` depende de `classify-formula-regions` nas fórmulas
+  que compartilham, assim como as obrigações das próprias fórmulas. A
+  política entre os passos do documento agora é: dois passos só
+  compartilham elementos quando o primeiro precisa rodar antes do segundo,
+  na ordem de `DOCUMENT_STEPS`.
+- **Correção:** `reconcile_document_steps` reconcilia as arestas mais uma
+  vez depois que as obrigações de todos os passos existem. A passada de um
+  passo só liga as obrigações que existem então, então a aresta do
+  reconhecimento para a classificação, criada numa passada posterior,
+  esperava a próxima reconciliação, e o primeiro plano podia rodá-los em
+  qualquer ordem.
+- **Ela muda obrigações.** Um desenho vira imagem descrita (as obrigações de
+  fórmula trocadas por `describe-image`); uma região incerta vai para
+  revisão humana (`verbalize-formula` fica só com `human-review`,
+  `normalize-formula` é retirada). O executor pula os passos que mudaram e
+  replaneja (M0).
+- A mensagem do método conta as regiões achadas como matemática, os
+  desenhos, as enviadas para revisão humana e o motivo de cada uma que
+  ficou sem classificação. Cada região classificada é gravada no checkpoint
+  de execução (#836). Ele é `transitional` (sua chamada de modelo é o
+  `VisionAgent` do core), com `pdf.render` como chamada opcional (#848).
+- Antes do planejamento a execução agora só prepara as imagens e marca a
+  matemática inline da prosa, anunciada como `STAGE_MARKING_INLINE_MATH`
+  (nova).
+- O M4 foi dividido em dois pull requests: a matemática inline da prosa
+  (M4b) vem em seguida.
+- Testes: a obrigação e seus alvos, a ordem com o reconhecimento (também no
+  Fast Downward), a mensagem do método, um desenho e uma região incerta no
+  executor e de ponta a ponta, uma queda no meio do passo e um teste
+  diferencial dos elementos antes e depois.
+
 ## 0.3.17 — checkpoints dentro de uma ação composta (#836)
 
 As descrições de imagens (M1), o LaTeX das fórmulas (M3) e o enriquecimento

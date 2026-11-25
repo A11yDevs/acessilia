@@ -6,7 +6,9 @@ it works on, instead of one per element: a per-element method would wait the
 retry pass once per failing element, and the elements after the breaker
 opened would lose the recovery (``docs/architecture/workflow-actions.md``).
 
-Three steps are planned this way:
+Four steps are planned this way:
+- the formula region classification (``classify-formula-regions``, method
+  ``formula-region-classifier``, M4);
 - the table enrichment (``enrich-tables``, method ``table-enrichment``, M2);
 - the picture descriptions (``describe-images``, method
   ``picture-description``, M1);
@@ -44,13 +46,15 @@ before each replan (#832):
   it. A future step that must run *before* it is not one this rule should
   order: it needs an exclusion here.
 
-  Between the document's steps, the policy is explicit (#845 review): the
-  steps do not share elements (the descriptions never take a table or a
-  formula, ``is_describable``; the formula LaTeX takes only formulas, the
-  table step only tables), so none depends on another. As a guard
-  for a future step, the rule follows ``DOCUMENT_STEPS``: a step's
+  Between the document's steps, the policy is explicit (#845 review): two
+  steps share elements only when the first must run before the second, and
+  ``DOCUMENT_STEPS`` lists them in that order. The rule follows it: a step's
   obligation may depend on an earlier step's that shares an element, never
-  on a later one's, so the rule can never make a cycle between them.
+  on a later one's, so it can never make a cycle between them. Today the
+  formula region classification and the formula LaTeX share the formulas
+  (M4: the recognition waits for the classification); the descriptions
+  never take a table or a formula (``is_describable``), and the table step
+  only tables, so no other pair shares one.
 
   So the order between the steps is not a dependency: the planner breaks
   the tie (their costs are equal), and ``DOCUMENT_STEPS`` is the order of the
@@ -71,6 +75,7 @@ from dataclasses import dataclass
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
+    MSG_OBLIGATION_FORMULA_CLASSIFICATION,
     MSG_OBLIGATION_FORMULA_RECOGNITION,
     MSG_OBLIGATION_PICTURE_DESCRIPTION,
     MSG_OBLIGATION_TABLE_ENRICHMENT,
@@ -81,7 +86,10 @@ from acessilia_core.manifest.models import (
     Obligation,
     ProcessingManifest,
 )
-from acessilia_core.pipeline.enrichment.formulas import formulas_to_recognize
+from acessilia_core.pipeline.enrichment.formulas import (
+    formulas_to_classify,
+    formulas_to_recognize,
+)
 from acessilia_core.pipeline.enrichment.pictures import (
     description_candidates,
     is_describable,
@@ -165,9 +173,28 @@ FORMULA_RECOGNITION = DocumentStep(
     pending=formulas_to_recognize,
 )
 
-#: In the order the enrichment before planning ran them: the descriptions,
-#: which can find formulas, then the formula LaTeX, then the tables.
+#: The document's formula region classification (M4): the formulas without
+#: LaTeX in a source that can be rendered, not classified yet, and not read
+#: as a formula by the vision model already. It shares the formulas with the
+#: formula LaTeX, which comes after it in ``DOCUMENT_STEPS``, so their
+#: recognition waits for it, as before planning until 0.3.17. A drawing it
+#: describes becomes a picture, which it no longer applies to.
+FORMULA_CLASSIFICATION = DocumentStep(
+    kind="classify-formula-regions",
+    method="formula-region-classifier",
+    obligation_id="obligation-classify-formula-regions",
+    rationale=MSG_OBLIGATION_FORMULA_CLASSIFICATION,
+    applies=lambda element: element.type == "formula",
+    pending=formulas_to_classify,
+)
+
+#: In the order the enrichment before planning ran them: the formula region
+#: classification, the descriptions (which can find formulas), the formula
+#: LaTeX, then the tables. Two steps share elements only when the first must
+#: run before the second (the classification, then the formula LaTeX); this
+#: order makes that dependency, and never the reverse.
 DOCUMENT_STEPS: tuple[DocumentStep, ...] = (
+    FORMULA_CLASSIFICATION,
     PICTURE_DESCRIPTION,
     FORMULA_RECOGNITION,
     TABLE_ENRICHMENT,
@@ -197,9 +224,17 @@ def reconcile_document_step(
 
 
 def reconcile_document_steps(manifest: ProcessingManifest, *, replan: bool = False) -> None:
-    """:func:`reconcile_document_step` for every step of ``DOCUMENT_STEPS``."""
+    """:func:`reconcile_document_step` for every step of ``DOCUMENT_STEPS``.
+
+    The edges are reconciled once more after every step's obligations exist:
+    a step's pass links the obligations that exist then, so when two steps
+    share an element (M4), the later step's obligation, created in its own
+    pass, would otherwise wait for the next reconciliation to depend on the
+    earlier one, and the first plan could run them in either order."""
     for step in DOCUMENT_STEPS:
         reconcile_document_step(manifest, step, replan=replan)
+    for step in DOCUMENT_STEPS:
+        _reconcile_edges(manifest, step)
 
 
 def _drop_lost(manifest: ProcessingManifest, step: DocumentStep) -> None:
@@ -307,6 +342,7 @@ def _reconcile_edges(manifest: ProcessingManifest, step: DocumentStep) -> None:
 __all__ = [
     "CLOSED_STATUSES",
     "DOCUMENT_STEPS",
+    "FORMULA_CLASSIFICATION",
     "FORMULA_RECOGNITION",
     "PICTURE_DESCRIPTION",
     "TABLE_ENRICHMENT",

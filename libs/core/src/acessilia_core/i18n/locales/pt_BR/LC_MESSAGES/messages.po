@@ -225,6 +225,9 @@ msgstr "O documento tem {page_count} páginas, mais que o limite de {max_pages}.
 msgid "Enriching the formulas..."
 msgstr "Enriquecendo as fórmulas..."
 
+msgid "Marking the math in the text..."
+msgstr "Marcando a matemática no texto..."
+
 msgid "Enriching the image descriptions..."
 msgstr "Enriquecendo as descrições de imagens..."
 
@@ -686,6 +689,13 @@ msgstr "A imagem deve receber descrição ou ser marcada como decorativa."
 
 msgid "The table must have verifiable headers and reading order."
 msgstr "A tabela deve ter cabeçalhos e ordem de leitura verificáveis."
+
+msgid ""
+"The document's formula regions must be checked as mathematics, a drawing,"
+" or a case for a person."
+msgstr ""
+"As regiões de fórmula do documento devem ser conferidas como matemática, "
+"desenho ou caso para uma pessoa."
 
 msgid ""
 "The document's formulas must get their LaTeX read and their equation "
@@ -2532,6 +2542,24 @@ msgstr[1] ""
 "Descrição de imagens rodou para {count} imagens: {described} descritas, "
 "{formulas} lidas como fórmulas, {already} já descritas; ficaram sem "
 "descrição: {left}"
+
+#, python-brace-format
+msgid ""
+"Formula region classification ran for {count} formula: {math} "
+"mathematical, {pictures} drawings described as pictures, {unresolved} "
+"sent to human review; left unclassified: {left}"
+msgid_plural ""
+"Formula region classification ran for {count} formulas: {math} "
+"mathematical, {pictures} drawings described as pictures, {unresolved} "
+"sent to human review; left unclassified: {left}"
+msgstr[0] ""
+"Classificação de regiões de fórmula rodou para {count} fórmula: {math} "
+"matemáticas, {pictures} desenhos descritos como imagens, {unresolved} "
+"enviadas para revisão humana; ficaram sem classificação: {left}"
+msgstr[1] ""
+"Classificação de regiões de fórmula rodou para {count} fórmulas: {math} "
+"matemáticas, {pictures} desenhos descritos como imagens, {unresolved} "
+"enviadas para revisão humana; ficaram sem classificação: {left}"
 
 #, python-brace-format
 msgid ""

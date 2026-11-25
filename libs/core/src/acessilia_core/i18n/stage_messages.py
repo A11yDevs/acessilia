@@ -61,6 +61,8 @@ STAGE_DOCUMENT_TOO_MANY_PAGES: str = (
 )
 #: PDDL-pipeline stage while formulas the extractor left without LaTeX are being recognized.
 STAGE_ENRICHING_FORMULAS: str = "Enriching the formulas..."
+#: Progress message while the math inside the text is marked (#640, M4).
+STAGE_MARKING_INLINE_MATH: str = "Marking the math in the text..."
 #: PDDL-pipeline stage while image descriptions are being enriched with the vision model.
 STAGE_ENRICHING_IMAGE_DESCRIPTIONS: str = "Enriching the image descriptions..."
 #: PDDL-pipeline stage while tables are being enriched with OCR as a fallback.
