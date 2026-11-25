@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
@@ -404,3 +404,24 @@ class ProcessingManifest(StrictModel):
             ),
         },
     )
+
+
+def validate_delivered_manifest(manifest: ProcessingManifest) -> None:
+    """Every check a resume makes on the manifest a run delivers (#844).
+
+    The model validates on construction, not on assignment, and a run
+    changes the manifest in place. A resume reads the checkpoint back with
+    ``ProcessingManifest.model_validate``, which checks the obligation
+    references and DAG (:func:`validate_obligation_graph`), the satisfied
+    obligations' predecessors and the summary counts. This runs the same
+    round trip on the live manifest, so a run never delivers what its own
+    resume would reject. Raises ``ValueError`` with the model's first
+    message.
+    """
+    try:
+        ProcessingManifest.model_validate(manifest.model_dump(mode="json", by_alias=True))
+    except ValidationError as error:
+        first = error.errors()[0]
+        cause = (first.get("ctx") or {}).get("error")
+        raise ValueError(str(cause) if cause is not None else first["msg"]) from error
+

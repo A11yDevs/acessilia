@@ -2,19 +2,24 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
-## 0.3.21 — the delivered obligation graph is validated (#844)
+## 0.3.21 — the delivered manifest is validated (#844)
 
 The replan loop revalidated the obligation graph (references and DAG) only
 before a replan (#832, M0). A run that completed without one delivered what
 a handler left: a satisfied obligation pointing at an obligation it removed
 reached the payload, and an exhausted dependent (no method left, so no
 replan) failed with the unsatisfied summary instead of the cause.
-- `_check_unsatisfied` validates the graph first, whatever the run's status
-  (`validate_obligation_graph`), so both fail with the manifest's message,
-  naming the obligation and the missing dependency. A valid graph is
-  delivered as before.
-- Tests: a satisfied and an exhausted dependent of a removed obligation, and
-  a removal that rewires its dependent.
+- `_check_unsatisfied` first runs `validate_delivered_manifest`, whatever the
+  run's status, dry runs included: the round trip a resume makes
+  (`ProcessingManifest.model_validate`), so a run never delivers what its own
+  resume would reject. Besides the references and the DAG, it checks the
+  satisfied obligations' predecessors and the summary counts. It fails with
+  the manifest's message; a valid manifest is delivered as before.
+- A test fixture that added a page without its count
+  (`test_unstructured_pages.py`) is fixed.
+- Tests: a satisfied and an exhausted dependent of a removed obligation, a
+  cycle, a satisfied obligation waiting for an exhausted one, a removal that
+  rewires its dependent (with what is delivered), and a dry run.
 
 ## 0.3.20 — the prose's inline math is a planned action (#640, M4b)
 

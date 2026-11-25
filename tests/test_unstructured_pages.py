@@ -178,6 +178,7 @@ def _planned_manifest(source: Path):
     manifest.source.path = str(source)
     manifest.source.sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     manifest.pages.append(PageDescriptor(page_number=2))
+    manifest.summary.page_count = len(manifest.pages)
     append_unstructured_page_needs(manifest)
     [obligation] = manifest.obligations
     return manifest, obligation.id, obligation.target_ids[0]

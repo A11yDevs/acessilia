@@ -41,7 +41,11 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_VALIDATING_PLAN_DRY_RUN,
 )
 from acessilia_core.logger import logger
-from acessilia_core.manifest.models import ProcessingManifest, validate_obligation_graph
+from acessilia_core.manifest.models import (
+    ProcessingManifest,
+    validate_delivered_manifest,
+    validate_obligation_graph,
+)
 from acessilia_core.manifest.toolbox_extractor import ToolboxManifestExtractor
 from acessilia_core.pipeline.checkpointing import (
     RunCheckpoints,
@@ -773,15 +777,18 @@ class PddlAccessibilityOrchestrator:
         elsewhere) or a critical obligation is; with only refinements open, the
         document is delivered with a technical warning. A completed run is
         held to the same policy for what it left open (the work found after
-        it with the discovery budget spent). A dry run is not checked.
+        it with the discovery budget spent). A dry run's open obligations are
+        not checked.
 
-        First, the obligation graph is validated, whatever the run's status
-        (#844): the replan loop revalidates it only before a replan, so a run
-        that completed, or ended without one, could otherwise deliver a
-        handler's dangling reference or cycle. It fails with the manifest's
-        message, which names the obligation.
+        First, whatever the run's status, dry runs included (their manifest
+        is delivered too), the manifest gets every check a resume would make
+        (``validate_delivered_manifest``, #844): the replan loop revalidates
+        the graph only before a replan, so a run that completed, or ended
+        without one, could otherwise deliver a handler's dangling reference
+        or cycle, a satisfied obligation waiting for an open one, or stale
+        counts. It fails with the manifest's message.
         """
-        validate_obligation_graph(manifest)
+        validate_delivered_manifest(manifest)
         if execution_report.status == "dry-run-completed":
             return
         completed = execution_report.status == "completed"

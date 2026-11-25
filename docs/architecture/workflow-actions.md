@@ -240,9 +240,12 @@ the manifest. **The enrichment migration needs no domain change.**
      of the manifest the run changed are rechecked, so a dangling reference a
      handler left fails the job with the manifest's message, naming the
      obligation and the missing dependency, instead of a `KeyError`. Since
-     core 0.3.21 (#844) the graph is also checked before delivery, whatever
-     the run's status (`_check_unsatisfied`): a run that completed, or ended
-     without a replan, can no longer deliver a dangling reference or cycle.
+     core 0.3.21 (#844) the manifest a run delivers gets every check a
+     resume makes, whatever the run's status, dry runs included
+     (`validate_delivered_manifest` in `_check_unsatisfied`): a run that
+     completed, or ended without a replan, can no longer deliver a dangling
+     reference, a cycle, a satisfied obligation waiting for an open one, or
+     stale counts.
    - `PDDL_MAX_DISCOVERY_REPLANS` (default 3) sets the separate bound; a
      value other than the default enters the checkpoint and cache
      identities.
