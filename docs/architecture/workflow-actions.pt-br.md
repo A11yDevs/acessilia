@@ -34,19 +34,19 @@ ordem:
 | Bootstrap | Limite de páginas, antes da extração | Recusa um documento acima de `DocumentConfig.max_pages` pela contagem de páginas da inspeção (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extração | Monta o manifesto: elementos, depois as obrigações derivadas dos seus tipos | Toolbox `document.structure.extract` (um ou dois providers) | `manifest` |
 | Bootstrap | Limite de páginas, depois da extração | Confere o limite de novo contra a estrutura extraída | — | — |
-| Enriquecimento | Passos antes do planejamento, numa ordem fixa (abaixo); desde a 0.3.12, os passos 5 e 6 rodam dentro do plano (M2), desde a 0.3.14 as descrições do passo 2 (M1), desde a 0.3.15 o passo 4 (M3), e desde a 0.3.18 o passo 1 (M4a) | | Toolbox e os agentes de modelo do Core | `enriched` no passo 3 e na preparação do passo 2; o checkpoint de execução, por passo do plano, no 1, nas descrições, no 4 e nos 5–6 |
+| Enriquecimento | Passos antes do planejamento, numa ordem fixa (abaixo); desde a 0.3.12, os passos 5 e 6 rodam dentro do plano (M2), desde a 0.3.14 as descrições do passo 2 (M1), desde a 0.3.15 o passo 4 (M3), e desde a 0.3.19 o passo 1 (M4a) | | Toolbox e os agentes de modelo do Core | `enriched` no passo 3 e na preparação do passo 2; o checkpoint de execução, por passo do plano, no 1, nas descrições, no 4 e nos 5–6 |
 | Planejamento | | Compila o problema a partir do manifesto enriquecido e planeja | — | `plan` |
 
 Os passos de enriquecimento (`_enrich_before_planning` até o core 0.3.11;
 desde a 0.3.12, os passos 5 e 6 rodam dentro do plano, como o método
 `table-enrichment`, M2; desde a 0.3.14, as descrições do passo 2, como o
 método `picture-description`, M1; desde a 0.3.15, o passo 4, como o método
-`formula-recognizer`, M3; desde a 0.3.18, o passo 1, como o método
+`formula-recognizer`, M3; desde a 0.3.19, o passo 1, como o método
 `formula-region-classifier`, M4a):
 
 | Passo | Função | Chama | Efeito no manifesto |
 |---|---|---|---|
-| 1. Regiões de fórmula | `_classify_formula_regions`, dentro do plano desde a 0.3.18 | Toolbox `pdf.render` (o recorte da fórmula); `VisionAgent` | confere os rótulos de fórmula do extrator. Um desenho é descrito uma vez e vira imagem, o que reconcilia suas obrigações (`reconcile_reclassified_element`); um candidato incerto vai para revisão humana |
+| 1. Regiões de fórmula | `_classify_formula_regions`, dentro do plano desde a 0.3.19 | Toolbox `pdf.render` (o recorte da fórmula); `VisionAgent` | confere os rótulos de fórmula do extrator. Um desenho é descrito uma vez e vira imagem, o que reconcilia suas obrigações (`reconcile_reclassified_element`); um candidato incerto vai para revisão humana |
 | 2. Descrições de imagens | `_prepare_pictures` antes do planejamento; `_enrich_picture_descriptions` dentro do plano desde a 0.3.14 | `VisionAgent` | primeiro injeta uma imagem de página inteira para uma imagem raster isolada e anota a posse do texto visual, ambas a partir da inspeção de mídia (essas ficam antes do planejamento); depois uma descrição por imagem, e a posse anotada de novo |
 | 3. Matemática inline | `_mark_inline_math` | Toolbox `document.text.spans` | marca a matemática na prosa |
 | 4. LaTeX das fórmulas | `_enrich_formula_latex`, dentro do plano desde a 0.3.15 | Toolbox `math.recognize`, `pdf.render`; `VisionAgent` como alternativa | separa os números de equação, depois o LaTeX de cada fórmula |
@@ -319,7 +319,7 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
    dependência, e os custos são iguais, então o planejador desempata
    (`DOCUMENT_STEPS` é a ordem da reconciliação, não a do plano).
 
-   **M4a (core 0.3.18).** A classificação de regiões de fórmula roda dentro
+   **M4a (core 0.3.19).** A classificação de regiões de fórmula roda dentro
    do plano. Ela compartilha as fórmulas com o LaTeX das fórmulas, que deve
    vir depois dela (a classificação decide se uma região é matemática),
    então `recognize-formulas` depende de `classify-formula-regions` nas
@@ -437,7 +437,7 @@ todos:
 | Passo | Tipo e método | Alvos | Sai dos alvos | Dependem dela |
 |---|---|---|---|---|
 | Enriquecimento de tabelas (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | todas as tabelas | um elemento que deixou de ser tabela | `linearize-table`, `select-table-source` e as obrigações de página de uma página com tabela |
-| Classificação de regiões de fórmula (M4a, 0.3.18) | `classify-formula-regions`, `formula-region-classifier` | numa fonte que pode ser renderizada, as fórmulas sem marcação LaTeX que nenhuma classificação decidiu, menos uma que as descrições transformaram em fórmula | um elemento que deixou de ser fórmula (um desenho que ela descreveu é imagem) | `recognize-formulas` (eles compartilham a fórmula), `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
+| Classificação de regiões de fórmula (M4a, 0.3.19) | `classify-formula-regions`, `formula-region-classifier` | numa fonte que pode ser renderizada, as fórmulas sem marcação LaTeX que nenhuma classificação decidiu, menos uma que as descrições transformaram em fórmula | um elemento que deixou de ser fórmula (um desenho que ela descreveu é imagem) | `recognize-formulas` (eles compartilham a fórmula), `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
 | LaTeX das fórmulas (M3, 0.3.15) | `recognize-formulas`, `formula-recognizer` | as fórmulas com um rótulo de equação a separar e, numa fonte que pode ser renderizada, as sem LaTeX que nenhum reconhecimento registrou | um elemento que deixou de ser fórmula (o reconhecimento o leu como imagem) | `verbalize-formula`, `normalize-formula` e as obrigações de página de uma página com fórmula |
 | Descrições de imagens (M1, 0.3.14) | `describe-images`, `picture-description` | as imagens ainda não descritas; sem imagens, num documento majoritariamente visual, seus visuais substitutos, ou o primeiro elemento de um documento de uma página; nunca uma fórmula nem uma tabela | um elemento que virou fórmula ou tabela | `describe-image` e as obrigações de página de uma página com imagem |
 
@@ -546,7 +546,7 @@ decididas no seu pull request.
 | M0 (feito, core 0.3.13) | Preparação do executor | O executor pula, e registra como `skipped` com o motivo, o passo de uma obrigação que esta execução removeu ou substituiu, e o de uma que agora espera uma obrigação aberta que o plano não executa antes dele. O `complete-job` é pulado enquanto toda obrigação aberta foi encontrada ou adiada; uma que o plano executou e deixou aberta é falha. O orquestrador replaneja depois de uma execução assim com um limite próprio (`max_discovery_replans`), separado de `max_replans`, e para quando um replanejamento partiria do mesmo estado de planejamento. O passo de uma obrigação mudada sob o mesmo id também é pulado. As obrigações do documento são reconciliadas antes de cada replanejamento, e o enriquecimento de tabelas se restringe aos seus alvos | — | — | — |
 | M1 (feito, core 0.3.14) | Descrições de imagens | `describe-images`, uma por documento com imagens a descrever (ou com os visuais substitutos de um documento majoritariamente visual), método `picture-description`, que roda o passo com seu paralelismo e sua passada de retry; `describe-image` mantém o `vision-description`, que confere o resultado, e depende dela. A imagem injetada e a primeira anotação de posse ficam antes do planejamento | `transitional` (`VisionAgent`) | opcional (#848): `pdf.render` para o recorte de uma imagem degrada para `crop_unavailable` | sim: uma descrição pode retipar uma imagem como fórmula, o que remove seu `describe-image` e acrescenta `verbalize-formula` |
 | M3 (feito, core 0.3.15) | LaTeX das fórmulas | `recognize-formulas`, uma por documento com fórmulas a reconhecer ou rótulos de equação a separar, método `formula-recognizer`, que roda o passo com seu paralelismo; `verbalize-formula` e `normalize-formula` dependem dela. Uma obrigação do documento, como no M1 e no M2, não uma por fórmula como proposto antes: o passo compartilha um breaker, uma sondagem do `math.recognize` por obrigação e seu paralelismo no documento inteiro | `transitional` (`VisionAgent`, a alternativa) | opcionais (#848): o `math.recognize` degrada para a alternativa de visão e o `pdf.render` por fórmula, então nunca o excluem | sim: a alternativa pode ler uma fórmula como imagem, o que troca suas obrigações de fórmula por `describe-image`; e uma fórmula que as descrições encontram ganha o passo no replanejamento |
-| M4a (feito, core 0.3.18) | Regiões de fórmula | `classify-formula-regions`, uma por documento com regiões de fórmula a conferir, método `formula-region-classifier`, que roda o passo com seu paralelismo; `recognize-formulas` depende dela nas fórmulas que compartilham. Do documento, como M1–M3, não uma por região como proposto antes (`classify-formula-region`) | `transitional` (`VisionAgent`) | opcional (#848): `pdf.render` para o recorte de uma região | sim: um desenho vira imagem descrita (as obrigações de fórmula trocadas por `describe-image`), e uma região incerta vai para revisão humana (`verbalize-formula` fica só com `human-review`, `normalize-formula` é retirada) |
+| M4a (feito, core 0.3.19) | Regiões de fórmula | `classify-formula-regions`, uma por documento com regiões de fórmula a conferir, método `formula-region-classifier`, que roda o passo com seu paralelismo; `recognize-formulas` depende dela nas fórmulas que compartilham. Do documento, como M1–M3, não uma por região como proposto antes (`classify-formula-region`) | `transitional` (`VisionAgent`) | opcional (#848): `pdf.render` para o recorte de uma região | sim: um desenho vira imagem descrita (as obrigações de fórmula trocadas por `describe-image`), e uma região incerta vai para revisão humana (`verbalize-formula` fica só com `human-review`, `normalize-formula` é retirada) |
 | M4b | Matemática inline da prosa | kind novo `mark-inline-math` (método `inline-math-marker`), substituindo a passada pós-execução da #599 | declarado | `document.text.spans` | sim: os blocos que um plano acrescenta a ganham no replanejamento |
 | — | Bootstrap | Mantido e documentado como a baseline 0.3.0 | — | — | — |
 
@@ -557,7 +557,7 @@ modelo lê como fórmula vira fórmula, e a reconciliação remove o
 só tratava obrigações acrescentadas (`_select_discovered`), então o M1 esperou
 o M0 e veio depois dele, no core 0.3.14. O M3 veio na 0.3.15 e fechou a
 lacuna que o M1 deixou para uma fórmula encontrada durante o plano (#846). O
-M4a veio na 0.3.18; o M4b também muda obrigações e se apoia no M0.
+M4a veio na 0.3.19; o M4b também muda obrigações e se apoia no M0.
 
 Cada PR:
 - tira seu passo de `_enrich_before_planning`;

@@ -142,11 +142,15 @@ needs a larger representative set and a controlled comparison.
   release branch (`release/*` as base or head); ordinary PRs skip it. Pushes,
   `workflow_dispatch` and the weekly schedule still scan unconditionally, and
   the dependency audit remains unconditional. The image-path filter and its
-  `image-changes` detector were removed in a follow-up: the detector caused
-  the 2026-11-23 skip of `publish verified images` because GitHub evaluates a
-  caller's `needs` on a reusable workflow by its internal jobs. The scan still
-  skips on ordinary PRs, so no PR job may `needs` the `security` call without
-  an explicit status guard.
+  `image-changes` detector were removed in the same follow-up that narrowed
+  the scan to release pulls. The scan still skips on ordinary PRs, so no PR
+  job may `needs` the `security` call without an explicit status guard.
+- The 2026-11-23 skip of `publish verified images` had a second cause: the
+  PR-only `changes` job is skipped on pushes; `app-integration` and `tests`
+  override that skip, but GitHub still propagates it transitively to
+  `delivery` under the default success check. `delivery` now uses
+  `!cancelled()` and requires every direct need to be `success` explicitly
+  (#861).
 - `docs/testing.md` still records the #448-era 1m59s / 59s–1m26s figures. The
   job absorbed Ruff/Mypy on 2026-11-20 and the suite grew; the numbers here are
   the comparable 2026-11-23 sample, not a contradiction of the historical

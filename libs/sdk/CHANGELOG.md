@@ -5,6 +5,15 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
+## 0.7.0 (2026-11-24)
+
+- **Added** `plan_downscale` in `acessilia_sdk.toolbox.clients.pdf`: the pure
+  decision `downscale_image` makes before it touches the Toolbox. It validates
+  `scale`, reads the PNG/JPEG header dimensions and returns the render's
+  `max_side` with the file suffix, or `None` when the image would not shrink.
+  `downscale_image` now uses it, and the Core's vision payload skips
+  unshrinkable images from the same rule instead of repeating it (#636).
+
 ## 0.6.0 (2026-11-22)
 
 - **Added** `resolve_findings` in `acessilia_sdk.i18n.translation`: formats

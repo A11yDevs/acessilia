@@ -2,7 +2,7 @@
 
 ``_classify_formula_regions`` asks the vision model whether each formula
 crop without LaTeX holds mathematics, a drawing or nothing it can tell, and
-reclassifies or escalates it: inside the plan since core 0.3.18, as the
+reclassifies or escalates it: inside the plan since core 0.3.19, as the
 ``formula-region-classifier`` method of the document's
 ``classify-formula-regions`` obligation (#640, M4). ``_enrich_formula_latex`` then reads
 the LaTeX of the mathematical ones, inside the plan since core 0.3.15, as the
@@ -194,7 +194,7 @@ async def _classify_formula_regions(
 ) -> None:
     """Check extractor formula labels before a mathematical recognizer sees them.
 
-    Inside the plan since core 0.3.18, as the ``formula-region-classifier``
+    Inside the plan since core 0.3.19, as the ``formula-region-classifier``
     method of the document's ``classify-formula-regions`` obligation (#640,
     M4); ``targets`` keeps it to the obligation's formulas (``None``: the
     whole document). A formula already classified is not asked again.

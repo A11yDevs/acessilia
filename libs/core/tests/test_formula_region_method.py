@@ -1,6 +1,6 @@
 """The document's formula region classification as a planned action (#640, M4).
 
-Until 0.3.17 the orchestrator checked the extractor's formula labels before
+Until 0.3.18 the orchestrator checked the extractor's formula labels before
 planning. Now a ``classify-formula-regions`` obligation, added when the
 document has formula regions to check, is satisfied by the
 ``formula-region-classifier`` method, which runs the same step. It shares the
@@ -255,7 +255,7 @@ def test_a_run_replans_the_picture_a_region_became(monkeypatch, tmp_path) -> Non
 
 def test_the_method_leaves_the_regions_as_the_step_before_planning_did(monkeypatch) -> None:
     """The differential test of the migration (ADR-0028): the same answers
-    give the same elements, before planning as until 0.3.17, and inside the
+    give the same elements, before planning as until 0.3.18, and inside the
     plan."""
     from acessilia_core.agents.provider_breaker import ProviderBreaker
 

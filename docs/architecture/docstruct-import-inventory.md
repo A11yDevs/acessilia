@@ -18,12 +18,16 @@ in step (see [The guard](#the-guard)).
 ## Summary
 
 Measured on `develop` at `82424b34` with an AST scan that includes imports
-inside functions and `import docstruct.x` statements (the guard's scan).
+inside functions and `import docstruct.x` statements (the guard's scan); the
+numbers below are re-measured after #636 removed the core's last direct import
+of `docstruct.imaging` (`toolbox/vision_payload` now asks the SDK for the
+downscale plan).
 
-- **50 files** import **57 docstruct modules**.
-- **45 files** import computation (algorithm or operation). ADR-0028 gives
-  43; the difference is `pipeline/judge` and `pipeline/handlers/judge`, which
-  import `docstruct.fusion.judge`, classified here as an algorithm (see
+- **49 files** import **56 docstruct modules**.
+- **44 files** import computation (algorithm or operation): ADR-0028's 43,
+  plus `pipeline/judge` and `pipeline/handlers/judge` (which import
+  `docstruct.fusion.judge`, classified here as an algorithm), minus
+  `toolbox/vision_payload`, whose last direct import #636 removed (see
   [The classification rule](#the-classification-rule)).
 - **5 files** import only contracts, validation or policy:
   - contract only: `export/catalog`, `manifest/document_adapter`,
@@ -31,8 +35,8 @@ inside functions and `import docstruct.x` statements (the guard's scan).
   - validation only: `pipeline/validators`;
   - policy only: `manifest/toolbox_extractor`.
 - ADR-0028 counts 46 files at `46f2fe7e`. The same scan finds 50 there, with
-  the same files as today: the difference is the counting, and no file has
-  started importing docstruct since.
+  the same files as at `82424b34`: the difference is the counting, and no file
+  has started importing docstruct since.
 
 | Class | Modules | What it is | Target |
 |---|---|---|---|
@@ -40,7 +44,7 @@ inside functions and `import docstruct.x` statements (the guard's scan).
 | validation | 1 | Checks of a document against a schema or rules | Transitional, pinned: schema validation stays near the interoperability layer; the document audit becomes a capability |
 | policy | 2 | Decision rules the core uses to coordinate | Transitional, pinned: the strategic part moves into the core (ADR-0029); the algorithms' parameters stay with the Toolbox |
 | operation | 10 | Compositions: canonical assembly, export rendering, payload fusion, the table specialist | A composite Toolbox capability, backing a planned action |
-| algorithm | 42 | Structural algorithms over document content, and the types internal to them | An atomic Toolbox capability, migrated with the plan method or agent that uses it |
+| algorithm | 41 | Structural algorithms over document content, and the types internal to them | An atomic Toolbox capability, migrated with the plan method or agent that uses it |
 
 Every class but contract is pinned: each importer and each name it imports
 is listed, and the list only shrinks.
@@ -155,7 +159,7 @@ is the order the migration can follow, per plan method or agent (ADR-0028):
 | Payload and canonical assembly | `pipeline/payload`, `pipeline/canonical_builder`, `pipeline/elements`, `pipeline/obligations` | Canonical assembly and page text: the composite behind accessible export |
 | Accessible export (`export/*`) | renderers, exporters, Pandoc exporter, markers, catalog | Rendering, behind the export capability (`document.export.*`) |
 | Manifest construction (`manifest/*`) | builder, layout and text detectors, slides | Reading order, tail join, verse, normalization while building the manifest |
-| Coordination and boundary | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `toolbox/vision_payload`, `manifest/toolbox_extractor` | Payload fusion, region clipping and the judge's threshold; the fusion policy is policy |
+| Coordination and boundary | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `manifest/toolbox_extractor` | Payload fusion, region clipping and the judge's threshold; the fusion policy is policy |
 | Compatibility shims | `pipeline/table_ast`, `formula_tools`, `pipeline/validators` | Re-exports kept for old imports (`import docstruct.x`); removed when their callers move |
 | Service (`backend/service.py`) | `backend/service` | `merge_broken_paragraphs` (algorithm) and `verbosity_for_mode` (policy) |
 
@@ -196,7 +200,6 @@ is the order the migration can follow, per plan method or agent (ADR-0028):
 | `docstruct.fusion.xycut` | algorithm | `xycut_order` | `agents/fusion_agent`, `agents/order_adjudication_agent`, `manifest/detectors/layout` |
 | `docstruct.geometry` | algorithm | `OrientedBox`, `ReadingItem`, `is_bottom_left`, `order_reading_items`, `reading_role`, `union` | `manifest/builder`, `manifest/detectors/types`, `manifest/slides`, `pipeline/elements`, `pipeline/payload`, `pipeline/secondary` |
 | `docstruct.geometry.boxes` | algorithm | `PageBox`, `best_effort_clip`, `box_contains_center`, `box_distance`, `boxes_overlap`, `boxes_side_by_side`, `downward_edges`, `expand_box`, `holds_point`, `spans_horizontally`, `union_area` | `manifest/slides`, `pipeline/enrichment/common`, `pipeline/enrichment/inline_math`, `pipeline/handlers/unicode_repair`, `pipeline/toolbox` |
-| `docstruct.imaging` | algorithm | `image_dimensions` | `toolbox/vision_payload` |
 | `docstruct.imaging.policy` | algorithm | `decide_orientation`, `upscale_factor` | `agents/page_level_agent` |
 | `docstruct.placeholders` | algorithm | `UNSTRUCTURED_PAGE_FLAG`, `UNSTRUCTURED_PAGE_LABEL`, `has_meaningful_text`, `is_mostly_visual`, `is_placeholder_visual`, `is_unstructured_page_placeholder` | `manifest/builder`, `pipeline/enrichment/pictures`, `pipeline/handlers/content`, `pipeline/payload` |
 | `docstruct.regions.classify` | algorithm | `classify_region`, `region_needs_vision`, `region_prompt_key` | `agents/fusion_agent`, `agents/vision_agent` |
@@ -319,7 +322,8 @@ Each migration, per plan method or agent (ADR-0028):
 4. adds a differential regression test;
 5. removes the obsolete files and names from the fixture, and a module's row
    from this page when its last importer goes;
-6. updates the indicators above.
+6. re-measures the summary above, which follows the code; the indicators keep
+   their `82424b34` baseline.
 
 A capability follows the semantics of the plan methods and agents. Not every
 utility function becomes a remote call: low-level algorithms are composed

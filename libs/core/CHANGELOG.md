@@ -2,9 +2,9 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
-## 0.3.18 — the formula region classification is a planned action (#640, M4a)
+## 0.3.19 — the formula region classification is a planned action (#640, M4a)
 
-Until 0.3.17 the orchestrator checked the extractor's formula labels before
+Until 0.3.18 the orchestrator checked the extractor's formula labels before
 planning. Now a document with formula regions to check gets one
 `classify-formula-regions` obligation, satisfied by the
 `formula-region-classifier` method, which runs the same step inside the
@@ -53,6 +53,18 @@ run's breaker and region cache.
   formula end to end (not classified again), a crash mid-step and a crash
   after the classification changed obligations, the optional `pdf.render`,
   and a differential test of the elements before and after.
+
+## 0.3.18 — the downscale plan comes from the SDK (#636)
+
+The vision payload's context recovery no longer repeats the SDK's rule for
+when downscaling is worth it. `toolbox/vision_payload` now asks
+`acessilia_sdk.toolbox.clients.pdf.plan_downscale` — the same pure decision the
+SDK's `downscale_image` executes — so the core skips exactly the images the
+render would not shrink, before it builds a client. Behaviour is unchanged: an
+invalid `scale`, unknown bytes and an unshrinkable image still return `None`
+without touching the Toolbox, and a Toolbox failure still returns `None` after
+closing the client. The core no longer imports `docstruct.imaging`, and it now
+requires SDK 0.7.
 
 ## 0.3.17 — checkpoints inside a composite action (#836)
 

@@ -1,10 +1,6 @@
 """Characterization and parity tests for core adoption of docstruct 0.5.7 primitives (#612)."""
 from __future__ import annotations
 
-import struct
-
-import pytest
-from core_config_support import toolbox_config
 from pddl_support import build_manifest, build_obligation
 
 from acessilia_core.agents.output_schemas import DataCell, DataOutput, DataRow
@@ -20,7 +16,6 @@ from acessilia_core.pipeline.handlers.rescue import is_legitimate_text
 from acessilia_core.pipeline.handlers.text import (
     _handle_deterministic_heading_repair_method,
 )
-from acessilia_core.toolbox import vision_payload
 from docstruct.fusion.noise import is_legitimate_text as docstruct_is_legitimate_text
 from docstruct.fusion.skeleton import (
     DEFAULT_MIN_SKELETON_MATCH as docstruct_min_skeleton_match,
@@ -185,21 +180,6 @@ def test_heading_gap_detection_and_repair_stay_in_sync() -> None:
     ]
     after_obs, _ = _derive_processing_needs(manifest.elements)
     assert [obs for obs in after_obs if obs.kind == "heading-hierarchy-gap"] == []
-
-
-@pytest.mark.asyncio
-async def test_downscale_image_uses_docstruct_image_dimensions() -> None:
-    # A 1x1 PNG cannot get smaller at scale=0.5 (max_side=max(1, 0)=1 >= 1), so
-    # downscale_image returns None without touching the Toolbox.
-    tiny_png = (
-        b"\x89PNG\r\n\x1a\n"
-        + struct.pack(">I", 13)
-        + b"IHDR"
-        + struct.pack(">II", 1, 1)
-        + b"\x08\x02\x00\x00\x00"
-    )
-    assert await vision_payload.downscale_image(tiny_png, scale=0.5, toolbox=toolbox_config()) is None
-    assert await vision_payload.downscale_image(b"not-an-image", scale=0.5, toolbox=toolbox_config()) is None
 
 
 def test_skeleton_order_wiring_ranking_and_threshold_are_unchanged() -> None:

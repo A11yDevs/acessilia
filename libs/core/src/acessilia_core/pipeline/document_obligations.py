@@ -177,7 +177,7 @@ FORMULA_RECOGNITION = DocumentStep(
 #: LaTeX in a source that can be rendered, not decided yet, and not turned
 #: into a formula by the descriptions (``formulas_needing_classification``). It shares the formulas with the
 #: formula LaTeX, which comes after it in ``DOCUMENT_STEPS``, so their
-#: recognition waits for it, as before planning until 0.3.17. A drawing it
+#: recognition waits for it, as before planning until 0.3.18. A drawing it
 #: describes becomes a picture, which it no longer applies to.
 FORMULA_CLASSIFICATION = DocumentStep(
     kind="classify-formula-regions",

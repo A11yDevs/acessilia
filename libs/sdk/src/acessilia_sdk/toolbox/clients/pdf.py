@@ -327,21 +327,19 @@ def check_renderable(source: Path, media_type: str | None = None) -> str:
     return sent_as
 
 
-async def downscale_image(
-    client: ToolboxPdfClient,
-    payload: bytes,
-    scale: float = 0.5,
-    *,
-    use_remote_cache: bool | None = None,
-) -> bytes | None:
-    """Render ``payload`` on the Toolbox with its longest side scaled by ``scale``.
+def plan_downscale(payload: bytes, scale: float = 0.5) -> tuple[int, str] | None:
+    """The ``max_side`` and file suffix a downscale of ``payload`` would use.
 
     Reads PNG/JPEG dimensions with :func:`docstruct.imaging.image_dimensions`
-    and delegates resizing to :meth:`ToolboxPdfClient.render` (ADR-0003).
-    Returns ``None`` when ``payload`` is not a PNG/JPEG with readable positive
-    dimensions or when scaling would not shrink the longest side. Raises
-    :class:`ValueError` if ``scale`` is not a finite positive number; Toolbox
-    and filesystem errors propagate unchanged.
+    and multiplies the longest side by ``scale``, rounding down. Returns
+    ``None`` when ``payload`` is not a PNG/JPEG with readable positive
+    dimensions or when the result would not shrink the longest side. Raises
+    :class:`ValueError` if ``scale`` is not a finite positive number.
+
+    This is the whole decision :func:`downscale_image` makes before it touches
+    the Toolbox, so a caller that must avoid building a client, such as the
+    core's vision payload, skips exactly the images the render would skip
+    (issue #636).
     """
     if (
         isinstance(scale, bool)
@@ -358,6 +356,27 @@ async def downscale_image(
     max_side = max(1, int(longest * scale))
     if max_side >= longest:
         return None
+    return max_side, suffix
+
+
+async def downscale_image(
+    client: ToolboxPdfClient,
+    payload: bytes,
+    scale: float = 0.5,
+    *,
+    use_remote_cache: bool | None = None,
+) -> bytes | None:
+    """Render ``payload`` on the Toolbox with its longest side scaled by ``scale``.
+
+    Plans the render with :func:`plan_downscale` and delegates resizing to
+    :meth:`ToolboxPdfClient.render` (ADR-0003). Returns ``None`` when the plan
+    declines ``payload``; raises :class:`ValueError` if ``scale`` is not a
+    finite positive number. Toolbox and filesystem errors propagate unchanged.
+    """
+    plan = plan_downscale(payload, scale)
+    if plan is None:
+        return None
+    max_side, suffix = plan
     with tempfile.TemporaryDirectory(prefix="acessilia-downscale-") as directory:
         source = Path(directory) / f"image{suffix}"
         source.write_bytes(payload)
@@ -380,4 +399,5 @@ __all__ = [
     "ToolboxPdfClient",
     "check_renderable",
     "downscale_image",
+    "plan_downscale",
 ]

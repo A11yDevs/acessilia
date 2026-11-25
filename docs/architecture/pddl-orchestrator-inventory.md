@@ -174,8 +174,8 @@ It finds 64 keys, 19 of them written or read by more than one group.
 3. Q marks inline math in prose.
 
 Two steps that ran here now run inside the plan (below):
-- step 1, P classifies formula regions: until core 0.3.17; inside the plan
-  since 0.3.18 (M4a), before the formulas' recognition;
+- step 1, P classifies formula regions: until core 0.3.18; inside the plan
+  since 0.3.19 (M4a), before the formulas' recognition;
 - step 4, P recognizes formulas: until core 0.3.14; inside the plan since
   0.3.15 (M3).
 

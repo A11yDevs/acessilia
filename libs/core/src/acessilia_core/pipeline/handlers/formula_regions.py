@@ -1,6 +1,6 @@
 """The document's formula region classification as a planned method (#640, M4).
 
-Until 0.3.17 the orchestrator checked the extractor's formula labels before
+Until 0.3.18 the orchestrator checked the extractor's formula labels before
 planning. ``formula-region-classifier`` runs the same step as the method of
 the document's ``classify-formula-regions`` obligation, so the plan chooses,
 orders and accounts it (``docs/architecture/workflow-actions.md``):

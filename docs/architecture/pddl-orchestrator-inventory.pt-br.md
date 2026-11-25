@@ -174,8 +174,8 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 3. Q marca matemática inline na prosa.
 
 Dois passos que rodavam aqui agora rodam dentro do plano (abaixo):
-- o passo 1, P classifica regiões de fórmula: até o core 0.3.17; dentro do
-  plano desde a 0.3.18 (M4a), antes do reconhecimento das fórmulas;
+- o passo 1, P classifica regiões de fórmula: até o core 0.3.18; dentro do
+  plano desde a 0.3.19 (M4a), antes do reconhecimento das fórmulas;
 - o passo 4, P reconhece fórmulas: até o core 0.3.14; dentro do plano desde
   a 0.3.15 (M3).
 

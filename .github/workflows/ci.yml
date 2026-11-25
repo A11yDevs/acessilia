@@ -960,6 +960,7 @@ jobs:
           COMPONENTS: ${{ needs.component-tests.result }}
           BACKENDS: ${{ needs.planning-backends.result }}
           APP_INTEGRATION: ${{ needs.app-integration.result }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           failed=0
           for entry in "quality:$QUALITY" "component-tests:$COMPONENTS" "planning-backends:$BACKENDS"; do
@@ -970,8 +971,15 @@ jobs:
               failed=1
             fi
           done
+          # A PR without integration-path changes may skip the integration
+          # suite. On every other event it must run, so a future path or
+          # condition edit cannot let delivery publish without it.
           if [ "$APP_INTEGRATION" != "success" ] && [ "$APP_INTEGRATION" != "skipped" ]; then
             echo "::error::app-integration finished as $APP_INTEGRATION"
+            failed=1
+          fi
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$APP_INTEGRATION" != "success" ]; then
+            echo "::error::app-integration finished as $APP_INTEGRATION on a $EVENT_NAME run"
             failed=1
           fi
           exit "$failed"
@@ -985,13 +993,25 @@ jobs:
 
   delivery:
     name: publish verified images
+    # `changes` is PR-only, so it is skipped on a push. `app-integration`
+    # overrides that skip with `!cancelled()` and runs, and the `tests`
+    # aggregator overrides it with `always()`. GitHub still propagates the
+    # skipped ancestor transitively to a job that needs `tests` under the
+    # default success check. `!cancelled()` removes the implicit check; the
+    # explicit results keep the gate fail-closed.
     if: >
+      !cancelled() &&
       github.event_name == 'push' &&
       (
         github.ref_name == 'main' ||
         github.ref_name == 'develop' ||
         startsWith(github.ref_name, 'release/')
-      )
+      ) &&
+      needs.tests.result == 'success' &&
+      needs.sdk-isolated.result == 'success' &&
+      needs.core-isolated.result == 'success' &&
+      needs.docstruct-isolated.result == 'success' &&
+      needs.security.result == 'success'
     needs:
       - tests
       - sdk-isolated
