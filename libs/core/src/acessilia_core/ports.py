@@ -142,6 +142,11 @@ class RunServices:
         #: it again after it retypes elements (#640, M1), as the stage did
         #: before planning. Not a planning fact: the planner never reads it.
         self.media_inspection: dict[str, Any] | None = None
+        #: Persists the manifest a composite method is enriching, mid-step, as
+        #: ``step_checkpoint(obligation_id, manifest_payload)`` (#836): set by
+        #: the orchestrator to its execution checkpoint, ``None`` outside a job.
+        #: Blocking, so a method calls it off its event loop.
+        self.step_checkpoint: Callable[[str, dict[str, Any]], None] | None = None
 
     def shared(self, key: str, build: Callable[[], _Shared]) -> _Shared:
         """The run's object under ``key``, built by ``build`` the first time."""

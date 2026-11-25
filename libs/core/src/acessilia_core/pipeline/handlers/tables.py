@@ -47,7 +47,7 @@ from acessilia_core.pipeline.enrichment.tables import (
     _enrich_table_structures,
     _tables_to_read,
 )
-from acessilia_core.pipeline.handlers.common import run_status
+from acessilia_core.pipeline.handlers.common import run_status, step_checkpoint
 from acessilia_core.pipeline.handlers.messages import (
     MSG_TABLE_NO_TABLE,
     MSG_TABLES_ENRICHED,
@@ -62,6 +62,7 @@ async def _enrich_tables(
     config: CoreConfig,
     ports: RunPorts,
     targets: frozenset[str],
+    obligation_id: str,
 ) -> int:
     """Read, then mark: the order of the steps before planning, kept (step 6
     runs after step 5, which can replace a table's cells). Returns the runs of
@@ -83,6 +84,8 @@ async def _enrich_tables(
         status_callback=status,
         breaker=run_breaker(ports, config.vision),
         targets=targets,
+        # Each table read is saved into the execution checkpoint (#836).
+        on_progress=step_checkpoint(ports, manifest, obligation_id),
     )
     marks = await _mark_table_inline_math(
         manifest,
@@ -134,7 +137,7 @@ def _handle_table_enrichment_method(
         manifest, visual_review=config.vision.table_visual_review, targets=targets
     )
     needing_ids = [element.id for element in needing]
-    marked = run_sync(_enrich_tables(manifest, Path(manifest.source.path), config, ports, targets))
+    marked = run_sync(_enrich_tables(manifest, Path(manifest.source.path), config, ports, targets, obligation_id))
     by_id = {element.id: element for element in manifest.elements}
     outcomes = Counter(_outcome(by_id[element_id]) for element_id in needing_ids)
     structured = outcomes.pop("read", 0) + outcomes.pop("from_text", 0)

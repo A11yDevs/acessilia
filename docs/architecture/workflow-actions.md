@@ -56,7 +56,7 @@ What the steps share is not uniform:
 | Resource | Steps | Where it lives (core 0.3.12) |
 |---|---|---|
 | Provider breaker | 1, 2, 4, 5 | the run's, `RunPorts.services` (`run_breaker`), shared with the `picture-description`, `formula-recognizer` and `table-enrichment` methods. Their order is the planner's tie-break, so under a partial outage the step the plan runs first spends the breaker's budget first (#853) |
-| Per-object progress (`on_progress`) | 1, 2, 4 | a local, from `checkpoints.enrichment_progress`; steps 2, 4 and 5, inside the plan, have the execution checkpoint of their plan step (per-object checkpoints inside a planned step: #836) |
+| Per-object progress (`on_progress`) | 1, 2, 4 | a local, from `checkpoints.enrichment_progress`; steps 2, 4 and 5, inside the plan, save the manifest they are enriching after each object into the execution checkpoint (`step_progress`, #836), and a crash mid-step resumes from it |
 | Region cache | 1, 2, 4 | from `RunPorts` (`region_cache_for`) |
 | Text-span reader (`_TextSpanReader`) | 3, 6 | the run's, `RunPorts.services` (`run_text_spans`); it keeps no manifest |
 | Progress messages | 1, 2, 4, 5 | the status callback before planning; `RunServices.progress` inside the plan |
@@ -350,6 +350,26 @@ the manifest. **The enrichment migration needs no domain change.**
 7. **Resume stays idempotent.** A step today skips the objects it already
    finished. As a method, the same record makes a re-executed plan step cheap,
    and the execution checkpoint records which steps ran.
+
+   **Inside a composite action (#836).** The planner's atomicity is not the
+   granularity of persistence. A composite method (`picture-description`,
+   `formula-recognizer`, `table-enrichment`) saves the manifest it is
+   enriching after each finished object, coalesced as before planning, into
+   the execution checkpoint, as `step_progress` next to the last finished
+   step (through `RunServices.step_checkpoint`; no new phase). A resumed
+   execution of the same plan starts that step again from it, and the step's
+   per-object gates (`vision_description_complete`, a table's structure, a
+   formula's recognition record) skip the objects already done, so the model
+   calls they cost are not paid again. The obligations the interrupted
+   step's finished objects added (a picture read as a formula gets
+   `verbalize-formula`) are selected on the restore, as the executor would
+   have done once the handler returned, so the replan plans them. A resumed
+   run's checkpoint starts from the snapshot it resumed, so a second crash in
+   the same step keeps the resumed run's progress too. The progress of a
+   step the plan does not run next is never used, and the next finished
+   step drops it. The
+   collective recovery stays the step's: one breaker, one retry pass. The
+   progress messages go through `RunServices.progress`, tied to the job.
 8. **Equivalence first.** Each migration keeps a differential test of the final
    manifest on fixture documents, before and after (ADR-0028).
 
