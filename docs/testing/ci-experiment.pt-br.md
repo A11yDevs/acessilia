@@ -145,11 +145,16 @@ controlada.
   de release (`release/*` como base ou head); PRs comuns o pulam. Pushes,
   `workflow_dispatch` e o schedule semanal continuam escaneando
   incondicionalmente, e a auditoria de dependências permanece incondicional.
-  O filtro por caminhos e o detector `image-changes` foram removidos em um
-  follow-up: o detector causou o skip de `publish verified images` em
-  2026-11-23 porque o GitHub avalia o `needs` de um workflow reutilizável
-  pelos jobs internos. O scan ainda é pulado em PRs comuns, então nenhum job
-  de PR pode depender da chamada `security` sem um guard explícito de status.
+  O filtro por caminhos e o detector `image-changes` foram removidos no mesmo
+  follow-up que restringiu o scan aos PRs de release. O scan ainda é pulado em
+  PRs comuns, então nenhum job de PR pode depender da chamada `security` sem
+  um guard explícito de status.
+- O skip de `publish verified images` em 2026-11-23 teve uma segunda causa: o
+  job `changes`, exclusivo de PR, é pulado em pushes; `app-integration` e
+  `tests` sobrescrevem esse skip, mas o GitHub ainda o propaga
+  transitivamente para `delivery` sob o success check padrão. O `delivery`
+  agora usa `!cancelled()` e exige explicitamente que cada dependência direta
+  termine `success` (#861).
 - `docs/testing.pt-br.md` ainda registra os valores da era #448 (1m59s /
   59s–1m26s). O job absorveu Ruff/Mypy em 2026-11-20 e a suíte cresceu; os
   números aqui são a amostra comparável de 2026-11-23, não uma contradição do
