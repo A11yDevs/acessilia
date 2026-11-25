@@ -277,8 +277,10 @@ def test_a_second_crash_in_the_same_step_keeps_the_resumed_progress(monkeypatch)
         _run(monkeypatch, _pictures(5), checkpoints)
     second_left = _left(checkpoints, "p-", "vision_description_complete")
 
-    assert second[:2] == ["p-3", "p-4"]
-    assert second_left[0] == "p-5"  # p-3 and p-4, described on the resume, were saved
+    # The resume starts with what the first crash left; what it described
+    # before the second crash (p-3 at least) stayed saved.
+    assert second[: len(first_left)] == first_left
+    assert second_left[0] == "p-5" and "p-3" not in second_left
 
     third = _vision(monkeypatch, crash_on=None)
     payload = _run(monkeypatch, _pictures(5), checkpoints)
