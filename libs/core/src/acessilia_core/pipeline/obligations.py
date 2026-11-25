@@ -225,6 +225,62 @@ def _replannable_obligation_ids(manifest: ProcessingManifest) -> list[str]:
     ]
 
 
+def _discovered_roots(manifest: ProcessingManifest) -> list[str]:
+    """The replannable obligations no failure touches (#842): never tried,
+    and with no open, tried obligation among their dependencies, directly or
+    not.
+
+    A discovery replan serves only these whenever the failure budget is
+    spent, in the round that failed and in every later one (with
+    ``max_replans=0``, every discovery replan), so the failed work and what
+    waits for it are not retried. They are not only the obligations a run
+    found: preexisting work never tried is served too, since it does not
+    spend the failure budget. What they leave out stays a goal
+    (``_restore_goals``).
+
+    Precondition: the references are valid and the graph is a DAG; the
+    replan loop validates them before (``validate_obligation_graph``). Each
+    obligation is visited once.
+    """
+    by_id = {obligation.id: obligation for obligation in manifest.obligations}
+    touched: dict[str, bool] = {}
+
+    def is_touched(obligation_id: str) -> bool:
+        if obligation_id not in touched:
+            obligation = by_id[obligation_id]
+            touched[obligation_id] = (obligation.status != "satisfied" and bool(obligation.attempts)) or any(
+                is_touched(dependency) for dependency in obligation.dependencies
+            )
+        return touched[obligation_id]
+
+    return [
+        obligation_id for obligation_id in _replannable_obligation_ids(manifest)
+        if not is_touched(obligation_id)
+    ]
+
+
+def _restore_goals(manifest: ProcessingManifest, planning_manifest: ProcessingManifest) -> None:
+    """Select again on ``manifest`` the goals the plan left out (#842 review).
+
+    The goals are the obligations ``planning_manifest`` had selected and not
+    satisfied. The executor marks selected only the plan's own obligations
+    (``_sync_selection``), so a plan for part of them (a discovery replan
+    after the failure budget is spent serves only ``_discovered_roots``)
+    would otherwise unselect the rest, and an open goal would vanish from
+    the delivery check: a critical one delivered in silence, a refinement
+    with no warning. A goal the run removed stays removed, and one it
+    satisfied stays satisfied. The plan checkpoint saves the planning
+    manifest, so a resume restores the same goals.
+    """
+    goals = {
+        obligation.id for obligation in planning_manifest.obligations
+        if obligation.selected and obligation.status != "satisfied"
+    }
+    for obligation in manifest.obligations:
+        if obligation.id in goals and obligation.status != "satisfied":
+            obligation.selected = True
+
+
 def _unsatisfied_summary(manifest: ProcessingManifest) -> str:
     """The open obligations grouped by kind with their pages.
 

@@ -210,21 +210,34 @@ def test_a_failure_and_a_discovery_with_both_budgets_left_recover_both(monkeypat
     assert "o-found-1" in calls and "o-bad:alternative" in calls
 
 
-def test_a_discovery_does_not_bypass_a_spent_failure_budget(monkeypatch, tmp_path) -> None:
-    """A non-critical failure next to a critical discovery, with
-    ``max_replans=0``: the run is a failure replan, so it does not replan. The
-    critical found obligation is open, and the job fails instead of
-    delivering it silently."""
+def test_a_discovery_that_waits_for_the_failed_work_still_stops(monkeypatch, tmp_path) -> None:
+    """A found obligation that depends on the failed one is touched by the
+    failure: with the failure budget spent it is not replanned, and, being
+    critical, it fails the job instead of being delivered silently."""
     calls: list[str] = []
     orchestrator, manifest = _failing_and_finding(
         calls, max_replans=0, failing_kind="repair-heading-hierarchy"
     )
+    review = orchestrator.executor.registry.get("human-review")
+
+    def finding_a_dependent(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        result = review(m, obligation_id)
+        for item in m.obligations:
+            if item.id.startswith("o-found") and "o-bad" not in item.dependencies:
+                item.dependencies.append("o-bad")
+        return result
+
+    orchestrator.executor.registry.register("human-review", finding_a_dependent)
 
     with pytest.raises(RuntimeError, match="review-structure"):
         _run(orchestrator, manifest, tmp_path, monkeypatch)
 
     assert "o-found-1" not in calls
     assert "o-bad:alternative" not in calls
+
+
+# The delivery after a discovery replan, and the roots at any depth, are
+# tested in test_discovery_after_failure_budget.py.
 
 
 # The enrichment's edges follow the targets.

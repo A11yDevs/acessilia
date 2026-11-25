@@ -2,6 +2,37 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.22 — a discovery is served after the failure budget is spent (#842)
+
+A run with a failed step and a discovery was a failure replan, so with
+`max_replans` spent the loop stopped, and a critical obligation the run
+found failed the job because of an independent, non-critical failure.
+- With `max_replans` spent, such a run is now a discovery replan, within
+  `max_discovery_replans` and the signature guard, for the work no failure
+  touches only (`_discovered_roots`: never tried, with no open, tried
+  obligation among its dependencies). The failed obligations and their
+  dependents are left out of that round and of every later one, so their
+  alternatives never run; the discovery budget is no way around the failure
+  one. `_replan_allowed` became `_replan_kind` (`failure`, `discovery` or
+  stop); the counters and the signature are saved with the plan as before.
+- **Left out is not cancelled** (#882 review). The executor selects only the
+  plan's obligations, so a discovery plan unselected the failed work it left
+  out, and the delivery check no longer saw it: a critical failure was
+  delivered in silence, a refinement with no warning and cached. After every
+  run, `_run_plan` now selects again the goals the plan left out
+  (`_restore_goals`: the planning manifest's selected, unsatisfied
+  obligations, which the plan checkpoint saves, so a resume keeps them). A
+  goal the run removed or satisfied is not brought back.
+- `_discovered_roots` visits each obligation once; `_replan_kind` returns a
+  `Literal`.
+- Tests (`test_discovery_after_failure_budget.py`): a refinement left out is
+  reported with a warning and no cache; a critical failure, or a critical
+  dependent never tried, fails the job after the discovery is served; a
+  budget spent in an earlier round; the roots at any depth with real
+  attempts; a resume inside the discovery plan keeps the goals and the
+  counters; a discovery that depends on the failed work still fails the job;
+  the kinds on their own.
+
 ## 0.3.21 — the delivered manifest is validated (#844)
 
 The replan loop revalidated the obligation graph (references and DAG) only

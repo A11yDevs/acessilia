@@ -2,6 +2,41 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.22 — uma descoberta é atendida depois de esgotado o orçamento de falhas (#842)
+
+Uma execução com um passo falho e uma descoberta era um replanejamento de
+falha; com `max_replans` esgotado o laço parava, e uma obrigação crítica que
+a execução encontrou fazia o job falhar por causa de uma falha independente e
+não crítica.
+- Com `max_replans` esgotado, essa execução agora é um replanejamento de
+  descoberta, dentro de `max_discovery_replans` e da guarda de assinatura,
+  só para o trabalho que nenhuma falha toca (`_discovered_roots`: nunca
+  tentado e sem obrigação aberta e já tentada entre as suas dependências). As
+  obrigações que falharam e as suas dependentes ficam fora dessa rodada e de
+  todas as seguintes, então as suas alternativas nunca rodam; o orçamento de
+  descobertas não é um caminho em volta do de falhas. `_replan_allowed`
+  virou `_replan_kind` (`failure`, `discovery` ou parar); os contadores e a
+  assinatura são salvos com o plano como antes.
+- **Ficar de fora não é ser cancelada** (revisão do #882). O executor
+  seleciona só as obrigações do plano, então um plano de descoberta
+  desselecionava o trabalho falho que deixava de fora, e a checagem de
+  entrega não o via mais: uma falha crítica era entregue em silêncio, um
+  refinamento sem aviso e em cache. Depois de cada execução, `_run_plan`
+  agora seleciona de novo os objetivos que o plano deixou de fora
+  (`_restore_goals`: as obrigações selecionadas e não satisfeitas do
+  manifesto de planejamento, que o checkpoint do plano salva, então uma
+  retomada as mantém). Um objetivo que a execução removeu ou satisfez não
+  volta.
+- `_discovered_roots` visita cada obrigação uma vez; `_replan_kind` devolve
+  um `Literal`.
+- Testes (`test_discovery_after_failure_budget.py`): um refinamento deixado
+  de fora é reportado com aviso e sem cache; uma falha crítica, ou uma
+  dependente crítica nunca tentada, faz o job falhar depois de a descoberta
+  ser atendida; um orçamento gasto numa rodada anterior; as raízes em
+  qualquer profundidade com tentativas reais; uma retomada dentro do plano de
+  descoberta mantém os objetivos e os contadores; uma descoberta que depende
+  do trabalho falho ainda faz o job falhar; os tipos isoladamente.
+
 ## 0.3.21 — o manifesto entregue é validado (#844)
 
 O laço de replanejamento revalidava o grafo de obrigações (referências e DAG)
