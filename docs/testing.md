@@ -65,9 +65,11 @@ GitHub Actions workflow `CI`:
   separates expensive integration coverage without treating it as live E2E;
   `e2e` remains the external-environment marker.
 - **`quality (Python 3.12)`** runs Ruff against the shrinking baseline, Mypy on
-  the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass
-  (#366), the Toolbox capability contract and the Toolbox's docstruct pin report
-  (warnings only; see below), in parallel with the suites.
+  the configured `docstruct`/SDK/core/backend scope (#366), the Toolbox
+  capability contract and the Toolbox's docstruct pin report (warnings only;
+  see below), in parallel with the suites. The libraries keep their 3.11
+  `requires-python` for their standalone consumers and Ruff's `py311` target
+  keeps them syntactically compatible, but no CI job runs Python 3.11 (#654).
 - **`tests (Python 3.12)`** is the required aggregator. It fails if any provider
   job failed or was skipped, then downloads the four coverage and JUnit
   artifacts, enforces the global thresholds and publishes the timing/coverage

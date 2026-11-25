@@ -65,10 +65,12 @@ o workflow `CI` do GitHub Actions:
   a cobertura de integração cara sem tratá-la como E2E real; `e2e` continua
   sendo o marker de ambiente externo.
 - **`quality (Python 3.12)`** executa o Ruff contra a baseline que só diminui, o
-  Mypy no escopo configurado de `docstruct`/SDK/core/backend e um passe 3.11 das
-  bibliotecas (#366), o contrato de capacidades da Toolbox e o relatório da
-  versão do docstruct fixada pela Toolbox (só avisos; veja abaixo), em paralelo
-  com as suítes.
+  Mypy no escopo configurado de `docstruct`/SDK/core/backend (#366), o contrato
+  de capacidades da Toolbox e o relatório da versão do docstruct fixada pela
+  Toolbox (só avisos; veja abaixo), em paralelo com as suítes. As bibliotecas
+  mantêm o `requires-python` 3.11 para seus consumidores standalone e o alvo
+  `py311` do Ruff as mantém compatíveis na sintaxe, mas nenhum job de CI roda
+  Python 3.11 (#654).
 - **`tests (Python 3.12)`** é o agregador obrigatório. Ele falha se qualquer job
   provedor falhou ou foi pulado, baixa os quatro artefatos de cobertura e JUnit,
   aplica os limites globais e publica os resumos de tempo/cobertura
