@@ -9,6 +9,27 @@ the whole pipeline is: M1's formula LaTeX gap (#846) was a regression between
 steps. These fixtures compare the **final canonical document** of a run of
 this tree with the one the core produced before each migration.
 
+A reference is a golden master, not ground truth: it can keep a bug of its
+release. Semantic quality is measured elsewhere, against ground truth (the
+benchmarks of #619).
+
+## Scope
+
+What the cases establish is limited to what they run:
+
+- five synthetic, one-page documents;
+- one extraction provider (`FUSION_MODE=single`), so `select-table-source`,
+  `fuse-providers`, `rescue-omitted` and `adjudicate-page` never run. The
+  stale table, the replan for a rescued block and the invalidation of formula
+  conversions (M4b) are covered by unit tests, not here;
+- a Toolbox that always answers: no failure, no unavailability, no
+  degradation;
+- the normalized canonical document: not the exports, not the number of
+  calls.
+
+The equivalence the references show holds for these cases only. Dual-provider,
+multi-page and degraded cases are #876; a resume from a checkpoint is #874.
+
 ## How a case runs
 
 `runner.py` runs a case the way `backend/service.py` runs a job: the PDDL
@@ -16,28 +37,46 @@ orchestrator's `execute` with a structured output, the paragraph merge, then
 `build_canonical_document`. It uses only what core 0.3.11 already had, so the
 same runner works on an older tree.
 
-Every call the core makes leaves it over HTTP: the SDK's capability clients
-and, with `AI_CLIENT=toolbox`, the agents' chats through the Toolbox VLM
-gateway. `fake_toolbox.py` answers that boundary in process: it routes every
-`httpx` client to a `MockTransport`, so nothing inside the core is patched.
-Its answers are deterministic, and come from the case:
+**The run is hermetic** (`hermetic_environment`). Every variable the
+backend's settings can read is removed first, including what `.env` loaded
+into the process. The settings then get their defaults plus the harness's
+`ENVIRONMENT`, with `DATA_DIR` and `TEMP_DIR` in a temporary directory, and
+the whole environment is restored afterwards. A reference recorded in a bare
+worktree and a run in a developer's tree therefore see the same
+configuration.
+
+**The Toolbox is a fake.** Every call the core makes leaves it over HTTP: the
+SDK's capability clients and, with `AI_CLIENT=toolbox`, the agents' chats
+through the Toolbox VLM gateway. `fake_toolbox.py` answers that boundary in
+process: it routes every `httpx` client to a `MockTransport`, so nothing
+inside the core is patched. Its answers come from the case:
 
 | Case key | Answers |
 |---|---|
 | `document` | `document.structure.extract`: a ProcessingManifest-compatible document |
-| `vision` | the VLM, per element id (or `page-<n>`): a description, a region's `kind` and `formula_latex`, a table's `rows`; fields the case leaves out get a valid default from the response schema |
-| `latex` | `math.recognize`, per formula id |
+| `vision` | the VLM, per element id (or `page-<n>`): a description, a region's `kind` and `formula_latex`, a table's `rows` |
+| `latex` | `math.recognize`, per formula id (`""`: it reads nothing) |
 | `text_spans` | `document.text.spans`, per page |
-| `tables` | `table.recognize`, per table id |
 
-A rendered image does not say which region it shows, and a newer core may
-downscale or re-encode it. So each `pdf.render` returns a solid colour that
-indexes the clip it rendered. The VLM and `math.recognize` answers decode the
-colour back to the clip, then to the element whose box holds its centre.
+**Regions are matched by colour.** A rendered image does not say which region
+it shows, and a newer core may downscale or re-encode it. So each `pdf.render`
+returns a solid colour that indexes the clip it rendered (up to 512 per
+case). The VLM and `math.recognize` decode the colour back to the clip:
+- a clip covering the page is `page-<n>`;
+- a smaller clip is the element it overlaps most (intersection over union).
+
+**The fake is strict.** It refuses, and records as unhandled, any of these:
+- an image it did not render;
+- a clip no element matches, or that two elements match equally;
+- an element the case gives no answer for;
+- an answer the agent's own response schema rejects;
+- a capability it does not serve.
+
+Only the fields a case's answer leaves out get a default, and the whole
+answer is still validated. The test fails on any unhandled call.
 
 `math.convert` and `math.verbalize` echo the LaTeX (`spoken <latex>`), so a
-change in what is sent shows in the output. A call the fake cannot answer is
-recorded; the test fails on any.
+change in what is sent shows in the output.
 
 ## The cases
 
@@ -54,7 +93,7 @@ recorded; the test fails on any.
 ## The references
 
 `references/<label>/` holds each case's normalized output recorded on the core
-before a migration, and a `SOURCE.json` naming the commit:
+before a migration:
 
 | Label | Commit | Before |
 |---|---|---|
@@ -64,27 +103,52 @@ before a migration, and a `SOURCE.json` naming the commit:
 | `core-0.3.18` | `6781ff58` | M4a |
 | `core-0.3.19` | `d2714cdf` | M4b |
 
-Normalization drops what changes from run to run: timestamps, durations,
-paths. It also drops what identifies or prices the planning state: the plan,
-execution and manifest ids, the expected cost, and the document id that hashes
-them.
+**Normalization** drops only these JSON pointers:
+- `/source/path`, the run's temporary path;
+- the plan, execution and manifest ids and the expected cost under
+  `/metadata`, which identify or price the planning state and change with
+  every migration by design;
+- the document's `/id`, which hashes them.
+
+A field of the same name anywhere else is still compared.
+
+**`calls`** counts the capabilities each run asked for. It is diagnostic only
+and is not compared: a later core may call less on purpose. For example, M4b
+stopped reading the text layer of a document with no prose to mark.
+
+**`SOURCE.json`** names the commit and core version, and the harness's
+identity (`runner.identity`): SHA-256 digests of the runner, the fake, the
+cases and the source PDF, and the versions of the packages the fake adds
+(Pillow and jsonschema, pinned). The test refuses a reference whose identity
+differs from this tree's, so a harness change calls for recording again. The
+comparison (`compare.py`) is not part of the identity.
+
+## Declared differences
 
 `tests/test_differential_canonical.py` runs each case once on this tree and
-compares it with every reference. A difference a later release made on purpose
-is declared in the reference's `intended.json`:
+compares it with every reference. A difference that a later release made on
+purpose is declared in the reference's `intended.json`, **with the value it
+allows**:
 
 ```json
 {
   "*": [{"kind": "added", "path": "/metadata/pddl_toolbox_availability/optional",
-         "reason": "core 0.3.16 (#848): optional capability calls"}],
-  "formulas": [{"kind": "changed", "path": "/sections/0/blocks/*/alt_text",
-                "reason": "..."}]
+         "expected": {}, "reason": "core 0.3.16 (#848): ..."}],
+  "formulas": [{"kind": "changed", "path": "/metadata/pddl_manifest_revision",
+                "expected": 3, "reason": "core 0.3.14 (M1): ..."}]
 }
 ```
 
-`kind` is `added`, `removed` or `changed`. `path` is a JSON pointer in which
-`*` matches any run of characters. Entries under `*` apply to every case. An
-undeclared difference fails, and so does a declared one that no longer
+The fields of an entry:
+- `kind` is `added`, `removed` or `changed`.
+- `path` is a JSON pointer in which `*` matches any run of characters. Use
+  `*` only where the position, not the field, varies.
+- `expected` is required for `added` and `changed`: a later change of the
+  same field is not accepted with it.
+- `was` is optional for `removed`, and checks the value that went.
+- Entries under `*` apply to every case.
+
+An undeclared difference fails, and so does a declared one that no longer
 happens.
 
 ## What the references show
@@ -97,10 +161,17 @@ When this harness was added (core 0.3.20):
   - the availability report of #848 (core 0.3.16);
   - one more manifest revision where a description retypes an element (M1,
     core 0.3.14).
-- **Against `core-0.3.14`**, the picture the vision model reads as a formula
-  has its formula LaTeX again (`formula_recognition`). That is the gap of M1
-  (#846), which M3 closed in 0.3.15: `core-0.3.14` is the one release without
-  it. Reintroducing the gap fails the test against every other reference.
+- **Against `core-0.3.14`**, the differences are:
+  - the same availability report of #848;
+  - the picture the vision model reads as a formula has its formula LaTeX
+    again (`formula_recognition`, `formula_text_layer`). That is the gap of
+    M1 (#846), which M3 closed in 0.3.15: `core-0.3.14` is the one release
+    without it;
+  - the surrounding text of that picture has the nearby formula's extracted
+    text again, since M3 runs the formula LaTeX after the descriptions, as
+    before 0.3.14.
+
+Reintroducing the #846 gap fails the test against every other reference.
 
 ## Recording
 
@@ -109,12 +180,27 @@ uv run python -m tests.differential.build_cases       # after editing a case
 uv run python scripts/record_differential_references.py --ref 9d433476 --label core-0.3.11
 ```
 
-The script checks the commit out in a temporary git worktree, copies this
-harness into it, and runs every case there with that tree's own locked
-environment, plus Pillow, which the fake needs. Record every reference again
-after changing a case. Add a reference before each later migration that
-could change the output.
+The script checks the commit out in a temporary git worktree, copies the
+harness into it, and runs the cases there with that tree's own locked
+environment, plus the pinned packages the fake needs. Nothing is published
+until every case ran and the fake answered every call; then the reference is
+swapped whole.
 
-The fixtures do not cover a resume from an enrichment checkpoint yet: a resume
-compares a run with itself, not with an older core, and the checkpoint format
-changed between these releases (#836). It is #874.
+- **Recording every case** replaces the reference and drops the cases that no
+  longer exist. It keeps `intended.json`, which is written by hand.
+- **Recording some cases** (`... core-0.3.11 formulas`) replaces only those,
+  and is refused when the reference was recorded with another commit or
+  harness.
+
+## Maintaining the references
+
+- **Adding a reference.** Add one before each later migration, or any change
+  that could move the output. Record it from the commit just before the
+  change merges.
+- **Updating a reference.** Record again only when the harness or a case
+  changes (the identity check says when). Never record again to turn the CI
+  green: a new difference is either a regression to fix or an intended
+  change to declare, with its value and the release that made it.
+- **Retiring a reference.** Retire one once a newer reference covers the
+  same migration and its declarations only repeat the newer one's. Say so in
+  the pull request.

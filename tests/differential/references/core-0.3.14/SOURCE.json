@@ -1,4 +1,9 @@
 {
   "commit": "da5c97b8ab543ae37733cf99793c68e25960ad1f",
-  "core_version": "0.3.14"
+  "core_version": "0.3.14",
+  "harness_sha256": "993679890a0fee55f8d219faa1fb6f43d216d40f3fb9a3ca0208ddca04a188f9",
+  "cases_sha256": "2e2d9eab6f032a748debbbb9d80c63e499d5c42956d20431f277078c6ef32bc9",
+  "source_pdf_sha256": "5a838678058f6de375e8635b5f2fea47a4e5f07cb1a882a44b10f39abc6f34ff",
+  "pillow_version": "13.0.0",
+  "jsonschema_version": "4.26.0"
 }

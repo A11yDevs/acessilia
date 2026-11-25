@@ -16,15 +16,21 @@ The answers come from the case (``cases/<name>/case.json``):
 - ``vision``: per element id (or ``page-<number>`` for a whole page), the
   fields a vision answer gets: a picture's description, a region's kind and
   LaTeX, a table's rows;
-- ``latex``: per formula id, what ``math.recognize`` reads;
-- ``tables``: per table id, the HTML ``table.recognize`` returns.
+- ``latex``: per formula id, what ``math.recognize`` reads (``""``: nothing).
 
 A rendered image does not carry the region it shows, and a newer core may
 downscale or re-encode it. So each ``pdf.render`` gets a solid colour that
 indexes the clip it rendered, and the VLM and ``math.recognize`` answers
-decode the colour back to the region, then to the element whose box holds its
-centre. Anything the fake does not know is answered 404 and recorded in
-``unhandled``, which the runner reports.
+decode the colour back to the clip: a whole page is ``page-<number>``, a
+smaller clip the element it overlaps most (intersection over union).
+
+The fake is strict. It answers only what the case answers: an image it did
+not render, a clip no element matches or two match equally, an element the
+case gives no answer for, an answer that does not validate against the
+schema the agent asked for, or a capability it does not serve is refused and
+recorded in ``unhandled``, and the test fails on any. Only the fields a
+case's answer leaves out get a default (:func:`_instance`), and the whole
+answer is still validated.
 """
 
 from __future__ import annotations
@@ -35,6 +41,7 @@ import hashlib
 import io
 import json
 import re
+import threading
 from collections.abc import Iterator
 from email.parser import BytesParser
 from email.policy import HTTP
@@ -50,8 +57,15 @@ _EXECUTE = re.compile(r"^/v1/capabilities/(?P<capability>[^/:]+):execute$")
 _ARTIFACT = re.compile(r"^/v1/artifacts/(?P<artifact_id>[^/]+)$")
 
 #: Colour step between two levels of a channel: large enough to survive a
-#: lossy re-encoding of a solid image.
+#: lossy re-encoding of a solid image. Eight levels on three channels index
+#: ``_MAX_RENDERS`` regions.
 _STEP = 32
+_MAX_RENDERS = 512
+
+#: A clip covering this share of its page is the whole page; a smaller one
+#: is an element's when it overlaps it at least ``_MIN_IOU``.
+_PAGE_SHARE = 0.9
+_MIN_IOU = 0.3
 
 
 class FakeToolbox:
@@ -63,10 +77,16 @@ class FakeToolbox:
         self.renders: list[dict[str, Any]] = []
         self.calls: list[str] = []
         self.unhandled: list[str] = []
+        # The core renders and asks the model from several threads.
+        self._lock = threading.Lock()
 
     # Transport.
 
     def handle(self, request: httpx.Request) -> httpx.Response:
+        with self._lock:
+            return self._handle(request)
+
+    def _handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
         try:
             if path.startswith("/v1/vlm"):
@@ -149,6 +169,8 @@ class FakeToolbox:
         box = _box(parameters.get("clip") or parameters.get("bbox"), size[1]) or (0.0, 0.0, *size)
         clip = dict(zip(("left", "top", "right", "bottom"), box))
         index = len(self.renders)
+        if index >= _MAX_RENDERS:
+            raise _Unanswerable(f"more than {_MAX_RENDERS} renders: the colours would repeat")
         self.renders.append({"page": page, "clip": clip})
         png = _solid_png(index)
         reference = self._store(png, "image/png")
@@ -195,31 +217,33 @@ class FakeToolbox:
 
     def _math_recognize(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
         element = self._element_of_image(self._input(form, files))
-        latex = (self.case.get("latex") or {}).get(element or "", "")
+        answers = self.case.get("latex") or {}
+        if element not in answers:
+            raise _Unanswerable(f"the case reads no LaTeX for {element}")
+        latex = answers[element]
         return {"formulas": [{"latex": latex, "confidence": 0.99}] if latex else []}
-
-    def _table_recognize(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
-        element = self._element_of_image(self._input(form, files))
-        html = (self.case.get("tables") or {}).get(element or "", "<table></table>")
-        return {
-            "greedy": {"text": html, "finish": "stop"},
-            "samples": [{"text": html, "finish": "stop", "seed": 0}],
-            "model": "differential",
-        }
 
     # The VLM gateway (OpenAI chat completions).
 
     def _vlm(self, request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content or b"{}")
-        element = None
-        for message in body.get("messages", []):
-            for part in message.get("content") or [] if isinstance(message.get("content"), list) else []:
-                url = (part.get("image_url") or {}).get("url", "") if isinstance(part, dict) else ""
-                if url.startswith("data:"):
-                    element = self._element_of_image(base64.b64decode(url.split(",", 1)[1]))
+        images = [
+            part["image_url"]["url"]
+            for message in body.get("messages", [])
+            if isinstance(message.get("content"), list)
+            for part in message["content"]
+            if isinstance(part, dict) and str((part.get("image_url") or {}).get("url", "")).startswith("data:")
+        ]
+        if len(images) != 1:
+            raise _Unanswerable(f"a chat with {len(images)} images")
+        element = self._element_of_image(base64.b64decode(images[0].split(",", 1)[1]))
+        answers = self.case.get("vision") or {}
+        if element not in answers:
+            raise _Unanswerable(f"the case gives no vision answer for {element}")
         schema = _response_schema(body)
-        answer = _instance(schema, (self.case.get("vision") or {}).get(element or "", {}))
-        content = json.dumps(answer, ensure_ascii=False) if schema else str(answer or "")
+        answer = _instance(schema, answers[element])
+        _validate(answer, schema)
+        content = json.dumps(answer, ensure_ascii=False) if schema else str(answer)
         return httpx.Response(200, json={
             "id": "chatcmpl-differential",
             "object": "chat.completion",
@@ -232,25 +256,34 @@ class FakeToolbox:
 
     # Regions.
 
-    def _element_of_image(self, content: bytes) -> str | None:
-        """The element whose box holds the centre of the region ``content``
-        shows, else ``page-<number>``; ``None`` for an image no render made."""
+    def _element_of_image(self, content: bytes) -> str:
+        """What the region ``content`` shows: ``page-<number>`` for a whole
+        page, else the element its clip overlaps most."""
         index = _decode_index(content)
         if index is None or index >= len(self.renders):
-            return None
+            raise _Unanswerable("an image the fake did not render")
         render = self.renders[index]
         clip = _box(render["clip"])
-        if clip is None:
-            return None
-        centre = ((clip[0] + clip[2]) / 2, (clip[1] + clip[3]) / 2)
+        width, height = self._page_size(render["page"])
+        if clip is None or _area(clip) >= _PAGE_SHARE * width * height:
+            return f"page-{render['page']}"
+        scores = sorted(
+            ((_iou(clip, box), element_id) for element_id, box in self._boxes(render["page"])),
+            reverse=True,
+        )
+        if not scores or scores[0][0] < _MIN_IOU:
+            raise _Unanswerable(f"no element matches the clip {render['clip']}")
+        if len(scores) > 1 and scores[1][0] >= scores[0][0] - 1e-9:
+            raise _Unanswerable(f"{scores[0][1]} and {scores[1][1]} match the clip equally")
+        return scores[0][1]
+
+    def _boxes(self, page: int) -> Iterator[tuple[str, tuple[float, float, float, float]]]:
+        height = self._page_size(page)[1]
         for element in self.case["document"].get("elements", []):
             for provenance in element.get("provenance") or []:
-                box = _box(provenance.get("bbox"), self._page_size(provenance.get("page_number", 1))[1])
-                if provenance.get("page_number", 1) == render["page"] and box and _holds(box, centre):
-                    return element["id"]
-        # A whole page, or a region no element holds: the case answers it as
-        # ``page-<number>``.
-        return f"page-{render['page']}"
+                box = _box(provenance.get("bbox"), height)
+                if provenance.get("page_number", 1) == page and box is not None:
+                    yield element["id"], box
 
     def _page_sizes(self) -> list[tuple[float, float]]:
         return [
@@ -339,6 +372,9 @@ def _solid_png(index: int) -> bytes:
     """A solid image whose colour encodes ``index`` (eight levels per channel)."""
     from PIL import Image
 
+    if not 0 <= index < _MAX_RENDERS:
+        raise ValueError(f"a render index must be below {_MAX_RENDERS}: {index}")
+
     levels = (index % 8, index // 8 % 8, index // 64 % 8)
     image = Image.new("RGB", (64, 64), tuple(16 + _STEP * level for level in levels))
     buffer = io.BytesIO()
@@ -377,8 +413,15 @@ def _box(value: Any, page_height: float | None = None) -> tuple[float, float, fl
     return None
 
 
-def _holds(box: tuple[float, float, float, float], point: tuple[float, float]) -> bool:
-    return box[0] - 1 <= point[0] <= box[2] + 1 and box[1] - 1 <= point[1] <= box[3] + 1
+def _area(box: tuple[float, float, float, float]) -> float:
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+
+
+def _iou(first: tuple[float, float, float, float], second: tuple[float, float, float, float]) -> float:
+    overlap = _area((max(first[0], second[0]), max(first[1], second[1]),
+                     min(first[2], second[2]), min(first[3], second[3])))
+    union = _area(first) + _area(second) - overlap
+    return overlap / union if union > 0 else 0.0
 
 
 def _escape(text: str) -> str:
@@ -393,7 +436,7 @@ def _response_schema(body: dict[str, Any]) -> dict[str, Any] | None:
 
 #: Values for fields the case does not answer, by name, when the schema's
 #: type alone gives an invalid one.
-_FIELD_DEFAULTS = {"language": "pt-BR", "confidence": 0.95, "description": "Visual content the case does not answer."}
+_FIELD_DEFAULTS = {"language": "pt-BR", "confidence": 0.95}
 
 
 def _instance(
@@ -417,7 +460,7 @@ def _instance(
     kind = schema.get("type")
     if kind == "object":
         return {
-            field: answers[field] if field in answers else _instance(spec, {}, defs, field)
+            field: _fill(spec, answers[field], defs) if field in answers else _instance(spec, {}, defs, field)
             for field, spec in (schema.get("properties") or {}).items()
         }
     if name in _FIELD_DEFAULTS:
@@ -426,11 +469,41 @@ def _instance(
         return schema["enum"][0]
     if "default" in schema:
         return schema["default"]
-    if kind == "string":
-        return "x" * int(schema.get("minLength", 0))
+    if kind == "string" and not schema.get("minLength") and not {"pattern", "format"} & set(schema):
+        return ""
     if kind in {"number", "integer"}:
         return schema.get("minimum", 0)
-    return {"boolean": False, "array": []}.get(kind)
+    if kind == "boolean":
+        return False
+    if kind == "array" and not schema.get("minItems"):
+        return []
+    raise _Unanswerable(f"no default for the field {name or '(root)'} ({schema}): the case must answer it")
+
+
+def _fill(schema: dict[str, Any], value: Any, defs: dict[str, Any]) -> Any:
+    """``value``, a case's answer, with the defaults of the object fields it
+    leaves out, at any depth (a table cell's ``header``)."""
+    if "$ref" in schema:
+        return _fill(defs[schema["$ref"].rsplit("/", 1)[-1]], value, defs)
+    if isinstance(value, dict) and schema.get("type") == "object":
+        return _instance(schema, value, defs)
+    if isinstance(value, list) and schema.get("type") == "array" and isinstance(schema.get("items"), dict):
+        return [_fill(schema["items"], item, defs) for item in value]
+    return value
+
+
+def _validate(answer: Any, schema: dict[str, Any] | None) -> None:
+    """Refuse an answer the agent's schema rejects, so it is never degraded in silence."""
+    if schema is None:
+        if not isinstance(answer, str) or not answer:
+            raise _Unanswerable("a free-text chat the case does not answer (vision ``text``)")
+        return
+    import jsonschema
+
+    try:
+        jsonschema.validate(answer, schema)
+    except jsonschema.ValidationError as error:
+        raise _Unanswerable(f"the answer does not validate: {error.message}") from error
 
 
 __all__ = ["BASE_URL", "FakeToolbox", "installed"]
