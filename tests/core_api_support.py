@@ -16,7 +16,21 @@ import httpx
 import pytest
 
 CORE_BASE_URL = os.getenv("CORE_BASE_URL", "").strip().rstrip("/")
-JOB_TIMEOUT = float(os.getenv("CORE_JOB_TIMEOUT", "600"))
+DEFAULT_JOB_TIMEOUT = 600.0
+#: Consecutive failed status reads tolerated before the wait gives up. A long
+#: deck job keeps one request in flight for thousands of seconds, through a
+#: front-end that can drop a connection; one drop must not cancel the job.
+STATUS_RETRIES = 5
+
+
+def _job_timeout() -> float:
+    raw = os.getenv("CORE_JOB_TIMEOUT", "")
+    if not raw:
+        return DEFAULT_JOB_TIMEOUT
+    try:
+        return float(raw)
+    except ValueError:
+        pytest.fail(f"CORE_JOB_TIMEOUT must be a number of seconds, got {raw!r}")
 
 
 def require_core() -> str:
@@ -108,14 +122,29 @@ def poll(
     job running on the server, so the cleanup runs for every exit that did not
     observe a terminal state.
     """
-    limit = JOB_TIMEOUT if timeout is None else timeout
+    limit = _job_timeout() if timeout is None else timeout
     headers = {"X-Job-Token": token}
     deadline = time.monotonic() + limit
     last: dict = {}
     terminal = False
+    failures = 0
     try:
         while time.monotonic() < deadline:
-            response = client.get(f"/jobs/{task_id}", headers=headers)
+            try:
+                response = client.get(f"/jobs/{task_id}", headers=headers)
+            except httpx.HTTPError:
+                failures += 1
+                if failures >= STATUS_RETRIES:
+                    raise
+                time.sleep(2)
+                continue
+            if response.status_code in {500, 502, 503, 504}:
+                failures += 1
+                if failures >= STATUS_RETRIES:
+                    assert response.status_code == 200, response.text
+                time.sleep(2)
+                continue
+            failures = 0
             assert response.status_code == 200, response.text
             last = response.json()
             if last.get("status") in {"done", "error", "cancelled"}:

@@ -15,16 +15,18 @@ and checks it against the dataset copy when the clone is present.
 The assertions lock what the pre-migration reference delivered: every slide
 and its title, the text, tables and formulas in their slide, and no fallback
 that hides a picture. A table row may be found in the PDF/UA's stream order,
-as the scorecard already reports. Vision-written descriptions may vary between
-runs, so the picture floor is deliberately below the full count.
+as the scorecard already reports. Twelve slides have no text layer; their
+tables and labels are read from the image (OCR/vision), so those objects can
+vary between runs even when the text-layer objects do not. The picture floor
+is deliberately below the full count for the same reason.
 
 Requires:
 - ``CORE_BASE_URL`` pointing at a deployed core
 - The dataset clone at ``tests/dataset`` (or ``ACESSILIA_TEST_DATASET_DIR``)
 - ``pdftotext`` (poppler-utils) for the PDF/UA
 
-``CORE_SLIDE_TIMEOUT`` (seconds, default 1500) bounds the job wait; the test
-allows 1800 so the wait fails with its own message first::
+``CORE_SLIDE_TIMEOUT`` (seconds, default 2400) bounds the job wait; the test
+adds 600 seconds so the wait fails with its own message first::
 
     CORE_BASE_URL=https://www.acessilia3.inf.ufg.br/api/v1 \
         uv run pytest -m e2e tests/test_slide_case_e2e.py -v
@@ -35,6 +37,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -43,21 +46,26 @@ import pytest
 from scripts.bench import slide_case
 from tests.core_api_support import download_token, poll, require_core, upload
 
-pytestmark = [pytest.mark.e2e, pytest.mark.timeout(1800)]
-
 SLIDE_PDF = (
     Path(__file__).parent
     / "fixtures"
     / "presentations"
     / "grandezas-e-medidas-42pgs.pdf"
 )
-SLIDE_TIMEOUT = float(os.getenv("CORE_SLIDE_TIMEOUT", "1500"))
+SLIDE_TIMEOUT = float(os.getenv("CORE_SLIDE_TIMEOUT", "2400"))
 OUT = Path(__file__).resolve().parents[1] / "var" / "bench" / "slides" / "e2e"
 
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.timeout(SLIDE_TIMEOUT + 600),
+]
+
 #: The better staging output the slide case was written from (v4, before the
-#: core move) kept 29 of the 31 pictures. A few may lose terms to the vision
-#: model; below this the deck has lost what the reference delivered.
-MIN_PICTURES_PASSED = 29
+#: core move) kept 29 of the 31 image descriptions. The five chemical
+#: structures are scored separately: #284 is exactly the regression where a
+#: drawn molecule loses its description.
+MIN_IMAGES_PASSED = 29
+MIN_CHEMICAL_STRUCTURES_PASSED = 5
 
 #: Objects whose text is read from the deck's text layer. Each one must pass in
 #: at least one delivered output; the PDF/UA's stream order rescues a table row
@@ -110,7 +118,11 @@ def deck(core_client) -> DeckOutputs:
             "the presentation fixture and the dataset input drifted apart"
         )
     rows, expectations = slide_case.load_case(root)
+    if shutil.which("pdftotext") is None:
+        pytest.skip("pdftotext (poppler-utils) is required to score the PDF/UA output")
     require_core()
+    shutil.rmtree(OUT, ignore_errors=True)
+    OUT.mkdir(parents=True)
 
     response = upload(
         core_client,
@@ -130,7 +142,6 @@ def deck(core_client) -> DeckOutputs:
     assert not status.get("erros"), status
 
     token = download_token(status)
-    OUT.mkdir(parents=True, exist_ok=True)
     written: dict[str, Path] = {}
     for ext, name in (("txt", "006.txt"), ("pdf_ua", "006.pdf_ua.pdf")):
         response = core_client.get(f"/download/{token}/{ext}")
@@ -194,6 +205,10 @@ def test_every_slide_title_stays_on_its_slide(deck: DeckOutputs) -> None:
 def test_text_tables_and_formulas_do_not_regress(deck: DeckOutputs) -> None:
     passed = deck.passed_by_kind()
     all_ids = deck.all_by_kind()
+    # Do not let a renamed or missing ground-truth kind turn the assertion
+    # below into a vacuous pass.
+    for kind in REQUIRED_KINDS:
+        assert all_ids.get(kind), f"the dataset has no {kind} ground-truth rows"
     missing = {
         kind: sorted(all_ids.get(kind, set()) - passed.get(kind, set()))
         for kind in REQUIRED_KINDS
@@ -202,15 +217,17 @@ def test_text_tables_and_formulas_do_not_regress(deck: DeckOutputs) -> None:
 
 
 def test_the_pictures_keep_their_descriptions(deck: DeckOutputs) -> None:
-    pictures = deck.all_by_kind().get("image", set()) | deck.all_by_kind().get(
-        "chemical-structure", set()
-    )
-    passed = deck.passed_by_kind().get("image", set()) | deck.passed_by_kind().get(
-        "chemical-structure", set()
-    )
-    assert len(pictures & passed) >= MIN_PICTURES_PASSED, (
-        f"{len(pictures & passed)}/{len(pictures)} pictures kept their terms"
-    )
+    all_ids = deck.all_by_kind()
+    passed = deck.passed_by_kind()
+    for kind, minimum in (
+        ("image", MIN_IMAGES_PASSED),
+        ("chemical-structure", MIN_CHEMICAL_STRUCTURES_PASSED),
+    ):
+        ids = all_ids.get(kind, set())
+        kept = ids & passed.get(kind, set())
+        assert len(kept) >= minimum, (
+            f"{len(kept)}/{len(ids)} {kind} descriptions kept their terms"
+        )
 
 
 def test_no_fallback_or_broken_text_reaches_the_reader(deck: DeckOutputs) -> None:

@@ -115,7 +115,8 @@ uv run pytest -m e2e -v --timeout=900
 
 `--timeout=900` overrides the suite-wide 180-second limit: E2E operations can
 take up to 300 seconds and a core job wait up to 600. The scheduled E2E job uses
-the same value.
+the same value. The full-deck slide case is the exception: it uses
+`CORE_SLIDE_TIMEOUT` (default 2400 s) and marks itself for that wait plus 600 s.
 
 The `Scheduled test monitoring` workflow runs the E2E suite weekly when the
 repository variables `TOOLBOX_BASE_URL` or `CORE_BASE_URL` are configured. It
@@ -141,7 +142,7 @@ It is a separate clone, ignored by Git, placed at `tests/dataset/`; point
 - `test_slide_case_e2e.py` reads `input/presentation-reference/` (the 006
   deck, issue #615) from the dataset's `main` and uploads the byte-identical
   copy in `fixtures/presentations/`. It makes one full-deck job, so
-  `CORE_SLIDE_TIMEOUT` (default 1500 s) bounds the wait; its scorecards and
+  `CORE_SLIDE_TIMEOUT` (default 2400 s) bounds the wait; its scorecards and
   outputs go to `var/bench/slides/e2e/`.
 
 To run those cases against a clone kept in the main checkout:
