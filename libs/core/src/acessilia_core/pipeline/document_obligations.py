@@ -142,7 +142,7 @@ class DocumentStep:
     #: a new one (M4b: a table whose inline math marks went stale after the
     #: step marked it). An open or exhausted obligation still covers them,
     #: so a degraded attempt is not reopened forever.
-    renewed: Callable[[ProcessingManifest], set[str]] = lambda _manifest: set()
+    renewed: Callable[[ProcessingManifest], set[str]] | None = None
     #: Whether the step's result is needed to deliver: with ``False``, an
     #: exhausted obligation of the step is a degradation, and the obligations
     #: that waited for it are planned without it (M4b: a formula conversion
@@ -268,7 +268,7 @@ def reconcile_document_step(
     """
     _drop_lost(manifest, step)
     own = [item for item in manifest.obligations if item.kind == step.kind]
-    renewed = step.renewed(manifest)
+    renewed = step.renewed(manifest) if step.renewed is not None else set()
     covered = {
         target for item in own for target in item.target_ids
         if target not in renewed or item.status != "satisfied"
