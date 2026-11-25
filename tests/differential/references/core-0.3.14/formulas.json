@@ -1,0 +1,398 @@
+{
+  "calls": [
+    "document.structure.extract",
+    "document.text.spans",
+    "math.convert",
+    "math.recognize",
+    "math.verbalize",
+    "media.inspect",
+    "pdf.render",
+    "vlm"
+  ],
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 6,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 1,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "id": "p1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p1",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 170.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "f1",
+              "metadata": {
+                "confidence": null,
+                "formula_classification": {
+                  "confidence": 0.95,
+                  "reason": null,
+                  "status": "math",
+                  "warnings": []
+                },
+                "formula_recognition": {
+                  "confidence": 0.99,
+                  "method": "math.recognize",
+                  "text_agreement": 1.0
+                },
+                "formula_text_layer": "s ( t ) = t 3",
+                "manifest_element_id": "f1",
+                "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s(t) = t^{3}</mtext></math>",
+                "parent_id": null,
+                "raw_label": "formula",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 200.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 180.0
+                },
+                "page_number": 1
+              },
+              "text": "s(t) = t^{3}",
+              "type": "math"
+            },
+            {
+              "id": "f2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "f2",
+                "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>v = \\frac{d}{t}</mtext></math>",
+                "parent_id": null,
+                "raw_label": "formula",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 230.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 210.0
+                },
+                "page_number": 1
+              },
+              "text": "v = \\frac{d}{t}",
+              "type": "math"
+            },
+            {
+              "id": "p2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p2",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 340.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 240.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "pic1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "pic1",
+                "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>E = mc^2</mtext></math>",
+                "original_type": "picture",
+                "parent_id": null,
+                "raw_label": "formula",
+                "source_ref": null,
+                "surrounding_text": [
+                  "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes",
+                  "s(t) = t^{3}",
+                  "v = \\frac{d}{t}"
+                ],
+                "vision_confidence": 0.95,
+                "vision_description_complete": true,
+                "vision_elements": [],
+                "vision_institutional_logo": false,
+                "vision_language": "pt-BR",
+                "vision_warnings": []
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 400.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 350.0
+                },
+                "page_number": 1
+              },
+              "text": "E = mc^2",
+              "type": "math"
+            },
+            {
+              "id": "p3",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p3",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 520.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 410.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            }
+          ],
+          "page_number": 1,
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\ns(t) = t^{3}\nv = \\frac{d}{t}\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nE = mc^2\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual."
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "completed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 3,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [],
+      "pddl_unsatisfied_summary": null,
+      "pddl_validation_only": true,
+      "pddl_visual_failures": null,
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "id": "p1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p1",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 170.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Fórmula: spoken s(t) = t^{3}",
+            "id": "f1",
+            "metadata": {
+              "confidence": null,
+              "formula_classification": {
+                "confidence": 0.95,
+                "reason": null,
+                "status": "math",
+                "warnings": []
+              },
+              "formula_recognition": {
+                "confidence": 0.99,
+                "method": "math.recognize",
+                "text_agreement": 1.0
+              },
+              "formula_text_layer": "s ( t ) = t 3",
+              "manifest_element_id": "f1",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s(t) = t^{3}</mtext></math>",
+              "parent_id": null,
+              "raw_label": "formula",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 200.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 180.0
+              },
+              "page_number": 1
+            },
+            "text": "s(t) = t^{3}",
+            "type": "math"
+          },
+          {
+            "alt_text": "Fórmula: spoken v = \\frac{d}{t}",
+            "id": "f2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "f2",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>v = \\frac{d}{t}</mtext></math>",
+              "parent_id": null,
+              "raw_label": "formula",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 230.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 210.0
+              },
+              "page_number": 1
+            },
+            "text": "v = \\frac{d}{t}",
+            "type": "math"
+          },
+          {
+            "id": "p2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p2",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 340.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 240.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Fórmula: spoken E = mc^2",
+            "id": "pic1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "pic1",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>E = mc^2</mtext></math>",
+              "original_type": "picture",
+              "parent_id": null,
+              "raw_label": "formula",
+              "source_ref": null,
+              "surrounding_text": [
+                "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes",
+                "s(t) = t^{3}",
+                "v = \\frac{d}{t}"
+              ],
+              "vision_confidence": 0.95,
+              "vision_description_complete": true,
+              "vision_elements": [],
+              "vision_institutional_logo": false,
+              "vision_language": "pt-BR",
+              "vision_warnings": []
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 400.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 350.0
+              },
+              "page_number": 1
+            },
+            "text": "E = mc^2",
+            "type": "math"
+          },
+          {
+            "id": "p3",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p3",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 520.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 410.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          }
+        ],
+        "children": [],
+        "id": "sectionless-1",
+        "level": 1,
+        "metadata": {},
+        "source_location": {},
+        "title": ""
+      }
+    ],
+    "source": {
+      "name": "formulas.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [],
+    "title": "formulas",
+    "verbosity": "detailed"
+  },
+  "unhandled": []
+}

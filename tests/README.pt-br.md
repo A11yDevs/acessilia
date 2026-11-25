@@ -100,6 +100,15 @@ verifica saída exata e políticas distintas de títulos/rótulos nos filhos.
 Esses testes rodam no mesmo contêiner travado. Veja a
 [API do walker](../libs/docstruct/README.pt-br.md#walker-de-exportação-docstructexportwalk).
 
+## Fixtures diferenciais da saída canônica
+
+[`differential/`](differential/README.pt-br.md) roda documentos inteiros pelo
+caminho do backend contra um Toolbox determinístico, em processo, e compara
+cada documento canônico com referências gravadas no core antes de cada
+migração da #640 (#849). `test_differential_canonical.py` roda na suíte
+normal; uma diferença que uma release posterior fez de propósito é declarada
+junto da sua referência.
+
 ## Testes end-to-end
 
 Os testes marcados com `-m e2e` ficam fora da CI e precisam de um ambiente real:

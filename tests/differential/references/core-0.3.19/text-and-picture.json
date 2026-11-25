@@ -1,0 +1,326 @@
+{
+  "calls": [
+    "document.structure.extract",
+    "document.text.spans",
+    "media.inspect",
+    "pdf.render",
+    "vlm"
+  ],
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 5,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 1,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "id": "h1",
+              "level": 1,
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "h1",
+                "parent_id": null,
+                "raw_label": "heading",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 80.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "text": "Experiment report",
+              "type": "heading"
+            },
+            {
+              "id": "p1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p1",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 200.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 90.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "alt_text": "Photograph of a bench with an oscilloscope and cables.",
+              "id": "pic1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "pic1",
+                "parent_id": null,
+                "raw_label": "picture",
+                "source_ref": null,
+                "surrounding_text": [
+                  "Figure 1: the equipment set up.",
+                  "Experiment report",
+                  "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes"
+                ],
+                "vision_confidence": 0.95,
+                "vision_description_complete": true,
+                "vision_elements": [],
+                "vision_institutional_logo": false,
+                "vision_language": "pt-BR",
+                "vision_warnings": []
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 420.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 220.0
+                },
+                "page_number": 1
+              },
+              "type": "image"
+            },
+            {
+              "id": "cap1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "cap1",
+                "parent_id": null,
+                "raw_label": "caption",
+                "source_ref": null,
+                "visual_text_ownership": {
+                  "confidence": 1.0,
+                  "owner_id": "pic1",
+                  "reason": "caption_element",
+                  "role": "caption"
+                }
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 440.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 425.0
+                },
+                "page_number": 1
+              },
+              "text": "Figure 1: the equipment set up.",
+              "type": "paragraph"
+            },
+            {
+              "id": "p2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p2",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 560.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 450.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            }
+          ],
+          "page_number": 1,
+          "text": "# Experiment report\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nPhotograph of a bench with an oscilloscope and cables.\nFigure 1: the equipment set up.\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual."
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "completed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 2,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "degraded_methods": {},
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "optional": {},
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [],
+      "pddl_unsatisfied_summary": null,
+      "pddl_validation_only": true,
+      "pddl_visual_failures": null,
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "id": "p1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p1",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 200.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 90.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Photograph of a bench with an oscilloscope and cables.",
+            "id": "pic1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "pic1",
+              "parent_id": null,
+              "raw_label": "picture",
+              "source_ref": null,
+              "surrounding_text": [
+                "Figure 1: the equipment set up.",
+                "Experiment report",
+                "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes"
+              ],
+              "vision_confidence": 0.95,
+              "vision_description_complete": true,
+              "vision_elements": [],
+              "vision_institutional_logo": false,
+              "vision_language": "pt-BR",
+              "vision_warnings": []
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 420.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 220.0
+              },
+              "page_number": 1
+            },
+            "type": "image"
+          },
+          {
+            "id": "cap1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "cap1",
+              "parent_id": null,
+              "raw_label": "caption",
+              "source_ref": null,
+              "visual_text_ownership": {
+                "confidence": 1.0,
+                "owner_id": "pic1",
+                "reason": "caption_element",
+                "role": "caption"
+              }
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 440.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 425.0
+              },
+              "page_number": 1
+            },
+            "text": "Figure 1: the equipment set up.",
+            "type": "paragraph"
+          },
+          {
+            "id": "p2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p2",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 560.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 450.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          }
+        ],
+        "children": [],
+        "id": "h1",
+        "level": 1,
+        "metadata": {
+          "confidence": null,
+          "manifest_element_id": "h1",
+          "parent_id": null,
+          "raw_label": "heading",
+          "source_ref": null
+        },
+        "source_location": {
+          "bbox": {
+            "bottom": 80.0,
+            "left": 72.0,
+            "right": 540.0,
+            "top": 60.0
+          },
+          "page_number": 1
+        },
+        "title": "Experiment report"
+      }
+    ],
+    "source": {
+      "name": "text-and-picture.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [],
+    "title": "Experiment report",
+    "verbosity": "detailed"
+  },
+  "unhandled": []
+}

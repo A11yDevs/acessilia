@@ -1,0 +1,200 @@
+{
+  "calls": [
+    "document.structure.extract",
+    "document.text.spans",
+    "media.inspect",
+    "pdf.render",
+    "vlm"
+  ],
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 2,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 1,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "alt_text": "Bar chart of the yearly output from 2020 to 2024.",
+              "id": "g1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "g1",
+                "original_type": "paragraph",
+                "parent_id": null,
+                "raw_label": "picture",
+                "source_ref": null,
+                "vision_confidence": 0.95,
+                "vision_description_complete": true,
+                "vision_elements": [],
+                "vision_institutional_logo": false,
+                "vision_language": "pt-BR",
+                "vision_warnings": []
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 380.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "type": "image"
+            },
+            {
+              "alt_text": "Map of Brazil with its regions coloured.",
+              "id": "g2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "g2",
+                "original_type": "paragraph",
+                "parent_id": null,
+                "raw_label": "picture",
+                "source_ref": null,
+                "vision_confidence": 0.95,
+                "vision_description_complete": true,
+                "vision_elements": [],
+                "vision_institutional_logo": false,
+                "vision_language": "pt-BR",
+                "vision_warnings": []
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 720.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 400.0
+                },
+                "page_number": 1
+              },
+              "type": "image"
+            }
+          ],
+          "page_number": 1,
+          "text": "Bar chart of the yearly output from 2020 to 2024.\nMap of Brazil with its regions coloured."
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "completed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 3,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "degraded_methods": {},
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "optional": {},
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [],
+      "pddl_unsatisfied_summary": null,
+      "pddl_validation_only": true,
+      "pddl_visual_failures": null,
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "alt_text": "Bar chart of the yearly output from 2020 to 2024.",
+            "id": "g1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "g1",
+              "original_type": "paragraph",
+              "parent_id": null,
+              "raw_label": "picture",
+              "source_ref": null,
+              "vision_confidence": 0.95,
+              "vision_description_complete": true,
+              "vision_elements": [],
+              "vision_institutional_logo": false,
+              "vision_language": "pt-BR",
+              "vision_warnings": []
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 380.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 1
+            },
+            "type": "image"
+          },
+          {
+            "alt_text": "Map of Brazil with its regions coloured.",
+            "id": "g2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "g2",
+              "original_type": "paragraph",
+              "parent_id": null,
+              "raw_label": "picture",
+              "source_ref": null,
+              "vision_confidence": 0.95,
+              "vision_description_complete": true,
+              "vision_elements": [],
+              "vision_institutional_logo": false,
+              "vision_language": "pt-BR",
+              "vision_warnings": []
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 720.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 400.0
+              },
+              "page_number": 1
+            },
+            "type": "image"
+          }
+        ],
+        "children": [],
+        "id": "sectionless-1",
+        "level": 1,
+        "metadata": {},
+        "source_location": {},
+        "title": ""
+      }
+    ],
+    "source": {
+      "name": "mostly-visual.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [],
+    "title": "mostly-visual",
+    "verbosity": "detailed"
+  },
+  "unhandled": []
+}

@@ -1,0 +1,183 @@
+{
+  "description": "A formula without LaTeX markup (classified, then read: M4a, M3), one with LaTeX, and a picture the vision model reads as a formula (M1, #846).",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "p1",
+          "f1",
+          "f2",
+          "p2",
+          "pic1",
+          "p3"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "f1",
+        "type": "formula",
+        "raw_label": "formula",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "s ( t ) = t 3",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 180.0,
+              "right": 540.0,
+              "bottom": 200.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "f2",
+        "type": "formula",
+        "raw_label": "formula",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "v = \\frac{d}{t}",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 210.0,
+              "right": 540.0,
+              "bottom": 230.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 240.0,
+              "right": 540.0,
+              "bottom": 340.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "pic1",
+        "type": "picture",
+        "raw_label": "picture",
+        "reading_order": 5,
+        "hierarchy_level": 1,
+        "text": "",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 350.0,
+              "right": 540.0,
+              "bottom": 400.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 6,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 410.0,
+              "right": 540.0,
+              "bottom": 520.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 6,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "vision": {
+    "f1": {
+      "kind": "formula",
+      "formula_latex": "s(t) = t^3",
+      "description": "s of t equals t cubed"
+    },
+    "pic1": {
+      "kind": "formula",
+      "formula_latex": "E = mc^2",
+      "description": "E equals m c squared"
+    }
+  },
+  "latex": {
+    "f1": "s(t) = t^{3}"
+  }
+}
