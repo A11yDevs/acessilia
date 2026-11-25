@@ -91,7 +91,8 @@ CASES: dict[str, dict[str, Any]] = {
             "f1": {"kind": "formula", "formula_latex": "s(t) = t^3", "description": "s of t equals t cubed"},
             "pic1": {"kind": "formula", "formula_latex": "E = mc^2", "description": "E equals m c squared"},
         },
-        "latex": {"f1": "s(t) = t^{3}"},
+        # pic1: math.recognize reads nothing, so the model's LaTeX stays.
+        "latex": {"f1": "s(t) = t^{3}", "pic1": ""},
     },
     "mostly-visual": {
         "description": "A one-page document with no text content and no picture: its placeholder visuals are described.",
@@ -102,7 +103,6 @@ CASES: dict[str, dict[str, Any]] = {
         "vision": {
             "g1": {"description": "Bar chart of the yearly output from 2020 to 2024."},
             "g2": {"description": "Map of Brazil with its regions coloured."},
-            "page-1": {"description": "A page with a bar chart and a map."},
         },
     },
     "inline-math": {
@@ -114,6 +114,8 @@ CASES: dict[str, dict[str, Any]] = {
             _element("p2", "paragraph", PROSE * 2, 320, 430, 4),
         ],
         "vision": {"f1": {"kind": "formula", "formula_latex": "h(12 + h)", "description": "h times 12 plus h"}},
+        # math.recognize reads nothing, so the classification's LaTeX stays.
+        "latex": {"f1": ""},
         "text_spans": {"1": [_line(
             _span("inicial", "CMR12", 60), _span("´e", "CMR12", 110), _span("s", "CMMI12", 130),
             _span("0", "CMR8", 137, size=7.97, baseline=227.76), _span("∈", "CMSY10", 145),
@@ -133,7 +135,7 @@ def build(name: str, spec: dict[str, Any]) -> dict[str, Any]:
     for key in ("source", "extractor", "obligations", "observations", "manifest_id", "created_at"):
         document.pop(key, None)
     case: dict[str, Any] = {"description": spec["description"], "document": document}
-    for key in ("vision", "latex", "text_spans", "tables"):
+    for key in ("vision", "latex", "text_spans"):
         if key in spec:
             case[key] = spec[key]
     return case

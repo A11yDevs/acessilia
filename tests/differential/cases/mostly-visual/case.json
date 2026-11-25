@@ -79,9 +79,6 @@
     },
     "g2": {
       "description": "Map of Brazil with its regions coloured."
-    },
-    "page-1": {
-      "description": "A page with a bar chart and a map."
     }
   }
 }

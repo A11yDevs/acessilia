@@ -15,10 +15,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
+from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +31,15 @@ HERE = Path(__file__).resolve().parent
 CASES = HERE / "cases"
 REFERENCES = HERE / "references"
 SOURCE_PDF = HERE / "source.pdf"
+
+#: The harness a reference is recorded with, copied into the older tree; the
+#: comparison (``compare.py``) is not part of it, so changing it does not
+#: call for recording again.
+HARNESS_FILES = ("__init__.py", "fake_toolbox.py", "runner.py")
+
+#: The packages the fake needs that an older lock may lack, at the version
+#: the references were recorded with (``uv run --with``).
+PINNED = {"pillow": "13.0.0", "jsonschema": "4.26.0"}
 
 #: The run's settings: every call to the fake, no cache, no retry, the
 #: availability gate off (the fake publishes no catalogue).
@@ -44,20 +58,23 @@ ENVIRONMENT = {
     "FUSION_MODE": "single",
 }
 
-#: Keys whose values change from run to run, at any depth of the output.
-VOLATILE_KEYS = frozenset({
-    "created_at", "generated_at", "started_at", "completed_at", "updated_at",
-    "duration_ms", "elapsed_ms", "elapsed_seconds", "timestamp",
-    "source_path", "path", "file_path", "tmpdir", "data_dir",
+#: Where the output changes from run to run (the source's temporary path),
+#: or identifies or prices the planning state rather than the document (the
+#: plan, execution and manifest ids, the expected cost: they change with
+#: every migration by design). JSON pointers; nothing else is dropped, so a
+#: field of the same name elsewhere is still compared. The document's ``id``
+#: hashes the metadata, those ids included, and is dropped too.
+VOLATILE_POINTERS = frozenset({
+    "/id",
+    "/source/path",
+    "/metadata/pddl_plan_id",
+    "/metadata/pddl_execution_id",
+    "/metadata/pddl_manifest_id",
+    "/metadata/pddl_expected_total_cost",
 })
 
-#: Keys that identify the planning state or price the plan, not the
-#: document: they change with every migration by design (the obligations
-#: and methods the plan has), so they are not compared.
-PLANNING_KEYS = frozenset({
-    "pddl_plan_id", "pddl_execution_id", "pddl_manifest_id",
-    "pddl_expected_total_cost",
-})
+#: The files the backend's settings read their environment from.
+SETTINGS_SOURCES = ("backend/config/settings.py", "backend/config/core_config.py")
 
 
 def load_case(path: Path) -> dict[str, Any]:
@@ -65,34 +82,67 @@ def load_case(path: Path) -> dict[str, Any]:
 
 
 def run_case(case_path: Path) -> dict[str, Any]:
-    """The normalized canonical document of ``case_path``, and what the fake saw."""
+    """The normalized canonical document of ``case_path``, and what the fake saw.
+
+    The run is hermetic (:func:`hermetic_environment`): the settings get
+    their defaults plus ``ENVIRONMENT``, whatever the shell or ``.env`` says,
+    so a reference recorded in a bare worktree and a run in a developer's
+    tree see the same configuration.
+    """
+    # Imported before the environment is cleaned: the settings module loads
+    # ``.env`` into the process environment once, when it is imported.
+    import backend.config.settings  # noqa: F401
     from tests.differential.fake_toolbox import FakeToolbox, installed
 
     case = load_case(case_path)
-    saved = {key: os.environ.get(key) for key in ENVIRONMENT}
-    os.environ.update(ENVIRONMENT)
-    os.environ.update(case.get("environment", {}))
-    fake = FakeToolbox(case)
-    workdir = Path(tempfile.mkdtemp(prefix="differential-"))
-    try:
+    with hermetic_environment(case.get("environment", {})) as workdir:
+        fake = FakeToolbox(case)
         source = workdir / f"{case_path.parent.name}.pdf"
         shutil.copy(SOURCE_PDF, source)
         with installed(fake):
             canonical = asyncio.run(_run(source, case.get("mode", "normal")))
-    finally:
-        shutil.rmtree(workdir, ignore_errors=True)
-        for key, value in saved.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
-    # The document's id hashes its metadata, planning ids included.
-    canonical.pop("id", None)
     return {
         "canonical": normalize(canonical),
-        "calls": sorted(set(fake.calls)),
+        # Diagnostic only: an older core may call more or less (M4b stopped
+        # reading the text layer of a document with no prose to mark).
+        "calls": dict(sorted(Counter(fake.calls).items())),
         "unhandled": sorted(set(fake.unhandled)),
     }
+
+
+@contextlib.contextmanager
+def hermetic_environment(extra: dict[str, str]) -> Iterator[Path]:
+    """Run with only the settings' defaults, ``ENVIRONMENT`` and ``extra``.
+
+    Every variable the backend's settings can read (each quoted upper-case
+    name in ``SETTINGS_SOURCES``) is removed first, ``.env`` included, which
+    ``load_dotenv`` copied into the process environment. ``DATA_DIR`` and
+    ``TEMP_DIR`` point into a temporary directory, which the block gets. The
+    whole environment is restored on the way out, whatever happens.
+    """
+    saved = dict(os.environ)
+    workdir = Path(tempfile.mkdtemp(prefix="differential-"))
+    try:
+        for name in _settings_variables():
+            os.environ.pop(name, None)
+        os.environ.update(ENVIRONMENT)
+        os.environ.update({"DATA_DIR": str(workdir / "data"), "TEMP_DIR": str(workdir / "temp")})
+        os.environ.update(extra)
+        yield workdir
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def _settings_variables() -> set[str]:
+    root = HERE.parents[1]
+    names: set[str] = set()
+    for relative in SETTINGS_SOURCES:
+        path = root / relative
+        if path.is_file():
+            names.update(re.findall(r"""["']([A-Z][A-Z0-9_]{2,})["']""", path.read_text(encoding="utf-8")))
+    return names
 
 
 async def _run(source: Path, mode: str) -> dict[str, Any]:
@@ -134,7 +184,11 @@ async def _run(source: Path, mode: str) -> dict[str, Any]:
 
 def _orchestrator(cls: Any, settings: Any) -> Any:
     """The orchestrator ``backend/service.py`` builds, without Fast Downward:
-    each argument only when this version's constructor takes it."""
+    each argument only when this version's constructor takes it.
+
+    The replan budgets keep the constructor's defaults, the version's own:
+    the settings read them when the module is imported, before
+    :func:`hermetic_environment` can clean what a shell or ``.env`` set."""
     import inspect
 
     wanted = {
@@ -143,8 +197,6 @@ def _orchestrator(cls: Any, settings: Any) -> Any:
         "execute_dry_run": False,
         "enable_ocr": False,
         "extractor_backend": "toolbox",
-        "max_replans": getattr(settings, "pddl_max_replans", None),
-        "max_discovery_replans": getattr(settings, "pddl_max_discovery_replans", None),
     }
     accepted = inspect.signature(cls).parameters
     return cls(**{
@@ -153,45 +205,44 @@ def _orchestrator(cls: Any, settings: Any) -> Any:
     })
 
 
-def normalize(value: Any) -> Any:
-    """``value`` without what changes from run to run (``VOLATILE_KEYS``)."""
+def normalize(value: Any, pointer: str = "") -> Any:
+    """``value`` without ``VOLATILE_POINTERS``, its keys sorted."""
     if isinstance(value, dict):
         return {
-            key: normalize(item) for key, item in sorted(value.items())
-            if key not in VOLATILE_KEYS and key not in PLANNING_KEYS
+            key: normalize(item, f"{pointer}/{escape(key)}")
+            for key, item in sorted(value.items())
+            if f"{pointer}/{escape(key)}" not in VOLATILE_POINTERS
         }
     if isinstance(value, list):
-        return [normalize(item) for item in value]
+        return [normalize(item, f"{pointer}/{index}") for index, item in enumerate(value)]
     return value
 
 
-def differences(reference: Any, current: Any, path: str = "") -> list[dict[str, str]]:
-    """Where ``current`` departs from ``reference``: each ``{kind, path}``,
-    ``kind`` being ``added``, ``removed`` or ``changed`` and ``path`` a JSON
-    pointer (``/sections/0/blocks/2/alt_text``)."""
-    if isinstance(reference, dict) and isinstance(current, dict):
-        found: list[dict[str, str]] = []
-        for key in sorted(set(reference) | set(current)):
-            child = f"{path}/{key}"
-            if key not in reference:
-                found.append({"kind": "added", "path": child})
-            elif key not in current:
-                found.append({"kind": "removed", "path": child})
-            else:
-                found.extend(differences(reference[key], current[key], child))
-        return found
-    if isinstance(reference, list) and isinstance(current, list):
-        found = []
-        for index in range(max(len(reference), len(current))):
-            child = f"{path}/{index}"
-            if index >= len(reference):
-                found.append({"kind": "added", "path": child})
-            elif index >= len(current):
-                found.append({"kind": "removed", "path": child})
-            else:
-                found.extend(differences(reference[index], current[index], child))
-        return found
-    return [] if reference == current else [{"kind": "changed", "path": path or "/"}]
+def escape(key: str) -> str:
+    """A JSON pointer segment (RFC 6901)."""
+    return str(key).replace("~", "~0").replace("/", "~1")
+
+
+def identity() -> dict[str, str]:
+    """What a reference depends on besides the core: SHA-256 digests of the
+    harness the run copies (``HARNESS_FILES``), of every case, and of the
+    source PDF, plus the versions of the packages the fake adds
+    (``PINNED``). ``scripts/record_differential_references.py`` stores it in
+    ``SOURCE.json``, and the test refuses a reference whose identity differs."""
+
+    def digest(paths: list[Path]) -> str:
+        hasher = hashlib.sha256()
+        for path in sorted(paths):
+            hasher.update(path.relative_to(HERE).as_posix().encode() + b"\0")
+            hasher.update(path.read_bytes() + b"\0")
+        return hasher.hexdigest()
+
+    return {
+        "harness_sha256": digest([HERE / name for name in HARNESS_FILES]),
+        "cases_sha256": digest(list(CASES.glob("*/case.json"))),
+        "source_pdf_sha256": hashlib.sha256(SOURCE_PDF.read_bytes()).hexdigest(),
+        **{f"{name}_version": version for name, version in PINNED.items()},
+    }
 
 
 def main() -> None:

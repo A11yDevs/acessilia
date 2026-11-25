@@ -1,11 +1,11 @@
 {
-  "calls": [
-    "document.structure.extract",
-    "document.text.spans",
-    "media.inspect",
-    "pdf.render",
-    "vlm"
-  ],
+  "calls": {
+    "document.structure.extract": 1,
+    "document.text.spans": 1,
+    "media.inspect": 1,
+    "pdf.render": 2,
+    "vlm": 2
+  },
   "canonical": {
     "accessibility": {
       "internal_links": true,

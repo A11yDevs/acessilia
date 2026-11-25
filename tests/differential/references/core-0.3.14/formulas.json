@@ -1,14 +1,14 @@
 {
-  "calls": [
-    "document.structure.extract",
-    "document.text.spans",
-    "math.convert",
-    "math.recognize",
-    "math.verbalize",
-    "media.inspect",
-    "pdf.render",
-    "vlm"
-  ],
+  "calls": {
+    "document.structure.extract": 1,
+    "document.text.spans": 1,
+    "math.convert": 3,
+    "math.recognize": 1,
+    "math.verbalize": 3,
+    "media.inspect": 1,
+    "pdf.render": 3,
+    "vlm": 2
+  },
   "canonical": {
     "accessibility": {
       "internal_links": true,

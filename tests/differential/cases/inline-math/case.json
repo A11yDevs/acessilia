@@ -126,6 +126,9 @@
       "description": "h times 12 plus h"
     }
   },
+  "latex": {
+    "f1": ""
+  },
   "text_spans": {
     "1": [
       {
