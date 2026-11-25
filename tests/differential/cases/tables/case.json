@@ -1,0 +1,180 @@
+{
+  "description": "A table without structure, read from its image, and a structured one: the table enrichment (M2).",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "p1",
+          "t1",
+          "t2",
+          "p2"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "t1",
+        "type": "table",
+        "raw_label": "table",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "Quantity Value Mass 2 kg",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 180.0,
+              "right": 540.0,
+              "bottom": 300.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "t2",
+        "type": "table",
+        "raw_label": "table",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 320.0,
+              "right": 540.0,
+              "bottom": 420.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {
+          "table_ast": {
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "Time",
+                    "header": true
+                  },
+                  {
+                    "text": "Position",
+                    "header": true
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "0 s"
+                  },
+                  {
+                    "text": "0 m"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 440.0,
+              "right": 540.0,
+              "bottom": 540.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 4,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "vision": {
+    "t1": {
+      "kind": "table",
+      "rows": [
+        {
+          "cells": [
+            {
+              "text": "Quantity",
+              "header": true,
+              "scope": "col"
+            },
+            {
+              "text": "Value",
+              "header": true,
+              "scope": "col"
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "text": "Mass"
+            },
+            {
+              "text": "2 kg"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

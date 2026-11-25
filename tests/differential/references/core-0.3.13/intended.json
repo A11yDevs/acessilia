@@ -1,0 +1,28 @@
+{
+  "*": [
+    {
+      "kind": "added",
+      "path": "/metadata/pddl_toolbox_availability/optional",
+      "reason": "core 0.3.16 (#848): the gate reports the optional capability calls of each method"
+    },
+    {
+      "kind": "added",
+      "path": "/metadata/pddl_toolbox_availability/degraded_methods",
+      "reason": "core 0.3.16 (#848): the gate reports the methods that may run degraded"
+    }
+  ],
+  "formulas": [
+    {
+      "kind": "changed",
+      "path": "/metadata/pddl_manifest_revision",
+      "reason": "core 0.3.14 (M1): the descriptions run inside the plan; one that retypes an element (a picture read as a formula, a placeholder read as a picture) is followed by a discovery replan, one more manifest revision"
+    }
+  ],
+  "mostly-visual": [
+    {
+      "kind": "changed",
+      "path": "/metadata/pddl_manifest_revision",
+      "reason": "core 0.3.14 (M1): the descriptions run inside the plan; one that retypes an element (a picture read as a formula, a placeholder read as a picture) is followed by a discovery replan, one more manifest revision"
+    }
+  ]
+}

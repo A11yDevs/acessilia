@@ -1,0 +1,46 @@
+{
+  "*": [
+    {
+      "kind": "added",
+      "path": "/metadata/pddl_toolbox_availability/optional",
+      "reason": "core 0.3.16 (#848): the gate reports the optional capability calls of each method"
+    },
+    {
+      "kind": "added",
+      "path": "/metadata/pddl_toolbox_availability/degraded_methods",
+      "reason": "core 0.3.16 (#848): the gate reports the methods that may run degraded"
+    }
+  ],
+  "formulas": [
+    {
+      "kind": "added",
+      "path": "/sections/0/blocks/4/metadata/formula_recognition",
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+    },
+    {
+      "kind": "added",
+      "path": "/sections/0/blocks/4/metadata/formula_text_layer",
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+    },
+    {
+      "kind": "changed",
+      "path": "/sections/0/blocks/4/metadata/surrounding_text/1",
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+    },
+    {
+      "kind": "added",
+      "path": "/metadata/pages/0/blocks/4/metadata/formula_recognition",
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+    },
+    {
+      "kind": "added",
+      "path": "/metadata/pages/0/blocks/4/metadata/formula_text_layer",
+      "reason": "core 0.3.15 (M3, #846): a formula the vision model finds while the plan runs gets the formula LaTeX step again, as before 0.3.14; 0.3.14 skipped it"
+    },
+    {
+      "kind": "changed",
+      "path": "/metadata/pages/0/blocks/4/metadata/surrounding_text/1",
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+    }
+  ]
+}

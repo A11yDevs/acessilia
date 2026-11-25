@@ -97,6 +97,14 @@ before rejection. The unchanged golden gate still checks exact output and the
 distinct title/child-label policies. These tests run in the same locked container.
 See the [walker API](../libs/docstruct/README.md#export-walker-docstructexportwalk).
 
+## Differential fixtures of the canonical output
+
+[`differential/`](differential/README.md) runs whole documents through the
+backend's path against a deterministic, in-process Toolbox, and compares each
+canonical document with references recorded on the core before each #640
+migration (#849). `test_differential_canonical.py` runs in the normal suite; a
+difference a later release made on purpose is declared next to its reference.
+
 ## End-to-end tests
 
 Tests marked with `-m e2e` are excluded from CI and need a live environment:

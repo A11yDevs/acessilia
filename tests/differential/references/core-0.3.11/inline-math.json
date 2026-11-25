@@ -1,0 +1,306 @@
+{
+  "calls": [
+    "document.structure.extract",
+    "document.text.spans",
+    "math.convert",
+    "math.recognize",
+    "math.verbalize",
+    "media.inspect",
+    "pdf.render",
+    "vlm"
+  ],
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 4,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 1,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "id": "p0",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p0",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 180.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "p1",
+              "metadata": {
+                "confidence": null,
+                "inline_math_detection": {
+                  "marked": 2,
+                  "unmatched": 0
+                },
+                "manifest_element_id": "p1",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 232.0,
+                  "left": 50.0,
+                  "right": 560.0,
+                  "top": 210.0
+                },
+                "page_number": 1
+              },
+              "text": "inicial ´ e $s_0\\in\\mathbb{R}$, $h\\neq0$",
+              "type": "paragraph"
+            },
+            {
+              "id": "f1",
+              "metadata": {
+                "confidence": null,
+                "formula_classification": {
+                  "confidence": 0.95,
+                  "reason": null,
+                  "status": "math",
+                  "warnings": []
+                },
+                "formula_recognition": {
+                  "confidence": 0.95,
+                  "method": "vision",
+                  "text_agreement": 1.0
+                },
+                "formula_text_layer": "h(12 + h)",
+                "manifest_element_id": "f1",
+                "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>h⁢(12 + h)</mtext></math>",
+                "parent_id": null,
+                "raw_label": "formula",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 305.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 290.0
+                },
+                "page_number": 1
+              },
+              "text": "h(12 + h)",
+              "type": "math"
+            },
+            {
+              "id": "p2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p2",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 430.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 320.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            }
+          ],
+          "page_number": 1,
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\ninicial ´ e $s_0\\in\\mathbb{R}$, $h\\neq0$\nh(12 + h)\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual."
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "completed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 2,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [],
+      "pddl_unsatisfied_summary": null,
+      "pddl_validation_only": true,
+      "pddl_visual_failures": null,
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "id": "p0",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p0",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 180.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "id": "p1",
+            "metadata": {
+              "confidence": null,
+              "inline_math": [
+                {
+                  "latex": "s_0\\in\\mathbb{R}",
+                  "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s_0\\in\\mathbb{R}</mtext></math>",
+                  "source": "s_0\\in\\mathbb{R}",
+                  "speech": "spoken s_0\\in\\mathbb{R}"
+                },
+                {
+                  "latex": "h\\neq0",
+                  "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>h\\neq0</mtext></math>",
+                  "source": "h\\neq0",
+                  "speech": "spoken h\\neq0"
+                }
+              ],
+              "inline_math_detection": {
+                "marked": 2,
+                "unmatched": 0
+              },
+              "manifest_element_id": "p1",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 232.0,
+                "left": 50.0,
+                "right": 560.0,
+                "top": 210.0
+              },
+              "page_number": 1
+            },
+            "text": "inicial ´ e $s_0\\in\\mathbb{R}$, $h\\neq0$",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Fórmula: spoken h⁢(12 + h)",
+            "id": "f1",
+            "metadata": {
+              "confidence": null,
+              "formula_classification": {
+                "confidence": 0.95,
+                "reason": null,
+                "status": "math",
+                "warnings": []
+              },
+              "formula_recognition": {
+                "confidence": 0.95,
+                "method": "vision",
+                "text_agreement": 1.0
+              },
+              "formula_text_layer": "h(12 + h)",
+              "manifest_element_id": "f1",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>h⁢(12 + h)</mtext></math>",
+              "parent_id": null,
+              "raw_label": "formula",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 305.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 290.0
+              },
+              "page_number": 1
+            },
+            "text": "h(12 + h)",
+            "type": "math"
+          },
+          {
+            "id": "p2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p2",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 430.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 320.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          }
+        ],
+        "children": [],
+        "id": "sectionless-1",
+        "level": 1,
+        "metadata": {},
+        "source_location": {},
+        "title": ""
+      }
+    ],
+    "source": {
+      "name": "inline-math.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [],
+    "title": "inline-math",
+    "verbosity": "detailed"
+  },
+  "unhandled": []
+}

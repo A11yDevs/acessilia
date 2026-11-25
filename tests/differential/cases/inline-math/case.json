@@ -1,0 +1,303 @@
+{
+  "description": "Prose whose math the text layer's fonts mark as $…$ (M4b), and a formula that reads its variables.",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "p0",
+          "p1",
+          "f1",
+          "p2"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "p0",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 180.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "inicial ´ e s 0 ∈ R , h = 0",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 50.0,
+              "top": 210.0,
+              "right": 560.0,
+              "bottom": 232.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "f1",
+        "type": "formula",
+        "raw_label": "formula",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "h(12 + h)",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 290.0,
+              "right": 540.0,
+              "bottom": 305.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 320.0,
+              "right": 540.0,
+              "bottom": 430.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 4,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "vision": {
+    "f1": {
+      "kind": "formula",
+      "formula_latex": "h(12 + h)",
+      "description": "h times 12 plus h"
+    }
+  },
+  "text_spans": {
+    "1": [
+      {
+        "bbox": [
+          60,
+          216.99,
+          200.94,
+          229.7525
+        ],
+        "spans": [
+          {
+            "text": "inicial",
+            "font": "CMR12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              60,
+              216.99,
+              101.86,
+              228.95000000000002
+            ],
+            "origin": [
+              60,
+              225.96
+            ]
+          },
+          {
+            "text": "´e",
+            "font": "CMR12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              110,
+              216.99,
+              121.96000000000001,
+              228.95000000000002
+            ],
+            "origin": [
+              110,
+              225.96
+            ]
+          },
+          {
+            "text": "s",
+            "font": "CMMI12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              130,
+              216.99,
+              135.98,
+              228.95000000000002
+            ],
+            "origin": [
+              130,
+              225.96
+            ]
+          },
+          {
+            "text": "0",
+            "font": "CMR8",
+            "size": 7.97,
+            "flags": 4,
+            "bbox": [
+              137,
+              221.7825,
+              140.985,
+              229.7525
+            ],
+            "origin": [
+              137,
+              227.76
+            ]
+          },
+          {
+            "text": "∈",
+            "font": "CMSY10",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              145,
+              216.99,
+              150.98,
+              228.95000000000002
+            ],
+            "origin": [
+              145,
+              225.96
+            ]
+          },
+          {
+            "text": "R",
+            "font": "MSBM10",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              155,
+              216.99,
+              160.98,
+              228.95000000000002
+            ],
+            "origin": [
+              155,
+              225.96
+            ]
+          },
+          {
+            "text": ",",
+            "font": "CMR12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              163,
+              216.99,
+              168.98,
+              228.95000000000002
+            ],
+            "origin": [
+              163,
+              225.96
+            ]
+          },
+          {
+            "text": "h",
+            "font": "CMMI12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              175,
+              216.99,
+              180.98,
+              228.95000000000002
+            ],
+            "origin": [
+              175,
+              225.96
+            ]
+          },
+          {
+            "text": "̸",
+            "font": "CMSY10",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              183,
+              216.99,
+              188.98,
+              228.95000000000002
+            ],
+            "origin": [
+              183,
+              225.96
+            ]
+          },
+          {
+            "text": "= 0",
+            "font": "CMR12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              183,
+              216.99,
+              200.94,
+              228.95000000000002
+            ],
+            "origin": [
+              183,
+              225.96
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

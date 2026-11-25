@@ -1,0 +1,150 @@
+{
+  "description": "Prose with one picture and its caption: the picture descriptions (M1).",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "h1",
+          "p1",
+          "pic1",
+          "cap1",
+          "p2"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "h1",
+        "type": "heading",
+        "raw_label": "heading",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "Experiment report",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 80.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 90.0,
+              "right": 540.0,
+              "bottom": 200.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "pic1",
+        "type": "picture",
+        "raw_label": "picture",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 220.0,
+              "right": 540.0,
+              "bottom": 420.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "cap1",
+        "type": "caption",
+        "raw_label": "caption",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "Figure 1: the equipment set up.",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 425.0,
+              "right": 540.0,
+              "bottom": 440.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 5,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 450.0,
+              "right": 540.0,
+              "bottom": 560.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 5,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "vision": {
+    "pic1": {
+      "description": "Photograph of a bench with an oscilloscope and cables."
+    }
+  }
+}

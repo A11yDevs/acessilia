@@ -1,0 +1,87 @@
+{
+  "description": "A one-page document with no text content and no picture: its placeholder visuals are described.",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "g1",
+          "g2"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "g1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 380.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "g2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "Fig",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 400.0,
+              "right": 540.0,
+              "bottom": 720.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 2,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "vision": {
+    "g1": {
+      "description": "Bar chart of the yearly output from 2020 to 2024."
+    },
+    "g2": {
+      "description": "Map of Brazil with its regions coloured."
+    },
+    "page-1": {
+      "description": "A page with a bar chart and a map."
+    }
+  }
+}
