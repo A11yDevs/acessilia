@@ -24,9 +24,10 @@ direto de `docstruct.imaging` no Core (`toolbox/vision_payload` agora pede o
 plano de redução ao SDK).
 
 - **49 arquivos** importam **56 módulos** do Docstruct.
-- **44 arquivos** importam computação (algoritmo ou operação). A ADR-0028
-  traz 43; a diferença são `pipeline/judge` e `pipeline/handlers/judge`, que
-  importam `docstruct.fusion.judge`, classificado aqui como algoritmo (veja
+- **44 arquivos** importam computação (algoritmo ou operação): os 43 da
+  ADR-0028, mais `pipeline/judge` e `pipeline/handlers/judge` (que importam
+  `docstruct.fusion.judge`, classificado aqui como algoritmo), menos
+  `toolbox/vision_payload`, cujo último import direto a #636 removeu (veja
   [A regra de classificação](#a-regra-de-classificação)).
 - **5 arquivos** importam só contratos, validação ou política:
   - só contrato: `export/catalog`, `manifest/document_adapter`,
@@ -164,7 +165,7 @@ Os importadores se agrupam pela parte do Core que executa a computação. Esta
 | Montagem do payload e do documento canônico | `pipeline/payload`, `pipeline/canonical_builder`, `pipeline/elements`, `pipeline/obligations` | Montagem canônica e texto das páginas: a composição por trás da exportação acessível |
 | Exportação acessível (`export/*`) | renderers, exporters, exportador Pandoc, markers, catalog | Renderização, por trás da capacidade de exportação (`document.export.*`) |
 | Construção do manifesto (`manifest/*`) | builder, detectores de layout e texto, slides | Ordem de leitura, junção final, verso e normalização durante a construção do manifesto |
-| Coordenação e fronteira | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `toolbox/vision_payload`, `manifest/toolbox_extractor` | Fusão de payloads, recorte de regiões e o limiar do juiz; a política de fusão é política |
+| Coordenação e fronteira | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `manifest/toolbox_extractor` | Fusão de payloads, recorte de regiões e o limiar do juiz; a política de fusão é política |
 | Shims de compatibilidade | `pipeline/table_ast`, `formula_tools`, `pipeline/validators` | Reexportações mantidas para imports antigos (`import docstruct.x`); saem quando seus chamadores saírem |
 | Serviço (`backend/service.py`) | `backend/service` | `merge_broken_paragraphs` (algoritmo) e `verbosity_for_mode` (política) |
 
@@ -330,7 +331,8 @@ Cada migração, por método do plano ou por agente (ADR-0028):
 4. acrescenta um teste diferencial de regressão;
 5. remove do fixture os arquivos e nomes obsoletos e, quando o último
    importador de um módulo sai, sua linha desta página;
-6. atualiza os indicadores acima.
+6. remede o resumo acima, que acompanha o código; os indicadores mantêm a
+   linha de base do `82424b34`.
 
 Uma capacidade segue a semântica dos métodos do plano e dos agentes. Nem
 toda função utilitária vira uma chamada remota: algoritmos de baixo nível

@@ -24,9 +24,10 @@ of `docstruct.imaging` (`toolbox/vision_payload` now asks the SDK for the
 downscale plan).
 
 - **49 files** import **56 docstruct modules**.
-- **44 files** import computation (algorithm or operation). ADR-0028 gives
-  43; the difference is `pipeline/judge` and `pipeline/handlers/judge`, which
-  import `docstruct.fusion.judge`, classified here as an algorithm (see
+- **44 files** import computation (algorithm or operation): ADR-0028's 43,
+  plus `pipeline/judge` and `pipeline/handlers/judge` (which import
+  `docstruct.fusion.judge`, classified here as an algorithm), minus
+  `toolbox/vision_payload`, whose last direct import #636 removed (see
   [The classification rule](#the-classification-rule)).
 - **5 files** import only contracts, validation or policy:
   - contract only: `export/catalog`, `manifest/document_adapter`,
@@ -158,7 +159,7 @@ is the order the migration can follow, per plan method or agent (ADR-0028):
 | Payload and canonical assembly | `pipeline/payload`, `pipeline/canonical_builder`, `pipeline/elements`, `pipeline/obligations` | Canonical assembly and page text: the composite behind accessible export |
 | Accessible export (`export/*`) | renderers, exporters, Pandoc exporter, markers, catalog | Rendering, behind the export capability (`document.export.*`) |
 | Manifest construction (`manifest/*`) | builder, layout and text detectors, slides | Reading order, tail join, verse, normalization while building the manifest |
-| Coordination and boundary | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `toolbox/vision_payload`, `manifest/toolbox_extractor` | Payload fusion, region clipping and the judge's threshold; the fusion policy is policy |
+| Coordination and boundary | `pipeline/fusion`, `pipeline/secondary`, `pipeline/toolbox`, `pipeline/judge`, `manifest/toolbox_extractor` | Payload fusion, region clipping and the judge's threshold; the fusion policy is policy |
 | Compatibility shims | `pipeline/table_ast`, `formula_tools`, `pipeline/validators` | Re-exports kept for old imports (`import docstruct.x`); removed when their callers move |
 | Service (`backend/service.py`) | `backend/service` | `merge_broken_paragraphs` (algorithm) and `verbosity_for_mode` (policy) |
 
@@ -321,7 +322,8 @@ Each migration, per plan method or agent (ADR-0028):
 4. adds a differential regression test;
 5. removes the obsolete files and names from the fixture, and a module's row
    from this page when its last importer goes;
-6. updates the indicators above.
+6. re-measures the summary above, which follows the code; the indicators keep
+   their `82424b34` baseline.
 
 A capability follows the semantics of the plan methods and agents. Not every
 utility function becomes a remote call: low-level algorithms are composed
