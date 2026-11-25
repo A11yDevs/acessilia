@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 from acessilia_core.config import ToolboxConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import LOG_VISION_CONTEXT_DOWNSCALE_FAILED
@@ -11,8 +9,10 @@ from acessilia_core.logger import logger
 from acessilia_core.toolbox.toolbox_client import make_toolbox_client
 from acessilia_sdk.toolbox import ToolboxError
 from acessilia_sdk.toolbox.clients import ToolboxPdfClient
-from acessilia_sdk.toolbox.clients.pdf import downscale_image as _sdk_downscale_image
-from docstruct.imaging import image_dimensions
+from acessilia_sdk.toolbox.clients.pdf import (
+    downscale_image as _sdk_downscale_image,
+    plan_downscale,
+)
 
 
 async def downscale_image(
@@ -20,23 +20,18 @@ async def downscale_image(
 ) -> bytes | None:
     """``payload`` rendered by the Toolbox with its longest side times ``scale``.
 
-    Delegates dimension parsing and ``pdf.render@2`` invocation to
+    Plans the render with :func:`acessilia_sdk.toolbox.clients.pdf.plan_downscale`,
+    so an image the render would not shrink returns ``None`` before a client is
+    built, and delegates dimension parsing and ``pdf.render@2`` invocation to
     :func:`acessilia_sdk.toolbox.clients.pdf.downscale_image`, keeping
     ``ToolboxConfig`` client lifecycle, localized logging, and best-effort
     ``None`` recovery in the core.
     """
-    if (
-        isinstance(scale, bool)
-        or not isinstance(scale, (int, float))
-        or not math.isfinite(scale)
-        or scale <= 0
-    ):
+    try:
+        plan = plan_downscale(payload, scale)
+    except ValueError:
         return None
-    size = image_dimensions(payload)
-    if size is None:
-        return None
-    width, height, _ = size
-    if max(1, int(max(width, height) * scale)) >= max(width, height):
+    if plan is None:
         return None
     client = None
     try:

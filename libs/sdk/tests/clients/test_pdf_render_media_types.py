@@ -95,6 +95,7 @@ def test_pdf_png_and_jpeg_are_rendered_and_exported() -> None:
     assert "RENDER_MEDIA_TYPES" in pdf.__all__
     assert "check_renderable" in pdf.__all__
     assert "downscale_image" in pdf.__all__
+    assert "plan_downscale" in pdf.__all__
 
 
 def test_every_suffix_the_transport_labels_as_renderable_is_listed() -> None:
@@ -190,6 +191,35 @@ async def test_downscale_image_rejects_invalid_scale(bad_scale) -> None:
             await downscale_image(client, _minimal_png(400, 240), scale=bad_scale)
     finally:
         await client.close()
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (_minimal_png(400, 240), (200, ".png")),
+        (_minimal_jpeg(400, 240), (200, ".jpg")),
+        (_minimal_png(240, 400), (200, ".png")),
+        (_minimal_png(401, 240), (200, ".png")),
+    ],
+    ids=["png", "jpeg", "portrait", "truncated"],
+)
+def test_plan_downscale_reads_the_longest_side_and_the_suffix(payload, expected) -> None:
+    """The plan is the render's own ``max_side``, truncating as the render does."""
+    assert pdf.plan_downscale(payload) == expected
+
+
+def test_plan_downscale_declines_unknown_and_unshrinkable_payloads() -> None:
+    assert pdf.plan_downscale(b"not an image") is None
+    assert pdf.plan_downscale(_minimal_png(400, 240), scale=1.0) is None
+    assert pdf.plan_downscale(_minimal_png(400, 240), scale=1.5) is None
+    # max(1, int(1 * 0.5)) == 1 is already the longest side: no render helps.
+    assert pdf.plan_downscale(_minimal_png(1, 1), scale=0.5) is None
+
+
+@pytest.mark.parametrize("bad_scale", [0, -0.5, float("nan"), float("inf"), True])
+def test_plan_downscale_rejects_invalid_scale(bad_scale) -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        pdf.plan_downscale(_minimal_png(400, 240), scale=bad_scale)
 
 
 @pytest.mark.asyncio

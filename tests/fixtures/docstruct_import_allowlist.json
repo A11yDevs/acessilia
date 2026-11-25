@@ -380,14 +380,6 @@
       ]
     }
   },
-  "docstruct.imaging": {
-    "class": "algorithm",
-    "files": {
-      "libs/core/src/acessilia_core/toolbox/vision_payload.py": [
-        "image_dimensions"
-      ]
-    }
-  },
   "docstruct.imaging.policy": {
     "class": "algorithm",
     "files": {

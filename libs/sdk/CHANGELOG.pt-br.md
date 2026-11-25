@@ -5,6 +5,15 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
+## 0.7.0 (2026-11-24)
+
+- **Adicionado** `plan_downscale` em `acessilia_sdk.toolbox.clients.pdf`: a
+  decisão pura que `downscale_image` toma antes de tocar a Toolbox. Ela valida
+  `scale`, lê as dimensões do cabeçalho PNG/JPEG e devolve o `max_side` do
+  render com o sufixo do arquivo, ou `None` quando a imagem não encolheria.
+  `downscale_image` passa a usá-la, e o payload de visão do Core pula imagens
+  não reduzíveis pela mesma regra, em vez de repeti-la (#636).
+
 ## 0.6.0 (2026-11-22)
 
 - **Adicionado** `resolve_findings` em `acessilia_sdk.i18n.translation`:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "acessilia-core"
-version = "0.3.16"
+version = "0.3.17"
 description = "Acessilia's core: the PDDL pipeline that plans and executes a document's accessibility, with its agents, enrichment stages and exporters (ADR-0016)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,7 +22,7 @@ classifiers = [
 # ./libs/sdk first; uv resolves them from the paths below.
 dependencies = [
     "acessilia-docstruct>=0.5.8,<0.6",
-    "acessilia-sdk>=0.6,<0.7",
+    "acessilia-sdk>=0.7,<0.8",
     "agno==3.0.5",
     "openai>=2.45.0,<3",
     "ollama>=0.6.2,<0.7",

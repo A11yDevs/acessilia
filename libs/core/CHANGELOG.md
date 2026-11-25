@@ -2,6 +2,18 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.17 — the downscale plan comes from the SDK (#636)
+
+The vision payload's context recovery no longer repeats the SDK's rule for
+when downscaling is worth it. `toolbox/vision_payload` now asks
+`acessilia_sdk.toolbox.clients.pdf.plan_downscale` — the same pure decision the
+SDK's `downscale_image` executes — so the core skips exactly the images the
+render would not shrink, before it builds a client. Behaviour is unchanged: an
+invalid `scale`, unknown bytes and an unshrinkable image still return `None`
+without touching the Toolbox, and a Toolbox failure still returns `None` after
+closing the client. The core no longer imports `docstruct.imaging`, and it now
+requires SDK 0.7.
+
 ## 0.3.16 — optional Toolbox capabilities (#848)
 
 A method's Toolbox calls are now of three kinds:

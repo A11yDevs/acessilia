@@ -2,6 +2,18 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.17 — o plano de redução vem do SDK (#636)
+
+A recuperação de contexto do payload de visão não repete mais a regra do SDK
+sobre quando vale a pena reduzir uma imagem. O `toolbox/vision_payload` agora
+consulta `acessilia_sdk.toolbox.clients.pdf.plan_downscale` — a mesma decisão
+pura que o `downscale_image` do SDK executa —, então o core pula exatamente as
+imagens que o render não reduziria, antes de criar um cliente. O comportamento
+não muda: um `scale` inválido, bytes desconhecidos e uma imagem não reduzível
+continuam devolvendo `None` sem tocar a Toolbox, e uma falha da Toolbox
+continua devolvendo `None` depois de fechar o cliente. O core deixa de
+importar `docstruct.imaging` e passa a exigir o SDK 0.7.
+
 ## 0.3.16 — capacidades opcionais do Toolbox (#848)
 
 As chamadas de um método ao Toolbox agora são de três tipos:
