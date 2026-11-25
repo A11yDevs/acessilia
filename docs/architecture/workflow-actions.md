@@ -34,17 +34,18 @@ order:
 | Bootstrap | Page limit, before extraction | Rejects a document over `DocumentConfig.max_pages` from the inspection's page count (`DocumentTooLargeError`) | — | — |
 | Bootstrap | Extraction | Builds the manifest: elements, then the obligations derived from their types | Toolbox `document.structure.extract` (one or two providers) | `manifest` |
 | Bootstrap | Page limit, after extraction | Checks the limit again against the extracted structure | — | — |
-| Enrichment | Steps before planning, in a fixed order (below); since 0.3.12, steps 5 and 6 run inside the plan (M2), since 0.3.14 the descriptions of step 2 (M1), and since 0.3.15 step 4 (M3) | | Toolbox and the core's model agents | `enriched`, per object, for steps 1 and 3 and the preparation of step 2; the execution checkpoint, per plan step, for the descriptions, 4 and 5–6 |
+| Enrichment | Steps before planning, in a fixed order (below); since 0.3.12, steps 5 and 6 run inside the plan (M2), since 0.3.14 the descriptions of step 2 (M1), since 0.3.15 step 4 (M3), and since 0.3.19 step 1 (M4a) | | Toolbox and the core's model agents | `enriched` for step 3 and the preparation of step 2; the execution checkpoint, per plan step, for 1, the descriptions, 4 and 5–6 |
 | Planning | | Compiles the problem from the enriched manifest and plans | — | `plan` |
 
 The enrichment steps (`_enrich_before_planning` until core 0.3.11; since
 0.3.12, steps 5 and 6 run inside the plan, as the `table-enrichment` method,
 M2; since 0.3.14, the descriptions of step 2, as the `picture-description`
-method, M1; since 0.3.15, step 4, as the `formula-recognizer` method, M3):
+method, M1; since 0.3.15, step 4, as the `formula-recognizer` method, M3;
+since 0.3.19, step 1, as the `formula-region-classifier` method, M4a):
 
 | Step | Function | Calls | Effect on the manifest |
 |---|---|---|---|
-| 1. Formula regions | `_classify_formula_regions` | Toolbox `pdf.render` (the formula crop); `VisionAgent` | checks the extractor's formula labels. A drawing is described once and becomes a picture, which reconciles its obligations (`reconcile_reclassified_element`); an uncertain candidate goes to human review |
+| 1. Formula regions | `_classify_formula_regions`, inside the plan since 0.3.19 | Toolbox `pdf.render` (the formula crop); `VisionAgent` | checks the extractor's formula labels. A drawing is described once and becomes a picture, which reconciles its obligations (`reconcile_reclassified_element`); an uncertain candidate goes to human review |
 | 2. Picture descriptions | `_prepare_pictures` before planning; `_enrich_picture_descriptions` inside the plan since 0.3.14 | `VisionAgent` | first injects a full-page picture for a standalone raster image and annotates the visual-text ownership, both from the media inspection (these stay before planning); then a description per picture, and the ownership annotated again |
 | 3. Inline math | `_mark_inline_math` | Toolbox `document.text.spans` | marks math in prose |
 | 4. Formula LaTeX | `_enrich_formula_latex`, inside the plan since 0.3.15 | Toolbox `math.recognize`, `pdf.render`; `VisionAgent` as the fallback | separates equation numbers, then LaTeX per formula |
@@ -55,8 +56,8 @@ What the steps share is not uniform:
 
 | Resource | Steps | Where it lives (core 0.3.12) |
 |---|---|---|
-| Provider breaker | 1, 2, 4, 5 | the run's, `RunPorts.services` (`run_breaker`), shared with the `picture-description`, `formula-recognizer` and `table-enrichment` methods. Their order is the planner's tie-break, so under a partial outage the step the plan runs first spends the breaker's budget first (#853) |
-| Per-object progress (`on_progress`) | 1, 2, 4 | a local, from `checkpoints.enrichment_progress`; steps 2, 4 and 5, inside the plan, save the manifest they are enriching after each object into the execution checkpoint (`step_progress`, #836), and a crash mid-step resumes from it |
+| Provider breaker | 1, 2, 4, 5 | the run's, `RunPorts.services` (`run_breaker`), shared with the `formula-region-classifier`, `picture-description`, `formula-recognizer` and `table-enrichment` methods. Their order is the planner's tie-break, so under a partial outage the step the plan runs first spends the breaker's budget first (#853) |
+| Per-object progress (`on_progress`) | 1, 2, 4 | a local, from `checkpoints.enrichment_progress`; steps 1, 2, 4 and 5, inside the plan, save the manifest they are enriching after each object into the execution checkpoint (`step_progress`, #836), and a crash mid-step resumes from it |
 | Region cache | 1, 2, 4 | from `RunPorts` (`region_cache_for`) |
 | Text-span reader (`_TextSpanReader`) | 3, 6 | the run's, `RunPorts.services` (`run_text_spans`); it keeps no manifest |
 | Progress messages | 1, 2, 4, 5 | the status callback before planning; `RunServices.progress` inside the plan |
@@ -307,9 +308,25 @@ the manifest. **The enrichment migration needs no domain change.**
    whose crop could not be made records why (`crop_unavailable`,
    `no_page`), as a picture does.
 
-   Between the three document steps there is no dependency: they take other
-   elements, and their costs are equal, so the planner breaks the tie
-   (`DOCUMENT_STEPS` is the reconciliation's order, not the plan's). They
+   Between document steps that take other elements there is no dependency,
+   and their costs are equal, so the planner breaks the tie
+   (`DOCUMENT_STEPS` is the reconciliation's order, not the plan's).
+
+   **M4a (core 0.3.19).** The formula region classification runs inside the
+   plan. It shares the formulas with the formula LaTeX, which must come
+   after it (the classification decides whether a region is mathematics), so
+   `recognize-formulas` depends on `classify-formula-regions` for the
+   formulas they share: `DOCUMENT_STEPS` lists the classification first, and
+   the edge rule follows it. An element the descriptions turned into a
+   formula (a picture or a placeholder visual) is not classified: the
+   descriptions ran after the classification before planning, so it never
+   was, and a second answer could drop the formula they gave. A
+   classification that got no answer (`unclassified`) is tried again when
+   the step runs again, like the other composite steps; `math` and
+   `unresolved` are decisions. A shared formula makes the whole recognition
+   batch wait for the classification batch: the cost of document-level
+   granularity, accepted for 0.3.0 (sub-batches are #619 research). Prose inline math, still before planning until M4b, reads other
+   elements. They
    share the vision breaker, so under a partial provider outage the order
    changes which step degrades; that is documented, not forced (#853).
 3. **Infrastructure stays out of the domain** (ADR-0029). The region cache is
@@ -399,13 +416,14 @@ when the manifest is enriched, before the first plan, and only when the
 document has the elements its step works on. That is its gate; the method
 keeps the step's per-element gates.
 
-Three steps are planned this way, each a `DocumentStep` of
+Four steps are planned this way, each a `DocumentStep` of
 `pipeline/document_obligations.py`, which holds the rules below once for
 all of them:
 
 | Step | Kind and method | Targets | Dropped from its targets | Depends on it |
 |---|---|---|---|---|
 | Table enrichment (M2, 0.3.12) | `enrich-tables`, `table-enrichment` | every table | an element no longer a table | `linearize-table`, `select-table-source`, and the page obligations of a page with a table |
+| Formula region classification (M4a, 0.3.19) | `classify-formula-regions`, `formula-region-classifier` | in a source that can be rendered, the formulas without LaTeX markup that no classification has decided, except one the descriptions turned into a formula | an element no longer a formula (a drawing it described is a picture) | `recognize-formulas` (they share the formula), `verbalize-formula`, `normalize-formula`, and the page obligations of a page with a formula |
 | Formula LaTeX (M3, 0.3.15) | `recognize-formulas`, `formula-recognizer` | the formulas with an equation label to separate and, in a source that can be rendered, the ones without LaTeX that no recognition has recorded | an element no longer a formula (the recognition read it as a picture) | `verbalize-formula`, `normalize-formula`, and the page obligations of a page with a formula |
 | Picture descriptions (M1, 0.3.14) | `describe-images`, `picture-description` | the pictures not described yet; without pictures, in a mostly visual document, its placeholder visuals, or the first element of a one-page one; never a formula or a table | an element that became a formula or a table | `describe-image`, and the page obligations of a page with a picture |
 
@@ -418,12 +436,16 @@ test (`is_describable`), so the step never takes an element it would then
 drop. A formula or a table, which the one-page fallback used to take, is
 left to its own steps and never retyped as a picture.
 
-**Between the two steps** the policy is explicit: they share no element, so
-neither depends on the other. Before the review of #845 they could share
-the table of a one-page document, and the target rule, applied by each
-step, made them depend on each other: a cycle. As a guard for a later step,
-the edges follow `DOCUMENT_STEPS`: a step's obligation may depend on an
-earlier step's that shares an element, never on a later one's.
+**Between the steps** the policy is explicit: two steps share elements only
+when the first must run before the second, and `DOCUMENT_STEPS` lists them in
+that order; the edges follow it (a step's obligation may depend on an
+earlier step's that shares an element, never on a later one's), so they
+never make a cycle. Before the review of #845 the descriptions and the
+tables could share the table of a one-page document, and the target rule,
+applied by each step, made them depend on each other. Today only the
+formula region classification and the formula LaTeX share elements (M4a).
+The edges are reconciled once more after every step's obligations exist,
+so the first plan already orders two steps that share an element.
 
 **The plan decides the targets.** The method describes its obligation's
 targets that are still describable and not described, whatever the
@@ -496,8 +518,9 @@ undescribed has.
 
 ## Migration order
 
-Each step is one pull request. Method and kind names for M4 are proposals,
-settled in its pull request.
+Each step is one pull request; M4 is two (M4a, M4b), since its two steps
+are independent. Method and kind names for M4b are proposals, settled in its
+pull request.
 
 | PR | Step | Obligation and method | Role | Toolbox requirements | Changes obligations while the plan runs |
 |---|---|---|---|---|---|
@@ -505,7 +528,8 @@ settled in its pull request.
 | M0 (done, core 0.3.13) | Executor preparation | The executor skips, and records as `skipped` with the reason, the step of an obligation this execution removed or replaced, and of one that now waits for an open obligation the plan does not run before it. `complete-job` is skipped while every open obligation was found or deferred; one the plan ran and left open is a failure. A step whose obligation changed under its id is skipped too. The orchestrator replans after such a run with its own bound (`max_discovery_replans`), apart from `max_replans`, and stops when a replan would start from the same planning state. Document-level obligations are reconciled before each replan, and the table enrichment keeps to its targets | — | — | — |
 | M1 (done, core 0.3.14) | Picture descriptions | `describe-images`, one per document with pictures to describe (or with the placeholder visuals of a mostly visual document), method `picture-description`, running the step with its concurrency and retry pass; `describe-image` keeps `vision-description`, which checks the result, and depends on it. The injected picture and the first ownership annotation stay before planning | `transitional` (`VisionAgent`) | optional (#848): `pdf.render` for a picture's crop degrades to `crop_unavailable` | yes: a description can retype a picture as a formula, which removes its `describe-image` and adds `verbalize-formula` |
 | M3 (done, core 0.3.15) | Formula LaTeX | `recognize-formulas`, one per document with formulas to recognize or equation labels to separate, method `formula-recognizer`, running the step with its concurrency; `verbalize-formula` and `normalize-formula` depend on it. A document-level obligation, like M1 and M2, not one per formula as first proposed: the step shares one breaker, one `math.recognize` probe per obligation and its concurrency across the document | `transitional` (`VisionAgent`, the fallback) | optional (#848): `math.recognize` degrades to the vision fallback and `pdf.render` per formula, so they never rule it out | yes: the fallback can read a formula as a picture, which replaces its formula obligations with `describe-image`; and a formula the descriptions find gets the step on the replan |
-| M4 | Formula regions and prose inline math | new kinds `classify-formula-region` (method `formula-region-classifier`) and `mark-inline-math` (method `inline-math-marker`), replacing the post-execution pass of #599 | new: `transitional` (`VisionAgent`) and declared | `pdf.render`; `document.text.spans` | yes: reclassification reconciles obligations |
+| M4a (done, core 0.3.19) | Formula regions | `classify-formula-regions`, one per document with formula regions to check, method `formula-region-classifier`, running the step with its concurrency; `recognize-formulas` depends on it for the formulas they share. Document-level, like M1–M3, not one per region as first proposed (`classify-formula-region`) | `transitional` (`VisionAgent`) | optional (#848): `pdf.render` for a region's crop | yes: a drawing becomes a described picture (its formula obligations replaced by `describe-image`), and an uncertain region goes to human review (`verbalize-formula` keeps only `human-review`, `normalize-formula` is dropped) |
+| M4b | Prose inline math | new kind `mark-inline-math` (method `inline-math-marker`), replacing the post-execution pass of #599 | declared | `document.text.spans` | yes: the blocks a plan adds get it on the replan |
 | — | Bootstrap | Kept and documented as the 0.3.0 baseline | — | — | — |
 
 M2 came first because it changes no obligation while the plan runs. M1 was
@@ -514,8 +538,8 @@ formula becomes a formula, and the reconciliation removes the picture's
 `describe-image` and adds `verbalize-formula`. The executor only handles
 added obligations then (`_select_discovered`), so M1 waited for M0 and
 followed it in core 0.3.14. M3 followed in 0.3.15 and closed the gap M1
-left for a formula found during the plan (#846). M4 changes obligations too,
-and builds on M0.
+left for a formula found during the plan (#846). M4a followed in 0.3.19;
+M4b changes obligations too, and builds on M0.
 
 Each PR:
 - removes its step from `_enrich_before_planning`;

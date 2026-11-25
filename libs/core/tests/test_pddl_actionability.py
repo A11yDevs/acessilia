@@ -639,6 +639,12 @@ class TestEveryHandlerIsCallable:
             "recognize-formulas",
             [_element("el-1", "formula", text=r"\frac{a}{b}")],
         ),
+        # The document's formula region classification (#640, M4). A formula
+        # with LaTeX is not a candidate, so nothing is asked.
+        "formula-region-classifier": (
+            "classify-formula-regions",
+            [_element("el-1", "formula", text=r"\frac{a}{b}")],
+        ),
         "pandoc-code": (
             "preserve-code-semantics",
             [_element("el-1", "code", text="def  f( ):\n  return  1")],

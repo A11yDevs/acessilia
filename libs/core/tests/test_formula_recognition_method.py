@@ -11,6 +11,7 @@ step before planning.
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -52,9 +53,18 @@ def _verbalize(target: str):
     return obligation
 
 
+#: Classified as mathematics already, so the region classification (M4) has
+#: nothing to ask and these tests see the formula LaTeX step alone.
+_CLASSIFIED = {"formula_classification": {"status": "math", "reason": None, "confidence": 0.9, "warnings": []}}
+
+
+def _formula(element_id: str, text: str):
+    return build_element(element_id, "formula", text=text, metadata=deepcopy(_CLASSIFIED))
+
+
 def _formulas_manifest(*formulas: tuple[str, str], media_type: str = "application/pdf") -> ProcessingManifest:
     elements = [build_element("prose", "paragraph", text=_PROSE)]
-    elements += [build_element(element_id, "formula", text=text) for element_id, text in formulas]
+    elements += [_formula(element_id, text) for element_id, text in formulas]
     manifest = build_manifest(elements, [_verbalize(element_id) for element_id, _ in formulas])
     manifest.source.media_type = media_type
     return manifest
@@ -141,12 +151,20 @@ def test_the_plan_recognizes_the_formulas_before_it_verbalizes_them() -> None:
 
 
 @pytest.mark.parametrize("element_type", ["picture", "formula", "table", "heading", "paragraph"])
-def test_no_two_document_steps_take_the_same_element(element_type) -> None:
-    """The policy between the document steps (#845 review): none shares an
-    element with another, so none depends on another."""
-    element = build_element("x", element_type, text="")
+def test_two_document_steps_share_an_element_only_in_their_order(element_type) -> None:
+    """The policy between the document steps (#845 review, M4): two steps
+    share an element only when the first must run before the second, and
+    ``DOCUMENT_STEPS`` lists them so. Today only a formula is shared: the
+    region classification, then the formula LaTeX."""
+    from acessilia_core.pipeline.document_obligations import FORMULA_CLASSIFICATION
 
-    assert sum(step.applies(element) for step in DOCUMENT_STEPS) <= 1
+    element = build_element("x", element_type, text="")
+    taking = [step for step in DOCUMENT_STEPS if step.applies(element)]
+
+    if element_type == "formula":
+        assert taking == [FORMULA_CLASSIFICATION, FORMULA_RECOGNITION]
+    else:
+        assert len(taking) <= 1
 
 
 # The method.
@@ -184,7 +202,7 @@ def test_a_second_obligation_reads_only_its_own_formulas(monkeypatch) -> None:
     manifest = _formulas_manifest(("f-1", ""))
     first = reconcile_document_step(manifest, FORMULA_RECOGNITION)
     first.status = "satisfied"
-    manifest.elements.append(build_element("f-2", "formula", text=""))
+    manifest.elements.append(_formula("f-2", ""))
     manifest.obligations.append(_verbalize("f-2"))
     manifest.summary.element_count = len(manifest.elements)
     second = reconcile_document_step(manifest, FORMULA_RECOGNITION, replan=True)
@@ -335,7 +353,7 @@ def test_each_obligation_probes_math_recognize_once(monkeypatch) -> None:
     handler = build_method_registry().get("formula-recognizer")
     handler(manifest, first.id, config=CONFIG, ports=RunPorts.none())
     first.status = "satisfied"
-    manifest.elements.append(build_element("f-3", "formula", text=""))
+    manifest.elements.append(_formula("f-3", ""))
     manifest.obligations.append(_verbalize("f-3"))
     manifest.summary.element_count = len(manifest.elements)
     second = reconcile_document_step(manifest, FORMULA_RECOGNITION, replan=True)
@@ -381,9 +399,12 @@ def test_an_outage_of_math_recognize_falls_back_to_the_vision_model(monkeypatch)
     )
 
 
-def test_the_pending_elements_of_the_document_steps_are_disjoint() -> None:
-    """The policy, on the steps' real selections (#851 review, item 3.9):
-    no element is pending for two document steps."""
+def test_only_ordered_document_steps_share_pending_elements() -> None:
+    """The policy, on the steps' real selections (#851 review, item 3.9; M4):
+    an element is pending for two steps only for the region classification
+    and the formula LaTeX, which run in that order."""
+    from acessilia_core.pipeline.document_obligations import FORMULA_CLASSIFICATION
+
     manifest = build_manifest(
         [
             build_element("prose", "paragraph", text=_PROSE),
@@ -395,10 +416,15 @@ def test_the_pending_elements_of_the_document_steps_are_disjoint() -> None:
         [],
     )
 
-    pending = [set(step.pending(manifest)) for step in DOCUMENT_STEPS]
+    pending = {step.kind: set(step.pending(manifest)) for step in DOCUMENT_STEPS}
+    shared = {
+        (a, b): pending[a] & pending[b]
+        for i, a in enumerate(pending) for b in list(pending)[i + 1:]
+        if pending[a] & pending[b]
+    }
 
-    assert all(not (a & b) for i, a in enumerate(pending) for b in pending[i + 1:])
-    assert set().union(*pending) == {"p-1", "f-1", "f-2", "t-1"}
+    assert shared == {(FORMULA_CLASSIFICATION.kind, FORMULA_RECOGNITION.kind): {"f-1"}}
+    assert set().union(*pending.values()) == {"p-1", "f-1", "f-2", "t-1"}
 
 
 def test_the_method_leaves_the_formulas_as_the_step_before_planning_did(monkeypatch) -> None:

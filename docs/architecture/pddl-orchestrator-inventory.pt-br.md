@@ -170,12 +170,14 @@ Ele encontra 64 chaves, 19 delas gravadas ou lidas por mais de um grupo.
 - a lista `obligations` por O e P.
 
 **Ordem do `execute`.** Antes do planejamento ele roda:
-1. P classifica regiões de fórmula;
 2. O prepara as figuras (a figura injetada e a posse);
 3. Q marca matemática inline na prosa.
 
-Até o core 0.3.14 vinha um quarto passo, 4. P reconhece fórmulas; ele roda
-dentro do plano desde a 0.3.15 (abaixo).
+Dois passos que rodavam aqui agora rodam dentro do plano (abaixo):
+- o passo 1, P classifica regiões de fórmula: até o core 0.3.18; dentro do
+  plano desde a 0.3.19 (M4a), antes do reconhecimento das fórmulas;
+- o passo 4, P reconhece fórmulas: até o core 0.3.14; dentro do plano desde
+  a 0.3.15 (M3).
 
 Desde o core 0.3.12 (#640, M2) os passos de tabela rodam dentro do plano, como
 o método `table-enrichment`, antes do `linearize-table` das tabelas:

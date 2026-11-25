@@ -25,6 +25,7 @@ from acessilia_core.pipeline.checkpointing import (
 )
 from acessilia_core.pipeline.handlers import (
     formula_recognition as formula_method,
+    formula_regions as regions_method,
     pictures as picture_method,
 )
 from acessilia_core.ports import CHECKPOINT_PHASES, NoRegionCache, RunPorts
@@ -73,9 +74,9 @@ def _counting_orchestrator(monkeypatch, counts):
         raise Stop
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    monkeypatch.setattr(pddl, "_classify_formula_regions", enrich)
-    for name in ("_mark_inline_math",):
-        monkeypatch.setattr(pddl, name, noop)
+    # The one enrichment step left before planning (#640, M1–M4a).
+    monkeypatch.setattr(pddl, "_mark_inline_math", enrich)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", noop)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", noop)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", noop)
     monkeypatch.setattr(pddl.toolbox_gate, "decide", decide)

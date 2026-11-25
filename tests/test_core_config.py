@@ -401,6 +401,7 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline.handlers import (
         formula_recognition as formula_method,
+        formula_regions as regions_method,
         pictures as picture_method,
     )
     from tests.pddl_support import build_element, build_manifest
@@ -415,11 +416,8 @@ async def test_a_run_executes_its_plan_with_handlers_bound_to_its_config(
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in (
-        "_classify_formula_regions",
-        "_mark_inline_math",
-    ):
-        monkeypatch.setattr(pddl, name, no_enrichment)
+    monkeypatch.setattr(pddl, "_mark_inline_math", no_enrichment)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", no_enrichment)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_enrichment)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
@@ -447,6 +445,7 @@ def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline.handlers import (
         formula_recognition as formula_method,
+        formula_regions as regions_method,
         pictures as picture_method,
     )
     from tests.pddl_support import build_element, build_manifest
@@ -458,11 +457,8 @@ def _stub_the_run_before_planning(monkeypatch, orchestrator) -> None:
         return None
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in (
-        "_classify_formula_regions",
-        "_mark_inline_math",
-    ):
-        monkeypatch.setattr(pddl, name, no_enrichment)
+    monkeypatch.setattr(pddl, "_mark_inline_math", no_enrichment)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", no_enrichment)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_enrichment)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_enrichment)
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])

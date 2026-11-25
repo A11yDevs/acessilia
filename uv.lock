@@ -86,7 +86,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "acessilia-core"
-version = "0.3.18"
+version = "0.3.19"
 source = { editable = "libs/core" }
 dependencies = [
     { name = "acessilia-docstruct" },

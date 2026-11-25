@@ -240,6 +240,7 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline.handlers import (
         formula_recognition as formula_method,
+        formula_regions as regions_method,
         pictures as picture_method,
     )
 
@@ -259,8 +260,8 @@ async def test_a_run_takes_the_gate_decision_with_its_config(monkeypatch, tmp_pa
         return None, {}
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, no_step)
+    monkeypatch.setattr(pddl, "_mark_inline_math", no_step)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", no_step)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", no_step)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", no_step)
     monkeypatch.setattr(toolbox_gate, "decide", decide)
@@ -430,6 +431,8 @@ TRANSITIONAL_BASELINE = frozenset({
     "picture-description",
     # #640 M3: the formula LaTeX, moved the same way.
     "formula-recognizer",
+    # #640 M4: the formula region classification, moved the same way.
+    "formula-region-classifier",
 })
 
 

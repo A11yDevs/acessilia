@@ -32,6 +32,7 @@ from acessilia_core.pipeline.enrichment import (
     pictures as picture_stage,
     tables as table_stage,
 )
+from acessilia_core.pipeline.handlers import formula_regions as regions_method
 from acessilia_core.ports import PHASE_EXECUTION, NoRegionCache, RunPorts
 
 #: Serial, and no wait before the retry pass, so the calls are in order.
@@ -76,13 +77,15 @@ def _left(checkpoints, prefix: str, done: str) -> list[str]:
     ]
 
 
-def _run(monkeypatch, manifest, checkpoints):
+def _run(monkeypatch, manifest, checkpoints, *, classify=False):
+    """One job run; ``classify`` runs the real formula region step (M4)."""
     async def nothing(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(preflight, "inspect_source_media", nothing)
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, nothing)
+    monkeypatch.setattr(pddl, "_mark_inline_math", nothing)
+    if not classify:
+        monkeypatch.setattr(regions_method, "_classify_formula_regions", nothing)
     orchestrator = build_orchestrator(max_replans=1)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: deepcopy(manifest))
     return asyncio.run(orchestrator.execute(
@@ -257,6 +260,143 @@ def test_a_crash_mid_step_resumes_without_recognizing_the_formulas_again(monkeyp
     _run(monkeypatch, _formulas(4), checkpoints)
 
     assert calls == left
+
+
+def test_a_crash_mid_step_resumes_without_classifying_the_regions_again(monkeypatch) -> None:
+    """The formula region classification (M4): five regions, the process
+    dies on the third; the resumed run asks only about what was left."""
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
+    from acessilia_core.pipeline.handlers import formula_recognition as formula_method
+
+    calls: list[str] = []
+    crash = {"on": "f-3"}
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            element_id = image_bytes.decode()
+            calls.append(element_id)
+            if element_id == crash["on"]:
+                raise Crash()
+            return VisionOutput(kind="formula", description="", formula_latex="x", language="und", confidence=0.9)
+
+    async def nothing(*_args, **_kwargs):
+        return 0
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(
+        formula_stage, "_formula_recognition_crop", lambda _source, element, **_kwargs: (element.id.encode(), 1)
+    )
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
+    manifest = _formulas(5)
+    for element in manifest.elements:
+        if element.type == "formula":
+            element.text = "x plus y"
+    checkpoints = MemoryCheckpoints()
+
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, manifest, checkpoints, classify=True)
+
+    assert calls[:3] == ["f-1", "f-2", "f-3"]
+    left = _left(checkpoints, "f-", "formula_classification")
+    assert left[0] == "f-3"
+    calls.clear()
+    crash["on"] = None
+    _run(monkeypatch, manifest, checkpoints, classify=True)
+
+    assert calls == left
+
+
+def test_a_resume_after_the_classification_changed_obligations_plans_them(monkeypatch) -> None:
+    """#862 review, item 2.2: ``f-1`` is a drawing (its formula obligations
+    become a ``describe-image``) and ``f-2`` an uncertain region (its
+    ``verbalize-formula`` keeps only ``human-review``); then the process
+    dies on ``f-3``. The resumed run asks only about what was left, plans
+    and validates the drawing's ``describe-image`` (selected on the
+    restore, #857), and sends ``f-2`` to human review, not to ``mathml``."""
+    from acessilia_core.execution.models import MethodResult
+    from acessilia_core.manifest.models import validate_obligation_graph
+    from acessilia_core.pipeline.enrichment import formulas as formula_stage
+    from acessilia_core.pipeline.handlers import formula_recognition as formula_method
+
+    calls: list[str] = []
+    crash = {"on": "f-3"}
+    answers = {
+        "f-1": VisionOutput(kind="description", description="A ring of atoms.", language="en", confidence=0.9),
+        "f-2": VisionOutput(kind="description", description="Unclear.", language="en", confidence=0.4,
+                            classification_uncertain=True),
+    }
+
+    class Vision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, image_bytes, **_kwargs):
+            element_id = image_bytes.decode()
+            calls.append(element_id)
+            if element_id == crash["on"]:
+                raise Crash()
+            return answers.get(element_id) or VisionOutput(
+                kind="formula", description="", formula_latex="x", language="und", confidence=0.9
+            )
+
+    async def nothing(*_args, **_kwargs):
+        return 0
+
+    mathml: list[str] = []
+    real = pddl.PddlAccessibilityOrchestrator._run_executor
+
+    def run_executor(self, config, ports):
+        executor = real(self, config, ports)
+        executor.registry.register(
+            "mathml", lambda _m, obligation_id: mathml.append(obligation_id) or MethodResult(success=True, validated=True)
+        )
+        return executor
+
+    monkeypatch.setattr(pddl.PddlAccessibilityOrchestrator, "_run_executor", run_executor)
+    monkeypatch.setattr(formula_stage, "VisionAgent", Vision)
+    monkeypatch.setattr(
+        formula_stage, "_formula_recognition_crop", lambda _source, element, **_kwargs: (element.id.encode(), 1)
+    )
+    monkeypatch.setattr(formula_method, "_enrich_formula_latex", nothing)
+    ids = ["f-1", "f-2", "f-3", "f-4"]
+    verbalize = []
+    for element_id in ids:
+        obligation = build_obligation("verbalize-formula", [element_id], ["mathml", "human-review"])
+        obligation.id = f"verbalize-{element_id}"
+        obligation.method_costs = {"mathml": 10, "human-review": 100}
+        verbalize.append(obligation)
+    manifest = build_manifest(
+        [build_element("prose", "paragraph", text=_PROSE)]
+        + [build_element(element_id, "formula", text="x plus y") for element_id in ids],
+        verbalize,
+    )
+    checkpoints = MemoryCheckpoints()
+
+    with pytest.raises((Crash, BaseExceptionGroup)):
+        _run(monkeypatch, manifest, checkpoints, classify=True)
+    left = _left(checkpoints, "f-", "formula_classification")
+    assert left[0] == "f-3" and "f-1" not in left and "f-2" not in left
+
+    calls.clear()
+    crash["on"] = None
+    payload = _run(monkeypatch, manifest, checkpoints, classify=True)
+
+    assert calls == left
+    assert "verbalize-f-1" not in mathml and "verbalize-f-2" not in mathml
+    assert {"verbalize-f-3", "verbalize-f-4"} <= set(mathml)
+    assert "A ring of atoms." in payload["text"]
+    # The last execution checkpoint holds the manifest the resumed run left.
+    from acessilia_core.manifest.models import ProcessingManifest
+
+    delivered = ProcessingManifest.model_validate(checkpoints.phases["execution"]["manifest"])
+    validate_obligation_graph(delivered)
+    describe = [item for item in delivered.obligations if item.kind == "describe-image" and item.target_ids == ["f-1"]]
+    assert describe and describe[0].selected and describe[0].status == "satisfied"
+    verbalize_f2 = next(item for item in delivered.obligations if item.id == "verbalize-f-2")
+    assert verbalize_f2.admissible_methods == ["human-review"]
 
 
 # The review of #857.

@@ -133,6 +133,11 @@ METHOD_OPTIONAL_CAPABILITIES: dict[str, Callable[[CoreConfig], list[Requirement]
     "picture-description": lambda config: [
         Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
     ],
+    # A formula region's crop; without it the region stays unclassified
+    # (crop_unavailable) and takes the formula path.
+    "formula-region-classifier": lambda config: [
+        Requirement("pdf.render", _provider(config, "toolbox_pdf_provider"))
+    ],
     # math.recognize degrades to the vision fallback; without pdf.render a
     # formula has no crop and records crop_unavailable.
     "formula-recognizer": lambda config: [
@@ -186,6 +191,9 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     # Moved from before planning into the plan (#640, M3). Its Toolbox calls
     # are optional (METHOD_OPTIONAL_CAPABILITIES).
     "formula-recognizer": ("transitional", "reads formula LaTeX, with the VisionAgent model as fallback"),
+    # Moved from before planning into the plan (#640, M4). Its Toolbox call
+    # is optional (METHOD_OPTIONAL_CAPABILITIES).
+    "formula-region-classifier": ("transitional", "asks the VisionAgent model what a formula region holds"),
     "vision-description": ("validation", "the picture descriptions picture-description made"),
     "pandoc-table": ("validation", "the table structure table-enrichment produced"),
     "human-review": ("symbolic", "the terminal escalation"),

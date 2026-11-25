@@ -74,6 +74,7 @@ def _stopped_before_execution(monkeypatch, counts):
     from acessilia_core.pipeline import orchestrator as pddl
     from acessilia_core.pipeline.handlers import (
         formula_recognition as formula_method,
+        formula_regions as regions_method,
         pictures as picture_method,
     )
     from tests.pddl_support import build_element, build_manifest
@@ -96,8 +97,8 @@ def _stopped_before_execution(monkeypatch, counts):
         return build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
 
     monkeypatch.setattr(pddl, "_inspect_media", inspect)
-    for name in ("_classify_formula_regions", "_mark_inline_math"):
-        monkeypatch.setattr(pddl, name, enrich)
+    monkeypatch.setattr(pddl, "_mark_inline_math", enrich)
+    monkeypatch.setattr(regions_method, "_classify_formula_regions", enrich)
     monkeypatch.setattr(formula_method, "_enrich_formula_latex", enrich)
     monkeypatch.setattr(picture_method, "_enrich_picture_descriptions", enrich)
     orchestrator = build_orchestrator()
@@ -291,8 +292,6 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
         return stage
 
     monkeypatch.setattr(pddl, "_inspect_media", no_media)
-    for name in ("_classify_formula_regions",):
-        monkeypatch.setattr(pddl, name, recording(name))
     monkeypatch.setattr(pddl, "_mark_inline_math", recording("_mark_inline_math"))
     manifest = build_manifest([build_element("p-1", "paragraph", text="Text.")], [])
     received = []
@@ -314,16 +313,20 @@ async def test_a_run_gives_its_region_cache_to_the_stages_and_the_handlers(
             model_calls=current_model_calls(), ports=ports,
         )
 
-    expected = cache if enabled else None
-    assert caches == {
-        "_classify_formula_regions": expected,
-        # The steps without a vision agent take no cache.
-        "_mark_inline_math": ...,
-    }
+    # Every vision step runs inside the plan since #640 (M1, M3, M4): the one
+    # left before planning has no vision agent and takes no cache.
+    assert caches == {"_mark_inline_math": ...}
+    # The methods take the run's cache through the ports, or none when the
+    # run's config turns it off.
+    config = core_config(vision={"region_cache_enabled": enabled})
+    assert region_cache_for(ports, config.vision) is (cache if enabled else None)
     [executor] = received
     # The picture descriptions run inside the plan (#640, M1): their method
     # takes the region cache from the ports, like the inspection handlers.
-    for method in ("pymupdf-region", "vision-page-inspection", "picture-description", "formula-recognizer"):
+    for method in (
+        "pymupdf-region", "vision-page-inspection", "picture-description", "formula-recognizer",
+        "formula-region-classifier",
+    ):
         assert executor.registry.get(method).keywords["ports"] is ports
 
 
@@ -354,11 +357,12 @@ def test_bind_run_gives_the_ports_only_to_the_handlers_that_take_them() -> None:
 
 @pytest.mark.asyncio
 async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp_path) -> None:
-    """After each of the three enrichment steps before planning the manifest
-    checkpoint is written again (#407), so a restart repeats at most the step
-    that ran. The picture descriptions (#640, M1), the formula LaTeX (M3) and
-    the table steps (M2) run inside the plan, where the execution checkpoint
-    covers them."""
+    """After each of the two enrichment steps left before planning (the
+    pictures' preparation, the prose's inline math) the manifest checkpoint
+    is written again (#407), so a restart repeats at most the step that ran.
+    The formula regions (#640, M4a), the picture descriptions (M1), the
+    formula LaTeX (M3) and the table steps (M2) run inside the plan, where
+    the execution checkpoint covers them."""
     counts = {"inspect": 0, "extract": 0}
     orchestrator, Stop = _stopped_before_execution(monkeypatch, counts)
     checkpoints = MemoryCheckpoints()
@@ -371,7 +375,7 @@ async def test_the_enrichment_steps_are_checkpointed_one_by_one(monkeypatch, tmp
         )
 
     # One after the extraction, then one after each enrichment step.
-    assert checkpoints.saved.count("manifest") == 1 + 3
+    assert checkpoints.saved.count("manifest") == 1 + 2
 
 
 @pytest.mark.asyncio

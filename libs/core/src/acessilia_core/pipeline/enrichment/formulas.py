@@ -1,8 +1,10 @@
 """Formula enrichment: the LaTeX of formulas the extractor left without it.
 
-Before planning, ``_classify_formula_regions`` asks the vision model whether
-each formula crop without LaTeX holds mathematics, a drawing or nothing it can
-tell, and reclassifies or escalates it. ``_enrich_formula_latex`` then reads
+``_classify_formula_regions`` asks the vision model whether each formula
+crop without LaTeX holds mathematics, a drawing or nothing it can tell, and
+reclassifies or escalates it: inside the plan since core 0.3.19, as the
+``formula-region-classifier`` method of the document's
+``classify-formula-regions`` obligation (#640, M4). ``_enrich_formula_latex`` then reads
 the LaTeX of the mathematical ones, inside the plan since core 0.3.15, as the
 ``formula-recognizer`` method of the document's ``recognize-formulas``
 obligation (#640, M3, #846): ``math.recognize`` first (through the SDK's
@@ -188,10 +190,16 @@ async def _classify_formula_regions(
     region_cache: RegionCache | None,
     breaker: ProviderBreaker,
     on_progress: Callable[[], Awaitable[None]] | None = None,
+    targets: frozenset[str] | None = None,
 ) -> None:
     """Check extractor formula labels before a mathematical recognizer sees them.
 
-    A drawing is described once and reconciled as a picture before planning.
+    Inside the plan since core 0.3.19, as the ``formula-region-classifier``
+    method of the document's ``classify-formula-regions`` obligation (#640,
+    M4); ``targets`` keeps it to the obligation's formulas (``None``: the
+    whole document). A formula already classified is not asked again.
+
+    A drawing is described once and reconciled as a picture.
     A candidate the model explicitly cannot classify (``classification_uncertain``)
     keeps its source content and goes to human review. A call that gives no
     answer (open breaker, no crop, model failure, empty description) is no
@@ -199,13 +207,9 @@ async def _classify_formula_regions(
     takes the formula path it took before this check, whose vision fallback
     can still reclassify it.
     """
-    if manifest.source.media_type not in RENDER_MEDIA_TYPES:
-        return
     candidates = [
-        element for element in manifest.elements
-        if element.type == "formula"
-        and not has_latex_markup(element.text)
-        and not element.metadata.get("latex_markup")
+        element for element in formulas_needing_classification(manifest)
+        if targets is None or element.id in targets
     ]
     if not candidates:
         return
@@ -275,6 +279,49 @@ async def _classify_formula_regions(
     async with asyncio.TaskGroup() as group:
         for element in candidates:
             group.create_task(classify_and_notify(element))
+
+
+def formulas_needing_classification(manifest: ProcessingManifest) -> list[ManifestElement]:
+    """The formulas the region classification asks the vision model about.
+
+    In a source that can be rendered, the extractor's formulas without LaTeX
+    markup that no classification has decided yet. The obligation's
+    selection and the step's execution share it.
+
+    - **Read by the vision model already.** An element the descriptions
+      turned into a formula (a picture, or a placeholder visual of a mostly
+      visual document) carries ``vision_description_complete`` and its
+      ``original_type``. It is not asked again: the descriptions ran after
+      the classification until 0.3.13, so it never was, and a second answer
+      could read it as a drawing and drop the formula the descriptions
+      gave (#862 review).
+    - **Decided or tried.** ``math`` and ``unresolved`` are decisions, and a
+      drawing is a picture now. A classification that got no answer
+      (``unclassified``: no crop, an open breaker, a model failure, an empty
+      answer) is tried again when the step runs again, as the other
+      composite steps retry an object that failed; within one run the
+      obligation that tried it is closed, so it is not asked twice.
+    """
+    if manifest.source.media_type not in RENDER_MEDIA_TYPES:
+        return []
+    return [
+        element for element in manifest.elements
+        if element.type == "formula"
+        and not has_latex_markup(element.text)
+        and not element.metadata.get("latex_markup")
+        and (element.metadata.get("formula_classification") or {}).get("status") not in _DECIDED
+        and not element.metadata.get("vision_description_complete")
+        and not element.metadata.get("original_type")
+    ]
+
+
+#: The classification statuses that decide a region; ``unclassified`` does not.
+_DECIDED = frozenset({"math", "unresolved"})
+
+
+def formulas_to_classify(manifest: ProcessingManifest) -> list[str]:
+    """The ids of ``formulas_needing_classification``, for the obligation."""
+    return [element.id for element in formulas_needing_classification(manifest)]
 
 
 def _separate_equation_numbers(
