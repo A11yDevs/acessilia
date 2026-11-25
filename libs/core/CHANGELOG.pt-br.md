@@ -2,6 +2,27 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.21 — o manifesto entregue é validado (#844)
+
+O laço de replanejamento revalidava o grafo de obrigações (referências e DAG)
+só antes de um replanejamento (#832, M0). Uma execução que concluía sem ele
+entregava o que um handler deixou: uma obrigação satisfeita apontando para
+uma obrigação que ele removeu chegava ao payload, e uma dependente esgotada
+(sem método restante, então sem replanejamento) falhava com o resumo das
+não satisfeitas em vez da causa.
+- `_check_unsatisfied` roda primeiro `validate_delivered_manifest`, qualquer
+  que seja o status da execução, dry runs incluídos: o round trip que uma
+  retomada faz (`ProcessingManifest.model_validate`), então uma execução
+  nunca entrega o que a sua própria retomada rejeitaria. Além das
+  referências e do DAG, ele checa as predecessoras das obrigações satisfeitas
+  e as contagens do resumo. Falha com a mensagem do manifesto; um manifesto
+  válido é entregue como antes.
+- Uma fixture de teste que acrescentava uma página sem a sua contagem
+  (`test_unstructured_pages.py`) foi corrigida.
+- Testes: uma dependente satisfeita e uma esgotada de uma obrigação removida,
+  um ciclo, uma obrigação satisfeita esperando por uma esgotada, uma remoção
+  que religa a sua dependente (com o que é entregue) e um dry run.
+
 ## 0.3.20 — a matemática inline da prosa é uma ação planejada (#640, M4b)
 
 Até a 0.3.19 o orquestrador marcava a matemática inline da prosa antes do

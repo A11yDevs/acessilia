@@ -246,7 +246,13 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      obrigação e o DAG do manifesto que a execução mudou são rechecados, então
      uma referência pendurada deixada por um handler faz o job falhar com a
      mensagem do manifesto, nomeando a obrigação e a dependência ausente, em
-     vez de um `KeyError`.
+     vez de um `KeyError`. Desde o core 0.3.21 (#844), o manifesto que uma
+     execução entrega passa por todas as checagens que uma retomada faz,
+     qualquer que seja o status da execução, dry runs incluídos
+     (`validate_delivered_manifest` em `_check_unsatisfied`): uma execução
+     que concluiu, ou terminou sem replanejamento, não entrega mais uma
+     referência pendurada, um ciclo, uma obrigação satisfeita esperando por
+     uma aberta, ou contagens desatualizadas.
    - `PDDL_MAX_DISCOVERY_REPLANS` (padrão 3) define o limite separado; um
      valor diferente do padrão entra nas identidades do checkpoint e do
      cache.

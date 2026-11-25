@@ -474,6 +474,128 @@ def test_a_handler_that_leaves_a_dangling_reference_is_reported_before_the_guard
     )
 
 
+def _dangling_after(outcome: bool):
+    """A manifest where ``o-2`` depends on ``o-3``, and a handler that, on
+    ``o-2``, removes the satisfied ``o-3`` without rewiring ``o-2``."""
+    elements = [build_element("a", "paragraph", text="a")]
+    first = _obligation("o-3", "review-structure", ["a"])
+    second = _obligation("o-2", "review-structure", ["a"])
+    second.dependencies = ["o-3"]
+    manifest = build_manifest(elements, [first, second])
+
+    def review(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        if obligation_id != "o-2":
+            return MethodResult(success=True, validated=True)
+        m.obligations = [item for item in m.obligations if item.id != "o-3"]
+        m.summary.obligation_count = len(m.obligations)
+        return MethodResult(success=outcome, validated=outcome)
+
+    return manifest, review
+
+
+@pytest.mark.parametrize("outcome", [True, False], ids=["satisfied", "failed"])
+def test_a_run_never_delivers_a_dangling_reference(monkeypatch, tmp_path, outcome) -> None:
+    """#844: the graph was revalidated only before a replan. A run that
+    completed delivered a satisfied obligation pointing at a removed one, and
+    an exhausted dependent (no method left, so no replan) failed with the
+    unsatisfied summary instead of the cause. The graph is now checked before
+    delivery, and both fail with the manifest's message."""
+    orchestrator = build_orchestrator(max_replans=0)
+    manifest, review = _dangling_after(outcome)
+    orchestrator.executor.registry.register("human-review", review)
+
+    with pytest.raises(ValueError) as error:
+        _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert str(error.value) == t(MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES).format(
+        obligation_id="o-2", ids=["o-3"]
+    )
+
+
+def _changing_on_o2(change):
+    """``o-2`` depends on ``o-3``; the handler, on ``o-2``, applies ``change``."""
+    manifest, _ = _dangling_after(True)
+
+    def review(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        if obligation_id == "o-2":
+            change(m)
+        return MethodResult(success=True, validated=True)
+
+    return manifest, review
+
+
+def _by_id(manifest: ProcessingManifest, obligation_id: str):
+    return next(item for item in manifest.obligations if item.id == obligation_id)
+
+
+def _rewire(m: ProcessingManifest) -> None:
+    m.obligations = [item for item in m.obligations if item.id != "o-3"]
+    _by_id(m, "o-2").dependencies = []
+    m.summary.obligation_count = len(m.obligations)
+
+
+def _cycle(m: ProcessingManifest) -> None:
+    _by_id(m, "o-3").dependencies = ["o-2"]
+
+
+def _exhausted_predecessor(m: ProcessingManifest) -> None:
+    exhausted = _obligation("o-4", "repair-heading-hierarchy", ["a"])
+    exhausted.status = "failed"
+    m.obligations.append(exhausted)
+    _by_id(m, "o-3").dependencies = ["o-4"]
+    m.summary.obligation_count = len(m.obligations)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (_cycle, r"Cycle in the obligation dependencies"),
+        (_exhausted_predecessor, r"o-3 possui predecessoras insatisfeitas: \['o-4'\]"),
+    ],
+    ids=["cycle", "satisfied waiting for an exhausted one"],
+)
+def test_a_run_never_delivers_what_a_resume_would_reject(monkeypatch, tmp_path, change, message) -> None:
+    """#844 review: the check before delivery is the resume's own round trip,
+    so it covers more than the references: a cycle, and a satisfied
+    obligation waiting for one no replan can satisfy. (An open predecessor
+    a replan serves, and the summary counts the reconciliation recomputes,
+    are healed before delivery.)"""
+    orchestrator = build_orchestrator(max_replans=0)
+    manifest, review = _changing_on_o2(change)
+    orchestrator.executor.registry.register("human-review", review)
+
+    with pytest.raises(ValueError, match=message):
+        _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+
+def test_a_completed_run_with_a_valid_graph_is_delivered(monkeypatch, tmp_path) -> None:
+    """The check before delivery has no false positive: a handler that
+    removes an obligation and rewires its dependent delivers, with nothing
+    left open."""
+    orchestrator = build_orchestrator(max_replans=0)
+    manifest, review = _changing_on_o2(_rewire)
+    orchestrator.executor.registry.register("human-review", review)
+
+    payload = _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert payload["canonical_metadata"]["pddl_unsatisfied_obligations"] == []
+    assert payload["text"].splitlines()[-1] == "a"
+
+
+def test_a_dry_run_is_checked_and_delivered(monkeypatch, tmp_path) -> None:
+    """A dry run delivers its manifest too, so it gets the same check; a
+    valid one is delivered as before."""
+    orchestrator = build_orchestrator(max_replans=0)
+    orchestrator.execute_dry_run = True
+    manifest, review = _changing_on_o2(_cycle)
+    orchestrator.executor.registry.register("human-review", review)
+
+    payload = _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "dry-run-completed"
+
+
 # Document-level obligations reconciled (#832).
 
 
