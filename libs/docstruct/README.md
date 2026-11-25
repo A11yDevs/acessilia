@@ -13,6 +13,14 @@ Pure document-structure processing core for Acessilia.
 
 ## Public API
 
+The table lists each module's **highlights**, not its full `__all__`: the names
+a reader most likely needs, rather than every exported name. Every unqualified
+name in a **symbol list** is exported by the module in the first column, and a
+cross-module name in that list is written with its full module path (for
+example `docstruct.text.paragraphs.PAGE_HEADING`); the prose after the symbols
+is descriptive. `tests/test_docstruct_readme_sync.py` guards both rules, so a
+row cannot keep a name its module no longer exports.
+
 | Module | Symbols |
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |

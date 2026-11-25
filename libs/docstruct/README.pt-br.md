@@ -13,6 +13,15 @@ Núcleo puro de processamento estrutural de documentos do Acessilia.
 
 ## API pública
 
+A tabela lista os **destaques** de cada módulo, e não o `__all__` completo: os
+nomes que quem lê provavelmente precisa, não todos os nomes exportados. Todo
+nome não qualificado em uma **lista de símbolos** é exportado pelo módulo da
+primeira coluna, e um nome de outro módulo nessa lista é escrito com o caminho
+completo do módulo (por exemplo `docstruct.text.paragraphs.PAGE_HEADING`); a
+prosa depois dos símbolos é descritiva. `tests/test_docstruct_readme_sync.py`
+guarda as duas regras, para que uma linha não mantenha um nome que o módulo
+deixou de exportar.
+
 | Módulo | Símbolos |
 |---|---|
 | `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
