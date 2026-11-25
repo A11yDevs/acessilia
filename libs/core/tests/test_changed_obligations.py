@@ -474,6 +474,62 @@ def test_a_handler_that_leaves_a_dangling_reference_is_reported_before_the_guard
     )
 
 
+
+def _dangling_after(outcome: bool):
+    """A manifest where ``o-2`` depends on ``o-3``, and a handler that, on
+    ``o-2``, removes the satisfied ``o-3`` without rewiring ``o-2``."""
+    elements = [build_element("a", "paragraph", text="a")]
+    first = _obligation("o-3", "review-structure", ["a"])
+    second = _obligation("o-2", "review-structure", ["a"])
+    second.dependencies = ["o-3"]
+    manifest = build_manifest(elements, [first, second])
+
+    def review(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        if obligation_id != "o-2":
+            return MethodResult(success=True, validated=True)
+        m.obligations = [item for item in m.obligations if item.id != "o-3"]
+        m.summary.obligation_count = len(m.obligations)
+        return MethodResult(success=outcome, validated=outcome)
+
+    return manifest, review
+
+
+@pytest.mark.parametrize("outcome", [True, False], ids=["satisfied", "failed"])
+def test_a_run_never_delivers_a_dangling_reference(monkeypatch, tmp_path, outcome) -> None:
+    """#844: the graph was revalidated only before a replan. A run that
+    completed delivered a satisfied obligation pointing at a removed one, and
+    an exhausted dependent (no method left, so no replan) failed with the
+    unsatisfied summary instead of the cause. The graph is now checked before
+    delivery, and both fail with the manifest's message."""
+    orchestrator = build_orchestrator(max_replans=0)
+    manifest, review = _dangling_after(outcome)
+    orchestrator.executor.registry.register("human-review", review)
+
+    with pytest.raises(ValueError) as error:
+        _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert str(error.value) == t(MSG_MANIFEST_OBLIGATION_UNKNOWN_DEPENDENCIES).format(
+        obligation_id="o-2", ids=["o-3"]
+    )
+
+
+def test_a_completed_run_with_a_valid_graph_is_delivered(monkeypatch, tmp_path) -> None:
+    """The check before delivery has no false positive: a handler that
+    removes an obligation and rewires its dependent delivers."""
+    orchestrator = build_orchestrator(max_replans=0)
+    manifest, _ = _dangling_after(True)
+
+    def review(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        if obligation_id == "o-2":
+            m.obligations = [item for item in m.obligations if item.id != "o-3"]
+            next(item for item in m.obligations if item.id == "o-2").dependencies = []
+            m.summary.obligation_count = len(m.obligations)
+        return MethodResult(success=True, validated=True)
+
+    orchestrator.executor.registry.register("human-review", review)
+
+    assert _run(orchestrator, manifest, tmp_path, monkeypatch)
+
 # Document-level obligations reconciled (#832).
 
 

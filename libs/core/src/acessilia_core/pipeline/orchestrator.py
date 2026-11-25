@@ -774,7 +774,14 @@ class PddlAccessibilityOrchestrator:
         document is delivered with a technical warning. A completed run is
         held to the same policy for what it left open (the work found after
         it with the discovery budget spent). A dry run is not checked.
+
+        First, the obligation graph is validated, whatever the run's status
+        (#844): the replan loop revalidates it only before a replan, so a run
+        that completed, or ended without one, could otherwise deliver a
+        handler's dangling reference or cycle. It fails with the manifest's
+        message, which names the obligation.
         """
+        validate_obligation_graph(manifest)
         if execution_report.status == "dry-run-completed":
             return
         completed = execution_report.status == "completed"

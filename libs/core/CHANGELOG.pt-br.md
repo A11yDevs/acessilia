@@ -2,6 +2,21 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.21 — o grafo de obrigações entregue é validado (#844)
+
+O laço de replanejamento revalidava o grafo de obrigações (referências e DAG)
+só antes de um replanejamento (#832, M0). Uma execução que concluía sem ele
+entregava o que um handler deixou: uma obrigação satisfeita apontando para
+uma obrigação que ele removeu chegava ao payload, e uma dependente esgotada
+(sem método restante, então sem replanejamento) falhava com o resumo das
+não satisfeitas em vez da causa.
+- `_check_unsatisfied` valida o grafo primeiro, qualquer que seja o status da
+  execução (`validate_obligation_graph`), então as duas falham com a
+  mensagem do manifesto, nomeando a obrigação e a dependência ausente. Um
+  grafo válido é entregue como antes.
+- Testes: uma dependente satisfeita e uma esgotada de uma obrigação removida,
+  e uma remoção que religa a sua dependente.
+
 ## 0.3.20 — a matemática inline da prosa é uma ação planejada (#640, M4b)
 
 Até a 0.3.19 o orquestrador marcava a matemática inline da prosa antes do
