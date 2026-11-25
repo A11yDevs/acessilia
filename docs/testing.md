@@ -406,7 +406,7 @@ Pass `--timeout=900`. The E2E clients allow single operations of up to 300
 seconds, and `CORE_JOB_TIMEOUT` defaults to 600 seconds per processing wait, so
 the suite-wide 180-second limit would abort a valid test before its own timeout.
 The scheduled E2E job uses the same value. The full-deck slide case allows
-11400 seconds and uses `CORE_SLIDE_TIMEOUT` (default 10800) for its own wait.
+4200 seconds and uses `CORE_SLIDE_TIMEOUT` (default 3600) for its own wait.
 
 See [tests/README.md](../tests/README.md#end-to-end-tests) for the Core API
 variables and the optional dataset corpus. E2E is also a scheduled validation,
