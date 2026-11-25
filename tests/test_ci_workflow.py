@@ -65,6 +65,10 @@ def test_ci_jobs_use_python_312() -> None:
     assert jobs["component-tests"]["env"]["UV_PYTHON"] == "3.12"
     assert _rendered_job_names(jobs["tests"]) == {"tests (Python 3.12)"}
     assert _rendered_job_names(jobs["sdk-isolated"]) == {"SDK alone (Python 3.12)"}
+    # The runtime is 3.12 only (#654): a 3.11 leg must not come back.
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert '"3.11"' not in workflow
+    assert "--python-version 3.11" not in workflow
 
 
 def test_the_container_scan_builds_without_layer_cache() -> None:
@@ -86,7 +90,6 @@ def test_quality_gates_run_once_in_the_quality_job() -> None:
     for name in (
         "Run Ruff against the shrinking baseline",
         "Run Mypy on the configured scope",
-        "Run Mypy on the libraries with Python 3.11",
         "Check the Toolbox capability contract",
         "Report the Toolbox's docstruct pin",
         "Verify GitHub Action pins",

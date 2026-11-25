@@ -23,7 +23,7 @@ No LLM writes PDDL directly.
 
 ## macOS compatibility
 
-- Python 3.11 or 3.12;
+- Python 3.12;
 - `agno==3.0.5`;
 - Fast Downward optional.
 

@@ -476,7 +476,7 @@ During a refactoring cycle, `is:open -type:Feature` shows the cycle's backlog, a
 
 The CI/CD pipeline is defined by three workflows:
 
-- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the Ruff baseline check and Mypy on the configured `docstruct`/SDK/core/backend scope plus a 3.11 library pass, executes the main, docstruct, SDK and core test suites on Python 3.12 with per-component branch coverage, enforces the coverage thresholds and uploads the reports as the `coverage-reports-py*` artifact, and rejects unexpected skipped tests.
+- **`.github/workflows/ci.yml`** — on every PR to `main`, `develop` or `release/**`, and after pushes to those branches, installs the root environment from `uv.lock` (`uv lock --check` + `uv sync --locked --extra dev`), runs the Ruff baseline check and Mypy on the configured `docstruct`/SDK/core/backend scope, executes the main, docstruct, SDK and core test suites on Python 3.12 with per-component branch coverage, enforces the coverage thresholds and uploads the reports as the `coverage-reports-py*` artifact, and rejects unexpected skipped tests.
 - **`.github/workflows/delivery.yml`** — after CI passes on a push, builds the image, runs a health smoke test and a size guardrail, and publishes it to GHCR.
 - **`.github/workflows/release.yml`** — when a maintainer creates a `v*` tag, builds, publishes and creates the GitHub Release.
 

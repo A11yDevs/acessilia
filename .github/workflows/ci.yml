@@ -499,12 +499,6 @@ jobs:
       - name: Run Mypy on the configured scope
         run: uv run --locked --extra dev mypy --no-incremental
 
-      - name: Run Mypy on the libraries with Python 3.11
-        run: |
-          uv run --locked --extra dev mypy --no-incremental --python-version 3.11 \
-            libs/docstruct/src/docstruct libs/sdk/src/acessilia_sdk \
-            libs/core/src/acessilia_core
-
       - name: Check the duplication ratchet
         run: uv run --locked --extra dev python scripts/check_duplication_ratchet.py
 
