@@ -196,14 +196,16 @@ request:
   headings and titles, floors for text, tables and formulas, the absence of
   fallback patterns, and picture/chemical-structure floors. It runs with
   `CORE_BASE_URL` and the dataset clone.
-  **Observed on 2026-11-25 at staging `d2714cd`:** PDF/UA 187/225 objects
-  (text 65/72, table rows 66/95, images 30/31, chemical structures 5/5,
-  formulas 10/10, 0 pattern violations); TXT 183/225 with 10 known
-  `english-table-row` violations. veraPDF reports a `.notdef` glyph failure
-  (#868); the missing image-only table rows are #870 and the TXT linearization
-  is #869. The full deck is a manual/slow run, not a scheduled gate. The
-  pre-migration scorecard was not archived, so the floors use the current
-  staging score plus the dataset ground truth.
+  **Observed on 2026-11-25 at staging `d2714cd` with the audited dataset
+  (`acessilia-dataset` `8e51a1f`, 304 annotations / 292 evaluable):** PDF/UA
+  244/292 (text 125/140, table rows 67/96, images 29/31, chemical structures
+  4/5, formulas 12/12, 0 pattern violations); TXT 243/292 with the known
+  `english-table-row`/`label-list-alt` inventory (#869). veraPDF reports a
+  `.notdef` glyph failure (#868); the missing image-only table rows are #870.
+  The twelve `table` objects are not scored by the legacy evaluator. The full
+  deck is a manual/slow run (`CORE_SLIDE_CASE=1`), not a scheduled gate. The
+  pre-migration scorecard was not archived, so the floors are a prospective
+  baseline, not proof of historical parity.
 
 ## Consequences observed
 

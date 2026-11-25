@@ -230,9 +230,16 @@ imagem precisa conter, cabeçalhos e linhas de tabela inteiros e em ordem,
 fórmulas e os padrões proibidos. Uma linha de tabela que o layout intercala
 ainda pode ser encontrada na ordem do fluxo de conteúdo do PDF/UA, e o
 relatório conta esses casos à parte. Como nos outros casos, os números
-acompanham deltas entre execuções. `tests/test_slide_case_e2e.py` processa o
-deck pelo core implantado (`CORE_BASE_URL`) e fixa a contagem de slides, os
-títulos, o texto, as tabelas, as fórmulas e a ausência de fallbacks; veja
+acompanham deltas entre execuções.
+
+A referência é a revisão auditada `8e51a1f` do dataset (acessilia-dataset#12):
+304 anotações, 292 avaliáveis pelo scorer legado. O scorer ainda não consome
+`audit.chart_data`, `audit.table_semantics`, `audit.object_associations` nem os
+doze objetos `table`; os resultados são proxies lexicais/estruturais, não
+aprovação semântica. `tests/test_slide_case_e2e.py` é um caso manual/slow
+(`CORE_SLIDE_CASE=1`) contra o core implantado, fixado por hashes do dataset e
+do PDF; ele aplica pisos de regressão por formato e acompanha os gaps conhecidos
+nas #868, #869 e #870. Veja
 [tests/README.pt-br.md](../tests/README.pt-br.md#testes-end-to-end).
 
 ## Snapshot dos experimentos do Dr.DocBench

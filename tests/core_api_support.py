@@ -8,12 +8,15 @@ larger ``pytest.mark.timeout``.
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from collections.abc import Iterator
 
 import httpx
 import pytest
+
+logger = logging.getLogger(__name__)
 
 CORE_BASE_URL = os.getenv("CORE_BASE_URL", "").strip().rstrip("/")
 DEFAULT_JOB_TIMEOUT = 600.0
@@ -105,8 +108,8 @@ def cancel_job(client: httpx.Client, task_id: str, token: str) -> None:
             headers={"X-Job-Token": token},
             timeout=10.0,
         )
-    except httpx.HTTPError:
-        pass
+    except httpx.HTTPError as exc:
+        logger.debug("Cancellation request for %s failed: %s", task_id, exc)
 
 
 def poll(
@@ -152,6 +155,7 @@ def poll(
                 return last
             time.sleep(2)
         pytest.fail(f"Job {task_id} did not finish in {limit:.0f}s: {last}")
+        raise AssertionError("unreachable: pytest.fail returned")
     finally:
         if not terminal:
             cancel_job(client, task_id, token)

@@ -195,14 +195,17 @@ seu pull request:
   pisos para texto, tabelas e fórmulas, a ausência de padrões de fallback e
   pisos de imagens/estruturas químicas. Ele roda com `CORE_BASE_URL` e o clone
   do dataset.
-  **Observado em 2026-11-25 no staging `d2714cd`:** PDF/UA 187/225 objetos
-  (texto 65/72, linhas de tabela 66/95, imagens 30/31, estruturas químicas 5/5,
-  fórmulas 10/10, 0 violações de padrão); TXT 183/225 com 10 violações
-  conhecidas `english-table-row`. O veraPDF reporta falha de glyph `.notdef`
-  (#868); as linhas perdidas em slides só-imagem são #870 e a linearização do
-  TXT é #869. O deck completo é uma execução manual/slow, não um gate
-  agendado. O scorecard pré-migração não foi arquivado, então os pisos usam o
-  score atual do staging mais o ground truth do dataset.
+  **Observado em 2026-11-25 no staging `d2714cd` com o dataset auditado
+  (`acessilia-dataset` `8e51a1f`, 304 anotações / 292 avaliáveis):** PDF/UA
+  244/292 (texto 125/140, linhas de tabela 67/96, imagens 29/31, estruturas
+  químicas 4/5, fórmulas 12/12, 0 violações de padrão); TXT 243/292 com o
+  inventário conhecido de `english-table-row`/`label-list-alt` (#869). O
+  veraPDF reporta falha de glyph `.notdef` (#868); as linhas perdidas em
+  slides só-imagem são #870. Os doze objetos `table` não são pontuados pelo
+  avaliador legado. O deck completo é uma execução manual/slow
+  (`CORE_SLIDE_CASE=1`), não um gate agendado. O scorecard pré-migração não
+  foi arquivado, então os pisos são um baseline prospectivo, não prova de
+  paridade histórica.
 
 ## Consequências observadas
 

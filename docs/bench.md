@@ -223,9 +223,16 @@ description must hold, table headers and rows whole and in order, formulas,
 and the forbidden patterns. A table row the layout interleaves may still be
 found in the PDF/UA's content-stream order, and the report counts those
 separately. Like the other cases, the numbers track deltas between runs.
-`tests/test_slide_case_e2e.py` processes the deck through the deployed core
-(`CORE_BASE_URL`) and locks the slide count, titles, text, tables, formulas
-and the absence of fallbacks; see [tests/README.md](../tests/README.md#end-to-end-tests).
+
+The reference is the audited dataset revision `8e51a1f` (acessilia-dataset#12):
+304 annotations, 292 evaluable by the legacy scorer. The scorer does not yet
+consume `audit.chart_data`, `audit.table_semantics`, `audit.object_associations`
+or the twelve `table` objects; its results are lexical/structural proxies, not
+semantic approval. `tests/test_slide_case_e2e.py` is a manual/slow case
+(`CORE_SLIDE_CASE=1`) against the deployed core, pinned by dataset and PDF
+hashes; it applies per-format regression floors and tracks the known product
+gaps in #868, #869 and #870. See
+[tests/README.md](../tests/README.md#end-to-end-tests).
 
 ## Dr.DocBench experiment snapshot
 
