@@ -14,6 +14,7 @@ import pytest
 
 from acessilia_core.agents.model_calls import ModelCallRejected, current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
+from acessilia_core.manifest.builder import _derive_processing_needs
 from acessilia_core.manifest.models import (
     BoundingBox,
     PageDescriptor,
@@ -264,15 +265,25 @@ async def test_a_failed_picture_description_gives_way_to_a_region_inspection(
 
     Picture enrichment sends a mostly visual document's placeholder to
     ``vision-description``; a ``model_failed`` leaves it ``unknown`` with the
-    failure keys. Planning then picks ``pymupdf-region`` for that target, and
-    the inspection describes it. The failure comes from the real stage, never
-    seeded, so the final assertions fail if the inspection writer stops
-    clearing the keys.
+    failure keys. The obligations come from ``_derive_processing_needs``, as at
+    extraction: ``unknown`` is what produces ``review-structure`` with
+    ``pymupdf-region``. The plan picks that method for the target, the
+    inspection describes it, and the final assertions fail if the inspection
+    writer stops clearing the keys. The failure comes from the real stage,
+    never seeded.
     """
     manifest, _, _ = inspection
     element = manifest.elements[0]
     # A placeholder, not readable text: the picture stage takes it.
     element.text = None
+    observations, obligations = _derive_processing_needs(manifest.elements)
+    manifest.observations = observations
+    manifest.obligations = obligations
+    manifest.summary.observation_count = len(observations)
+    manifest.summary.obligation_count = len(obligations)
+    [obligation] = obligations
+    assert (obligation.kind, obligation.target_ids) == ("review-structure", [element.id])
+    assert "pymupdf-region" in obligation.admissible_methods
     assert picture_stage.description_candidates(manifest) == [element]
 
     class FailingVision:
@@ -308,13 +319,17 @@ async def test_a_failed_picture_description_gives_way_to_a_region_inspection(
     [step] = [
         step
         for step in plan.steps
-        if step.action == "execute-obligation" and step.obligation_id == "o-1"
+        if step.action == "execute-obligation"
+        and step.obligation_id == obligation.id
     ]
     assert step.method == "pymupdf-region"
 
     updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
 
     assert report.status == "completed"
+    assert next(
+        item for item in updated.obligations if item.id == obligation.id
+    ).status == "satisfied"
     [described] = [item for item in updated.elements if item.id == element.id]
     assert described.type == "picture"
     assert described.text == "A map"
@@ -322,8 +337,17 @@ async def test_a_failed_picture_description_gives_way_to_a_region_inspection(
     assert "vision_failure_reason" not in described.metadata
     assert "vision_failure_detail" not in described.metadata
     assert pipeline_payload._visual_failures(updated) is None
+    payload = pipeline_payload.build_pddl_structured_payload(
+        file_path=Path(manifest.source.path),
+        manifest=updated,
+        plan=plan,
+        planner_backend="internal",
+        execution_report=report,
+        comparison=None,
+    )
+    assert payload["canonical_metadata"]["pddl_visual_failures"] is None
     assert not pipeline_payload.records_visual_failures(
-        pipeline_payload._visual_failures(updated)
+        payload["canonical_metadata"]["pddl_visual_failures"]
     )
 
 
