@@ -24,10 +24,18 @@ from acessilia_core.pipeline import (
     payload as pipeline_payload,
     preflight as pipeline_preflight,
 )
-from acessilia_core.pipeline.enrichment import common as enrichment_common
+from acessilia_core.pipeline.enrichment import (
+    common as enrichment_common,
+    pictures as picture_stage,
+)
 from acessilia_core.pipeline.handlers import inspection as inspection_handlers
 from acessilia_core.ports import NoRegionCache, RunPorts
-from tests.core_config_support import core_config, model_config, toolbox_config
+from tests.core_config_support import (
+    core_config,
+    model_config,
+    toolbox_config,
+    vision_config,
+)
 from tests.pddl_support import (
     build_element as _element,
     build_manifest as _manifest,
@@ -246,6 +254,77 @@ def test_the_region_handler_replaces_a_failed_description(inspection, kind):
     assert updated.metadata["vision_description_complete"] is True
     assert "vision_failure_reason" not in updated.metadata
     assert "vision_failure_detail" not in updated.metadata
+
+
+@pytest.mark.asyncio
+async def test_a_failed_picture_description_gives_way_to_a_region_inspection(
+    inspection, monkeypatch
+):
+    """#689: the O failure, the plan and the G inspection on one manifest.
+
+    Picture enrichment sends a mostly visual document's placeholder to
+    ``vision-description``; a ``model_failed`` leaves it ``unknown`` with the
+    failure keys. Planning then picks ``pymupdf-region`` for that target, and
+    the inspection describes it. The failure comes from the real stage, never
+    seeded, so the final assertions fail if the inspection writer stops
+    clearing the keys.
+    """
+    manifest, _, _ = inspection
+    element = manifest.elements[0]
+    # A placeholder, not readable text: the picture stage takes it.
+    element.text = None
+    assert picture_stage.description_candidates(manifest) == [element]
+
+    class FailingVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, *, errors=None, **_kwargs):
+            if errors is not None:
+                errors.append("TimeoutError: provider gave up")
+            return None
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", FailingVision)
+
+    await picture_stage._enrich_picture_descriptions(
+        manifest,
+        Path(manifest.source.path),
+        mode="medio",
+        vision=vision_config(),
+        toolbox=toolbox_config(),
+        models=model_config(),
+        region_cache=None,
+    )
+
+    assert element.type == "unknown"
+    assert element.metadata["vision_failure_reason"] == "model_failed"
+    assert element.metadata["vision_failure_detail"] == "TimeoutError: provider gave up"
+    failures = pipeline_payload._visual_failures(manifest)
+    assert failures == {"pictures": {"model_failed": 1}}
+    assert pipeline_payload.records_visual_failures(failures)
+
+    orchestrator = _orchestrator()
+    plan, _ = orchestrator._build_plan(manifest)
+    [step] = [
+        step
+        for step in plan.steps
+        if step.action == "execute-obligation" and step.obligation_id == "o-1"
+    ]
+    assert step.method == "pymupdf-region"
+
+    updated, report = orchestrator.executor.execute(plan, manifest, dry_run=False)
+
+    assert report.status == "completed"
+    [described] = [item for item in updated.elements if item.id == element.id]
+    assert described.type == "picture"
+    assert described.text == "A map"
+    assert described.metadata["vision_description_complete"] is True
+    assert "vision_failure_reason" not in described.metadata
+    assert "vision_failure_detail" not in described.metadata
+    assert pipeline_payload._visual_failures(updated) is None
+    assert not pipeline_payload.records_visual_failures(
+        pipeline_payload._visual_failures(updated)
+    )
 
 
 def test_a_region_inspection_admission_rejection_fails_the_method_with_its_reason(
