@@ -269,13 +269,22 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      cache.
    - Os passos que elas tornam obsoletos são pulados, não executados (5). Isso
      inclui uma obrigação mudada sob o mesmo id: outro kind, alvos de outros
-     tipos, ou o método do passo que deixou de ser admissível. O executor
-     compara cada passo com o que tornava o método aplicável no manifesto do
-     plano; um redirecionamento que mantém os tipos (uma divisão ou uma junção
-     remapeia alvos) não é mudança. Os ids são únicos num manifesto; um
-     liberado por uma remoção pode voltar num plano seguinte, nunca dentro da
-     comparação de uma execução. Mudanças do conteúdo dos elementos sob o
-     mesmo tipo não são comparadas (revisões de elementos são a #840).
+     tipos, outro conjunto de alvos, ou o método do passo que deixou de ser
+     admissível. O executor compara cada passo com o que tornava o método
+     aplicável no manifesto do plano. Desde o core 0.3.23 (#843) isso inclui
+     os ids dos alvos. `remap_references` (`handlers/structure.py`) registra o
+     mapeamento de cada divisão e junção no manifesto de trabalho, em ordem; o
+     executor os compõe sobre os alvos planejados e compara o resultado com os
+     atuais (`_retargeted`). Uma divisão ou junção sozinha não é mudança e não
+     gasta replanejamento de descoberta; qualquer outra coisa é, qualquer que
+     seja a forma: um elemento trocado ou acrescentado, novo ou preexistente,
+     ou um removido sem junção. O checkpoint de execução salva o registro para
+     uma retomada (um anterior à 0.3.23 não o tem, e uma divisão antes dele
+     custa um replanejamento). Uma divisão ou junção ainda pode tornar o passo
+     obsoleto por outro motivo (tipos, método, dependências). Os ids são
+     únicos num manifesto; um liberado por uma remoção pode voltar num plano
+     seguinte. Mudanças do conteúdo dos elementos sob o mesmo tipo não são
+     comparadas (revisões de elementos são a #840).
    - O contador de descobertas fica no checkpoint de plano, e os pulos derivam
      dos manifestos do plano e do checkpoint, então uma retomada não precisa
      de mais nada (6).

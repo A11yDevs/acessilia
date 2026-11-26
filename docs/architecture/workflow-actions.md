@@ -260,11 +260,20 @@ the manifest. **The enrichment migration needs no domain change.**
      identities.
    - The steps they make obsolete are skipped, not run (5). That includes an
      obligation changed under its id: another kind, targets of other types,
-     or the step's method no longer admissible. The executor compares each
-     step with what made its method applicable in the plan's manifest; a
-     retarget that keeps the types (a split or a join remaps targets) is
-     not a change. Ids are unique in a manifest; one freed by a removal may
-     come back in a later plan, never inside one execution's comparison.
+     another target set, or the step's method no longer admissible. The
+     executor compares each step with what made its method applicable in the
+     plan's manifest. Since core 0.3.23 (#843) that includes the target ids.
+     `remap_references` (`handlers/structure.py`) records each split's and
+     join's mapping on the working manifest, in order; the executor composes
+     them over the planned targets and compares the result with the current
+     ones (`_retargeted`). A split or a join alone is not a change and spends
+     no discovery replan; anything else is, whatever it looks like: an
+     element swapped in or added, new or pre-existing, or one dropped
+     without a join. The execution checkpoint saves the record for a resume
+     (one from before 0.3.23 has none, and a split before it costs one
+     replan). A split or a join can still make the step stale for another
+     reason (types, method, dependencies). Ids are unique in a manifest; one
+     freed by a removal may come back in a later plan.
      Changes of the elements' content under the same type are not compared
      (element revisions are #840).
    - The discovery count is in the plan checkpoint, and the skips derive from

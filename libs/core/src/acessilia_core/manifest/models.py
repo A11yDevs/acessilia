@@ -4,7 +4,14 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    ValidationError,
+    model_validator,
+)
 
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
@@ -354,6 +361,12 @@ class ProcessingManifest(StrictModel):
     obligations: list[Obligation] = Field(default_factory=list)
     artifacts: list[Artifact] = Field(default_factory=list)
     summary: ManifestSummary
+    #: The structural remaps of this execution, in order (#843): each split or
+    #: join ``remap_references`` applied, as ``{element id: replacement ids}``.
+    #: The executor composes them over the planned targets, so a split or a
+    #: join is told apart from a retarget. Not part of the schema: the
+    #: execution checkpoint saves it, and each execution starts it again.
+    _structural_remaps: list[dict[str, list[str]]] = PrivateAttr(default_factory=list)
 
     @model_validator(mode="after")
     def validate_references(self) -> ProcessingManifest:
@@ -424,4 +437,31 @@ def validate_delivered_manifest(manifest: ProcessingManifest) -> None:
         first = error.errors()[0]
         cause = (first.get("ctx") or {}).get("error")
         raise ValueError(str(cause) if cause is not None else first["msg"]) from error
+
+
+def remap_ids(ids: list[str], mapping: dict[str, list[str]]) -> list[str]:
+    """``ids`` with each one ``mapping`` names replaced by its replacements,
+    in order and without repeats (a split maps an id to itself and its parts,
+    a join a dropped id to the survivor)."""
+    out: list[str] = []
+    for element_id in ids:
+        for replacement in mapping.get(element_id, [element_id]):
+            if replacement not in out:
+                out.append(replacement)
+    return out
+
+
+def record_structural_remap(manifest: ProcessingManifest, mapping: dict[str, list[str]]) -> None:
+    """Record a split's or a join's ``mapping`` on ``manifest`` (#843)."""
+    manifest._structural_remaps.append({key: list(value) for key, value in mapping.items()})
+
+
+def structural_remaps(manifest: ProcessingManifest) -> list[dict[str, list[str]]]:
+    """The structural remaps recorded on ``manifest`` in this execution, in order."""
+    return manifest._structural_remaps
+
+
+def reset_structural_remaps(manifest: ProcessingManifest, remaps: list[dict[str, list[str]]]) -> None:
+    """Start an execution's record: empty, or what a resumed one had recorded."""
+    manifest._structural_remaps = [{key: list(value) for key, value in item.items()} for item in remaps]
 
