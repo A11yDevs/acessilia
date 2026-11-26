@@ -1,0 +1,582 @@
+{
+  "cacheable": true,
+  "calls": {
+    "document.structure.extract": 1,
+    "document.text.spans": 1,
+    "math.convert": 1,
+    "math.recognize": 1,
+    "math.verbalize": 1,
+    "media.inspect": 1,
+    "pdf.render": 4,
+    "vlm": 3
+  },
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 7,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 3,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "id": "h1",
+              "level": 1,
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "h1",
+                "parent_id": null,
+                "raw_label": "heading",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 80.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "text": "Experiment report",
+              "type": "heading"
+            },
+            {
+              "id": "p1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p1",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 200.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 90.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "alt_text": "Photograph of a bench with an oscilloscope and cables.",
+              "id": "pic1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "pic1",
+                "parent_id": null,
+                "raw_label": "picture",
+                "source_ref": null,
+                "surrounding_text": [
+                  "Experiment report",
+                  "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes"
+                ],
+                "vision_confidence": 0.95,
+                "vision_description_complete": true,
+                "vision_elements": [],
+                "vision_institutional_logo": false,
+                "vision_language": "pt-BR",
+                "vision_warnings": []
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 420.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 220.0
+                },
+                "page_number": 1
+              },
+              "type": "image"
+            }
+          ],
+          "page_number": 1,
+          "text": "# Experiment report\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nPhotograph of a bench with an oscilloscope and cables."
+        },
+        {
+          "blocks": [
+            {
+              "id": "p2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p2",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 170.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 2
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "f1",
+              "metadata": {
+                "confidence": null,
+                "formula_classification": {
+                  "confidence": 0.95,
+                  "reason": null,
+                  "status": "math",
+                  "warnings": []
+                },
+                "formula_recognition": {
+                  "confidence": 0.99,
+                  "method": "math.recognize",
+                  "text_agreement": 1.0
+                },
+                "formula_text_layer": "s ( t ) = t 3",
+                "manifest_element_id": "f1",
+                "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s(t) = t^{3}</mtext></math>",
+                "parent_id": null,
+                "raw_label": "formula",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 230.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 200.0
+                },
+                "page_number": 2
+              },
+              "text": "s(t) = t^{3}",
+              "type": "math"
+            }
+          ],
+          "page_number": 2,
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\ns(t) = t^{3}"
+        },
+        {
+          "blocks": [
+            {
+              "id": "p3",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p3",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 170.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 3
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "t1",
+              "metadata": {
+                "confidence": null,
+                "data_confidence": 0.95,
+                "data_language": "pt-BR",
+                "data_warnings": [],
+                "manifest_element_id": "t1",
+                "parent_id": null,
+                "raw_label": "table",
+                "source_ref": null,
+                "table_ast": {
+                  "body": [
+                    {
+                      "cells": [
+                        {
+                          "text": "Mass"
+                        },
+                        {
+                          "text": "2 kg"
+                        }
+                      ]
+                    }
+                  ],
+                  "header": [
+                    {
+                      "cells": [
+                        {
+                          "header": true,
+                          "text": "Quantity"
+                        },
+                        {
+                          "header": true,
+                          "text": "Value"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "table_column_count": 2,
+                "table_has_header": true,
+                "table_linearization_hint": "data-agent-structured",
+                "table_row_count": 2
+              },
+              "rows": [
+                [
+                  "Quantity",
+                  "Value"
+                ],
+                [
+                  "Mass",
+                  "2 kg"
+                ]
+              ],
+              "source_location": {
+                "bbox": {
+                  "bottom": 320.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 200.0
+                },
+                "page_number": 3
+              },
+              "table_ast": {
+                "body": [
+                  {
+                    "cells": [
+                      {
+                        "text": "Mass"
+                      },
+                      {
+                        "text": "2 kg"
+                      }
+                    ]
+                  }
+                ],
+                "header": [
+                  {
+                    "cells": [
+                      {
+                        "header": true,
+                        "text": "Quantity"
+                      },
+                      {
+                        "header": true,
+                        "text": "Value"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "type": "table"
+            }
+          ],
+          "page_number": 3,
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nQuantity | Value\nMass | 2 kg"
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "completed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 2,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [],
+      "pddl_unsatisfied_summary": null,
+      "pddl_validation_only": true,
+      "pddl_visual_failures": null,
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "id": "p1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p1",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 200.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 90.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Photograph of a bench with an oscilloscope and cables.",
+            "id": "pic1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "pic1",
+              "parent_id": null,
+              "raw_label": "picture",
+              "source_ref": null,
+              "surrounding_text": [
+                "Experiment report",
+                "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes"
+              ],
+              "vision_confidence": 0.95,
+              "vision_description_complete": true,
+              "vision_elements": [],
+              "vision_institutional_logo": false,
+              "vision_language": "pt-BR",
+              "vision_warnings": []
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 420.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 220.0
+              },
+              "page_number": 1
+            },
+            "type": "image"
+          },
+          {
+            "id": "p2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p2",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 170.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 2
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Fórmula: spoken s(t) = t^{3}",
+            "id": "f1",
+            "metadata": {
+              "confidence": null,
+              "formula_classification": {
+                "confidence": 0.95,
+                "reason": null,
+                "status": "math",
+                "warnings": []
+              },
+              "formula_recognition": {
+                "confidence": 0.99,
+                "method": "math.recognize",
+                "text_agreement": 1.0
+              },
+              "formula_text_layer": "s ( t ) = t 3",
+              "manifest_element_id": "f1",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s(t) = t^{3}</mtext></math>",
+              "parent_id": null,
+              "raw_label": "formula",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 230.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 200.0
+              },
+              "page_number": 2
+            },
+            "text": "s(t) = t^{3}",
+            "type": "math"
+          },
+          {
+            "id": "p3",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p3",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 170.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 3
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "id": "t1",
+            "metadata": {
+              "confidence": null,
+              "data_confidence": 0.95,
+              "data_language": "pt-BR",
+              "data_warnings": [],
+              "manifest_element_id": "t1",
+              "parent_id": null,
+              "raw_label": "table",
+              "source_ref": null,
+              "table_ast": {
+                "body": [
+                  {
+                    "cells": [
+                      {
+                        "text": "Mass"
+                      },
+                      {
+                        "text": "2 kg"
+                      }
+                    ]
+                  }
+                ],
+                "header": [
+                  {
+                    "cells": [
+                      {
+                        "header": true,
+                        "text": "Quantity"
+                      },
+                      {
+                        "header": true,
+                        "text": "Value"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "table_column_count": 2,
+              "table_has_header": true,
+              "table_linearization_hint": "data-agent-structured",
+              "table_row_count": 2
+            },
+            "rows": [
+              [
+                "Quantity",
+                "Value"
+              ],
+              [
+                "Mass",
+                "2 kg"
+              ]
+            ],
+            "source_location": {
+              "bbox": {
+                "bottom": 320.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 200.0
+              },
+              "page_number": 3
+            },
+            "table_ast": {
+              "body": [
+                {
+                  "cells": [
+                    {
+                      "text": "Mass"
+                    },
+                    {
+                      "text": "2 kg"
+                    }
+                  ]
+                }
+              ],
+              "header": [
+                {
+                  "cells": [
+                    {
+                      "header": true,
+                      "text": "Quantity"
+                    },
+                    {
+                      "header": true,
+                      "text": "Value"
+                    }
+                  ]
+                }
+              ]
+            },
+            "type": "table"
+          }
+        ],
+        "children": [],
+        "id": "h1",
+        "level": 1,
+        "metadata": {
+          "confidence": null,
+          "manifest_element_id": "h1",
+          "parent_id": null,
+          "raw_label": "heading",
+          "source_ref": null
+        },
+        "source_location": {
+          "bbox": {
+            "bottom": 80.0,
+            "left": 72.0,
+            "right": 540.0,
+            "top": 60.0
+          },
+          "page_number": 1
+        },
+        "title": "Experiment report"
+      }
+    ],
+    "source": {
+      "name": "multi-page.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [],
+    "title": "Experiment report",
+    "verbosity": "detailed"
+  },
+  "refused": [],
+  "unhandled": []
+}

@@ -1,4 +1,5 @@
 {
+  "cacheable": true,
   "calls": {
     "document.structure.extract": 1,
     "document.text.spans": 1,
@@ -304,5 +305,6 @@
     "title": "inline-math",
     "verbosity": "detailed"
   },
+  "refused": [],
   "unhandled": []
 }

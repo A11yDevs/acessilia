@@ -17,18 +17,27 @@ benchmarks of #619).
 
 What the cases establish is limited to what they run:
 
-- five synthetic, one-page documents;
-- one extraction provider (`FUSION_MODE=single`), so `select-table-source`,
-  `fuse-providers`, `rescue-omitted` and `adjudicate-page` never run. The
-  stale table, the replan for a rescued block and the invalidation of formula
-  conversions (M4b) are covered by unit tests, not here;
-- a Toolbox that always answers: no failure, no unavailability, no
-  degradation;
+- eight synthetic documents, of one to three pages;
+- one extraction provider, except `dual-provider` (`FUSION_MODE=dual`),
+  which exercises the page adjudication, `select-table-source` and a page
+  routed to the secondary provider. `fuse-providers` and the text fusion
+  (`dual-provider-fusion`) are not exercised, and `rescue-omitted` never
+  fires: its trigger does not meet the pages it exists for (#887);
+- a Toolbox that answers, except in `degraded`, where `math.recognize` and
+  `document.text.spans` are unavailable and the vision model fails on one
+  picture. These are failures at call time (HTTP 503); the availability
+  gate is off, so a capability the catalogue reports unavailable before
+  planning (#848) is not exercised;
+- pages that exist in the extraction only: every case runs on the same
+  one-page `source.pdf`, and the fake answers the page count and the
+  renders, so `multi-page` tests the pipeline's handling of pages and
+  elements, not the extraction or rendering of a real multi-page PDF (the
+  e2e tests on the dataset's documents cover that);
 - the normalized canonical document: not the exports, not the number of
   calls.
 
-The equivalence the references show holds for these cases only. Dual-provider,
-multi-page and degraded cases are #876; a resume from a checkpoint is #874.
+The equivalence the references show holds for these cases only. A resume
+from a checkpoint is #874.
 
 ## How a case runs
 
@@ -39,7 +48,9 @@ same runner works on an older tree.
 
 **The run is hermetic** (`hermetic_environment`). Every variable the
 backend's settings can read is removed first, including what `.env` loaded
-into the process. The settings then get their defaults plus the harness's
+into the process, and the server and task locale are pinned to `en_US`,
+so the messages an output carries (a warning, a fallback alt text) do not
+follow `LANG` or an earlier test. The settings then get their defaults plus the harness's
 `ENVIRONMENT`, with `DATA_DIR` and `TEMP_DIR` in a temporary directory, and
 the whole environment is restored afterwards. A reference recorded in a bare
 worktree and a run in a developer's tree therefore see the same
@@ -57,6 +68,10 @@ inside the core is patched. Its answers come from the case:
 | `vision` | the VLM, per element id (or `page-<n>`): a description, a region's `kind` and `formula_latex`, a table's `rows` |
 | `latex` | `math.recognize`, per formula id (`""`: it reads nothing) |
 | `text_spans` | `document.text.spans`, per page |
+| `secondary_document` | the secondary provider's extraction, with `FUSION_MODE=dual`. Only the primary provider (`primary_provider`, `docling`) and the secondary (`FUSION_SECONDARY_PROVIDER`, else `secondary_provider`, else `mineru`) get one; any other is unhandled. A region only the secondary extracted is matched against its boxes |
+| `judge` | per page (`page-<n>`), the `pB` of `document.adjudicate.page` for that page's image |
+| `failures` | what fails on purpose: `capabilities` answered 503, `vision` element ids the model refuses; recorded in `refused`. The test and the recording both require exactly the declared failures |
+| `environment` | settings the case sets over the harness's (`FUSION_MODE=dual`) |
 
 **Regions are matched by colour.** A rendered image does not say which region
 it shows, and a newer core may downscale or re-encode it. So each `pdf.render`
@@ -89,6 +104,9 @@ change in what is sent shows in the output.
 | `formulas` | a formula without LaTeX markup, classified and read (M4a, M3); one with LaTeX; a picture the vision model reads as a formula (M1, #846) |
 | `mostly-visual` | a page with no text content, whose placeholder visuals are described |
 | `inline-math` | prose marked from the text layer's fonts (M4b), and a formula that reads its variables |
+| `multi-page` | a picture, a formula and a table read from its image, each on its own page |
+| `dual-provider` | two providers on three pages: a page adjudicated, a table adopted from the secondary and marked again (M4b's `inline_math_stale`), a page routed to the secondary that loses a primary-only paragraph (#887) |
+| `degraded` | `math.recognize` and `document.text.spans` unavailable, and the vision model failing on one of two pictures: the formula falls back to the vision model, the inline math is unavailable, one picture is left undescribed with a warning |
 
 ## The references
 
@@ -111,6 +129,11 @@ before a migration:
 - the document's `/id`, which hashes them.
 
 A field of the same name anywhere else is still compared.
+
+**`refused`** and **`cacheable`** are recorded too. `refused` must equal
+the case's `failures` when a reference is recorded and on this tree;
+`cacheable` (whether the backend would cache the result) is checked on this
+tree only, since its contract may evolve: `degraded` must not be cached.
 
 **`calls`** counts the capabilities each run asked for. It is diagnostic only
 and is not compared: a later core may call less on purpose. For example, M4b
@@ -172,6 +195,23 @@ When this harness was added (core 0.3.20):
     before 0.3.14.
 
 Reintroducing the #846 gap fails the test against every other reference.
+
+The cases added for #876 (core 0.3.23) show:
+
+- **`multi-page`** matches every reference.
+- **`dual-provider`**:
+  - the adopted table's math cell is marked again (`$s_0\in\mathbb{R}$`) by
+    every release since 0.3.12, where the pass of #599 marked it after the
+    plan; M4b (0.3.20) does it as a planned step, at the cost of one more
+    manifest revision. `core-0.3.11`, before #599, left the cell unmarked:
+    declared;
+  - the formula of the page routed to the secondary is read from the
+    secondary's region the same way by every release;
+  - every release loses the paragraph that only the primary provider kept on
+    the routed page (#887), which a pinning test fixes until it is fixed.
+- **`degraded`** matches every reference but `core-0.3.14`, where the
+  pictures' surrounding text differs, the same M3 difference as in
+  `formulas`.
 
 ## Recording
 

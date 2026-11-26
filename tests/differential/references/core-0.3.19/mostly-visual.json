@@ -1,4 +1,5 @@
 {
+  "cacheable": true,
   "calls": {
     "document.structure.extract": 1,
     "document.text.spans": 1,
@@ -196,5 +197,6 @@
     "title": "mostly-visual",
     "verbosity": "detailed"
   },
+  "refused": [],
   "unhandled": []
 }

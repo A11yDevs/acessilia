@@ -1,4 +1,5 @@
 {
+  "cacheable": true,
   "calls": {
     "document.structure.extract": 1,
     "document.text.spans": 1,
@@ -394,5 +395,6 @@
     "title": "formulas",
     "verbosity": "detailed"
   },
+  "refused": [],
   "unhandled": []
 }

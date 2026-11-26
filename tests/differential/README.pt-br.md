@@ -18,19 +18,28 @@ truth (os benchmarks da #619).
 
 O que os casos estabelecem se limita ao que eles rodam:
 
-- cinco documentos sintéticos de uma página;
-- um provedor de extração (`FUSION_MODE=single`), então `select-table-source`,
-  `fuse-providers`, `rescue-omitted` e `adjudicate-page` nunca rodam. A
-  tabela obsoleta, o replanejamento por um bloco resgatado e a invalidação
-  das conversões de fórmula (M4b) são cobertos por testes unitários, não
-  aqui;
-- um Toolbox que sempre responde: sem falha, indisponibilidade ou
-  degradação;
+- oito documentos sintéticos, de uma a três páginas;
+- um provedor de extração, exceto em `dual-provider` (`FUSION_MODE=dual`), que
+  exercita a adjudicação de página, o `select-table-source` e uma página
+  roteada para o provedor secundário. O `fuse-providers` e a fusão de texto
+  (`dual-provider-fusion`) não são exercitados, e o `rescue-omitted` nunca
+  dispara: o seu gatilho não alcança as páginas para as quais ele existe
+  (#887);
+- um Toolbox que responde, exceto em `degraded`, em que `math.recognize` e
+  `document.text.spans` estão indisponíveis e o modelo de visão falha numa
+  figura. São falhas na chamada (HTTP 503); o gate de disponibilidade está
+  desligado, então uma capacidade que o catálogo informa indisponível antes
+  do planejamento (#848) não é exercitada;
+- páginas que só existem na extração: todos os casos rodam sobre o mesmo
+  `source.pdf` de uma página, e o falso responde a contagem de páginas e as
+  renderizações, então `multi-page` testa o tratamento de páginas e
+  elementos pelo pipeline, não a extração nem a renderização de um PDF real
+  de várias páginas (os testes e2e com os documentos do dataset cobrem
+  isso);
 - o documento canônico normalizado: nem os exports, nem o número de chamadas.
 
-A equivalência que as referências mostram vale só para estes casos. Casos com
-dois provedores, várias páginas e degradação são a #876; a retomada a partir
-de um checkpoint é a #874.
+A equivalência que as referências mostram vale só para estes casos. A
+retomada a partir de um checkpoint é a #874.
 
 ## Como um caso roda
 
@@ -41,7 +50,9 @@ mesmo runner funciona numa árvore mais antiga.
 
 **A execução é hermética** (`hermetic_environment`). Primeiro, toda variável
 que as settings do backend podem ler é removida, inclusive o que o `.env`
-carregou no processo. As settings recebem então os seus padrões mais o
+carregou no processo, e o locale do servidor e da tarefa é fixado em
+`en_US`, então as mensagens que uma saída traz (um aviso, um alt text de
+fallback) não seguem o `LANG` nem um teste anterior. As settings recebem então os seus padrões mais o
 `ENVIRONMENT` do harness, com `DATA_DIR` e `TEMP_DIR` num diretório
 temporário, e o ambiente inteiro é restaurado ao final. Uma referência gravada
 num worktree limpo e uma execução na árvore de um desenvolvedor veem, por
@@ -59,6 +70,10 @@ nada dentro do core é substituído. As respostas vêm do caso:
 | `vision` | o VLM, por id de elemento (ou `page-<n>`): uma descrição, o `kind` e o `formula_latex` de uma região, as `rows` de uma tabela |
 | `latex` | `math.recognize`, por id de fórmula (`""`: não lê nada) |
 | `text_spans` | `document.text.spans`, por página |
+| `secondary_document` | a extração do provedor secundário, com `FUSION_MODE=dual`. Só o provedor primário (`primary_provider`, `docling`) e o secundário (`FUSION_SECONDARY_PROVIDER`, senão `secondary_provider`, senão `mineru`) recebem uma; qualquer outro fica sem resposta. Uma região que só o secundário extraiu é casada com as caixas dele |
+| `judge` | por página (`page-<n>`), o `pB` de `document.adjudicate.page` para a imagem daquela página |
+| `failures` | o que falha de propósito: `capabilities` respondidas com 503, ids em `vision` que o modelo recusa; registrado em `refused`. O teste e a gravação exigem exatamente as falhas declaradas |
+| `environment` | settings que o caso define sobre as do harness (`FUSION_MODE=dual`) |
 
 **As regiões são associadas pela cor.** Uma imagem renderizada não diz que
 região mostra, e um core mais novo pode reduzi-la ou recodificá-la. Por isso
@@ -94,6 +109,9 @@ mudança no que é enviado aparece na saída.
 | `formulas` | uma fórmula sem marcação LaTeX, classificada e lida (M4a, M3); uma com LaTeX; uma figura que o modelo de visão lê como fórmula (M1, #846) |
 | `mostly-visual` | uma página sem conteúdo textual, cujos visuais de placeholder são descritos |
 | `inline-math` | prosa marcada a partir das fontes da camada de texto (M4b), e uma fórmula que lê as suas variáveis |
+| `multi-page` | uma figura, uma fórmula e uma tabela lida da sua imagem, cada uma na sua página |
+| `dual-provider` | dois provedores em três páginas: uma página adjudicada, uma tabela adotada do secundário e marcada de novo (o `inline_math_stale` do M4b), uma página roteada para o secundário que perde um parágrafo só do primário (#887) |
+| `degraded` | `math.recognize` e `document.text.spans` indisponíveis, e o modelo de visão falhando numa de duas figuras: a fórmula recai no modelo de visão, a matemática inline fica indisponível, uma figura fica sem descrição, com aviso |
 
 ## As referências
 
@@ -116,6 +134,12 @@ antes de uma migração:
 - o `/id` do documento, que é um hash deles.
 
 Um campo de mesmo nome em qualquer outro lugar continua sendo comparado.
+
+**`refused`** e **`cacheable`** também são gravados. `refused` precisa ser
+igual às `failures` do caso quando uma referência é gravada e nesta árvore;
+`cacheable` (se o backend guardaria o resultado em cache) é conferido só
+nesta árvore, porque o seu contrato pode evoluir: `degraded` não pode ir
+para o cache.
 
 **`calls`** conta as capacidades que cada execução pediu. É só diagnóstico e
 não é comparado: um core mais novo pode chamar menos de propósito. Por
@@ -179,6 +203,23 @@ Quando este harness foi criado (core 0.3.20):
 
 Reintroduzir a lacuna da #846 faz o teste falhar contra todas as outras
 referências.
+
+Os casos acrescentados pela #876 (core 0.3.23) mostram:
+
+- **`multi-page`** coincide com todas as referências.
+- **`dual-provider`**:
+  - a célula com matemática da tabela adotada é marcada de novo
+    (`$s_0\in\mathbb{R}$`) por toda release desde a 0.3.12, em que a passada
+    da #599 a marcava depois do plano; o M4b (0.3.20) faz isso como passo
+    planejado, ao custo de uma revisão de manifesto a mais. `core-0.3.11`,
+    antes da #599, deixava a célula sem marca: declarado;
+  - a fórmula da página roteada para o secundário é lida da região do
+    secundário do mesmo jeito por toda release;
+  - toda release perde o parágrafo que só o provedor primário manteve na
+    página roteada (#887), o que um teste de fixação registra até a correção.
+- **`degraded`** coincide com todas as referências, menos `core-0.3.14`, em
+  que o texto ao redor das figuras difere, a mesma diferença do M3 que em
+  `formulas`.
 
 ## Gravação
 

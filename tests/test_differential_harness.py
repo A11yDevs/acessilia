@@ -257,6 +257,20 @@ def test_a_complete_recording_replaces_the_reference_and_keeps_the_declarations(
     assert not any(path.name.startswith(".") for path in target.parent.iterdir())
 
 
+def test_a_failure_on_purpose_the_run_did_not_meet_publishes_nothing(tmp_path) -> None:
+    """#888 review: an older core that never called the failing capability
+    would record a healthy run as the degraded case's reference."""
+    recorder = _recorder()
+    target = tmp_path / "references" / "core-x"
+    _reference(target, {"commit": "c"})
+    out = _outputs(tmp_path / "out", {"a": []})
+
+    with pytest.raises(SystemExit, match="failures on purpose"):
+        recorder.publish(out, target, {"commit": "d"}, ["a"], complete=True, failures={"a": {"math.recognize"}})
+
+    assert (target / "a.json").read_text() == "old"
+
+
 def test_a_partial_recording_needs_the_same_commit_and_harness(tmp_path) -> None:
     recorder = _recorder()
     target = tmp_path / "references" / "core-x"
@@ -269,3 +283,125 @@ def test_a_partial_recording_needs_the_same_commit_and_harness(tmp_path) -> None
 
     assert json.loads((target / "a.json").read_text()) == {"canonical": {"case": "a"}, "unhandled": []}
     assert (target / "gone.json").read_text() == "old"
+
+
+# Two providers, a page judgement and failures on purpose (#876).
+
+
+def _execute(fake: FakeToolbox, capability: str, provider: str = "fake") -> httpx.Response:
+    request = httpx.Request(
+        "POST", f"{fake_toolbox.BASE_URL}/v1/capabilities/{capability}:execute",
+        files={"file": ("x.pdf", b"%PDF", "application/pdf")}, data={"provider": provider},
+    )
+    request.read()
+    return fake.handle(request)
+
+
+def test_the_secondary_provider_gets_the_secondary_document() -> None:
+    case = json.loads((CASES / "dual-provider" / "case.json").read_text(encoding="utf-8"))
+    fake = FakeToolbox(case)
+
+    primary = _execute(fake, "document.structure.extract", "docling").json()["document"]
+    secondary = _execute(fake, "document.structure.extract", "mineru").json()["document"]
+
+    assert primary == case["document"] and secondary == case["secondary_document"]
+
+
+def _render_page(fake: FakeToolbox, page: int) -> bytes:
+    request = httpx.Request(
+        "POST", f"{fake_toolbox.BASE_URL}/v1/capabilities/pdf.render:execute",
+        files={"file": ("x.pdf", b"%PDF", "application/pdf")},
+        data={"provider": "fake", "parameters": json.dumps({"page_number": page})},
+    )
+    request.read()
+    artifact = fake.handle(request).json()["document"]["artifact_id"].removeprefix("sha256:")
+    return fake.artifacts[artifact]
+
+
+def _judge(fake: FakeToolbox, image: bytes) -> httpx.Response:
+    request = httpx.Request(
+        "POST", f"{fake_toolbox.BASE_URL}/v1/capabilities/document.adjudicate.page:execute",
+        files={"file": ("page.png", image, "image/png")}, data={"provider": "fake"},
+    )
+    request.read()
+    return fake.handle(request)
+
+
+def _dual() -> dict:
+    return json.loads((CASES / "dual-provider" / "case.json").read_text(encoding="utf-8"))
+
+
+def test_a_page_judgement_answers_the_page_it_was_asked_about() -> None:
+    """#888 review: the judgement is the declared page's; another page, or
+    an image the fake did not render, is unhandled."""
+    fake = FakeToolbox(_dual())
+    assert _judge(fake, _render_page(fake, 1)).json()["document"] == {"pB": 0.2}
+
+    assert _judge(fake, _render_page(fake, 2)).status_code == 422
+    assert _judge(fake, fake_toolbox._solid_png(9)).status_code == 422
+    assert len(fake.unhandled) == 2
+
+
+@pytest.mark.parametrize("provider", ["mineru-hyb", "unknown"])
+def test_an_unexpected_extraction_provider_is_unhandled(provider) -> None:
+    """#888 review: only the primary provider, and the secondary when the
+    case has a secondary document, get an extraction."""
+    fake = FakeToolbox(_dual())
+    assert _execute(fake, "document.structure.extract", provider).status_code == 422
+    assert fake.unhandled
+
+
+def test_a_single_provider_case_gives_no_secondary_extraction() -> None:
+    fake = FakeToolbox(_case())
+    assert _execute(fake, "document.structure.extract", "mineru").status_code == 422
+
+
+def test_a_region_only_the_secondary_extracted_is_matched() -> None:
+    """#888 review: page 3 is routed to the secondary, whose formula ``v2``
+    the primary does not have; a region both providers have (``u1``,
+    ``v1``) is the primary's, with no artificial tie."""
+    fake = FakeToolbox(_dual())
+
+    def region(top, bottom):
+        request = httpx.Request(
+            "POST", f"{fake_toolbox.BASE_URL}/v1/capabilities/pdf.render:execute",
+            files={"file": ("x.pdf", b"%PDF", "application/pdf")},
+            data={"provider": "fake", "parameters": json.dumps({"page_number": 3, "clip": {
+                "left": 72, "top": top, "right": 540, "bottom": bottom, "origin": "TOPLEFT"}})},
+        )
+        request.read()
+        artifact = fake.handle(request).json()["document"]["artifact_id"].removeprefix("sha256:")
+        return fake._element_of_image(fake.artifacts[artifact])
+
+    assert region(250, 280) == "v2"
+    assert region(60, 170) == "u1"
+
+
+def test_a_failure_on_purpose_is_refused_but_not_unhandled() -> None:
+    case = {**_case(), "failures": {"capabilities": ["math.recognize"], "vision": ["pic1"]}}
+    fake = FakeToolbox(case)
+
+    assert _execute(fake, "math.recognize").status_code == 503
+    picture = _render(fake, {"left": 72, "top": 222, "right": 540, "bottom": 418, "origin": "TOPLEFT"})
+    assert _ask(fake, picture, SCHEMA).status_code == 503
+    assert fake.refused == ["math.recognize", "vlm:pic1"] and fake.unhandled == []
+
+
+def test_the_output_does_not_follow_the_process_locale() -> None:
+    """#888 review: an earlier test (the API's lifespan) or ``LANG`` set the
+    process locale to pt_BR, and the degraded case's warnings and fallback
+    alt text followed it. The run pins its locale, and restores the one it
+    found."""
+    from acessilia_core import i18n
+
+    previous = i18n._SERVER_LOCALE
+    try:
+        outputs = []
+        for locale in ("pt_BR", "en_US"):
+            i18n.configure_server_locale(locale)
+            outputs.append(run_case(CASES / "degraded" / "case.json")["canonical"])
+            assert i18n.server_locale() == locale
+    finally:
+        i18n._SERVER_LOCALE = previous
+
+    assert outputs[0] == outputs[1]

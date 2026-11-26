@@ -18,8 +18,9 @@ one shows the pipeline is, so a regression between steps (the formula LaTeX
 gap of M1, #846) fails here. A difference a later release made on purpose is
 declared in the reference's ``intended.json``, with the value it allows and
 the release that made it; any other one fails, and so does a declared one
-that no longer happens. The scope is the cases': one page, one provider
-(``FUSION_MODE=single``), a Toolbox that always answers (see the README).
+that no longer happens. The scope is the cases' (see the README): eight
+synthetic documents, one or several pages, one or two providers, and a
+Toolbox that answers, or fails where a case says so.
 """
 
 from __future__ import annotations
@@ -70,6 +71,55 @@ def test_each_reference_was_recorded_with_this_harness_and_every_case(label) -> 
 @pytest.mark.parametrize("case", CASE_NAMES)
 def test_the_fake_toolbox_answers_every_call(runs, case) -> None:
     assert runs[case]["unhandled"] == []
+
+
+@pytest.mark.parametrize("case", CASE_NAMES)
+def test_every_failure_a_case_declares_happens(runs, case) -> None:
+    """A degraded case keeps degrading: a failure the core no longer meets
+    (it stopped calling the capability, or the element) would leave the
+    case testing nothing."""
+    failures = json.loads((CASES / case / "case.json").read_text(encoding="utf-8")).get("failures") or {}
+    declared = {*failures.get("capabilities", []), *(f"vlm:{element}" for element in failures.get("vision", []))}
+    assert set(runs[case]["refused"]) == declared
+
+
+@pytest.mark.parametrize("case", CASE_NAMES)
+def test_a_dual_provider_case_extracts_twice(runs, case) -> None:
+    """#888 review: a case with a secondary document must keep testing two
+    providers; one that ran single would still pass the comparison."""
+    dual = "secondary_document" in json.loads((CASES / case / "case.json").read_text(encoding="utf-8"))
+    assert runs[case]["calls"].get("document.structure.extract") == (2 if dual else 1)
+
+
+def test_a_degraded_result_is_not_cached(runs) -> None:
+    """#882: a result with work left open is not cached as a success."""
+    assert runs["degraded"]["cacheable"] is False
+    assert all(runs[case]["cacheable"] for case in CASE_NAMES if case != "degraded")
+
+
+def _blocks(canonical: dict) -> list[dict]:
+    return [block for section in canonical["sections"] for block in section.get("blocks", [])]
+
+
+def test_the_table_adopted_from_the_secondary_is_marked_again(runs) -> None:
+    """#888 review: M4b's evidence, not only its extra revision. The
+    secondary's table replaces the primary's, and its math cell, flagged
+    stale, is marked from the text layer's fonts."""
+    [table] = [block for block in _blocks(runs["dual-provider"]["canonical"]) if block["type"] == "table"]
+    rows = [[cell["text"] for cell in row["cells"]] for row in table["metadata"]["table_ast"]["body"]]
+
+    assert table["metadata"]["table_source"] == "mineru"
+    assert rows[-3:] == [["Mass", "3 kg"], ["Speed", "4 m/s"], ["Start", "$s_0\\in\\mathbb{R}$"]]
+
+
+def test_the_primary_only_paragraph_of_a_routed_page_is_still_lost(runs) -> None:
+    """Pins #887 (a pinning test: the CI refuses xfail). Page 3 is routed to
+    the secondary, and ``See the cart.``, which only the primary kept, is
+    lost with no rescue obligation. When #887 is fixed, invert this
+    assertion and declare the restored paragraph in the references'
+    ``intended.json``."""
+    texts = [block.get("text") or "" for block in _blocks(runs["dual-provider"]["canonical"])]
+    assert "See the cart." not in texts
 
 
 @pytest.mark.parametrize("label", LABELS)

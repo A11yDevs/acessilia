@@ -100,19 +100,24 @@ def run_case(case_path: Path) -> dict[str, Any]:
         source = workdir / f"{case_path.parent.name}.pdf"
         shutil.copy(SOURCE_PDF, source)
         with installed(fake):
-            canonical = asyncio.run(_run(source, case.get("mode", "normal")))
+            canonical, cacheable = asyncio.run(_run(source, case.get("mode", "normal")))
     return {
         "canonical": normalize(canonical),
         # Diagnostic only: an older core may call more or less (M4b stopped
         # reading the text layer of a document with no prose to mark).
         "calls": dict(sorted(Counter(fake.calls).items())),
         "unhandled": sorted(set(fake.unhandled)),
+        "refused": sorted(set(fake.refused)),
+        # Whether the backend would cache the result: a degraded one must not
+        # be cached as a success (#882). Recorded, checked on this tree only.
+        "cacheable": cacheable,
     }
 
 
 @contextlib.contextmanager
 def hermetic_environment(extra: dict[str, str]) -> Iterator[Path]:
-    """Run with only the settings' defaults, ``ENVIRONMENT`` and ``extra``.
+    """Run with only the settings' defaults, ``ENVIRONMENT`` and ``extra``,
+    in ``PINNED_LOCALE``.
 
     Every variable the backend's settings can read (each quoted upper-case
     name in ``SETTINGS_SOURCES``) is removed first, ``.env`` included, which
@@ -122,6 +127,7 @@ def hermetic_environment(extra: dict[str, str]) -> Iterator[Path]:
     """
     saved = dict(os.environ)
     workdir = Path(tempfile.mkdtemp(prefix="differential-"))
+    locale = _pinned_locale()
     try:
         for name in _settings_variables():
             os.environ.pop(name, None)
@@ -130,9 +136,33 @@ def hermetic_environment(extra: dict[str, str]) -> Iterator[Path]:
         os.environ.update(extra)
         yield workdir
     finally:
+        _restore_locale(locale)
         os.environ.clear()
         os.environ.update(saved)
         shutil.rmtree(workdir, ignore_errors=True)
+
+
+#: The messages a run writes in its output (a warning, a fallback alt text)
+#: follow the process locale, which an earlier test or ``LANG`` may have set.
+PINNED_LOCALE = "en_US"
+
+
+def _pinned_locale() -> tuple[Any, Any]:
+    """Pin the server and the task locale to ``PINNED_LOCALE``; what to
+    restore. Both exist since core 0.3.11."""
+    from acessilia_core import i18n
+
+    previous = i18n._SERVER_LOCALE
+    i18n.configure_server_locale(PINNED_LOCALE)
+    return previous, i18n.set_request_locale(PINNED_LOCALE)
+
+
+def _restore_locale(pinned: tuple[Any, Any]) -> None:
+    from acessilia_core import i18n
+
+    previous, token = pinned
+    i18n.reset_request_locale(token)
+    i18n._SERVER_LOCALE = previous
 
 
 def _settings_variables() -> set[str]:
@@ -145,7 +175,7 @@ def _settings_variables() -> set[str]:
     return names
 
 
-async def _run(source: Path, mode: str) -> dict[str, Any]:
+async def _run(source: Path, mode: str) -> tuple[dict[str, Any], bool]:
     # Imported here: the settings read the environment when they are built.
     from acessilia_core.pipeline.canonical_builder import build_canonical_document
     from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
@@ -168,7 +198,7 @@ async def _run(source: Path, mode: str) -> dict[str, Any]:
     processed = {**result, "text": merge_broken_paragraphs(result["text"])}
     metadata = result.get("canonical_metadata")
     warnings = result.get("technical_warnings")
-    return build_canonical_document(
+    canonical = build_canonical_document(
         processed,
         toolbox=config.toolbox,
         title=source.stem,
@@ -180,6 +210,7 @@ async def _run(source: Path, mode: str) -> dict[str, Any]:
         metadata=metadata if isinstance(metadata, dict) else None,
         technical_warnings=[str(item) for item in warnings] if isinstance(warnings, list) else None,
     )
+    return canonical, bool(result.get("cacheable", True))
 
 
 def _orchestrator(cls: Any, settings: Any) -> Any:

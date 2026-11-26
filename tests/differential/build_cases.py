@@ -48,6 +48,15 @@ def _line(*spans):
                      max(b[2] for b in boxes), max(b[3] for b in boxes)], "spans": list(spans)}
 
 
+_TABLE_2KG = "| Quantity | Value |\n|---|---|\n| Mass | 2 kg |"
+_TABLE_3KG = "| Quantity | Value |\n|---|---|\n| Mass | 3 kg |\n| Speed | 4 m/s |\n| Start | s 0 ∈ R |"
+
+
+def _ast(*rows: tuple[str, str]) -> dict[str, Any]:
+    header = {"cells": [{"text": "Quantity", "header": True}, {"text": "Value", "header": True}]}
+    return {"body": [header, *({"cells": [{"text": a}, {"text": b}]} for a, b in rows)]}
+
+
 CASES: dict[str, dict[str, Any]] = {
     "text-and-picture": {
         "description": "Prose with one picture and its caption: the picture descriptions (M1).",
@@ -123,19 +132,118 @@ CASES: dict[str, dict[str, Any]] = {
             _span("̸", "CMSY10", 183), _span("= 0", "CMR12", 183),
         )]},
     },
+    "multi-page": {
+        "description": "Three pages: a picture, a formula without LaTeX markup and a table read from its image, each on its own page.",
+        "elements": [
+            _element("h1", "heading", "Experiment report", 60, 80, 1),
+            _element("p1", "paragraph", PROSE * 3, 90, 200, 2),
+            _element("pic1", "picture", "", 220, 420, 3),
+            _element("p2", "paragraph", PROSE * 2, 60, 170, 4, page=2),
+            _element("f1", "formula", "s ( t ) = t 3", 200, 230, 5, page=2),
+            _element("p3", "paragraph", PROSE * 2, 60, 170, 6, page=3),
+            _element("t1", "table", "Quantity Value Mass 2 kg", 200, 320, 7, page=3),
+        ],
+        "vision": {
+            "pic1": {"description": "Photograph of a bench with an oscilloscope and cables."},
+            "f1": {"kind": "formula", "formula_latex": "s(t) = t^3", "description": "s of t equals t cubed"},
+            "t1": {"kind": "table", "rows": [
+                {"cells": [{"text": "Quantity", "header": True}, {"text": "Value", "header": True}]},
+                {"cells": [{"text": "Mass"}, {"text": "2 kg"}]},
+            ]},
+        },
+        "latex": {"f1": "s(t) = t^{3}"},
+    },
+    "dual-provider": {
+        "description": (
+            "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the "
+            "structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables "
+            "diverge, and select-table-source adopts the secondary's cells, which the inline math "
+            "marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the "
+            "page is routed to it: its formula is read from the secondary's region, and the sentence "
+            "only the primary kept is lost (#887)."
+        ),
+        "environment": {"FUSION_MODE": "dual"},
+        "elements": [
+            _element("p1", "paragraph", PROSE * 2, 60, 170, 1),
+            _element("p2", "paragraph", "A sentence only the primary provider kept about the cart.", 180, 200, 2),
+            _element("p3", "paragraph", PROSE * 2, 420, 530, 3),
+            _element("q1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
+            _element("t1", "table", _TABLE_2KG, 200, 300, 5, page=2, table_ast=_ast(("Mass", "2 kg"))),
+            _element("u1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
+            _element("u2", "paragraph", "See the cart.", 180, 195, 7, page=3),
+            _element("u3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
+        ],
+        "secondary": [
+            _element("s1", "paragraph", PROSE * 2, 60, 170, 1),
+            _element("s2", "formula", "v = \\frac{d}{t}", 250, 280, 2),
+            _element("s3", "paragraph", PROSE * 2, 420, 530, 3),
+            _element("r1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
+            _element("r2", "table", _TABLE_3KG, 200, 300, 5, page=2,
+                     table_ast=_ast(("Mass", "3 kg"), ("Speed", "4 m/s"), ("Start", "s 0 ∈ R"))),
+            _element("v1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
+            _element("v2", "formula", "a = v t", 250, 280, 7, page=3),
+            _element("v3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
+        ],
+        # Page 3 is routed to the secondary: its formula, without LaTeX markup,
+        # is classified and read from the secondary's region.
+        "vision": {
+            "v2": {"kind": "formula", "formula_latex": "a = \\frac{v}{t}", "description": "a equals v over t"},
+        },
+        "latex": {"v2": "a = \\frac{v}{t}"},
+        # The adopted table's last row is math the text layer's fonts mark
+        # again once the table is stale (M4b).
+        "text_spans": {"2": [_line(
+            _span("Start", "CMR12", 80, baseline=285.0), _span("s", "CMMI12", 330, baseline=285.0),
+            _span("0", "CMR8", 337, size=7.97, baseline=286.8), _span("∈", "CMSY10", 345, baseline=285.0),
+            _span("R", "MSBM10", 355, baseline=285.0),
+        )]},
+        # The judge keeps the primary on the adjudicated page.
+        "judge": {"page-1": 0.2},
+    },
+    "degraded": {
+        "description": (
+            "The Toolbox degrades: math.recognize and document.text.spans are unavailable, and the "
+            "vision model fails on one of two pictures. The formula falls back to the vision model, "
+            "the inline math is unavailable, and the second picture is left without a description."
+        ),
+        "failures": {"capabilities": ["math.recognize", "document.text.spans"], "vision": ["pic2"]},
+        "elements": [
+            _element("p1", "paragraph", PROSE * 3, 60, 170, 1),
+            _element("pic1", "picture", "", 180, 330, 2),
+            _element("pic2", "picture", "", 340, 480, 3),
+            _element("f1", "formula", "s ( t ) = t 3", 500, 530, 4),
+            _element("p2", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 540, 560, 5, left=50.0, right=560.0),
+            _element("p3", "paragraph", PROSE * 2, 580, 700, 6),
+        ],
+        "vision": {
+            "pic1": {"description": "Photograph of a bench with an oscilloscope and cables."},
+            "f1": {"kind": "formula", "formula_latex": "s(t) = t^3", "description": "s of t equals t cubed"},
+        },
+    },
 }
 
 
-def build(name: str, spec: dict[str, Any]) -> dict[str, Any]:
-    elements = spec["elements"]
+def _document(elements) -> dict[str, Any]:
+    """A manifest-compatible extraction of ``elements``, one page per page number."""
     manifest = build_manifest(elements, [])
-    manifest.pages = [PageDescriptor(page_number=1, width=WIDTH, height=HEIGHT,
-                                     element_ids=[element.id for element in elements])]
+    numbers = sorted({element.page_number or 1 for element in elements})
+    manifest.pages = [
+        PageDescriptor(page_number=number, width=WIDTH, height=HEIGHT,
+                       element_ids=[element.id for element in elements if (element.page_number or 1) == number])
+        for number in numbers
+    ]
+    manifest.summary.page_count = len(numbers)
     document = manifest.model_dump(mode="json", exclude_none=True)
     for key in ("source", "extractor", "obligations", "observations", "manifest_id", "created_at"):
         document.pop(key, None)
-    case: dict[str, Any] = {"description": spec["description"], "document": document}
-    for key in ("vision", "latex", "text_spans"):
+    return document
+
+
+def build(name: str, spec: dict[str, Any]) -> dict[str, Any]:
+    case: dict[str, Any] = {"description": spec["description"], "document": _document(spec["elements"])}
+    if "secondary" in spec:
+        case["secondary_document"] = _document(spec["secondary"])
+    for key in ("environment", "primary_provider", "secondary_provider", "vision", "latex", "text_spans", "judge", "failures"):
         if key in spec:
             case[key] = spec[key]
     return case
