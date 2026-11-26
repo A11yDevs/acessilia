@@ -36,7 +36,7 @@ What the cases establish is limited to what they run:
   calls.
 
 The equivalence the references show holds for these cases only. A resume
-from a checkpoint is #874.
+from a checkpoint is tested apart, against the same tree (see below).
 
 ## How a case runs
 
@@ -138,6 +138,12 @@ tree only, since its contract may evolve: `degraded` must not be cached.
 and is not compared: a later core may call less on purpose. For example, M4b
 stopped reading the text layer of a document with no prose to mark.
 
+**`served`** lists, for each vision or `math.recognize` answer the fake gave
+once it passed its schema, the kind and the element it was for. Like
+`calls`, it is diagnostic in the references and never compared across
+cores; the resume test below asserts on it, on this tree only.
+`converted` (conversions per LaTeX expression) is the same.
+
 **`SOURCE.json`** names the commit and core version, and the harness's
 identity (`runner.identity`): SHA-256 digests of the runner, the fake, the
 cases and the source PDF, and the versions of the packages the fake adds
@@ -219,6 +225,40 @@ The cases added for #876 (core 0.3.23) show:
 - **`degraded`** matches every reference but `core-0.3.14`, where the
   pictures' surrounding text differs, the same M3 difference as in
   `formulas`.
+
+## A resume from a checkpoint (#874)
+
+A resume compares a run with itself, so the oracle is the same case run
+without interruption, not an older core (the checkpoint format also
+changed across the references, #836). `tests/test_differential_resume.py`:
+
+- runs a case once, whole;
+- runs it again as a job, with the service's checkpoints
+  (`FileJobCheckpoints`, files under a temporary data directory), and the
+  fake interrupts it at its N-th vision or `math.recognize` request with
+  `Interrupted`, a `BaseException` no step handler catches;
+- reads the execution checkpoint back from the files: the step is still
+  open, and its `step_progress` holds exactly the answers the interrupted
+  run was served (the first picture described, the first formula read);
+- runs it a third time, with a new `FileJobCheckpoints` over the same
+  files and the same fake store (the artifacts, as a real Toolbox keeps
+  them, and the renders the fake needs to tell what an image shows), and
+  requires the canonical document of the whole run, no unsatisfied
+  obligation, the same cache and failure outcome, and every answer, of every
+  kind, served once across the interrupted and the resumed run: the formula
+  case's VLM classifications are not asked for again either.
+
+It covers the two steps that save their progress inside the step: the
+picture descriptions (M1) and the formula LaTeX (M3), one at a time
+(`VISION_CONCURRENCY=1`). A control run without checkpoints asks for every
+answer again.
+
+What it does not show: `Interrupted` stops the run, but the process lives
+on, so `finally` blocks run and nothing is cut mid-write. The store's own
+guarantees (schema version, payload hash, corrupt file) are tested in
+`tests/test_job_resume.py`; a process killed by the system, a crash between an answer and its save, an
+interruption with several requests in flight, and a resume of a degraded
+run are left to #900.
 
 ## Recording
 

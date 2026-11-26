@@ -401,5 +401,19 @@
     "v = \\frac{d}{t}": 1
   },
   "refused": [],
+  "served": [
+    [
+      "vlm",
+      "f1"
+    ],
+    [
+      "math.recognize",
+      "f1"
+    ],
+    [
+      "vlm",
+      "pic1"
+    ]
+  ],
   "unhandled": []
 }

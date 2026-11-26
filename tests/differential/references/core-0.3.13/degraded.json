@@ -434,5 +434,19 @@
     "math.recognize",
     "vlm:pic2"
   ],
+  "served": [
+    [
+      "vlm",
+      "f1"
+    ],
+    [
+      "vlm",
+      "pic1"
+    ],
+    [
+      "vlm",
+      "f1"
+    ]
+  ],
   "unhandled": []
 }

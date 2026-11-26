@@ -309,5 +309,19 @@
     "s_0\\in\\mathbb{R}": 1
   },
   "refused": [],
+  "served": [
+    [
+      "vlm",
+      "f1"
+    ],
+    [
+      "math.recognize",
+      "f1"
+    ],
+    [
+      "vlm",
+      "f1"
+    ]
+  ],
   "unhandled": []
 }

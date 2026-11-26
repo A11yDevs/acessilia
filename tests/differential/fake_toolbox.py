@@ -81,13 +81,43 @@ _PAGE_SHARE = 0.9
 _MIN_IOU = 0.3
 
 
-class FakeToolbox:
-    """The Toolbox of one case. ``calls`` lists the capabilities it served."""
+class Interrupted(BaseException):
+    """The run dies (#874), where :class:`FakeToolbox` was told to interrupt.
 
-    def __init__(self, case: dict[str, Any]) -> None:
+    A ``BaseException``, which no step handler catches, so the run stops
+    there; the model-call executor forwards it, and the core's concurrent
+    stages wrap it in an exception group. It is not a process killed by the
+    system: ``finally`` blocks still run. ``served`` is what the Toolbox had
+    answered before."""
+
+    def __init__(self, message: str, served: list[tuple[str, str]]) -> None:
+        super().__init__(message)
+        self.served = served
+
+
+class FakeToolbox:
+    """The Toolbox of one case. ``calls`` lists the capabilities it served,
+    ``served`` the element each vision or ``math.recognize`` answer it gave
+    was for, once the answer passed its schema.
+
+    ``interrupt=(kind, number)`` makes the ``number``-th request of ``kind``
+    (``vlm`` or ``math.recognize``) raise :class:`Interrupted` instead of
+    being answered, to test a resume from the checkpoints the run saved.
+    ``store`` is what the fake keeps between two runs: the artifacts, as a
+    real Toolbox keeps them, and the regions it rendered, which the fake needs
+    to tell what an image shows. The resumed run gets the interrupted run's.
+    """
+
+    def __init__(
+        self, case: dict[str, Any], *, interrupt: tuple[str, int] | None = None, store: dict[str, Any] | None = None
+    ) -> None:
         self.case = case
-        self.artifacts: dict[str, bytes] = {}
-        self.renders: list[dict[str, Any]] = []
+        self.interrupt = interrupt
+        self.served: list[tuple[str, str]] = []
+        self._requests: dict[str, int] = {}
+        self.store = store if store is not None else {}
+        self.artifacts: dict[str, bytes] = self.store.setdefault("artifacts", {})
+        self.renders: list[dict[str, Any]] = self.store.setdefault("renders", [])
         self.calls: list[str] = []
         self.unhandled: list[str] = []
         self.refused: list[str] = []
@@ -105,6 +135,11 @@ class FakeToolbox:
     def handle(self, request: httpx.Request) -> httpx.Response:
         with self._lock:
             return self._handle(request)
+
+    def _interrupting(self, kind: str) -> None:
+        self._requests[kind] = self._requests.get(kind, 0) + 1
+        if self.interrupt == (kind, self._requests[kind]):
+            raise Interrupted(f"the run dies at {kind} request {self._requests[kind]}", list(self.served))
 
     def _handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -253,6 +288,8 @@ class FakeToolbox:
         answers = self.case.get("latex") or {}
         if element not in answers:
             raise _Unanswerable(f"the case reads no LaTeX for {element}")
+        self._interrupting("math.recognize")
+        self.served.append(("math.recognize", element))
         latex = answers[element]
         return {"formulas": [{"latex": latex, "confidence": 0.99}] if latex else []}
 
@@ -285,9 +322,11 @@ class FakeToolbox:
         answers = self.case.get("vision") or {}
         if element not in answers:
             raise _Unanswerable(f"the case gives no vision answer for {element}")
+        self._interrupting("vlm")
         schema = _response_schema(body)
         answer = _instance(schema, answers[element])
         _validate(answer, schema)
+        self.served.append(("vlm", element))
         content = json.dumps(answer, ensure_ascii=False) if schema else str(answer)
         return httpx.Response(200, json={
             "id": "chatcmpl-differential",
@@ -554,4 +593,4 @@ def _validate(answer: Any, schema: dict[str, Any] | None) -> None:
         raise _Unanswerable(f"the answer does not validate: {error.message}") from error
 
 
-__all__ = ["BASE_URL", "FakeToolbox", "installed"]
+__all__ = ["BASE_URL", "FakeToolbox", "Interrupted", "installed"]
