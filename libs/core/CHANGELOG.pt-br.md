@@ -11,19 +11,28 @@ alvos de todas as obrigações durante a execução (`handlers/structure.py`),
 não pedisse um replanejamento a cada divisão. Assim, um redirecionamento que
 mantinha os tipos (uma tabela trocada por outra) executava o passo para o
 qual o plano não foi feito.
-- O executor agora registra os ids dos alvos e os elementos planejados, e
-  separa os dois casos pelos elementos (`_retargeted`): `remap_references`
-  só tira um alvo quando o seu elemento sumiu, e só traz um como parte nova
-  ou como sobrevivente de um elemento que ele substitui. Um alvo que saiu
-  com o seu elemento ainda presente, ou um elemento preexistente
-  acrescentado sem nenhum sair, torna o passo obsoleto: ele é pulado e o
-  replanejamento decide de novo. Uma divisão ou junção não, e não gasta
-  replanejamento de descoberta. Nenhum marcador nem mudança de manifesto é
-  necessário.
+- `remap_references` agora registra o mapeamento de cada divisão e junção no
+  manifesto de trabalho (um atributo privado, fora do schema), em ordem. O
+  executor os compõe sobre os ids planejados e compara o resultado com os
+  alvos atuais (`_retargeted`): uma divisão ou junção sozinha não é mudança e
+  não gasta replanejamento de descoberta; qualquer outra coisa é, qualquer
+  que seja a forma (um elemento trocado ou acrescentado, novo ou
+  preexistente, um removido sem junção, um redirecionamento feito junto com
+  uma junção). Uma divisão seguida de junção se compõe, e um id liberado e
+  reusado dentro da execução não é tomado por um elemento preexistente.
+- O checkpoint de execução salva o registro (`remaps`), então uma retomada
+  também separa uma divisão de um redirecionamento; um checkpoint anterior à
+  0.3.23 não o tem, e uma divisão antes dele custa um replanejamento.
+- `_Applicability` é uma tupla nomeada (kind, tipos, alvos).
 - A política de ids não muda.
 - Testes: uma divisão e uma junção pelas funções reais `replace_elements` e
-  `remap_references` ainda executam o passo; uma troca do mesmo tipo e um
-  elemento preexistente acrescentado o tornam obsoleto.
+  `remap_references`, uma divisão seguida de junção, um id liberado e
+  reusado e uma retomada depois de uma divisão executam o passo; uma troca do
+  mesmo tipo, um elemento preexistente ou novo acrescentado, uma remoção
+  seguida de redirecionamento, uma junção com acréscimo e uma retomada depois
+  de um redirecionamento o tornam obsoleto; o orquestrador replaneja um
+  redirecionamento e o executa no alvo novo, e uma divisão não custa
+  replanejamento.
 
 ## 0.3.22 — uma descoberta é atendida depois de esgotado o orçamento de falhas (#842)
 

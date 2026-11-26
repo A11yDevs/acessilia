@@ -1,9 +1,11 @@
 """What an execution changes under the same ids (#832, second review of #837).
 
 - An obligation kept under its id whose method no longer applies (another
-  kind, targets of other types, the step's method no longer admissible) is
-  stale: its step is skipped and the replan decides again. A retarget that
-  keeps the types (a split or a join) is not a change.
+  kind, targets of other types, another target set, the step's method no
+  longer admissible) is stale: its step is skipped and the replan decides
+  again. The splits and joins of the execution (``remap_references``) are
+  composed over the planned targets first, so they alone are not a change
+  (#843).
 - The replan guard compares the planning state after the reconciliation, not
   only the ids of the open obligations.
 - A run with a failure and a discovery is a failure replan: the discovery
@@ -134,7 +136,7 @@ def test_a_split_remap_is_not_a_change() -> None:
 
     def split(m: ProcessingManifest) -> None:
         source = next(element for element in m.elements if element.id == "b")
-        part = source.model_copy(update={"id": "b-2"})
+        part = source.model_copy(update={"id": "b-2"}, deep=True)
         replace_elements(m, {"b": [source, part]})
         remap_references(m, {"b": ["b", "b-2"]})
 
@@ -183,6 +185,195 @@ def test_a_same_type_retarget_makes_the_step_stale(retarget) -> None:
     assert _step(report, "o-2").message == t(EXE_OBLIGATION_CHANGED).format(obligation_id="o-2")
     assert report.status == "replan-required"
     assert "o-2" in _replannable_obligation_ids(updated)
+
+
+def _stale(change, manifest: ProcessingManifest | None = None) -> bool:
+    """Whether ``change``, made by ``o-1``'s handler, makes ``o-2``'s step stale."""
+    manifest = manifest or _three()
+    calls: list[str] = []
+    _, report = _executing(change, calls).execute(_plan(manifest), manifest)
+    stale = _step(report, "o-2").status == "skipped"
+    assert stale == (report.status == "replan-required") and stale == ("o-2" not in calls)
+    return stale
+
+
+def _new_picture(m: ProcessingManifest, element_id: str) -> None:
+    m.elements.append(build_element(element_id, "picture", text=element_id))
+    m.pages[0].element_ids.append(element_id)
+    m.summary.element_count = len(m.elements)
+
+
+def test_a_new_element_added_without_a_split_is_a_change() -> None:
+    """#885 review: a new id is not always a split's part. One added to the
+    targets with no remap recorded is a retarget."""
+    def add(m: ProcessingManifest) -> None:
+        _new_picture(m, "x")
+        _by_id(m, "o-2").target_ids = ["b", "x"]
+
+    assert _stale(add)
+
+
+def test_a_drop_then_a_retarget_without_a_join_is_a_change() -> None:
+    """#885 review: ``b`` is removed and ``o-2`` pointed at ``c`` by hand,
+    with no join mapping ``b`` to ``c``."""
+    from acessilia_core.pipeline.handlers.structure import replace_elements
+
+    def drop_and_retarget(m: ProcessingManifest) -> None:
+        replace_elements(m, {"b": []})
+        _by_id(m, "o-2").target_ids = ["c"]
+
+    assert _stale(drop_and_retarget)
+
+
+def test_a_join_does_not_hide_a_retarget_made_with_it() -> None:
+    """#885 review: a join of ``b`` into ``c``, then ``x`` added by hand."""
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
+    def join_and_add(m: ProcessingManifest) -> None:
+        replace_elements(m, {"b": []})
+        remap_references(m, {"b": ["c"]})
+        _new_picture(m, "x")
+        _by_id(m, "o-2").target_ids = ["c", "x"]
+
+    assert _stale(join_and_add)
+
+
+def test_a_split_then_a_join_of_its_part_is_not_a_change() -> None:
+    """#885 review: ``b`` split into ``b`` and ``b-2``, then ``b-2`` joined
+    into the pre-existing ``c``: the targets become ``b`` and ``c`` through
+    two recorded remaps."""
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
+    def split_then_join(m: ProcessingManifest) -> None:
+        source = next(element for element in m.elements if element.id == "b")
+        replace_elements(m, {"b": [source, source.model_copy(update={"id": "b-2"}, deep=True)]})
+        remap_references(m, {"b": ["b", "b-2"]})
+        replace_elements(m, {"b-2": []})
+        remap_references(m, {"b-2": ["c"]})
+
+    assert not _stale(split_then_join)
+
+
+def test_an_id_freed_and_reused_within_the_execution_is_not_taken_for_a_retarget() -> None:
+    """#885 review: ``b-2`` is in the plan's manifest; a step drops it, and a
+    split of ``b`` gives the freed id to its new part. The recorded remaps
+    say what happened, whatever the ids were before."""
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
+    manifest = _three()
+    _new_picture(manifest, "b-2")
+
+    def drop_then_split(m: ProcessingManifest) -> None:
+        replace_elements(m, {"b-2": []})
+        remap_references(m, {"b-2": []})
+        source = next(element for element in m.elements if element.id == "b")
+        replace_elements(m, {"b": [source, source.model_copy(update={"id": "b-2"}, deep=True)]})
+        remap_references(m, {"b": ["b", "b-2"]})
+
+    assert not _stale(drop_then_split, manifest)
+
+
+@pytest.mark.parametrize(("change", "stale"), [("split", False), ("retarget", True)])
+def test_a_resume_keeps_the_record_of_the_splits(change, stale) -> None:
+    """The process dies right after ``o-1``'s step. The execution checkpoint
+    holds the remaps recorded so far, so the resumed run still tells a split
+    from a retarget."""
+    from acessilia_core.execution.executor import ExecutionResume
+    from acessilia_core.execution.models import ExecutionStepResult
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
+    manifest = _three()
+    calls: list[str] = []
+
+    def act(m: ProcessingManifest) -> None:
+        if change == "split":
+            source = next(element for element in m.elements if element.id == "b")
+            replace_elements(m, {"b": [source, source.model_copy(update={"id": "b-2"}, deep=True)]})
+            remap_references(m, {"b": ["b", "b-2"]})
+        else:
+            _by_id(m, "o-2").target_ids = ["c"]
+
+    executor = _executing(act, calls)
+    plan = _plan(manifest)
+
+    class Crash(BaseException):
+        """The process dies after the first step."""
+
+    snapshots: list[dict] = []
+
+    def save(snapshot: dict) -> None:
+        snapshots.append(snapshot)
+        if len(snapshot["results"]) == 1:
+            raise Crash()
+
+    with pytest.raises(Crash):
+        executor.execute(plan, manifest, on_step=save)
+    last = snapshots[-1]
+    resume = ExecutionResume(
+        manifest=ProcessingManifest.model_validate(last["manifest"]),
+        results=[ExecutionStepResult.model_validate(item) for item in last["results"]],
+        replan_required=bool(last["replan_required"]),
+        remaps=last["remaps"],
+    )
+
+    _, report = executor.execute(plan, manifest, resume=resume)
+
+    assert (_step(report, "o-2").status == "skipped") is stale
+    assert ("o-2" in calls) is not stale
+
+
+@pytest.mark.parametrize(("change", "plans", "targets"), [("split", 1, ["b", "b-2"]), ("retarget", 2, ["c"])])
+def test_the_orchestrator_replans_a_retarget_and_not_a_split(monkeypatch, tmp_path, change, plans, targets) -> None:
+    """The whole loop: a retarget is skipped, replanned and run on its new
+    target, and the job completes; a split runs in the same plan and costs
+    no replan."""
+    from pddl_support import build_orchestrator
+
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
+    manifest = build_manifest(
+        [build_element(name, "paragraph", text=name) for name in ("a", "b", "c")],
+        [_obligation("o-1", "review-structure", ["a"]), _obligation("o-2", "review-structure", ["b"])],
+    )
+    orchestrator = build_orchestrator()
+    seen: dict[str, list[str]] = {}
+
+    def review(m: ProcessingManifest, obligation_id: str) -> MethodResult:
+        seen[obligation_id] = list(_by_id(m, obligation_id).target_ids)
+        if obligation_id == "o-1" and change == "split":
+            source = next(element for element in m.elements if element.id == "b")
+            replace_elements(m, {"b": [source, source.model_copy(update={"id": "b-2"}, deep=True)]})
+            remap_references(m, {"b": ["b", "b-2"]})
+        elif obligation_id == "o-1":
+            _by_id(m, "o-2").target_ids = ["c"]
+        return MethodResult(success=True, validated=True)
+
+    orchestrator.executor.registry.register("human-review", review)
+    built = []
+    original = orchestrator._build_plan
+    monkeypatch.setattr(orchestrator, "_build_plan", lambda *a, **k: built.append(1) or original(*a, **k))
+
+    payload = _run(orchestrator, manifest, tmp_path, monkeypatch)
+
+    assert len(built) == plans
+    assert seen["o-2"] == targets
+    assert payload["canonical_metadata"]["pddl_execution_status"] == "completed"
+    assert payload["canonical_metadata"]["pddl_unsatisfied_obligations"] == []
 
 
 def test_an_enrichment_id_freed_by_a_removal_is_reused_by_the_next_plan() -> None:

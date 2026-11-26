@@ -262,15 +262,18 @@ the manifest. **The enrichment migration needs no domain change.**
      obligation changed under its id: another kind, targets of other types,
      another target set, or the step's method no longer admissible. The
      executor compares each step with what made its method applicable in the
-     plan's manifest. Since core 0.3.23 (#843) that includes the target ids,
-     telling a split or a join apart from a retarget by the elements
-     (`_retargeted`): `remap_references` lets a target go only when its
-     element is gone, and brings one in only as a new part or as the
-     survivor of an element it replaces. A target that went while its
-     element is still there, or a pre-existing element added with none
-     going (one table swapped for another of the same type), makes the step
-     stale; a split or a join does not, and spends no discovery replan. Ids are unique in a manifest; one freed by a removal may
-     come back in a later plan, never inside one execution's comparison.
+     plan's manifest. Since core 0.3.23 (#843) that includes the target ids.
+     `remap_references` (`handlers/structure.py`) records each split's and
+     join's mapping on the working manifest, in order; the executor composes
+     them over the planned targets and compares the result with the current
+     ones (`_retargeted`). A split or a join alone is not a change and spends
+     no discovery replan; anything else is, whatever it looks like: an
+     element swapped in or added, new or pre-existing, or one dropped
+     without a join. The execution checkpoint saves the record for a resume
+     (one from before 0.3.23 has none, and a split before it costs one
+     replan). A split or a join can still make the step stale for another
+     reason (types, method, dependencies). Ids are unique in a manifest; one
+     freed by a removal may come back in a later plan.
      Changes of the elements' content under the same type are not compared
      (element revisions are #840).
    - The discovery count is in the plan checkpoint, and the skips derive from

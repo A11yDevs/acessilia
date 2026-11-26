@@ -565,10 +565,8 @@ class PddlAccessibilityOrchestrator:
         *,
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
-        """Execute ``plan`` with the run's ``executor``, continuing from ``execution_state`` when it exists.
-
-        The executor selects only the plan's obligations; the job's goals that
-        the plan left out stay selected (``_restore_goals``, #842 review)."""
+        """Execute ``plan`` with the run's ``executor``, continuing from ``execution_state`` when it exists;
+        the job's goals the plan left out stay selected (``_restore_goals``, #842 review)."""
         resume = None
         if execution_state is not None:
             resume = ExecutionResume(
@@ -579,6 +577,7 @@ class PddlAccessibilityOrchestrator:
                     for item in execution_state.get("results") or []
                 ],
                 replan_required=bool(execution_state.get("replan_required")),
+                remaps=list(execution_state.get("remaps") or []),
             )
         on_step = (
             checkpoints.execution_saver(plan, resumed=execution_state)

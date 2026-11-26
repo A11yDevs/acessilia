@@ -272,17 +272,19 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      tipos, outro conjunto de alvos, ou o método do passo que deixou de ser
      admissível. O executor compara cada passo com o que tornava o método
      aplicável no manifesto do plano. Desde o core 0.3.23 (#843) isso inclui
-     os ids dos alvos, separando uma divisão ou junção de um redirecionamento
-     pelos elementos (`_retargeted`): `remap_references` só tira um alvo
-     quando o seu elemento sumiu, e só traz um como parte nova ou como
-     sobrevivente de um elemento que ele substitui. Um alvo que saiu com o seu
-     elemento ainda presente, ou um elemento preexistente acrescentado sem
-     nenhum sair (uma tabela trocada por outra do mesmo tipo), torna o passo
-     obsoleto; uma divisão ou junção não, e não gasta replanejamento de
-     descoberta. Os ids são únicos num manifesto; um
-     liberado por uma remoção pode voltar num plano seguinte, nunca dentro da
-     comparação de uma execução. Mudanças do conteúdo dos elementos sob o
-     mesmo tipo não são comparadas (revisões de elementos são a #840).
+     os ids dos alvos. `remap_references` (`handlers/structure.py`) registra o
+     mapeamento de cada divisão e junção no manifesto de trabalho, em ordem; o
+     executor os compõe sobre os alvos planejados e compara o resultado com os
+     atuais (`_retargeted`). Uma divisão ou junção sozinha não é mudança e não
+     gasta replanejamento de descoberta; qualquer outra coisa é, qualquer que
+     seja a forma: um elemento trocado ou acrescentado, novo ou preexistente,
+     ou um removido sem junção. O checkpoint de execução salva o registro para
+     uma retomada (um anterior à 0.3.23 não o tem, e uma divisão antes dele
+     custa um replanejamento). Uma divisão ou junção ainda pode tornar o passo
+     obsoleto por outro motivo (tipos, método, dependências). Os ids são
+     únicos num manifesto; um liberado por uma remoção pode voltar num plano
+     seguinte. Mudanças do conteúdo dos elementos sob o mesmo tipo não são
+     comparadas (revisões de elementos são a #840).
    - O contador de descobertas fica no checkpoint de plano, e os pulos derivam
      dos manifestos do plano e do checkpoint, então uma retomada não precisa
      de mais nada (6).

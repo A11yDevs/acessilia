@@ -17,6 +17,8 @@ from acessilia_core.manifest.models import (
     ManifestElement,
     ProcessingManifest,
     Provenance,
+    record_structural_remap,
+    remap_ids,
 )
 from docstruct.fusion.verse import split_box_rows
 
@@ -84,13 +86,11 @@ def remap_references(
     in ``metadata["original_parent_ref"]`` for traceability.
     """
     def remapped(ids: list[str]) -> list[str]:
-        out: list[str] = []
-        for element_id in ids:
-            for replacement in mapping.get(element_id, [element_id]):
-                if replacement not in out:
-                    out.append(replacement)
-        return out
+        return remap_ids(ids, mapping)
 
+    # The executor composes the recorded remaps over the planned targets, so
+    # this split or join is not taken for a retarget (#843).
+    record_structural_remap(manifest, mapping)
     for obligation in manifest.obligations:
         obligation.target_ids = remapped(obligation.target_ids)
     for observation in manifest.observations:

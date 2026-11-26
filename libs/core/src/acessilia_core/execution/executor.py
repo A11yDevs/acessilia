@@ -4,7 +4,7 @@ import hashlib
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any, Callable, NamedTuple
 
 from acessilia_core.agents.agno_support import require_workflow_classes
 from acessilia_core.execution.messages import (
@@ -52,6 +52,9 @@ from acessilia_core.manifest.models import (
     Obligation,
     ObligationAttempt,
     ProcessingManifest,
+    remap_ids,
+    reset_structural_remaps,
+    structural_remaps,
 )
 from acessilia_core.planning.domain_bundle import DomainBundle
 from acessilia_core.planning.models import NominalPlan, PlanStep
@@ -78,6 +81,10 @@ class ExecutionResume:
     manifest: ProcessingManifest
     results: list[ExecutionStepResult]
     replan_required: bool = False
+    #: The structural remaps the interrupted run had recorded (#843). A
+    #: checkpoint from before 0.3.23 has none: a split before it then reads
+    #: as a retarget, and costs one replan.
+    remaps: list[dict[str, list[str]]] = field(default_factory=list)
 
 
 class MethodRegistry:
@@ -125,9 +132,6 @@ class _ExecutionState:
     #: addition was found during it (#594, #832); one whose applicability
     #: changed under the same id is stale.
     planned: dict[str, _Applicability] = field(default_factory=dict)
-    #: The elements of that manifest: a target added since is a new part of a
-    #: split, or a pre-existing element (``_retargeted``, #843).
-    planned_elements: frozenset[str] = frozenset()
 
 
 class _SkipStep(Exception):
@@ -220,6 +224,9 @@ class ExecutorAgent:
             plan, manifest, resume
         )
         replan_required = self._sync_selection(plan, manifest, working) or replan_required
+        # The splits and joins of this execution, recorded by
+        # ``remap_references`` (#843); a resume continues its own record.
+        reset_structural_remaps(working, resume.remaps if resume is not None else [])
 
         started_at = datetime.now(timezone.utc)
         state = _ExecutionState(
@@ -233,7 +240,6 @@ class ExecutorAgent:
             replan_required=replan_required,
             progress=progress,
             planned=_planned_applicability(manifest),
-            planned_elements=frozenset(element.id for element in manifest.elements),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -540,9 +546,10 @@ class ExecutorAgent:
         Removed or replaced by a reclassification: the step no longer applies.
         Changed under the same id (another kind, targets of other types,
         another target set, or the step's method no longer admissible): the
-        step is stale and the replan decides again. A split or a join remaps
-        the targets (``handlers/structure.py``) and is not a change: the
-        method reads its targets when it runs (``_retargeted``, #843).
+        step is stale and the replan decides again. The splits and joins of
+        this execution (``remap_references``, recorded on the manifest) are
+        applied to the planned targets first, so they alone are not a change:
+        the method reads its targets when it runs (``_retargeted``, #843).
         Made to depend on an open obligation this plan does not run before it
         (found during this execution, or planned and not run yet): it waits
         for the replan, which orders the two. A dependency the plan ran and
@@ -752,47 +759,54 @@ class ExecutorAgent:
             )
 
 
-#: What made an obligation's method applicable when the plan was made: its
-#: kind and the types of its targets (#832).
-#: An obligation's kind, the types of its targets and its target ids.
-_Applicability = tuple[str, frozenset[str], frozenset[str]]
+class _Applicability(NamedTuple):
+    """What made a step's method applicable to its obligation in the plan's
+    manifest (#832, #843)."""
+
+    kind: str
+    #: The types of the obligation's targets.
+    types: frozenset[str]
+    #: The obligation's target ids.
+    targets: tuple[str, ...]
 
 
 def _applicability(manifest: ProcessingManifest, obligation: Obligation) -> _Applicability:
     targets = set(obligation.target_ids)
     types = frozenset(element.type for element in manifest.elements if element.id in targets)
-    return obligation.kind, types, frozenset(targets)
+    return _Applicability(obligation.kind, types, tuple(obligation.target_ids))
 
 
 def _changed(state: _ExecutionState, obligation: Obligation, step: PlanStep) -> bool:
     """Whether a planned obligation changed under its id: another kind,
     targets of other types, another target set (``_retargeted``), or the
     step's method no longer admissible."""
-    kind, types, targets = state.planned[obligation.id]
+    planned = state.planned[obligation.id]
+    now = _applicability(state.manifest, obligation)
     return (
-        _applicability(state.manifest, obligation)[:2] != (kind, types)
-        or _retargeted(state, targets, frozenset(obligation.target_ids))
+        (now.kind, now.types) != (planned.kind, planned.types)
+        or _retargeted(planned.targets, obligation.target_ids, structural_remaps(state.manifest))
         or step.method not in obligation.admissible_methods
     )
 
 
-def _retargeted(state: _ExecutionState, before: frozenset[str], after: frozenset[str]) -> bool:
-    """Whether an obligation's targets changed beyond what a split or a join
-    does (#843).
+def _retargeted(
+    planned: tuple[str, ...] | list[str], current: list[str], remaps: list[dict[str, list[str]]]
+) -> bool:
+    """Whether an obligation's targets are other than its planned ones after
+    this execution's splits and joins (#843).
 
-    ``remap_references`` (``handlers/structure.py``) only lets a target go
-    when its element is gone (a join drops it), and only brings one in as a
-    new part (a split) or as the survivor of an element it replaces (a
-    join). So the targets were changed on purpose when one went whose
-    element is still in the manifest, or when a pre-existing element came in
-    with no target going: one table swapped for another, a picture added to
-    an obligation. Then the step is stale, even with the same types.
+    ``remap_references`` records each split's and join's mapping; composed
+    in order over the planned targets, they give the targets the plan's step
+    still stands for. Any other change is a retarget, whatever it looks
+    like: another element swapped in or added, new or pre-existing, or an
+    element dropped without a join. A split then a join composes, and an id
+    freed and reused within the execution is not taken for a pre-existing
+    element.
     """
-    removed, added = before - after, after - before
-    current = {element.id for element in state.manifest.elements}
-    if removed & current:
-        return True
-    return not removed and bool(added & state.planned_elements)
+    expected = list(planned)
+    for mapping in remaps:
+        expected = remap_ids(expected, mapping)
+    return set(expected) != set(current)
 
 
 def _planned_applicability(manifest: ProcessingManifest) -> dict[str, _Applicability]:
@@ -817,6 +831,8 @@ def _execution_snapshot(plan: NominalPlan, state: _ExecutionState) -> dict[str, 
         "manifest": state.manifest.model_dump(mode="json", by_alias=True),
         "results": [result.model_dump(mode="json") for result in state.results],
         "replan_required": state.replan_required,
+        # The splits and joins so far, so a resume tells them from a retarget (#843).
+        "remaps": structural_remaps(state.manifest),
     }
 
 
