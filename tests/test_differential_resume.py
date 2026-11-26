@@ -3,20 +3,23 @@
 The differential fixtures (#849) compare a run with older cores. A resume
 compares a run with itself: the same case run without interruption is the
 oracle. The fake Toolbox interrupts the run at its N-th vision or
-``math.recognize`` request, with a ``BaseException`` no handler catches, as
-a process death would; the run then starts again over the same checkpoints
-(``JobCheckpoints``, kept here in memory, every payload through JSON as a
-file would be).
+``math.recognize`` request, with a ``BaseException`` no step handler
+catches; the run then starts again from the checkpoints the service writes
+(``FileJobCheckpoints``, in a temporary data directory), read by a new
+instance, as a restarted worker would.
 
 Two steps save their progress inside the step (``step_progress``, #836):
 the picture descriptions (M1) and the formula LaTeX (M3). For each, the
-resumed run must deliver the canonical document of the uninterrupted run,
-and must not ask again for what the interrupted run had already answered.
+interrupted run must have saved what it was answered, and the resumed run
+must deliver the canonical document of the uninterrupted run, asking for
+exactly what the interrupted run had not been answered: nothing twice, of
+any kind (the formula case's VLM classifications too), nothing missing.
 """
 
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -26,28 +29,7 @@ from tests.differential import build_cases
 from tests.differential.fake_toolbox import Interrupted
 from tests.differential.runner import run_case
 
-
-class MemoryCheckpoints:
-    """``JobCheckpoints`` in memory; each payload goes through JSON."""
-
-    job_id = "differential-resume"
-    options: dict[str, Any] = {}
-
-    def __init__(self) -> None:
-        self.payloads: dict[str, str] = {}
-
-    def load(self, phase: str) -> dict[str, Any] | None:
-        payload = self.payloads.get(phase)
-        return json.loads(payload) if payload is not None else None
-
-    def save(self, phase: str, payload: dict[str, Any]) -> None:
-        self.payloads[phase] = json.dumps(payload)
-
-    def remove(self, phase: str) -> None:
-        self.payloads.pop(phase, None)
-
-
-E = build_cases._element
+E = build_cases.element
 PROSE = build_cases.PROSE
 
 #: Three pictures, described one at a time (``VISION_CONCURRENCY=1``).
@@ -86,18 +68,42 @@ FORMULAS = {
 }
 
 
-def _dies(case: Path, **kwargs: Any) -> None:
-    """Run ``case`` and require that it died of :class:`Interrupted`, alone
-    or inside the exception group of the core's concurrent stages."""
+def _described(element: dict[str, Any]) -> bool:
+    return bool(element.get("text"))
 
-    def interrupted(error: BaseException) -> bool:
-        if isinstance(error, Interrupted):
-            return True
-        return isinstance(error, BaseExceptionGroup) and any(interrupted(item) for item in error.exceptions)
 
-    with pytest.raises(BaseException) as error:  # noqa: B017 - checked below
+def _recognized(element: dict[str, Any]) -> bool:
+    return "formula_recognition" in (element.get("metadata") or {})
+
+
+def _interruption(error: BaseException) -> Interrupted:
+    """The :class:`Interrupted` ``error`` is, alone or inside the exception
+    groups of the core's concurrent stages; a group that also holds another
+    failure is not an interruption, and fails the test."""
+    if isinstance(error, Interrupted):
+        return error
+    assert isinstance(error, BaseExceptionGroup), f"the run died of {error!r}, not of the interruption"
+    interrupted, rest = error.split(Interrupted)
+    assert rest is None, f"the run died of {rest!r} besides the interruption"
+    assert interrupted is not None
+    return _interruption(interrupted.exceptions[0])
+
+
+def _dies(case: Path, **kwargs: Any) -> Interrupted:
+    with pytest.raises(BaseException) as error:  # noqa: B017 - checked by _interruption
         run_case(case, **kwargs)
-    assert interrupted(error.value), f"the run died of {error.value!r}, not of the interruption"
+    return _interruption(error.value)
+
+
+def test_an_interruption_beside_another_failure_is_not_accepted() -> None:
+    """#898 review: an unexpected error next to the interruption must not
+    pass for it."""
+    alone = Interrupted("dies", [])
+    assert _interruption(BaseExceptionGroup("stage", [BaseExceptionGroup("inner", [alone])])) is alone
+    with pytest.raises(AssertionError, match="besides the interruption"):
+        _interruption(BaseExceptionGroup("stage", [Interrupted("dies", []), ValueError("invalid state")]))
+    with pytest.raises(AssertionError, match="not of the interruption"):
+        _interruption(ValueError("invalid state"))
 
 
 def _case(tmp_path: Path, name: str, spec: dict[str, Any]) -> Path:
@@ -107,44 +113,72 @@ def _case(tmp_path: Path, name: str, spec: dict[str, Any]) -> Path:
     return target
 
 
+@pytest.fixture
+def job_checkpoints(tmp_path, monkeypatch):
+    """A new ``FileJobCheckpoints`` of one job at each call, on files under a
+    temporary data directory, with the service's options."""
+    from backend.config.settings import settings
+    from backend.services.job_checkpoint import FileJobCheckpoints
+    from backend.services.run_ports import checkpoint_options
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    return lambda: FileJobCheckpoints("differential-resume", checkpoint_options())
+
+
 @pytest.mark.parametrize(
-    ("spec", "interrupt", "answered_before"),
+    ("spec", "interrupt", "obligation", "saved"),
     [
-        (PICTURES, ("vlm", 2), [("vlm", "pic1")]),
-        (FORMULAS, ("math.recognize", 2), [("math.recognize", "f1")]),
+        (PICTURES, ("vlm", 2), "obligation-describe-images", _described),
+        (FORMULAS, ("math.recognize", 2), "obligation-recognize-formulas", _recognized),
     ],
     ids=["picture-descriptions", "formula-latex"],
 )
-def test_a_resumed_run_delivers_what_an_uninterrupted_one_does(tmp_path, spec, interrupt, answered_before) -> None:
+def test_a_resumed_run_delivers_what_an_uninterrupted_one_does(
+    tmp_path, job_checkpoints, spec, interrupt, obligation, saved
+) -> None:
     """The run dies at the second request of the step, after its first
-    answer was saved; the resume finishes it without asking for that answer
-    again, and delivers the same canonical document."""
+    answer was saved; the resume finishes it without asking again for any
+    answer the interrupted run had, and delivers the same document."""
     case = _case(tmp_path, "resume", spec)
     whole = run_case(case)
-    checkpoints, toolbox = MemoryCheckpoints(), {}
+    toolbox: dict[str, Any] = {}
+    kind = interrupt[0]
 
-    _dies(case, checkpoints=checkpoints, interrupt=interrupt, toolbox_store=toolbox)
-    assert checkpoints.payloads, "the interrupted run saved no checkpoint"
-    resumed = run_case(case, checkpoints=checkpoints, toolbox_store=toolbox)
+    interrupted = _dies(case, checkpoints=job_checkpoints(), interrupt=interrupt, toolbox_store=toolbox)
+
+    # What the interrupted run saved, read back from the files: the step is
+    # still open, and its progress holds the answers of that kind it had.
+    state = job_checkpoints().load("execution")
+    assert state is not None and "step_progress" in state, "the interrupted run saved no step progress"
+    progress = state["step_progress"]
+    assert progress["obligation_id"] == obligation
+    [step] = [item for item in progress["manifest"]["obligations"] if item["id"] == obligation]
+    assert step["status"] != "satisfied"
+    targets = {element for served_kind, element in whole["served"] if served_kind == kind}
+    elements = {item["id"]: item for item in progress["manifest"]["elements"] if item["id"] in targets}
+    answered = {element for served_kind, element in interrupted.served if served_kind == kind}
+    assert answered and answered < targets
+    assert {element for element, item in elements.items() if saved(item)} == answered
+
+    resumed = run_case(case, checkpoints=job_checkpoints(), toolbox_store=toolbox)
 
     assert whole["unhandled"] == resumed["unhandled"] == []
     assert resumed["canonical"] == whole["canonical"]
-    kind = interrupt[0]
-    asked_again = [item for item in resumed["served"] if tuple(item) in answered_before]
-    assert asked_again == [], f"the resume asked again for {asked_again}"
-    whole_answers = sorted(element for served_kind, element in whole["served"] if served_kind == kind)
-    resumed_answers = sorted(element for served_kind, element in resumed["served"] if served_kind == kind)
-    assert resumed_answers == sorted(set(whole_answers) - {element for _, element in answered_before})
+    assert resumed["canonical"]["metadata"]["pddl_unsatisfied_obligations"] == []
+    assert (resumed["cacheable"], resumed["refused"]) == (whole["cacheable"], whole["refused"]) == (True, [])
+    # Every answer, of every kind, once across the two runs: the resume asks
+    # for none the interrupted run had, and for every other one.
+    assert Counter(map(tuple, interrupted.served)) + Counter(map(tuple, resumed["served"])) == Counter(
+        map(tuple, whole["served"])
+    )
 
 
-def test_a_run_without_checkpoints_starts_over() -> None:
+def test_a_run_without_checkpoints_starts_over(tmp_path) -> None:
     """The control: the same interruption with no checkpoints leaves nothing
     to resume from, so a second run asks for every answer again."""
-    import tempfile
+    case = _case(tmp_path, "control", PICTURES)
+    interrupted = _dies(case, interrupt=("vlm", 2))
+    again = run_case(case)
 
-    with tempfile.TemporaryDirectory() as directory:
-        case = _case(Path(directory), "control", PICTURES)
-        _dies(case, interrupt=("vlm", 2))
-        again = run_case(case)
-
+    assert interrupted.served == [("vlm", "pic1")]
     assert [element for kind, element in again["served"] if kind == "vlm"] == ["pic1", "pic2", "pic3"]

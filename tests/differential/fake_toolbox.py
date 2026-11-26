@@ -82,19 +82,30 @@ _MIN_IOU = 0.3
 
 
 class Interrupted(BaseException):
-    """The process dies (#874): a ``BaseException``, which no handler of the
-    core catches, raised where :class:`FakeToolbox` was told to interrupt."""
+    """The run dies (#874), where :class:`FakeToolbox` was told to interrupt.
+
+    A ``BaseException``, which no step handler catches, so the run stops
+    there; the model-call executor forwards it, and the core's concurrent
+    stages wrap it in an exception group. It is not a process killed by the
+    system: ``finally`` blocks still run. ``served`` is what the Toolbox had
+    answered before."""
+
+    def __init__(self, message: str, served: list[tuple[str, str]]) -> None:
+        super().__init__(message)
+        self.served = served
 
 
 class FakeToolbox:
     """The Toolbox of one case. ``calls`` lists the capabilities it served,
-    ``served`` the element each vision or ``math.recognize`` answer was for.
+    ``served`` the element each vision or ``math.recognize`` answer it gave
+    was for, once the answer passed its schema.
 
     ``interrupt=(kind, number)`` makes the ``number``-th request of ``kind``
     (``vlm`` or ``math.recognize``) raise :class:`Interrupted` instead of
     being answered, to test a resume from the checkpoints the run saved.
-    ``store`` is what a Toolbox keeps between two runs, its artifacts and the
-    regions it rendered: the resumed run gets the interrupted run's.
+    ``store`` is what the fake keeps between two runs: the artifacts, as a
+    real Toolbox keeps them, and the regions it rendered, which the fake needs
+    to tell what an image shows. The resumed run gets the interrupted run's.
     """
 
     def __init__(
@@ -128,7 +139,7 @@ class FakeToolbox:
     def _interrupting(self, kind: str) -> None:
         self._requests[kind] = self._requests.get(kind, 0) + 1
         if self.interrupt == (kind, self._requests[kind]):
-            raise Interrupted(f"the run dies at {kind} request {self._requests[kind]}")
+            raise Interrupted(f"the run dies at {kind} request {self._requests[kind]}", list(self.served))
 
     def _handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -312,10 +323,10 @@ class FakeToolbox:
         if element not in answers:
             raise _Unanswerable(f"the case gives no vision answer for {element}")
         self._interrupting("vlm")
-        self.served.append(("vlm", element))
         schema = _response_schema(body)
         answer = _instance(schema, answers[element])
         _validate(answer, schema)
+        self.served.append(("vlm", element))
         content = json.dumps(answer, ensure_ascii=False) if schema else str(answer)
         return httpx.Response(200, json={
             "id": "chatcmpl-differential",

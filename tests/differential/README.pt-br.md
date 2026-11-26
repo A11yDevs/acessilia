@@ -146,6 +146,12 @@ não é comparado: um core mais novo pode chamar menos de propósito. Por
 exemplo, o M4b deixou de ler a camada de texto de um documento sem prosa a
 marcar.
 
+**`served`** lista, para cada resposta de visão ou de `math.recognize` que o
+falso deu depois de ela passar no schema, o tipo e o elemento a que se
+referia. Como `calls`, é diagnóstico nas referências e nunca é comparado
+entre cores; o teste de retomada abaixo o confere, só nesta árvore. O mesmo
+vale para `converted` (conversões por expressão LaTeX).
+
 **`SOURCE.json`** registra o commit, a versão do core e a identidade do
 harness (`runner.identity`): os SHA-256 do runner, do falso, dos casos e do
 PDF de origem, e as versões dos pacotes que o falso acrescenta (Pillow e
@@ -238,19 +244,37 @@ checkpoint também mudou entre as referências, #836).
 `tests/test_differential_resume.py`:
 
 - roda um caso uma vez, inteiro;
-- roda de novo como um job, com checkpoints (`JobCheckpoints`, em memória,
-  cada payload passando por JSON), e o falso o interrompe na N-ésima
-  requisição de visão ou de `math.recognize` com `Interrupted`, uma
-  `BaseException` que nenhum handler captura, como a morte de um processo;
-- roda uma terceira vez sobre os mesmos checkpoints e o mesmo armazenamento
-  do Toolbox (artefatos e renderizações, que um Toolbox real mantém), e
-  exige o documento canônico da execução inteira, sem pedir de novo uma
-  resposta que a execução interrompida salvou em `step_progress`.
+- roda de novo como um job, com os checkpoints do serviço
+  (`FileJobCheckpoints`, arquivos num diretório de dados temporário), e o
+  falso o interrompe na N-ésima requisição de visão ou de `math.recognize`
+  com `Interrupted`, uma `BaseException` que nenhum handler de passo
+  captura;
+- lê de volta, dos arquivos, o checkpoint de execução: o passo continua
+  aberto, e o seu `step_progress` guarda exatamente as respostas que a
+  execução interrompida recebeu (a primeira figura descrita, a primeira
+  fórmula lida);
+- roda uma terceira vez, com um novo `FileJobCheckpoints` sobre os mesmos
+  arquivos e o mesmo armazenamento do falso (os artefatos, como um Toolbox
+  real os mantém, e as renderizações de que o falso precisa para saber o
+  que uma imagem mostra), e exige o documento canônico da execução inteira,
+  nenhuma obrigação insatisfeita, o mesmo resultado de cache e de falhas, e
+  cada resposta, de todo tipo, servida uma vez entre a execução interrompida
+  e a retomada: as classificações VLM do caso de fórmulas também não são
+  pedidas de novo.
 
 Cobre os dois passos que salvam o progresso dentro do passo: as descrições
 de figuras (M1) e o LaTeX das fórmulas (M3), um de cada vez
 (`VISION_CONCURRENCY=1`). Uma execução de controle sem checkpoints pede de
 novo todas as respostas.
+
+O que ele não mostra: `Interrupted` para a execução, mas o processo
+continua vivo, então os blocos `finally` rodam e nada é cortado no meio de
+uma escrita. As garantias do próprio armazenamento (versão do schema, hash
+do payload, arquivo corrompido) são testadas em `tests/test_job_resume.py`;
+um processo morto pelo
+sistema, uma queda entre uma resposta e o seu salvamento, uma interrupção
+com várias requisições em andamento e a retomada de uma execução degradada
+ficam para a #900.
 
 ## Gravação
 

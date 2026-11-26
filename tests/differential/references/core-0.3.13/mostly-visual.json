@@ -199,11 +199,11 @@
   "served": [
     [
       "vlm",
-      "g2"
+      "g1"
     ],
     [
       "vlm",
-      "g1"
+      "g2"
     ]
   ],
   "unhandled": []

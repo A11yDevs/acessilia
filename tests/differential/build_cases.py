@@ -27,7 +27,7 @@ PROSE = (
 )
 
 
-def _element(element_id, element_type, text, top, bottom, order, *, left=72.0, right=540.0, page=1, **metadata):
+def element(element_id, element_type, text, top, bottom, order, *, left=72.0, right=540.0, page=1, **metadata):
     element = build_element(element_id, element_type, text=text, reading_order=order, metadata=metadata or None)
     element.page_number = page
     element.provenance = [Provenance(page_number=page, bbox=BoundingBox(
@@ -61,24 +61,24 @@ CASES: dict[str, dict[str, Any]] = {
     "text-and-picture": {
         "description": "Prose with one picture and its caption: the picture descriptions (M1).",
         "elements": [
-            _element("h1", "heading", "Experiment report", 60, 80, 1),
-            _element("p1", "paragraph", PROSE * 3, 90, 200, 2),
-            _element("pic1", "picture", "", 220, 420, 3),
-            _element("cap1", "caption", "Figure 1: the equipment set up.", 425, 440, 4),
-            _element("p2", "paragraph", PROSE * 2, 450, 560, 5),
+            element("h1", "heading", "Experiment report", 60, 80, 1),
+            element("p1", "paragraph", PROSE * 3, 90, 200, 2),
+            element("pic1", "picture", "", 220, 420, 3),
+            element("cap1", "caption", "Figure 1: the equipment set up.", 425, 440, 4),
+            element("p2", "paragraph", PROSE * 2, 450, 560, 5),
         ],
         "vision": {"pic1": {"description": "Photograph of a bench with an oscilloscope and cables."}},
     },
     "tables": {
         "description": "A table without structure, read from its image, and a structured one: the table enrichment (M2).",
         "elements": [
-            _element("p1", "paragraph", PROSE * 3, 60, 170, 1),
-            _element("t1", "table", "Quantity Value Mass 2 kg", 180, 300, 2),
-            _element("t2", "table", "", 320, 420, 3, table_ast={"body": [
+            element("p1", "paragraph", PROSE * 3, 60, 170, 1),
+            element("t1", "table", "Quantity Value Mass 2 kg", 180, 300, 2),
+            element("t2", "table", "", 320, 420, 3, table_ast={"body": [
                 {"cells": [{"text": "Time", "header": True}, {"text": "Position", "header": True}]},
                 {"cells": [{"text": "0 s"}, {"text": "0 m"}]},
             ]}),
-            _element("p2", "paragraph", PROSE * 2, 440, 540, 4),
+            element("p2", "paragraph", PROSE * 2, 440, 540, 4),
         ],
         "vision": {"t1": {"kind": "table", "rows": [
             {"cells": [{"text": "Quantity", "header": True, "scope": "col"},
@@ -89,12 +89,12 @@ CASES: dict[str, dict[str, Any]] = {
     "formulas": {
         "description": "A formula without LaTeX markup (classified, then read: M4a, M3), one with LaTeX, and a picture the vision model reads as a formula (M1, #846).",
         "elements": [
-            _element("p1", "paragraph", PROSE * 3, 60, 170, 1),
-            _element("f1", "formula", "s ( t ) = t 3", 180, 200, 2),
-            _element("f2", "formula", "v = \\frac{d}{t}", 210, 230, 3),
-            _element("p2", "paragraph", PROSE * 2, 240, 340, 4),
-            _element("pic1", "picture", "", 350, 400, 5),
-            _element("p3", "paragraph", PROSE * 2, 410, 520, 6),
+            element("p1", "paragraph", PROSE * 3, 60, 170, 1),
+            element("f1", "formula", "s ( t ) = t 3", 180, 200, 2),
+            element("f2", "formula", "v = \\frac{d}{t}", 210, 230, 3),
+            element("p2", "paragraph", PROSE * 2, 240, 340, 4),
+            element("pic1", "picture", "", 350, 400, 5),
+            element("p3", "paragraph", PROSE * 2, 410, 520, 6),
         ],
         "vision": {
             "f1": {"kind": "formula", "formula_latex": "s(t) = t^3", "description": "s of t equals t cubed"},
@@ -106,8 +106,8 @@ CASES: dict[str, dict[str, Any]] = {
     "mostly-visual": {
         "description": "A one-page document with no text content and no picture: its placeholder visuals are described.",
         "elements": [
-            _element("g1", "paragraph", "", 60, 380, 1),
-            _element("g2", "paragraph", "Fig", 400, 720, 2),
+            element("g1", "paragraph", "", 60, 380, 1),
+            element("g2", "paragraph", "Fig", 400, 720, 2),
         ],
         "vision": {
             "g1": {"description": "Bar chart of the yearly output from 2020 to 2024."},
@@ -117,10 +117,10 @@ CASES: dict[str, dict[str, Any]] = {
     "inline-math": {
         "description": "Prose whose math the text layer's fonts mark as $…$ (M4b), and a formula that reads its variables.",
         "elements": [
-            _element("p0", "paragraph", PROSE * 2, 60, 180, 1),
-            _element("p1", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 210, 232, 2, left=50.0, right=560.0),
-            _element("f1", "formula", "h(12 + h)", 290, 305, 3),
-            _element("p2", "paragraph", PROSE * 2, 320, 430, 4),
+            element("p0", "paragraph", PROSE * 2, 60, 180, 1),
+            element("p1", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 210, 232, 2, left=50.0, right=560.0),
+            element("f1", "formula", "h(12 + h)", 290, 305, 3),
+            element("p2", "paragraph", PROSE * 2, 320, 430, 4),
         ],
         "vision": {"f1": {"kind": "formula", "formula_latex": "h(12 + h)", "description": "h times 12 plus h"}},
         # math.recognize reads nothing, so the classification's LaTeX stays.
@@ -135,13 +135,13 @@ CASES: dict[str, dict[str, Any]] = {
     "multi-page": {
         "description": "Three pages: a picture, a formula without LaTeX markup and a table read from its image, each on its own page.",
         "elements": [
-            _element("h1", "heading", "Experiment report", 60, 80, 1),
-            _element("p1", "paragraph", PROSE * 3, 90, 200, 2),
-            _element("pic1", "picture", "", 220, 420, 3),
-            _element("p2", "paragraph", PROSE * 2, 60, 170, 4, page=2),
-            _element("f1", "formula", "s ( t ) = t 3", 200, 230, 5, page=2),
-            _element("p3", "paragraph", PROSE * 2, 60, 170, 6, page=3),
-            _element("t1", "table", "Quantity Value Mass 2 kg", 200, 320, 7, page=3),
+            element("h1", "heading", "Experiment report", 60, 80, 1),
+            element("p1", "paragraph", PROSE * 3, 90, 200, 2),
+            element("pic1", "picture", "", 220, 420, 3),
+            element("p2", "paragraph", PROSE * 2, 60, 170, 4, page=2),
+            element("f1", "formula", "s ( t ) = t 3", 200, 230, 5, page=2),
+            element("p3", "paragraph", PROSE * 2, 60, 170, 6, page=3),
+            element("t1", "table", "Quantity Value Mass 2 kg", 200, 320, 7, page=3),
         ],
         "vision": {
             "pic1": {"description": "Photograph of a bench with an oscilloscope and cables."},
@@ -166,26 +166,26 @@ CASES: dict[str, dict[str, Any]] = {
         ),
         "environment": {"FUSION_MODE": "dual"},
         "elements": [
-            _element("p1", "paragraph", PROSE * 2, 60, 170, 1),
-            _element("p2", "paragraph", "A sentence only the primary provider kept about the cart.", 180, 200, 2),
-            _element("p3", "paragraph", PROSE * 2, 420, 530, 3),
-            _element("q1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
-            _element("t1", "table", _TABLE_2KG, 200, 300, 5, page=2, table_ast=_ast(("Mass", "2 kg"))),
-            _element("u1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
-            _element("u2", "paragraph", "See the cart at $v_0$.", 180, 195, 7, page=3),
-            _element("u3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
+            element("p1", "paragraph", PROSE * 2, 60, 170, 1),
+            element("p2", "paragraph", "A sentence only the primary provider kept about the cart.", 180, 200, 2),
+            element("p3", "paragraph", PROSE * 2, 420, 530, 3),
+            element("q1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
+            element("t1", "table", _TABLE_2KG, 200, 300, 5, page=2, table_ast=_ast(("Mass", "2 kg"))),
+            element("u1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
+            element("u2", "paragraph", "See the cart at $v_0$.", 180, 195, 7, page=3),
+            element("u3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
         ],
         "secondary": [
-            _element("s1", "paragraph", PROSE * 2, 60, 170, 1),
-            _element("s2", "formula", "v = \\frac{d}{t}", 250, 280, 2),
-            _element("s3", "paragraph", PROSE * 2, 420, 530, 3),
-            _element("r1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
-            _element("r2", "table", _TABLE_3KG, 200, 300, 5, page=2,
+            element("s1", "paragraph", PROSE * 2, 60, 170, 1),
+            element("s2", "formula", "v = \\frac{d}{t}", 250, 280, 2),
+            element("s3", "paragraph", PROSE * 2, 420, 530, 3),
+            element("r1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
+            element("r2", "table", _TABLE_3KG, 200, 300, 5, page=2,
                      table_ast=_ast(("Mass", "3 kg"), ("Speed", "4 m/s"), ("Start", "s 0 ∈ R"))),
-            _element("v1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
-            _element("v2", "formula", "a = v t", 250, 280, 7, page=3),
-            _element("v4", "paragraph", "The cart starts at $v$ and speeds up.", 300, 315, 8, page=3),
-            _element("v3", "paragraph", PROSE * 2, 420, 530, 9, page=3),
+            element("v1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
+            element("v2", "formula", "a = v t", 250, 280, 7, page=3),
+            element("v4", "paragraph", "The cart starts at $v$ and speeds up.", 300, 315, 8, page=3),
+            element("v3", "paragraph", PROSE * 2, 420, 530, 9, page=3),
         ],
         # Page 3 is routed to the secondary: its formula, without LaTeX markup,
         # is classified and read from the secondary's region.
@@ -211,12 +211,12 @@ CASES: dict[str, dict[str, Any]] = {
         ),
         "failures": {"capabilities": ["math.recognize", "document.text.spans"], "vision": ["pic2"]},
         "elements": [
-            _element("p1", "paragraph", PROSE * 3, 60, 170, 1),
-            _element("pic1", "picture", "", 180, 330, 2),
-            _element("pic2", "picture", "", 340, 480, 3),
-            _element("f1", "formula", "s ( t ) = t 3", 500, 530, 4),
-            _element("p2", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 540, 560, 5, left=50.0, right=560.0),
-            _element("p3", "paragraph", PROSE * 2, 580, 700, 6),
+            element("p1", "paragraph", PROSE * 3, 60, 170, 1),
+            element("pic1", "picture", "", 180, 330, 2),
+            element("pic2", "picture", "", 340, 480, 3),
+            element("f1", "formula", "s ( t ) = t 3", 500, 530, 4),
+            element("p2", "paragraph", "inicial ´ e s 0 ∈ R , h = 0", 540, 560, 5, left=50.0, right=560.0),
+            element("p3", "paragraph", PROSE * 2, 580, 700, 6),
         ],
         "vision": {
             "pic1": {"description": "Photograph of a bench with an oscilloscope and cables."},
