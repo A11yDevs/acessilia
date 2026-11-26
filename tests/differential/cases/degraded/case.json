@@ -1,0 +1,187 @@
+{
+  "description": "The Toolbox degrades: math.recognize and document.text.spans are unavailable, and the vision model fails on one of two pictures. The formula falls back to the vision model, the inline math is unavailable, and the second picture is left without a description.",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "p1",
+          "pic1",
+          "pic2",
+          "f1",
+          "p2",
+          "p3"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "pic1",
+        "type": "picture",
+        "raw_label": "picture",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 180.0,
+              "right": 540.0,
+              "bottom": 330.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "pic2",
+        "type": "picture",
+        "raw_label": "picture",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 340.0,
+              "right": 540.0,
+              "bottom": 480.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "f1",
+        "type": "formula",
+        "raw_label": "formula",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "s ( t ) = t 3",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 500.0,
+              "right": 540.0,
+              "bottom": 530.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 5,
+        "hierarchy_level": 1,
+        "text": "inicial ´ e s 0 ∈ R , h = 0",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 50.0,
+              "top": 540.0,
+              "right": 560.0,
+              "bottom": 560.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 6,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 580.0,
+              "right": 540.0,
+              "bottom": 700.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 6,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "vision": {
+    "pic1": {
+      "description": "Photograph of a bench with an oscilloscope and cables."
+    },
+    "f1": {
+      "kind": "formula",
+      "formula_latex": "s(t) = t^3",
+      "description": "s of t equals t cubed"
+    }
+  },
+  "failures": {
+    "capabilities": [
+      "math.recognize",
+      "document.text.spans"
+    ],
+    "vision": [
+      "pic2"
+    ]
+  }
+}

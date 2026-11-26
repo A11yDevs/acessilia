@@ -16,7 +16,13 @@ The answers come from the case (``cases/<name>/case.json``):
 - ``vision``: per element id (or ``page-<number>`` for a whole page), the
   fields a vision answer gets: a picture's description, a region's kind and
   LaTeX, a table's rows;
-- ``latex``: per formula id, what ``math.recognize`` reads (``""``: nothing).
+- ``latex``: per formula id, what ``math.recognize`` reads (``""``: nothing);
+- ``secondary_document``: what the secondary provider extracts, with
+  ``FUSION_MODE=dual`` (``secondary_provider``, ``mineru`` by default);
+- ``judge``: the ``pB`` ``document.adjudicate.page`` answers;
+- ``failures``: what fails on purpose, a degraded run: ``capabilities``
+  answered 503, and ``vision`` element ids the VLM refuses (503). They are
+  recorded in ``refused``, not in ``unhandled``.
 
 A rendered image does not carry the region it shows, and a newer core may
 downscale or re-encode it. So each ``pdf.render`` gets a solid colour that
@@ -27,8 +33,8 @@ smaller clip the element it overlaps most (intersection over union).
 The fake is strict. It answers only what the case answers: an image it did
 not render, a clip no element matches or two match equally, an element the
 case gives no answer for, an answer that does not validate against the
-schema the agent asked for, or a capability it does not serve is refused and
-recorded in ``unhandled``, and the test fails on any. Only the fields a
+schema the agent asked for, or a capability it does not serve is answered
+with an error and recorded in ``unhandled``, and the test fails on any. Only the fields a
 case's answer leaves out get a default (:func:`_instance`), and the whole
 answer is still validated.
 """
@@ -77,6 +83,10 @@ class FakeToolbox:
         self.renders: list[dict[str, Any]] = []
         self.calls: list[str] = []
         self.unhandled: list[str] = []
+        self.refused: list[str] = []
+        failures = case.get("failures") or {}
+        self._failing_capabilities = frozenset(failures.get("capabilities") or [])
+        self._failing_elements = frozenset(failures.get("vision") or [])
         # The core renders and asks the model from several threads.
         self._lock = threading.Lock()
 
@@ -96,6 +106,9 @@ class FakeToolbox:
             if match and request.method == "POST":
                 capability = match["capability"]
                 self.calls.append(capability)
+                if capability in self._failing_capabilities:
+                    self.refused.append(capability)
+                    return _error(503, "provider_unavailable", f"{capability} fails on purpose (the case's failures)")
                 form, files = _form(request)
                 answer = getattr(self, "_" + capability.replace(".", "_"), None)
                 if answer is not None:
@@ -158,7 +171,12 @@ class FakeToolbox:
     def _document_structure_extract(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
         self._input(form, files)
         # The envelope's ``document`` is the extraction result; the core reads
-        # the manifest-compatible payload from its own ``document`` key.
+        # the manifest-compatible payload from its own ``document`` key. With
+        # ``FUSION_MODE=dual`` the secondary provider (``FUSION_SECONDARY_PROVIDER``)
+        # asks too, and gets the case's ``secondary_document``.
+        secondary = self.case.get("secondary_document")
+        if secondary is not None and form.get("provider") == self.case.get("secondary_provider", "mineru"):
+            return secondary
         return self.case["document"]
 
     def _pdf_render(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
@@ -223,6 +241,11 @@ class FakeToolbox:
         latex = answers[element]
         return {"formulas": [{"latex": latex, "confidence": 0.99}] if latex else []}
 
+    def _document_adjudicate_page(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
+        if "judge" not in self.case:
+            raise _Unanswerable("the case gives no page judgement (judge)")
+        return {"pB": self.case["judge"]}
+
     # The VLM gateway (OpenAI chat completions).
 
     def _vlm(self, request: httpx.Request) -> httpx.Response:
@@ -237,6 +260,9 @@ class FakeToolbox:
         if len(images) != 1:
             raise _Unanswerable(f"a chat with {len(images)} images")
         element = self._element_of_image(base64.b64decode(images[0].split(",", 1)[1]))
+        if element in self._failing_elements:
+            self.refused.append(f"vlm:{element}")
+            return _error(503, "provider_unavailable", f"the VLM fails on {element} on purpose")
         answers = self.case.get("vision") or {}
         if element not in answers:
             raise _Unanswerable(f"the case gives no vision answer for {element}")

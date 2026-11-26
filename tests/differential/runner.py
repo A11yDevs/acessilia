@@ -107,6 +107,7 @@ def run_case(case_path: Path) -> dict[str, Any]:
         # reading the text layer of a document with no prose to mark).
         "calls": dict(sorted(Counter(fake.calls).items())),
         "unhandled": sorted(set(fake.unhandled)),
+        "refused": sorted(set(fake.refused)),
     }
 
 

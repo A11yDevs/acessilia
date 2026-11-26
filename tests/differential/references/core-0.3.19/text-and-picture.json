@@ -322,5 +322,6 @@
     "title": "Experiment report",
     "verbosity": "detailed"
   },
+  "refused": [],
   "unhandled": []
 }

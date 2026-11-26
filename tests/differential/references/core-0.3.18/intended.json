@@ -1,0 +1,10 @@
+{
+  "dual-provider": [
+    {
+      "kind": "changed",
+      "path": "/metadata/pddl_manifest_revision",
+      "expected": 3,
+      "reason": "core 0.3.20 (M4b): the table adopted from the secondary provider is flagged inline_math_stale, and the completed run replans to mark it again, one more manifest revision"
+    }
+  ]
+}

@@ -28,5 +28,13 @@
       "expected": 3,
       "reason": "core 0.3.14 (M1): the descriptions run inside the plan; one that retypes an element (a picture read as a formula, a placeholder read as a picture) is followed by a discovery replan, one more manifest revision"
     }
+  ],
+  "dual-provider": [
+    {
+      "kind": "changed",
+      "path": "/metadata/pddl_manifest_revision",
+      "expected": 3,
+      "reason": "core 0.3.20 (M4b): the table adopted from the secondary provider is flagged inline_math_stale, and the completed run replans to mark it again, one more manifest revision"
+    }
   ]
 }

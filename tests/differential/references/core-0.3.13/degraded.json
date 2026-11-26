@@ -1,0 +1,434 @@
+{
+  "calls": {
+    "document.structure.extract": 1,
+    "document.text.spans": 1,
+    "math.convert": 1,
+    "math.recognize": 1,
+    "math.verbalize": 1,
+    "media.inspect": 1,
+    "pdf.render": 5,
+    "vlm": 5
+  },
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 6,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 1,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "id": "p1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p1",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 170.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "alt_text": "Photograph of a bench with an oscilloscope and cables.",
+              "id": "pic1",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "pic1",
+                "parent_id": null,
+                "raw_label": "picture",
+                "source_ref": null,
+                "surrounding_text": [
+                  "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes",
+                  "s ( t ) = t 3",
+                  "inicial ´ e s 0 ∈ R , h = 0"
+                ],
+                "vision_confidence": 0.95,
+                "vision_description_complete": true,
+                "vision_elements": [],
+                "vision_institutional_logo": false,
+                "vision_language": "pt-BR",
+                "vision_warnings": []
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 330.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 180.0
+                },
+                "page_number": 1
+              },
+              "type": "image"
+            },
+            {
+              "alt_text": "Image without a text description.",
+              "id": "pic2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "pic2",
+                "parent_id": null,
+                "raw_label": "picture",
+                "source_ref": null,
+                "surrounding_text": [
+                  "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes",
+                  "s ( t ) = t 3",
+                  "inicial ´ e s 0 ∈ R , h = 0"
+                ],
+                "vision_failure_detail": "AgentRunError: model run failed: the VLM fails on pic2 on purpose",
+                "vision_failure_reason": "model_failed"
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 480.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 340.0
+                },
+                "page_number": 1
+              },
+              "type": "image"
+            },
+            {
+              "id": "f1",
+              "metadata": {
+                "confidence": null,
+                "formula_classification": {
+                  "confidence": 0.95,
+                  "reason": null,
+                  "status": "math",
+                  "warnings": []
+                },
+                "formula_recognition": {
+                  "confidence": 0.95,
+                  "method": "vision",
+                  "text_agreement": 1.0
+                },
+                "formula_recognition_failure": "recognizer_unavailable",
+                "formula_text_layer": "s ( t ) = t 3",
+                "manifest_element_id": "f1",
+                "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s(t) = t^3</mtext></math>",
+                "parent_id": null,
+                "raw_label": "formula",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 530.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 500.0
+                },
+                "page_number": 1
+              },
+              "text": "s(t) = t^3",
+              "type": "math"
+            },
+            {
+              "id": "p2",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p2",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 560.0,
+                  "left": 50.0,
+                  "right": 560.0,
+                  "top": 540.0
+                },
+                "page_number": 1
+              },
+              "text": "inicial ´ e s 0 ∈ R , h = 0",
+              "type": "paragraph"
+            },
+            {
+              "id": "p3",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "p3",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 700.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 580.0
+                },
+                "page_number": 1
+              },
+              "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            }
+          ],
+          "page_number": 1,
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nPhotograph of a bench with an oscilloscope and cables.\nImage without a text description.\ns(t) = t^3\ninicial ´ e s 0 ∈ R , h = 0\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual."
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "failed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 3,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [
+        {
+          "escalated": true,
+          "id": "obligation-describe-image-pic2",
+          "kind": "describe-image",
+          "last_message": "Escalated to human review: no automated method satisfied describe-image (obligation-describe-image-pic2)",
+          "last_method": "human-review",
+          "recovery": "human-review",
+          "status": "failed",
+          "target_ids": [
+            "pic2"
+          ]
+        }
+      ],
+      "pddl_unsatisfied_summary": "Selected obligations not satisfied: describe-image (page 1)",
+      "pddl_validation_only": true,
+      "pddl_visual_failures": {
+        "formulas": {
+          "recognizer_unavailable": 1
+        },
+        "pictures": {
+          "model_failed": 1
+        }
+      },
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "id": "p1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p1",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 170.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "alt_text": "Photograph of a bench with an oscilloscope and cables.",
+            "id": "pic1",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "pic1",
+              "parent_id": null,
+              "raw_label": "picture",
+              "source_ref": null,
+              "surrounding_text": [
+                "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes",
+                "s ( t ) = t 3",
+                "inicial ´ e s 0 ∈ R , h = 0"
+              ],
+              "vision_confidence": 0.95,
+              "vision_description_complete": true,
+              "vision_elements": [],
+              "vision_institutional_logo": false,
+              "vision_language": "pt-BR",
+              "vision_warnings": []
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 330.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 180.0
+              },
+              "page_number": 1
+            },
+            "type": "image"
+          },
+          {
+            "alt_text": "Image without a text description.",
+            "id": "pic2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "pic2",
+              "parent_id": null,
+              "raw_label": "picture",
+              "source_ref": null,
+              "surrounding_text": [
+                "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes",
+                "s ( t ) = t 3",
+                "inicial ´ e s 0 ∈ R , h = 0"
+              ],
+              "vision_failure_detail": "AgentRunError: model run failed: the VLM fails on pic2 on purpose",
+              "vision_failure_reason": "model_failed"
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 480.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 340.0
+              },
+              "page_number": 1
+            },
+            "type": "image"
+          },
+          {
+            "alt_text": "Fórmula: spoken s(t) = t^3",
+            "id": "f1",
+            "metadata": {
+              "confidence": null,
+              "formula_classification": {
+                "confidence": 0.95,
+                "reason": null,
+                "status": "math",
+                "warnings": []
+              },
+              "formula_recognition": {
+                "confidence": 0.95,
+                "method": "vision",
+                "text_agreement": 1.0
+              },
+              "formula_recognition_failure": "recognizer_unavailable",
+              "formula_text_layer": "s ( t ) = t 3",
+              "manifest_element_id": "f1",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>s(t) = t^3</mtext></math>",
+              "parent_id": null,
+              "raw_label": "formula",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 530.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 500.0
+              },
+              "page_number": 1
+            },
+            "text": "s(t) = t^3",
+            "type": "math"
+          },
+          {
+            "id": "p2",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p2",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 560.0,
+                "left": 50.0,
+                "right": 560.0,
+                "top": 540.0
+              },
+              "page_number": 1
+            },
+            "text": "inicial ´ e s 0 ∈ R , h = 0",
+            "type": "paragraph"
+          },
+          {
+            "id": "p3",
+            "metadata": {
+              "confidence": null,
+              "manifest_element_id": "p3",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 700.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 580.0
+              },
+              "page_number": 1
+            },
+            "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          }
+        ],
+        "children": [],
+        "id": "sectionless-1",
+        "level": 1,
+        "metadata": {},
+        "source_location": {},
+        "title": ""
+      }
+    ],
+    "source": {
+      "name": "degraded.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [
+      "Selected obligations not satisfied: describe-image (page 1)",
+      "1 image could not be described."
+    ],
+    "title": "degraded",
+    "verbosity": "detailed"
+  },
+  "refused": [
+    "document.text.spans",
+    "math.recognize",
+    "vlm:pic2"
+  ],
+  "unhandled": []
+}

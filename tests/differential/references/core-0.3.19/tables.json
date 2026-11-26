@@ -526,5 +526,6 @@
     "title": "tables",
     "verbosity": "detailed"
   },
+  "refused": [],
   "unhandled": []
 }

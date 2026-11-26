@@ -18,19 +18,20 @@ truth (os benchmarks da #619).
 
 O que os casos estabelecem se limita ao que eles rodam:
 
-- cinco documentos sintéticos de uma página;
-- um provedor de extração (`FUSION_MODE=single`), então `select-table-source`,
-  `fuse-providers`, `rescue-omitted` e `adjudicate-page` nunca rodam. A
-  tabela obsoleta, o replanejamento por um bloco resgatado e a invalidação
-  das conversões de fórmula (M4b) são cobertos por testes unitários, não
-  aqui;
-- um Toolbox que sempre responde: sem falha, indisponibilidade ou
-  degradação;
+- oito documentos sintéticos, de uma a três páginas;
+- um provedor de extração, exceto em `dual-provider` (`FUSION_MODE=dual`), que
+  exercita a adjudicação de página, o `select-table-source` e uma página
+  roteada para o provedor secundário. O `fuse-providers` e a fusão de texto
+  (`dual-provider-fusion`) não são exercitados, e o `rescue-omitted` nunca
+  dispara: o seu gatilho não alcança as páginas para as quais ele existe
+  (#887);
+- um Toolbox que responde, exceto em `degraded`, em que `math.recognize` e
+  `document.text.spans` estão indisponíveis e o modelo de visão falha numa
+  figura;
 - o documento canônico normalizado: nem os exports, nem o número de chamadas.
 
-A equivalência que as referências mostram vale só para estes casos. Casos com
-dois provedores, várias páginas e degradação são a #876; a retomada a partir
-de um checkpoint é a #874.
+A equivalência que as referências mostram vale só para estes casos. A
+retomada a partir de um checkpoint é a #874.
 
 ## Como um caso roda
 
@@ -59,6 +60,10 @@ nada dentro do core é substituído. As respostas vêm do caso:
 | `vision` | o VLM, por id de elemento (ou `page-<n>`): uma descrição, o `kind` e o `formula_latex` de uma região, as `rows` de uma tabela |
 | `latex` | `math.recognize`, por id de fórmula (`""`: não lê nada) |
 | `text_spans` | `document.text.spans`, por página |
+| `secondary_document` | a extração do provedor secundário, com `FUSION_MODE=dual` (`secondary_provider`, `mineru` por padrão) |
+| `judge` | o `pB` de `document.adjudicate.page` |
+| `failures` | o que falha de propósito: `capabilities` respondidas com 503, ids em `vision` que o modelo recusa; registrado em `refused`, que o teste confere |
+| `environment` | settings que o caso define sobre as do harness (`FUSION_MODE=dual`) |
 
 **As regiões são associadas pela cor.** Uma imagem renderizada não diz que
 região mostra, e um core mais novo pode reduzi-la ou recodificá-la. Por isso
@@ -94,6 +99,9 @@ mudança no que é enviado aparece na saída.
 | `formulas` | uma fórmula sem marcação LaTeX, classificada e lida (M4a, M3); uma com LaTeX; uma figura que o modelo de visão lê como fórmula (M1, #846) |
 | `mostly-visual` | uma página sem conteúdo textual, cujos visuais de placeholder são descritos |
 | `inline-math` | prosa marcada a partir das fontes da camada de texto (M4b), e uma fórmula que lê as suas variáveis |
+| `multi-page` | uma figura, uma fórmula e uma tabela lida da sua imagem, cada uma na sua página |
+| `dual-provider` | dois provedores em três páginas: uma página adjudicada, uma tabela adotada do secundário e marcada de novo (o `inline_math_stale` do M4b), uma página roteada para o secundário que perde um parágrafo só do primário (#887) |
+| `degraded` | `math.recognize` e `document.text.spans` indisponíveis, e o modelo de visão falhando numa de duas figuras: a fórmula recai no modelo de visão, a matemática inline fica indisponível, uma figura fica sem descrição, com aviso |
 
 ## As referências
 
@@ -179,6 +187,20 @@ Quando este harness foi criado (core 0.3.20):
 
 Reintroduzir a lacuna da #846 faz o teste falhar contra todas as outras
 referências.
+
+Os casos acrescentados pela #876 (core 0.3.23) mostram:
+
+- **`multi-page`** coincide com todas as referências.
+- **`dual-provider`**:
+  - o conteúdo coincide com todas as referências, inclusive a tabela adotada;
+  - a execução faz uma revisão de manifesto a mais que qualquer release
+    anterior. No M4b (0.3.20), a tabela adotada é marcada `inline_math_stale`,
+    e a execução concluída replaneja para marcá-la de novo;
+  - todas as releases perdem o parágrafo que só o provedor primário manteve
+    na página roteada para o secundário (#887).
+- **`degraded`** coincide com todas as referências, menos `core-0.3.14`, em
+  que o texto ao redor das figuras difere, a mesma diferença do M3 que em
+  `formulas`.
 
 ## Gravação
 

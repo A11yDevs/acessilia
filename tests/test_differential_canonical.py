@@ -18,8 +18,9 @@ one shows the pipeline is, so a regression between steps (the formula LaTeX
 gap of M1, #846) fails here. A difference a later release made on purpose is
 declared in the reference's ``intended.json``, with the value it allows and
 the release that made it; any other one fails, and so does a declared one
-that no longer happens. The scope is the cases': one page, one provider
-(``FUSION_MODE=single``), a Toolbox that always answers (see the README).
+that no longer happens. The scope is the cases' (see the README): eight
+synthetic documents, one or several pages, one or two providers, and a
+Toolbox that answers, or fails where a case says so.
 """
 
 from __future__ import annotations
@@ -70,6 +71,16 @@ def test_each_reference_was_recorded_with_this_harness_and_every_case(label) -> 
 @pytest.mark.parametrize("case", CASE_NAMES)
 def test_the_fake_toolbox_answers_every_call(runs, case) -> None:
     assert runs[case]["unhandled"] == []
+
+
+@pytest.mark.parametrize("case", CASE_NAMES)
+def test_every_failure_a_case_declares_happens(runs, case) -> None:
+    """A degraded case keeps degrading: a failure the core no longer meets
+    (it stopped calling the capability, or the element) would leave the
+    case testing nothing."""
+    failures = json.loads((CASES / case / "case.json").read_text(encoding="utf-8")).get("failures") or {}
+    declared = {*failures.get("capabilities", []), *(f"vlm:{element}" for element in failures.get("vision", []))}
+    assert set(runs[case]["refused"]) == declared
 
 
 @pytest.mark.parametrize("label", LABELS)

@@ -304,5 +304,6 @@
     "title": "inline-math",
     "verbosity": "detailed"
   },
+  "refused": [],
   "unhandled": []
 }

@@ -269,3 +269,43 @@ def test_a_partial_recording_needs_the_same_commit_and_harness(tmp_path) -> None
 
     assert json.loads((target / "a.json").read_text()) == {"canonical": {"case": "a"}, "unhandled": []}
     assert (target / "gone.json").read_text() == "old"
+
+
+# Two providers, a page judgement and failures on purpose (#876).
+
+
+def _execute(fake: FakeToolbox, capability: str, provider: str = "fake") -> httpx.Response:
+    request = httpx.Request(
+        "POST", f"{fake_toolbox.BASE_URL}/v1/capabilities/{capability}:execute",
+        files={"file": ("x.pdf", b"%PDF", "application/pdf")}, data={"provider": provider},
+    )
+    request.read()
+    return fake.handle(request)
+
+
+def test_the_secondary_provider_gets_the_secondary_document() -> None:
+    case = json.loads((CASES / "dual-provider" / "case.json").read_text(encoding="utf-8"))
+    fake = FakeToolbox(case)
+
+    primary = _execute(fake, "document.structure.extract", "docling").json()["document"]
+    secondary = _execute(fake, "document.structure.extract", "mineru").json()["document"]
+
+    assert primary == case["document"] and secondary == case["secondary_document"]
+
+
+def test_a_page_judgement_comes_from_the_case_or_is_refused() -> None:
+    case = json.loads((CASES / "dual-provider" / "case.json").read_text(encoding="utf-8"))
+    assert _execute(FakeToolbox(case), "document.adjudicate.page").json()["document"] == {"pB": case["judge"]}
+
+    without = FakeToolbox({key: value for key, value in case.items() if key != "judge"})
+    assert _execute(without, "document.adjudicate.page").status_code == 422 and without.unhandled
+
+
+def test_a_failure_on_purpose_is_refused_but_not_unhandled() -> None:
+    case = {**_case(), "failures": {"capabilities": ["math.recognize"], "vision": ["pic1"]}}
+    fake = FakeToolbox(case)
+
+    assert _execute(fake, "math.recognize").status_code == 503
+    picture = _render(fake, {"left": 72, "top": 222, "right": 540, "bottom": 418, "origin": "TOPLEFT"})
+    assert _ask(fake, picture, SCHEMA).status_code == 503
+    assert fake.refused == ["math.recognize", "vlm:pic1"] and fake.unhandled == []

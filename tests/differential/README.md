@@ -17,18 +17,20 @@ benchmarks of #619).
 
 What the cases establish is limited to what they run:
 
-- five synthetic, one-page documents;
-- one extraction provider (`FUSION_MODE=single`), so `select-table-source`,
-  `fuse-providers`, `rescue-omitted` and `adjudicate-page` never run. The
-  stale table, the replan for a rescued block and the invalidation of formula
-  conversions (M4b) are covered by unit tests, not here;
-- a Toolbox that always answers: no failure, no unavailability, no
-  degradation;
+- eight synthetic documents, of one to three pages;
+- one extraction provider, except `dual-provider` (`FUSION_MODE=dual`),
+  which exercises the page adjudication, `select-table-source` and a page
+  routed to the secondary provider. `fuse-providers` and the text fusion
+  (`dual-provider-fusion`) are not exercised, and `rescue-omitted` never
+  fires: its trigger does not meet the pages it exists for (#887);
+- a Toolbox that answers, except in `degraded`, where `math.recognize` and
+  `document.text.spans` are unavailable and the vision model fails on one
+  picture;
 - the normalized canonical document: not the exports, not the number of
   calls.
 
-The equivalence the references show holds for these cases only. Dual-provider,
-multi-page and degraded cases are #876; a resume from a checkpoint is #874.
+The equivalence the references show holds for these cases only. A resume
+from a checkpoint is #874.
 
 ## How a case runs
 
@@ -57,6 +59,10 @@ inside the core is patched. Its answers come from the case:
 | `vision` | the VLM, per element id (or `page-<n>`): a description, a region's `kind` and `formula_latex`, a table's `rows` |
 | `latex` | `math.recognize`, per formula id (`""`: it reads nothing) |
 | `text_spans` | `document.text.spans`, per page |
+| `secondary_document` | the secondary provider's extraction, with `FUSION_MODE=dual` (`secondary_provider`, `mineru` by default) |
+| `judge` | the `pB` of `document.adjudicate.page` |
+| `failures` | what fails on purpose: `capabilities` answered 503, `vision` element ids the model refuses; recorded in `refused`, which the test checks |
+| `environment` | settings the case sets over the harness's (`FUSION_MODE=dual`) |
 
 **Regions are matched by colour.** A rendered image does not say which region
 it shows, and a newer core may downscale or re-encode it. So each `pdf.render`
@@ -89,6 +95,9 @@ change in what is sent shows in the output.
 | `formulas` | a formula without LaTeX markup, classified and read (M4a, M3); one with LaTeX; a picture the vision model reads as a formula (M1, #846) |
 | `mostly-visual` | a page with no text content, whose placeholder visuals are described |
 | `inline-math` | prose marked from the text layer's fonts (M4b), and a formula that reads its variables |
+| `multi-page` | a picture, a formula and a table read from its image, each on its own page |
+| `dual-provider` | two providers on three pages: a page adjudicated, a table adopted from the secondary and marked again (M4b's `inline_math_stale`), a page routed to the secondary that loses a primary-only paragraph (#887) |
+| `degraded` | `math.recognize` and `document.text.spans` unavailable, and the vision model failing on one of two pictures: the formula falls back to the vision model, the inline math is unavailable, one picture is left undescribed with a warning |
 
 ## The references
 
@@ -172,6 +181,20 @@ When this harness was added (core 0.3.20):
     before 0.3.14.
 
 Reintroducing the #846 gap fails the test against every other reference.
+
+The cases added for #876 (core 0.3.23) show:
+
+- **`multi-page`** matches every reference.
+- **`dual-provider`**:
+  - the content matches every reference, the adopted table included;
+  - the run makes one more manifest revision than any earlier release. In
+    M4b (0.3.20), the adopted table is flagged `inline_math_stale`, and the
+    completed run replans to mark it again;
+  - every release loses the paragraph that only the primary provider kept on
+    the page routed to the secondary (#887).
+- **`degraded`** matches every reference but `core-0.3.14`, where the
+  pictures' surrounding text differs, the same M3 difference as in
+  `formulas`.
 
 ## Recording
 

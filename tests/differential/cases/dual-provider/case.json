@@ -1,0 +1,528 @@
+{
+  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the page is routed to it, and the sentence only the primary kept is lost (#887).",
+  "document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "p1",
+          "p2",
+          "p3"
+        ]
+      },
+      {
+        "page_number": 2,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "q1",
+          "t1"
+        ]
+      },
+      {
+        "page_number": 3,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "u1",
+          "u2",
+          "u3"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "p1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "A sentence only the primary provider kept about the cart.",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 180.0,
+              "right": 540.0,
+              "bottom": 200.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "p3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 420.0,
+              "right": 540.0,
+              "bottom": 530.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "q1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 2,
+        "provenance": [
+          {
+            "page_number": 2,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "t1",
+        "type": "table",
+        "raw_label": "table",
+        "reading_order": 5,
+        "hierarchy_level": 1,
+        "text": "| Quantity | Value |\n|---|---|\n| Mass | 2 kg |",
+        "page_number": 2,
+        "provenance": [
+          {
+            "page_number": 2,
+            "bbox": {
+              "left": 72.0,
+              "top": 200.0,
+              "right": 540.0,
+              "bottom": 300.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {
+          "table_ast": {
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "Quantity",
+                    "header": true
+                  },
+                  {
+                    "text": "Value",
+                    "header": true
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "Mass"
+                  },
+                  {
+                    "text": "2 kg"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "u1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 6,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "u2",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 7,
+        "hierarchy_level": 1,
+        "text": "See the cart.",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 180.0,
+              "right": 540.0,
+              "bottom": 195.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "u3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 8,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 420.0,
+              "right": 540.0,
+              "bottom": 530.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 3,
+      "element_count": 8,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "secondary_document": {
+    "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "revision": 1,
+    "status": "extracted",
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "s1",
+          "s2",
+          "s3"
+        ]
+      },
+      {
+        "page_number": 2,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "r1",
+          "r2"
+        ]
+      },
+      {
+        "page_number": 3,
+        "width": 612.0,
+        "height": 792.0,
+        "element_ids": [
+          "v1",
+          "v2",
+          "v3"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "s1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "s2",
+        "type": "formula",
+        "raw_label": "formula",
+        "reading_order": 2,
+        "hierarchy_level": 1,
+        "text": "v = \\frac{d}{t}",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 250.0,
+              "right": 540.0,
+              "bottom": 280.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "s3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 3,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 1,
+        "provenance": [
+          {
+            "page_number": 1,
+            "bbox": {
+              "left": 72.0,
+              "top": 420.0,
+              "right": 540.0,
+              "bottom": 530.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "r1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 4,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 2,
+        "provenance": [
+          {
+            "page_number": 2,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "r2",
+        "type": "table",
+        "raw_label": "table",
+        "reading_order": 5,
+        "hierarchy_level": 1,
+        "text": "| Quantity | Value |\n|---|---|\n| Mass | 3 kg |\n| Speed | 4 m/s |",
+        "page_number": 2,
+        "provenance": [
+          {
+            "page_number": 2,
+            "bbox": {
+              "left": 72.0,
+              "top": 200.0,
+              "right": 540.0,
+              "bottom": 300.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {
+          "table_ast": {
+            "body": [
+              {
+                "cells": [
+                  {
+                    "text": "Quantity",
+                    "header": true
+                  },
+                  {
+                    "text": "Value",
+                    "header": true
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "Mass"
+                  },
+                  {
+                    "text": "3 kg"
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "Speed"
+                  },
+                  {
+                    "text": "4 m/s"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "v1",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 6,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 60.0,
+              "right": 540.0,
+              "bottom": 170.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "v2",
+        "type": "formula",
+        "raw_label": "formula",
+        "reading_order": 7,
+        "hierarchy_level": 1,
+        "text": "a = \\frac{v}{t}",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 250.0,
+              "right": 540.0,
+              "bottom": 280.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "v3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 8,
+        "hierarchy_level": 1,
+        "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 420.0,
+              "right": 540.0,
+              "bottom": 530.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 3,
+      "element_count": 8,
+      "observation_count": 0,
+      "obligation_count": 0,
+      "element_types": {}
+    }
+  },
+  "environment": {
+    "FUSION_MODE": "dual"
+  },
+  "vision": {
+    "v2": {
+      "kind": "formula",
+      "formula_latex": "a = \\frac{v}{t}",
+      "description": "a equals v over t"
+    }
+  },
+  "judge": 0.2
+}
