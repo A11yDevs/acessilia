@@ -501,7 +501,7 @@ LOG_PROVIDER_BREAKER_OPEN: str = (
     "{failures} vision calls in a row got no usable answer; "
     "skipping the remaining calls of this job"
 )
-#: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.
+#: Warning logged before the picture stage tries again what failed; {count} is how many pictures, {delay} the seconds waited first.
 LOG_PDDL_VISION_RETRY_PASS_PICTURES: tuple[str, str] = (
     "{count} picture without a usable description from the model; "
     "trying again in {delay}s",

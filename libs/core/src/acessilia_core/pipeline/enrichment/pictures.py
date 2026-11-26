@@ -79,16 +79,45 @@ VisionFailureReason = Literal[
 ]
 
 
+#: The fields a completed fold writes with the answer it accepted. A manifest
+#: can lose only the completion flag (an older version, a hand edit); the
+#: fields and the text still say the picture was answered (#681).
+_ACCEPTED_ANSWER_KEYS = ("vision_language", "vision_confidence")
+
+
+def _has_accepted_vision_answer(element: ManifestElement) -> bool:
+    """Whether ``element`` already holds the answer a fold accepted.
+
+    The completion flag is the normal mark, but it is the one a failure
+    removes; the text and the answer's ``vision_*`` fields are what show a
+    picture was answered before this attempt. A legacy ``empty_description``
+    element has no text (the old branch cleared it), and an alt text the
+    extractor gave has no vision fields, so neither is taken for an answer.
+    """
+    return bool(
+        (element.text or "").strip()
+        and all(key in element.metadata for key in _ACCEPTED_ANSWER_KEYS)
+    )
+
+
 def _record_vision_failure(
     element: ManifestElement, reason: VisionFailureReason, detail: str | None = None
 ) -> None:
     """Mark ``element`` as undescribed and say why, so a later pass describes it again.
 
-    Only the certification goes: the text and the ``vision_*`` fields an
-    earlier answer left stay, because they are the best description the
-    manifest has, and the reason records that this attempt added none (#681).
-    A picture the extractor gave text to keeps it for the same reason.
+    A picture that already holds a fold's answer keeps it and stays described:
+    the failed attempt added nothing, and the element must not be reported as
+    described and failed at once (#681). The text and the ``vision_*`` fields
+    stay, and the answer is certified again, because no completion flag a
+    restore lost can unmake it. A picture the extractor gave text to has no
+    such answer; it keeps the text and records the reason, so the operator sees
+    the model added nothing.
     """
+    if _has_accepted_vision_answer(element):
+        element.metadata["vision_description_complete"] = True
+        element.metadata.pop("vision_failure_reason", None)
+        element.metadata.pop("vision_failure_detail", None)
+        return
     element.metadata.pop("vision_description_complete", None)
     element.metadata["vision_failure_reason"] = reason
     if detail:
@@ -223,7 +252,8 @@ class _PictureEnrichment:
         if not isinstance(vision_output, VisionOutput):
             _record_vision_failure(element, "model_failed", errors[-1] if errors else None)
             return False
-        return _fold_picture_description(self.manifest, element, vision_output, page_number)
+        _fold_picture_description(self.manifest, element, vision_output, page_number)
+        return True
 
 
 async def _enrich_picture_descriptions(
@@ -380,8 +410,8 @@ def _fold_picture_description(
     element: ManifestElement,
     vision_output: VisionOutput,
     page_number: int,
-) -> bool:
-    """Fold the vision model's answer into ``element``; True when it is now described.
+) -> None:
+    """Fold the vision model's answer into ``element``.
 
     A formula answer makes the element a formula; a description makes it a
     picture. ``VisionOutput`` validation guarantees the field ``kind`` asks for
@@ -425,7 +455,6 @@ def _fold_picture_description(
     element.metadata["vision_description_complete"] = True
     element.metadata.pop("vision_failure_reason", None)
     element.metadata.pop("vision_failure_detail", None)
-    return True
 
 
 def _retype_element(

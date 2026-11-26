@@ -20,6 +20,7 @@ from acessilia_core.i18n import t
 from acessilia_core.pipeline.elements import (
     MSG_UNDESCRIBED_PICTURE_ALT,
     _element_to_block,
+    _text_kept_by_picture,
 )
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
@@ -109,16 +110,21 @@ async def test_a_failed_picture_is_described_on_a_later_pass(monkeypatch, tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_a_failure_keeps_the_answer_a_previous_fold_folded(monkeypatch, tmp_path):
-    """A failed later attempt drops the certification, not the description.
+async def test_a_failed_re_description_leaves_an_answered_picture_as_it_was(
+    monkeypatch, tmp_path
+):
+    """A failed attempt on an answered picture changes nothing.
 
-    The stage only re-asks a picture whose completion flag is gone (a restored
-    manifest), so its text and vision metadata are an earlier answer's. The
-    failure records that this attempt added nothing; discarding the earlier
-    answer would lose the only description the manifest has (#681).
+    The stage only re-asks a picture whose completion flag is gone, which a
+    manifest written before the flag existed or a hand edit can leave. Its
+    text and ``vision_*`` fields show the answer; a failure added nothing, so
+    it must neither discard nor uncertify the answer, nor report the picture
+    as described and failed at once (#681).
     """
     _patch(monkeypatch, _DESCRIPTION)
-    manifest = _manifest([_element("pic-1", "picture")], [])
+    manifest = _manifest(
+        [_element("pic-1", "picture", metadata={"replaced_text": "Slide text"})], []
+    )
     picture = await _enrich(manifest, tmp_path)
     folded = {
         key: picture.metadata[key]
@@ -130,8 +136,9 @@ async def test_a_failure_keeps_the_answer_a_previous_fold_folded(monkeypatch, tm
         )
     }
     assert picture.metadata["vision_description_complete"] is True
+    assert _text_kept_by_picture(picture) == []
 
-    # The flag a restored manifest may have lost; the description remains.
+    # What an older manifest or a hand edit can leave: no completion flag.
     picture.metadata.pop("vision_description_complete")
     _patch(monkeypatch, None)
     picture = await _enrich(manifest, tmp_path)
@@ -139,9 +146,31 @@ async def test_a_failure_keeps_the_answer_a_previous_fold_folded(monkeypatch, tm
     assert picture.text == "An illustrated periodic table."
     for key, value in folded.items():
         assert picture.metadata[key] == value
+    assert picture.metadata["vision_description_complete"] is True
+    assert "vision_failure_reason" not in picture.metadata
+    assert "vision_failure_detail" not in picture.metadata
+    assert _element_to_block(picture)["alt_text"] == "An illustrated periodic table."
+    assert _text_kept_by_picture(picture) == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_call_keeps_the_text_the_extractor_had(monkeypatch, tmp_path):
+    """A picture the extractor gave text to keeps it when the model fails.
+
+    The text is the alt the reader gets; the failure only says no vision
+    answer came back, and the element stays retryable (#681).
+    """
+    _patch(monkeypatch, None)
+    manifest = _manifest(
+        [_element("pic-1", "picture", text="Periodic table of the elements")], []
+    )
+
+    picture = await _enrich(manifest, tmp_path)
+
+    assert picture.text == "Periodic table of the elements"
+    assert _element_to_block(picture)["alt_text"] == "Periodic table of the elements"
     assert "vision_description_complete" not in picture.metadata
     assert picture.metadata["vision_failure_reason"] == "model_failed"
-    assert _element_to_block(picture)["alt_text"] == "An illustrated periodic table."
 
 
 @pytest.mark.asyncio

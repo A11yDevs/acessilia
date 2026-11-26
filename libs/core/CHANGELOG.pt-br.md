@@ -2,6 +2,28 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.24 — uma redescrição falha não desdescreve uma imagem (#681)
+
+`_fold_picture_description` mantinha um ramo para uma resposta sem texto que
+nenhum caminho de produção produz: `VisionOutput` rejeita descrição ou LaTeX
+de fórmula vazios, o salvage mantém 40 caracteres, o truncamento acrescenta o
+aviso e o cache de regiões valida na leitura. O ramo, o motivo
+`empty_description`, a entrada dele no conjunto de retentativas e a mensagem
+de log foram removidos. Uma redescrição falha de uma imagem que já tem a
+resposta de um fold agora deixa essa resposta certificada e não registra falha,
+então o elemento nunca é reportado como descrito e falho ao mesmo tempo; uma
+imagem a que o extrator deu texto o mantém e registra o motivo.
+- A entrada `empty_description` das retentativas foi removida; uma resposta
+  vazia vira `model_failed` pelo contrato de saída, como qualquer falha sem
+  resposta.
+- Testes: uma imagem respondida, reconsultada sem a flag de conclusão e com
+  uma tentativa falha, continua descrita com seu texto e campos de visão; uma
+  chamada falha mantém o texto do extrator; as fixtures de resposta vazia
+  foram removidas.
+- Documentação: `toolbox_integration` (EN/PT), `.env.example`, o campo de
+  settings e o comentário da mensagem de log não descrevem mais a entrada de
+  retentativa removida.
+
 ## 0.3.23 — um redirecionamento do mesmo tipo sob o mesmo id é uma mudança (#843)
 
 O M0 (#832) pulava um passo do plano cuja obrigação mudou sob o mesmo id,
