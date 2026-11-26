@@ -2,6 +2,29 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.23 — um redirecionamento do mesmo tipo sob o mesmo id é uma mudança (#843)
+
+O M0 (#832) pulava um passo do plano cuja obrigação mudou sob o mesmo id,
+mas comparava só o kind, os tipos dos alvos e os métodos admissíveis: os ids
+dos alvos ficavam de fora para que uma divisão ou junção, que remapeia os
+alvos de todas as obrigações durante a execução (`handlers/structure.py`),
+não pedisse um replanejamento a cada divisão. Assim, um redirecionamento que
+mantinha os tipos (uma tabela trocada por outra) executava o passo para o
+qual o plano não foi feito.
+- O executor agora registra os ids dos alvos e os elementos planejados, e
+  separa os dois casos pelos elementos (`_retargeted`): `remap_references`
+  só tira um alvo quando o seu elemento sumiu, e só traz um como parte nova
+  ou como sobrevivente de um elemento que ele substitui. Um alvo que saiu
+  com o seu elemento ainda presente, ou um elemento preexistente
+  acrescentado sem nenhum sair, torna o passo obsoleto: ele é pulado e o
+  replanejamento decide de novo. Uma divisão ou junção não, e não gasta
+  replanejamento de descoberta. Nenhum marcador nem mudança de manifesto é
+  necessário.
+- A política de ids não muda.
+- Testes: uma divisão e uma junção pelas funções reais `replace_elements` e
+  `remap_references` ainda executam o passo; uma troca do mesmo tipo e um
+  elemento preexistente acrescentado o tornam obsoleto.
+
 ## 0.3.22 — uma descoberta é atendida depois de esgotado o orçamento de falhas (#842)
 
 Uma execução com um passo falho e uma descoberta era um replanejamento de

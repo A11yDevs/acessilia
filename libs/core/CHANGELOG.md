@@ -2,6 +2,27 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.23 — a same-type retarget under the same id is a change (#843)
+
+M0 (#832) skipped a plan step whose obligation changed under its id, but
+compared only the kind, the types of the targets and the admissible methods:
+the target ids were left out so that a split or a join, which remaps every
+obligation's targets during the execution (`handlers/structure.py`), would
+not ask for a replan on every split. So a retarget that kept the types (one
+table swapped for another) ran the step the plan was not made for.
+- The executor now records the planned target ids and the planned elements,
+  and tells the two apart by the elements (`_retargeted`):
+  `remap_references` lets a target go only when its element is gone, and
+  brings one in only as a new part or as the survivor of an element it
+  replaces. A target that went while its element is still there, or a
+  pre-existing element added with none going, makes the step stale: it is
+  skipped and the replan decides again. A split or a join does not, and
+  spends no discovery replan. No marker or manifest change is needed.
+- The id policy is unchanged.
+- Tests: a split and a join through the real `replace_elements` and
+  `remap_references` still run the step; a same-type swap and a
+  pre-existing element added make it stale.
+
 ## 0.3.22 — a discovery is served after the failure budget is spent (#842)
 
 A run with a failed step and a discovery was a failure replan, so with

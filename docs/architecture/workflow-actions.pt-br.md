@@ -269,10 +269,17 @@ manifesto. **A migração do enriquecimento não muda o domínio.**
      cache.
    - Os passos que elas tornam obsoletos são pulados, não executados (5). Isso
      inclui uma obrigação mudada sob o mesmo id: outro kind, alvos de outros
-     tipos, ou o método do passo que deixou de ser admissível. O executor
-     compara cada passo com o que tornava o método aplicável no manifesto do
-     plano; um redirecionamento que mantém os tipos (uma divisão ou uma junção
-     remapeia alvos) não é mudança. Os ids são únicos num manifesto; um
+     tipos, outro conjunto de alvos, ou o método do passo que deixou de ser
+     admissível. O executor compara cada passo com o que tornava o método
+     aplicável no manifesto do plano. Desde o core 0.3.23 (#843) isso inclui
+     os ids dos alvos, separando uma divisão ou junção de um redirecionamento
+     pelos elementos (`_retargeted`): `remap_references` só tira um alvo
+     quando o seu elemento sumiu, e só traz um como parte nova ou como
+     sobrevivente de um elemento que ele substitui. Um alvo que saiu com o seu
+     elemento ainda presente, ou um elemento preexistente acrescentado sem
+     nenhum sair (uma tabela trocada por outra do mesmo tipo), torna o passo
+     obsoleto; uma divisão ou junção não, e não gasta replanejamento de
+     descoberta. Os ids são únicos num manifesto; um
      liberado por uma remoção pode voltar num plano seguinte, nunca dentro da
      comparação de uma execução. Mudanças do conteúdo dos elementos sob o
      mesmo tipo não são comparadas (revisões de elementos são a #840).

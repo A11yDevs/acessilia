@@ -111,21 +111,78 @@ def test_a_method_no_longer_admissible_makes_the_step_stale() -> None:
     assert calls == ["o-1", "o-2"]
 
 
-def test_a_retarget_that_keeps_the_types_is_not_a_change() -> None:
-    """A split remaps an obligation's targets to the parts (``handlers/structure.py``):
-    the method reads its targets when it runs, so the step still runs."""
+def _three() -> ProcessingManifest:
+    """``_two`` plus a second picture, ``c``, that no obligation targets."""
+    manifest = _two()
+    manifest.elements.append(build_element("c", "picture", text="c"))
+    manifest.pages[0].element_ids.append("c")
+    manifest.summary.element_count = len(manifest.elements)
+    return manifest
+
+
+def test_a_split_remap_is_not_a_change() -> None:
+    """A split remaps an obligation's targets to the source and its new parts
+    (``handlers/structure.py``): the method reads its targets when it runs,
+    so the step still runs and nothing asks for a replan."""
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
     manifest = _two()
     calls: list[str] = []
 
     def split(m: ProcessingManifest) -> None:
-        m.elements.append(build_element("b-2", "picture", text="b2"))
-        m.summary.element_count = len(m.elements)
-        _by_id(m, "o-2").target_ids = ["b", "b-2"]
+        source = next(element for element in m.elements if element.id == "b")
+        part = source.model_copy(update={"id": "b-2"})
+        replace_elements(m, {"b": [source, part]})
+        remap_references(m, {"b": ["b", "b-2"]})
 
     _, report = _executing(split, calls).execute(_plan(manifest), manifest)
 
     assert calls == ["o-1", "o-2"]
     assert report.status == "completed"
+
+
+def test_a_join_remap_is_not_a_change() -> None:
+    """A join drops an element and remaps its references to the survivor,
+    which existed already: still the same work."""
+    from acessilia_core.pipeline.handlers.structure import (
+        remap_references,
+        replace_elements,
+    )
+
+    manifest = _three()
+    calls: list[str] = []
+
+    def join(m: ProcessingManifest) -> None:
+        replace_elements(m, {"b": []})
+        remap_references(m, {"b": ["c"]})
+
+    _, report = _executing(join, calls).execute(_plan(manifest), manifest)
+
+    assert calls == ["o-1", "o-2"]
+    assert report.status == "completed"
+
+
+@pytest.mark.parametrize("retarget", [["c"], ["b", "c"]], ids=["swapped", "added"])
+def test_a_same_type_retarget_makes_the_step_stale(retarget) -> None:
+    """#843: one picture swapped for another, or a pre-existing picture added,
+    keeps the types but is not the step the plan was made for: it is
+    skipped and the replan decides again."""
+    manifest = _three()
+    calls: list[str] = []
+
+    def retarget_o2(m: ProcessingManifest) -> None:
+        _by_id(m, "o-2").target_ids = list(retarget)
+
+    updated, report = _executing(retarget_o2, calls).execute(_plan(manifest), manifest)
+
+    assert calls == ["o-1"]
+    assert _step(report, "o-2").status == "skipped"
+    assert _step(report, "o-2").message == t(EXE_OBLIGATION_CHANGED).format(obligation_id="o-2")
+    assert report.status == "replan-required"
+    assert "o-2" in _replannable_obligation_ids(updated)
 
 
 def test_an_enrichment_id_freed_by_a_removal_is_reused_by_the_next_plan() -> None:

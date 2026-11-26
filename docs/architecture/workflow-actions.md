@@ -260,10 +260,16 @@ the manifest. **The enrichment migration needs no domain change.**
      identities.
    - The steps they make obsolete are skipped, not run (5). That includes an
      obligation changed under its id: another kind, targets of other types,
-     or the step's method no longer admissible. The executor compares each
-     step with what made its method applicable in the plan's manifest; a
-     retarget that keeps the types (a split or a join remaps targets) is
-     not a change. Ids are unique in a manifest; one freed by a removal may
+     another target set, or the step's method no longer admissible. The
+     executor compares each step with what made its method applicable in the
+     plan's manifest. Since core 0.3.23 (#843) that includes the target ids,
+     telling a split or a join apart from a retarget by the elements
+     (`_retargeted`): `remap_references` lets a target go only when its
+     element is gone, and brings one in only as a new part or as the
+     survivor of an element it replaces. A target that went while its
+     element is still there, or a pre-existing element added with none
+     going (one table swapped for another of the same type), makes the step
+     stale; a split or a join does not, and spends no discovery replan. Ids are unique in a manifest; one freed by a removal may
      come back in a later plan, never inside one execution's comparison.
      Changes of the elements' content under the same type are not compared
      (element revisions are #840).

@@ -125,6 +125,9 @@ class _ExecutionState:
     #: addition was found during it (#594, #832); one whose applicability
     #: changed under the same id is stale.
     planned: dict[str, _Applicability] = field(default_factory=dict)
+    #: The elements of that manifest: a target added since is a new part of a
+    #: split, or a pre-existing element (``_retargeted``, #843).
+    planned_elements: frozenset[str] = frozenset()
 
 
 class _SkipStep(Exception):
@@ -230,6 +233,7 @@ class ExecutorAgent:
             replan_required=replan_required,
             progress=progress,
             planned=_planned_applicability(manifest),
+            planned_elements=frozenset(element.id for element in manifest.elements),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -534,11 +538,11 @@ class ExecutorAgent:
         """The step's obligation, or a skip when this execution changed it (#832).
 
         Removed or replaced by a reclassification: the step no longer applies.
-        Changed under the same id (another kind, targets of other types, or
-        the step's method no longer admissible): the step is stale and the
-        replan decides again. A retarget that keeps the types (a split or a
-        join remaps the targets, ``handlers/structure.py``) is not a change:
-        the method reads its targets when it runs.
+        Changed under the same id (another kind, targets of other types,
+        another target set, or the step's method no longer admissible): the
+        step is stale and the replan decides again. A split or a join remaps
+        the targets (``handlers/structure.py``) and is not a change: the
+        method reads its targets when it runs (``_retargeted``, #843).
         Made to depend on an open obligation this plan does not run before it
         (found during this execution, or planned and not run yet): it waits
         for the replan, which orders the two. A dependency the plan ran and
@@ -555,10 +559,7 @@ class ExecutorAgent:
         ):
             raise _SkipStep(t(EXE_OBLIGATION_REMOVED).format(obligation_id=obligation_id))
         obligation = cls._find_obligation(state, obligation_id)
-        if obligation_id in state.planned and (
-            _applicability(state.manifest, obligation) != state.planned[obligation_id]
-            or step.method not in obligation.admissible_methods
-        ):
+        if obligation_id in state.planned and _changed(state, obligation, step):
             state.replan_required = True
             raise _SkipStep(t(EXE_OBLIGATION_CHANGED).format(obligation_id=obligation_id))
         by_id = {item.id: item for item in state.manifest.obligations}
@@ -753,13 +754,45 @@ class ExecutorAgent:
 
 #: What made an obligation's method applicable when the plan was made: its
 #: kind and the types of its targets (#832).
-_Applicability = tuple[str, frozenset[str]]
+#: An obligation's kind, the types of its targets and its target ids.
+_Applicability = tuple[str, frozenset[str], frozenset[str]]
 
 
 def _applicability(manifest: ProcessingManifest, obligation: Obligation) -> _Applicability:
     targets = set(obligation.target_ids)
     types = frozenset(element.type for element in manifest.elements if element.id in targets)
-    return obligation.kind, types
+    return obligation.kind, types, frozenset(targets)
+
+
+def _changed(state: _ExecutionState, obligation: Obligation, step: PlanStep) -> bool:
+    """Whether a planned obligation changed under its id: another kind,
+    targets of other types, another target set (``_retargeted``), or the
+    step's method no longer admissible."""
+    kind, types, targets = state.planned[obligation.id]
+    return (
+        _applicability(state.manifest, obligation)[:2] != (kind, types)
+        or _retargeted(state, targets, frozenset(obligation.target_ids))
+        or step.method not in obligation.admissible_methods
+    )
+
+
+def _retargeted(state: _ExecutionState, before: frozenset[str], after: frozenset[str]) -> bool:
+    """Whether an obligation's targets changed beyond what a split or a join
+    does (#843).
+
+    ``remap_references`` (``handlers/structure.py``) only lets a target go
+    when its element is gone (a join drops it), and only brings one in as a
+    new part (a split) or as the survivor of an element it replaces (a
+    join). So the targets were changed on purpose when one went whose
+    element is still in the manifest, or when a pre-existing element came in
+    with no target going: one table swapped for another, a picture added to
+    an obligation. Then the step is stale, even with the same types.
+    """
+    removed, added = before - after, after - before
+    current = {element.id for element in state.manifest.elements}
+    if removed & current:
+        return True
+    return not removed and bool(added & state.planned_elements)
 
 
 def _planned_applicability(manifest: ProcessingManifest) -> dict[str, _Applicability]:
