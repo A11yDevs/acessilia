@@ -268,9 +268,10 @@ async def extract_dual_fused(
     error is recorded too instead of passing for a successful step. Every
     :class:`~acessilia_sdk.toolbox.errors.ToolboxError` degrades here, a
     contract violation included, whether the transport or the envelope
-    validation raised it; the core extractor classifies dual-mode failures the
-    same way (#699). If both fail with ``ToolboxError``, raises
-    :class:`DualFusionUnavailable` (a subclass of
+    validation raised it. The core extractor classifies a contract violation
+    the same way in dual mode (#699), while its permanent document rejections
+    still fail the job from the primary. If both fail with ``ToolboxError``,
+    raises :class:`DualFusionUnavailable` (a subclass of
     :class:`~acessilia_sdk.toolbox.errors.ToolboxProviderUnavailable`) carrying
     ``failures`` and ``artifact_fallbacks``. Unexpected (non-``ToolboxError``)
     exceptions propagate unchanged.

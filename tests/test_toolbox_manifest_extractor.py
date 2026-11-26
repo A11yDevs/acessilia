@@ -742,6 +742,29 @@ def test_identical_providers_with_an_invalid_primary_answer_raise(
         )
 
 
+def test_identical_providers_keep_a_client_raised_contract_violation_fatal(
+    mock_client, monkeypatch
+):
+    """#699: without a distinct secondary the transport's rejection is fatal."""
+    failure = ToolboxContractViolation("422 from the provider")
+    mock_client.extract_structure.side_effect = failure
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    with pytest.raises(ToolboxContractViolation) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            fusion=fusion_config(mode="dual", secondary_provider="docling"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    assert caught.value is failure
+
+
 @pytest.mark.parametrize("answer", [
     None,
     {"status": "failed", "document": {"elements": []}},
@@ -765,6 +788,30 @@ def test_presentation_mode_with_an_invalid_answer_does_not_try_a_secondary(
             paths=paths_config(),
             operations=None,
         )
+
+
+def test_presentation_mode_keeps_a_client_raised_contract_violation_fatal(
+    mock_client, monkeypatch
+):
+    """#699: dual_fusion=False keeps the transport's rejection fatal too."""
+    failure = ToolboxContractViolation("422 from the provider")
+    mock_client.extract_structure.side_effect = failure
+    monkeypatch.setattr(
+        "acessilia_core.manifest.toolbox_extractor.make_toolbox_client",
+        lambda *a, **k: pytest.fail("secondary must not be built"),
+    )
+
+    with pytest.raises(ToolboxContractViolation) as caught:
+        ToolboxManifestExtractor(client=mock_client).extract(
+            FIXTURE_PDF,
+            dual_fusion=False,
+            fusion=fusion_config(mode="dual", secondary_provider="mineru"),
+            toolbox=toolbox_config(use_artifact_store=False),
+            paths=paths_config(),
+            operations=None,
+        )
+
+    assert caught.value is failure
 
 
 def test_dual_mode_uses_the_normalized_primary_in_the_identity_gate(

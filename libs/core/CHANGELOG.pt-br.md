@@ -16,13 +16,15 @@ sobre o documento em si, então outro provider pode respondê-lo corretamente.
   mantém o primário completo, e duas falhas de provider levantam
   `ToolboxUnavailable` com as duas causas em vez do erro do secundário com o
   primário como causa.
-- As recusas permanentes são as que nenhum provider resolveria: mídia não
-  suportada, entrada inválida e autenticação. Pelo primário, ainda derrubam o
-  job; pelo secundário, só degradam.
+- As falhas que não são de provider e continuam permanentes incluem mídia não
+  suportada, entrada inválida, autenticação, `ToolboxArtifactNotFound` e erros
+  de capacidade. Pelo primário, ainda derrubam o job; pelo secundário,
+  degradam quando o resultado do primário está em mãos.
 - Testes: uma violação de contrato levantada pelo cliente no modo single
-  (levanta) e no modo dual (degrada, ou levanta `ToolboxUnavailable` quando
-  os dois providers recusam); os casos de validação do envelope agora também
-  fixam a classificação compartilhada.
+  (levanta), no modo dual (degrada, ou levanta `ToolboxUnavailable` quando os
+  dois providers recusam) e no modo de apresentação e com providers idênticos
+  (continua levantando); os casos de validação do envelope agora também fixam
+  a classificação compartilhada.
 - A documentação (`docs/toolbox_integration.md` e `.pt-br.md`) e as
   docstrings do extrator e da fusão do SDK declaram a classificação
   compartilhada.

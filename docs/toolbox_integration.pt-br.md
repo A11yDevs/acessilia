@@ -521,10 +521,12 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 > É a mesma classificação que o `extract_dual_fused` do SDK aplica. O documento
 > degradado leva um aviso técnico (`extraction_degraded`,
 > `extraction_failures`) e não é cacheado. Uma recusa do próprio documento que
-> nenhum provider resolveria (mídia não suportada, entrada inválida,
-> autenticação) é permanente: pelo primário, derruba o job; pelo secundário, só
-> degrada. Se os dois providers falharem, o erro tipado propaga; quando as duas
-> falhas são de provider, é um `ToolboxUnavailable` com as duas causas.
+> nenhum provider resolveria (por exemplo, mídia não suportada, entrada
+> inválida ou autenticação) é permanente: pelo primário, derruba o job. Pelo
+> secundário, degrada quando o resultado do primário está em mãos; quando o
+> primário falhou, ela é levantada com a falha do primário como causa. Se as
+> duas falhas forem de provider, o core levanta um `ToolboxUnavailable` com as
+> duas causas.
 >
 > O caso de `status` é o que um cliente injetado ou duck-typed pode produzir; o
 > transporte real rejeita uma resposta com `status` diferente de `succeeded`

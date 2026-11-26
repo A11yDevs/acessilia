@@ -518,11 +518,12 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 > `provenance`). This is the same classification the SDK's
 > `extract_dual_fused` applies. The degraded document carries a technical
 > warning (`extraction_degraded`, `extraction_failures`) and is not cached. A
-> rejection of the document itself that no provider would solve (unsupported
-> media, invalid input, authentication) is permanent: by the primary it fails
-> the job; by the secondary, it only degrades. If both providers fail, the
-> typed error propagates; when both are provider failures it is a
-> `ToolboxUnavailable` carrying both causes.
+> rejection of the document itself that no provider would solve (for example
+> unsupported media, invalid input or authentication) is permanent: from the
+> primary it fails the job. From the secondary it degrades when the primary's
+> result is in hand; when the primary failed, it is raised with the primary
+> failure as its cause. If both failures are provider failures, the core raises
+> a `ToolboxUnavailable` carrying both causes.
 >
 > The `status` case is what an injected or duck-typed client can produce; the
 > shipped transport rejects a non-`succeeded` answer before it reaches the

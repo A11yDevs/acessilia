@@ -15,12 +15,14 @@ so another provider may answer it correctly.
   invalid primary hands over to the secondary, an invalid secondary keeps the
   complete primary, and two provider failures raise `ToolboxUnavailable` with
   both causes instead of the secondary's error with the primary as its cause.
-- The permanent rejections are the ones no provider would solve: unsupported
-  media, invalid input and authentication. From the primary they still fail
-  the job; from the secondary they only degrade.
-- Tests: a client-raised contract violation in single mode (raises) and dual
-  mode (degrades, or raises `ToolboxUnavailable` when both providers reject);
-  the envelope-validation cases now pin the shared classification too.
+- The non-provider failures that remain permanent include unsupported media,
+  invalid input, authentication, `ToolboxArtifactNotFound` and capability
+  errors. From the primary they still fail the job; from the secondary they
+  degrade when the primary's result is in hand.
+- Tests: a client-raised contract violation in single mode (raises), dual
+  mode (degrades, or raises `ToolboxUnavailable` when both providers reject),
+  and in presentation mode and with identical providers (still raises); the
+  envelope-validation cases now pin the shared classification too.
 - The docs (`docs/toolbox_integration.md` and `.pt-br.md`) and the extractor
   and SDK fusion docstrings state the shared classification.
 

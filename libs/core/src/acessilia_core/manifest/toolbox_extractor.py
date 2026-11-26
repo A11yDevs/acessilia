@@ -122,9 +122,10 @@ class ToolboxManifestExtractor:
     transport raised it (HTTP 422, invalid JSON, a non-``succeeded`` status) or
     this module's envelope validation did; the SDK's ``extract_dual_fused``
     classifies it the same way (#699). A rejection of the document itself that
-    no provider would solve (unsupported media, invalid input, authentication)
-    is permanent: from the primary it fails the job, and from the secondary it
-    only degrades.
+    no provider would solve (for example unsupported media, invalid input or
+    authentication) is permanent: from the primary it fails the job; from the
+    secondary it degrades when the primary's result is in hand, and when the
+    primary failed it is raised with the primary failure as its cause.
     """
 
     def __init__(
@@ -400,23 +401,18 @@ class ToolboxManifestExtractor:
                     language="pt-BR",
                     use_remote_cache=toolbox_config.use_remote_cache,
                 )
-        except ToolboxError as exc:
-            if not dual_enabled or not _provider_failure(exc):
-                raise
-            _record_provider_failure(primary_provider, exc, extraction_failures)
-            return None, exc
-        # A contract violation is a per-provider failure in both forms: the
-        # transport's (HTTP 422, invalid JSON, a non-`succeeded` status) and
-        # this validation's (#673). The provider answered outside the contract
-        # for this document, and the secondary may answer it correctly, so in
-        # dual mode it degrades -- the classification the SDK's dual fusion
-        # already applies (#699).
-        try:
+            # A contract violation is a per-provider failure in both forms: the
+            # transport's (HTTP 422, invalid JSON, a non-`succeeded` status) and
+            # this validation's (#673). The provider answered outside the
+            # contract for this document, and the secondary may answer it
+            # correctly, so in dual mode it degrades -- the classification the
+            # SDK's dual fusion already applies (#699). The validation stays
+            # inside this `try` so both forms take the same decision.
             return _validated_structure_result(
                 result, provider=primary_provider
             ), None
-        except ToolboxContractViolation as exc:
-            if not dual_enabled:
+        except ToolboxError as exc:
+            if not dual_enabled or not _provider_failure(exc):
                 raise
             _record_provider_failure(primary_provider, exc, extraction_failures)
             return None, exc
@@ -773,7 +769,8 @@ def _provider_failure(exc: ToolboxError) -> bool:
     did: the provider answered outside the contract for this document, and the
     other provider may answer it correctly. The SDK's dual fusion classifies it
     the same way (#699). A rejection of the document itself that no provider
-    would solve (media type, invalid input, authentication) is permanent.
+    would solve (for example media type, invalid input or authentication) is
+    permanent.
     """
     return isinstance(
         exc, (ToolboxTimeout, ToolboxProviderUnavailable, ToolboxContractViolation)
