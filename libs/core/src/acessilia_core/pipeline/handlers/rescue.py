@@ -36,6 +36,7 @@ executor selects what a handler adds and replans for it.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -408,7 +409,22 @@ def _omitted(
     text = element.text or ""
     if not is_legitimate_text(text):
         return False
-    return not is_duplicate(text, [page_text], min_len=_MIN_CONTAINED_TEXT)
+    return not _contained(text, page_text)
+
+
+def _contained(text: str, page_text: str) -> bool:
+    """Whether the page already carries ``text``.
+
+    ``is_duplicate`` decides from ``_MIN_CONTAINED_TEXT`` characters on, as a
+    plain substring. A shorter block (``Fig. 2``, ``Note 1``) is matched as
+    whole words, case and spacing folded, so one the secondary merged into a
+    longer block is not inserted again (#891 review), and a short text is
+    not taken for part of a longer word.
+    """
+    if is_duplicate(text, [page_text], min_len=_MIN_CONTAINED_TEXT):
+        return True
+    needle, haystack = (" ".join(value.casefold().split()) for value in (text, page_text))
+    return bool(needle) and re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
 
 
 def _renumber(manifest: ProcessingManifest, pages: set[int]) -> None:

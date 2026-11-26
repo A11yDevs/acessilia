@@ -19,6 +19,11 @@ perdia o texto, em silêncio, em todas as releases.
 - Um bloco resgatado é acrescentado durante o plano, então recebe a
   matemática inline no replanejamento (M4b) e invalida as conversões de
   fórmula feitas antes dele.
+- O filtro do resgate (`_omitted`) só reconhecia um texto que a página já
+  traz a partir de 8 caracteres (`is_duplicate`): um bloco primário mais
+  curto que o secundário juntou a outro maior (`Fig. 2`, `Note 1`) voltava
+  duplicado. Um texto curto agora é casado por palavras inteiras, com caixa e
+  espaços normalizados (revisão do #891).
 - Testes: o detector numa página roteada com e sem blocos só do primário e
   numa página que manteve o primário; o caso diferencial `dual-provider`
   agora resgata `See the cart at $v_0$.` na página roteada, com a sua

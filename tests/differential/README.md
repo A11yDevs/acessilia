@@ -173,6 +173,13 @@ The fields of an entry:
 An undeclared difference fails, and so does a declared one that no longer
 happens.
 
+Lists of objects that all carry a distinct, non-empty string `id` (blocks,
+elements) are aligned by id: an inserted block is one `added`, and the same
+blocks in another order are one `changed` of the list. A difference inside a
+block that moved also names its `reference_path`, for information only: a
+declaration uses the current `path` (the reference's, for `removed`).
+Binding a declaration to an object's id is #895.
+
 ## What the references show
 
 When this harness was added (core 0.3.20):

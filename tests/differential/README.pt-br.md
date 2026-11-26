@@ -180,6 +180,14 @@ Os campos de uma entrada:
 Uma diferença não declarada falha, e uma declarada que não acontece mais
 também.
 
+Listas de objetos que trazem todos um `id` string, não vazio e distinto
+(blocos, elementos) são alinhadas pelo id: um bloco inserido é um `added`, e
+os mesmos blocos em outra ordem são um `changed` da lista. Uma diferença
+dentro de um bloco que mudou de lugar também informa o seu
+`reference_path`, só como informação: uma declaração usa o `path` atual (o
+da referência, para `removed`). Vincular uma declaração ao id de um objeto é
+a #895.
+
 ## O que as referências mostram
 
 Quando este harness foi criado (core 0.3.20):

@@ -868,6 +868,11 @@
     "title": "dual-provider",
     "verbosity": "detailed"
   },
+  "converted": {
+    "a = \\frac{v}{t}": 2,
+    "s_0\\in\\mathbb{R}": 1,
+    "v": 1
+  },
   "refused": [],
   "unhandled": []
 }

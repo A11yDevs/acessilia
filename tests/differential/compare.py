@@ -63,8 +63,16 @@ def _item(kind: str, path: str, reference_path: str) -> dict[str, str]:
 
 
 def _identified(items: list[Any]) -> bool:
+    """Whether ``items`` are objects that all carry a distinct, non-empty
+    string ``id``; any other list (ids missing, repeated, empty or of
+    another type, an empty list) is compared position by position."""
     ids = [item.get("id") for item in items if isinstance(item, dict)]
-    return bool(items) and len(ids) == len(items) and None not in ids and len(set(ids)) == len(ids)
+    return (
+        bool(items)
+        and len(ids) == len(items)
+        and all(isinstance(value, str) and value for value in ids)
+        and len(set(ids)) == len(ids)
+    )
 
 
 def _aligned(reference: list[dict], current: list[dict], path: str, reference_path: str) -> list[dict[str, str]]:

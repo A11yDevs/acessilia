@@ -18,6 +18,11 @@ in every release.
   the page does not carry.
 - A rescued block is added during the plan, so it gets the inline math on
   the replan (M4b) and invalidates the formula conversions made before it.
+- The rescue's filter (`_omitted`) matched a text the page already carries
+  only from 8 characters on (`is_duplicate`): a shorter primary block the
+  secondary had merged into a longer one (`Fig. 2`, `Note 1`) came back
+  twice. A short text is now matched as whole words, case and spacing
+  folded (#891 review).
 - Tests: the detector on a routed page with and without primary-only blocks
   and on a page that kept the primary; the differential case
   `dual-provider` now rescues `See the cart at $v_0$.` on its routed page,

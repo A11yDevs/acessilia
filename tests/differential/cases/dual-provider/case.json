@@ -1,5 +1,5 @@
 {
-  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the page is routed to it (both sides have math): its formula is read from the secondary's region, and rescue-omitted puts back the sentence with inline math only the primary kept (#887), which the inline math marks on the replan.",
+  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: both providers have math, so the page is routed to the secondary (both_formula->mineru): its formula is read from the secondary's region, and rescue-omitted puts back the sentence with inline math only the primary kept (#887), which the inline math marks on the replan, dropping the conversions made before it.",
   "document": {
     "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
     "schema_version": "1.1.0",

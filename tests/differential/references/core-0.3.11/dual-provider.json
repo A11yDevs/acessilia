@@ -859,6 +859,10 @@
     "title": "dual-provider",
     "verbosity": "detailed"
   },
+  "converted": {
+    "a = \\frac{v}{t}": 1,
+    "v": 1
+  },
   "refused": [],
   "unhandled": []
 }

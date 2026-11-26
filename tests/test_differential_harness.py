@@ -67,6 +67,25 @@ def test_a_removed_block_is_checked_against_its_reference_place() -> None:
     assert explain(reference, current, declared) == ([], [])
 
 
+@pytest.mark.parametrize(
+    "ids",
+    [[["a", "b"], "c"], [None, "c"], ["", "c"], ["a", "a"], [1, 2]],
+    ids=["unhashable", "missing", "empty", "repeated", "not-strings"],
+)
+def test_a_list_whose_ids_are_not_distinct_strings_is_compared_by_position(ids) -> None:
+    """#891 review: only distinct, non-empty string ids align a list; any
+    other (an unhashable id included) is compared position by position,
+    without an error."""
+    reference = {"items": [{"id": value, "text": "x"} for value in ids]}
+    current = {"items": [{"id": value, "text": "y"} for value in ids]}
+
+    assert differences(reference, current) == [
+        {"kind": "changed", "path": "/items/0/text"},
+        {"kind": "changed", "path": "/items/1/text"},
+    ]
+    assert differences({"items": []}, {"items": []}) == []
+
+
 def test_a_declared_change_allows_only_its_value() -> None:
     """A later regression of a field whose change was declared still fails."""
     declared = [{"kind": "changed", "path": "/blocks/*/text", "expected": "x^{2}", "reason": "r"}]
