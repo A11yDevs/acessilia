@@ -32,6 +32,15 @@ from acessilia_sdk.toolbox.errors import (
 from docstruct.fusion.payload import fuse_extraction_payloads
 from docstruct.policy import FusionPolicy
 
+_UNAVAILABLE_PREFIX = "No provider available for extraction"
+
+
+def _failure_details(failures: dict[str, ToolboxError]) -> str:
+    """``provider: ExceptionType`` for each failure, in recording order."""
+    return "; ".join(
+        f"{provider}: {type(exc).__name__}" for provider, exc in failures.items()
+    )
+
 
 class DualFusionUnavailable(ToolboxProviderUnavailable):
     """Both structure providers failed during :func:`extract_dual_fused`.
@@ -40,19 +49,33 @@ class DualFusionUnavailable(ToolboxProviderUnavailable):
     in ``failures`` and any ``artifact_id`` upload fallbacks in
     ``artifact_fallbacks``, so callers that log (such as the core) can record
     per-provider diagnostics without coupling the SDK to a logger (ADR-0017).
+
+    Without an explicit ``message``, the message names every recorded failure:
+    ``No provider available for extraction (docling: ToolboxContractViolation;
+    mineru: ToolboxProviderUnavailable)``. The prefix stays stable, so callers
+    matching it keep working, and the details name each failure's type so a
+    provider that answered outside the envelope is not misdescribed as
+    unavailable.
     """
 
     def __init__(
         self,
         failures: dict[str, ToolboxError],
         artifact_fallbacks: tuple[str, ...] = (),
-        message: str = "No provider available for extraction",
+        message: str | None = None,
     ) -> None:
         self.failures = dict(failures)
         self.artifact_fallbacks = tuple(artifact_fallbacks)
+        if message is None:
+            details = _failure_details(self.failures)
+            message = (
+                f"{_UNAVAILABLE_PREFIX} ({details})" if details else _UNAVAILABLE_PREFIX
+            )
         super().__init__(message)
 
     def __reduce__(self) -> tuple[Any, ...]:
+        # ``args`` holds the formatted message; rebuild from it so the error
+        # survives pickling (process pools, multiprocessing queues).
         return (
             type(self),
             (self.failures, self.artifact_fallbacks, str(self)),

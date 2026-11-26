@@ -5,6 +5,17 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 The SDK is a public API for scripts and benchmarks (#402). Changes that a caller
 can see are recorded here, newest first.
 
+## Unreleased
+
+- **Changed** `DualFusionUnavailable` now builds its default message from
+  `failures`, appending `provider: ExceptionType` for each entry (for example
+  `No provider available for extraction (docling: ToolboxContractViolation;
+  mineru: ToolboxProviderUnavailable)`). The `No provider available for
+  extraction` prefix is kept, so callers matching it keep working, and an
+  explicit `message` is still honoured. A provider that answered outside the
+  envelope is no longer misdescribed as unavailable, though the kept prefix
+  still says so -- the parenthetical names the real failure type (#672).
+
 ## 0.7.0 (2026-11-24)
 
 - **Added** `plan_downscale` in `acessilia_sdk.toolbox.clients.pdf`: the pure

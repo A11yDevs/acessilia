@@ -5,6 +5,18 @@ Também disponível em **inglês (EUA)**: [English version](CHANGELOG.md)
 O SDK é uma API pública para scripts e benchmarks (#402). As mudanças visíveis
 para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
+## Não lançado
+
+- **Alterado** `DualFusionUnavailable` agora monta a mensagem padrão a partir de
+  `failures`, acrescentando `provedor: ExceptionType` para cada entrada (por
+  exemplo `No provider available for extraction (docling:
+  ToolboxContractViolation; mineru: ToolboxProviderUnavailable)`). O prefixo
+  `No provider available for extraction` é mantido, então quem o compara
+  continua funcionando, e um `message` explícito continua valendo. Um provedor
+  que respondeu fora do envelope deixa de ser descrito erroneamente como
+  indisponível, embora o prefixo mantido ainda o diga -- o parêntese nomeia o
+  tipo real da falha (#672).
+
 ## 0.7.0 (2026-11-24)
 
 - **Adicionado** `plan_downscale` em `acessilia_sdk.toolbox.clients.pdf`: a

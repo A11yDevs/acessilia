@@ -438,6 +438,45 @@ async def test_both_providers_answering_none_record_each_contract_violation() ->
 
 
 @pytest.mark.asyncio
+async def test_unavailable_message_names_each_provider_and_failure_type() -> None:
+    primary = _FakeStructureClient("docling", ToolboxProviderUnavailable("down"))
+    secondary = _FakeStructureClient("mineru", None)
+
+    with pytest.raises(DualFusionUnavailable) as caught:
+        await extract_dual_fused(primary, secondary, "doc.pdf")
+
+    assert isinstance(caught.value.failures["docling"], ToolboxProviderUnavailable)
+    assert isinstance(caught.value.failures["mineru"], ToolboxContractViolation)
+    assert str(caught.value) == (
+        "No provider available for extraction "
+        "(docling: ToolboxProviderUnavailable; mineru: ToolboxContractViolation)"
+    )
+
+
+def test_unavailable_message_stays_overridable_and_pickles() -> None:
+    failures = {
+        "docling": ToolboxProviderUnavailable("down"),
+        "mineru": ToolboxContractViolation("outside the envelope"),
+    }
+
+    err = DualFusionUnavailable(failures, ("docling",), message="custom message")
+
+    assert str(err) == "custom message"
+    restored = pickle.loads(pickle.dumps(err))
+    assert isinstance(restored, DualFusionUnavailable)
+    assert str(restored) == "custom message"
+    assert restored.failures.keys() == failures.keys()
+    assert {
+        provider: type(exc) for provider, exc in restored.failures.items()
+    } == {provider: type(exc) for provider, exc in failures.items()}
+    assert restored.artifact_fallbacks == ("docling",)
+
+
+def test_unavailable_message_without_failures_keeps_the_bare_prefix() -> None:
+    assert str(DualFusionUnavailable({})) == "No provider available for extraction"
+
+
+@pytest.mark.asyncio
 async def test_a_failed_status_secondary_keeps_the_primary_and_records_the_violation() -> None:
     primary = _FakeStructureClient(
         "docling",
