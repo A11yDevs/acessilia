@@ -4,9 +4,9 @@
     "document.adjudicate.page": 1,
     "document.structure.extract": 2,
     "document.text.spans": 1,
-    "math.convert": 3,
+    "math.convert": 4,
     "math.recognize": 1,
-    "math.verbalize": 2,
+    "math.verbalize": 3,
     "media.inspect": 1,
     "pdf.render": 3,
     "vlm": 1
@@ -21,7 +21,7 @@
       "reader"
     ],
     "audit": {
-      "block_count": 8,
+      "block_count": 9,
       "generated_by": "canonical_builder",
       "input_length": 8
     },
@@ -297,6 +297,12 @@
               "metadata": {
                 "confidence": null,
                 "manifest_element_id": "mineru-v1",
+                "page_judgement": {
+                  "choice": "mineru",
+                  "content": "mineru",
+                  "pB": null,
+                  "reason": "agree"
+                },
                 "parent_id": null,
                 "provider": "mineru",
                 "raw_label": "paragraph",
@@ -331,6 +337,12 @@
                 },
                 "formula_text_layer": "a = v t",
                 "manifest_element_id": "mineru-v2",
+                "page_judgement": {
+                  "choice": "mineru",
+                  "content": "mineru",
+                  "pB": null,
+                  "reason": "agree"
+                },
                 "parent_id": null,
                 "provider": "mineru",
                 "raw_label": "formula",
@@ -349,10 +361,44 @@
               "type": "math"
             },
             {
+              "id": "mineru-v4",
+              "metadata": {
+                "confidence": null,
+                "manifest_element_id": "mineru-v4",
+                "page_judgement": {
+                  "choice": "mineru",
+                  "content": "mineru",
+                  "pB": null,
+                  "reason": "agree"
+                },
+                "parent_id": null,
+                "provider": "mineru",
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 315.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 300.0
+                },
+                "page_number": 3
+              },
+              "text": "The cart starts at $v$ and speeds up.",
+              "type": "paragraph"
+            },
+            {
               "id": "mineru-v3",
               "metadata": {
                 "confidence": null,
                 "manifest_element_id": "mineru-v3",
+                "page_judgement": {
+                  "choice": "mineru",
+                  "content": "mineru",
+                  "pB": null,
+                  "reason": "agree"
+                },
                 "parent_id": null,
                 "provider": "mineru",
                 "raw_label": "paragraph",
@@ -372,7 +418,7 @@
             }
           ],
           "page_number": 3,
-          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\na = \\frac{v}{t}\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual."
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\na = \\frac{v}{t}\nThe cart starts at $v$ and speeds up.\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual."
         }
       ],
       "pddl_comparison_verdict": null,
@@ -674,6 +720,12 @@
             "metadata": {
               "confidence": null,
               "manifest_element_id": "mineru-v1",
+              "page_judgement": {
+                "choice": "mineru",
+                "content": "mineru",
+                "pB": null,
+                "reason": "agree"
+              },
               "parent_id": null,
               "provider": "mineru",
               "raw_label": "paragraph",
@@ -710,6 +762,12 @@
               "formula_text_layer": "a = v t",
               "manifest_element_id": "mineru-v2",
               "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>a = \\frac{v}{t}</mtext></math>",
+              "page_judgement": {
+                "choice": "mineru",
+                "content": "mineru",
+                "pB": null,
+                "reason": "agree"
+              },
               "parent_id": null,
               "provider": "mineru",
               "raw_label": "formula",
@@ -728,10 +786,52 @@
             "type": "math"
           },
           {
+            "id": "mineru-v4",
+            "metadata": {
+              "confidence": null,
+              "inline_math": [
+                {
+                  "latex": "v",
+                  "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>v</mtext></math>",
+                  "source": "v",
+                  "speech": "spoken v"
+                }
+              ],
+              "manifest_element_id": "mineru-v4",
+              "page_judgement": {
+                "choice": "mineru",
+                "content": "mineru",
+                "pB": null,
+                "reason": "agree"
+              },
+              "parent_id": null,
+              "provider": "mineru",
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 315.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 300.0
+              },
+              "page_number": 3
+            },
+            "text": "The cart starts at $v$ and speeds up.",
+            "type": "paragraph"
+          },
+          {
             "id": "mineru-v3",
             "metadata": {
               "confidence": null,
               "manifest_element_id": "mineru-v3",
+              "page_judgement": {
+                "choice": "mineru",
+                "content": "mineru",
+                "pB": null,
+                "reason": "agree"
+              },
               "parent_id": null,
               "provider": "mineru",
               "raw_label": "paragraph",
@@ -765,6 +865,11 @@
     "technical_warnings": [],
     "title": "dual-provider",
     "verbosity": "detailed"
+  },
+  "converted": {
+    "a = \\frac{v}{t}": 2,
+    "s_0\\in\\mathbb{R}": 1,
+    "v": 1
   },
   "refused": [],
   "unhandled": []

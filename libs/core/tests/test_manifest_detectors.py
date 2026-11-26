@@ -9,6 +9,8 @@ materialization step and the ``inspect_document_needs`` facade.
 
 from __future__ import annotations
 
+import pytest
+
 from acessilia_core.manifest import builder
 from acessilia_core.manifest.detectors import (
     MAX_ID_SUFFIX,
@@ -298,6 +300,25 @@ def test_detect_page_fusion_needs_covers_judge_rescue_table_and_repetition() -> 
     without_judge = detect_page_fusion_needs([para, table], stats, 1, judge=False)
     adjudicate = next(c for c in without_judge if c.kind == "adjudicate-page")
     assert adjudicate.methods == ["human-review"]
+
+
+@pytest.mark.parametrize(
+    ("route", "unilateral", "rescued"),
+    [("mineru", 1, True), ("docling", 1, False), ("mineru", 0, False)],
+    ids=["routed-with-primary-only-blocks", "kept-primary", "routed-without-them"],
+)
+def test_a_page_routed_to_the_secondary_that_lost_primary_blocks_asks_for_the_rescue(
+    route, unilateral, rescued
+) -> None:
+    """#887: the differ counts a block only the primary had as
+    ``unilateral-docling``, never as dropped; on a page routed to the
+    secondary that block is gone, so the rescue is asked for."""
+    para = _element("el-1", "paragraph", text="Hello")
+    stats = {"route": route, "route_reason": "secondary_structure_superset", "unilateral-docling": unilateral}
+
+    kinds = {candidate.kind for candidate in detect_page_fusion_needs([para], stats, 3, judge=False)}
+
+    assert ("rescue-omitted-block" in kinds) is rescued
 
 
 def test_detect_fusion_needs_emits_single_document_fuse_providers_and_respects_budget() -> None:

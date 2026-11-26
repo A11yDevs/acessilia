@@ -2,7 +2,10 @@
 
 ``rescue-omitted-block`` is emitted for a page where the block-level fusion
 dropped a primary (Docling) block (``dropped-docling-*`` in the page's fusion
-stats). The method ports Dr.DocBench's ``rescue_omitted`` (tree_differ_v2.py of
+stats), and, since core 0.3.24 (#887), for a page routed to the secondary
+provider that had blocks only the primary extracted (``unilateral-docling``):
+the differ runs with ``min_len=0`` and never drops those, but the route loses
+them. The method ports Dr.DocBench's ``rescue_omitted`` (tree_differ_v2.py of
 the drbench-2026-snapshot tag): a primary text block that reads as legitimate
 text is kept even when the fusion would discard it.
 
@@ -33,6 +36,7 @@ executor selects what a handler adds and replans for it.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -405,7 +409,22 @@ def _omitted(
     text = element.text or ""
     if not is_legitimate_text(text):
         return False
-    return not is_duplicate(text, [page_text], min_len=_MIN_CONTAINED_TEXT)
+    return not _contained(text, page_text)
+
+
+def _contained(text: str, page_text: str) -> bool:
+    """Whether the page already carries ``text``.
+
+    ``is_duplicate`` decides from ``_MIN_CONTAINED_TEXT`` characters on, as a
+    plain substring. A shorter block (``Fig. 2``, ``Note 1``) is matched as
+    whole words, case and spacing folded, so one the secondary merged into a
+    longer block is not inserted again (#891 review), and a short text is
+    not taken for part of a longer word.
+    """
+    if is_duplicate(text, [page_text], min_len=_MIN_CONTAINED_TEXT):
+        return True
+    needle, haystack = (" ".join(value.casefold().split()) for value in (text, page_text))
+    return bool(needle) and re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
 
 
 def _renumber(manifest: ProcessingManifest, pages: set[int]) -> None:

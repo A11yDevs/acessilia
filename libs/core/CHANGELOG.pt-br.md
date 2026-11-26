@@ -2,6 +2,33 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.24 — uma página roteada para o provedor secundário recupera o texto que só o primário tinha (#887)
+
+`rescue-omitted-block` (#236) só era emitido para uma página cujas
+estatísticas de fusão contavam um bloco primário descartado
+(`dropped-docling-*`). O resgate existe para as páginas que o roteador toma
+do provedor secundário, que perdem todo bloco primário que o secundário não
+extraiu; mas o differ roda com `min_len=0`, então um bloco legítimo só do
+primário é contado como `unilateral-docling`, nunca descartado. Essa página
+perdia o texto, em silêncio, em todas as releases.
+- O detector agora também pede o resgate para uma página roteada para o
+  secundário (`route: mineru`, o nome que o differ dá ao lado secundário) com
+  blocos `unilateral-docling` (`_primary_blocks_lost`). O filtro do próprio
+  handler (`_omitted`) ainda decide qual bloco volta: texto legítimo que a
+  página não traz.
+- Um bloco resgatado é acrescentado durante o plano, então recebe a
+  matemática inline no replanejamento (M4b) e invalida as conversões de
+  fórmula feitas antes dele.
+- O filtro do resgate (`_omitted`) só reconhecia um texto que a página já
+  traz a partir de 8 caracteres (`is_duplicate`): um bloco primário mais
+  curto que o secundário juntou a outro maior (`Fig. 2`, `Note 1`) voltava
+  duplicado. Um texto curto agora é casado por palavras inteiras, com caixa e
+  espaços normalizados (revisão do #891).
+- Testes: o detector numa página roteada com e sem blocos só do primário e
+  numa página que manteve o primário; o caso diferencial `dual-provider`
+  agora resgata `See the cart at $v_0$.` na página roteada, com a sua
+  matemática inline, e as referências o declaram.
+
 ## 0.3.23 — um redirecionamento do mesmo tipo sob o mesmo id é uma mudança (#843)
 
 O M0 (#832) pulava um passo do plano cuja obrigação mudou sob o mesmo id,

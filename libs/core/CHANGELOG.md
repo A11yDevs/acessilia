@@ -2,6 +2,32 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.24 — a page routed to the secondary provider gets its primary-only text back (#887)
+
+`rescue-omitted-block` (#236) was emitted only for a page whose fusion
+stats counted a dropped primary block (`dropped-docling-*`). The rescue
+exists for the pages the router takes from the secondary provider, which
+lose every primary block the secondary did not extract; but the differ runs
+with `min_len=0`, so a legitimate primary-only block is counted
+`unilateral-docling`, never dropped. Such a page lost that text, silently,
+in every release.
+- The detector now also asks for the rescue on a page routed to the
+  secondary (`route: mineru`, the differ's name for the secondary side) with
+  `unilateral-docling` blocks (`_primary_blocks_lost`). The handler's own
+  filter (`_omitted`) still decides which block comes back: legitimate text
+  the page does not carry.
+- A rescued block is added during the plan, so it gets the inline math on
+  the replan (M4b) and invalidates the formula conversions made before it.
+- The rescue's filter (`_omitted`) matched a text the page already carries
+  only from 8 characters on (`is_duplicate`): a shorter primary block the
+  secondary had merged into a longer one (`Fig. 2`, `Note 1`) came back
+  twice. A short text is now matched as whole words, case and spacing
+  folded (#891 review).
+- Tests: the detector on a routed page with and without primary-only blocks
+  and on a page that kept the primary; the differential case
+  `dual-provider` now rescues `See the cart at $v_0$.` on its routed page,
+  with its inline math, and the references declare it.
+
 ## 0.3.23 — a same-type retarget under the same id is a change (#843)
 
 M0 (#832) skipped a plan step whose obligation changed under its id, but
