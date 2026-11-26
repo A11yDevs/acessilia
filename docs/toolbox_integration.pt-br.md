@@ -511,22 +511,24 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 > seguintes (fusão, text spans) reenviam o arquivo. Com o cache remoto ativo, a
 > Toolbox pode responder a partir do `cache_key` sem reprocessar.
 >
-> Em `FUSION_MODE=dual`, uma falha de provider (timeout, indisponibilidade ou um
-> erro HTTP não mapeado, como 500) de qualquer um dos dois degrada a extração
-> para o outro: o documento leva um aviso técnico (`extraction_degraded`,
-> `extraction_failures`) e não é cacheado. Uma recusa do próprio documento
-> (mídia não suportada, entrada inválida, contrato, autenticação) pelo primário
-> derruba o job; pelo secundário, só degrada.
+> Em `FUSION_MODE=dual`, uma falha de provider de qualquer um dos dois degrada
+> a extração para o outro: timeout, indisponibilidade, um erro HTTP não mapeado
+> (como 500) ou uma violação de contrato. A violação de contrato é específica do
+> provider nas duas formas: a levantada pelo transporte (HTTP 422, JSON
+> inválido, `status` diferente de `succeeded`) e a levantada pela validação do
+> envelope no core (resposta que não é objeto, com `status` diferente de
+> `succeeded`, sem objeto `document` ou com `provenance` que não seja objeto).
+> É a mesma classificação que o `extract_dual_fused` do SDK aplica. O documento
+> degradado leva um aviso técnico (`extraction_degraded`,
+> `extraction_failures`) e não é cacheado. Uma recusa do próprio documento que
+> nenhum provider resolveria (mídia não suportada, entrada inválida,
+> autenticação) é permanente: pelo primário, derruba o job; pelo secundário, só
+> degrada. Se os dois providers falharem, o erro tipado propaga; quando as duas
+> falhas são de provider, é um `ToolboxUnavailable` com as duas causas.
 >
-> Uma resposta malformada é distinta de uma recusa de contrato no transporte:
-> uma resposta que não é objeto, com `status` diferente de `succeeded`, sem
-> objeto `document` ou com `provenance` que não seja objeto é uma falha por
-> provider, então no modo dual o primário inválido passa para o secundário e um
-> secundário inválido mantém o primário completo; se ambos estiverem
-> malformados, o erro tipado propaga. O caso de `status` é o que um cliente
-> injetado pode produzir; o transporte real rejeita uma resposta com status
-> diferente de `succeeded` antes deste guard. A recusa de transporte acima
-> mantém sua permanência quando vem do primário.
+> O caso de `status` é o que um cliente injetado ou duck-typed pode produzir; o
+> transporte real rejeita uma resposta com `status` diferente de `succeeded`
+> antes de chegar ao guard do core, como uma violação de contrato própria.
 
 ---
 

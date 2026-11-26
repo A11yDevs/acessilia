@@ -2,6 +2,31 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.26 — a violação de contrato é falha de provider no modo dual (#699)
+
+O extrator do core e a fusão do SDK classificavam de formas diferentes uma
+`ToolboxContractViolation` levantada pelo cliente: a recusa do transporte
+(HTTP 422, JSON inválido, `status` diferente de `succeeded`) derrubava o job
+no modo dual, enquanto o `extract_dual_fused` do SDK degradava para o outro
+provider. A exceção é sobre a resposta do provider a este documento, não
+sobre o documento em si, então outro provider pode respondê-lo corretamente.
+- `_provider_failure` agora inclui `ToolboxContractViolation`, seja ela
+  levantada pelo transporte ou pela validação do envelope no core. No modo
+  dual um primário inválido passa para o secundário, um secundário inválido
+  mantém o primário completo, e duas falhas de provider levantam
+  `ToolboxUnavailable` com as duas causas em vez do erro do secundário com o
+  primário como causa.
+- As recusas permanentes são as que nenhum provider resolveria: mídia não
+  suportada, entrada inválida e autenticação. Pelo primário, ainda derrubam o
+  job; pelo secundário, só degradam.
+- Testes: uma violação de contrato levantada pelo cliente no modo single
+  (levanta) e no modo dual (degrada, ou levanta `ToolboxUnavailable` quando
+  os dois providers recusam); os casos de validação do envelope agora também
+  fixam a classificação compartilhada.
+- A documentação (`docs/toolbox_integration.md` e `.pt-br.md`) e as
+  docstrings do extrator e da fusão do SDK declaram a classificação
+  compartilhada.
+
 ## 0.3.25 — uma redescrição falha não desdescreve uma imagem (#681)
 
 `_fold_picture_description` mantinha um ramo para uma resposta sem texto que

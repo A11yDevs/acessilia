@@ -2,6 +2,28 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.26 — a contract violation is a provider failure in dual mode (#699)
+
+The core extractor and the SDK fusion classified a client-raised
+`ToolboxContractViolation` differently: the transport's rejection (HTTP 422,
+invalid JSON, a non-`succeeded` status) was job-fatal in dual mode, while the
+SDK's `extract_dual_fused` degraded to the other provider. The exception is
+about the provider's answer to this document, not about the document itself,
+so another provider may answer it correctly.
+- `_provider_failure` now includes `ToolboxContractViolation`, whether the
+  transport or the core's envelope validation raised it. In dual mode an
+  invalid primary hands over to the secondary, an invalid secondary keeps the
+  complete primary, and two provider failures raise `ToolboxUnavailable` with
+  both causes instead of the secondary's error with the primary as its cause.
+- The permanent rejections are the ones no provider would solve: unsupported
+  media, invalid input and authentication. From the primary they still fail
+  the job; from the secondary they only degrade.
+- Tests: a client-raised contract violation in single mode (raises) and dual
+  mode (degrades, or raises `ToolboxUnavailable` when both providers reject);
+  the envelope-validation cases now pin the shared classification too.
+- The docs (`docs/toolbox_integration.md` and `.pt-br.md`) and the extractor
+  and SDK fusion docstrings state the shared classification.
+
 ## 0.3.25 — a failed re-description does not un-describe a picture (#681)
 
 `_fold_picture_description` kept a branch for an answer with no text that no
