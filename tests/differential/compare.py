@@ -12,33 +12,86 @@ from typing import Any
 from tests.differential.runner import escape
 
 
-def differences(reference: Any, current: Any, path: str = "") -> list[dict[str, str]]:
+def differences(
+    reference: Any, current: Any, path: str = "", reference_path: str | None = None
+) -> list[dict[str, str]]:
     """Where ``current`` departs from ``reference``: each ``{kind, path}``,
     ``kind`` being ``added``, ``removed`` or ``changed`` and ``path`` a JSON
-    pointer (``/sections/0/blocks/2/alt_text``)."""
+    pointer into ``current`` (into ``reference`` for ``removed``):
+    ``/sections/0/blocks/2/alt_text``.
+
+    A list of objects that all carry a distinct ``id`` (blocks, elements) is
+    aligned by id, so a block inserted (a rescued paragraph) is one
+    ``added``, not a change of every block after it; the same ids in
+    another order are one ``changed`` of the list. Any other list is
+    compared position by position. Where an aligned object moved, a
+    difference inside it also names its ``reference_path``.
+    """
+    reference_path = path if reference_path is None else reference_path
     if isinstance(reference, dict) and isinstance(current, dict):
         found: list[dict[str, str]] = []
         for key in sorted(set(reference) | set(current)):
-            child = f"{path}/{escape(key)}"
+            child, reference_child = f"{path}/{escape(key)}", f"{reference_path}/{escape(key)}"
             if key not in reference:
                 found.append({"kind": "added", "path": child})
             elif key not in current:
-                found.append({"kind": "removed", "path": child})
+                found.append(_item("removed", reference_child, reference_child))
             else:
-                found.extend(differences(reference[key], current[key], child))
+                found.extend(differences(reference[key], current[key], child, reference_child))
         return found
     if isinstance(reference, list) and isinstance(current, list):
+        if _identified(reference) and _identified(current):
+            return _aligned(reference, current, path, reference_path)
         found = []
         for index in range(max(len(reference), len(current))):
-            child = f"{path}/{index}"
+            child, reference_child = f"{path}/{index}", f"{reference_path}/{index}"
             if index >= len(reference):
                 found.append({"kind": "added", "path": child})
             elif index >= len(current):
-                found.append({"kind": "removed", "path": child})
+                found.append(_item("removed", reference_child, reference_child))
             else:
-                found.extend(differences(reference[index], current[index], child))
+                found.extend(differences(reference[index], current[index], child, reference_child))
         return found
-    return [] if reference == current else [{"kind": "changed", "path": path or "/"}]
+    return [] if reference == current else [_item("changed", path or "/", reference_path or "/")]
+
+
+def _item(kind: str, path: str, reference_path: str) -> dict[str, str]:
+    item = {"kind": kind, "path": path}
+    if reference_path != path:
+        item["reference_path"] = reference_path
+    return item
+
+
+def _identified(items: list[Any]) -> bool:
+    """Whether ``items`` are objects that all carry a distinct, non-empty
+    string ``id``; any other list (ids missing, repeated, empty or of
+    another type, an empty list) is compared position by position."""
+    ids = [item.get("id") for item in items if isinstance(item, dict)]
+    return (
+        bool(items)
+        and len(ids) == len(items)
+        and all(isinstance(value, str) and value for value in ids)
+        and len(set(ids)) == len(ids)
+    )
+
+
+def _aligned(reference: list[dict], current: list[dict], path: str, reference_path: str) -> list[dict[str, str]]:
+    before = {item["id"]: index for index, item in enumerate(reference)}
+    after = {item["id"]: index for index, item in enumerate(current)}
+    found: list[dict[str, str]] = []
+    if [key for key in before if key in after] != [key for key in after if key in before]:
+        found.append(_item("changed", path, reference_path))
+    for index, item in enumerate(current):
+        if item["id"] not in before:
+            found.append({"kind": "added", "path": f"{path}/{index}"})
+        else:
+            old = before[item["id"]]
+            found.extend(differences(reference[old], item, f"{path}/{index}", f"{reference_path}/{old}"))
+    found.extend(
+        _item("removed", f"{reference_path}/{index}", f"{reference_path}/{index}")
+        for index, item in enumerate(reference) if item["id"] not in after
+    )
+    return found
 
 
 def explain(
@@ -63,7 +116,7 @@ def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, curre
     if entry["kind"] != item["kind"] or not fnmatchcase(item["path"], entry["path"]):
         return False
     if entry["kind"] == "removed":
-        return "was" not in entry or resolve(reference, item["path"]) == entry["was"]
+        return "was" not in entry or resolve(reference, item.get("reference_path", item["path"])) == entry["was"]
     if "expected" not in entry:
         raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
     return resolve(current, item["path"]) == entry["expected"]

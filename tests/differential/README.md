@@ -19,10 +19,9 @@ What the cases establish is limited to what they run:
 
 - eight synthetic documents, of one to three pages;
 - one extraction provider, except `dual-provider` (`FUSION_MODE=dual`),
-  which exercises the page adjudication, `select-table-source` and a page
-  routed to the secondary provider. `fuse-providers` and the text fusion
-  (`dual-provider-fusion`) are not exercised, and `rescue-omitted` never
-  fires: its trigger does not meet the pages it exists for (#887);
+  which exercises the page adjudication, `select-table-source`, and a page
+  routed to the secondary provider with `rescue-omitted`. `fuse-providers`
+  and the text fusion (`dual-provider-fusion`) are not exercised;
 - a Toolbox that answers, except in `degraded`, where `math.recognize` and
   `document.text.spans` are unavailable and the vision model fails on one
   picture. These are failures at call time (HTTP 503); the availability
@@ -105,7 +104,7 @@ change in what is sent shows in the output.
 | `mostly-visual` | a page with no text content, whose placeholder visuals are described |
 | `inline-math` | prose marked from the text layer's fonts (M4b), and a formula that reads its variables |
 | `multi-page` | a picture, a formula and a table read from its image, each on its own page |
-| `dual-provider` | two providers on three pages: a page adjudicated, a table adopted from the secondary and marked again (M4b's `inline_math_stale`), a page routed to the secondary that loses a primary-only paragraph (#887) |
+| `dual-provider` | two providers on three pages: a page adjudicated, a table adopted from the secondary and marked again (M4b's `inline_math_stale`), a page routed to the secondary whose primary-only paragraph, with inline math, `rescue-omitted` puts back (#887) |
 | `degraded` | `math.recognize` and `document.text.spans` unavailable, and the vision model failing on one of two pictures: the formula falls back to the vision model, the inline math is unavailable, one picture is left undescribed with a warning |
 
 ## The references
@@ -174,6 +173,13 @@ The fields of an entry:
 An undeclared difference fails, and so does a declared one that no longer
 happens.
 
+Lists of objects that all carry a distinct, non-empty string `id` (blocks,
+elements) are aligned by id: an inserted block is one `added`, and the same
+blocks in another order are one `changed` of the list. A difference inside a
+block that moved also names its `reference_path`, for information only: a
+declaration uses the current `path` (the reference's, for `removed`).
+Binding a declaration to an object's id is #895.
+
 ## What the references show
 
 When this harness was added (core 0.3.20):
@@ -207,8 +213,9 @@ The cases added for #876 (core 0.3.23) show:
     declared;
   - the formula of the page routed to the secondary is read from the
     secondary's region the same way by every release;
-  - every release loses the paragraph that only the primary provider kept on
-    the routed page (#887), which a pinning test fixes until it is fixed.
+  - every recorded release loses the paragraph that only the primary
+    provider kept on the routed page; core 0.3.24 (#887) rescues it, with
+    its inline math, and every reference declares it.
 - **`degraded`** matches every reference but `core-0.3.14`, where the
   pictures' surrounding text differs, the same M3 difference as in
   `formulas`.

@@ -21,10 +21,9 @@ O que os casos estabelecem se limita ao que eles rodam:
 - oito documentos sintéticos, de uma a três páginas;
 - um provedor de extração, exceto em `dual-provider` (`FUSION_MODE=dual`), que
   exercita a adjudicação de página, o `select-table-source` e uma página
-  roteada para o provedor secundário. O `fuse-providers` e a fusão de texto
-  (`dual-provider-fusion`) não são exercitados, e o `rescue-omitted` nunca
-  dispara: o seu gatilho não alcança as páginas para as quais ele existe
-  (#887);
+  roteada para o provedor secundário com o `rescue-omitted`. O
+  `fuse-providers` e a fusão de texto (`dual-provider-fusion`) não são
+  exercitados;
 - um Toolbox que responde, exceto em `degraded`, em que `math.recognize` e
   `document.text.spans` estão indisponíveis e o modelo de visão falha numa
   figura. São falhas na chamada (HTTP 503); o gate de disponibilidade está
@@ -110,7 +109,7 @@ mudança no que é enviado aparece na saída.
 | `mostly-visual` | uma página sem conteúdo textual, cujos visuais de placeholder são descritos |
 | `inline-math` | prosa marcada a partir das fontes da camada de texto (M4b), e uma fórmula que lê as suas variáveis |
 | `multi-page` | uma figura, uma fórmula e uma tabela lida da sua imagem, cada uma na sua página |
-| `dual-provider` | dois provedores em três páginas: uma página adjudicada, uma tabela adotada do secundário e marcada de novo (o `inline_math_stale` do M4b), uma página roteada para o secundário que perde um parágrafo só do primário (#887) |
+| `dual-provider` | dois provedores em três páginas: uma página adjudicada, uma tabela adotada do secundário e marcada de novo (o `inline_math_stale` do M4b), uma página roteada para o secundário cujo parágrafo só do primário, com matemática inline, o `rescue-omitted` devolve (#887) |
 | `degraded` | `math.recognize` e `document.text.spans` indisponíveis, e o modelo de visão falhando numa de duas figuras: a fórmula recai no modelo de visão, a matemática inline fica indisponível, uma figura fica sem descrição, com aviso |
 
 ## As referências
@@ -181,6 +180,14 @@ Os campos de uma entrada:
 Uma diferença não declarada falha, e uma declarada que não acontece mais
 também.
 
+Listas de objetos que trazem todos um `id` string, não vazio e distinto
+(blocos, elementos) são alinhadas pelo id: um bloco inserido é um `added`, e
+os mesmos blocos em outra ordem são um `changed` da lista. Uma diferença
+dentro de um bloco que mudou de lugar também informa o seu
+`reference_path`, só como informação: uma declaração usa o `path` atual (o
+da referência, para `removed`). Vincular uma declaração ao id de um objeto é
+a #895.
+
 ## O que as referências mostram
 
 Quando este harness foi criado (core 0.3.20):
@@ -215,8 +222,9 @@ Os casos acrescentados pela #876 (core 0.3.23) mostram:
     antes da #599, deixava a célula sem marca: declarado;
   - a fórmula da página roteada para o secundário é lida da região do
     secundário do mesmo jeito por toda release;
-  - toda release perde o parágrafo que só o provedor primário manteve na
-    página roteada (#887), o que um teste de fixação registra até a correção.
+  - toda release gravada perde o parágrafo que só o provedor primário manteve
+    na página roteada; o core 0.3.24 (#887) o resgata, com a sua matemática
+    inline, e todas as referências o declaram.
 - **`degraded`** coincide com todas as referências, menos `core-0.3.14`, em
   que o texto ao redor das figuras difere, a mesma diferença do M3 que em
   `formulas`.

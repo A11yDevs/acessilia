@@ -91,6 +91,9 @@ class FakeToolbox:
         self.calls: list[str] = []
         self.unhandled: list[str] = []
         self.refused: list[str] = []
+        #: The LaTeX each ``math.convert`` call converted, in order: a
+        #: conversion done again shows twice.
+        self.converted: list[str] = []
         failures = case.get("failures") or {}
         self._failing_capabilities = frozenset(failures.get("capabilities") or [])
         self._failing_elements = frozenset(failures.get("vision") or [])
@@ -234,6 +237,7 @@ class FakeToolbox:
 
     def _math_convert(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
         latex = _latex(form, files)
+        self.converted.append(latex)
         return {
             "latex": latex,
             "mathml": f'<math xmlns="http://www.w3.org/1998/Math/MathML"><mtext>{_escape(latex)}</mtext></math>',

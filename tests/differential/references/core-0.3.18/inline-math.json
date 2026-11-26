@@ -305,6 +305,11 @@
     "title": "inline-math",
     "verbosity": "detailed"
   },
+  "converted": {
+    "h\\neq0": 1,
+    "h⁢(12 + h)": 1,
+    "s_0\\in\\mathbb{R}": 1
+  },
   "refused": [],
   "unhandled": []
 }

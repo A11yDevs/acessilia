@@ -7,14 +7,21 @@ default or injected via ``id_factory``.
 
 
 import re
-from typing import Any, Callable
+from typing import Any
 
 from docstruct.blocks.classify import extract_plain_heading
 from docstruct.text.math_spans import split_inline_math
 from docstruct.text.sanitize import BEFORE_WORD, sanitize_block_text
+from docstruct.types import BlockIdFactory
 
 
-def parse_text_to_blocks(text: str, id_factory: Callable[[int], str] | None = None) -> list[dict[str, Any]]:
+def parse_text_to_blocks(text: str, id_factory: BlockIdFactory | None = None) -> list[dict[str, Any]]:
+    """Parse plain text into canonical blocks.
+
+    ``id_factory`` (a ``BlockIdFactory``) receives each block's 1-based index;
+    it is not the zero-argument ``DocumentIdFactory`` of
+    ``docstruct.canonical.build_canonical_document``.
+    """
     blocks: list[dict[str, Any]] = []
     lines = text.splitlines()
     i = 0
@@ -110,10 +117,11 @@ def parse_text_to_blocks(text: str, id_factory: Callable[[int], str] | None = No
 
 def _attach_ids(
     blocks: list[dict[str, Any]],
-    id_factory: Callable[[int], str] | None = None,
+    id_factory: BlockIdFactory | None = None,
 ) -> list[dict[str, Any]]:
     """Ensure every block has an id. Default ids are deterministic
-    (``blk-<index>``); pass ``id_factory`` for custom schemes (e.g. uuid)."""
+    (``blk-<index>``); pass a ``BlockIdFactory`` for custom schemes (e.g.
+    uuid), invoked with each block's 1-based index."""
     factory = id_factory or (lambda index: f"blk-{index}")
     for index, block in enumerate(blocks, start=1):
         block.setdefault("id", factory(index))

@@ -304,6 +304,34 @@ def test_text_the_secondary_merged_into_another_block_is_not_duplicated(tmp_path
     assert _texts(manifest) == [f"{first} {second}"]
 
 
+@pytest.mark.parametrize(("first", "second"), [("Fig. 2", "Note 1"), ("fig. 2", "NOTE  1")])
+def test_short_text_the_secondary_merged_into_another_block_is_not_duplicated(tmp_path, first, second):
+    """#891 review: below ``_MIN_CONTAINED_TEXT`` characters the containment
+    is a whole-word match, case and spacing folded."""
+    elements = [_adopted("m-1", "paragraph", "Fig. 2 Note 1", MIDDLE, 1)]
+    replaced = {1: [
+        _row("d-1", "paragraph", first, (40, 200, 560, 240), 1),
+        _row("d-2", "paragraph", second, (40, 400, 560, 440), 2),
+    ]}
+    manifest = _manifest(tmp_path, elements, replaced=replaced)
+
+    result = _rescue(manifest)
+
+    assert result.success
+    assert _texts(manifest) == ["Fig. 2 Note 1"]
+
+
+def test_a_short_text_inside_a_longer_word_is_still_rescued(tmp_path):
+    """``Note 1`` is not carried by ``Notes 12``: the match is on whole words."""
+    elements = [_adopted("m-1", "paragraph", "Notes 12 and more", MIDDLE, 1)]
+    replaced = {1: [_row("d-1", "paragraph", "Note 1", (40, 400, 560, 440), 1)]}
+    manifest = _manifest(tmp_path, elements, replaced=replaced)
+
+    _rescue(manifest)
+
+    assert "Note 1" in _texts(manifest)
+
+
 def test_text_inside_a_primary_picture_is_not_rescued(tmp_path):
     elements = [_adopted("m-1", "picture", "", MIDDLE, 1)]
     replaced = {1: [

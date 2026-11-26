@@ -112,14 +112,63 @@ def test_the_table_adopted_from_the_secondary_is_marked_again(runs) -> None:
     assert rows[-3:] == [["Mass", "3 kg"], ["Speed", "4 m/s"], ["Start", "$s_0\\in\\mathbb{R}$"]]
 
 
-def test_the_primary_only_paragraph_of_a_routed_page_is_still_lost(runs) -> None:
-    """Pins #887 (a pinning test: the CI refuses xfail). Page 3 is routed to
-    the secondary, and ``See the cart.``, which only the primary kept, is
-    lost with no rescue obligation. When #887 is fixed, invert this
-    assertion and declare the restored paragraph in the references'
-    ``intended.json``."""
-    texts = [block.get("text") or "" for block in _blocks(runs["dual-provider"]["canonical"])]
-    assert "See the cart." not in texts
+def test_the_primary_only_paragraph_of_a_routed_page_is_rescued(runs) -> None:
+    """#887: page 3 is routed to the secondary, which lacks the sentence only
+    the primary kept. ``rescue-omitted`` puts it back, in its place, with
+    its inline math, which the canonical build converts."""
+    page = [block for block in _blocks(runs["dual-provider"]["canonical"])
+            if block.get("source_location", {}).get("page_number") == 3]
+    texts = [block.get("text") or "" for block in page]
+
+    assert texts.index("See the cart at $v_0$.") == 1
+    rescued = page[1]
+    assert [entry["latex"] for entry in rescued["metadata"]["inline_math"]] == ["v_0"]
+
+
+def _routed_page(tmp_path, sentence: str, secondary_math: bool) -> dict:
+    """``dual-provider``'s page 3 alone, routed to the secondary; the primary
+    alone keeps ``sentence``. Run here, compared with no reference: the
+    reproduction of #887 as it was found, and its inline-math variant."""
+    from tests.differential import build_cases
+
+    spec = build_cases.CASES["dual-provider"]
+    primary = [element.model_copy(deep=True) for element in spec["elements"] if element.page_number == 3]
+    secondary = [element.model_copy(deep=True) for element in spec["secondary"] if element.page_number == 3]
+    if not secondary_math:
+        secondary = [element for element in secondary if element.id != "v4"]
+    for element in [*primary, *secondary]:
+        element.page_number = 1
+        element.provenance[0].page_number = 1
+    primary[1] = primary[1].model_copy(update={"text": sentence})
+    case = build_cases.build("routed", {
+        "description": "", "environment": {"FUSION_MODE": "dual"}, "elements": primary,
+        "secondary": secondary, "vision": spec["vision"], "latex": spec["latex"],
+    })
+    target = tmp_path / "routed" / "case.json"
+    target.parent.mkdir()
+    target.write_text(json.dumps(case, ensure_ascii=False), encoding="utf-8")
+    return run_case(target)
+
+
+@pytest.mark.parametrize(
+    ("sentence", "secondary_math", "conversions"),
+    [("See the cart.", False, 1), ("See the cart at $v_0$.", True, 2)],
+    ids=["as-found", "with-inline-math"],
+)
+def test_a_routed_page_rescues_its_primary_only_sentence_once(tmp_path, sentence, secondary_math, conversions) -> None:
+    """#887 as it was found (``secondary_structure_superset``) and with
+    inline math (``both_formula->mineru``): the sentence comes back once, in
+    its place, and nothing critical is left open. With inline math, the
+    rescued block is variable evidence the planned conversion did not see,
+    so the conversion is dropped and done again (#891 review): the formula
+    is converted twice, against once when the sentence has none."""
+    outcome = _routed_page(tmp_path, sentence, secondary_math)
+    texts = [block.get("text") or "" for block in _blocks(outcome["canonical"])]
+
+    assert outcome["unhandled"] == []
+    assert texts.count(sentence) == 1 and texts.index(sentence) == 1
+    assert outcome["canonical"]["metadata"]["pddl_unsatisfied_obligations"] == []
+    assert outcome["converted"]["a = \\frac{v}{t}"] == conversions
 
 
 @pytest.mark.parametrize("label", LABELS)

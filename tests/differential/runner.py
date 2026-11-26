@@ -108,6 +108,8 @@ def run_case(case_path: Path) -> dict[str, Any]:
         "calls": dict(sorted(Counter(fake.calls).items())),
         "unhandled": sorted(set(fake.unhandled)),
         "refused": sorted(set(fake.refused)),
+        # How many times each LaTeX was converted: diagnostic, not compared.
+        "converted": dict(sorted(Counter(fake.converted).items())),
         # Whether the backend would cache the result: a degraded one must not
         # be cached as a success (#882). Recorded, checked on this tree only.
         "cacheable": cacheable,

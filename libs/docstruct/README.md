@@ -28,7 +28,7 @@ longer exports.
 
 | Module | Symbols |
 |---|---|
-| `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
+| `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult`, `DocumentIdFactory`, `BlockIdFactory` — the two injected `id_factory` hooks: `DocumentIdFactory` takes no arguments, `BlockIdFactory` takes the block index |
 | Legacy compatibility exports in `docstruct.types` and `docstruct` | `CanonicalDocument`, `CanonicalSection` — deprecated since 0.5.3; retained with unchanged behavior (see migration below) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point`, `boxes_overlap`, `union_area`, `expand_box`, `spans_horizontally`, `boxes_side_by_side`, `box_distance`, `box_contains_center` — boxes that keep their coordinate origin (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), with top-down, page-fraction and spatial helpers |

@@ -426,6 +426,9 @@
     "title": "degraded",
     "verbosity": "detailed"
   },
+  "converted": {
+    "s(t) = t^3": 1
+  },
   "refused": [
     "document.text.spans",
     "math.recognize",
