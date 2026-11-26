@@ -36,13 +36,11 @@ if TYPE_CHECKING:
 
 
 #: Vision-stage failures a second try may fix (pictures and tables): the
-#: provider gave no answer, an empty picture answer (empty answers are never
-#: cached, so the try reaches the model), or a local admission rejection
-#: (capacity may have freed by the second pass). A crop that could not be
-#: rendered will not render the second time either.
-_RETRIED_VISION_FAILURES = frozenset(
-    {"model_failed", "empty_description", "admission_rejected"}
-)
+#: provider gave no answer, or a local admission rejection (capacity may have
+#: freed by the second pass). A crop that could not be rendered will not
+#: render the second time either, and an empty answer never becomes a
+#: recorded failure: the output contract rejects it before any fold (#681).
+_RETRIED_VISION_FAILURES = frozenset({"model_failed", "admission_rejected"})
 
 
 def should_retry_vision_failure(reason: str | None) -> bool:
@@ -63,8 +61,7 @@ async def _retry_failed(
     delay_seconds: int,
 ) -> int:
     """Try once more, one at a time, what a vision stage left without a
-    usable answer: the calls the model failed, and the pictures it answered
-    empty.
+    usable answer: the calls the model failed.
 
     A provider that failed for a while (006.pdf v5 lost every picture after
     slide 10) may be back after a wait. The breaker lets the first try through

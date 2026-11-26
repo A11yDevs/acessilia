@@ -41,18 +41,6 @@ _DESCRIPTION = VisionOutput(
     confidence=0.9,
 )
 
-# Validation rejects an empty description; construct one to stand for an
-# answer that came back blank.
-_EMPTY = VisionOutput.model_construct(
-    kind="description",
-    description="",
-    formula_latex=None,
-    language="pt-BR",
-    confidence=0.1,
-    mentioned_elements=[],
-    warnings=[],
-)
-
 _TABLE = DataOutput(
     kind="table",
     rows=[
@@ -215,22 +203,6 @@ async def test_a_provider_that_stays_down_costs_the_threshold_and_one_probe(
     details = [p.metadata["vision_failure_detail"] for p in manifest.elements]
     assert details[0] == "TimeoutError: no answer"
     assert details[-1] == "skipped: 2 vision calls in a row got no usable answer"
-
-
-@pytest.mark.asyncio
-async def test_an_empty_answer_is_asked_again_but_does_not_open_the_breaker(
-    monkeypatch, tmp_path
-):
-    calls = _vision(monkeypatch, [_EMPTY, _EMPTY, _EMPTY, _DESCRIPTION, _DESCRIPTION, _EMPTY])
-    manifest = _pictures(3)
-
-    await _enrich_picture_descriptions(manifest, tmp_path / "doc.pdf", mode="medio", vision=_serial(), toolbox=toolbox_config(), models=model_config(), region_cache=None)
-
-    # Every picture reached the model on both passes: an empty answer is an answer.
-    assert len(calls) == 6
-    complete = [bool(p.metadata.get("vision_description_complete")) for p in manifest.elements]
-    assert complete == [True, True, False]
-    assert manifest.elements[2].metadata["vision_failure_reason"] == "empty_description"
 
 
 @pytest.mark.asyncio

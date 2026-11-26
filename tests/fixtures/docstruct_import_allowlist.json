@@ -401,7 +401,6 @@
         "is_unstructured_page_placeholder"
       ],
       "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py": [
-        "has_meaningful_text",
         "is_mostly_visual",
         "is_placeholder_visual"
       ],

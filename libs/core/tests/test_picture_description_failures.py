@@ -31,18 +31,6 @@ _DESCRIPTION = VisionOutput(
     confidence=0.9,
 )
 
-# Validation rejects an empty description; construct one to stand for a
-# salvaged answer that came back blank.
-_EMPTY = VisionOutput.model_construct(
-    kind="description",
-    description="",
-    formula_latex=None,
-    language="pt-BR",
-    confidence=0.1,
-    mentioned_elements=[],
-    warnings=[],
-)
-
 
 def _patch(monkeypatch, answer, *, image=b"image-bytes", error=None):
     """Answer every call with ``answer`` (``error`` reported when it is None)."""
@@ -106,46 +94,6 @@ async def test_a_picture_that_cannot_be_cropped_is_reported(monkeypatch, tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_an_empty_answer_keeps_meaningful_text_the_extractor_had(
-    monkeypatch, tmp_path
-):
-    _patch(monkeypatch, _EMPTY)
-    manifest = _manifest(
-        [_element("pic-1", "picture", text="Periodic table of the elements")], []
-    )
-
-    picture = await _enrich(manifest, tmp_path)
-
-    assert picture.text == "Periodic table of the elements"
-    assert _element_to_block(picture)["alt_text"] == "Periodic table of the elements"
-    assert picture.metadata["vision_description_complete"] is True
-    assert "vision_failure_reason" not in picture.metadata
-
-
-@pytest.mark.parametrize(
-    "element_type, text",
-    [("paragraph", "body"), ("picture", "1a,")],
-    ids=["extractor-placeholder", "ocr-noise"],
-)
-@pytest.mark.asyncio
-async def test_an_empty_answer_never_turns_extractor_noise_into_alt_text(
-    monkeypatch, tmp_path, element_type, text
-):
-    _patch(monkeypatch, _EMPTY)
-    manifest = _manifest([_element("pic-1", element_type, text=text)], [])
-    if element_type != "picture":
-        # A non-picture is only sent for description as a placeholder of a
-        # mostly visual page; describe it directly here.
-        manifest.elements[0].type = "picture"
-
-    picture = await _enrich(manifest, tmp_path)
-
-    assert _element_to_block(picture)["alt_text"] == t(MSG_UNDESCRIBED_PICTURE_ALT)
-    assert picture.metadata["vision_failure_reason"] == "empty_description"
-    assert "vision_description_complete" not in picture.metadata
-
-
-@pytest.mark.asyncio
 async def test_a_failed_picture_is_described_on_a_later_pass(monkeypatch, tmp_path):
     _patch(monkeypatch, None)
     manifest = _manifest([_element("pic-1", "picture")], [])
@@ -158,6 +106,42 @@ async def test_a_failed_picture_is_described_on_a_later_pass(monkeypatch, tmp_pa
     assert picture.metadata["vision_description_complete"] is True
     assert "vision_failure_reason" not in picture.metadata
     assert "vision_failure_detail" not in picture.metadata
+
+
+@pytest.mark.asyncio
+async def test_a_failure_keeps_the_answer_a_previous_fold_folded(monkeypatch, tmp_path):
+    """A failed later attempt drops the certification, not the description.
+
+    The stage only re-asks a picture whose completion flag is gone (a restored
+    manifest), so its text and vision metadata are an earlier answer's. The
+    failure records that this attempt added nothing; discarding the earlier
+    answer would lose the only description the manifest has (#681).
+    """
+    _patch(monkeypatch, _DESCRIPTION)
+    manifest = _manifest([_element("pic-1", "picture")], [])
+    picture = await _enrich(manifest, tmp_path)
+    folded = {
+        key: picture.metadata[key]
+        for key in (
+            "vision_language",
+            "vision_confidence",
+            "vision_elements",
+            "vision_warnings",
+        )
+    }
+    assert picture.metadata["vision_description_complete"] is True
+
+    # The flag a restored manifest may have lost; the description remains.
+    picture.metadata.pop("vision_description_complete")
+    _patch(monkeypatch, None)
+    picture = await _enrich(manifest, tmp_path)
+
+    assert picture.text == "An illustrated periodic table."
+    for key, value in folded.items():
+        assert picture.metadata[key] == value
+    assert "vision_description_complete" not in picture.metadata
+    assert picture.metadata["vision_failure_reason"] == "model_failed"
+    assert _element_to_block(picture)["alt_text"] == "An illustrated periodic table."
 
 
 @pytest.mark.asyncio

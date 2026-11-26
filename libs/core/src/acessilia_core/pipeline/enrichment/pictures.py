@@ -34,7 +34,6 @@ from acessilia_core.blocking import run_blocking
 from acessilia_core.config import ModelConfig, ToolboxConfig, VisionConfig
 from acessilia_core.i18n import t
 from acessilia_core.i18n.log_messages import (
-    LOG_PDDL_EMPTY_VISION_DESCRIPTION,
     LOG_PDDL_IMAGES_ENRICHED,
     LOG_VISION_ELEMENT_DESCRIPTION,
 )
@@ -55,11 +54,7 @@ from acessilia_core.pipeline.enrichment.common import (
 from acessilia_core.pipeline.page_labels import _pages_label
 from acessilia_core.pipeline.toolbox import _source_artifact_id
 from acessilia_core.ports import RegionCache
-from docstruct.placeholders import (
-    has_meaningful_text,
-    is_mostly_visual,
-    is_placeholder_visual,
-)
+from docstruct.placeholders import is_mostly_visual, is_placeholder_visual
 from docstruct.visual_text import (
     TextOwnership,
     analyze_visual_text_ownership,
@@ -73,13 +68,13 @@ from docstruct.visual_text import (
 #: for the operator: the crop could not be rendered, the source has no page to
 #: render and the extraction embedded no image in the picture (a DOCX or HTML
 #: picture, so the model was never asked), the vision call failed (its error
-#: goes to metadata["vision_failure_detail"]), the answer had no text, or the
-#: local model-call runner had no admission capacity (#590).
+#: goes to metadata["vision_failure_detail"]), or the local model-call runner
+#: had no admission capacity (#590). An answer with no text is not a reason:
+#: the output contract rejects it before any fold (#681).
 VisionFailureReason = Literal[
     "crop_unavailable",
     "image_unavailable",
     "model_failed",
-    "empty_description",
     "admission_rejected",
 ]
 
@@ -87,7 +82,13 @@ VisionFailureReason = Literal[
 def _record_vision_failure(
     element: ManifestElement, reason: VisionFailureReason, detail: str | None = None
 ) -> None:
-    """Mark ``element`` as undescribed and say why, so a later pass describes it again."""
+    """Mark ``element`` as undescribed and say why, so a later pass describes it again.
+
+    Only the certification goes: the text and the ``vision_*`` fields an
+    earlier answer left stay, because they are the best description the
+    manifest has, and the reason records that this attempt added none (#681).
+    A picture the extractor gave text to keeps it for the same reason.
+    """
     element.metadata.pop("vision_description_complete", None)
     element.metadata["vision_failure_reason"] = reason
     if detail:
@@ -383,9 +384,9 @@ def _fold_picture_description(
     """Fold the vision model's answer into ``element``; True when it is now described.
 
     A formula answer makes the element a formula; a description makes it a
-    picture. The element is marked described when the model answered, or
-    when its extractor text is still meaningful; otherwise its text is
-    cleared and it is recorded as an empty description.
+    picture. ``VisionOutput`` validation guarantees the field ``kind`` asks for
+    is non-empty, so every answer that reaches this fold certifies the
+    element; an empty answer fails validation before it gets here (#681).
     """
     logger.debug(
         t(LOG_VISION_ELEMENT_DESCRIPTION).format(
@@ -409,42 +410,22 @@ def _fold_picture_description(
 
     if vision_output.kind == "formula":
         element.text = vision_output.formula_latex or ""
-        answered = bool(element.text.strip())
         _retype_element(manifest, element, "formula")
     else:
-        # An empty answer keeps text the extractor already had; whether
-        # that text is worth keeping is decided below.
-        answered = bool(vision_output.description.strip())
-        if answered:
-            surrounding = element.metadata.get("surrounding_text") or ()
-            element.text = (
-                deduplicate_picture_description(vision_output.description, surrounding)
-                if surrounding
-                else vision_output.description
-            )
+        surrounding = element.metadata.get("surrounding_text") or ()
+        element.text = (
+            deduplicate_picture_description(vision_output.description, surrounding)
+            if surrounding
+            else vision_output.description
+        )
         _retype_element(manifest, element, "picture")
     if element.page_number is None and page_number >= 1:
         element.page_number = page_number
-    # The model's own text stands however short ("Logo" is a description);
-    # text left over from the extractor after an empty answer must still be
-    # meaningful. Otherwise the picture is reported as undescribed, so the
-    # operator sees the model refused instead of a silent gap, and stays
-    # eligible for a later pass.
-    if answered or has_meaningful_text(element):
-        element.metadata["vision_description_complete"] = True
-        element.metadata.pop("vision_failure_reason", None)
-        element.metadata.pop("vision_failure_detail", None)
-        return True
-    # What is left is an extractor placeholder ("body") or OCR noise, which
-    # must not become the alt text.
-    element.text = ""
-    _record_vision_failure(element, "empty_description")
-    logger.warning(
-        t(LOG_PDDL_EMPTY_VISION_DESCRIPTION).format(
-            element_id=element.id
-        )
-    )
-    return False
+    # The model's own text stands however short ("Logo" is a description).
+    element.metadata["vision_description_complete"] = True
+    element.metadata.pop("vision_failure_reason", None)
+    element.metadata.pop("vision_failure_detail", None)
+    return True
 
 
 def _retype_element(

@@ -179,7 +179,8 @@ def _warnings(failures):
         ([("group", {"vision_failure_reason": "model_failed"}),
           ("paragraph", {"vision_failure_reason": "model_failed"})],
          {"pictures": {"model_failed": 2}}),
-        # An empty description is the model's answer and would come back the same.
+        # Only a manifest written before #681 carries this picture failure; it
+        # was a stored answer, not an outage, so it does not count.
         ([("picture", {"vision_failure_reason": "empty_description"})], None),
         ([("picture", {"vision_description_complete": True})], None),
         # Review of #561: a formula the outage left without a classification

@@ -288,9 +288,10 @@ def build_pddl_structured_payload(
 #: out differently on a rerun: the model provider or the Toolbox was down, the
 #: extraction embedded no image in a pageless picture (a Toolbox that forwards
 #: it would get the picture described), or the local model-call runner had no
-#: admission capacity (#590). An empty description is the model's answer, as is
-#: a refused table reading, and would come back the same, so it neither counts
-#: nor keeps a run uncached.
+#: admission capacity (#590). An empty answer is not recorded: the output
+#: contract rejects it before any fold, and a manifest from before #681 may
+#: still carry ``empty_description``, which a rerun would answer the same; it
+#: neither counts nor keeps a run uncached.
 _RETRYABLE_VISUAL_FAILURES = frozenset(
     {"crop_unavailable", "image_unavailable", "model_failed", "admission_rejected"}
 )
