@@ -49,11 +49,27 @@ def _core_version(tree: Path) -> str:
     return "unknown"
 
 
-def publish(out: Path, target: Path, source: dict[str, Any], cases: list[str], *, complete: bool) -> None:
+def declared_failures(case: str) -> set[str]:
+    """What a case fails on purpose, as the fake records it in ``refused``."""
+    failures = json.loads((CASES / case / "case.json").read_text(encoding="utf-8")).get("failures") or {}
+    return {*failures.get("capabilities", []), *(f"vlm:{element}" for element in failures.get("vision", []))}
+
+
+def publish(
+    out: Path,
+    target: Path,
+    source: dict[str, Any],
+    cases: list[str],
+    *,
+    complete: bool,
+    failures: dict[str, set[str]] | None = None,
+) -> None:
     """Move the validated outputs of ``out`` to the reference ``target``.
 
-    Every case of ``cases`` must be in ``out`` with no unhandled call, or
-    nothing changes. ``complete`` replaces the whole reference (the
+    Every case of ``cases`` must be in ``out`` with no unhandled call, and
+    with every failure it declares (``failures``, by case) met, or nothing
+    changes: a reference that did not degrade where its case says would
+    compare a degraded run with a healthy one. ``complete`` replaces the whole reference (the
     hand-written ``KEPT`` files survive); otherwise only ``cases`` are
     replaced, and only into a reference of the same commit and harness.
     """
@@ -65,6 +81,9 @@ def publish(out: Path, target: Path, source: dict[str, Any], cases: list[str], *
         outcome = json.loads(path.read_text(encoding="utf-8"))
         if outcome["unhandled"]:
             raise SystemExit(f"{case}: the fake did not answer {outcome['unhandled']}")
+        expected = (failures or {}).get(case, set())
+        if set(outcome.get("refused", [])) != expected:
+            raise SystemExit(f"{case}: the failures on purpose were {sorted(outcome.get('refused', []))}, not {sorted(expected)}")
         outcomes[case] = path
     if not complete:
         recorded = target / "SOURCE.json"
@@ -112,7 +131,10 @@ def record(ref: str, label: str, cases: list[str], *, complete: bool) -> Path:
             )
             source = {"commit": commit, "core_version": _core_version(tree), **identity()}
             target = REFERENCES / label
-            publish(out, target, source, cases, complete=complete)
+            publish(
+                out, target, source, cases, complete=complete,
+                failures={case: declared_failures(case) for case in cases},
+            )
         finally:
             # A failure here must not hide the one that brought us here.
             try:

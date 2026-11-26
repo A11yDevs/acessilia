@@ -25,7 +25,14 @@ What the cases establish is limited to what they run:
   fires: its trigger does not meet the pages it exists for (#887);
 - a Toolbox that answers, except in `degraded`, where `math.recognize` and
   `document.text.spans` are unavailable and the vision model fails on one
-  picture;
+  picture. These are failures at call time (HTTP 503); the availability
+  gate is off, so a capability the catalogue reports unavailable before
+  planning (#848) is not exercised;
+- pages that exist in the extraction only: every case runs on the same
+  one-page `source.pdf`, and the fake answers the page count and the
+  renders, so `multi-page` tests the pipeline's handling of pages and
+  elements, not the extraction or rendering of a real multi-page PDF (the
+  e2e tests on the dataset's documents cover that);
 - the normalized canonical document: not the exports, not the number of
   calls.
 
@@ -41,7 +48,9 @@ same runner works on an older tree.
 
 **The run is hermetic** (`hermetic_environment`). Every variable the
 backend's settings can read is removed first, including what `.env` loaded
-into the process. The settings then get their defaults plus the harness's
+into the process, and the server and task locale are pinned to `en_US`,
+so the messages an output carries (a warning, a fallback alt text) do not
+follow `LANG` or an earlier test. The settings then get their defaults plus the harness's
 `ENVIRONMENT`, with `DATA_DIR` and `TEMP_DIR` in a temporary directory, and
 the whole environment is restored afterwards. A reference recorded in a bare
 worktree and a run in a developer's tree therefore see the same
@@ -59,9 +68,9 @@ inside the core is patched. Its answers come from the case:
 | `vision` | the VLM, per element id (or `page-<n>`): a description, a region's `kind` and `formula_latex`, a table's `rows` |
 | `latex` | `math.recognize`, per formula id (`""`: it reads nothing) |
 | `text_spans` | `document.text.spans`, per page |
-| `secondary_document` | the secondary provider's extraction, with `FUSION_MODE=dual` (`secondary_provider`, `mineru` by default) |
-| `judge` | the `pB` of `document.adjudicate.page` |
-| `failures` | what fails on purpose: `capabilities` answered 503, `vision` element ids the model refuses; recorded in `refused`, which the test checks |
+| `secondary_document` | the secondary provider's extraction, with `FUSION_MODE=dual`. Only the primary provider (`primary_provider`, `docling`) and the secondary (`FUSION_SECONDARY_PROVIDER`, else `secondary_provider`, else `mineru`) get one; any other is unhandled. A region only the secondary extracted is matched against its boxes |
+| `judge` | per page (`page-<n>`), the `pB` of `document.adjudicate.page` for that page's image |
+| `failures` | what fails on purpose: `capabilities` answered 503, `vision` element ids the model refuses; recorded in `refused`. The test and the recording both require exactly the declared failures |
 | `environment` | settings the case sets over the harness's (`FUSION_MODE=dual`) |
 
 **Regions are matched by colour.** A rendered image does not say which region
@@ -120,6 +129,11 @@ before a migration:
 - the document's `/id`, which hashes them.
 
 A field of the same name anywhere else is still compared.
+
+**`refused`** and **`cacheable`** are recorded too. `refused` must equal
+the case's `failures` when a reference is recorded and on this tree;
+`cacheable` (whether the backend would cache the result) is checked on this
+tree only, since its contract may evolve: `degraded` must not be cached.
 
 **`calls`** counts the capabilities each run asked for. It is diagnostic only
 and is not compared: a later core may call less on purpose. For example, M4b
@@ -186,12 +200,15 @@ The cases added for #876 (core 0.3.23) show:
 
 - **`multi-page`** matches every reference.
 - **`dual-provider`**:
-  - the content matches every reference, the adopted table included;
-  - the run makes one more manifest revision than any earlier release. In
-    M4b (0.3.20), the adopted table is flagged `inline_math_stale`, and the
-    completed run replans to mark it again;
+  - the adopted table's math cell is marked again (`$s_0\in\mathbb{R}$`) by
+    every release since 0.3.12, where the pass of #599 marked it after the
+    plan; M4b (0.3.20) does it as a planned step, at the cost of one more
+    manifest revision. `core-0.3.11`, before #599, left the cell unmarked:
+    declared;
+  - the formula of the page routed to the secondary is read from the
+    secondary's region the same way by every release;
   - every release loses the paragraph that only the primary provider kept on
-    the page routed to the secondary (#887).
+    the routed page (#887), which a pinning test fixes until it is fixed.
 - **`degraded`** matches every reference but `core-0.3.14`, where the
   pictures' surrounding text differs, the same M3 difference as in
   `formulas`.

@@ -70,13 +70,25 @@
   "degraded": [
     {
       "kind": "changed",
-      "path": "/sections/0/blocks/*/metadata/surrounding_text/1",
+      "path": "/sections/0/blocks/1/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
       "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
     },
     {
       "kind": "changed",
-      "path": "/metadata/pages/0/blocks/*/metadata/surrounding_text/1",
+      "path": "/sections/0/blocks/2/metadata/surrounding_text/1",
+      "expected": "s ( t ) = t 3",
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+    },
+    {
+      "kind": "changed",
+      "path": "/metadata/pages/0/blocks/1/metadata/surrounding_text/1",
+      "expected": "s ( t ) = t 3",
+      "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
+    },
+    {
+      "kind": "changed",
+      "path": "/metadata/pages/0/blocks/2/metadata/surrounding_text/1",
       "expected": "s ( t ) = t 3",
       "reason": "core 0.3.15 (M3): the formula LaTeX runs inside the plan, after the descriptions, so a description's surrounding text has a nearby formula's extracted text again, as before 0.3.14"
     }

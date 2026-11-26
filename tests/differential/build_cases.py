@@ -49,7 +49,7 @@ def _line(*spans):
 
 
 _TABLE_2KG = "| Quantity | Value |\n|---|---|\n| Mass | 2 kg |"
-_TABLE_3KG = "| Quantity | Value |\n|---|---|\n| Mass | 3 kg |\n| Speed | 4 m/s |"
+_TABLE_3KG = "| Quantity | Value |\n|---|---|\n| Mass | 3 kg |\n| Speed | 4 m/s |\n| Start | s 0 ∈ R |"
 
 
 def _ast(*rows: tuple[str, str]) -> dict[str, Any]:
@@ -159,7 +159,8 @@ CASES: dict[str, dict[str, Any]] = {
             "structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables "
             "diverge, and select-table-source adopts the secondary's cells, which the inline math "
             "marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the "
-            "page is routed to it, and the sentence only the primary kept is lost (#887)."
+            "page is routed to it: its formula is read from the secondary's region, and the sentence "
+            "only the primary kept is lost (#887)."
         ),
         "environment": {"FUSION_MODE": "dual"},
         "elements": [
@@ -177,15 +178,27 @@ CASES: dict[str, dict[str, Any]] = {
             _element("s2", "formula", "v = \\frac{d}{t}", 250, 280, 2),
             _element("s3", "paragraph", PROSE * 2, 420, 530, 3),
             _element("r1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
-            _element("r2", "table", _TABLE_3KG, 200, 300, 5, page=2, table_ast=_ast(("Mass", "3 kg"), ("Speed", "4 m/s"))),
+            _element("r2", "table", _TABLE_3KG, 200, 300, 5, page=2,
+                     table_ast=_ast(("Mass", "3 kg"), ("Speed", "4 m/s"), ("Start", "s 0 ∈ R"))),
             _element("v1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
-            _element("v2", "formula", "a = \\frac{v}{t}", 250, 280, 7, page=3),
+            _element("v2", "formula", "a = v t", 250, 280, 7, page=3),
             _element("v3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
         ],
+        # Page 3 is routed to the secondary: its formula, without LaTeX markup,
+        # is classified and read from the secondary's region.
         "vision": {
             "v2": {"kind": "formula", "formula_latex": "a = \\frac{v}{t}", "description": "a equals v over t"},
         },
-        "judge": 0.2,
+        "latex": {"v2": "a = \\frac{v}{t}"},
+        # The adopted table's last row is math the text layer's fonts mark
+        # again once the table is stale (M4b).
+        "text_spans": {"2": [_line(
+            _span("Start", "CMR12", 80, baseline=285.0), _span("s", "CMMI12", 330, baseline=285.0),
+            _span("0", "CMR8", 337, size=7.97, baseline=286.8), _span("∈", "CMSY10", 345, baseline=285.0),
+            _span("R", "MSBM10", 355, baseline=285.0),
+        )]},
+        # The judge keeps the primary on the adjudicated page.
+        "judge": {"page-1": 0.2},
     },
     "degraded": {
         "description": (
@@ -230,7 +243,7 @@ def build(name: str, spec: dict[str, Any]) -> dict[str, Any]:
     case: dict[str, Any] = {"description": spec["description"], "document": _document(spec["elements"])}
     if "secondary" in spec:
         case["secondary_document"] = _document(spec["secondary"])
-    for key in ("environment", "vision", "latex", "text_spans", "judge", "failures"):
+    for key in ("environment", "primary_provider", "secondary_provider", "vision", "latex", "text_spans", "judge", "failures"):
         if key in spec:
             case[key] = spec[key]
     return case

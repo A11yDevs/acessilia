@@ -1,12 +1,15 @@
 {
+  "cacheable": true,
   "calls": {
     "document.adjudicate.page": 1,
     "document.structure.extract": 2,
     "document.text.spans": 1,
     "math.convert": 1,
+    "math.recognize": 1,
     "math.verbalize": 1,
     "media.inspect": 1,
-    "pdf.render": 1
+    "pdf.render": 3,
+    "vlm": 1
   },
   "canonical": {
     "accessibility": {
@@ -151,6 +154,10 @@
               "id": "t1",
               "metadata": {
                 "confidence": null,
+                "inline_math_detection": {
+                  "marked": 0,
+                  "unmatched": 1
+                },
                 "manifest_element_id": "t1",
                 "parent_id": null,
                 "raw_label": "table",
@@ -188,6 +195,16 @@
                           "text": "4 m/s"
                         }
                       ]
+                    },
+                    {
+                      "cells": [
+                        {
+                          "text": "Start"
+                        },
+                        {
+                          "text": "s 0 ∈ R"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -206,6 +223,10 @@
                 [
                   "Speed",
                   "4 m/s"
+                ],
+                [
+                  "Start",
+                  "s 0 ∈ R"
                 ]
               ],
               "source_location": {
@@ -250,6 +271,16 @@
                         "text": "4 m/s"
                       }
                     ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "text": "Start"
+                      },
+                      {
+                        "text": "s 0 ∈ R"
+                      }
+                    ]
                   }
                 ]
               },
@@ -257,7 +288,7 @@
             }
           ],
           "page_number": 2,
-          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nQuantity | Value\nMass | 3 kg\nSpeed | 4 m/s"
+          "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nQuantity | Value\nMass | 3 kg\nSpeed | 4 m/s\nStart | s 0 ∈ R"
         },
         {
           "blocks": [
@@ -287,6 +318,18 @@
               "id": "mineru-v2",
               "metadata": {
                 "confidence": null,
+                "formula_classification": {
+                  "confidence": 0.95,
+                  "reason": null,
+                  "status": "math",
+                  "warnings": []
+                },
+                "formula_recognition": {
+                  "confidence": 0.99,
+                  "method": "math.recognize",
+                  "text_agreement": 1.0
+                },
+                "formula_text_layer": "a = v t",
                 "manifest_element_id": "mineru-v2",
                 "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>a = \\frac{v}{t}</mtext></math>",
                 "parent_id": null,
@@ -487,6 +530,10 @@
             "id": "t1",
             "metadata": {
               "confidence": null,
+              "inline_math_detection": {
+                "marked": 0,
+                "unmatched": 1
+              },
               "manifest_element_id": "t1",
               "parent_id": null,
               "raw_label": "table",
@@ -524,6 +571,16 @@
                         "text": "4 m/s"
                       }
                     ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "text": "Start"
+                      },
+                      {
+                        "text": "s 0 ∈ R"
+                      }
+                    ]
                   }
                 ]
               },
@@ -542,6 +599,10 @@
               [
                 "Speed",
                 "4 m/s"
+              ],
+              [
+                "Start",
+                "s 0 ∈ R"
               ]
             ],
             "source_location": {
@@ -586,6 +647,16 @@
                       "text": "4 m/s"
                     }
                   ]
+                },
+                {
+                  "cells": [
+                    {
+                      "text": "Start"
+                    },
+                    {
+                      "text": "s 0 ∈ R"
+                    }
+                  ]
                 }
               ]
             },
@@ -618,6 +689,18 @@
             "id": "mineru-v2",
             "metadata": {
               "confidence": null,
+              "formula_classification": {
+                "confidence": 0.95,
+                "reason": null,
+                "status": "math",
+                "warnings": []
+              },
+              "formula_recognition": {
+                "confidence": 0.99,
+                "method": "math.recognize",
+                "text_agreement": 1.0
+              },
+              "formula_text_layer": "a = v t",
               "manifest_element_id": "mineru-v2",
               "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>a = \\frac{v}{t}</mtext></math>",
               "parent_id": null,

@@ -18,8 +18,14 @@ The answers come from the case (``cases/<name>/case.json``):
   LaTeX, a table's rows;
 - ``latex``: per formula id, what ``math.recognize`` reads (``""``: nothing);
 - ``secondary_document``: what the secondary provider extracts, with
-  ``FUSION_MODE=dual`` (``secondary_provider``, ``mineru`` by default);
-- ``judge``: the ``pB`` ``document.adjudicate.page`` answers;
+  ``FUSION_MODE=dual``. The structure extraction answers only the primary
+  provider (``primary_provider``, ``docling`` by default) and, when the case
+  has a secondary document, the secondary one (``FUSION_SECONDARY_PROVIDER``,
+  else ``secondary_provider``, else ``mineru``); any other is unhandled. A
+  region only the secondary extracted (a page routed to it) is matched
+  against the secondary's boxes, when no primary element matches it;
+- ``judge``: per page (``page-<number>``), the ``pB`` that
+  ``document.adjudicate.page`` answers for the page image it gets;
 - ``failures``: what fails on purpose, a degraded run: ``capabilities``
   answered 503, and ``vision`` element ids the VLM refuses (503). They are
   recorded in ``refused``, not in ``unhandled``.
@@ -33,8 +39,8 @@ smaller clip the element it overlaps most (intersection over union).
 The fake is strict. It answers only what the case answers: an image it did
 not render, a clip no element matches or two match equally, an element the
 case gives no answer for, an answer that does not validate against the
-schema the agent asked for, or a capability it does not serve is answered
-with an error and recorded in ``unhandled``, and the test fails on any. Only the fields a
+schema the agent asked for, or a capability it does not serve is
+answered with an error and recorded in ``unhandled``, and the test fails on any. Only the fields a
 case's answer leaves out get a default (:func:`_instance`), and the whole
 answer is still validated.
 """
@@ -46,6 +52,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import re
 import threading
 from collections.abc import Iterator
@@ -174,10 +181,14 @@ class FakeToolbox:
         # the manifest-compatible payload from its own ``document`` key. With
         # ``FUSION_MODE=dual`` the secondary provider (``FUSION_SECONDARY_PROVIDER``)
         # asks too, and gets the case's ``secondary_document``.
+        provider = form.get("provider")
         secondary = self.case.get("secondary_document")
-        if secondary is not None and form.get("provider") == self.case.get("secondary_provider", "mineru"):
+        secondary_provider = os.environ.get("FUSION_SECONDARY_PROVIDER") or self.case.get("secondary_provider", "mineru")
+        if provider == self.case.get("primary_provider", "docling"):
+            return self.case["document"]
+        if secondary is not None and provider == secondary_provider:
             return secondary
-        return self.case["document"]
+        raise _Unanswerable(f"no extraction for the provider {provider!r}")
 
     def _pdf_render(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
         self._input(form, files)
@@ -242,9 +253,13 @@ class FakeToolbox:
         return {"formulas": [{"latex": latex, "confidence": 0.99}] if latex else []}
 
     def _document_adjudicate_page(self, form: dict[str, str], files: dict[str, bytes]) -> dict[str, Any]:
-        if "judge" not in self.case:
-            raise _Unanswerable("the case gives no page judgement (judge)")
-        return {"pB": self.case["judge"]}
+        page = self._element_of_image(self._input(form, files))
+        judged = self.case.get("judge") or {}
+        if page not in judged:
+            raise _Unanswerable(f"the case gives no page judgement for {page}")
+        if not 0.0 <= float(judged[page]) <= 1.0:
+            raise _Unanswerable(f"the judgement of {page} is not a probability: {judged[page]}")
+        return {"pB": float(judged[page])}
 
     # The VLM gateway (OpenAI chat completions).
 
@@ -293,19 +308,22 @@ class FakeToolbox:
         width, height = self._page_size(render["page"])
         if clip is None or _area(clip) >= _PAGE_SHARE * width * height:
             return f"page-{render['page']}"
-        scores = sorted(
-            ((_iou(clip, box), element_id) for element_id, box in self._boxes(render["page"])),
-            reverse=True,
-        )
+        scores = self._scores(clip, render["page"], "document")
+        if not scores or scores[0][0] < _MIN_IOU:
+            # A region only the secondary extracted: a page routed to it.
+            scores = self._scores(clip, render["page"], "secondary_document")
         if not scores or scores[0][0] < _MIN_IOU:
             raise _Unanswerable(f"no element matches the clip {render['clip']}")
         if len(scores) > 1 and scores[1][0] >= scores[0][0] - 1e-9:
             raise _Unanswerable(f"{scores[0][1]} and {scores[1][1]} match the clip equally")
         return scores[0][1]
 
-    def _boxes(self, page: int) -> Iterator[tuple[str, tuple[float, float, float, float]]]:
+    def _scores(self, clip, page: int, document: str) -> list[tuple[float, str]]:
+        return sorted(((_iou(clip, box), element_id) for element_id, box in self._boxes(page, document)), reverse=True)
+
+    def _boxes(self, page: int, document: str = "document") -> Iterator[tuple[str, tuple[float, float, float, float]]]:
         height = self._page_size(page)[1]
-        for element in self.case["document"].get("elements", []):
+        for element in (self.case.get(document) or {}).get("elements", []):
             for provenance in element.get("provenance") or []:
                 box = _box(provenance.get("bbox"), height)
                 if provenance.get("page_number", 1) == page and box is not None:

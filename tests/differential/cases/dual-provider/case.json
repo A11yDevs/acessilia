@@ -1,5 +1,5 @@
 {
-  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the page is routed to it, and the sentence only the primary kept is lost (#887).",
+  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the page is routed to it: its formula is read from the secondary's region, and the sentence only the primary kept is lost (#887).",
   "document": {
     "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
     "schema_version": "1.1.0",
@@ -385,7 +385,7 @@
         "raw_label": "table",
         "reading_order": 5,
         "hierarchy_level": 1,
-        "text": "| Quantity | Value |\n|---|---|\n| Mass | 3 kg |\n| Speed | 4 m/s |",
+        "text": "| Quantity | Value |\n|---|---|\n| Mass | 3 kg |\n| Speed | 4 m/s |\n| Start | s 0 ∈ R |",
         "page_number": 2,
         "provenance": [
           {
@@ -433,6 +433,16 @@
                     "text": "4 m/s"
                   }
                 ]
+              },
+              {
+                "cells": [
+                  {
+                    "text": "Start"
+                  },
+                  {
+                    "text": "s 0 ∈ R"
+                  }
+                ]
               }
             ]
           }
@@ -466,7 +476,7 @@
         "raw_label": "formula",
         "reading_order": 7,
         "hierarchy_level": 1,
-        "text": "a = \\frac{v}{t}",
+        "text": "a = v t",
         "page_number": 3,
         "provenance": [
           {
@@ -524,5 +534,104 @@
       "description": "a equals v over t"
     }
   },
-  "judge": 0.2
+  "latex": {
+    "v2": "a = \\frac{v}{t}"
+  },
+  "text_spans": {
+    "2": [
+      {
+        "bbox": [
+          80,
+          276.03,
+          360.98,
+          288.7925
+        ],
+        "spans": [
+          {
+            "text": "Start",
+            "font": "CMR12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              80,
+              276.03,
+              109.9,
+              287.99
+            ],
+            "origin": [
+              80,
+              285.0
+            ]
+          },
+          {
+            "text": "s",
+            "font": "CMMI12",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              330,
+              276.03,
+              335.98,
+              287.99
+            ],
+            "origin": [
+              330,
+              285.0
+            ]
+          },
+          {
+            "text": "0",
+            "font": "CMR8",
+            "size": 7.97,
+            "flags": 4,
+            "bbox": [
+              337,
+              280.8225,
+              340.985,
+              288.7925
+            ],
+            "origin": [
+              337,
+              286.8
+            ]
+          },
+          {
+            "text": "∈",
+            "font": "CMSY10",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              345,
+              276.03,
+              350.98,
+              287.99
+            ],
+            "origin": [
+              345,
+              285.0
+            ]
+          },
+          {
+            "text": "R",
+            "font": "MSBM10",
+            "size": 11.96,
+            "flags": 4,
+            "bbox": [
+              355,
+              276.03,
+              360.98,
+              287.99
+            ],
+            "origin": [
+              355,
+              285.0
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "judge": {
+    "page-1": 0.2
+  }
 }
