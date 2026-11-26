@@ -112,14 +112,17 @@ def test_the_table_adopted_from_the_secondary_is_marked_again(runs) -> None:
     assert rows[-3:] == [["Mass", "3 kg"], ["Speed", "4 m/s"], ["Start", "$s_0\\in\\mathbb{R}$"]]
 
 
-def test_the_primary_only_paragraph_of_a_routed_page_is_still_lost(runs) -> None:
-    """Pins #887 (a pinning test: the CI refuses xfail). Page 3 is routed to
-    the secondary, and ``See the cart.``, which only the primary kept, is
-    lost with no rescue obligation. When #887 is fixed, invert this
-    assertion and declare the restored paragraph in the references'
-    ``intended.json``."""
-    texts = [block.get("text") or "" for block in _blocks(runs["dual-provider"]["canonical"])]
-    assert "See the cart." not in texts
+def test_the_primary_only_paragraph_of_a_routed_page_is_rescued(runs) -> None:
+    """#887: page 3 is routed to the secondary, which lacks the sentence only
+    the primary kept. ``rescue-omitted`` puts it back, in its place, with
+    its inline math, which the canonical build converts."""
+    page = [block for block in _blocks(runs["dual-provider"]["canonical"])
+            if block.get("source_location", {}).get("page_number") == 3]
+    texts = [block.get("text") or "" for block in page]
+
+    assert texts.index("See the cart at $v_0$.") == 1
+    rescued = page[1]
+    assert [entry["latex"] for entry in rescued["metadata"]["inline_math"]] == ["v_0"]
 
 
 @pytest.mark.parametrize("label", LABELS)

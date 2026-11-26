@@ -35,6 +35,82 @@
       "path": "/metadata/pddl_manifest_revision",
       "expected": 3,
       "reason": "core 0.3.20 (M4b): the table adopted from the secondary provider is flagged inline_math_stale, and the completed run replans to mark it again, one more manifest revision"
+    },
+    {
+      "kind": "changed",
+      "path": "/audit/block_count",
+      "expected": 10,
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+    },
+    {
+      "kind": "added",
+      "path": "/metadata/pages/2/blocks/1",
+      "expected": {
+        "id": "element-rescued-p3-u2",
+        "metadata": {
+          "confidence": null,
+          "manifest_element_id": "element-rescued-p3-u2",
+          "parent_id": null,
+          "provider": "docling",
+          "raw_label": "paragraph",
+          "rescued_by": "rescue-omitted",
+          "source_ref": null
+        },
+        "source_location": {
+          "bbox": {
+            "bottom": 195.0,
+            "left": 72.0,
+            "right": 540.0,
+            "top": 180.0
+          },
+          "page_number": 3
+        },
+        "text": "See the cart at $v_0$.",
+        "type": "paragraph"
+      },
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+    },
+    {
+      "kind": "changed",
+      "path": "/metadata/pages/2/text",
+      "expected": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nSee the cart at $v_0$.\na = \\frac{v}{t}\nThe cart starts at $v$ and speeds up.\nThis document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+    },
+    {
+      "kind": "added",
+      "path": "/sections/0/blocks/6",
+      "expected": {
+        "id": "element-rescued-p3-u2",
+        "metadata": {
+          "confidence": null,
+          "inline_math": [
+            {
+              "latex": "v_0",
+              "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mtext>v_0</mtext></math>",
+              "source": "v_0",
+              "speech": "spoken v_0"
+            }
+          ],
+          "manifest_element_id": "element-rescued-p3-u2",
+          "parent_id": null,
+          "provider": "docling",
+          "raw_label": "paragraph",
+          "rescued_by": "rescue-omitted",
+          "source_ref": null
+        },
+        "source_location": {
+          "bbox": {
+            "bottom": 195.0,
+            "left": 72.0,
+            "right": 540.0,
+            "top": 180.0
+          },
+          "page_number": 3
+        },
+        "text": "See the cart at $v_0$.",
+        "type": "paragraph"
+      },
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
     }
   ]
 }

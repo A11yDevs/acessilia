@@ -55,6 +55,23 @@ def pages_for_vlm_judge(
     return {page_number for _, page_number in ambiguous[: max(budget, 0)]}
 
 
+def _primary_blocks_lost(stats: dict[str, Any]) -> bool:
+    """Whether a page routed to the secondary provider lost blocks only the
+    primary had (#887).
+
+    ``fusion.apply_page_routes`` replaces such a page with the secondary's
+    extraction, so every primary block the secondary did not extract is gone,
+    and ``rescue-omitted`` exists to bring the legitimate ones back. The
+    differ counts those blocks as ``unilateral-docling``, not as
+    ``dropped-docling-*`` (it runs with ``min_len=0``), so the drop counts
+    alone never asked for the rescue. ``docling`` and ``mineru`` are the
+    differ's names for the primary and the secondary side, whatever the
+    providers; the rescue's own filter (``_omitted``) decides which block
+    comes back.
+    """
+    return stats.get("route") == "mineru" and bool(stats.get("unilateral-docling"))
+
+
 def detect_page_fusion_needs(
     targets: list[ManifestElement],
     stats: dict[str, Any],
@@ -84,7 +101,7 @@ def detect_page_fusion_needs(
                 methods=["human-review"],
             )
         )
-    if any(key.startswith("dropped-") and value for key, value in stats.items()):
+    if any(key.startswith("dropped-") and value for key, value in stats.items()) or _primary_blocks_lost(stats):
         candidates.append(
             NeedCandidate(
                 "rescue-omitted-block",

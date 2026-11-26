@@ -2,7 +2,10 @@
 
 ``rescue-omitted-block`` is emitted for a page where the block-level fusion
 dropped a primary (Docling) block (``dropped-docling-*`` in the page's fusion
-stats). The method ports Dr.DocBench's ``rescue_omitted`` (tree_differ_v2.py of
+stats), and, since core 0.3.24 (#887), for a page routed to the secondary
+provider that had blocks only the primary extracted (``unilateral-docling``):
+the differ runs with ``min_len=0`` and never drops those, but the route loses
+them. The method ports Dr.DocBench's ``rescue_omitted`` (tree_differ_v2.py of
 the drbench-2026-snapshot tag): a primary text block that reads as legitimate
 text is kept even when the fusion would discard it.
 

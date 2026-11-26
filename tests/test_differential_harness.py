@@ -39,6 +39,34 @@ def test_differences_name_what_was_added_removed_and_changed() -> None:
     ]
 
 
+def test_a_block_inserted_is_one_addition_not_a_change_of_every_later_block() -> None:
+    """#887: lists of objects with distinct ids are aligned by id, so a
+    rescued paragraph is one ``added``; a change inside a block that moved
+    names the block's place on both sides."""
+    reference = {"blocks": [{"id": "a", "text": "A"}, {"id": "c", "text": "C"}]}
+    current = {"blocks": [{"id": "a", "text": "A"}, {"id": "b", "text": "B"}, {"id": "c", "text": "C!"}]}
+
+    assert differences(reference, current) == [
+        {"kind": "added", "path": "/blocks/1"},
+        {"kind": "changed", "path": "/blocks/2/text", "reference_path": "/blocks/1/text"},
+    ]
+
+
+def test_the_same_blocks_in_another_order_are_a_change() -> None:
+    reference = {"blocks": [{"id": "a"}, {"id": "b"}]}
+    current = {"blocks": [{"id": "b"}, {"id": "a"}]}
+
+    assert differences(reference, current) == [{"kind": "changed", "path": "/blocks"}]
+
+
+def test_a_removed_block_is_checked_against_its_reference_place() -> None:
+    reference = {"blocks": [{"id": "a"}, {"id": "gone", "text": "G"}, {"id": "c"}]}
+    current = {"blocks": [{"id": "a"}, {"id": "c"}]}
+    declared = [{"kind": "removed", "path": "/blocks/1", "was": {"id": "gone", "text": "G"}, "reason": "r"}]
+
+    assert explain(reference, current, declared) == ([], [])
+
+
 def test_a_declared_change_allows_only_its_value() -> None:
     """A later regression of a field whose change was declared still fails."""
     declared = [{"kind": "changed", "path": "/blocks/*/text", "expected": "x^{2}", "reason": "r"}]

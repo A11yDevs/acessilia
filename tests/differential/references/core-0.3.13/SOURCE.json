@@ -2,7 +2,7 @@
   "commit": "0cc303b576369c56b0a444ba67bfd19eeb15b510",
   "core_version": "0.3.13",
   "harness_sha256": "671c788771d7a2f850fcd43983acd45a4cf45f8f58ea61477e9c8f6d88368511",
-  "cases_sha256": "a625ec1fcc13a800c1be9590537a775bf56c18e7a017a51495434cce485d1a49",
+  "cases_sha256": "9858555c35be5589dd7594f998e1561d9a447f1b03b5f7ea6d826aafde29c9fe",
   "source_pdf_sha256": "5a838678058f6de375e8635b5f2fea47a4e5f07cb1a882a44b10f39abc6f34ff",
   "pillow_version": "13.0.0",
   "jsonschema_version": "4.26.0"

@@ -1,5 +1,5 @@
 {
-  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the page is routed to it: its formula is read from the secondary's region, and the sentence only the primary kept is lost (#887).",
+  "description": "Two providers (FUSION_MODE=dual), three pages. Page 1: the providers disagree on the structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables diverge, and select-table-source adopts the secondary's cells, which the inline math marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the page is routed to it (both sides have math): its formula is read from the secondary's region, and rescue-omitted puts back the sentence with inline math only the primary kept (#887), which the inline math marks on the replan.",
   "document": {
     "schema_ref": "urn:a11y-devs:schema:processing-manifest:1.1.0",
     "schema_version": "1.1.0",
@@ -204,7 +204,7 @@
         "raw_label": "paragraph",
         "reading_order": 7,
         "hierarchy_level": 1,
-        "text": "See the cart.",
+        "text": "See the cart at $v_0$.",
         "page_number": 3,
         "provenance": [
           {
@@ -286,6 +286,7 @@
         "element_ids": [
           "v1",
           "v2",
+          "v4",
           "v3"
         ]
       }
@@ -493,10 +494,32 @@
         "metadata": {}
       },
       {
-        "id": "v3",
+        "id": "v4",
         "type": "paragraph",
         "raw_label": "paragraph",
         "reading_order": 8,
+        "hierarchy_level": 1,
+        "text": "The cart starts at $v$ and speeds up.",
+        "page_number": 3,
+        "provenance": [
+          {
+            "page_number": 3,
+            "bbox": {
+              "left": 72.0,
+              "top": 300.0,
+              "right": 540.0,
+              "bottom": 315.0,
+              "coord_origin": "TOPLEFT"
+            }
+          }
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "v3",
+        "type": "paragraph",
+        "raw_label": "paragraph",
+        "reading_order": 9,
         "hierarchy_level": 1,
         "text": "This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
         "page_number": 3,
@@ -518,7 +541,7 @@
     "artifacts": [],
     "summary": {
       "page_count": 3,
-      "element_count": 8,
+      "element_count": 9,
       "observation_count": 0,
       "obligation_count": 0,
       "element_types": {}

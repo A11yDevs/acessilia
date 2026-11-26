@@ -159,8 +159,9 @@ CASES: dict[str, dict[str, Any]] = {
             "structure, so the page is adjudicated (the judge keeps the primary). Page 2: their tables "
             "diverge, and select-table-source adopts the secondary's cells, which the inline math "
             "marks again (inline_math_stale, M4b). Page 3: only the secondary has a formula, so the "
-            "page is routed to it: its formula is read from the secondary's region, and the sentence "
-            "only the primary kept is lost (#887)."
+            "page is routed to it (both sides have math): its formula is read from the secondary's "
+            "region, and rescue-omitted puts back the sentence with inline math only the primary "
+            "kept (#887), which the inline math marks on the replan."
         ),
         "environment": {"FUSION_MODE": "dual"},
         "elements": [
@@ -170,7 +171,7 @@ CASES: dict[str, dict[str, Any]] = {
             _element("q1", "paragraph", PROSE * 2, 60, 170, 4, page=2),
             _element("t1", "table", _TABLE_2KG, 200, 300, 5, page=2, table_ast=_ast(("Mass", "2 kg"))),
             _element("u1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
-            _element("u2", "paragraph", "See the cart.", 180, 195, 7, page=3),
+            _element("u2", "paragraph", "See the cart at $v_0$.", 180, 195, 7, page=3),
             _element("u3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
         ],
         "secondary": [
@@ -182,7 +183,8 @@ CASES: dict[str, dict[str, Any]] = {
                      table_ast=_ast(("Mass", "3 kg"), ("Speed", "4 m/s"), ("Start", "s 0 ∈ R"))),
             _element("v1", "paragraph", PROSE * 2, 60, 170, 6, page=3),
             _element("v2", "formula", "a = v t", 250, 280, 7, page=3),
-            _element("v3", "paragraph", PROSE * 2, 420, 530, 8, page=3),
+            _element("v4", "paragraph", "The cart starts at $v$ and speeds up.", 300, 315, 8, page=3),
+            _element("v3", "paragraph", PROSE * 2, 420, 530, 9, page=3),
         ],
         # Page 3 is routed to the secondary: its formula, without LaTeX markup,
         # is classified and read from the secondary's region.
