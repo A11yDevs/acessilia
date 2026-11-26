@@ -29,7 +29,7 @@ que uma linha não mantenha um nome que o módulo deixou de exportar.
 
 | Módulo | Símbolos |
 |---|---|
-| `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult` |
+| `docstruct.types` | `BBox`, `CanonicalBlock`, `Region`, `BlockPairing`, `OrientationResult`, `DocumentIdFactory`, `BlockIdFactory` — os dois hooks de `id_factory` injetados: `DocumentIdFactory` não recebe argumentos, `BlockIdFactory` recebe o índice do bloco |
 | Exports legados de compatibilidade em `docstruct.types` e `docstruct` | `CanonicalDocument`, `CanonicalSection` — descontinuados desde 0.5.3; mantidos com comportamento inalterado (veja migração abaixo) |
 | `docstruct.geometry` | `content_fingerprint`, `overlaps_clean`, `merge_bboxes`, `union`, `intersection_area` |
 | `docstruct.geometry.boxes` | `OrientedBox`, `PageBox`, `is_bottom_left`, `downward_edges`, `best_effort_clip`, `holds_point`, `boxes_overlap`, `union_area`, `expand_box`, `spans_horizontally`, `boxes_side_by_side`, `box_distance`, `box_contains_center` — caixas que mantêm a origem de coordenadas (`TOPLEFT`, `BOTTOMLEFT`, `UNKNOWN`), com conversões e auxiliares espaciais |

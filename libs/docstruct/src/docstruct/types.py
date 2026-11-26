@@ -6,11 +6,17 @@ sem dependência do backend. O backend importa destes tipos; nunca o contrário.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 # Coordenadas em espaço de página (origem no canto superior esquerdo).
 # Convenção igual ao PyMuPDF/Docling: (x0, y0, x1, y1).
 BBox = tuple[float, float, float, float]
+
+# The two id injection hooks share the parameter name ``id_factory`` but not
+# the arity, so each module declares a distinct alias: a document has a single
+# id, while a block id comes from the block's 1-based index.
+DocumentIdFactory = Callable[[], str]
+BlockIdFactory = Callable[[int], str]
 
 
 @dataclass

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
-from typing import Any, Callable, Iterator
+from typing import Any, Iterator
 
 from docstruct.blocks.parser import parse_text_to_blocks
 from docstruct.tables.ast import raw_rows_from_table_ast, table_ast_from_rows
@@ -36,6 +36,7 @@ from docstruct.text.sanitize import (
     sanitize_text,
     sanitize_title_text,
 )
+from docstruct.types import DocumentIdFactory
 
 
 class MathEnricher:
@@ -87,13 +88,15 @@ def build_canonical_document(
     metadata: dict[str, Any] | None = None,
     technical_warnings: list[str] | None = None,
     math_enricher: MathEnricher | None = None,
-    id_factory: Callable[[], str] | None = None,
+    id_factory: DocumentIdFactory | None = None,
     inline_math_promote: bool = True,
 ) -> dict[str, Any]:
     """Build the canonical document from a structured payload or plain text.
 
-    ``id_factory`` is a zero-argument callable producing the document id; the
-    default is deterministic. ``inline_math_promote``
+    ``id_factory`` (a ``DocumentIdFactory``) is a zero-argument callable
+    producing the document id; the default is deterministic. It is not the
+    per-block ``BlockIdFactory`` of ``docstruct.blocks.parser.parse_text_to_blocks``,
+    which takes the block index. ``inline_math_promote``
     (``FusionPolicy.inline_math_promote``) turns a paragraph whose whole text is
     one inline math span into a display ``math`` block (#296).
     """
