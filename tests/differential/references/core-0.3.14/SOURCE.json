@@ -1,7 +1,7 @@
 {
   "commit": "da5c97b8ab543ae37733cf99793c68e25960ad1f",
   "core_version": "0.3.14",
-  "harness_sha256": "0d74c96563583de49b9b876ff4b2438a40c655917886bb7d71f99cb16bb95fdf",
+  "harness_sha256": "2a1b560768f7968e843eca2d346b516ad6e5cc11594ca4b01d1ad5f5136c5e52",
   "cases_sha256": "9e7f065aaa9ec24ffcdfc66ca1d06a0df9ec903ea1c7d8cd6df233c15ba33b27",
   "source_pdf_sha256": "5a838678058f6de375e8635b5f2fea47a4e5f07cb1a882a44b10f39abc6f34ff",
   "pillow_version": "13.0.0",

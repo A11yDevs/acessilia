@@ -197,5 +197,15 @@
   },
   "converted": {},
   "refused": [],
+  "served": [
+    [
+      "vlm",
+      "g1"
+    ],
+    [
+      "vlm",
+      "g2"
+    ]
+  ],
   "unhandled": []
 }

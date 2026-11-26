@@ -81,13 +81,32 @@ _PAGE_SHARE = 0.9
 _MIN_IOU = 0.3
 
 
-class FakeToolbox:
-    """The Toolbox of one case. ``calls`` lists the capabilities it served."""
+class Interrupted(BaseException):
+    """The process dies (#874): a ``BaseException``, which no handler of the
+    core catches, raised where :class:`FakeToolbox` was told to interrupt."""
 
-    def __init__(self, case: dict[str, Any]) -> None:
+
+class FakeToolbox:
+    """The Toolbox of one case. ``calls`` lists the capabilities it served,
+    ``served`` the element each vision or ``math.recognize`` answer was for.
+
+    ``interrupt=(kind, number)`` makes the ``number``-th request of ``kind``
+    (``vlm`` or ``math.recognize``) raise :class:`Interrupted` instead of
+    being answered, to test a resume from the checkpoints the run saved.
+    ``store`` is what a Toolbox keeps between two runs, its artifacts and the
+    regions it rendered: the resumed run gets the interrupted run's.
+    """
+
+    def __init__(
+        self, case: dict[str, Any], *, interrupt: tuple[str, int] | None = None, store: dict[str, Any] | None = None
+    ) -> None:
         self.case = case
-        self.artifacts: dict[str, bytes] = {}
-        self.renders: list[dict[str, Any]] = []
+        self.interrupt = interrupt
+        self.served: list[tuple[str, str]] = []
+        self._requests: dict[str, int] = {}
+        self.store = store if store is not None else {}
+        self.artifacts: dict[str, bytes] = self.store.setdefault("artifacts", {})
+        self.renders: list[dict[str, Any]] = self.store.setdefault("renders", [])
         self.calls: list[str] = []
         self.unhandled: list[str] = []
         self.refused: list[str] = []
@@ -105,6 +124,11 @@ class FakeToolbox:
     def handle(self, request: httpx.Request) -> httpx.Response:
         with self._lock:
             return self._handle(request)
+
+    def _interrupting(self, kind: str) -> None:
+        self._requests[kind] = self._requests.get(kind, 0) + 1
+        if self.interrupt == (kind, self._requests[kind]):
+            raise Interrupted(f"the run dies at {kind} request {self._requests[kind]}")
 
     def _handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -253,6 +277,8 @@ class FakeToolbox:
         answers = self.case.get("latex") or {}
         if element not in answers:
             raise _Unanswerable(f"the case reads no LaTeX for {element}")
+        self._interrupting("math.recognize")
+        self.served.append(("math.recognize", element))
         latex = answers[element]
         return {"formulas": [{"latex": latex, "confidence": 0.99}] if latex else []}
 
@@ -285,6 +311,8 @@ class FakeToolbox:
         answers = self.case.get("vision") or {}
         if element not in answers:
             raise _Unanswerable(f"the case gives no vision answer for {element}")
+        self._interrupting("vlm")
+        self.served.append(("vlm", element))
         schema = _response_schema(body)
         answer = _instance(schema, answers[element])
         _validate(answer, schema)
@@ -554,4 +582,4 @@ def _validate(answer: Any, schema: dict[str, Any] | None) -> None:
         raise _Unanswerable(f"the answer does not validate: {error.message}") from error
 
 
-__all__ = ["BASE_URL", "FakeToolbox", "installed"]
+__all__ = ["BASE_URL", "FakeToolbox", "Interrupted", "installed"]

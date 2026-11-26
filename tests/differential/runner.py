@@ -81,13 +81,24 @@ def load_case(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def run_case(case_path: Path) -> dict[str, Any]:
+def run_case(
+    case_path: Path,
+    *,
+    checkpoints: Any = None,
+    interrupt: tuple[str, int] | None = None,
+    toolbox_store: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The normalized canonical document of ``case_path``, and what the fake saw.
 
     The run is hermetic (:func:`hermetic_environment`): the settings get
     their defaults plus ``ENVIRONMENT``, whatever the shell or ``.env`` says,
     so a reference recorded in a bare worktree and a run in a developer's
     tree see the same configuration.
+
+    ``checkpoints`` (a ``JobCheckpoints``) makes it a job's run, which saves
+    and resumes from them; ``interrupt`` and ``toolbox_store`` are the
+    fake's (#874). The recording
+    uses neither, so they need only the current core.
     """
     # Imported before the environment is cleaned: the settings module loads
     # ``.env`` into the process environment once, when it is imported.
@@ -96,11 +107,11 @@ def run_case(case_path: Path) -> dict[str, Any]:
 
     case = load_case(case_path)
     with hermetic_environment(case.get("environment", {})) as workdir:
-        fake = FakeToolbox(case)
+        fake = FakeToolbox(case, interrupt=interrupt, store=toolbox_store)
         source = workdir / f"{case_path.parent.name}.pdf"
         shutil.copy(SOURCE_PDF, source)
         with installed(fake):
-            canonical, cacheable = asyncio.run(_run(source, case.get("mode", "normal")))
+            canonical, cacheable = asyncio.run(_run(source, case.get("mode", "normal"), checkpoints))
     return {
         "canonical": normalize(canonical),
         # Diagnostic only: an older core may call more or less (M4b stopped
@@ -110,6 +121,7 @@ def run_case(case_path: Path) -> dict[str, Any]:
         "refused": sorted(set(fake.refused)),
         # How many times each LaTeX was converted: diagnostic, not compared.
         "converted": dict(sorted(Counter(fake.converted).items())),
+        "served": [list(item) for item in fake.served],
         # Whether the backend would cache the result: a degraded one must not
         # be cached as a success (#882). Recorded, checked on this tree only.
         "cacheable": cacheable,
@@ -177,7 +189,7 @@ def _settings_variables() -> set[str]:
     return names
 
 
-async def _run(source: Path, mode: str) -> tuple[dict[str, Any], bool]:
+async def _run(source: Path, mode: str, checkpoints: Any = None) -> tuple[dict[str, Any], bool]:
     # Imported here: the settings read the environment when they are built.
     from acessilia_core.pipeline.canonical_builder import build_canonical_document
     from acessilia_core.pipeline.orchestrator import PddlAccessibilityOrchestrator
@@ -193,7 +205,7 @@ async def _run(source: Path, mode: str) -> tuple[dict[str, Any], bool]:
     orchestrator = _orchestrator(PddlAccessibilityOrchestrator, settings)
     result = await orchestrator.execute(
         source, source.parent, None, mode=mode, structured_output=True,
-        config=config, model_calls=get_model_calls(), ports=RunPorts.none(),
+        config=config, model_calls=get_model_calls(), ports=_ports(RunPorts, checkpoints),
     )
     if not isinstance(result, dict):
         raise RuntimeError(f"the run returned {type(result).__name__}, not a structured payload")
@@ -213,6 +225,15 @@ async def _run(source: Path, mode: str) -> tuple[dict[str, Any], bool]:
         technical_warnings=[str(item) for item in warnings] if isinstance(warnings, list) else None,
     )
     return canonical, bool(result.get("cacheable", True))
+
+
+def _ports(cls: Any, checkpoints: Any) -> Any:
+    """No state, as the recording runs; or a job's ``checkpoints`` (#874)."""
+    if checkpoints is None:
+        return cls.none()
+    from acessilia_core.ports import NoRegionCache
+
+    return cls(region_cache=NoRegionCache(), checkpoints=checkpoints, operations=None)
 
 
 def _orchestrator(cls: Any, settings: Any) -> Any:

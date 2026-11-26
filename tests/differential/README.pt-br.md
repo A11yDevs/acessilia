@@ -38,7 +38,8 @@ O que os casos estabelecem se limita ao que eles rodam:
 - o documento canônico normalizado: nem os exports, nem o número de chamadas.
 
 A equivalência que as referências mostram vale só para estes casos. A
-retomada a partir de um checkpoint é a #874.
+retomada a partir de um checkpoint é testada à parte, contra a mesma árvore
+(veja abaixo).
 
 ## Como um caso roda
 
@@ -228,6 +229,28 @@ Os casos acrescentados pela #876 (core 0.3.23) mostram:
 - **`degraded`** coincide com todas as referências, menos `core-0.3.14`, em
   que o texto ao redor das figuras difere, a mesma diferença do M3 que em
   `formulas`.
+
+## Retomada a partir de um checkpoint (#874)
+
+Uma retomada compara uma execução com ela mesma, então o oráculo é o mesmo
+caso rodado sem interrupção, não um core mais antigo (o formato do
+checkpoint também mudou entre as referências, #836).
+`tests/test_differential_resume.py`:
+
+- roda um caso uma vez, inteiro;
+- roda de novo como um job, com checkpoints (`JobCheckpoints`, em memória,
+  cada payload passando por JSON), e o falso o interrompe na N-ésima
+  requisição de visão ou de `math.recognize` com `Interrupted`, uma
+  `BaseException` que nenhum handler captura, como a morte de um processo;
+- roda uma terceira vez sobre os mesmos checkpoints e o mesmo armazenamento
+  do Toolbox (artefatos e renderizações, que um Toolbox real mantém), e
+  exige o documento canônico da execução inteira, sem pedir de novo uma
+  resposta que a execução interrompida salvou em `step_progress`.
+
+Cobre os dois passos que salvam o progresso dentro do passo: as descrições
+de figuras (M1) e o LaTeX das fórmulas (M3), um de cada vez
+(`VISION_CONCURRENCY=1`). Uma execução de controle sem checkpoints pede de
+novo todas as respostas.
 
 ## Gravação
 

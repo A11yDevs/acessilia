@@ -36,7 +36,7 @@ What the cases establish is limited to what they run:
   calls.
 
 The equivalence the references show holds for these cases only. A resume
-from a checkpoint is #874.
+from a checkpoint is tested apart, against the same tree (see below).
 
 ## How a case runs
 
@@ -219,6 +219,27 @@ The cases added for #876 (core 0.3.23) show:
 - **`degraded`** matches every reference but `core-0.3.14`, where the
   pictures' surrounding text differs, the same M3 difference as in
   `formulas`.
+
+## A resume from a checkpoint (#874)
+
+A resume compares a run with itself, so the oracle is the same case run
+without interruption, not an older core (the checkpoint format also
+changed across the references, #836). `tests/test_differential_resume.py`:
+
+- runs a case once, whole;
+- runs it again as a job, with checkpoints (`JobCheckpoints`, kept in
+  memory, every payload through JSON), and the fake interrupts it at its
+  N-th vision or `math.recognize` request with `Interrupted`, a
+  `BaseException` no handler catches, as a process death would;
+- runs it a third time over the same checkpoints and the same Toolbox store
+  (its artifacts and renders, which a real Toolbox keeps), and requires the
+  canonical document of the whole run, without asking again for an answer
+  the interrupted run had saved in `step_progress`.
+
+It covers the two steps that save their progress inside the step: the
+picture descriptions (M1) and the formula LaTeX (M3), one at a time
+(`VISION_CONCURRENCY=1`). A control run without checkpoints asks for every
+answer again.
 
 ## Recording
 

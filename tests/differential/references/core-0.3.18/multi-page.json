@@ -583,5 +583,23 @@
     "s(t) = t^{3}": 1
   },
   "refused": [],
+  "served": [
+    [
+      "vlm",
+      "f1"
+    ],
+    [
+      "vlm",
+      "pic1"
+    ],
+    [
+      "vlm",
+      "t1"
+    ],
+    [
+      "math.recognize",
+      "f1"
+    ]
+  ],
   "unhandled": []
 }
