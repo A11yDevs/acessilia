@@ -129,32 +129,6 @@ async def test_a_formula_answer_retypes_a_picture() -> None:
 
 
 @pytest.mark.asyncio
-async def test_an_empty_answer_keeps_meaningful_extractor_text() -> None:
-    manifest = _manifest([build_element("pic", "picture", text="Legenda que o extrator leu")])
-    Vision.answers = {"pic": _describe("A")}
-    Vision.answers["pic"] = Vision.answers["pic"].model_copy(update={"description": "  "})
-
-    await _run(manifest)
-
-    pic = manifest.elements[0]
-    assert pic.text == "Legenda que o extrator leu"
-    assert pic.metadata["vision_description_complete"] is True
-
-
-@pytest.mark.asyncio
-async def test_an_empty_answer_over_noise_is_an_empty_description() -> None:
-    manifest = _manifest([build_element("pic", "picture", text="body")])
-    Vision.answers = {"pic": _describe("A").model_copy(update={"description": ""})}
-
-    await _run(manifest)
-
-    pic = manifest.elements[0]
-    assert pic.text == ""
-    assert pic.metadata["vision_failure_reason"] == "empty_description"
-    assert len(Vision.calls) == 2  # the retry pass asks once more
-
-
-@pytest.mark.asyncio
 async def test_failures_are_recorded_with_their_reason(fakes) -> None:
     manifest = _manifest([build_element("crop", "picture"), build_element("none", "picture"),
                           build_element("model", "picture")])

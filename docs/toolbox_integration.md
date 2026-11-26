@@ -428,21 +428,23 @@ The `media.inspect` capability (provider `pure-media-inspect`, PR
   placeholders of a mostly visual document are described too; the reason sits
   in `metadata.vision_failure_reason`, and a table's in
   `metadata.table_read_failure`. The document says how many images could not
-  be described and how many tables could not be read. An empty description
-  and a table reading refused as worse than the table are the model's answers,
-  so they neither count nor keep the run uncached. A cached entry that records
-  a failure is not replayed, and a rerun that is still degraded drops it.
+  be described and how many tables could not be read. An empty answer is not
+  recorded as such: the output contract rejects it before any fold, so the
+  attempt becomes `model_failed` like any other failure without an answer,
+  and it counts. A table reading refused as worse than the table is the
+  model's answer, so it neither counts nor keeps the run uncached. A cached
+  entry that records a failure is not replayed, and a rerun that is still
+  degraded drops it.
 
   Before a picture or table is left that way, its stage tries it once more:
   after `VISION_RETRY_PASS_DELAY_SECONDS` (60), the objects left without a
-  usable description or reading (and pictures the model answered empty) are
-  sent again, one at a time. A provider that keeps failing is not called for
-  every object: after `VISION_BREAKER_THRESHOLD` (3) calls in a row without a
-  usable answer, the rest of the job's picture, formula and table calls are
-  skipped and recorded as `model_failed`, with
-  `metadata.vision_failure_detail` saying they were skipped. The first
-  call of the second pass gets through anyway, to test whether the provider
-  came back.
+  usable description or reading are sent again, one at a time. A provider
+  that keeps failing is not called for every object: after
+  `VISION_BREAKER_THRESHOLD` (3) calls in a row without a usable answer, the
+  rest of the job's picture, formula and table calls are skipped and recorded
+  as `model_failed`, with `metadata.vision_failure_detail` saying they were
+  skipped. The first call of the second pass gets through anyway, to test
+  whether the provider came back.
 
 The PDDL predicates `media_inspected`/`media_profile_classified` belong to the Toolbox
 domain; the core consumes the signal only as an enrichment heuristic and it does not

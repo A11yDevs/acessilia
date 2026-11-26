@@ -431,15 +431,17 @@ A capacidade `media.inspect` (provider `pure-media-inspect`, PR
   também são descritos; o motivo fica em `metadata.vision_failure_reason`, e o
   de uma tabela em `metadata.table_read_failure`. O documento informa quantas
   imagens não puderam ser descritas e quantas tabelas não puderam ser lidas.
-  Uma descrição vazia e uma leitura de tabela recusada por ser pior que a
-  tabela são respostas do modelo, então não contam nem impedem o cache. Uma
+  Uma resposta vazia não é registrada como tal: o contrato de saída a rejeita
+  antes de qualquer fold, então a tentativa vira `model_failed` como qualquer
+  falha sem resposta, e conta. Uma leitura de tabela recusada por ser pior que
+  a tabela é resposta do modelo, então não conta nem impede o cache. Uma
   entrada em cache que registra falha não é reaproveitada, e uma nova execução
   ainda degradada a descarta.
 
   Antes de uma imagem ou tabela ficar assim, o seu estágio tenta mais uma vez:
   depois de `VISION_RETRY_PASS_DELAY_SECONDS` (60), os objetos sem descrição ou
-  leitura utilizável (e as imagens que o modelo respondeu vazias) são enviados
-  de novo, um de cada vez. Um provedor que continua falhando não é chamado para
+  leitura utilizável são enviados de novo, um de cada vez. Um provedor que
+  continua falhando não é chamado para
   cada objeto: depois de `VISION_BREAKER_THRESHOLD` (3) chamadas seguidas sem
   resposta utilizável, as demais chamadas de imagem, fórmula e tabela do job
   são puladas e registradas como `model_failed`, com

@@ -501,7 +501,7 @@ LOG_PROVIDER_BREAKER_OPEN: str = (
     "{failures} vision calls in a row got no usable answer; "
     "skipping the remaining calls of this job"
 )
-#: Warning logged before the picture stage tries again what failed; {count} is how many pictures (empty answers included), {delay} the seconds waited first.
+#: Warning logged before the picture stage tries again what failed; {count} is how many pictures, {delay} the seconds waited first.
 LOG_PDDL_VISION_RETRY_PASS_PICTURES: tuple[str, str] = (
     "{count} picture without a usable description from the model; "
     "trying again in {delay}s",
@@ -522,10 +522,6 @@ LOG_PDDL_EMPTY_LIST_ITEMS_DROPPED: str = (
 #: Exception logged when extracting an element's image clip from the source PDF for the PDDL pipeline fails; {element_id} is the failing element's id.
 LOG_PDDL_ELEMENT_CROP_FAILED: str = (
     "Failed to extract the image clip for element {element_id}"
-)
-#: Warning logged when the vision model answered with an empty description for a picture element, leaving the `describe-image` obligation unsatisfiable. {element_id} is the element without a usable description.
-LOG_PDDL_EMPTY_VISION_DESCRIPTION: str = (
-    "Vision model returned an empty description for element {element_id}"
 )
 #: Warning logged once per document when math.recognize is unavailable during formula enrichment; {error} is the full failure message, naming the provider and its HTTP status.
 LOG_PDDL_FORMULA_RECOGNIZE_UNAVAILABLE: str = (

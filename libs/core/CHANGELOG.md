@@ -2,6 +2,26 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.25 — a failed re-description does not un-describe a picture (#681)
+
+`_fold_picture_description` kept a branch for an answer with no text that no
+production path can produce: `VisionOutput` rejects an empty description or
+formula LaTeX, the salvage path keeps 40 characters, truncation appends its
+notice, and the region cache validates on read. The branch, its
+`empty_description` reason, its entry in the retry set and its log message are
+gone. A failed re-description of a picture that already holds a fold's answer
+now leaves that answer certified and records no failure, so the element is
+never reported as described and failed at once; a picture the extractor gave
+text to keeps it and records the reason.
+- The `empty_description` retry entry is removed; an empty answer becomes
+  `model_failed` through the output contract, as any failure without an
+  answer.
+- Tests: an answered picture re-asked without its completion flag and with a
+  failed attempt stays described with its text and vision fields; a failed
+  call keeps the extractor's text; the empty-answer fixtures are gone.
+- Docs: `toolbox_integration` (EN/PT), `.env.example`, the settings field and
+  the log-message comment no longer describe the removed retry entry.
+
 ## 0.3.24 — a page routed to the secondary provider gets its primary-only text back (#887)
 
 `rescue-omitted-block` (#236) was emitted only for a page whose fusion

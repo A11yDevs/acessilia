@@ -20,6 +20,7 @@ from acessilia_core.i18n import t
 from acessilia_core.pipeline.elements import (
     MSG_UNDESCRIBED_PICTURE_ALT,
     _element_to_block,
+    _text_kept_by_picture,
 )
 from acessilia_core.pipeline.enrichment.pictures import _enrich_picture_descriptions
 from acessilia_core.pipeline.handlers.content import _handle_vision_description_method
@@ -29,18 +30,6 @@ _DESCRIPTION = VisionOutput(
     description="An illustrated periodic table.",
     language="pt-BR",
     confidence=0.9,
-)
-
-# Validation rejects an empty description; construct one to stand for a
-# salvaged answer that came back blank.
-_EMPTY = VisionOutput.model_construct(
-    kind="description",
-    description="",
-    formula_latex=None,
-    language="pt-BR",
-    confidence=0.1,
-    mentioned_elements=[],
-    warnings=[],
 )
 
 
@@ -106,46 +95,6 @@ async def test_a_picture_that_cannot_be_cropped_is_reported(monkeypatch, tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_an_empty_answer_keeps_meaningful_text_the_extractor_had(
-    monkeypatch, tmp_path
-):
-    _patch(monkeypatch, _EMPTY)
-    manifest = _manifest(
-        [_element("pic-1", "picture", text="Periodic table of the elements")], []
-    )
-
-    picture = await _enrich(manifest, tmp_path)
-
-    assert picture.text == "Periodic table of the elements"
-    assert _element_to_block(picture)["alt_text"] == "Periodic table of the elements"
-    assert picture.metadata["vision_description_complete"] is True
-    assert "vision_failure_reason" not in picture.metadata
-
-
-@pytest.mark.parametrize(
-    "element_type, text",
-    [("paragraph", "body"), ("picture", "1a,")],
-    ids=["extractor-placeholder", "ocr-noise"],
-)
-@pytest.mark.asyncio
-async def test_an_empty_answer_never_turns_extractor_noise_into_alt_text(
-    monkeypatch, tmp_path, element_type, text
-):
-    _patch(monkeypatch, _EMPTY)
-    manifest = _manifest([_element("pic-1", element_type, text=text)], [])
-    if element_type != "picture":
-        # A non-picture is only sent for description as a placeholder of a
-        # mostly visual page; describe it directly here.
-        manifest.elements[0].type = "picture"
-
-    picture = await _enrich(manifest, tmp_path)
-
-    assert _element_to_block(picture)["alt_text"] == t(MSG_UNDESCRIBED_PICTURE_ALT)
-    assert picture.metadata["vision_failure_reason"] == "empty_description"
-    assert "vision_description_complete" not in picture.metadata
-
-
-@pytest.mark.asyncio
 async def test_a_failed_picture_is_described_on_a_later_pass(monkeypatch, tmp_path):
     _patch(monkeypatch, None)
     manifest = _manifest([_element("pic-1", "picture")], [])
@@ -158,6 +107,70 @@ async def test_a_failed_picture_is_described_on_a_later_pass(monkeypatch, tmp_pa
     assert picture.metadata["vision_description_complete"] is True
     assert "vision_failure_reason" not in picture.metadata
     assert "vision_failure_detail" not in picture.metadata
+
+
+@pytest.mark.asyncio
+async def test_a_failed_re_description_leaves_an_answered_picture_as_it_was(
+    monkeypatch, tmp_path
+):
+    """A failed attempt on an answered picture changes nothing.
+
+    The stage only re-asks a picture whose completion flag is gone, which a
+    manifest written before the flag existed or a hand edit can leave. Its
+    text and ``vision_*`` fields show the answer; a failure added nothing, so
+    it must neither discard nor uncertify the answer, nor report the picture
+    as described and failed at once (#681).
+    """
+    _patch(monkeypatch, _DESCRIPTION)
+    manifest = _manifest(
+        [_element("pic-1", "picture", metadata={"replaced_text": "Slide text"})], []
+    )
+    picture = await _enrich(manifest, tmp_path)
+    folded = {
+        key: picture.metadata[key]
+        for key in (
+            "vision_language",
+            "vision_confidence",
+            "vision_elements",
+            "vision_warnings",
+        )
+    }
+    assert picture.metadata["vision_description_complete"] is True
+    assert _text_kept_by_picture(picture) == []
+
+    # What an older manifest or a hand edit can leave: no completion flag.
+    picture.metadata.pop("vision_description_complete")
+    _patch(monkeypatch, None)
+    picture = await _enrich(manifest, tmp_path)
+
+    assert picture.text == "An illustrated periodic table."
+    for key, value in folded.items():
+        assert picture.metadata[key] == value
+    assert picture.metadata["vision_description_complete"] is True
+    assert "vision_failure_reason" not in picture.metadata
+    assert "vision_failure_detail" not in picture.metadata
+    assert _element_to_block(picture)["alt_text"] == "An illustrated periodic table."
+    assert _text_kept_by_picture(picture) == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_call_keeps_the_text_the_extractor_had(monkeypatch, tmp_path):
+    """A picture the extractor gave text to keeps it when the model fails.
+
+    The text is the alt the reader gets; the failure only says no vision
+    answer came back, and the element stays retryable (#681).
+    """
+    _patch(monkeypatch, None)
+    manifest = _manifest(
+        [_element("pic-1", "picture", text="Periodic table of the elements")], []
+    )
+
+    picture = await _enrich(manifest, tmp_path)
+
+    assert picture.text == "Periodic table of the elements"
+    assert _element_to_block(picture)["alt_text"] == "Periodic table of the elements"
+    assert "vision_description_complete" not in picture.metadata
+    assert picture.metadata["vision_failure_reason"] == "model_failed"
 
 
 @pytest.mark.asyncio
