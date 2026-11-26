@@ -2,11 +2,12 @@
 
 Both parameters share the name ``id_factory`` but not the arity: the document
 hook takes no arguments, the block hook takes the block's 1-based index. The
-aliases in ``docstruct.types`` are what the annotations expose.
+aliases in ``docstruct.types`` name the shapes the annotations resolve to.
 """
 from __future__ import annotations
 
-from typing import Callable, get_type_hints
+from collections.abc import Callable
+from typing import get_type_hints
 
 from docstruct.blocks.parser import parse_text_to_blocks
 from docstruct.canonical import build_canonical_document

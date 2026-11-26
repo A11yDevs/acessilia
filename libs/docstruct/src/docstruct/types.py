@@ -5,8 +5,9 @@ sem dependência do backend. O backend importa destes tipos; nunca o contrário.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 # Coordenadas em espaço de página (origem no canto superior esquerdo).
 # Convenção igual ao PyMuPDF/Docling: (x0, y0, x1, y1).

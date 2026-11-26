@@ -15,14 +15,12 @@ from docstruct.text.sanitize import BEFORE_WORD, sanitize_block_text
 from docstruct.types import BlockIdFactory
 
 
-def parse_text_to_blocks(
-    text: str, id_factory: BlockIdFactory | None = None
-) -> list[dict[str, Any]]:
+def parse_text_to_blocks(text: str, id_factory: BlockIdFactory | None = None) -> list[dict[str, Any]]:
     """Parse plain text into canonical blocks.
 
     ``id_factory`` (a ``BlockIdFactory``) receives each block's 1-based index;
     it is not the zero-argument ``DocumentIdFactory`` of
-    ``canonical.build_canonical_document``.
+    ``docstruct.canonical.build_canonical_document``.
     """
     blocks: list[dict[str, Any]] = []
     lines = text.splitlines()
