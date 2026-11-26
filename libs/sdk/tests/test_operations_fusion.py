@@ -472,6 +472,10 @@ def test_unavailable_message_stays_overridable_and_pickles() -> None:
     assert restored.artifact_fallbacks == ("docling",)
 
 
+def test_unavailable_message_without_failures_keeps_the_bare_prefix() -> None:
+    assert str(DualFusionUnavailable({})) == "No provider available for extraction"
+
+
 @pytest.mark.asyncio
 async def test_a_failed_status_secondary_keeps_the_primary_and_records_the_violation() -> None:
     primary = _FakeStructureClient(

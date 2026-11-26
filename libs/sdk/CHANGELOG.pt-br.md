@@ -13,8 +13,9 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
   ToolboxContractViolation; mineru: ToolboxProviderUnavailable)`). O prefixo
   `No provider available for extraction` é mantido, então quem o compara
   continua funcionando, e um `message` explícito continua valendo. Um provedor
-  que respondeu fora do envelope deixa de ser descrito como indisponível
-  (#672).
+  que respondeu fora do envelope deixa de ser descrito erroneamente como
+  indisponível, embora o prefixo mantido ainda o diga -- o parêntese nomeia o
+  tipo real da falha (#672).
 
 ## 0.7.0 (2026-11-24)
 

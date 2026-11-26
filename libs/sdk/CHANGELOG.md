@@ -13,7 +13,8 @@ can see are recorded here, newest first.
   mineru: ToolboxProviderUnavailable)`). The `No provider available for
   extraction` prefix is kept, so callers matching it keep working, and an
   explicit `message` is still honoured. A provider that answered outside the
-  envelope is no longer described as unavailable (#672).
+  envelope is no longer misdescribed as unavailable, though the kept prefix
+  still says so -- the parenthetical names the real failure type (#672).
 
 ## 0.7.0 (2026-11-24)
 

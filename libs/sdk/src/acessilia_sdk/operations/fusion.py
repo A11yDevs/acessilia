@@ -53,8 +53,9 @@ class DualFusionUnavailable(ToolboxProviderUnavailable):
     Without an explicit ``message``, the message names every recorded failure:
     ``No provider available for extraction (docling: ToolboxContractViolation;
     mineru: ToolboxProviderUnavailable)``. The prefix stays stable, so callers
-    matching it keep working, and a provider that answered outside the envelope
-    is no longer described as unavailable.
+    matching it keep working, and the details name each failure's type so a
+    provider that answered outside the envelope is not misdescribed as
+    unavailable.
     """
 
     def __init__(
