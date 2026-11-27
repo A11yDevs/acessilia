@@ -226,8 +226,11 @@ Caminhos concretos consumidos por `resolve` são vazios ou começam com `/`.
 sinais, espaços, underscores e dígitos não ASCII são rejeitados. Um prefixo
 ou índice inválido ou um valor ausente gera `KeyError` com o ponteiro original.
 Essas verificações se aplicam a caminhos concretos, não aos padrões de
-declaração casados por `fnmatchcase`. A validação de escapes de til inválidos
-está registrada na [#920](https://github.com/A11yDevs/acessilia/issues/920).
+declaração casados por `fnmatchcase`. Em um token concreto, somente `~0` e `~1`
+codificam til e barra. Outros escapes de til e um til isolado no final geram
+`KeyError` com o ponteiro original, mesmo quando a chave decodificada existe.
+A validação precede a decodificação: `~01` representa a chave literal `~1`,
+não `/`, e `~02` representa `~2`.
 
 A detecção de diferenças e `expected`/`was` usam a mesma regra recursiva de
 igualdade JSON. Booleanos diferem de números: `true` não é `1`, e `false`

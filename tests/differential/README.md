@@ -216,8 +216,10 @@ List indices must be `0` or ASCII decimal digits without leading zeroes;
 signs, whitespace, underscores and non-ASCII digits are rejected. An invalid
 prefix/index or a missing value raises `KeyError` with the original pointer.
 These checks apply to concrete paths, not the declaration patterns matched
-by `fnmatchcase`. Validation of malformed tilde escapes is tracked in
-[#920](https://github.com/A11yDevs/acessilia/issues/920).
+by `fnmatchcase`. Within a concrete token, only `~0` and `~1` encode tilde and
+slash. Other tilde escapes and a trailing bare tilde raise `KeyError` with
+the original pointer, even if the decoded key exists. Validation precedes
+decoding: `~01` names the literal key `~1`, not `/`, and `~02` names `~2`.
 
 Difference detection and `expected`/`was` use the same recursive JSON
 equality rule. Booleans differ from numbers: `true` is not `1`, and `false`

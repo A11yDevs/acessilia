@@ -249,6 +249,44 @@ def test_a_nonempty_pointer_must_start_with_a_slash(pointer):
     assert error.value.args == (pointer,)
 
 
+@pytest.mark.parametrize("encoded,key", [
+    ("~", "~"), ("~2", "~2"), ("name~", "name~"), ("~01~2", "~1~2"),
+    ("~~0", "~~"), ("~0~", "~~"), ("~2~1", "~2/"),
+])
+@pytest.mark.parametrize("nested", [False, True])
+def test_invalid_tilde_escapes_fail_even_when_the_decoded_key_exists(encoded, key, nested):
+    document, pointer = {key: "value"}, f"/{encoded}"
+    if nested:
+        document = {"blocks": [{"id": "a", "metadata": document}]}
+        pointer = f"/blocks/0/metadata/{encoded}"
+    with pytest.raises(KeyError) as error:
+        resolve(document, pointer)
+    assert error.value.args == (pointer,)
+
+
+@pytest.mark.parametrize("encoded,key", [("~0", "~"), ("~1", "/"), ("~01", "~1"), ("~00", "~0"), ("~0~1", "~/"), ("~02", "~2")])
+@pytest.mark.parametrize("kind", ["added", "changed", "removed"])
+def test_valid_tilde_escapes_decode_once_and_keep_identity_binding(encoded, key, kind):
+    assert resolve({key: "new"}, f"/{encoded}") == "new"
+    reference, current = {"blocks": [{"id": "a"}]}, {"blocks": [{"id": "a", key: "new"}]}
+    if kind == "changed":
+        reference["blocks"][0][key] = "old"
+    elif kind == "removed":
+        reference, current = current, reference
+    value_key = "was" if kind == "removed" else "expected"
+    path = f"/blocks/0/{encoded}"
+    assert differences(reference, current) == [{"kind": kind, "path": path}]
+    declared = [{"kind": kind, "path": path, "id": "a", value_key: "new", "reason": "r"}]
+    assert explain(reference, current, declared) == ([], [])
+
+
+def test_a_tilde_glob_is_a_declaration_pattern_not_a_concrete_pointer():
+    reference, current = {"~2": "old"}, {"~2": "new"}
+    assert differences(reference, current) == [{"kind": "changed", "path": "/~02"}]
+    declared = [{"kind": "changed", "path": "/~*", "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == ([], [])
+
+
 @pytest.mark.parametrize("reference,current", [
     ({}, [{"id": "a"}]),
     ({"": 0}, {"": 1}),

@@ -7,7 +7,7 @@ outputs are compared does not change what a reference recorded.
 from __future__ import annotations
 
 from fnmatch import fnmatchcase
-from re import fullmatch
+from re import fullmatch, search
 from typing import Any
 
 from tests.differential.runner import escape
@@ -215,12 +215,15 @@ def resolve(document: Any, pointer: str) -> Any:
 
     ``"/"`` names an empty property key. Nonempty pointers start with ``/``;
     list indices are ``0`` or ASCII decimals without leading zeroes.
-    An invalid prefix/index or a missing value raises ``KeyError(pointer)``.
+    Only ``~0`` and ``~1`` escape a token's tilde and slash, respectively.
+    A malformed pointer or a missing value raises ``KeyError(pointer)``.
     """
     if pointer and not pointer.startswith("/"):
         raise KeyError(pointer)
     value = document
     for segment in pointer.split("/")[1:]:
+        if search(r"~(?:[^01]|$)", segment):
+            raise KeyError(pointer)
         segment = segment.replace("~1", "/").replace("~0", "~")
         if isinstance(value, list):
             if not fullmatch(r"0|[1-9][0-9]*", segment):
