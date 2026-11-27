@@ -16,6 +16,11 @@ LOG_BOT_ALREADY_RUNNING: str = (
 )
 #: Critical message logged when another process holds the startup lock but its PID is not readable.
 LOG_LOCK_ALREADY_HELD: str = "Another instance holds the process lock ({path})"
+#: Warning logged when the pre-#903 compatibility lock cannot be written; {path} is that file and {error} the OS error.
+LOG_LOCK_COMPAT_UNWRITABLE: str = (
+    "Could not write the legacy process lock {path}: {error}. A pre-#903 "
+    "instance may not detect this one"
+)
 #: Critical message logged when the lock file cannot be inspected, written or removed; {path} is the lock file and {error} the OS error.
 LOG_LOCK_UNUSABLE: str = (
     "Cannot use the process lock {path}: {error}. Refusing to start; stop any "

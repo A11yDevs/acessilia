@@ -59,25 +59,29 @@ mesma sondagem de PID, o mesmo lock de processo e o mesmo startup de interfaces,
 mudando apenas a formatação, o local do arquivo de lock e a presença de uma
 função `main()`. O ponto de entrada dos console scripts agora importa `main` de
 `frontend.run`, então o runtime tem uma única implementação e um único lock
-(`frontend/bot.lock`). Iniciar um dos entry points com o outro já rodando agora é
-recusado, em vez de usar dois locks separados. O runtime toma um lock exclusivo
-do sistema operacional sobre o arquivo (`fcntl.flock` no POSIX,
-`msvcrt.locking` no Windows) e o mantém por um handle aberto durante toda a vida
-do processo, então duas aquisições concorrentes não podem ambas ter sucesso; o
-PID no arquivo é diagnóstico. O runtime também reconhece o lock legado
-`frontend/cli/bot.lock`: se ele apontar para um processo vivo, o startup é
-recusado; se o dono não puder ser inspecionado, como um processo de outro
-usuário, o lock é mantido e o startup é recusado; se estiver obsoleto ou
-malformado, é removido.
+autoritativo (`frontend/bot.lock.v2`). Iniciar um dos entry points com o outro já
+rodando agora é recusado, em vez de usar dois locks separados. O runtime toma um
+lock exclusivo do sistema operacional sobre `frontend/bot.lock.v2`
+(`fcntl.flock` no POSIX, `msvcrt.locking` no Windows) e o mantém por um handle
+aberto durante toda a vida do processo, então duas aquisições concorrentes não
+podem ambas ter sucesso; o PID no arquivo é diagnóstico. Ele também grava seu
+PID no caminho anterior ao #903, `frontend/bot.lock`, para que um runtime antigo
+continue recusando iniciar enquanto o novo roda. O runtime reconhece o lock
+legado `frontend/cli/bot.lock` e o `frontend/bot.lock` anterior ao #903: se um
+deles apontar para um processo vivo, o startup é recusado; se o dono não puder
+ser inspecionado, como um processo de outro usuário, o lock é mantido e o
+startup é recusado; se estiver obsoleto ou malformado, é removido.
 
 O modo `0600` é best-effort: é aplicado na criação e restringido no POSIX quando
 possível, e não protege o arquivo contra remoção por quem tem permissão de
 escrita no diretório. O lock do SO, não o modo, é o mecanismo de exclusão mútua.
 
-Um runtime antigo anterior a esta mudança não toma lock do SO e ainda remove o
-arquivo ao sair, então um único upgrade in-place ainda pode sobrepor um início
-antigo e um novo; o novo runtime recusa um arquivo que nomeia um PID antigo vivo,
-mas não consegue impedir essa remoção.
+Um runtime anterior ao #903 não toma lock do SO e ainda remove
+`frontend/bot.lock` ao sair. Esse caminho agora é apenas o anúncio de
+compatibilidade, então a remoção não libera o `frontend/bot.lock.v2`
+autoritativo. Um processo antigo que inicia antes de o novo runtime gravar seu
+PID de compatibilidade ainda pode sobrepor naquele startup; depois que o novo
+runtime está no ar, um início antigo vê um PID vivo e recusa.
 
 O comportamento de startup e lock é fixado por `tests/test_frontend_startup.py`:
 cada interface habilitada, as saídas por token ausente e por nenhuma interface, o

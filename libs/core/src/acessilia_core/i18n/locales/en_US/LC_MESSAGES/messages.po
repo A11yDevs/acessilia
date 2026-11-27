@@ -1347,6 +1347,14 @@ msgid "Another instance holds the process lock ({path})"
 msgstr "Another instance holds the process lock ({path})"
 
 #, python-brace-format
+msgid ""
+"Could not write the legacy process lock {path}: {error}. A pre-#903 "
+"instance may not detect this one"
+msgstr ""
+"Could not write the legacy process lock {path}: {error}. A pre-#903 "
+"instance may not detect this one"
+
+#, python-brace-format
 msgid "Lock file stale (PID {pid} is not running); replacing it..."
 msgstr "Lock file stale (PID {pid} is not running); replacing it..."
 

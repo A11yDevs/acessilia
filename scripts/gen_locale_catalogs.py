@@ -150,6 +150,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_JOB_EXECUTOR_ERROR,
     LOG_LOCK_ACQUIRED,
     LOG_LOCK_ALREADY_HELD,
+    LOG_LOCK_COMPAT_UNWRITABLE,
     LOG_LOCK_FILE_STALE,
     LOG_LOCK_LEGACY_FILE_STALE,
     LOG_LOCK_OWNER_UNKNOWN,
@@ -871,6 +872,7 @@ MESSAGES: tuple[str, ...] = (
     LOG_LOGGER_CONFIGURED,
     LOG_BOT_ALREADY_RUNNING,
     LOG_LOCK_ALREADY_HELD,
+    LOG_LOCK_COMPAT_UNWRITABLE,
     LOG_LOCK_FILE_STALE,
     LOG_LOCK_LEGACY_FILE_STALE,
     LOG_LOCK_OWNER_UNKNOWN,
@@ -1894,6 +1896,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "Outra instância do bot já está em execução (PID={pid}, lock {path})"
         ),
         LOG_LOCK_ALREADY_HELD: "Outra instância mantém o lock de processo ({path})",
+        LOG_LOCK_COMPAT_UNWRITABLE: (
+            "Não foi possível escrever o lock de processo legado {path}: {error}. "
+            "Uma instância anterior ao #903 pode não detectar esta"
+        ),
         LOG_LOCK_UNUSABLE: (
             "Não foi possível usar o lock de processo {path}: {error}. Recusando "
             "iniciar; pare qualquer instância em execução ou corrija as permissões "

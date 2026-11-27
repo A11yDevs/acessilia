@@ -1,4 +1,6 @@
 # Process locks written by the shared frontend runtime.
 bot.lock
+# Authoritative OS lock introduced in #903; the old runtime never touches it.
+bot.lock.v2
 # Legacy CLI lock, kept here so an old process cannot be committed.
 cli/bot.lock
