@@ -132,6 +132,7 @@ class _ExecutionState:
     #: addition was found during it (#594, #832); one whose applicability
     #: changed under the same id is stale.
     planned: dict[str, _Applicability] = field(default_factory=dict)
+    selected_obligations: set[str] = field(default_factory=set)
 
 
 class _SkipStep(Exception):
@@ -223,7 +224,7 @@ class ExecutorAgent:
         working, results, replan_required = self._initial_working_state(
             plan, manifest, resume
         )
-        replan_required = self._sync_selection(plan, manifest, working) or replan_required
+        replan_required = self._sync_goals(plan, manifest, working) or replan_required
         # The splits and joins of this execution, recorded by
         # ``remap_references`` (#843); a resume continues its own record.
         reset_structural_remaps(working, resume.remaps if resume is not None else [])
@@ -240,6 +241,7 @@ class ExecutorAgent:
             replan_required=replan_required,
             progress=progress,
             planned=_planned_applicability(manifest),
+            selected_obligations=set(plan.selected_obligations),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -291,26 +293,29 @@ class ExecutorAgent:
         return resume.manifest, results, resume.replan_required
 
     @staticmethod
-    def _sync_selection(
+    def _sync_goals(
         plan: NominalPlan, manifest: ProcessingManifest, working: ProcessingManifest
     ) -> bool:
-        """Mark the plan's obligations selected on ``working``; True when one asks for a replan.
+        """Keep job goals independent of the plan's scope (#883).
 
-        An obligation the plan's manifest does not have was added by a
-        handler of this execution (#594). Its `selected` flag is the one the
-        checkpoint recorded: set by a handler that succeeded
-        (`_select_discovered`), left unset by one that failed. One still
-        selected and open asks for a replan, as when it was found.
+        Older execution checkpoints cleared goals outside their plan. The
+        planning manifest recovers those flags when resuming, for existing
+        obligations only. A discovered open goal still asks for a replan.
         """
-        planned = {item.id for item in manifest.obligations}
+        planned = {item.id: item for item in manifest.obligations}
         selected = set(plan.selected_obligations)
         replan_required = False
         for obligation in working.obligations:
-            if obligation.id not in planned:
+            original = planned.get(obligation.id)
+            if original is None:
                 if obligation.selected and obligation.status != "satisfied":
                     replan_required = True
                 continue
-            obligation.selected = obligation.id in selected
+            obligation.selected = obligation.selected or original.selected or obligation.id in selected
+            if obligation.status == "satisfied" or obligation.id in selected:
+                obligation.deferred_reason = None
+            elif obligation.selected:
+                obligation.deferred_reason = obligation.deferred_reason or "outside-plan"
         return replan_required
 
     @staticmethod
@@ -503,12 +508,13 @@ class ExecutorAgent:
 
     @staticmethod
     def _execute_complete_job(state: _ExecutionState) -> None:
-        # `selected`, not the plan's list: it also holds what a
-        # handler added during this execution.
+        # The plan's scope plus goals discovered during this execution.
+        # Other job goals remain open for the delivery check, not this plan.
         open_items = [
             item
             for item in state.manifest.obligations
-            if item.selected and item.status != "satisfied"
+            if item.status != "satisfied"
+            and (item.id in state.selected_obligations or (item.selected and item.id not in state.planned))
         ]
         skipped = {result.obligation_id for result in state.results if result.status == "skipped"}
         if open_items and all(

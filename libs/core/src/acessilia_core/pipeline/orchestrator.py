@@ -57,14 +57,12 @@ from acessilia_core.pipeline.enrichment.pictures import _prepare_pictures
 from acessilia_core.pipeline.handlers.registry import bind_run, build_method_registry
 from acessilia_core.pipeline.obligations import (
     _blocks_delivery,
-    _discovered_roots,
     _document_work_found,
     _reopen,
-    _replannable_obligation_ids,
-    _restore_goals,
     _unsatisfied_selected_obligations,
     _unsatisfied_summary,
     planning_signature,
+    replan_roots,
 )
 from acessilia_core.pipeline.payload import build_pddl_structured_payload
 from acessilia_core.pipeline.preflight import (
@@ -565,8 +563,7 @@ class PddlAccessibilityOrchestrator:
         *,
         executor: ExecutorAgent,
     ) -> tuple[ProcessingManifest, ExecutionReport]:
-        """Execute ``plan`` with the run's ``executor``, continuing from ``execution_state`` when it exists;
-        the job's goals the plan left out stay selected (``_restore_goals``, #842 review)."""
+        """Execute ``plan``, continuing from ``execution_state`` when it exists."""
         resume = None
         if execution_state is not None:
             resume = ExecutionResume(
@@ -584,7 +581,7 @@ class PddlAccessibilityOrchestrator:
             if checkpoints.active and not self.execute_dry_run
             else None
         )
-        manifest, report = await run_blocking(
+        return await run_blocking(
             executor.execute,
             plan,
             planning_manifest,
@@ -593,8 +590,6 @@ class PddlAccessibilityOrchestrator:
             resume=resume,
             on_step=on_step,
         )
-        _restore_goals(manifest, planning_manifest)
-        return manifest, report
 
     async def _extract_structure(
         self,
@@ -741,8 +736,7 @@ class PddlAccessibilityOrchestrator:
             ]
             if any(_blocks_delivery(obligation, manifest) for obligation in exhausted):
                 break
-            spent = kind == "discovery" and replans >= self.max_replans  # no failed work again (#842)
-            roots = _discovered_roots(manifest) if spent else _replannable_obligation_ids(manifest)
+            roots = replan_roots(manifest, failure_budget_spent=kind == "discovery" and replans >= self.max_replans)
             if not roots:
                 break
             _reopen(manifest)  # only now, with the replan allowed (M4b)

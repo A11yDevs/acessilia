@@ -2,8 +2,8 @@
 
 With ``max_replans`` spent, a run that found work is a discovery replan for
 the work no failure touches only (``_discovered_roots``). That plan leaves the
-failed work out, but the job still has it as a goal: it stays selected
-(``_restore_goals``), so the delivery check judges it, a refinement with a
+failed work out, but the job still has it as a goal: it stays selected,
+so the delivery check judges it, a refinement with a
 warning and no cache, a critical obligation by failing the job.
 """
 
@@ -26,7 +26,7 @@ from test_changed_obligations import (
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.manifest.models import ObligationAttempt, ProcessingManifest
 from acessilia_core.pipeline.checkpointing import RunCheckpoints
-from acessilia_core.pipeline.obligations import _discovered_roots, _restore_goals
+from acessilia_core.pipeline.obligations import _discovered_roots
 from acessilia_core.planning import toolbox_gate
 from acessilia_core.planning.planner_agent import PlannerAgent
 
@@ -77,6 +77,7 @@ def test_a_refinement_left_out_is_reported_with_a_warning_and_no_cache(monkeypat
     assert payload["canonical_metadata"]["pddl_unsatisfied_summary"]
     assert payload["technical_warnings"]
     assert payload["cacheable"] is False
+    assert payload["canonical_metadata"]["pddl_unsatisfied_obligations"][0]["deferred_reason"] == "failure-budget-exhausted"
 
 
 def test_a_critical_failure_left_out_fails_the_job_after_the_discovery(monkeypatch, tmp_path) -> None:
@@ -157,25 +158,8 @@ def test_the_discovery_roots_leave_out_what_a_failure_touches_at_any_depth() -> 
     assert _discovered_roots(ProcessingManifest.model_validate(manifest.model_dump(by_alias=True))) == ["o-free"]
 
 
-def test_a_goal_a_run_removed_or_satisfied_is_not_brought_back() -> None:
-    manifest = build_manifest(
-        [build_element("a", "paragraph", text="a")],
-        [_obligation(name, "review-structure", ["a"]) for name in ("o-left", "o-done")],
-    )
-    for item in manifest.obligations:
-        item.selected = True
-    after = manifest.model_copy(deep=True)
-    for item in after.obligations:
-        item.selected = False
-    after.obligations[1].status = "satisfied"
-    after.obligations = [item for item in after.obligations if item.id != "o-gone"]
-
-    _restore_goals(after, manifest)
-
-    assert [(item.id, item.selected) for item in after.obligations] == [("o-left", True), ("o-done", False)]
-
-
-def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters() -> None:
+@pytest.mark.parametrize("legacy_checkpoint", [False, True])
+def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters(legacy_checkpoint) -> None:
     """The process dies inside the discovery plan that serves ``o-found``.
     The resume reads the plan checkpoint (counters, signature and the
     planning manifest, where ``o-bad`` is still a goal), finishes the plan
@@ -222,6 +206,14 @@ def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters() -> None:
     with pytest.raises(Crash):
         orchestrator.executor.execute(plan, manifest, on_step=save)
 
+    saved_bad = next(item for item in snapshots[-1]["manifest"]["obligations"] if item["id"] == "o-bad")
+    assert saved_bad["selected"] is True
+    assert saved_bad["deferred_reason"] == "outside-plan"
+    if legacy_checkpoint:
+        # Before #883 the executor cleared a goal outside its current plan.
+        saved_bad["selected"] = False
+        saved_bad.pop("deferred_reason")
+
     ctx = SimpleNamespace(checkpoints=checkpoints, config=config, status_callback=None)
     state = asyncio.run(orchestrator._load_or_build_plan(ctx, manifest))
     resumed, _ = asyncio.run(orchestrator._run_plan(
@@ -233,3 +225,4 @@ def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters() -> None:
     assert calls == ["o-found", "o-found-2"]
     bad_after = next(item for item in resumed.obligations if item.id == "o-bad")
     assert (bad_after.selected, bad_after.status) == (True, "candidate")
+    assert bad_after.deferred_reason == "outside-plan"

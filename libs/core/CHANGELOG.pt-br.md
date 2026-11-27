@@ -2,6 +2,24 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.27 — metas do job sobrevivem a planos que atendem apenas parte delas (#883)
+
+A flag `selected` de uma obrigação mantém seu significado de meta do job
+durante toda a execução. `NominalPlan.selected_obligations` define o escopo
+do plano atual; `complete-job` espera por esse escopo e pelas metas descobertas
+durante a execução. A verificação de entrega continua julgando todas as metas
+abertas. O orquestrador deixa de restaurar metas depois da execução.
+- O campo opcional `deferred_reason` registra `outside-plan` ou
+  `failure-budget-exhausted` nas metas excluídas. O payload de obrigações
+  insatisfeitas inclui o motivo quando presente; um plano posterior o limpa
+  ao assumir o trabalho.
+- Checkpoints antigos de 0.3.x continuam legíveis. O manifesto de planejamento
+  recupera flags de meta apagadas por executores antigos; adiamentos ausentes
+  continuam ausentes na serialização, preservando hashes e vínculos de planos.
+- Testes cobrem planos parciais, avisos e cache na entrega adiada, execução
+  posterior, metas removidas e retomada de checkpoints atuais e antigos.
+- Decisão de contrato: [ADR-0031](../../docs/adr/0031-job-goals-and-plan-selection.pt-br.md).
+
 ## 0.3.26 — a violação de contrato é falha de provider no modo dual (#699)
 
 O extrator do core e a fusão do SDK classificavam de formas diferentes uma

@@ -275,11 +275,24 @@ A handler that adds content may also add its processing needs: after
 join the manifest (#594). No plan covers them yet, so when the handler
 succeeds the executor selects them and, if one is still open, reports
 `replan-required`. The rest of the plan still runs first, as after a failed
-method, and `complete-job` checks every selected obligation, these included.
-The replan takes them as roots, within the same `max_replans` budget. A
+method, and `complete-job` checks the plan's selection plus these new goals.
+The replan takes them as roots, within the failure and discovery budgets. A
 checkpoint resume keeps the selection the checkpoint recorded for an
 obligation the plan's manifest does not have: selected if the handler that
 added it succeeded, not selected if it failed.
+
+`Obligation.selected` is a job goal; `NominalPlan.selected_obligations` is
+the current plan's scope ([ADR-0031](adr/0031-job-goals-and-plan-selection.md),
+#883). A partial plan leaves the other goals selected. Open goals outside
+its scope carry an optional `deferred_reason`: `outside-plan`, or
+`failure-budget-exhausted` when discovery policy excludes failed work and
+its dependents. The unsatisfied-obligation payload includes this reason.
+Taking up a deferred goal in a later plan clears the reason. The final
+delivery check judges every open goal: a critical one fails the job, a
+refinement leaves a warning and prevents caching, even if the plan completed.
+Old checkpoints remain readable and keep their hashes when no deferral is
+present; resumes recover goal flags cleared by older executors from the
+planning manifest.
 
 ### 5.1 `dual-provider-fusion` method
 

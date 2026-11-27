@@ -287,12 +287,26 @@ obrigações do próprio bloco (`normalize-text`, `repair-legacy-unicode`,
 `repair-heading-hierarchy`, ...) entram no manifesto (#594). Nenhum plano as
 cobre ainda, então, quando o handler tem sucesso, o executor as seleciona e,
 se alguma continua aberta, informa `replan-required`. O resto do plano roda
-antes, como depois de um método que falhou, e o `complete-job` confere todas
-as obrigações selecionadas, inclusive essas. O replanejamento as toma como
-raízes, dentro do mesmo limite `max_replans`. Ao retomar de um checkpoint,
+antes, como depois de um método que falhou, e o `complete-job` confere a
+seleção do plano e essas novas metas. O replanejamento as toma como raízes,
+dentro dos limites de falha e descoberta. Ao retomar de um checkpoint,
 vale a seleção que o checkpoint gravou para uma obrigação que o manifesto
 do plano não tem: selecionada se o handler que a acrescentou teve sucesso, não
 selecionada se ele falhou.
+
+`Obligation.selected` representa uma meta do job;
+`NominalPlan.selected_obligations`, o escopo do plano atual
+([ADR-0031](adr/0031-job-goals-and-plan-selection.pt-br.md), #883).
+Um plano parcial mantém as outras metas selecionadas. Metas abertas fora
+do escopo recebem o motivo opcional `deferred_reason`: `outside-plan`, ou
+`failure-budget-exhausted` quando a política de descoberta exclui trabalho
+que falhou e seus dependentes. O payload de obrigações insatisfeitas inclui
+esse motivo. Selecionar uma meta adiada em um plano posterior limpa o motivo.
+A verificação final de entrega julga todas as metas abertas: uma crítica
+faz o job falhar; um refinamento gera aviso e impede cache, mesmo se o plano
+terminou. Checkpoints antigos continuam legíveis e mantêm seus hashes sem
+adiamentos; a retomada recupera do manifesto de planejamento as flags de
+meta apagadas por executores antigos.
 
 ### 5.1 Método `dual-provider-fusion`
 
