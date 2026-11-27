@@ -16,6 +16,21 @@ from frontend.telegram.middlewares import pause_middleware
 from frontend.telegram.state_store import TelegramStateStore
 from tests.test_telegram_client import _FakeBot, _FakeMessage
 
+_STATE_STORE_WARNING = "Telegram state store unavailable: "
+
+
+class _CancelClient:
+    async def cancel_job(self, task_id: str) -> dict:
+        return {"task_id": task_id}
+
+
+def _state_store_warnings(warnings: StringIO) -> list[str]:
+    return [
+        line
+        for line in warnings.getvalue().splitlines()
+        if line.startswith(_STATE_STORE_WARNING)
+    ]
+
 
 @pytest.fixture(autouse=True)
 def isolated_store(tmp_path, monkeypatch):
@@ -210,11 +225,7 @@ def test_cancel_removes_the_persisted_task(monkeypatch) -> None:
     )
     user_context.user_task_ids[state_key] = "cancelled-task"
 
-    class CancelClient:
-        async def cancel_job(self, task_id: str) -> dict:
-            return {"task_id": task_id}
-
-    monkeypatch.setattr(start_module, "client", CancelClient())
+    monkeypatch.setattr(start_module, "client", _CancelClient())
     message = _FakeMessage(_FakeBot(b""), chat_id=123, user_id=456)
 
     asyncio.run(start_module.cmd_cancel(message))
@@ -229,15 +240,11 @@ def test_cancel_warns_with_the_store_error(monkeypatch) -> None:
     user_context.user_task_ids[state_key] = "cancelled-task"
 
     class FailingStore:
-        def remove_task(self, state_key: tuple, task_id: str) -> None:
+        def remove_task(self, state_key: tuple[int, int | None, int], task_id: str) -> None:
             raise sqlite3.Error("down")
 
-    class CancelClient:
-        async def cancel_job(self, task_id: str) -> dict:
-            return {"task_id": task_id}
-
     monkeypatch.setattr(start_module, "get_state_store", FailingStore)
-    monkeypatch.setattr(start_module, "client", CancelClient())
+    monkeypatch.setattr(start_module, "client", _CancelClient())
     message = _FakeMessage(_FakeBot(b""), chat_id=123, user_id=456)
 
     warnings = StringIO()
@@ -247,7 +254,7 @@ def test_cancel_warns_with_the_store_error(monkeypatch) -> None:
     finally:
         start_module.logger.remove(sink)
 
-    assert warnings.getvalue().splitlines() == [
+    assert _state_store_warnings(warnings) == [
         "Telegram state store unavailable: down"
     ]
 
@@ -268,6 +275,76 @@ def test_resume_warns_with_the_store_error(monkeypatch) -> None:
     finally:
         doc_module.logger.remove(sink)
 
-    assert warnings.getvalue().splitlines() == [
+    assert _state_store_warnings(warnings) == [
+        "Telegram state store unavailable: down"
+    ]
+
+
+def test_process_file_warns_when_saving_and_clearing_the_row_fail(
+    monkeypatch, tmp_path
+) -> None:
+    """Saving a new task and clearing it after polling both log the SQLite error (#759)."""
+
+    class FailingStore:
+        def save_task(self, *args, **kwargs) -> None:
+            raise sqlite3.Error("down")
+
+        def remove_task(self, *args, **kwargs) -> None:
+            raise sqlite3.Error("down")
+
+    class SubmitClient:
+        async def submit_job(self, input_path, filename, **kwargs) -> dict:
+            return {"task_id": "task-1", "job_token": "token"}
+
+    async def finished(*args, **kwargs) -> str:
+        return "done"
+
+    monkeypatch.setattr(settings, "temp_dir", tmp_path / "tmp")
+    monkeypatch.setattr(doc_module, "get_state_store", FailingStore)
+    monkeypatch.setattr(doc_module, "client", SubmitClient())
+    monkeypatch.setattr(doc_module, "_poll_job", finished)
+    message = _FakeMessage(_FakeBot(b"content"), chat_id=123, user_id=456)
+
+    warnings = StringIO()
+    sink = doc_module.logger.add(warnings, level="WARNING", format="{message}")
+    try:
+        asyncio.run(doc_module.process_file(message, "file1", "doc.pdf"))
+    finally:
+        doc_module.logger.remove(sink)
+
+    assert _state_store_warnings(warnings) == [
+        "Telegram state store unavailable: down",
+        "Telegram state store unavailable: down",
+    ]
+
+
+def test_resume_task_warns_when_clearing_the_row_fails(monkeypatch) -> None:
+    """Resuming a finished task formats the SQLite error with loguru (#759)."""
+
+    class FailingStore:
+        def remove_task(self, *args, **kwargs) -> None:
+            raise sqlite3.Error("down")
+
+    async def finished(*args, **kwargs) -> str:
+        return "done"
+
+    monkeypatch.setattr(doc_module, "get_state_store", FailingStore)
+    monkeypatch.setattr(doc_module, "_poll_job", finished)
+    task = state_store.TrackedTask(
+        chat_id=123,
+        message_thread_id=None,
+        user_id=456,
+        task_id="task-1",
+        filename="doc.pdf",
+    )
+
+    warnings = StringIO()
+    sink = doc_module.logger.add(warnings, level="WARNING", format="{message}")
+    try:
+        asyncio.run(doc_module._resume_task(_FakeBot(b""), task))
+    finally:
+        doc_module.logger.remove(sink)
+
+    assert _state_store_warnings(warnings) == [
         "Telegram state store unavailable: down"
     ]
