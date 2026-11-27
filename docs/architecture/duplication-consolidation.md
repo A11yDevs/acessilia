@@ -68,6 +68,11 @@ the file is diagnostic. The runtime also recognizes the legacy
 owner cannot be inspected, such as a process owned by another user, the lock is
 kept and startup is refused; if it is stale or malformed, it is removed.
 
+An old runtime predating this change takes no OS lock and still unlinks the file
+on exit, so a single in-place upgrade can still overlap an old and a new start;
+the new runtime refuses a file naming a live old PID, but it cannot prevent that
+unlink.
+
 The startup and lock behaviour is pinned by `tests/test_frontend_startup.py`:
 every enabled interface, the missing-token and empty-interface exits, the lock
 lifecycle (live, stale and malformed files, and two concurrent acquisitions),
@@ -76,7 +81,7 @@ probes.
 `tests/test_process_setup.py` keeps checking that the runtime sets up the process
 before it takes the lock.
 
-**Measured delta on this PR's code commit:** 23 groups / 55 functions / 672
+**Measured delta on #656's code commit:** 23 groups / 55 functions / 672
 lines → **20 groups / 49 functions / 499 lines**. The `_is_process_running`,
 `acquire_lock` and `startup` groups disappear.
 

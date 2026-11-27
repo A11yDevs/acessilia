@@ -10,8 +10,10 @@ stable English identifiers across every supported locale.
 
 #: Emitted by setup_logger once the root logger sinks are registered; {level} is the active level name.
 LOG_LOGGER_CONFIGURED: str = "Logger configured - level: {level}"
-#: Critical message logged when the startup lock file names a live PID already running the bot.
-LOG_BOT_ALREADY_RUNNING: str = "Another instance of the bot is already running (PID={pid})"
+#: Critical message logged when the startup lock file names a live PID already running the bot; {path} is the lock file.
+LOG_BOT_ALREADY_RUNNING: str = (
+    "Another instance of the bot is already running (PID={pid}, lock {path})"
+)
 #: Critical message logged when another process holds the startup lock but its PID is not readable.
 LOG_LOCK_ALREADY_HELD: str = "Another instance holds the process lock ({path})"
 #: Critical message logged when the lock file cannot be inspected, written or removed; {path} is the lock file and {error} the OS error.
@@ -27,6 +29,10 @@ LOG_LOCK_OWNER_UNKNOWN: str = (
 #: Warning logged when a stale lock file whose PID is no longer running is detected and replaced.
 LOG_LOCK_FILE_STALE: str = (
     "Lock file stale (PID {pid} is not running); replacing it..."
+)
+#: Warning logged when a stale legacy lock file is detected and removed; {path} is the legacy lock file.
+LOG_LOCK_LEGACY_FILE_STALE: str = (
+    "Legacy lock file stale (PID {pid} is not running); removing {path}..."
 )
 #: Info logged once the startup lock file is written with the current process PID.
 LOG_LOCK_ACQUIRED: str = "Lock acquired (PID={pid})"

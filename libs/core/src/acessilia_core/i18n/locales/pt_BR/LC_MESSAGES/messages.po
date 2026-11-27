@@ -1355,8 +1355,8 @@ msgid "Logger configured - level: {level}"
 msgstr "Logger configurado - nível: {level}"
 
 #, python-brace-format
-msgid "Another instance of the bot is already running (PID={pid})"
-msgstr "Outra instância do bot já está em execução (PID={pid})"
+msgid "Another instance of the bot is already running (PID={pid}, lock {path})"
+msgstr "Outra instância do bot já está em execução (PID={pid}, lock {path})"
 
 #, python-brace-format
 msgid "Another instance holds the process lock ({path})"
@@ -1365,6 +1365,12 @@ msgstr "Outra instância mantém o lock de processo ({path})"
 #, python-brace-format
 msgid "Lock file stale (PID {pid} is not running); replacing it..."
 msgstr "Arquivo de lock obsoleto (PID {pid} não está em execução); substituindo..."
+
+#, python-brace-format
+msgid "Legacy lock file stale (PID {pid} is not running); removing {path}..."
+msgstr ""
+"Arquivo de lock legado obsoleto (PID {pid} não está em execução); "
+"removendo {path}..."
 
 #, python-brace-format
 msgid ""

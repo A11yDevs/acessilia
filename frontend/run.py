@@ -20,6 +20,7 @@ from acessilia_core.i18n.log_messages import (
     LOG_LOCK_ACQUIRED,
     LOG_LOCK_ALREADY_HELD,
     LOG_LOCK_FILE_STALE,
+    LOG_LOCK_LEGACY_FILE_STALE,
     LOG_LOCK_OWNER_UNKNOWN,
     LOG_LOCK_RELEASED,
     LOG_LOCK_UNUSABLE,
@@ -37,6 +38,7 @@ LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
 # The console entry point used a separate lock before both entry points shared
 # this runtime. Keep recognizing it during an in-place upgrade.
 LEGACY_LOCK_FILE = os.path.join(os.path.dirname(__file__), "cli", "bot.lock")
+
 
 class _LockState:
     """The open handle that holds the OS lock for this process.
@@ -62,6 +64,9 @@ def _windows_process_running(pid: int) -> bool:
             ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
             capture_output=True,
             text=True,
+            # The tool emits the OEM code page; a process name outside the
+            # ANSI page must not crash the lock probe (#742 review).
+            errors="replace",
         )
     except OSError as error:
         raise _ProcessCheckError(str(error)) from error
@@ -108,21 +113,30 @@ def _read_lock_pid(handle: BinaryIO) -> int | None:
 def _open_lock_file(path: str) -> BinaryIO:
     """Open the lock file for the process lifetime, without truncating it."""
     try:
-        # Owner-only: another user must not open or replace this process's lock.
+        # Owner-only on POSIX. On Windows the mode is a no-op and the OS lock
+        # is what protects the file.
         descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     except OSError as error:
         logger.critical(t(LOG_LOCK_UNUSABLE).format(path=path, error=error))
         sys.exit(1)
-    handle = os.fdopen(descriptor, "r+b")
-    if sys.platform == "win32":
-        # msvcrt.locking() needs a byte to lock; an empty file is normal
-        # before the first start.
-        handle.seek(0, os.SEEK_END)
-        if handle.tell() == 0:
-            handle.write(b"\0")
-            handle.flush()
-        handle.seek(0)
-    return handle
+    if sys.platform != "win32":
+        try:
+            # os.open's mode applies only on creation: tighten a lock file
+            # left by an older runtime as well.
+            os.fchmod(descriptor, 0o600)
+        except OSError:
+            # The file holds only a PID; the OS lock still protects it.
+            pass
+    try:
+        return os.fdopen(descriptor, "r+b")
+    except OSError as error:
+        try:
+            os.close(descriptor)
+        except OSError:
+            # The descriptor is already unusable; report the original error.
+            pass
+        logger.critical(t(LOG_LOCK_UNUSABLE).format(path=path, error=error))
+        sys.exit(1)
 
 
 def _acquire_os_lock(handle: BinaryIO) -> bool:
@@ -187,7 +201,9 @@ def _check_previous_owner(handle: BinaryIO, path: str) -> None:
         _abandon_lock(handle)
         sys.exit(1)
     if running:
-        logger.critical(t(LOG_BOT_ALREADY_RUNNING).format(pid=pid))
+        logger.critical(
+            t(LOG_BOT_ALREADY_RUNNING).format(pid=pid, path=path)
+        )
         _abandon_lock(handle)
         sys.exit(1)
     logger.warning(t(LOG_LOCK_FILE_STALE).format(pid=pid))
@@ -208,7 +224,7 @@ def _check_legacy_lock(path: str) -> None:
         logger.critical(t(LOG_LOCK_UNUSABLE).format(path=path, error=error))
         sys.exit(1)
     else:
-        if pid <= 0:
+        if pid <= 0 or pid == os.getpid():
             pass
         else:
             try:
@@ -219,9 +235,13 @@ def _check_legacy_lock(path: str) -> None:
                 )
                 sys.exit(1)
             if running:
-                logger.critical(t(LOG_BOT_ALREADY_RUNNING).format(pid=pid))
+                logger.critical(
+                    t(LOG_BOT_ALREADY_RUNNING).format(pid=pid, path=path)
+                )
                 sys.exit(1)
-            logger.warning(t(LOG_LOCK_FILE_STALE).format(pid=pid))
+            logger.warning(
+                t(LOG_LOCK_LEGACY_FILE_STALE).format(pid=pid, path=path)
+            )
     try:
         os.remove(path)
     except FileNotFoundError:
@@ -243,12 +263,23 @@ def acquire_lock() -> None:
     _check_legacy_lock(LEGACY_LOCK_FILE)
     handle = _open_lock_file(LOCK_FILE)
     if not _acquire_os_lock(handle):
-        pid = _read_lock_pid(handle)
+        try:
+            pid = _read_lock_pid(handle)
+        except OSError:
+            # Windows byte-range locks are mandatory: a second handle cannot
+            # read the holder's PID. Report the holder without it (#742).
+            pid = None
         if pid is None:
             logger.critical(t(LOG_LOCK_ALREADY_HELD).format(path=LOCK_FILE))
         else:
-            logger.critical(t(LOG_BOT_ALREADY_RUNNING).format(pid=pid))
-        handle.close()
+            logger.critical(
+                t(LOG_BOT_ALREADY_RUNNING).format(pid=pid, path=LOCK_FILE)
+            )
+        try:
+            handle.close()
+        except OSError:
+            # This attempt never held the lock; closing is best-effort.
+            pass
         sys.exit(1)
     _check_previous_owner(handle, LOCK_FILE)
     try:
@@ -288,6 +319,7 @@ def release_lock() -> None:
         # The descriptor may already be closed; the OS lock is released anyway.
         pass
     logger.info(t(LOG_LOCK_RELEASED))
+
 
 async def startup():
     enabled = [i.strip() for i in settings.enabled_interfaces.split(",")]

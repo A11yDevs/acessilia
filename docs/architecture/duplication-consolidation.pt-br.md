@@ -70,6 +70,11 @@ recusado; se o dono não puder ser inspecionado, como um processo de outro
 usuário, o lock é mantido e o startup é recusado; se estiver obsoleto ou
 malformado, é removido.
 
+Um runtime antigo anterior a esta mudança não toma lock do SO e ainda remove o
+arquivo ao sair, então um único upgrade in-place ainda pode sobrepor um início
+antigo e um novo; o novo runtime recusa um arquivo que nomeia um PID antigo vivo,
+mas não consegue impedir essa remoção.
+
 O comportamento de startup e lock é fixado por `tests/test_frontend_startup.py`:
 cada interface habilitada, as saídas por token ausente e por nenhuma interface, o
 ciclo do lock (arquivo vivo, obsoleto e malformado, e duas aquisições
@@ -77,7 +82,7 @@ concorrentes), o tratamento conservador de um dono não inspecionável e as
 sondagens de PID em POSIX/Windows. `tests/test_process_setup.py` continua
 conferindo que o runtime configura o processo antes de obter o lock.
 
-**Delta medido no commit de código deste PR:** 23 grupos / 55 funções / 672
+**Delta medido no commit de código do #656:** 23 grupos / 55 funções / 672
 linhas → **20 grupos / 49 funções / 499 linhas**. Os grupos `_is_process_running`,
 `acquire_lock` e `startup` desaparecem.
 
