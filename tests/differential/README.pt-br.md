@@ -191,7 +191,9 @@ Os campos de uma entrada:
   `removed`. Uma identidade ausente ou diferente deixa a diferença sem
   explicação e a declaração sem uso. Um vínculo inválido (não é string
   não vazia) é rejeitado mesmo quando não existem diferenças.
-- Entradas sob `*` valem para todo caso.
+- Entradas sob `*` valem para todo caso. Um `id` restringe a entrada aos
+  casos em que aquele objeto existe no caminho casado; quando a identidade
+  não é comum a todos os casos, use uma entrada específica do caso.
 
 Uma diferença não declarada falha, e uma declarada que não acontece mais
 também.

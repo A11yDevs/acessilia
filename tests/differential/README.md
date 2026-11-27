@@ -183,7 +183,9 @@ The fields of an entry:
   for `removed`. A missing/different identity leaves the difference
   unexplained and the declaration unused. An invalid binding (not a
   non-empty string) is rejected even when there are no differences.
-- Entries under `*` apply to every case.
+- Entries under `*` apply to every case. An `id` narrows the entry to
+  the cases where that object exists at the matched path; when the identity
+  is not shared by every case, use a case-specific entry.
 
 An undeclared difference fails, and so does a declared one that no longer
 happens.
