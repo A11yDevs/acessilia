@@ -41,6 +41,13 @@ The system runs the `pddl` pipeline engine (the manifest → plan → execution 
 
 ---
 
+## Toolbox runtime placement
+
+[Runtime placement and first migration slices](architecture/toolbox-runtime-placement.md)
+records the source inventory, library/deployment boundaries and the initial
+operational migration map for ADR-0032 (#913).
+Brazilian Portuguese: [pt-BR version](architecture/toolbox-runtime-placement.pt-br.md).
+
 ## PDDL + Agno Architecture
 
 The planning-based pipeline and its incorporation are documented separately:

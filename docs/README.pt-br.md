@@ -46,6 +46,13 @@ O sistema opera com o motor de pipeline `pddl` (o fluxo manifest → plan → ex
 
 ---
 
+## Localização do runtime da Toolbox
+
+[Localização do runtime e primeiras fatias de migração](architecture/toolbox-runtime-placement.pt-br.md)
+registra o inventário de fontes, as fronteiras de bibliotecas/implantação e o
+mapa inicial de migração operacional da ADR-0032 (#913).
+Inglês: [English version](architecture/toolbox-runtime-placement.md).
+
 ## Arquitetura PDDL + Agno
 
 O pipeline baseado em planejamento e sua incorporação são documentados separadamente:
