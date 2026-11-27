@@ -234,7 +234,7 @@ collapsed body.
 warning and `AttributeError` logic, differing only in the module name and the
 replacement import. Both now delegate to `_deprecated_attribute`; the warning
 keeps pointing to the caller of the shim, and the message, returned value and
-unknown-attribute error are unchanged. The deprecation tests cover both
+unknown-attribute error are unchanged. The deprecation tests cover these
 modules.
 
 **Measured delta on this PR's code commit:** 9 groups / 19 functions / 242
@@ -243,6 +243,12 @@ group disappears. Each shim is now one statement but stays below the
 whole-function node floor, so the detector does not report it; this remains an
 accepted limitation, and the shared helper is the actual extraction, not the
 collapsed body.
+
+`formula_tools.__getattr__` joined the shared helper in #799. Its replacements
+point to different names in `docstruct.text.latex`, so it passes a mapping from
+each name to the exact import text; the warning message, caller location and
+unknown-attribute error stay the same. The same tests now cover
+`formula_tools`.
 
 ## Fourteenth consolidation: the lazily built planner
 
@@ -370,8 +376,8 @@ Baseline order from the original 23-group snapshot; “candidate” means the ne
 | 22 | `_check_artifact_id` / `_check_digest` (2/12) | **Consolidated:** the generator shares one checker for identical constraints. |
 
 The table is anchored to the November baseline. The planner property shared by
-the orchestrator and the planning engine introduced by #632 and the two
-deprecation `__getattr__` functions in `table_ast`/`validators` were
+the orchestrator and the planning engine introduced by #632 and the deprecation
+`__getattr__` functions in `table_ast`/`validators`/`formula_tools` were
 consolidated above; they were tracked separately from the baseline rows.
 
 The 56 groups currently accepted are the pre-#749 trivial constructor pair plus
