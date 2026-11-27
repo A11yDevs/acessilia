@@ -29,15 +29,12 @@ from acessilia_core.pipeline.payload import (
     records_extraction_degradation,
     records_visual_failures,
 )
+from acessilia_core.ports import RunOutcome
 from backend.agents.state_manager import TaskCancelledError, state_manager
+from backend.config.processing_identity import processing_cache_configuration
 from backend.config.settings import Settings, settings
 from backend.services import shutdown
-from backend.services.cache import (
-    drop_cache,
-    get_cached,
-    processing_cache_configuration,
-    set_cache,
-)
+from backend.services.cache import drop_cache, get_cached, set_cache
 from backend.services.history_service import finalizar_conversao, registrar_conversao
 from backend.services.model_calls import get_model_calls
 from backend.services.operation_registry import operation_registry
@@ -196,6 +193,65 @@ def _usable_cache(cached: Any, service_settings: Settings) -> dict[str, Any] | N
     return None if _cache_entry_is_refused(cached, metadata, service_settings) else cached
 
 
+async def _store_processed_result(
+    processed_result: str | dict[str, Any], file_path: Path, cache_variant: str
+) -> None:
+    """Store the canonical payload, or drop a degraded entry (#544)."""
+    if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
+        await set_cache(file_path, processed_result, cache_variant)
+    else:
+        # An entry refused above would otherwise be read and refused again
+        # on every request while the reruns stay degraded.
+        await drop_cache(file_path, cache_variant)
+        logger.debug("Resultado degradado nao cacheado para {}", file_path.name)
+
+
+async def _serve_cached(
+    cached: dict[str, Any],
+    *,
+    file_path: Path,
+    config: CoreConfig,
+    shown_name: str,
+    mode: str,
+    external_task_id: bool,
+    task_id: str,
+    status_callback: Callable[[str], Coroutine] | None,
+    service_settings: Settings,
+    inicio: float,
+) -> dict[str, Any]:
+    """Rebuild and return a cached canonical document for this submission."""
+    logger.info("Cache hit para {}", file_path.name)
+    cached = _payload_for_source(cached, file_path)
+    cached_metadata, cached_warnings = _canonical_details(cached)
+    canonical_document = build_canonical_document(
+        cached,
+        toolbox=config.toolbox,
+        title=Path(shown_name).stem,
+        language="pt-BR",
+        verbosity=verbosity_for_mode(mode),
+        source_name=shown_name,
+        source_path=str(file_path),
+        audience=["reader"],
+        metadata=cached_metadata,
+        technical_warnings=cached_warnings,
+    )
+    if not external_task_id:
+        state_manager.finalizar(
+            task_id,
+            json.dumps(canonical_document, ensure_ascii=False),
+        )
+        await finalizar_conversao(
+            task_id=task_id,
+            status="done",
+            pipeline=f"{service_settings.ai_client}-{_normalized_engine()}",
+            resultado_resumo=canonical_document["title"][:200],
+            tempo_segundos=time.time() - inicio,
+        )
+    if status_callback:
+        await status_callback("✅ Processamento finalizado com sucesso!")
+    return canonical_document
+
+
 async def process(
     file_path: Path,
     status_callback: Callable[[str], Coroutine] | None = None,
@@ -208,6 +264,7 @@ async def process(
     *,
     config: CoreConfig,
     settings_snapshot: Settings | None = None,
+    outcome: RunOutcome | None = None,
 ) -> dict[str, Any]:
     """Process one document and return its canonical document.
 
@@ -229,7 +286,13 @@ async def process(
     and the history's ``ai_client`` read it, so they see the same values as
     the job's ``CoreConfig``. The pipeline engine and its orchestrator remain
     process-level values fixed at import.
+
+    ``outcome`` is the attempt's result record (#944): a cache hit sets its
+    origin to ``cache``, a run that reused checkpoints sets ``resumed`` and
+    the phases, and a fresh run sets ``produced``. A caller that omits it gets
+    an object nobody reads.
     """
+    run_outcome = outcome if outcome is not None else RunOutcome()
     external_task_id = task_id is not None
     # Only the name, never a path the client sent.
     shown_name = (
@@ -256,36 +319,20 @@ async def process(
         )
         cached = _usable_cache(await get_cached(file_path, cache_variant), service_settings)
         if cached is not None:
-            logger.info("Cache hit para {}", file_path.name)
-            cached = _payload_for_source(cached, file_path)
-            cached_metadata, cached_warnings = _canonical_details(cached)
-            canonical_document = build_canonical_document(
+            run_outcome.result_origin = "cache"
+            run_outcome.reused_phases.clear()
+            return await _serve_cached(
                 cached,
-                toolbox=config.toolbox,
-                title=Path(shown_name).stem,
-                language="pt-BR",
-                verbosity=verbosity_for_mode(mode),
-                source_name=shown_name,
-                source_path=str(file_path),
-                audience=["reader"],
-                metadata=cached_metadata,
-                technical_warnings=cached_warnings,
+                file_path=file_path,
+                config=config,
+                shown_name=shown_name,
+                mode=mode,
+                external_task_id=external_task_id,
+                task_id=task_id,
+                status_callback=status_callback,
+                service_settings=service_settings,
+                inicio=inicio,
             )
-            if not external_task_id:
-                state_manager.finalizar(
-                    task_id,
-                    json.dumps(canonical_document, ensure_ascii=False),
-                )
-                await finalizar_conversao(
-                    task_id=task_id,
-                    status="done",
-                    pipeline=f"{service_settings.ai_client}-{_normalized_engine()}",
-                    resultado_resumo=canonical_document["title"][:200],
-                    tempo_segundos=time.time() - inicio,
-                )
-            if status_callback:
-                await status_callback("✅ Processamento finalizado com sucesso!")
-            return canonical_document
 
         if not resumed:
             state_manager.atualizar(
@@ -317,7 +364,7 @@ async def process(
                 thinking_mode=thinking_mode,
                 config=config,
                 model_calls=get_model_calls(),
-                ports=service_run_ports(task_id),
+                ports=service_run_ports(task_id, outcome=run_outcome),
             )
         except Exception:
             # A cancellation that arrives while the extraction thread is
@@ -329,6 +376,11 @@ async def process(
             # call reaches the Toolbox as the same operation (#407).
             if not shutdown.shutting_down():
                 operation_registry.clear(task_id)
+
+        if run_outcome.result_origin == "unknown":
+            run_outcome.result_origin = (
+                "resumed" if resumed and run_outcome.reused_phases else "produced"
+            )
 
         canonical_metadata: dict[str, Any] | None = None
         technical_warnings: list[str] | None = None
@@ -368,13 +420,7 @@ async def process(
             technical_warnings=technical_warnings,
         )
 
-        if not isinstance(processed_result, dict) or processed_result.get("cacheable", True):
-            await set_cache(file_path, processed_result, cache_variant)
-        else:
-            # An entry refused above would otherwise be read and refused again
-            # on every request while the reruns stay degraded.
-            await drop_cache(file_path, cache_variant)
-            logger.debug("Resultado degradado nao cacheado para {}", file_path.name)
+        await _store_processed_result(processed_result, file_path, cache_variant)
         _salvar_json_canonico(canonical_document, file_path.name)
 
         if not external_task_id:

@@ -352,7 +352,8 @@ class PddlAccessibilityOrchestrator:
             config=config,
             ports=ports,
             checkpoints=RunCheckpoints(
-                ports.checkpoints, config, options=self._checkpoint_options()
+                ports.checkpoints, config, options=self._checkpoint_options(),
+                outcome=ports.outcome,
             ),
         )
 

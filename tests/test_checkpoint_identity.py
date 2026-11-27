@@ -28,7 +28,13 @@ from acessilia_core.pipeline.handlers import (
     formula_regions as regions_method,
     pictures as picture_method,
 )
-from acessilia_core.ports import CHECKPOINT_PHASES, NoRegionCache, RunPorts
+from acessilia_core.ports import (
+    CHECKPOINT_PHASES,
+    PHASE_MANIFEST,
+    NoRegionCache,
+    RunOutcome,
+    RunPorts,
+)
 from acessilia_core.run_identity import PROCESSING_FIELDS, STAGE_FIELDS, stage_identity
 from tests.core_config_support import core_config
 from tests.pddl_support import build_element, build_manifest, build_orchestrator
@@ -453,3 +459,35 @@ def test_normalizer_upgrade_changes_cache_key_and_invalidates_all_stamped_phases
         store.phases[phase] = {IDENTITY_KEY: {stage: stage_identity(previous, stage) for stage in stages}}
     resumed = RunCheckpoints(store, config)
     assert all(resumed.load(phase) is None for phase in CHECKPOINT_PHASES)
+
+
+def test_a_reused_checkpoint_is_recorded_in_the_run_outcome() -> None:
+    """A resumed run reports the phases it reused, once each (#944)."""
+    config = core_config()
+    store = MemoryCheckpoints("job-outcome")
+    writer = RunCheckpoints(store, config)
+    store.phases[PHASE_MANIFEST] = writer._stamp(
+        {"manifest": {}}, PHASE_STAGES[PHASE_MANIFEST]
+    )
+    outcome = RunOutcome()
+
+    reader = RunCheckpoints(store, config, outcome=outcome)
+
+    assert reader.load(PHASE_MANIFEST) is not None
+    assert outcome.reused_phases == [PHASE_MANIFEST]
+    assert reader.load(PHASE_MANIFEST) is not None
+    assert outcome.reused_phases == [PHASE_MANIFEST]
+    assert outcome.result_origin == "unknown"
+
+
+def test_a_rejected_checkpoint_is_not_recorded_as_reused() -> None:
+    config = core_config()
+    store = MemoryCheckpoints("job-outcome-stale")
+    store.phases[PHASE_MANIFEST] = {
+        "manifest": {},
+        IDENTITY_KEY: {"media": "another-config"},
+    }
+    outcome = RunOutcome()
+
+    assert RunCheckpoints(store, config, outcome=outcome).load(PHASE_MANIFEST) is None
+    assert outcome.reused_phases == []

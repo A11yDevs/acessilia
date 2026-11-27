@@ -70,6 +70,7 @@ from acessilia_core.export.renderers.html_renderer import (
     MSG_HTML_TABLE_REGION,
 )
 from acessilia_core.i18n.log_messages import (
+    API_AUDIT_NOT_CONFIGURED,
     API_CANCEL_STATE_INVALID,
     API_FILE_NOT_FOUND,
     API_FORMAT_INVALID,
@@ -695,6 +696,7 @@ MESSAGES: tuple[str, ...] = (
     API_FORMAT_INVALID,
     API_FILE_NOT_FOUND,
     API_LOG_FILE_NOT_FOUND,
+    API_AUDIT_NOT_CONFIGURED,
     API_OBSERVABILITY_NOT_CONFIGURED,
     API_OPERATIONS_NOT_CONFIGURED,
     API_TOKEN_INVALID,
@@ -1591,6 +1593,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # 503 API detail body when observability access is not configured.
         API_OBSERVABILITY_NOT_CONFIGURED: "Acesso de observabilidade não configurado",
         API_OPERATIONS_NOT_CONFIGURED: "Acesso de operações não configurado",
+        API_AUDIT_NOT_CONFIGURED: "Acesso de auditoria não configurado",
         # 401 API detail body when an invalid observability token is supplied.
         API_TOKEN_INVALID: "Token inválido",
         # 403 API detail body when write access is attempted with an observability token.

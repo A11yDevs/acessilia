@@ -18,7 +18,7 @@ from acessilia_core.i18n.log_messages import (
 )
 from acessilia_core.logger import logger
 from backend.api.limiter import limiter
-from backend.api.routes import download, health, history, jobs, logs, operations
+from backend.api.routes import audit, download, health, history, jobs, logs, operations
 from backend.config.process_setup import setup_process
 from backend.services.access_log_filter import AccessLogFilter
 from backend.services.cleanup_service import periodic_cleanup
@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(logs.router, prefix="/api/v1")
     app.include_router(operations.router, prefix="/api/v1")
+    app.include_router(audit.router, prefix="/api/v1")
     return app
 
 

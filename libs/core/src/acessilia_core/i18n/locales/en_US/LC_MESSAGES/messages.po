@@ -659,6 +659,9 @@ msgstr "File not found"
 msgid "Log file not found"
 msgstr "Log file not found"
 
+msgid "Audit access not configured"
+msgstr "Audit access not configured"
+
 msgid "Observability access not configured"
 msgstr "Observability access not configured"
 

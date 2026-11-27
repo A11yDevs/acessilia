@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from acessilia_core.ports import RunPorts
+from acessilia_core.ports import RunOutcome, RunPorts
 from backend.config.settings import settings
 from backend.services.cache import ContentCache
 from backend.services.job_checkpoint import FileJobCheckpoints
@@ -18,15 +18,22 @@ def checkpoint_options() -> dict[str, dict[str, str]]:
     return {"enrichment": revision, "execution": revision}
 
 
-def service_run_ports(task_id: str | None = None) -> RunPorts:
+def service_run_ports(
+    task_id: str | None = None, *, outcome: RunOutcome | None = None
+) -> RunPorts:
     """The ports of a run the service hosts: the region cache on its file
     cache and, inside a job (``task_id``), that job's checkpoints and
     registry of remote operations. A run without a job (the pipeline
-    scripts) has neither."""
+    scripts) has neither.
+
+    ``outcome`` is the attempt's mutable result record (#944); a run without
+    one gets a fresh object that nobody reads.
+    """
     return RunPorts(
         region_cache=ContentCache(),
         checkpoints=FileJobCheckpoints(task_id, checkpoint_options()) if task_id else None,
         operations=JobOperations(task_id) if task_id else None,
+        outcome=outcome or RunOutcome(),
     )
 
 

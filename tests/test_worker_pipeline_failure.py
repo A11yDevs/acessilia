@@ -52,10 +52,15 @@ async def test_job_executor_does_not_export_pipeline_failure(tmp_path, monkeypat
     task = state_manager.obter(task_id)
     assert task is not None
     assert task["status"] == "error"
-    # The record is written before the pipeline starts, even when it fails.
-    configuration = job_store.load_record(task_id)["configuration"]
-    assert configuration["attempt"]["resumed"] is False
-    assert configuration["provenance"]["result_origin"] == "unknown"
+    # The attempt is recorded before the pipeline starts and its result is
+    # filled when it fails, without the error message (#944).
+    attempts = job_store.load_attempts(task_id)
+    assert len(attempts) == 1
+    assert attempts[0]["resumed"] is False
+    assert attempts[0]["state"] == "failed"
+    assert attempts[0]["origin"] == "unknown"
+    assert attempts[0]["error_type"] == "RuntimeError"
+    assert attempts[0]["configuration"]["provenance"]["result_origin"] == "unknown"
     assert task.get("download_url") is None
     assert not output_dir.exists()
 

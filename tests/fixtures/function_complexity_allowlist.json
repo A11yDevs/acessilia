@@ -7,15 +7,15 @@
       "complexity": 17
     },
     "backend/api/worker.py::JobExecutor.run": {
-      "lines": 313,
-      "complexity": 43
+      "lines": 310,
+      "complexity": 38
     },
     "backend/api/worker.py::recover_pending_jobs": {
       "lines": 104,
       "complexity": 19
     },
     "backend/service.py::process": {
-      "lines": 223,
+      "lines": 213,
       "complexity": 29
     },
     "backend/services/model_calls.py::ModelCallExecutor._invoke": {

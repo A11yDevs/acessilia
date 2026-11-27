@@ -54,6 +54,7 @@ from acessilia_core.i18n.stage_messages import (
     STAGE_RESTART_RESUBMIT,
 )
 from acessilia_core.logger import logger
+from acessilia_core.ports import RunOutcome
 from acessilia_core.toolbox.pdf_ua_audit import audit_pdf_ua, summarize_audit
 from backend.agents.state_manager import TaskCancelledError, state_manager, trim_stage
 from backend.api.export_plan import (
@@ -78,7 +79,8 @@ from backend.services.history_service import finalizar_conversao, registrar_conv
 from backend.services.job_store import (
     load_record,
     pending_records,
-    save_configuration,
+    save_attempt_result,
+    save_attempt_start,
     save_status,
 )
 
@@ -393,7 +395,7 @@ class JobExecutor:
         state_manager.restaurar(task_id, record["status"])
         return True
 
-    async def _record_effective_configuration(
+    async def _start_attempt(
         self,
         task_id: str,
         job: ApiJob,
@@ -401,16 +403,16 @@ class JobExecutor:
         run_settings: Settings,
         *,
         resumed: bool,
-    ) -> None:
-        """Store the latest attempt's configuration (#380, Etapa 0).
+    ) -> str | None:
+        """Append the attempt's configuration and return its id (#944).
 
-        Written once at the job's start and kept with its durable record, so a
-        result can be audited after the cache entry is gone. The record is not
-        a history: a resumed attempt replaces the previous one, and a failed
-        write leaves the previous record with its own attempt identity. Both
-        the build and the write are best effort: an audit failure must not
-        fail a job whose pipeline has not started, and cancellation is not
-        caught (``CancelledError`` is a ``BaseException``).
+        The configuration snapshot is immutable; the result is filled later by
+        :meth:`_finish_attempt`. Both the build and the write are best effort:
+        an audit failure must not fail a job whose pipeline has not started,
+        and cancellation is not caught (``CancelledError`` is a
+        ``BaseException``). The status carries the attempt id before the
+        atomic snapshot write, so the audit can tell a stale record from the
+        current attempt even when that write is the one that fails.
         """
         attempt = {
             "id": uuid.uuid4().hex,
@@ -437,20 +439,65 @@ class JobExecutor:
                 task_id,
                 type(exc).__name__,
             )
-            return
+            return None
+        state_manager.definir_tentativa(
+            task_id, str(attempt["id"]), str(attempt["captured_at"])
+        )
         try:
-            await run_blocking(save_configuration, task_id, configuration)
+            await run_blocking(save_status, task_id, get_job_status(task_id))
+        except Exception as exc:  # noqa: BLE001 - the marker is best-effort
+            logger.warning(
+                "Job {}: attempt marker not persisted: {}",
+                task_id,
+                type(exc).__name__,
+            )
+        try:
+            await run_blocking(
+                save_attempt_start, task_id, attempt, configuration
+            )
         except Exception as exc:  # noqa: BLE001 - the audit record is best-effort
             logger.warning(
                 "Job {}: effective configuration not persisted: {}",
                 task_id,
                 type(exc).__name__,
             )
+            return None
+        return str(attempt["id"])
+
+    async def _finish_attempt(
+        self,
+        task_id: str,
+        attempt_id: str | None,
+        *,
+        state: str,
+        outcome: RunOutcome,
+        error_type: str | None = None,
+    ) -> None:
+        """Fill the attempt's result from the run outcome (#944), best effort."""
+        if attempt_id is None:
+            return
+        try:
+            await run_blocking(
+                save_attempt_result,
+                task_id,
+                attempt_id,
+                state=state,
+                origin=outcome.result_origin,
+                reused_phases=outcome.reused_phases,
+                producer=outcome.producer,
+                error_type=error_type,
+            )
+        except Exception as exc:  # noqa: BLE001 - the audit result is best-effort
+            logger.warning(
+                "Job {}: attempt result not persisted: {}",
+                task_id,
+                type(exc).__name__,
+            )
 
     async def _prepare_run(
         self, task_id: str, job: ApiJob, *, resumed: bool
-    ) -> tuple[Settings, CoreConfig, int]:
-        """Take one settings snapshot for the job and record it (#380).
+    ) -> tuple[Settings, CoreConfig, int, str | None]:
+        """Take one settings snapshot and append the attempt (#380, #944).
 
         The snapshot feeds the core's ``CoreConfig``, the cache variant, the
         audit's e-mail limit and the effective record, so they all describe
@@ -460,10 +507,39 @@ class JobExecutor:
         run_settings = copy.copy(settings)
         job_config = core_config_from_settings(run_settings)
         audit_max_rules = run_settings.pdf_ua_audit_max_rules
-        await self._record_effective_configuration(
+        attempt_id = await self._start_attempt(
             task_id, job, job_config, run_settings, resumed=resumed
         )
-        return run_settings, job_config, audit_max_rules
+        return run_settings, job_config, audit_max_rules, attempt_id
+
+    async def _begin_job(self, task_id: str, job: ApiJob) -> bool:
+        """Create the task, restore a durable record and register the start.
+
+        Returns whether the job is resumed; the confirmation e-mail is sent
+        only for a fresh job (#407).
+        """
+        resumed = state_manager.obter(task_id) is not None
+        queued_jobs.pop(task_id, None)
+        if state_manager.obter(task_id) is None:
+            state_manager.criar_tarefa(
+                job.file_path, task_id=task_id, arquivo=job.filename
+            )
+            if await self._restore_from_record(task_id):
+                resumed = True
+        await run_blocking(save_status, task_id, get_job_status(task_id))
+        await registrar_conversao(
+            task_id=task_id,
+            arquivo=job.filename,
+            extensao=job.file_path.suffix,
+            tamanho_bytes=_file_size_or_zero(job.file_path),
+            modo=job.mode,
+        )
+        if not resumed:
+            state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
+        if job.email and not resumed:
+            await send_confirmation_email(job.email, job.filename)
+            state_manager.verificar_cancelamento(task_id)
+        return resumed
 
     def _status_callback(self, task_id: str) -> Callable[[str], Coroutine[Any, Any, None]]:
         """The progress callback a run uses, persisting every stage (#407)."""
@@ -488,41 +564,21 @@ class JobExecutor:
         started_at = time.time()
         out_dir: Path | None = None
         result_published = False
-        resumed = state_manager.obter(task_id) is not None
+        resumed = False
         preserve_for_resume = False
         status_callback = self._status_callback(task_id)
+        outcome = RunOutcome()
+        attempt_id: str | None = None
 
         try:
-            queued_jobs.pop(task_id, None)
-            if state_manager.obter(task_id) is None:
-                state_manager.criar_tarefa(
-                    job.file_path, task_id=task_id, arquivo=job.filename
-                )
-                if await self._restore_from_record(task_id):
-                    resumed = True
-            await run_blocking(save_status, task_id, get_job_status(task_id))
-            await registrar_conversao(
-                task_id=task_id,
-                arquivo=job.filename,
-                extensao=job.file_path.suffix,
-                tamanho_bytes=_file_size_or_zero(job.file_path),
-                modo=job.mode,
-            )
-            if not resumed:
-                state_manager.atualizar(task_id, etapa="Enfileirado, aguardando...")
-
-            # The user already received the confirmation before the restart; a
-            # resumed job must not send it again.
-            if job.email and not resumed:
-                await send_confirmation_email(job.email, job.filename)
-                state_manager.verificar_cancelamento(task_id)
+            resumed = await self._begin_job(task_id, job)
 
             from backend.service import process
 
             # One snapshot for the whole job (ADR-0016, step 3); it also
             # feeds the effective record (#380).
-            run_settings, job_config, audit_max_rules = await self._prepare_run(
-                task_id, job, resumed=resumed
+            run_settings, job_config, audit_max_rules, attempt_id = (
+                await self._prepare_run(task_id, job, resumed=resumed)
             )
             canonical = await process(
                 job.file_path,
@@ -535,6 +591,7 @@ class JobExecutor:
                 resumed=resumed,
                 config=job_config,
                 settings_snapshot=run_settings,
+                outcome=outcome,
             )
             state_manager.verificar_cancelamento(task_id)
 
@@ -694,8 +751,11 @@ class JobExecutor:
                 status="done", resultado=json.dumps(canonical, ensure_ascii=False),
                 email_delivery="pending" if job.email else None,
             )
-            result_published = True
             await run_blocking(save_status, task_id, get_job_status(task_id))
+            await self._finish_attempt(
+                task_id, attempt_id, state="completed", outcome=outcome
+            )
+            result_published = True
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
@@ -730,6 +790,9 @@ class JobExecutor:
                 # The queue worker stops the callback on a normal restart. Keep
                 # the durable record, upload and checkpoints so the next startup
                 # resumes the job instead of losing it (#407).
+                await self._finish_attempt(
+                    task_id, attempt_id, state="interrupted", outcome=outcome
+                )
                 preserve_for_resume = True
                 logger.info(
                     "Job {}: service shutdown; keeping it resumable", task_id
@@ -739,6 +802,9 @@ class JobExecutor:
                 state_manager.atualizar(task_id, email_delivery="unknown" if job.email else None)
                 return
             state_manager.atualizar(task_id, status="cancelled", etapa=t(STAGE_CANCELLED_BY_USER))
+            await self._finish_attempt(
+                task_id, attempt_id, state="cancelled", outcome=outcome
+            )
             if out_dir is not None:
                 _remove_output_dir(out_dir)
             logger.info(t(LOG_JOB_CANCELLED).format(task_id=task_id))
@@ -754,6 +820,13 @@ class JobExecutor:
                 return
             if out_dir is not None:
                 _remove_output_dir(out_dir)
+            await self._finish_attempt(
+                task_id,
+                attempt_id,
+                state="failed",
+                outcome=outcome,
+                error_type=type(e).__name__,
+            )
             task = state_manager.obter(task_id)
             if task is not None and task.get("status") == "error" and task.get("erros"):
                 # process() already recorded the error with the stage it failed in.

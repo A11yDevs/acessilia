@@ -99,6 +99,20 @@ def test_processing_group_is_the_cache_configuration() -> None:
     assert "pddl_max_discovery_replans" in record["processing"]
 
 
+def test_the_shared_identity_module_is_the_single_source() -> None:
+    """The audit and the cache consume the same function, not a cache import."""
+    from backend.config import effective
+    from backend.config.processing_identity import (
+        processing_cache_configuration as shared,
+    )
+    from backend.services.cache import processing_cache_configuration as reused
+
+    source = Path(effective.__file__).read_text(encoding="utf-8")
+
+    assert "backend.services.cache" not in source
+    assert shared is reused
+
+
 def test_the_record_carries_the_job_options_under_processing() -> None:
     prompt = "Describe charts"
     record = effective_configuration(
@@ -176,6 +190,7 @@ def test_the_record_omits_known_credentials_and_verbatim_prompts() -> None:
     service = _service(
         bot_token="service-secret-bot",
         observability_api_token="service-secret-observability",
+        audit_api_token="service-secret-audit",
         operations_api_token="service-secret-operations",
         ollama_api_key="service-secret-ollama",
         openrouter_api_key="service-secret-openrouter",
@@ -414,13 +429,15 @@ async def test_worker_persists_the_effective_configuration(tmp_path, monkeypatch
     service = copy.copy(settings)
     config = core_config_from_settings(service)
 
-    await JobExecutor()._record_effective_configuration(
+    attempt_id = await JobExecutor()._start_attempt(
         "task-int", job, config, service, resumed=False
     )
 
-    record = job_store.load_record("task-int")
-    assert record is not None
-    configuration = record["configuration"]
+    assert attempt_id is not None
+    attempt = job_store.load_latest_attempt("task-int")
+    assert attempt is not None
+    assert attempt["attempt_id"] == attempt_id
+    configuration = attempt["configuration"]
     assert configuration["schema"] == SCHEMA
     assert configuration["attempt"]["resumed"] is False
     assert configuration["processing"]["run"]["object_markers_requested"] is True
@@ -445,11 +462,12 @@ async def test_worker_survives_a_record_that_cannot_be_built(
     job = ApiJob("task-build", tmp_path / "a.pdf", "a.pdf")
     service = copy.copy(settings)
 
-    await JobExecutor()._record_effective_configuration(
+    attempt_id = await JobExecutor()._start_attempt(
         "task-build", job, core_config_from_settings(service), service, resumed=False
     )
 
-    assert job_store.load_record("task-build")["configuration"] is None
+    assert attempt_id is None
+    assert job_store.load_attempts("task-build") == []
 
 
 @pytest.mark.asyncio
@@ -466,15 +484,16 @@ async def test_worker_survives_a_record_that_cannot_be_saved(
     def broken(*args, **kwargs):
         raise sqlite3.OperationalError("disk is full")
 
-    monkeypatch.setattr(worker, "save_configuration", broken)
+    monkeypatch.setattr(worker, "save_attempt_start", broken)
     job = ApiJob("task-save", tmp_path / "a.pdf", "a.pdf")
     service = copy.copy(settings)
 
-    await JobExecutor()._record_effective_configuration(
+    attempt_id = await JobExecutor()._start_attempt(
         "task-save", job, core_config_from_settings(service), service, resumed=False
     )
 
-    assert job_store.load_record("task-save")["configuration"] is None
+    assert attempt_id is None
+    assert job_store.load_attempts("task-save") == []
 
 
 def test_saving_a_configuration_for_an_unknown_job_fails(tmp_path, monkeypatch) -> None:

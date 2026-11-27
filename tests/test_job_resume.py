@@ -464,11 +464,15 @@ async def test_a_resumed_run_restores_progress_and_skips_the_confirmation(
 
     assert seen == [stage]
     confirmation.assert_not_awaited()
-    # The resumed attempt replaced the record and says so (#380).
-    from backend.services.job_store import load_record
+    # The resumed attempt appended a new row and says so (#380, #944).
+    from backend.services.job_store import load_attempts, load_record
 
     configuration = load_record("resume-run")["configuration"]
     assert configuration["attempt"]["resumed"] is True
+    attempts = load_attempts("resume-run")
+    assert len(attempts) == 1
+    assert attempts[0]["resumed"] is True
+    assert attempts[0]["state"] == "failed"
     # The job is terminal now: its checkpoints must not be reused.
     assert job_checkpoint.resumable("resume-run") is False
 

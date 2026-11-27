@@ -30,6 +30,7 @@ from acessilia_core.ports import (
     PHASE_MEDIA,
     PHASE_PLAN,
     JobCheckpoints,
+    RunOutcome,
 )
 from acessilia_core.run_identity import STAGE_FIELDS, stage_identity
 
@@ -67,11 +68,15 @@ class RunCheckpoints:
         config: CoreConfig,
         *,
         options: Mapping[str, Mapping[str, Any]] | None = None,
+        outcome: RunOutcome | None = None,
     ) -> None:
         """``options`` are the run's own options outside ``config``, by stage
         (the orchestrator's planner and dry run); the port's ``options``
-        add the service's (its model revision). Both enter the identities."""
+        add the service's (its model revision). Both enter the identities.
+
+        ``outcome`` records the phases a resumed run actually reused (#944)."""
         self._checkpoints = checkpoints
+        self._outcome = outcome
         self._identity: dict[str, str] = {}
         if checkpoints is not None:
             port_options = getattr(checkpoints, "options", None) or {}
@@ -124,6 +129,8 @@ class RunCheckpoints:
                 self._checkpoints.job_id, phase, ", ".join(changed),
             )
             return None
+        if self._outcome is not None:
+            self._outcome.mark_reused(phase)
         return payload
 
     def _stamp(self, payload: dict[str, Any], stages: Iterable[str]) -> dict[str, Any]:

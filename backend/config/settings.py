@@ -85,6 +85,12 @@ class Settings:
     operations_api_token: str = field(
         default_factory=lambda: os.getenv("OPERATIONS_API_TOKEN", "")
     )
+    #: Bearer token for the read-only audit routes. Empty disables them; it is
+    #: separate from OPERATIONS_API_TOKEN so a researcher can read the record
+    #: without the write-capable cache route (#946).
+    audit_api_token: str = field(
+        default_factory=lambda: os.getenv("AUDIT_API_TOKEN", "")
+    )
     #: Telegram user ids allowed to run the operator commands. Empty denies all.
     telegram_admin_ids: frozenset[int] = field(
         default_factory=lambda: _int_set_from_env("TELEGRAM_ADMIN_IDS")

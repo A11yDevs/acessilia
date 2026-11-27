@@ -675,6 +675,9 @@ msgstr "Arquivo não encontrado"
 msgid "Log file not found"
 msgstr "Log não encontrado"
 
+msgid "Audit access not configured"
+msgstr "Acesso de auditoria não configurado"
+
 msgid "Observability access not configured"
 msgstr "Acesso de observabilidade não configurado"
 

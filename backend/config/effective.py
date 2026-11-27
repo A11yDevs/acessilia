@@ -3,22 +3,24 @@
 The record groups the configuration the way the Etapa 0 proposal asks:
 
 - ``processing``: what changes the processed document. It starts from
-  :func:`backend.services.cache.processing_cache_configuration`, the same
-  configuration the processing cache keys on, so there is one definition of
-  "changes the result" (and ``run_identity`` classifies every ``CoreConfig``
-  field for it);
+  :func:`backend.config.processing_identity.processing_cache_configuration`,
+  the same configuration the processing cache keys on, so there is one
+  definition of "changes the result" (and ``run_identity`` classifies every
+  ``CoreConfig`` field for it);
 - ``operational``: how the run is carried out (timeouts, retries, caches,
   limits), never what it produces;
 - ``environment``: where the run happened (paths, interfaces, build identity).
 
 The record describes **the configuration resolved for one attempt**, not the
 provenance of every delivered result. A canonical document may come from the
-processing cache or from a checkpoint written under another configuration;
-``provenance.result_origin`` therefore stays ``unknown`` until a caller records
-the origin explicitly. :func:`backend.api.worker.JobExecutor._record_effective_configuration`
-keeps only the latest attempt, so the durable record is not a history: an
-attempt whose write fails leaves the previous record in place, and the
-operations route serves that record with its own ``attempt`` identity.
+processing cache or from a checkpoint written under another configuration; the
+snapshot therefore keeps ``provenance.result_origin`` as ``unknown``, and the
+service stores the actual origin, reused phases and result state in the
+attempt's result (``backend/services/job_store.py``, #944). The audit route
+merges both for reading. Every attempt is appended to the job's history; an
+attempt whose write fails leaves the previous one in place with its own
+identity, and the route reports whether the latest persisted attempt is the
+job's current one.
 
 ``settings.py`` remains the only reader of the environment: this module reads
 the values of a ``Settings`` instance and an explicit ``CoreConfig``. It does
@@ -30,7 +32,7 @@ secret scanner: a credential embedded in another textual field, or in a URL
 path, is not detected here. Names left out are listed in ``secrets_omitted``
 and ``not_recorded``, so the absence is deliberate and visible.
 
-The record is written once per job start by ``backend/api/worker.py`` and kept
+The record is written once per attempt by ``backend/api/worker.py`` and kept
 with the durable job record. It is not part of the processing cache key: the
 key stays exactly what :func:`processing_cache_configuration` returns, so
 adding the record does not change any cache hit.
@@ -51,6 +53,10 @@ from acessilia_core.run_identity import (
     NOT_PROCESSING_PROVIDERS,
     config_fields,
 )
+from backend.config.processing_identity import (
+    SERVICE_PROCESSING_SETTINGS,
+    processing_cache_configuration,
+)
 
 if TYPE_CHECKING:
     from backend.config.settings import Settings
@@ -61,9 +67,10 @@ SCHEMA = "acessilia/effective-configuration@2"
 
 #: Why a record is not the provenance of a cached or resumed result.
 PROVENANCE_NOTE: str = (
-    "The record describes the configuration resolved for this attempt. It is "
+    "The configuration snapshot describes what this attempt resolved. It is "
     "not the provenance of a result reused from the processing cache or a "
-    "checkpoint written under another configuration."
+    "checkpoint; the attempt result records the origin, the reused phases and "
+    "the producer when it is identifiable."
 )
 
 #: ``CoreConfig`` fields left out of the processing identity that describe
@@ -113,6 +120,7 @@ ENVIRONMENT_SETTINGS: tuple[str, ...] = (
 #: Service settings never recorded because they hold a credential or a
 #: personal identifier. The record names them in ``secrets_omitted``.
 SECRET_SETTINGS: frozenset[str] = frozenset({
+    "audit_api_token",
     "bot_token",
     "observability_api_token",
     "ollama_api_key",
@@ -166,7 +174,8 @@ def effective_configuration(
             a fingerprint; ``object_markers`` keeps the requested override and
             the effective value the delivery uses.
         attempt: The attempt identity (``id``, ``captured_at``, ``resumed``).
-            The record is the latest attempt only, not a history.
+            The snapshot belongs to one attempt; the service appends it to the
+            job's attempt history and records the result separately.
         settings: The service's ``Settings``; the global one by default. It is
             passed explicitly so a test can replace values without reading the
             environment.
@@ -178,7 +187,6 @@ def effective_configuration(
         reasons.
     """
     from backend.config.settings import settings as default_settings
-    from backend.services.cache import processing_cache_configuration
 
     service_settings = default_settings if settings is None else settings
     values = config_fields(config)
@@ -240,8 +248,6 @@ def recorded_setting_names() -> set[str]:
     the suite passes. This is the nominal classification; a second test checks
     that every recorded value actually appears in the representation.
     """
-    from backend.services.cache import SERVICE_PROCESSING_SETTINGS
-
     recorded = _recorded_core_fields()
     core_settings = {
         setting
