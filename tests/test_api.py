@@ -301,6 +301,43 @@ def test_cache_clear_declares_bearer_auth_in_openapi(client):
     ]
 
 
+def test_job_configuration_requires_the_bearer_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "operations_api_token", "secret")
+
+    assert client.get("/api/v1/operations/jobs/task/configuration").status_code == 401
+    assert (
+        client.get(
+            "/api/v1/operations/jobs/task/configuration",
+            headers={"Authorization": "Bearer wrong"},
+        ).status_code
+        == 401
+    )
+
+
+def test_job_configuration_returns_the_recorded_configuration(client, monkeypatch):
+    monkeypatch.setattr(settings, "operations_api_token", "secret")
+    monkeypatch.setattr(
+        "backend.api.routes.operations.load_record",
+        lambda task_id: {"configuration": {"schema": "acessilia/effective-configuration@1"}}
+        if task_id == "task"
+        else None,
+    )
+    headers = {"Authorization": "Bearer secret"}
+
+    response = client.get(
+        "/api/v1/operations/jobs/task/configuration", headers=headers
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"schema": "acessilia/effective-configuration@1"}
+    assert (
+        client.get(
+            "/api/v1/operations/jobs/missing/configuration", headers=headers
+        ).status_code
+        == 404
+    )
+
+
 def test_observability_token_cannot_authorize_writes(monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "secret")
     request = Request({"type": "http", "method": "POST"})

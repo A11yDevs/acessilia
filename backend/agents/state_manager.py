@@ -64,6 +64,7 @@ class StateManager:
             "erros",
             "email_delivery",
             "remote_cancellation",
+            "configuracao_efetiva",
         ):
             value = status.get(key)
             if value is not None:
@@ -171,6 +172,12 @@ class StateManager:
         task = self._tasks.get(task_id)
         if task:
             task["download_url"] = url
+
+    def definir_configuracao(self, task_id: str, configuration: dict) -> None:
+        """Record the effective configuration of the job's run (#380)."""
+        task = self._tasks.get(task_id)
+        if task is not None:
+            task["configuracao_efetiva"] = configuration
 
     def expirar_tarefas_terminais(
         self, max_age_seconds: int, now: float | None = None

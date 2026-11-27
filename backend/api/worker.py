@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, cast
 
 from acessilia_core.blocking import run_blocking
-from acessilia_core.config import ToolboxConfig
+from acessilia_core.config import CoreConfig, ToolboxConfig
 from acessilia_core.export.catalog import CATALOG, DOCX, DRBENCH_MD, HTML, PDF_UA, TXT
 from acessilia_core.export.exporters.audio_exporter import export_mp3
 from acessilia_core.export.exporters.docx_exporter import export_docx
@@ -61,6 +61,7 @@ from backend.api.export_plan import (
     ExportStep,
 )
 from backend.config.core_config import core_config_from_settings
+from backend.config.effective import effective_configuration
 from backend.config.settings import settings
 from backend.services import job_checkpoint, shutdown
 from backend.services.download_token_service import criar_token
@@ -71,7 +72,12 @@ from backend.services.email_service import (
 )
 from backend.services.filenames import output_stem
 from backend.services.history_service import finalizar_conversao, registrar_conversao
-from backend.services.job_store import load_record, pending_records, save_status
+from backend.services.job_store import (
+    load_record,
+    pending_records,
+    save_configuration,
+    save_status,
+)
 
 queued_jobs: dict[str, dict[str, Any]] = {}
 
@@ -184,7 +190,12 @@ def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | No
         if not durable:
             return None
         record = load_record(task_id)
-        return _cancellation_progress(record["status"]) if record else None
+        if record is None:
+            return None
+        status = record["status"]
+        if record.get("configuration") is not None:
+            status["configuracao_efetiva"] = record["configuration"]
+        return _cancellation_progress(status)
     status = dict(queued)
     if status.get("status") == "queued":
         from backend.services.queue_service import unified_queue
@@ -203,6 +214,8 @@ async def get_job_status_async(task_id: str) -> dict[str, Any] | None:
     if record is None:
         return None
     status = record["status"]
+    if record.get("configuration") is not None:
+        status["configuracao_efetiva"] = record["configuration"]
     if status.get("email_delivery") == "pending":
         # No in-memory task owns delivery after a restart.
         status["email_delivery"] = "unknown"
@@ -380,7 +393,34 @@ class JobExecutor:
         if not record or record["status"].get("status") != "processing":
             return False
         state_manager.restaurar(task_id, record["status"])
+        if record.get("configuration") is not None:
+            state_manager.definir_configuracao(task_id, record["configuration"])
         return True
+
+    async def _record_effective_configuration(
+        self, task_id: str, job: ApiJob, job_config: CoreConfig
+    ) -> None:
+        """Store the configuration the job's run uses (#380, Etapa 0).
+
+        Written once at the job's start and kept with its durable record, so a
+        result can be audited after the cache entry is gone. A persistence
+        failure must not fail a job whose pipeline has not even started.
+        """
+        run = {
+            "mode": job.mode,
+            "custom_prompt": job.custom_prompt,
+            "thinking_mode": job.thinking_mode,
+        }
+        configuration = await run_blocking(
+            effective_configuration, job_config, run=run
+        )
+        state_manager.definir_configuracao(task_id, configuration)
+        try:
+            await run_blocking(save_configuration, task_id, configuration)
+        except Exception as exc:  # noqa: BLE001 - the audit record is best-effort
+            logger.warning(
+                "Job {}: effective configuration not persisted: {}", task_id, exc
+            )
 
     async def run(self, job: ApiJob) -> None:
         task_id = job.task_id
@@ -435,6 +475,7 @@ class JobExecutor:
             # values, even if the settings change while the job runs. The
             # audit's e-mail summary limit is the service's, taken now too.
             job_config = core_config_from_settings()
+            await self._record_effective_configuration(task_id, job, job_config)
             audit_max_rules = settings.pdf_ua_audit_max_rules
             canonical = await process(
                 job.file_path,

@@ -28,6 +28,12 @@ def connection():
         conn.execute(
             "CREATE TABLE IF NOT EXISTS api_jobs (task_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, request TEXT NOT NULL, status TEXT NOT NULL)"
         )
+        # The effective configuration of the run (#380) lives in its own
+        # column: it is written once per job start, while the status is
+        # rewritten on every stage. Existing databases gain the column here.
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(api_jobs)")}
+        if "configuration" not in columns:
+            conn.execute("ALTER TABLE api_jobs ADD COLUMN configuration TEXT")
         yield conn
         conn.commit()
     finally:
@@ -37,8 +43,22 @@ def connection():
 def save_request(task_id: str, token: str, request: dict, status: dict) -> None:
     with connection() as conn:
         conn.execute(
-            "INSERT INTO api_jobs VALUES (?, ?, ?, ?)",
+            "INSERT INTO api_jobs (task_id, token_hash, request, status) VALUES (?, ?, ?, ?)",
             (task_id, token_digest(token), json.dumps(request), json.dumps(status)),
+        )
+
+
+def save_configuration(task_id: str, configuration: dict[str, Any]) -> None:
+    """Store the effective configuration of the job's run (#380).
+
+    Written once at the job's start. A resumed job overwrites it with the
+    configuration its current run uses, so the record never describes a run
+    that did not happen.
+    """
+    with connection() as conn:
+        conn.execute(
+            "UPDATE api_jobs SET configuration=? WHERE task_id=?",
+            (json.dumps(configuration, ensure_ascii=False, sort_keys=True), task_id),
         )
 
 
@@ -49,16 +69,25 @@ def load_record(task_id: str) -> dict[str, Any] | None:
         ).fetchone()
     if row is None:
         return None
+    configuration = row["configuration"]
     return {
         "task_id": row["task_id"],
         "token_hash": row["token_hash"],
         "request": json.loads(row["request"]),
         "status": json.loads(row["status"]),
+        "configuration": json.loads(configuration) if configuration else None,
     }
 
 
 def save_status(task_id: str, status: dict) -> None:
-    status = {key: value for key, value in status.items() if key != "resultado"}
+    # ``resultado`` and the effective configuration live outside the status:
+    # one is the job's result, the other is written once by
+    # ``save_configuration`` (#380).
+    status = {
+        key: value
+        for key, value in status.items()
+        if key not in {"resultado", "configuracao_efetiva"}
+    }
     destination = status.get("status")
     if destination not in {"queued", "processing", "cancelling", "cancelled", "done", "error"}:
         raise ValueError("A valid job status is required")
