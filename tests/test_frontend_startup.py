@@ -736,7 +736,7 @@ def test_an_unwritable_compat_path_does_not_undo_the_lock(
 ) -> None:
     real_open = runtime.os.open
 
-    def denied(path, flags, mode=0o777):
+    def denied(path, flags, mode=0o600):
         if str(path) in {str(lock_files.compat), str(lock_files.legacy)}:
             raise PermissionError("denied")
         return real_open(path, flags, mode)
