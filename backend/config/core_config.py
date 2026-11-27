@@ -22,6 +22,66 @@ from acessilia_core.toolbox.toolbox_client import TIMEOUT_KEYS
 from acessilia_sdk.toolbox import PROVIDER_DEFAULTS
 from backend.config.settings import Settings, settings as default_settings
 
+#: Which setting fills each ``CoreConfig`` field, by ``group.field``. The
+#: provider and timeout tables are flattened to ``group.table[key]``. Written
+#: out so that a swapped pair fails, and read by the effective-configuration
+#: record to prove every setting is classified (#380).
+FIELD_SETTINGS: dict[str, str] = {
+    "toolbox.base_url": "toolbox_base_url",
+    "toolbox.base_urls": "toolbox_base_urls",
+    "toolbox.api_key": "toolbox_api_key",
+    "toolbox.timeout_seconds": "toolbox_timeout_seconds",
+    "toolbox.retries": "toolbox_retries",
+    "toolbox.retry_backoff_seconds": "toolbox_retry_backoff_seconds",
+    "toolbox.extraction_timeout_seconds": "toolbox_extraction_timeout_seconds",
+    "toolbox.use_remote_cache": "toolbox_use_remote_cache",
+    "toolbox.use_artifact_store": "toolbox_use_artifact_store",
+    "toolbox.availability_gate": "toolbox_availability_gate",
+    "toolbox.catalog_refresh_seconds": "toolbox_catalog_refresh_seconds",
+    "toolbox.catalog_stale_seconds": "toolbox_catalog_stale_seconds",
+    "toolbox.media_inspect_enabled": "toolbox_media_inspect_enabled",
+    "toolbox.pdf_validate_enabled": "toolbox_pdf_validate_enabled",
+    "models.ai_client": "ai_client",
+    "models.ollama_base_url": "ollama_base_url",
+    "models.ollama_model": "ollama_model",
+    "models.ollama_api_key": "ollama_api_key",
+    "models.openrouter_base_url": "openrouter_base_url",
+    "models.openrouter_model": "openrouter_model",
+    "models.openrouter_api_key": "openrouter_api_key",
+    "models.openrouter_site_url": "openrouter_site_url",
+    "models.openrouter_app_name": "openrouter_app_name",
+    "models.openrouter_max_tokens": "openrouter_max_tokens",
+    "models.toolbox_vlm_provider": "toolbox_vlm_provider",
+    "models.model_call_timeout_seconds": "model_call_timeout_seconds",
+    "models.vision_region_max_tokens": "vision_region_max_tokens",
+    "models.data_agent_max_tokens": "data_agent_max_tokens",
+    "models.data_agent_timeout_seconds": "data_agent_timeout_seconds",
+    "vision.concurrency": "vision_concurrency",
+    "vision.breaker_threshold": "vision_breaker_threshold",
+    "vision.region_cache_enabled": "vision_region_cache_enabled",
+    "vision.retry_pass_delay_seconds": "vision_retry_pass_delay_seconds",
+    "vision.table_visual_review": "table_visual_review",
+    "vision.pdf_split_dpi": "pdf_split_dpi",
+    "fusion.mode": "fusion_mode",
+    "fusion.secondary_provider": "fusion_secondary_provider",
+    "fusion.apply_page_routes": "fusion_apply_page_routes",
+    "fusion.judge_max_pages": "fusion_judge_max_pages",
+    "document.max_pages": "max_pages",
+    "document.legacy_unicode_repair": "legacy_unicode_repair",
+    "document.inline_math_detection": "inline_math_detection",
+    "document.formula_text_agreement_min": "formula_text_agreement_min",
+    "document.slide_visual_coverage": "slide_visual_coverage",
+    "document.slide_fold_figure_labels": "slide_fold_figure_labels",
+    "export.tts_voice": "tts_voice",
+    "export.object_markers_enabled": "object_markers_enabled",
+    "export.toolbox_docx_enabled": "toolbox_docx_enabled",
+    "export.toolbox_pdf_ua_enabled": "toolbox_pdf_ua_enabled",
+    "export.toolbox_pdf_ua_math_bisect_budget": "toolbox_pdf_ua_math_bisect_budget",
+    "paths.data_dir": "data_dir",
+    **{f"toolbox.providers[{key}]": key for key in PROVIDER_DEFAULTS},
+    **{f"toolbox.timeouts[{key}]": key for key in TIMEOUT_KEYS},
+}
+
 
 def core_config_from_settings(settings: Settings | None = None) -> CoreConfig:
     """The core's configuration from ``settings`` (the service's, by default)."""
@@ -95,4 +155,4 @@ def core_config_from_settings(settings: Settings | None = None) -> CoreConfig:
     )
 
 
-__all__ = ["core_config_from_settings"]
+__all__ = ["FIELD_SETTINGS", "core_config_from_settings"]
