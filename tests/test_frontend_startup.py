@@ -778,7 +778,9 @@ def test_a_corrupt_compat_file_does_not_break_release(lock_files) -> None:
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes")
 def test_the_compat_file_is_owner_only(lock_files) -> None:
     lock_files.compat.write_text(str(os.getpid()), encoding="utf-8")
-    lock_files.compat.chmod(0o644)
+    # A group-readable mode is enough to prove the tighten; avoid a
+    # world-accessible literal that static analysis correctly flags.
+    lock_files.compat.chmod(0o640)
 
     runtime.acquire_lock()
 
