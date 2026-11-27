@@ -20,7 +20,7 @@ O script lê cada arquivo `.py` rastreado pelo `git` na revisão pedida, então 
 | Aresta de dependência | Um arquivo do componente A importa um módulo first-party do componente B (`acessilia_core`, `acessilia_sdk`, `docstruct`, `backend`, `frontend`); cada arquivo conta uma vez por destino, e imports relativos contam como o componente atual |
 | Fan-in / fan-out | Componentes que importam A / componentes que A importa |
 | Ciclo | Um ciclo simples no grafo de componentes |
-| Duplicata estrutural | Funções com pelo menos 15 nós AST que não são de contexto e dois comandos após um docstring inicial cujos corpos normalizados têm o mesmo digest SHA-256; nomes, constantes, atributos e nomes de keyword são normalizados |
+| Duplicata estrutural | Funções cujos corpos normalizados têm o mesmo digest SHA-256; nomes, constantes, atributos e nomes de keyword são normalizados. Uma função com vários comandos precisa de pelo menos 15 nós AST que não são de contexto, como no baseline original; um corpo de um comando precisa de 15 nós próprios, então reduzir um repassador a um comando não pode escondê-lo |
 | Hotspot | As funções mais complexas e os maiores módulos |
 
 Uma duplicata estrutural é uma **candidata**, não um clone semântico. Duas funções podem compartilhar o fluxo de controle e ainda diferir em tipos, efeitos colaterais ou tratamento de erro. O total de linhas reportado é a extensão física dos membros (incluindo docstrings e assinaturas), portanto é um limite superior de lógica duplicada. O PR 2 decide quais grupos valem consolidar. Coesão (LCOM), fan-in em nível de módulo e duplicação semântica ficam deliberadamente para o PR 3; este baseline expõe as entradas para essas análises.
@@ -56,19 +56,19 @@ Nenhum ciclo entre componentes foi encontrado. Fan-in: Core 2, SDK 2, docstruct 
 
 ### Duplicatas estruturais
 
-O baseline contém **23 grupos**, **57 funções** e **699 linhas** em grupos duplicados. O JSON guarda os 40 maiores grupos; aqui todos os 23 cabem. Os cinco maiores grupos são:
+O baseline regerado contém **38 grupos**, **91 funções** e **1.147 linhas** em grupos duplicados. O JSON foi medido de novo na mesma revisão histórica (`f812032a`) depois que a #749 mudou o detector, então os números dos componentes continuam comparáveis e só a composição dos grupos mudou. O JSON guarda os 40 maiores grupos; aqui todos os 38 cabem. Os cinco maiores grupos são:
 
 | Grupo | Linhas | Exemplos |
 |---:|---:|---|
 | 5 funções | 39 | handlers do Telegram no frontend `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` |
 | 5 funções | 15 | leitores de dataset gerados do SDK (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
+| 4 funções | 32 | leitores de histórico do backend (`listar_historico`, `listar_ocr_raw`, …) |
 | 4 funções | 33 | escritores de schema do core (`write_execution_report_schema`, `write_processing_manifest_schema`, …) |
 | 3 funções | 17 | helpers de configuração do core (`_tool_config`, `_export_config`, `_toolbox_config`) |
-| 3 funções | 48 | leitores de resultado do SDK (`transcribe_region_result`, `text_spans_result`, `validate_result`) |
 
 Dois grupos cruzam componentes. O substantivo é `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 funções, 30 linhas) — candidato à questão de responsabilidade do PR 2. O outro é trivial (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 funções, 6 linhas). Os leitores de dataset do SDK vivem em `_dataset_generated.py`, cujo cabeçalho diz “do not edit by hand”; são sinal para o gerador, não para consolidação manual.
 
-Os demais grupos são candidatos, não veredictos: fluxo de controle normalizado igual não é equivalência semântica. O detector ignora docstrings e nós de contexto da AST, então um wrapper documentado de um comando não entra mais em grupo. O PR 2 avalia cada grupo antes de tocar no código.
+Os demais grupos são candidatos, não veredictos: fluxo de controle normalizado igual não é equivalência semântica. O detector ignora docstrings e nós de contexto da AST. Desde a [#749](https://github.com/A11yDevs/acessilia/issues/749) um corpo substantivo de um comando recebe fingerprint em vez de isenção, então um wrapper documentado de repasse continua visível quando o temporário é embutido. O PR 2 avalia cada grupo antes de tocar no código.
 
 ### Hotspots
 

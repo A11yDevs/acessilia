@@ -3,13 +3,13 @@
 > A Brazilian Portuguese translation is available in
 > [duplication-consolidation.pt-br.md](duplication-consolidation.pt-br.md).
 
-This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). It triages the duplicate groups from the [November baseline](quality-baseline.md) and records the low-risk consolidations implemented so far. The snapshot that seeded the triage is `develop` at `b00636fc`: **23 groups, 57 functions and 699 lines**.
+This is PR 2 of [issue #656](https://github.com/A11yDevs/acessilia/issues/656). It triages the duplicate groups from the [November baseline](quality-baseline.md) and records the low-risk consolidations implemented so far. The snapshot that seeded the triage is `develop` at `b00636fc`: **23 groups, 57 functions and 699 lines**. The baseline JSON was measured again at the same revision after [#749](https://github.com/A11yDevs/acessilia/issues/749) changed the detector; the 23-group figures below remain the original measurement, and the one-statement policy section records the new totals.
 
 ## Method
 
 - A structural group is actionable only when the functions are semantically interchangeable for the same callers. Equal normalized control flow is not enough.
 - Generated code is changed through its generator, never by editing the generated file.
-- The duplicate detector ignores bodies with fewer than two statements. A one-statement wrapper is not evidence of consolidation; the exemption is recorded here so it does not silently lower the metric.
+- The duplicate detector fingerprints a one-statement body when the body itself meets `MIN_DUPLICATE_NODES`; multi-statement functions keep the historical whole-function floor. A forwarding wrapper therefore stays visible after its temporary is inlined ([#749](https://github.com/A11yDevs/acessilia/issues/749)), and its group is classified as reclassified rather than consolidated.
 - Behaviour-sensitive flows (agent selection, frontend startup) need a characterization test before extraction.
 - A cross-component duplicate needs a single owner. Locale parsing is i18n semantics and the generic parser now lives in the SDK (`acessilia_sdk.i18n`); the core keeps catalogs and policies, the SDK owns request context and translation, and the service reads the environment and delegates the parse.
 
@@ -32,7 +32,7 @@ The behaviour is pinned by `tests/test_i18n_locales.py` and the SDK's `tests/tes
 
 The core facade was a new compatibility name, not a preserved pre-existing caller: `_locales_from_raw` was dead code before this PR. It existed so the remaining migration could proceed without a flag day; #712 removed it and moved the core pin to `acessilia-sdk>=0.4,<0.5` when SDK 0.4.0 published the full i18n API.
 
-**Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. The initial [baseline JSON](quality-baseline.json) stays as the historical snapshot; this page records the changes against it.
+**Measured delta on this PR's code commit:** 23 groups / 57 functions / 699 lines → **22 groups / 55 functions / 669 lines**. Only the `_locales_*` group disappears. These deltas are against the original 23-group snapshot; the [baseline JSON](quality-baseline.json) is the regenerated snapshot described in the one-statement policy section.
 
 ## Second consolidation: the JSON Schema writer
 
@@ -114,14 +114,14 @@ This covers `judge_page_result`, `transcribe_region_result`, `text_spans_result`
 `analyze_result` and `extract_structure_result`. The existing result-reader and
 layout-reader tests exercise both valid and invalid outputs.
 
-The detector now reports 20 groups / 49 functions / 499 lines → **17 groups / 41
-functions / 381 lines**, but this is a detector exemption, not an extraction of
-shared behaviour: every rewritten body has one statement, and `_fingerprint`
-ignores bodies with fewer than two statements. The eight wrappers in those
-groups would be grouped again if that floor changed. The three rows stay recorded
-as reclassified rather than consolidated until the detector's one-statement
-policy is decided for the CI guard of PR 5; [#749](https://github.com/A11yDevs/acessilia/issues/749)
-tracks that decision.
+The measured drop from 20 groups / 49 functions / 499 lines to **17 groups / 41
+functions / 381 lines** was a detector exemption at the time, not an extraction
+of shared behaviour: every rewritten body had one statement, and `_fingerprint`
+then ignored bodies with fewer than two statements. Since
+[#749](https://github.com/A11yDevs/acessilia/issues/749) those bodies are
+fingerprinted again, so the three rows stay reclassified rather than
+consolidated: the shared readers already own the validation, and there is
+nothing further to extract.
 
 ## Fifth consolidation: the Telegram command helpers
 
@@ -159,11 +159,10 @@ and `caption`.
 
 **Measured delta on this PR's code commit:** 15 groups / 34 functions / 319
 lines → **14 groups / 32 functions / 309 lines**. The output-schema normalizer
-group disappears. Both delegating validators now have one statement, so the
-detector's `< 2 statements` exemption hides them; they would be grouped again
-if [#749](https://github.com/A11yDevs/acessilia/issues/749) changes that floor.
-Unlike the SDK wrapper case, this is a real extraction: both validators share
-`_blank_to_none`.
+group disappears. Both delegating validators now have one statement; the
+pre-#749 detector hid them, and they return as a reclassified one-statement
+group under the policy below. Unlike the SDK wrapper case, this is a real
+extraction: both validators share `_blank_to_none`.
 
 ## Eighth consolidation: the file SHA-256 helper
 
@@ -223,9 +222,9 @@ tests cover valid, empty and malformed documents.
 
 **Measured delta on this PR's code commit:** 10 groups / 24 functions / 257
 lines → **9 groups / 19 functions / 242 lines**. The generated dataset-reader
-group disappears. Each reader is now one statement, so the detector's
-one-statement floor also applies; the shared helper is the actual extraction,
-not the floor.
+group disappears. Each reader is now one statement and remains a reclassified
+one-statement group; the shared helper is the actual extraction, not the
+collapsed body.
 
 ## Thirteenth consolidation: the deprecation attribute shims
 
@@ -238,9 +237,9 @@ modules.
 
 **Measured delta on this PR's code commit:** 9 groups / 19 functions / 242
 lines → **8 groups / 17 functions / 222 lines**. The deprecation `__getattr__`
-group disappears. Each shim is now one statement, so the detector's
-one-statement floor also applies; the shared helper is the actual extraction,
-not the floor.
+group disappears. Each shim is now one statement and remains a reclassified
+one-statement group; the shared helper is the actual extraction, not the
+collapsed body.
 
 ## Fourteenth consolidation: the lazily built planner
 
@@ -252,9 +251,9 @@ injected planner.
 
 **Measured delta on this PR's code commit:** 8 groups / 17 functions / 222
 lines → **7 groups / 15 functions / 213 lines**. The planner-property group
-disappears. Each property is now one statement, so the detector's
-one-statement floor also applies; the shared helper is the actual extraction,
-not the floor.
+disappears. Each property is now one statement and remains a reclassified
+one-statement group; the shared helper is the actual extraction, not the
+collapsed body.
 
 ## Fifteenth consolidation: the generated reference checkers
 
@@ -268,8 +267,9 @@ behaviour; a direct generator test pins the shared checker.
 
 **Measured delta on this PR's code commit:** 7 groups / 15 functions / 213
 lines → **6 groups / 13 functions / 201 lines**. The generated checker group
-disappears. Each wrapper is now one statement, so the detector's one-statement
-floor also applies; the shared checker is the actual extraction, not the floor.
+disappears. Each wrapper is now one statement and remains a reclassified
+one-statement group; the shared checker is the actual extraction, not the
+collapsed body.
 
 ## Sixteenth consolidation: the agent tool envelopes
 
@@ -307,12 +307,34 @@ unchanged.
 6 groups / 13 functions / 201 lines → **5 groups / 11 functions / 161 lines**.
 The table-selection group disappears.
 
-Together, the three parallel PRs leave **1 group / 2 functions / 6 lines**:
-the trivial constructor pair, reclassified below as no action.
+Together, the three parallel PRs leave **1 group / 2 functions / 6 lines** under
+the detector of the time: the trivial constructor pair, reclassified below as no
+action. #749 later made the one-statement delegates visible again.
+
+## One-statement policy (#749)
+
+The detector no longer exempts a body with fewer than two statements. A
+one-statement body is fingerprinted when the body itself meets
+`MIN_DUPLICATE_NODES`; multi-statement functions keep the whole-function floor
+of the original baseline. Measuring the one-statement case on the body avoids
+turning a long signature into evidence, while keeping every group in the
+original baseline comparable.
+
+The consequence is that the eight typed SDK accessors from the fourth triage
+are reported again, together with the other one-line delegates created by the
+consolidations above. They are structural clones but not consolidation
+candidates: the shared reader, helper or checker already owns the behaviour. The
+[regenerated baseline](quality-baseline.json) at `f812032a` reports **38 groups /
+91 functions / 1,147 lines**, and the current code reports **19 groups / 43
+functions / 550 lines**. The duplication ratchet records those 19 reviewed
+groups in `tests/fixtures/duplication-allowlist.json`, so a new one-statement
+clone fails CI instead of silently lowering the metric. The regression tests in
+`tests/test_architecture_quality.py` pin a multi-line forwarding wrapper and the
+body-size floor.
 
 ## Classification of the remaining groups
 
-Baseline order from `docs/architecture/quality-baseline.json`; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately.
+Baseline order from the original 23-group snapshot; “candidate” means the next consolidation can evaluate it with tests, not that it is safe to merge immediately. The regenerated baseline adds the one-statement groups described above.
 
 | # | Group | Disposition |
 |---:|---|---|
@@ -323,7 +345,7 @@ Baseline order from `docs/architecture/quality-baseline.json`; “candidate” m
 | 4 | SDK result readers in adjudicate/pdf/pdf_validate (3/48) | **Reclassified:** false positive; the shared reader already owns validation. |
 | 5 | SDK result readers in math/media_inspect (3/38) | **Reclassified:** false positive; inlining is style-only, not extraction. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidated in this PR.** |
-| 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | **Reclassified:** independent field assignments; no shared behaviour. Accepted as the only remaining group. |
+| 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | **Reclassified:** independent field assignments; no shared behaviour. The only remaining group under the pre-#749 detector. |
 | 8 | Frontend `_is_process_running` (2/26) | **Consolidated:** one runtime behind both entry points, with PID-probe tests. |
 | 9 | Frontend `acquire_lock` (2/36) | **Consolidated:** the console script shares `frontend.run` and its lock. |
 | 10 | Frontend `startup` (2/107) | **Consolidated:** characterization covers interface composition and shutdown. |
@@ -345,17 +367,19 @@ the orchestrator and the planning engine introduced by #632 and the two
 deprecation `__getattr__` functions in `table_ast`/`validators` were
 consolidated above; they were tracked separately from the baseline rows.
 
-The only detected group left is the trivial constructor pair, reclassified
-above. The agent, config and table groups were consolidated in three parallel
-PRs; the planner and deprecation groups were consolidated earlier. PR 5 can
-decide whether the single remaining group needs a CI allowance or whether the
-detector's floor already makes it a non-issue.
+The 19 groups currently accepted are the pre-#749 trivial constructor pair plus
+the one-statement delegates and incidental shapes that #749 surfaced; none needs
+another extraction. The agent, config and table groups were consolidated in
+three parallel PRs; the planner and deprecation groups were consolidated
+earlier. The #656 ratchet now enforces the reviewed remainder, and a new
+one-statement clone fails it.
 
 ## Reproduction
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # initial baseline
 python scripts/architecture_quality.py --rev HEAD       # current numbers
+python scripts/check_duplication_ratchet.py             # CI remainder
 python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_reference.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py libs/core/tests/test_adjudication_agent.py libs/core/tests/test_page_level_agent.py libs/core/tests/test_fusion_agent.py tests/test_core_config.py tests/test_docx_export.py tests/test_pdf_ua_export.py libs/core/tests/test_table_specialist_agent.py tests/test_architecture_layers.py
 ```
 

@@ -21,7 +21,7 @@ The script reads every tracked `.py` file from `git` at the requested revision, 
 | Dependency edge | A file in component A imports a first-party module of component B (`acessilia_core`, `acessilia_sdk`, `docstruct`, `backend`, `frontend`); each file counts once per target, and relative imports count as the current component |
 | Fan-in / fan-out | Components that import A / components A imports |
 | Cycle | A simple cycle in the component graph |
-| Structural duplicate | Functions with at least 15 non-context AST nodes and two statements after a leading docstring whose normalized bodies have the same SHA-256 digest; names, constants, attributes and keyword names are normalized |
+| Structural duplicate | Functions whose normalized bodies have the same SHA-256 digest; names, constants, attributes and keyword names are normalized. A multi-statement function needs at least 15 non-context AST nodes, as in the original baseline; a one-statement body needs at least 15 nodes of its own, so collapsing a forwarder into one statement cannot hide it |
 | Hotspot | The most complex functions and the largest modules |
 
 A structural duplicate is a **candidate**, not a semantic clone. Two functions can share control flow and still differ in types, side effects or error handling. The reported line total is the physical span of the members (including docstrings and signatures), so it is an upper bound on duplicated logic. PR 2 decides which groups are worth consolidating. Cohesion (LCOM), module-level fan-in and semantic duplication are deliberately left to PR 3; this baseline exposes the inputs for those analyses.
@@ -57,19 +57,19 @@ No component cycle was found. Fan-in: Core 2, SDK 2, docstruct 3, backend 1, fro
 
 ### Structural duplicates
 
-The baseline contains **23 groups**, **57 functions** and **699 lines** in duplicate groups. The JSON keeps the 40 largest groups; here all 23 fit. The five largest groups are:
+The regenerated baseline contains **38 groups**, **91 functions** and **1,147 lines** in duplicate groups. The JSON was measured again at the same historical revision (`f812032a`) after #749 changed the detector, so the component numbers stay comparable and only duplicate membership changed. The JSON keeps the 40 largest groups; here all 38 fit. The five largest groups are:
 
 | Group | Lines | Examples |
 |---:|---:|---|
 | 5 functions | 39 | frontend Telegram handlers `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` |
 | 5 functions | 15 | generated SDK dataset readers (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
+| 4 functions | 32 | backend history readers (`listar_historico`, `listar_ocr_raw`, …) |
 | 4 functions | 33 | core schema writers (`write_execution_report_schema`, `write_processing_manifest_schema`, …) |
 | 3 functions | 17 | core config helpers (`_tool_config`, `_export_config`, `_toolbox_config`) |
-| 3 functions | 48 | SDK result readers (`transcribe_region_result`, `text_spans_result`, `validate_result`) |
 
 Two groups cross component boundaries. The substantive one is `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 functions, 30 lines) — a candidate for PR 2's ownership question. The other is trivial (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 functions, 6 lines). The SDK dataset readers live in `_dataset_generated.py`, whose header says “do not edit by hand”; they are a signal for the generator, not for manual consolidation.
 
-The remaining groups are candidates, not verdicts: equal normalized control flow is not semantic equivalence. The detector ignores docstrings and AST context nodes, so a documented one-statement wrapper no longer enters a group. PR 2 evaluates each group before touching it.
+The remaining groups are candidates, not verdicts: equal normalized control flow is not semantic equivalence. The detector ignores docstrings and AST context nodes. Since [#749](https://github.com/A11yDevs/acessilia/issues/749) a substantive one-statement body is fingerprinted instead of exempted, so a documented forwarding wrapper stays visible when its temporary is inlined. PR 2 evaluates each group before touching it.
 
 ### Hotspots
 

@@ -181,6 +181,36 @@
       },
       {
         "size": 4,
+        "lines": 32,
+        "functions": [
+          {
+            "component": "backend",
+            "path": "backend/services/history_service.py",
+            "qualname": "listar_historico",
+            "lines": 9
+          },
+          {
+            "component": "backend",
+            "path": "backend/services/history_service.py",
+            "qualname": "listar_ocr_raw",
+            "lines": 7
+          },
+          {
+            "component": "backend",
+            "path": "backend/services/history_service.py",
+            "qualname": "listar_ocr_revised",
+            "lines": 8
+          },
+          {
+            "component": "backend",
+            "path": "backend/services/history_service.py",
+            "qualname": "listar_ocr_translated",
+            "lines": 8
+          }
+        ]
+      },
+      {
+        "size": 4,
         "lines": 33,
         "functions": [
           {
@@ -259,6 +289,54 @@
       },
       {
         "size": 3,
+        "lines": 34,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.get_item_result",
+            "lines": 9
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.sample_dataset_result",
+            "lines": 9
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.sync_dataset_result",
+            "lines": 16
+          }
+        ]
+      },
+      {
+        "size": 3,
+        "lines": 64,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py",
+            "qualname": "ToolboxLayoutClient.analyze",
+            "lines": 20
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py",
+            "qualname": "ToolboxMathClient.recognize",
+            "lines": 23
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/structure.py",
+            "qualname": "ToolboxStructureClient.extract_structure",
+            "lines": 21
+          }
+        ]
+      },
+      {
+        "size": 3,
         "lines": 38,
         "functions": [
           {
@@ -296,6 +374,24 @@
             "path": "libs/core/src/acessilia_core/i18n/__init__.py",
             "qualname": "_locales_from_raw",
             "lines": 15
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 20,
+        "functions": [
+          {
+            "component": "backend",
+            "path": "backend/services/history_service.py",
+            "qualname": "salvar_ocr_revised",
+            "lines": 10
+          },
+          {
+            "component": "backend",
+            "path": "backend/services/history_service.py",
+            "qualname": "salvar_ocr_translated",
+            "lines": 10
           }
         ]
       },
@@ -355,6 +451,24 @@
       },
       {
         "size": 2,
+        "lines": 14,
+        "functions": [
+          {
+            "component": "frontend",
+            "path": "frontend/cli/run.py",
+            "qualname": "release_lock",
+            "lines": 7
+          },
+          {
+            "component": "frontend",
+            "path": "frontend/run.py",
+            "qualname": "release_lock",
+            "lines": 7
+          }
+        ]
+      },
+      {
+        "size": 2,
         "lines": 107,
         "functions": [
           {
@@ -404,6 +518,24 @@
             "path": "frontend/telegram/handlers/start.py",
             "qualname": "cmd_desativar",
             "lines": 10
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 53,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/adjudication_agent.py",
+            "qualname": "AdjudicationAgent.__init__",
+            "lines": 27
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/agents/page_level_agent.py",
+            "qualname": "PageLevelAgent.__init__",
+            "lines": 26
           }
         ]
       },
@@ -517,6 +649,24 @@
       },
       {
         "size": 2,
+        "lines": 21,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py",
+            "qualname": "_FormulaEnrichment.enrich_and_notify",
+            "lines": 8
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py",
+            "qualname": "_PictureEnrichment.describe_one",
+            "lines": 13
+          }
+        ]
+      },
+      {
+        "size": 2,
         "lines": 12,
         "functions": [
           {
@@ -535,6 +685,42 @@
       },
       {
         "size": 2,
+        "lines": 47,
+        "functions": [
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py",
+            "qualname": "toolbox_convert_latex",
+            "lines": 24
+          },
+          {
+            "component": "core",
+            "path": "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py",
+            "qualname": "toolbox_verbalize_latex",
+            "lines": 23
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 10,
+        "functions": [
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/export/pandoc_ast.py",
+            "qualname": "_block_to_ast",
+            "lines": 5
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/export/txt.py",
+            "qualname": "_render_block",
+            "lines": 5
+          }
+        ]
+      },
+      {
+        "size": 2,
         "lines": 18,
         "functions": [
           {
@@ -548,6 +734,114 @@
             "path": "libs/docstruct/src/docstruct/export/pandoc_ast.py",
             "qualname": "_count_math_nodes",
             "lines": 9
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 6,
+        "functions": [
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/fusion/adjudication.py",
+            "qualname": "ratio",
+            "lines": 3
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/fusion/page_select.py",
+            "qualname": "page_agreement",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 14,
+        "functions": [
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/fusion/hf_end.py",
+            "qualname": "hf_categories_texts",
+            "lines": 7
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/fusion/hf_end.py",
+            "qualname": "hf_texts",
+            "lines": 7
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 6,
+        "functions": [
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/fusion/page_select.py",
+            "qualname": "page_norm",
+            "lines": 3
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/fusion/repetition.py",
+            "qualname": "token_norm",
+            "lines": 3
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 49,
+        "functions": [
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/policy.py",
+            "qualname": "FusionPolicy.drbench_best_method",
+            "lines": 29
+          },
+          {
+            "component": "docstruct",
+            "path": "libs/docstruct/src/docstruct/policy.py",
+            "qualname": "FusionPolicy.drbench_v15",
+            "lines": 20
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 42,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py",
+            "qualname": "ToolboxAdjudicateClient.transcribe_region",
+            "lines": 21
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/orientation.py",
+            "qualname": "ToolboxOrientationClient.detect",
+            "lines": 21
+          }
+        ]
+      },
+      {
+        "size": 2,
+        "lines": 36,
+        "functions": [
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.list_all_items",
+            "lines": 21
+          },
+          {
+            "component": "sdk",
+            "path": "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py",
+            "qualname": "ToolboxDatasetClient.list_all_items_result",
+            "lines": 15
           }
         ]
       },
@@ -589,9 +883,9 @@
       }
     ],
     "totals": {
-      "groups": 23,
-      "functions_in_groups": 57,
-      "lines_in_groups": 699
+      "groups": 38,
+      "functions_in_groups": 91,
+      "lines_in_groups": 1147
     }
   },
   "hotspots": {

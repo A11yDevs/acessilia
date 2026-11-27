@@ -148,13 +148,133 @@ def test_a_trivial_function_has_no_duplicate_fingerprint() -> None:
     assert quality._fingerprint(node) is None
 
 
-def test_a_docstring_does_not_make_a_one_statement_wrapper_a_duplicate() -> None:
+def test_a_multiline_one_statement_forwarding_wrapper_is_a_duplicate() -> None:
+    """#749: one-statement bodies are fingerprinted once they clear the size floor.
+
+    A two-statement forwarder that inlines its temporary still has the same
+    forwarding shape, so collapsing it must not remove the duplicate group.
+    """
+    tree = ast.parse(
+        "async def transcribe_region_result(\n"
+        "    self,\n"
+        "    candidates: list[str],\n"
+        "    file_path: Path | None = None,\n"
+        "    artifact_id: str | None = None,\n"
+        "    *,\n"
+        "    use_remote_cache: bool | None = None,\n"
+        ") -> RegionTranscription:\n"
+        '    """Typed published result."""\n'
+        "    return read_document(\n"
+        "        await self.transcribe_region(\n"
+        "            candidates=candidates,\n"
+        "            file_path=file_path,\n"
+        "            artifact_id=artifact_id,\n"
+        "            use_remote_cache=use_remote_cache,\n"
+        "        ),\n"
+        "        RegionTranscription,\n"
+        "    )\n"
+        "\n"
+        "async def text_spans_result(\n"
+        "    self,\n"
+        "    spans: list[str],\n"
+        "    source_path: Path | None = None,\n"
+        "    source_id: str | None = None,\n"
+        "    *,\n"
+        "    remote_cache: bool | None = None,\n"
+        ") -> TextSpans:\n"
+        '    """Typed published result."""\n'
+        "    return read_document(\n"
+        "        await self.text_spans(\n"
+        "            spans=spans,\n"
+        "            source_path=source_path,\n"
+        "            source_id=source_id,\n"
+        "            remote_cache=remote_cache,\n"
+        "        ),\n"
+        "        TextSpans,\n"
+        "    )\n"
+    )
+    parents = quality._parents(tree)
+    records = [
+        _record(node, parents)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+
+    assert all(record.fingerprint is not None for record in records)
+    groups, totals = quality._duplicate_groups(records)
+
+    assert [group["size"] for group in groups] == [2]
+    assert totals["groups"] == 1
+    assert {function["qualname"] for function in groups[0]["functions"]} == {
+        "transcribe_region_result",
+        "text_spans_result",
+    }
+
+
+def test_collapsing_a_forwarder_to_one_statement_keeps_its_group() -> None:
+    """Inlining the temporary must not lower the duplicate total (#749)."""
+    two_statement = (
+        "async def first(self):\n"
+        "    result = await self.raw_call(\n"
+        "        first=1, second=2, third=3, fourth=4\n"
+        "    )\n"
+        "    return read_result(result, Model)\n"
+        "async def second(self):\n"
+        "    result = await self.other_call(\n"
+        "        first=1, second=2, third=3, fourth=4\n"
+        "    )\n"
+        "    return read_result(result, Model)\n"
+    )
+    one_statement = (
+        "async def first(self):\n"
+        "    return read_result(\n"
+        "        await self.raw_call(first=1, second=2, third=3, fourth=4),\n"
+        "        Model,\n"
+        "    )\n"
+        "async def second(self):\n"
+        "    return read_result(\n"
+        "        await self.other_call(first=1, second=2, third=3, fourth=4),\n"
+        "        Model,\n"
+        "    )\n"
+    )
+
+    for source in (two_statement, one_statement):
+        tree = ast.parse(source)
+        parents = quality._parents(tree)
+        records = [
+            _record(node, parents)
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        groups, totals = quality._duplicate_groups(records)
+
+        assert [group["size"] for group in groups] == [2]
+        assert totals["groups"] == 1
+        assert totals["functions_in_groups"] == 2
+
+
+def test_a_long_signature_does_not_make_a_trivial_body_a_duplicate() -> None:
+    """The size floor measures the body, not the signature it is attached to."""
     node = cast(
         ast.FunctionDef,
         ast.parse(
-            'def wrapper(value):\n    """Documented wrapper."""\n    return other(value)\n'
+            "def wrapper(\n"
+            "    first,\n"
+            "    second,\n"
+            "    third,\n"
+            "    fourth,\n"
+            "    fifth,\n"
+            "    sixth,\n"
+            "    seventh,\n"
+            "    eighth,\n"
+            "    ninth,\n"
+            "    *, keyword=None,\n"
+            "):\n"
+            "    return value\n"
         ).body[0],
     )
+
+    assert quality._node_count(node) >= quality.MIN_DUPLICATE_NODES
     assert quality._fingerprint(node) is None
 
 

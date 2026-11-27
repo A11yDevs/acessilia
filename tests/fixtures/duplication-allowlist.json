@@ -1,13 +1,90 @@
 {
-  "reason": "Accepted remainder: two independent constructors with no shared behaviour. Physical line counts are diagnostic only: comments, blank lines and docstrings must not turn a formatting edit into duplication growth.",
+  "reason": "Accepted remainder after #749: one-statement forwarding bodies that meet the body-size floor, reviewed as delegations or incidental shapes. Collapsing a two-statement forwarding body into one statement no longer hides the group. Physical line counts are diagnostic only: comments, blank lines and docstrings must not turn a formatting edit into duplication growth.",
   "groups": [
+    [
+      "backend/services/history_service.py:listar_historico",
+      "backend/services/history_service.py:listar_ocr_raw",
+      "backend/services/history_service.py:listar_ocr_revised",
+      "backend/services/history_service.py:listar_ocr_translated"
+    ],
+    [
+      "backend/services/history_service.py:salvar_ocr_revised",
+      "backend/services/history_service.py:salvar_ocr_translated"
+    ],
     [
       "backend/services/operation_registry.py:JobOperations.__init__",
       "libs/core/src/acessilia_core/pipeline/handlers/text.py:_FurnitureView.__init__"
+    ],
+    [
+      "libs/core/src/acessilia_core/agents/adjudication_agent.py:AdjudicationAgent.__init__",
+      "libs/core/src/acessilia_core/agents/page_level_agent.py:PageLevelAgent.__init__"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/enrichment/formulas.py:_FormulaEnrichment.enrich_and_notify",
+      "libs/core/src/acessilia_core/pipeline/enrichment/pictures.py:_PictureEnrichment.describe_one"
+    ],
+    [
+      "libs/core/src/acessilia_core/pipeline/table_ast.py:__dir__",
+      "libs/core/src/acessilia_core/pipeline/validators.py:__dir__"
+    ],
+    [
+      "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py:_convert_latex_async",
+      "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py:_verbalize_latex_async"
+    ],
+    [
+      "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py:toolbox_convert_latex",
+      "libs/core/src/acessilia_core/toolbox/toolbox_math_tools.py:toolbox_verbalize_latex"
+    ],
+    [
+      "libs/docstruct/src/docstruct/export/pandoc_ast.py:_block_to_ast",
+      "libs/docstruct/src/docstruct/export/txt.py:_render_block"
+    ],
+    [
+      "libs/docstruct/src/docstruct/fusion/adjudication.py:ratio",
+      "libs/docstruct/src/docstruct/fusion/page_select.py:page_agreement"
+    ],
+    [
+      "libs/docstruct/src/docstruct/fusion/hf_end.py:hf_categories_texts",
+      "libs/docstruct/src/docstruct/fusion/hf_end.py:hf_texts"
+    ],
+    [
+      "libs/docstruct/src/docstruct/fusion/page_select.py:page_norm",
+      "libs/docstruct/src/docstruct/fusion/repetition.py:token_norm"
+    ],
+    [
+      "libs/docstruct/src/docstruct/policy.py:FusionPolicy.drbench_best_method",
+      "libs/docstruct/src/docstruct/policy.py:FusionPolicy.drbench_v15"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py:ToolboxAdjudicateClient.transcribe_region",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/orientation.py:ToolboxOrientationClient.detect"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/adjudicate.py:ToolboxAdjudicateClient.transcribe_region_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf.py:ToolboxPdfClient.text_spans_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/pdf_validate.py:ToolboxPdfValidateClient.validate_result"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.get_item_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.sample_dataset_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.sync_dataset_result"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.list_all_items",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/dataset.py:ToolboxDatasetClient.list_all_items_result"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py:ToolboxLayoutClient.analyze",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/math.py:ToolboxMathClient.recognize",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/structure.py:ToolboxStructureClient.extract_structure"
+    ],
+    [
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/layout.py:ToolboxLayoutClient.analyze_result",
+      "libs/sdk/src/acessilia_sdk/toolbox/clients/structure.py:ToolboxStructureClient.extract_structure_result"
     ]
   ],
   "totals": {
-    "groups": 1,
-    "functions_in_groups": 2
+    "groups": 19,
+    "functions_in_groups": 43
   }
 }
