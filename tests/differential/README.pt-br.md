@@ -213,6 +213,14 @@ Os campos de uma entrada:
   naquele caso. Prefira uma entrada específica para uma mudança pretendida
   somente para aquele caso.
 
+Toda declaração é validada antes do cálculo das diferenças, mesmo quando os
+documentos são iguais ou seu caminho não casaria com nada. Uma entrada deve
+ser um objeto com `kind` válido e `path` string (inclusive `""`). `added` e
+`changed` exigem a presença de `expected`; valores nulos, falsos e vazios são
+válidos. `was` continua opcional para `removed`; um `id` opcional deve ser uma
+string não vazia. Entradas inválidas geram `ValueError` identificando o campo
+e a entrada. Caminhos de declaração continuam padrões glob, não caminhos concretos.
+
 Caminhos concretos consumidos por `resolve` são vazios ou começam com `/`.
 Índices de listas devem ser `0` ou dígitos decimais ASCII sem zeros iniciais;
 sinais, espaços, underscores e dígitos não ASCII são rejeitados. Um prefixo

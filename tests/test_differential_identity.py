@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import pytest
 
+from tests.differential import compare
 from tests.differential.compare import differences, explain, resolve
 
 
@@ -107,6 +108,40 @@ def test_id_binding_does_not_hide_a_missing_expected_value():
     with pytest.raises(ValueError, match="expected value"):
         explain({"blocks": [{"id": "a", "text": "old"}]}, {"blocks": [{"id": "a", "text": "new"}]},
                 [{"kind": "changed", "path": "/blocks/0/text", "id": "another", "reason": "r"}])
+
+
+@pytest.mark.parametrize("entry,diagnostic", [
+    (None, "object"), ([], "object"), ("entry", "object"),
+    ({}, "kind"), ({"kind": "unknown", "path": ""}, "kind"),
+    ({"kind": None, "path": ""}, "kind"), ({"kind": [], "path": ""}, "kind"),
+    ({"kind": "removed"}, "path"), ({"kind": "removed", "path": None}, "path"),
+    ({"kind": "removed", "path": 0}, "path"), ({"kind": "removed", "path": []}, "path"),
+    ({"kind": "added", "path": "/unused"}, "expected value"),
+    ({"kind": "changed", "path": "/unused"}, "expected value"),
+])
+def test_every_declaration_is_validated_before_any_comparison(monkeypatch, entry, diagnostic):
+    def unexpected_comparison(*args, **kwargs):
+        raise AssertionError("validation must happen before comparison")
+
+    monkeypatch.setattr(compare, "differences", unexpected_comparison)
+    valid = {"kind": "removed", "path": "/valid"}
+    with pytest.raises(ValueError, match=diagnostic) as error:
+        explain({}, {}, [valid, entry])
+    assert repr(entry) in str(error.value)
+
+
+@pytest.mark.parametrize("path", ["", "/", "*", "/blocks/*/text", "/~*"])
+def test_validation_accepts_root_empty_key_and_glob_patterns(path):
+    for kind in ("added", "changed", "removed"):
+        entry = {"kind": kind, "path": path, "expected": False, "id": "a"}
+        assert explain({}, {}, [entry]) == ([], [entry])
+
+
+@pytest.mark.parametrize("expected", [None, False, 0, "", [], {}])
+@pytest.mark.parametrize("kind", ["added", "changed"])
+def test_expected_presence_does_not_require_a_truthy_value(kind, expected):
+    entry = {"kind": kind, "path": "", "expected": expected}
+    assert explain({}, {}, [entry]) == ([], [entry])
 
 
 @pytest.mark.parametrize("side", ["reference", "current"])

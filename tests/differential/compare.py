@@ -126,12 +126,25 @@ def explain(
     require the same identified member and list context on both sides.
     """
     for entry in declared:
-        if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
-            raise ValueError(f"a declaration's id must be a non-empty string: {entry}")
+        _validate_declaration(entry)
     found = differences(reference, current)
     unexplained = [item for item in found if not any(_explains(entry, item, reference, current) for entry in declared)]
     unused = [entry for entry in declared if not any(_explains(entry, item, reference, current) for item in found)]
     return unexplained, unused
+
+
+def _validate_declaration(entry: Any) -> None:
+    """Reject a malformed entry before computing or matching differences (#912)."""
+    if not isinstance(entry, dict):
+        raise ValueError(f"a declaration must be an object: {entry!r}")
+    if entry.get("kind") not in ("added", "changed", "removed"):
+        raise ValueError(f"a declaration's kind must be added, changed or removed: {entry!r}")
+    if not isinstance(entry.get("path"), str):
+        raise ValueError(f"a declaration's path must be a string: {entry!r}")
+    if entry["kind"] in ("added", "changed") and "expected" not in entry:
+        raise ValueError(f"a {entry['kind']} declaration must name its expected value: {entry!r}")
+    if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
+        raise ValueError(f"a declaration's id must be a non-empty string: {entry!r}")
 
 
 def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, current: Any) -> bool:
@@ -143,8 +156,6 @@ def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, curre
         value_matches = "was" not in entry or _json_equal(resolve(document, pointer), entry["was"])
     else:
         document, pointer = current, item["path"]
-        if "expected" not in entry:
-            raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
         value_matches = _json_equal(resolve(document, pointer), entry["expected"])
     if not value_matches or "id" not in entry:
         return value_matches

@@ -203,6 +203,14 @@ The fields of an entry:
   under a case name must be used in that case. Prefer a case-specific entry
   for a change intended only for that case.
 
+Every declaration is validated before computing differences, even when the
+documents are equal or its path would match nothing. An entry must be an
+object with a valid `kind` and a string `path` (including `""`). `added` and
+`changed` require the presence of `expected`; null, false and empty values
+are valid. `was` remains optional for `removed`; an optional `id` must be a
+non-empty string. Invalid entries raise `ValueError` identifying the field
+and the entry. Declaration paths remain glob patterns, not concrete paths.
+
 Concrete paths consumed by `resolve` are either empty or start with `/`.
 List indices must be `0` or ASCII decimal digits without leading zeroes;
 signs, whitespace, underscores and non-ASCII digits are rejected. An invalid
