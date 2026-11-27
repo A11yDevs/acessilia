@@ -29,6 +29,15 @@ def object_marker_labels() -> dict[str, str]:
     }
 
 
+def object_markers_enabled(enabled: bool | None, export: ExportConfig) -> bool:
+    """Whether markers apply: the job's choice, or the run's default when None.
+
+    One resolver for the delivery and the effective-configuration record
+    (#380), so the recorded value cannot disagree with the delivered one.
+    """
+    return export.object_markers_enabled if enabled is None else enabled
+
+
 def with_object_markers(
     document: dict[str, Any], enabled: bool | None, export: ExportConfig
 ) -> dict[str, Any]:
@@ -38,6 +47,6 @@ def with_object_markers(
     ``ExportConfig.object_markers_enabled``. The document is returned
     unchanged when off.
     """
-    if enabled is None:
-        enabled = export.object_markers_enabled
-    return wrap_object_markers(document, object_marker_labels()) if enabled else document
+    if object_markers_enabled(enabled, export):
+        return wrap_object_markers(document, object_marker_labels())
+    return document
