@@ -233,9 +233,10 @@ the manifest. **The enrichment migration needs no domain change.**
      among its dependencies. The failed obligations and what waits for them
      are left out of that round and of every later one, so their
      alternatives never run. Left out of a plan is not cancelled: the
-     executor selects only the plan's obligations, so after every run the
-     goals the plan left out are selected again (`_restore_goals`, from the
-     planning manifest, which the plan checkpoint saves for a resume). A
+     executor preserves `selected` as a job goal. The plan's scope is
+     `NominalPlan.selected_obligations`; `complete-job` checks that scope
+     plus newly discovered goals. Delivery judges every open goal. Excluded
+     work carries `deferred_reason` when known (ADR-0031). A
      critical obligation left open, found, failed or waiting for failed
      work, still fails the job instead of being delivered silently, and a
      refinement is delivered with a warning and no cache.

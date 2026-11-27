@@ -13,9 +13,17 @@ abertas. O orquestrador deixa de restaurar metas depois da execução.
   `failure-budget-exhausted` nas metas excluídas. O payload de obrigações
   insatisfeitas inclui o motivo quando presente; um plano posterior o limpa
   ao assumir o trabalho.
-- Checkpoints antigos de 0.3.x continuam legíveis. O manifesto de planejamento
-  recupera flags de meta apagadas por executores antigos; adiamentos ausentes
-  continuam ausentes na serialização, preservando hashes e vínculos de planos.
+- Checkpoints antigos sem o campo continuam legíveis; metas apagadas só são
+  recuperadas quando o manifesto de planejamento ainda as registra. Metas
+  perdidas em ambos não podem ser inferidas. Motivos ausentes continuam
+  ausentes na serialização, preservando hashes e vínculos históricos; um
+  fixture real de 0.3.26 verifica essa fronteira.
+- Os adiamentos são recalculados a cada decisão de replanejamento, mesmo sem
+  raízes. Só trabalho replanejável excluído pelo orçamento de falhas recebe
+  `failure-budget-exhausted`; `outside-plan` também inclui trabalho esgotado
+  ou bloqueado. Satisfação indireta e seleção limpam motivos obsoletos.
+- O executor revalida o escopo do plano mesmo depois de cópia sem validação
+  ou mutação, e mantém imutável o escopo da execução.
 - Testes cobrem planos parciais, avisos e cache na entrega adiada, execução
   posterior, metas removidas e retomada de checkpoints atuais e antigos.
 - Decisão de contrato: [ADR-0031](../../docs/adr/0031-job-goals-and-plan-selection.pt-br.md).

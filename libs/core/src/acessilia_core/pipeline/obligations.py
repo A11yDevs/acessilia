@@ -260,12 +260,17 @@ def _discovered_roots(manifest: ProcessingManifest) -> list[str]:
 
 def replan_roots(manifest: ProcessingManifest, *, failure_budget_spent: bool) -> list[str]:
     """Choose the next plan's roots and record why other goals wait (#883)."""
-    roots = _discovered_roots(manifest) if failure_budget_spent else _replannable_obligation_ids(manifest)
-    if roots and failure_budget_spent:
-        selected = set(roots)
-        for obligation in manifest.obligations:
-            if _is_open_obligation(obligation) and obligation.id not in selected:
-                obligation.deferred_reason = "failure-budget-exhausted"
+    eligible = _replannable_obligation_ids(manifest)
+    roots = _discovered_roots(manifest) if failure_budget_spent else eligible
+    eligible_ids = set(eligible)
+    selected = set(roots)
+    for obligation in manifest.obligations:
+        if not _is_open_obligation(obligation) or obligation.id in selected:
+            obligation.deferred_reason = None
+        elif failure_budget_spent and obligation.id in eligible_ids:
+            obligation.deferred_reason = "failure-budget-exhausted"
+        else:
+            obligation.deferred_reason = "outside-plan"
     return roots
 
 

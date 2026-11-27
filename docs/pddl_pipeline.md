@@ -285,14 +285,17 @@ added it succeeded, not selected if it failed.
 the current plan's scope ([ADR-0031](adr/0031-job-goals-and-plan-selection.md),
 #883). A partial plan leaves the other goals selected. Open goals outside
 its scope carry an optional `deferred_reason`: `outside-plan`, or
-`failure-budget-exhausted` when discovery policy excludes failed work and
-its dependents. The unsatisfied-obligation payload includes this reason.
+`failure-budget-exhausted` when discovery policy excludes otherwise
+replannable failed work and its dependents. Exhausted or permanently blocked
+work uses the broader `outside-plan`, which promises no future eligibility.
+Replan decisions recompute reasons even with no roots. The payload includes them.
 Taking up a deferred goal in a later plan clears the reason. The final
 delivery check judges every open goal: a critical one fails the job, a
-refinement leaves a warning and prevents caching, even if the plan completed.
+retryable refinement leaves a warning and prevents caching, even if the plan
+completed. The existing human-review-only cache exception still applies.
 Old checkpoints remain readable and keep their hashes when no deferral is
-present; resumes recover goal flags cleared by older executors from the
-planning manifest.
+present; resumes recover cleared goal flags only if the planning manifest
+retains them. If both manifests already lost a goal, it cannot be inferred.
 
 ### 5.1 `dual-provider-fusion` method
 

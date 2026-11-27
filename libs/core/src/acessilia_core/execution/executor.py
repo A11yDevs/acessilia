@@ -132,7 +132,7 @@ class _ExecutionState:
     #: addition was found during it (#594, #832); one whose applicability
     #: changed under the same id is stale.
     planned: dict[str, _Applicability] = field(default_factory=dict)
-    selected_obligations: set[str] = field(default_factory=set)
+    selected_obligations: frozenset[str] = field(default_factory=frozenset)
 
 
 class _SkipStep(Exception):
@@ -187,7 +187,7 @@ class ExecutorAgent:
                 # A failed obligation does not stop the workflow: the remaining
                 # independent obligations still run, and those depending on the
                 # failed one fail their own precondition check. complete-job
-                # still refuses to finish while any selected obligation is open.
+                # still waits for its scope and goals discovered during execution.
                 return StepOutput(
                     content=result.model_dump(mode="json"),
                     success=not failed,
@@ -241,7 +241,7 @@ class ExecutorAgent:
             replan_required=replan_required,
             progress=progress,
             planned=_planned_applicability(manifest),
-            selected_obligations=set(plan.selected_obligations),
+            selected_obligations=frozenset(plan.selected_obligations),
         )
         if len(results) < len(plan.steps):
             workflow = self.build_workflow(
@@ -299,8 +299,10 @@ class ExecutorAgent:
         """Keep job goals independent of the plan's scope (#883).
 
         Older execution checkpoints cleared goals outside their plan. The
-        planning manifest recovers those flags when resuming, for existing
-        obligations only. A discovered open goal still asks for a replan.
+        planning manifest recovers those flags when resuming if they are
+        still recorded there, for existing obligations only. Flags lost
+        from both manifests cannot be inferred. A discovered open goal
+        still asks for a replan.
         """
         planned = {item.id: item for item in manifest.obligations}
         selected = set(plan.selected_obligations)
@@ -439,6 +441,8 @@ class ExecutorAgent:
             raise ValueError(
                 t(EXE_PLAN_UNKNOWN_OBLIGATIONS).format(unknown=sorted(unknown))
             )
+        # Revalidate unchecked copies/mutations, including each step's declared scope.
+        NominalPlan.model_validate(plan.model_dump())
 
     def _execute_step(
         self,
@@ -493,6 +497,8 @@ class ExecutorAgent:
             message=message,
             artifact_ids=artifact_ids,
         )
+        for obligation in state.manifest.obligations:
+            obligation.clear_inactive_deferral()
         state.results.append(result)
         return result
 

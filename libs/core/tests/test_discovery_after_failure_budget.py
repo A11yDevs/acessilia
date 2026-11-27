@@ -26,7 +26,7 @@ from test_changed_obligations import (
 from acessilia_core.execution.models import MethodResult
 from acessilia_core.manifest.models import ObligationAttempt, ProcessingManifest
 from acessilia_core.pipeline.checkpointing import RunCheckpoints
-from acessilia_core.pipeline.obligations import _discovered_roots
+from acessilia_core.pipeline.obligations import _discovered_roots, replan_roots
 from acessilia_core.planning import toolbox_gate
 from acessilia_core.planning.planner_agent import PlannerAgent
 
@@ -158,8 +158,8 @@ def test_the_discovery_roots_leave_out_what_a_failure_touches_at_any_depth() -> 
     assert _discovered_roots(ProcessingManifest.model_validate(manifest.model_dump(by_alias=True))) == ["o-free"]
 
 
-@pytest.mark.parametrize("legacy_checkpoint", [False, True])
-def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters(legacy_checkpoint) -> None:
+@pytest.mark.parametrize("checkpoint_shape", ["partial", "legacy", "budget"])
+def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters(checkpoint_shape) -> None:
     """The process dies inside the discovery plan that serves ``o-found``.
     The resume reads the plan checkpoint (counters, signature and the
     planning manifest, where ``o-bad`` is still a goal), finishes the plan
@@ -185,7 +185,9 @@ def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters(legacy_checkp
     )
     for item in manifest.obligations:
         item.selected = True
-    _, plan = PlannerAgent().plan(manifest, selected_roots=_discovered_roots(manifest))
+    roots = replan_roots(manifest, failure_budget_spent=True) if checkpoint_shape == "budget" else _discovered_roots(manifest)
+    reason = "failure-budget-exhausted" if checkpoint_shape == "budget" else "outside-plan"
+    _, plan = PlannerAgent().plan(manifest, selected_roots=roots)
     config = core_config()
     checkpoints = RunCheckpoints(_Store(), config)
     availability = toolbox_gate.AvailabilityDecision.from_metadata({}, config.toolbox)
@@ -208,8 +210,8 @@ def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters(legacy_checkp
 
     saved_bad = next(item for item in snapshots[-1]["manifest"]["obligations"] if item["id"] == "o-bad")
     assert saved_bad["selected"] is True
-    assert saved_bad["deferred_reason"] == "outside-plan"
-    if legacy_checkpoint:
+    assert saved_bad["deferred_reason"] == reason
+    if checkpoint_shape == "legacy":
         # Before #883 the executor cleared a goal outside its current plan.
         saved_bad["selected"] = False
         saved_bad.pop("deferred_reason")
@@ -225,4 +227,36 @@ def test_a_resumed_discovery_plan_keeps_the_goals_and_the_counters(legacy_checkp
     assert calls == ["o-found", "o-found-2"]
     bad_after = next(item for item in resumed.obligations if item.id == "o-bad")
     assert (bad_after.selected, bad_after.status) == (True, "candidate")
-    assert bad_after.deferred_reason == "outside-plan"
+    assert bad_after.deferred_reason == reason
+
+
+@pytest.mark.parametrize("independent_work", [False, True])
+def test_budget_deferrals_are_causal_and_are_recomputed_for_the_next_policy(independent_work):
+    names = ["retry", "dependent", "exhausted", "blocked"] + (["free"] if independent_work else [])
+    manifest = build_manifest(
+        [build_element("a", "paragraph", text="a")],
+        [_obligation(name, "repair-heading-hierarchy", ["a"]) for name in names],
+    )
+    by_id = {item.id: item for item in manifest.obligations}
+    for item in manifest.obligations:
+        item.selected = True
+    by_id["retry"].attempts = [_failed_attempt()]
+    by_id["retry"].status = "pending"
+    by_id["dependent"].dependencies = ["retry"]
+    by_id["exhausted"].attempts = [_failed_attempt("human-review")]
+    by_id["exhausted"].status = "failed"
+    by_id["blocked"].dependencies = ["exhausted"]
+
+    assert replan_roots(manifest, failure_budget_spent=True) == (["free"] if independent_work else [])
+    assert {item.id: item.deferred_reason for item in manifest.obligations} == {
+        "retry": "failure-budget-exhausted", "dependent": "failure-budget-exhausted",
+        "exhausted": "outside-plan", "blocked": "outside-plan",
+        **({"free": None} if independent_work else {}),
+    }
+    assert set(replan_roots(manifest, failure_budget_spent=False)) == {"retry", "dependent"} | ({"free"} if independent_work else set())
+    assert by_id["retry"].deferred_reason is by_id["dependent"].deferred_reason is None
+    # Reopening exhausted work with fresh methods makes the budget policy causal again.
+    by_id["exhausted"].status = "pending"
+    by_id["exhausted"].admissible_methods.append("alternative")
+    replan_roots(manifest, failure_budget_spent=True)
+    assert by_id["exhausted"].deferred_reason == by_id["blocked"].deferred_reason == "failure-budget-exhausted"

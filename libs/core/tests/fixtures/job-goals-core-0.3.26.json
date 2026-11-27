@@ -1,0 +1,276 @@
+{
+  "provenance": {
+    "repository": "A11yDevs/acessilia",
+    "commit": "c0c26e16945d4a94b0c9b4b43a9a99d917159199",
+    "core_version": "0.3.26",
+    "method": "git archive of libs/core/src, first on_step snapshot of ExecutorAgent.execute; no new-core imports"
+  },
+  "planning_manifest": {
+    "$schema": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+    "schema_version": "1.1.0",
+    "manifest_id": "manifest-actionability",
+    "revision": 1,
+    "status": "extracted",
+    "created_at": "2026-10-14T00:00:00Z",
+    "source": {
+      "document_id": "doc-actionability",
+      "filename": "amostra.pdf",
+      "path": "/tmp/amostra.pdf",
+      "media_type": "application/pdf",
+      "byte_size": 1,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "extractor": {
+      "name": "docling",
+      "version": "2.0.0",
+      "started_at": "2026-10-14T00:00:00Z",
+      "completed_at": "2026-10-14T00:00:00Z",
+      "duration_ms": 1,
+      "configuration": {}
+    },
+    "title": "Actionability",
+    "language": "pt-BR",
+    "pages": [
+      {
+        "page_number": 1,
+        "width": null,
+        "height": null,
+        "element_ids": [
+          "a"
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "id": "a",
+        "type": "heading",
+        "raw_label": "heading",
+        "reading_order": 1,
+        "hierarchy_level": 1,
+        "text": "Historical fixture",
+        "source_ref": null,
+        "parent_ref": null,
+        "parent_id": null,
+        "page_number": 1,
+        "confidence": null,
+        "provenance": [],
+        "metadata": {}
+      }
+    ],
+    "observations": [],
+    "obligations": [
+      {
+        "id": "o-run",
+        "kind": "repair-heading-hierarchy",
+        "status": "candidate",
+        "selected": true,
+        "target_ids": [
+          "a"
+        ],
+        "dependencies": [],
+        "admissible_methods": [
+          "human-review"
+        ],
+        "method_costs": {
+          "human-review": 5
+        },
+        "attempts": [],
+        "rationale": "test"
+      },
+      {
+        "id": "o-later",
+        "kind": "repair-heading-hierarchy",
+        "status": "candidate",
+        "selected": true,
+        "target_ids": [
+          "a"
+        ],
+        "dependencies": [],
+        "admissible_methods": [
+          "human-review"
+        ],
+        "method_costs": {
+          "human-review": 5
+        },
+        "attempts": [],
+        "rationale": "test"
+      }
+    ],
+    "artifacts": [],
+    "summary": {
+      "page_count": 1,
+      "element_count": 1,
+      "observation_count": 0,
+      "obligation_count": 2,
+      "element_types": {}
+    }
+  },
+  "plan": {
+    "$schema": "urn:a11y-devs:schema:nominal-plan:1.0.0",
+    "schema_version": "1.0.0",
+    "plan_id": "plan-c04184e46d5b9672",
+    "generated_at": "2026-11-27T01:50:01.242235Z",
+    "status": "nominal",
+    "manifest_id": "manifest-actionability",
+    "manifest_revision": 1,
+    "manifest_sha256": "cc9387f6fab0948665a8935b632c70a53a75f10685b742c42921404c27f79f22",
+    "domain": {
+      "name": "acessilia-obligations",
+      "version": "2.4",
+      "domain_sha256": "7ea452a92cb09389c413a7669f24fdddeebc1a15276e99f2f4daa43c69b72e48",
+      "description_sha256": "bf262feca003087601d750bdade16b5401c4877c74c021fabf8e4fdcbfe6de36"
+    },
+    "problem_name": "manifest-actionability",
+    "problem_sha256": "c1e8a042daac666ea025d32ff508a1736bfe5beb704b6366b13a65f67716014a",
+    "planner": "internal-reference",
+    "metric": "minimize-total-cost",
+    "selected_obligations": [
+      "o-run"
+    ],
+    "expected_total_cost": 5,
+    "steps": [
+      {
+        "index": 0,
+        "action": "start-job",
+        "obligation_id": null,
+        "obligation_kind": null,
+        "method": null,
+        "expected_cost": 0
+      },
+      {
+        "index": 1,
+        "action": "execute-obligation",
+        "obligation_id": "o-run",
+        "obligation_kind": "repair-heading-hierarchy",
+        "method": "human-review",
+        "expected_cost": 5
+      },
+      {
+        "index": 2,
+        "action": "complete-job",
+        "obligation_id": null,
+        "obligation_kind": null,
+        "method": null,
+        "expected_cost": 0
+      }
+    ]
+  },
+  "execution": {
+    "plan_id": "plan-c04184e46d5b9672",
+    "manifest": {
+      "$schema": "urn:a11y-devs:schema:processing-manifest:1.1.0",
+      "schema_version": "1.1.0",
+      "manifest_id": "manifest-actionability",
+      "revision": 1,
+      "status": "processing",
+      "created_at": "2026-10-14T00:00:00Z",
+      "source": {
+        "document_id": "doc-actionability",
+        "filename": "amostra.pdf",
+        "path": "/tmp/amostra.pdf",
+        "media_type": "application/pdf",
+        "byte_size": 1,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "extractor": {
+        "name": "docling",
+        "version": "2.0.0",
+        "started_at": "2026-10-14T00:00:00Z",
+        "completed_at": "2026-10-14T00:00:00Z",
+        "duration_ms": 1,
+        "configuration": {}
+      },
+      "title": "Actionability",
+      "language": "pt-BR",
+      "pages": [
+        {
+          "page_number": 1,
+          "width": null,
+          "height": null,
+          "element_ids": [
+            "a"
+          ]
+        }
+      ],
+      "elements": [
+        {
+          "id": "a",
+          "type": "heading",
+          "raw_label": "heading",
+          "reading_order": 1,
+          "hierarchy_level": 1,
+          "text": "Historical fixture",
+          "source_ref": null,
+          "parent_ref": null,
+          "parent_id": null,
+          "page_number": 1,
+          "confidence": null,
+          "provenance": [],
+          "metadata": {}
+        }
+      ],
+      "observations": [],
+      "obligations": [
+        {
+          "id": "o-run",
+          "kind": "repair-heading-hierarchy",
+          "status": "candidate",
+          "selected": true,
+          "target_ids": [
+            "a"
+          ],
+          "dependencies": [],
+          "admissible_methods": [
+            "human-review"
+          ],
+          "method_costs": {
+            "human-review": 5
+          },
+          "attempts": [],
+          "rationale": "test"
+        },
+        {
+          "id": "o-later",
+          "kind": "repair-heading-hierarchy",
+          "status": "candidate",
+          "selected": false,
+          "target_ids": [
+            "a"
+          ],
+          "dependencies": [],
+          "admissible_methods": [
+            "human-review"
+          ],
+          "method_costs": {
+            "human-review": 5
+          },
+          "attempts": [],
+          "rationale": "test"
+        }
+      ],
+      "artifacts": [],
+      "summary": {
+        "page_count": 1,
+        "element_count": 1,
+        "observation_count": 0,
+        "obligation_count": 2,
+        "element_types": {}
+      }
+    },
+    "results": [
+      {
+        "index": 0,
+        "action": "start-job",
+        "status": "succeeded",
+        "obligation_id": null,
+        "method": null,
+        "started_at": "2026-11-27T01:50:01.314892Z",
+        "completed_at": "2026-11-27T01:50:01.314919Z",
+        "message": null,
+        "artifact_ids": []
+      }
+    ],
+    "replan_required": false,
+    "remaps": []
+  }
+}
