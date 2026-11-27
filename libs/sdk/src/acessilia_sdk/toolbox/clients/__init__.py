@@ -25,6 +25,7 @@ from acessilia_sdk.toolbox.clients.pdf_ua import ToolboxPdfUaClient
 from acessilia_sdk.toolbox.clients.pdf_validate import ToolboxPdfValidateClient
 from acessilia_sdk.toolbox.clients.structure import ToolboxStructureClient
 from acessilia_sdk.toolbox.clients.table import ToolboxTableClient
+from acessilia_sdk.toolbox.clients.text_normalization import ToolboxTextNormalizeClient
 
 __all__ = [
     "ToolboxAdjudicateClient",
@@ -43,6 +44,7 @@ __all__ = [
     "ToolboxPdfValidateClient",
     "ToolboxStructureClient",
     "ToolboxTableClient",
+    "ToolboxTextNormalizeClient",
     "client_timeout_keys",
 ]
 

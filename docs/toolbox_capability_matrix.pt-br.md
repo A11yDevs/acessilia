@@ -72,6 +72,8 @@ Legenda de **Caminho de chamada**: como o core alcança a capacidade.
 | `document.adjudicate.region` | `acessilia_sdk/toolbox/clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; nenhum método PDDL a chama ainda (o `rescue-omitted` restaura os blocos do provider primário de forma determinística, #236) |
 | `table.recognize` | `acessilia_sdk/toolbox/clients/table.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | publicada; handler do `table-specialist` pendente (regra de seleção a decidir) |
 | `image.page.orient` | `acessilia_sdk/toolbox/clients/orientation.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contrato válido; falta gatilho PDDL e validação do efeito em produção |
+| `document.text.normalize` | `acessilia_sdk/toolbox/clients/text_normalization.py` | `TOOLBOX_TEXT_NORMALIZE_PROVIDER=docstruct-text` | `docstruct-text` | `norm-fix`: contrato 1, lotes delimitados e aceite atômico por obrigação; sem fallback local (#929) |
+| `audio.synthesize` | **ausente** | — | `edge-tts`, `piper-tts` | publicado; migração do TTS do Core pendente (Toolbox #73) |
 | `accessibility.mark` | **ausente** | — | `pure-accessibility` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `chem.convert` | **ausente** | — | `pure-chem` | pendente: cliente e obrigação/método/handler acionados por evidência |
 | `chem.recognize` | **ausente** | — | `docling-chem` | pendente: cliente e obrigação/método/handler acionados por evidência |
@@ -96,7 +98,7 @@ Medida contra a Toolbox de homologação em execução com
    `qwen3-vl-page` e `qwen3-vl-judge`, do perfil de 32B dos experimentos).
 3. O `KNOWN_DRIFT` está vazio contra o catálogo do develop da Toolbox; a
    homologação ainda roda uma imagem anterior ao #50 até ser reimplantada.
-4. Seis capacidades não têm nenhum cliente no core (ver a matriz).
+4. Sete capacidades não têm nenhum cliente no core (ver a matriz).
 
 A deriva de contrato de orientação foi resolvida: o cliente postava em
 `document.orientation.detect` com provider `rapidocr-orientation`, nenhum dos dois

@@ -1,0 +1,224 @@
+{
+  "cacheable": true,
+  "calls": {
+    "document.structure.extract": 1,
+    "document.text.spans": 1,
+    "media.inspect": 1
+  },
+  "canonical": {
+    "accessibility": {
+      "internal_links": true,
+      "navigation": true,
+      "semantic_headings": true
+    },
+    "audience": [
+      "reader"
+    ],
+    "audit": {
+      "block_count": 3,
+      "generated_by": "canonical_builder",
+      "input_length": 8
+    },
+    "language": "pt-BR",
+    "metadata": {
+      "accessibility_verified": false,
+      "mode": "pddl-internal",
+      "page_count": 1,
+      "pages": [
+        {
+          "blocks": [
+            {
+              "id": "p1",
+              "metadata": {
+                "confidence": null,
+                "keep": "first",
+                "manifest_element_id": "p1",
+                "norm_fixed": true,
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 220.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 60.0
+                },
+                "page_number": 1
+              },
+              "text": "first text ab-\nc. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "p2",
+              "metadata": {
+                "confidence": null,
+                "keep": "second",
+                "manifest_element_id": "p2",
+                "norm_fixed": true,
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 420.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 240.0
+                },
+                "page_number": 1
+              },
+              "text": "soft hyphen text. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. ",
+              "type": "paragraph"
+            },
+            {
+              "id": "p3",
+              "metadata": {
+                "confidence": null,
+                "keep": "protected",
+                "manifest_element_id": "p3",
+                "parent_id": null,
+                "raw_label": "paragraph",
+                "source_ref": null
+              },
+              "source_location": {
+                "bbox": {
+                  "bottom": 500.0,
+                  "left": 72.0,
+                  "right": 540.0,
+                  "top": 440.0
+                },
+                "page_number": 1
+              },
+              "text": "$$ a  b $$",
+              "type": "paragraph"
+            }
+          ],
+          "page_number": 1,
+          "text": "first text ab-\nc. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\nsoft hyphen text. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.\n$$ a  b $$"
+        }
+      ],
+      "pddl_comparison_verdict": null,
+      "pddl_execution_status": "completed",
+      "pddl_fusion": null,
+      "pddl_manifest_revision": 2,
+      "pddl_media_inspection": {
+        "document_genre": null,
+        "error": null,
+        "genre_signals": [],
+        "status": "toolbox"
+      },
+      "pddl_planner": "internal-reference",
+      "pddl_toolbox_availability": {
+        "applied": false,
+        "assumed_runnable_methods": [],
+        "blocked_methods": {},
+        "catalog_error": null,
+        "catalog_revision": null,
+        "mode": "off",
+        "offered": null,
+        "offered_source": "none",
+        "requirements": {}
+      },
+      "pddl_unsatisfied_obligations": [],
+      "pddl_unsatisfied_summary": null,
+      "pddl_validation_only": true,
+      "pddl_visual_failures": null,
+      "pipeline_engine": "pddl"
+    },
+    "schema_version": "1.0.0",
+    "sections": [
+      {
+        "blocks": [
+          {
+            "id": "p1",
+            "metadata": {
+              "confidence": null,
+              "keep": "first",
+              "manifest_element_id": "p1",
+              "norm_fixed": true,
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 220.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 60.0
+              },
+              "page_number": 1
+            },
+            "text": "first text ab-\nc. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "id": "p2",
+            "metadata": {
+              "confidence": null,
+              "keep": "second",
+              "manifest_element_id": "p2",
+              "norm_fixed": true,
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 420.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 240.0
+              },
+              "page_number": 1
+            },
+            "text": "soft hyphen text. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual. This document describes the experiment in enough detail for the text to be long, so that the document is not taken as mostly visual.",
+            "type": "paragraph"
+          },
+          {
+            "id": "p3",
+            "metadata": {
+              "confidence": null,
+              "keep": "protected",
+              "manifest_element_id": "p3",
+              "parent_id": null,
+              "raw_label": "paragraph",
+              "source_ref": null
+            },
+            "source_location": {
+              "bbox": {
+                "bottom": 500.0,
+                "left": 72.0,
+                "right": 540.0,
+                "top": 440.0
+              },
+              "page_number": 1
+            },
+            "text": "$$ a  b $$",
+            "type": "paragraph"
+          }
+        ],
+        "children": [],
+        "id": "sectionless-1",
+        "level": 1,
+        "metadata": {},
+        "source_location": {},
+        "title": ""
+      }
+    ],
+    "source": {
+      "name": "text-normalization.pdf",
+      "type": "pdf"
+    },
+    "technical_warnings": [],
+    "title": "text-normalization",
+    "verbosity": "detailed"
+  },
+  "converted": {},
+  "refused": [],
+  "served": [],
+  "unhandled": []
+}

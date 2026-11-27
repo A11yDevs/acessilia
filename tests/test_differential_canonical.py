@@ -18,7 +18,7 @@ one shows the pipeline is, so a regression between steps (the formula LaTeX
 gap of M1, #846) fails here. A difference a later release made on purpose is
 declared in the reference's ``intended.json``, with the value it allows and
 the release that made it; any other one fails, and so does a declared one
-that no longer happens. The scope is the cases' (see the README): eight
+that no longer happens. The scope is the cases' (see the README): nine
 synthetic documents, one or several pages, one or two providers, and a
 Toolbox that answers, or fails where a case says so.
 """

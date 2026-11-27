@@ -63,6 +63,7 @@ PROVIDER_DEFAULTS: dict[str, str] = {
     "toolbox_table_provider": "qwen3-vl-8b",
     "toolbox_orientation_provider": "rapidocr-orient",
     "toolbox_media_inspect_provider": "pure-media-inspect",
+    "toolbox_text_normalize_provider": "docstruct-text",
     "toolbox_pdf_ua_provider": "pandoc-pdf-ua",
     "toolbox_pdf_validate_provider": "verapdf",
     "toolbox_docx_provider": "pandoc-docx",
@@ -101,6 +102,7 @@ _BINDINGS: dict[tuple[str, int], tuple[str | None, bool]] = {
     ('document.ocr', 1): ('ocr-result@1', True),
     ('document.ocr.page', 1): ('page-transcription@1', True),
     ('document.structure.extract', 1): ('structured-document@1', True),
+    ('document.text.normalize', 1): ('text-normalization-result@1', True),
     ('document.text.spans', 1): ('text-spans@1', True),
     ('image.page.orient', 1): ('page-orientation@1', True),
     ('math.convert', 1): ('mathml@1', True),
@@ -154,6 +156,10 @@ _CAPABILITIES: tuple[ToolboxCapability, ...] = (
     _selected("pdf.render", 2, "Renderização de PDF", provider_key="toolbox_pdf_provider"),
     # The text layer with fonts and baselines, read for inline math (#265).
     _selected("document.text.spans", 1, "Text spans", provider_key="toolbox_pdf_provider"),
+    _selected(
+        "document.text.normalize", 1, "Text normalization",
+        provider_key="toolbox_text_normalize_provider",
+    ),
     _selected(
         "math.recognize", 1, "Reconhecimento de fórmula",
         provider_key="toolbox_math_recognize_provider",

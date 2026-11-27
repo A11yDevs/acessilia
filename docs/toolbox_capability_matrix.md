@@ -70,6 +70,8 @@ Legend for **Call path**: how the core reaches the capability.
 | `document.adjudicate.region` | `acessilia_sdk/toolbox/clients/adjudicate.py` | `TOOLBOX_ADJUDICATE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; no PDDL method calls it yet (`rescue-omitted` restores the primary provider's blocks deterministically, #236) |
 | `table.recognize` | `acessilia_sdk/toolbox/clients/table.py` | `TOOLBOX_TABLE_PROVIDER=qwen3-vl-8b` | `qwen3-vl-8b` (acessilia-toolbox#50) | published; `table-specialist` handler pending (selection rule to decide) |
 | `image.page.orient` | `acessilia_sdk/toolbox/clients/orientation.py` | `TOOLBOX_ORIENTATION_PROVIDER=rapidocr-orient` | `rapidocr-orient` | contract-valid; PDDL trigger and production effect validation pending |
+| `document.text.normalize` | `acessilia_sdk/toolbox/clients/text_normalization.py` | `TOOLBOX_TEXT_NORMALIZE_PROVIDER=docstruct-text` | `docstruct-text` | `norm-fix`: contract 1, bounded batches and atomic acceptance per obligation; no local fallback (#929) |
+| `audio.synthesize` | **absent** | — | `edge-tts`, `piper-tts` | published; Core TTS migration pending (Toolbox #73) |
 | `accessibility.mark` | **absent** | — | `pure-accessibility` | pending: evidence-driven client and obligation/method/handler |
 | `chem.convert` | **absent** | — | `pure-chem` | pending: evidence-driven client and obligation/method/handler |
 | `chem.recognize` | **absent** | — | `docling-chem` | pending: evidence-driven client and obligation/method/handler |
@@ -94,7 +96,7 @@ Measured against the running staging Toolbox with
    `qwen3-vl-page` and `qwen3-vl-judge`, from the experiments' 32B profile).
 3. `KNOWN_DRIFT` is empty against the Toolbox develop catalogue; staging still
    runs an image older than #50 until it is redeployed.
-4. Six capabilities have no core client at all (see the matrix).
+4. Seven capabilities have no core client at all (see the matrix).
 
 The orientation contract drift was resolved: the client posted to
 `document.orientation.detect` with provider `rapidocr-orientation`, neither of

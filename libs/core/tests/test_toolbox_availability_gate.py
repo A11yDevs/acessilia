@@ -581,7 +581,7 @@ async def test_a_resumed_observe_plan_keeps_its_assumed_facts(monkeypatch) -> No
 #: (ADR-0028, #804): a new local document method fails here unless this baseline
 #: is edited in review, with the reason.
 TRANSITIONAL_BASELINE = frozenset({
-    "deterministic-heading-repair", "latex-normalizer", "line-number-extractor", "norm-fix",
+    "deterministic-heading-repair", "latex-normalizer", "line-number-extractor",
     "pandoc-code", "rep-guard", "tailjoin", "tailjoin-positioned", "unicode-repair",
     "verse-chunker", "xycut-order", "agreement-rule", "rescue-omitted", "skeleton-order",
     "table-smart-fusion",

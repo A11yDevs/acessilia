@@ -144,12 +144,14 @@ classifications or remove a transitional allowance before a migration works.
 
 The existing [text provider](https://github.com/A11yDevs/acessilia-toolbox/blob/dac17c24ad709398a49418f1eb71493b22816660/src/acessilia_toolbox/providers/pure_text.py)
 behind `text.postprocess@1` adds markers, deduplicates and emits processed text.
-The Core's [`norm-fix` handler](../../libs/core/src/acessilia_core/pipeline/handlers/text.py)
-preserves targets/ids and applies ligature, soft-hyphen, NBSP and spacing repair,
-with protected table/formula prefixes. The current capability is not an
-equivalent replacement. [#929](https://github.com/A11yDevs/acessilia/issues/929)
-defines a bounded batch contract first, then a Toolbox provider/runtime PR and
-a Core integration PR. Its capability name is a candidate until contract review.
+The original Core `norm-fix` handler preserves targets/ids and applies
+ligature, soft-hyphen, NBSP and spacing repair, with protected table/formula
+prefixes. That contract is not equivalent to `text.postprocess@1`.
+[#929](https://github.com/A11yDevs/acessilia/issues/929) now uses the published
+`document.text.normalize@1` / `docstruct-text@1.0.0` contract after Toolbox
+#174/#177. The [consumer report](norm-fix-consumer.md) records atomic acceptance,
+recovery, differential evidence and measured limits. Existing obligation
+granularity is preserved; cross-obligation batching is tracked in #948.
 
 Each slice must:
 

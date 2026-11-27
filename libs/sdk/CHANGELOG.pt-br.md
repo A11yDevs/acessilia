@@ -7,6 +7,13 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
+- **Adicionado (0.7.1)** `ToolboxTextNormalizeClient` para o contrato publicado
+  `document.text.normalize@1`, modelos estritos de alvo/resultado gerados,
+  lotes imutáveis (256 alvos / 1 MiB UTF-8 serializado), vetores de fingerprint
+  compartilhados com o provider e validação de proveniência/contagem/ordem/flags.
+  `toolbox.text_normalization` exporta DTOs e funções do protocolo; a configuração
+  de provider continua explícita. Sem fallback local de normalização (#929).
+
 - **Alterado** `ToolboxUnavailable` agora escolhe uma mensagem adequada às suas
   causas em vez de sempre alegar indisponibilidade. Quando ao menos uma causa
   não é exclusivamente timeout ou indisponibilidade (por exemplo, uma

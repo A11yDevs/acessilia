@@ -2336,6 +2336,15 @@ msgstr "Nenhum bloco de código encontrado para a obrigação"
 msgid "No text eligible for normalization"
 msgstr "Nenhum texto elegível para normalização"
 
+#, python-brace-format
+msgid "Text normalization failed ({reason}); no targets were updated"
+msgstr "Falha na normalização de texto ({reason}); nenhum alvo foi atualizado"
+
+msgid "Text normalization response is stale; no targets were updated"
+msgstr ""
+"A resposta da normalização de texto está obsoleta; nenhum alvo foi "
+"atualizado"
+
 msgid "No text eligible for Unicode repair"
 msgstr "Nenhum texto elegível para reparo Unicode"
 

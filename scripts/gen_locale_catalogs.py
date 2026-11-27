@@ -1074,6 +1074,8 @@ HANDLER_SINGLE_TRANSLATIONS: dict[str, str] = {
     handler_messages.MSG_TABLE_NO_STRUCTURE: "Tabela sem estrutura tabular: {ids}",
     handler_messages.MSG_CODE_NO_CODE: "Nenhum bloco de código encontrado para a obrigação",
     handler_messages.MSG_NORMALIZE_NO_TEXT: "Nenhum texto elegível para normalização",
+    handler_messages.MSG_NORMALIZE_FAILED: "Falha na normalização de texto ({reason}); nenhum alvo foi atualizado",
+    handler_messages.MSG_NORMALIZE_STALE: "A resposta da normalização de texto está obsoleta; nenhum alvo foi atualizado",
     handler_messages.MSG_UNICODE_REPAIR_NO_TEXT: "Nenhum texto elegível para reparo Unicode",
     handler_messages.MSG_REPETITION_NONE: "Nenhuma repetição degenerada encontrada nos alvos",
     handler_messages.MSG_LINE_NUMBERS_NONE: "Nenhum número de linha marginal encontrado",

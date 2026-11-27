@@ -652,9 +652,6 @@
       ],
       "libs/core/src/acessilia_core/manifest/detectors/text.py": [
         "norm_fix"
-      ],
-      "libs/core/src/acessilia_core/pipeline/handlers/text.py": [
-        "norm_fix"
       ]
     }
   },

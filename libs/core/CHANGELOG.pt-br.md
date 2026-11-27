@@ -2,6 +2,21 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.30 — normalização remota em uma passagem (#929)
+
+`norm-fix` agora usa `document.text.normalize@1` pelo SDK 0.7.1, após os PRs
+Toolbox #174/#177. O Core preserva seleção de alvos, metadados e aceite;
+as requisições são delimitadas por quantidade e bytes UTF-8 serializados.
+Vínculo estrito da resposta e verificação do contexto atual precedem uma única
+atualização atômica da obrigação. Os diários de operação existentes preservam a
+identidade dos lotes originais entre tentativas/retomadas; não há fallback local
+do algoritmo. O gate de disponibilidade e a identidade de processamento incluem
+o novo provider. Referências diferenciais históricas, qualificação HTTP real e
+limites estão no [relatório do consumidor](../../docs/architecture/norm-fix-consumer.pt-br.md).
+Agrupar obrigações continua uma decisão de planejamento separada (#948); os
+demais métodos locais continuam como dívida da #804. Os hashes do domínio PDDL
+publicado permanecem iguais.
+
 ## 0.3.29 — o catálogo da Toolbox é sempre a entrada do plano (#809)
 
 O gate de disponibilidade não tem mais o modo `observe`. Desde o domínio 2.4 o

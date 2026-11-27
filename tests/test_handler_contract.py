@@ -33,6 +33,7 @@ from tests.core_config_support import core_config
 
 #: The handlers that take run parameters, by method. Any other handler takes none.
 EXPECTED_RUN_PARAMETERS = {
+    "norm-fix": ("config", "ports"),
     "mathml": ("config",),
     "latex-verbalizer": ("config",),
     "dual-provider-fusion": ("config",),

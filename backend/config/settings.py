@@ -356,6 +356,12 @@ class Settings:
             provider_default("toolbox_media_inspect_provider"),
         )
     )
+    toolbox_text_normalize_provider: str = field(
+        default_factory=lambda: os.getenv(
+            "TOOLBOX_TEXT_NORMALIZE_PROVIDER",
+            provider_default("toolbox_text_normalize_provider"),
+        )
+    )
     toolbox_pdf_ua_provider: str = field(
         default_factory=lambda: os.getenv(
             "TOOLBOX_PDF_UA_PROVIDER", provider_default("toolbox_pdf_ua_provider")

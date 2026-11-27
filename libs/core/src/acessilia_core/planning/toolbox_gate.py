@@ -96,6 +96,9 @@ def _provider(config: CoreConfig, key: str) -> str:
 #: every method without requirements is in ``LOCAL_METHODS`` or
 #: ``NEVER_AVAILABLE_METHODS`` below.
 METHOD_TOOLBOX_REQUIREMENTS: dict[str, Callable[[CoreConfig], list[Requirement]]] = {
+    "norm-fix": lambda config: [
+        Requirement("document.text.normalize", _provider(config, "toolbox_text_normalize_provider"))
+    ],
     "dual-provider-fusion": lambda config: [
         Requirement(_EXTRACT, _provider(config, "toolbox_provider")),
         Requirement(_EXTRACT, config.fusion.secondary_provider),
@@ -179,7 +182,6 @@ LOCAL_METHODS: dict[str, tuple[str, str]] = {
     "deterministic-heading-repair": ("transitional", "docstruct heading repair"),
     "latex-normalizer": ("transitional", "delimiter and symbol normalization"),
     "line-number-extractor": ("transitional", "deterministic text rule"),
-    "norm-fix": ("transitional", "docstruct norm_fix"),
     "pandoc-code": ("transitional", "docstruct code reflow, in place"),
     "rep-guard": ("transitional", "deterministic text rule"),
     "tailjoin": ("transitional", "docstruct tailjoin"),

@@ -72,6 +72,8 @@ MSG_CODE_NORMALIZED_PARTIAL = (
 )
 
 MSG_NORMALIZE_NO_TEXT = "No text eligible for normalization"
+MSG_NORMALIZE_FAILED = "Text normalization failed ({reason}); no targets were updated"
+MSG_NORMALIZE_STALE = "Text normalization response is stale; no targets were updated"
 MSG_NORMALIZE_APPLIED = (
     "Deterministic normalization applied to {count} element",
     "Deterministic normalization applied to {count} elements",
@@ -251,6 +253,8 @@ SINGLE_MESSAGES: tuple[str, ...] = (
     MSG_TABLE_NO_STRUCTURE,
     MSG_CODE_NO_CODE,
     MSG_NORMALIZE_NO_TEXT,
+    MSG_NORMALIZE_FAILED,
+    MSG_NORMALIZE_STALE,
     MSG_UNICODE_REPAIR_NO_TEXT,
     MSG_REPETITION_NONE,
     MSG_LINE_NUMBERS_NONE,

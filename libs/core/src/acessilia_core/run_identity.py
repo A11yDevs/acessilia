@@ -100,6 +100,7 @@ PROCESSING_PROVIDERS: frozenset[str] = frozenset({
     "toolbox_adjudicate_provider",
     "toolbox_orientation_provider",
     "toolbox_media_inspect_provider",
+    "toolbox_text_normalize_provider",
 })
 
 #: Toolbox providers the processed document does not depend on, with reasons

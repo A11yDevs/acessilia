@@ -58,6 +58,16 @@ def _ast(*rows: tuple[str, str]) -> dict[str, Any]:
 
 
 CASES: dict[str, dict[str, Any]] = {
+    "text-normalization": {
+        "description": "Remote one-pass text normalization: legacy text, metadata and obligations (#929).",
+        "elements": [
+            element("p1", "paragraph", "ﬁrst\u00a0 text a-\nb-\nc. " + PROSE * 3, 60, 220, 1,
+                    keep="first", norm_fixed=False),
+            element("p2", "paragraph", "soft\u00ad hyphen  text. " + PROSE * 2, 240, 420, 2,
+                    keep="second", norm_fixed=False),
+            element("p3", "paragraph", "$$ a  b $$", 440, 500, 3, keep="protected"),
+        ],
+    },
     "text-and-picture": {
         "description": "Prose with one picture and its caption: the picture descriptions (M1).",
         "elements": [

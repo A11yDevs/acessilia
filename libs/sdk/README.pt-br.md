@@ -48,7 +48,8 @@ O `__all__` de cada módulo é a API pública do SDK ([ADR-0018](../../docs/adr/
 | `acessilia_sdk.toolbox.transport` | `execute_capability` — único caminho para `POST /v1/capabilities/{id}:execute`; `require_capability`, `raise_for_error`, `auth_headers`, `media_type_for` |
 | `acessilia_sdk.toolbox.client` | `ToolboxCapabilityClient` — base dos clientes por capacidade (conexões, header Bearer, provider, failover, `health`, `close`); `FailoverHook` |
 | `acessilia_sdk.toolbox.config` | `ToolboxClientConfig`, `make_client` — toda a configuração de um cliente como valores explícitos (endpoints, chave de API, timeouts, retries, providers por `provider_key`, timeouts de exportação por `timeout_key`, hook de failover) e a factory que monta um cliente a partir dela |
-| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOperationClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxPdfValidateClient`, `ToolboxStructureClient`, `ToolboxTableClient` — um cliente por família de capacidades; sem settings e sem logs; `client_timeout_keys` lista os timeouts próprios dos clientes para quem monta um ToolboxClientConfig |
+| `acessilia_sdk.toolbox.clients` | `ToolboxAdjudicateClient`, `ToolboxArtifactClient`, `ToolboxDatasetClient`, `ToolboxDocxClient`, `ToolboxLayoutClient`, `ToolboxMathClient`, `ToolboxMediaInspectClient`, `ToolboxOcrClient`, `ToolboxOperationClient`, `ToolboxOrientationClient`, `ToolboxPageOcrClient`, `ToolboxPdfClient`, `ToolboxPdfUaClient`, `ToolboxPdfValidateClient`, `ToolboxStructureClient`, `ToolboxTableClient`, `ToolboxTextNormalizeClient` — um cliente por família de capacidades; sem settings e sem logs; `client_timeout_keys` lista os timeouts próprios dos clientes para quem monta um ToolboxClientConfig |
+| `acessilia_sdk.toolbox.text_normalization` | `TextTarget`, `TextObservation`, `NormalizationBatch`, `NormalizedBatch`, `NormalizationProvenance`, `normalization_batches`, `read_normalization`, `target_fingerprint`, `canonical_json`, `fingerprint`, `CAPABILITY`, `PROVIDER_VERSION`, `DOCSTRUCT_VERSION`, `MAX_TARGETS`, `MAX_PAYLOAD_BYTES` — DTOs imutáveis, lotes delimitados da requisição original, fingerprints do protocolo e validação estrita de observações/proveniência |
 | `acessilia_sdk.toolbox.clients.adjudicate` | `page_judgement_probability` — o `pB` de uma resposta do `document.adjudicate.page`, ou `None` quando ausente ou fora de [0, 1] |
 | `acessilia_sdk.toolbox.endpoints` | `ToolboxEndpoint`, `parse_endpoints`, `FAILOVER_ERRORS` — as instâncias da Toolbox que um cliente tenta, em ordem |
 | `acessilia_sdk.toolbox.clients.pdf` | `RenderedPage` (o PNG de `ToolboxPdfClient.render`, o recorte aplicado e o resultado `image@2`), `ClipOrigin`, `RENDER_MEDIA_TYPES` (as entradas que o `pdf.render@2` abre: PDF, PNG, JPEG), `check_renderable` (pré-valida um arquivo de entrada contra `RENDER_MEDIA_TYPES`), `plan_downscale` (o maior lado que uma redução renderizaria e o sufixo do arquivo, ou nada quando a imagem não reduziria), `downscale_image` (reduz PNG/JPEG via `pdf.render@2` usando dimensões de cabeçalho da docstruct); `ToolboxPdfClient.text_spans_by_page` lê as páginas `text-spans@1` de qualquer número de páginas, em chamadas de no máximo `TEXT_SPANS_MAX_PAGES` |
@@ -313,3 +314,14 @@ Downloads por identificador também procuram no próximo endpoint compatível ap
 um 404. Essa exceção vale somente para `ToolboxArtifactClient.download`: outros
 erros 4xx e chamadas de capacidade mantêm seu comportamento. Se todos retornarem
 404, o SDK lança `ToolboxArtifactNotFound`; falhas de integridade não são repetidas.
+
+## Normalização de texto
+
+Use `normalization_batches([TextTarget(id="p1", text="ﬁrst  text")])` e
+aguarde `client.normalize(batch)` para cada lote retornado, usando um
+`ToolboxTextNormalizeClient` configurado por `make_client`. Sua chave de provider é
+`toolbox_text_normalize_provider` (padrão `docstruct-text`). Preserve os lotes
+originais entre tentativas; aplique os resultados somente após conferir o contexto
+atual do chamador. Um alvo que ultrapasse o limite de requisição de 1 MiB é
+rejeitado, nunca dividido. Consulte os limites de retomada e compatibilidade no
+[relatório do consumidor](../../docs/architecture/norm-fix-consumer.pt-br.md).

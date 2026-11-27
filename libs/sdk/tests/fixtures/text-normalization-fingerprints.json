@@ -1,0 +1,41 @@
+{
+  "source": "A11yDevs/acessilia-toolbox@b1ac9178c15e394860d4ee1adb9cc694a4602db3",
+  "vectors": [
+    {
+      "id": "null",
+      "text": null,
+      "canonical": "{\"id\":\"null\",\"text\":null}",
+      "input_fingerprint": "sha256:25c2586258a35877937a8ff87f0b98b79ae3c94be531c7fe6762217b12d913cf"
+    },
+    {
+      "id": "empty",
+      "text": "",
+      "canonical": "{\"id\":\"empty\",\"text\":\"\"}",
+      "input_fingerprint": "sha256:3fe1d37176f4e19c4bc08ef1dd4e26fc5f610cf9838fd323d8e31ce653df258d"
+    },
+    {
+      "id": "spaces",
+      "text": " \t ",
+      "canonical": "{\"id\":\"spaces\",\"text\":\" \\t \"}",
+      "input_fingerprint": "sha256:6bf69168c9cbcfaadfda9a07c1b165bd369897edab8e89225cd174e4258bc61a"
+    },
+    {
+      "id": "ligature",
+      "text": "ﬁ",
+      "canonical": "{\"id\":\"ligature\",\"text\":\"ﬁ\"}",
+      "input_fingerprint": "sha256:8564a9fc75eb495bb6a6e3acf7334b9f4ddcc90f323023b06550c012f6da3055"
+    },
+    {
+      "id": "unicode-ç",
+      "text": "ação 😀",
+      "canonical": "{\"id\":\"unicode-ç\",\"text\":\"ação 😀\"}",
+      "input_fingerprint": "sha256:6f5cdc1dd0e9c3a25f364e63c8bca432dd6dd7a500c026e20204cf3ced176cb1"
+    },
+    {
+      "id": "escaped",
+      "text": "\"quote\"\n\\\t",
+      "canonical": "{\"id\":\"escaped\",\"text\":\"\\\"quote\\\"\\n\\\\\\t\"}",
+      "input_fingerprint": "sha256:f7dd04e815f53048f6f78172c7dc2f387bafe7eb0e4f04fc026c4fdcfd3be550"
+    }
+  ]
+}

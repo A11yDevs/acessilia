@@ -17,7 +17,7 @@ benchmarks of #619).
 
 What the cases establish is limited to what they run:
 
-- eight synthetic documents, of one to three pages;
+- nine synthetic documents, of one to three pages;
 - one extraction provider, except `dual-provider` (`FUSION_MODE=dual`),
   which exercises the page adjudication, `select-table-source`, and a page
   routed to the secondary provider with `rescue-omitted`. `fuse-providers`
@@ -99,6 +99,7 @@ change in what is sent shows in the output.
 | Case | What it covers |
 |---|---|
 | `text-and-picture` | a picture described (M1) |
+| `text-normalization` | one-pass normalization, metadata and protected text |
 | `tables` | a table read from its image, and one already structured (M2) |
 | `formulas` | a formula without LaTeX markup, classified and read (M4a, M3); one with LaTeX; a picture the vision model reads as a formula (M1, #846) |
 | `mostly-visual` | a page with no text content, whose placeholder visuals are described |
@@ -326,6 +327,16 @@ The cases added for #876 (core 0.3.23) show:
   `formulas`.
 
 ## A resume from a checkpoint (#874)
+
+`text-normalization` also checks the #929 consumer against historical local
+execution. The fake serves the published one-pass contract using Docstruct only
+inside the test server, with input-bound provenance. An interruption before the
+second normalization obligation resumes from the first committed step, preserving
+its non-fixed-point result (`a-\nb-\nc` becomes `ab-\nc`, not `abc`). Within one
+multi-batch obligation, no observation is applied/checkpointed until all validate;
+an interruption there retries the original immutable batches, with journalled
+operation ids where the host provides the port. This does not claim distributed
+exactly-once execution. Existing obligation granularity is preserved.
 
 A resume compares a run with itself, so the oracle is the same case run
 without interruption, not an older core (the checkpoint format also

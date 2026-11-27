@@ -101,7 +101,7 @@ class FakeToolbox:
     was for, once the answer passed its schema.
 
     ``interrupt=(kind, number)`` makes the ``number``-th request of ``kind``
-    (``vlm`` or ``math.recognize``) raise :class:`Interrupted` instead of
+    (``vlm``, ``math.recognize`` or ``document.text.normalize``) raise :class:`Interrupted` instead of
     being answered, to test a resume from the checkpoints the run saved.
     ``store`` is what the fake keeps between two runs: the artifacts, as a
     real Toolbox keeps them, and the regions it rendered, which the fake needs
@@ -155,6 +155,9 @@ class FakeToolbox:
                     self.refused.append(capability)
                     return _error(503, "provider_unavailable", f"{capability} fails on purpose (the case's failures)")
                 form, files = _form(request)
+                if capability == "document.text.normalize":
+                    self._interrupting(capability)
+                    return self._normalization(form, files)
                 answer = getattr(self, "_" + capability.replace(".", "_"), None)
                 if answer is not None:
                     document = answer(form, files)
@@ -196,6 +199,48 @@ class FakeToolbox:
         if artifact in self.artifacts:
             return self.artifacts[artifact]
         raise _Unanswerable(f"unknown input artifact {form.get('artifact_id')!r}")
+
+    def _normalization(self, form: dict[str, str], files: dict[str, bytes]) -> httpx.Response:
+        """The published one-pass contract; only the fake executes Docstruct locally."""
+        from docstruct.text.norm_fix import norm_fix
+
+        if form.get("version") != "1" or form.get("provider") != "docstruct-text":
+            raise _Unanswerable("unsupported normalization version/provider")
+        raw = self._input(form, files)
+        request = json.loads(raw)
+        targets = request.get("targets")
+        if set(request) != {"targets"} or not isinstance(targets, list) or len(targets) > 256:
+            raise _Unanswerable("invalid normalization targets")
+        if len(raw) > 1_048_576 or len({item["id"] for item in targets}) != len(targets):
+            raise _Unanswerable("oversized/duplicate normalization targets")
+        results = []
+        for item in targets:
+            if set(item) != {"id", "text"} or not isinstance(item["id"], str) or not 1 <= len(item["id"]) <= 256:
+                raise _Unanswerable("invalid normalization target")
+            text = item["text"]
+            if text is not None and not isinstance(text, str):
+                raise _Unanswerable("normalization text is not string/null")
+            material = json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            cleaned = norm_fix(text) if text else text
+            results.append({
+                "id": item["id"], "text": cleaned, "processed": bool(text),
+                "changed": cleaned != text,
+                "input_fingerprint": "sha256:" + hashlib.sha256(material).hexdigest(),
+            })
+        return httpx.Response(200, json={
+            "status": "succeeded", "capability": "document.text.normalize@1", "provider": "docstruct-text",
+            "artifacts": [],
+            "document": {"results": results, "processed_count": sum(r["processed"] for r in results),
+                         "changed_count": sum(r["changed"] for r in results)},
+            "provenance": {
+                "capability": "document.text.normalize", "capability_version": 1,
+                "provider": "docstruct-text", "provider_version": "1.0.0",
+                "input_fingerprints": ["sha256:" + hashlib.sha256(raw).hexdigest()],
+                "parameters_hash": "sha256:" + hashlib.sha256(b"{}").hexdigest(),
+                "model_versions": {"runtime": "differential-1",
+                                   "docstruct": "0.5.8", "norm_fix": "0.5.8"},
+            },
+        })
 
     # Capabilities: each returns the envelope's ``document``.
 

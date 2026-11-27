@@ -2,6 +2,20 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.30 — remote one-pass normalization (#929)
+
+`norm-fix` now uses `document.text.normalize@1` through SDK 0.7.1, after
+Toolbox #174/#177. The Core preserves target selection, metadata and acceptance;
+requests are bounded by target count and serialized UTF-8 bytes. Strict response
+binding and a current-context check precede one atomic obligation update.
+Existing job journals retain original batch identities across retry/restart;
+there is no local algorithm fallback. The availability gate and processing
+identity include the new provider. Historical differential references, real HTTP
+qualification and limits are documented in the
+[consumer report](../../docs/architecture/norm-fix-consumer.md). Cross-obligation
+batching remains a separate planning decision (#948); other local methods remain
+migration debt under #804. Shipped PDDL domain hashes are unchanged.
+
 ## 0.3.29 — the Toolbox catalogue is always the plan's input (#809)
 
 The availability gate no longer has an `observe` mode. Since domain 2.4 the

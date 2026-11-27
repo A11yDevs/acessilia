@@ -1,0 +1,151 @@
+{
+  "legacy_ref": "add11c46db9ab8e28eaeb54b4319c3fcf6509392",
+  "platform": "darwin",
+  "python": "3.12.13",
+  "transport": "real HTTP; controlled local qualification",
+  "synthetic_delay_per_request_ms": 5,
+  "notes": "Qualification-process CPU includes fixtures, parity/oracle checks and HTTP instrumentation; handler latency excludes the oracle; parent RSS is process-lifetime peak; server RSS is sampled after each phase, not peak. Filesystem/Redis are local, not production MinIO/Valkey.",
+  "storage_before": {
+    "files": 4,
+    "bytes": 1192
+  },
+  "scenarios": {
+    "64-targets": [
+      {
+        "mode": "legacy",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 2.27642800018657,
+        "latency_p95_ms": 8.573292001528898,
+        "parent_cpu_ms_total": 139.8229999999998,
+        "parent_process_lifetime_peak_rss_bytes": 65613824,
+        "server_cpu_ms_total": 0.0,
+        "server_rss_after_bytes": 88965120,
+        "requests": 0,
+        "request_body_bytes": 0,
+        "response_body_bytes": 0,
+        "cache_hits": 0
+      },
+      {
+        "mode": "individual",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 5917.067100999702,
+        "latency_p95_ms": 7318.2328549992235,
+        "parent_cpu_ms_total": 9759.734999999999,
+        "parent_process_lifetime_peak_rss_bytes": 76857344,
+        "server_cpu_ms_total": 3200.0,
+        "server_rss_after_bytes": 89288704,
+        "requests": 192,
+        "request_body_bytes": 101124,
+        "response_body_bytes": 274500,
+        "cache_hits": 0
+      },
+      {
+        "mode": "batch",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 84.25697500206297,
+        "latency_p95_ms": 111.02126400146517,
+        "parent_cpu_ms_total": 199.38099999999892,
+        "parent_process_lifetime_peak_rss_bytes": 76857344,
+        "server_cpu_ms_total": 50.0,
+        "server_rss_after_bytes": 89427968,
+        "requests": 3,
+        "request_body_bytes": 9648,
+        "response_body_bytes": 35616,
+        "cache_hits": 0
+      },
+      {
+        "mode": "warm-cache",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 73.00628200027859,
+        "latency_p95_ms": 149.01529499911703,
+        "parent_cpu_ms_total": 190.93600000000066,
+        "parent_process_lifetime_peak_rss_bytes": 76857344,
+        "server_cpu_ms_total": 30.0,
+        "server_rss_after_bytes": 89501696,
+        "requests": 3,
+        "request_body_bytes": 9369,
+        "response_body_bytes": 35613,
+        "cache_hits": 3
+      },
+      {
+        "mode": "batch",
+        "concurrency": 4,
+        "runs": 12,
+        "latency_median_ms": 204.1424310009461,
+        "latency_p95_ms": 340.1822710002307,
+        "parent_cpu_ms_total": 846.6660000000008,
+        "parent_process_lifetime_peak_rss_bytes": 78106624,
+        "server_cpu_ms_total": 260.0,
+        "server_rss_after_bytes": 89960448,
+        "requests": 12,
+        "request_body_bytes": 38592,
+        "response_body_bytes": 142464,
+        "cache_hits": 0
+      }
+    ],
+    "near-limit": [
+      {
+        "mode": "legacy",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 183.85795199719723,
+        "latency_p95_ms": 271.9909119987278,
+        "parent_cpu_ms_total": 710.4370000000007,
+        "parent_process_lifetime_peak_rss_bytes": 89169920,
+        "server_cpu_ms_total": 0.0,
+        "server_rss_after_bytes": 89960448,
+        "requests": 0,
+        "request_body_bytes": 0,
+        "response_body_bytes": 0,
+        "cache_hits": 0
+      },
+      {
+        "mode": "batch",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 390.990261999832,
+        "latency_p95_ms": 490.2044990012655,
+        "parent_cpu_ms_total": 729.4800000000023,
+        "parent_process_lifetime_peak_rss_bytes": 94449664,
+        "server_cpu_ms_total": 580.0,
+        "server_rss_after_bytes": 105897984,
+        "requests": 3,
+        "request_body_bytes": 3144156,
+        "response_body_bytes": 2623116,
+        "cache_hits": 0
+      },
+      {
+        "mode": "warm-cache",
+        "concurrency": 1,
+        "runs": 3,
+        "latency_median_ms": 178.11277999862796,
+        "latency_p95_ms": 192.37425800019992,
+        "parent_cpu_ms_total": 702.2770000000023,
+        "parent_process_lifetime_peak_rss_bytes": 97632256,
+        "server_cpu_ms_total": 100.0,
+        "server_rss_after_bytes": 102981632,
+        "requests": 3,
+        "request_body_bytes": 3143877,
+        "response_body_bytes": 2623113,
+        "cache_hits": 3
+      }
+    ]
+  },
+  "checkpoint_resume": {
+    "atomic": true,
+    "rehydrated": true,
+    "journal_ids_stable": true,
+    "first_batch_original_outcome_joined": true,
+    "remote_execution_cache": false
+  },
+  "storage_after": {
+    "files": 138,
+    "bytes": 967860
+  },
+  "toolbox_source_ref": "b1ac9178c15e394860d4ee1adb9cc694a4602db3",
+  "near_limit_json_payload_bytes": 1047581
+}

@@ -147,13 +147,15 @@ nem retira permissões transitórias antes de uma migração funcionar.
 
 O [provider de texto](https://github.com/A11yDevs/acessilia-toolbox/blob/dac17c24ad709398a49418f1eb71493b22816660/src/acessilia_toolbox/providers/pure_text.py)
 existente de `text.postprocess@1` acrescenta marcadores, deduplica e emite texto
-processado. O [handler `norm-fix` do Core](../../libs/core/src/acessilia_core/pipeline/handlers/text.py)
-preserva alvos/ids e repara ligaduras, hífens suaves, NBSP e espaços, protegendo
-prefixos de tabelas/fórmulas. A capacidade atual não é uma substituição
-equivalente. A [#929](https://github.com/A11yDevs/acessilia/issues/929) define
-primeiro um contrato de lote delimitado, depois um PR de provider/runtime na
-Toolbox e um PR de integração no Core. O nome da capacidade é candidato até
-a revisão do contrato.
+processado. O handler original `norm-fix` do Core preserva alvos/ids e repara
+ligaduras, hífens suaves, NBSP e espaços, protegendo prefixos de tabelas/fórmulas.
+Esse contrato não equivale a `text.postprocess@1`. A
+[#929](https://github.com/A11yDevs/acessilia/issues/929) agora usa o contrato
+publicado `document.text.normalize@1` / `docstruct-text@1.0.0`, após Toolbox
+#174/#177. O [relatório do consumidor](norm-fix-consumer.pt-br.md) registra
+aceite atômico, retomada, evidências diferenciais e limites medidos. A
+granularidade existente das obrigações é preservada; agrupamento entre
+obrigações está registrado na #948.
 
 Cada fatia deve:
 

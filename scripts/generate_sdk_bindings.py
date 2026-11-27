@@ -413,6 +413,15 @@ def models(contract: dict | None = None) -> dict[Path, str]:
     generated[SDK_TOOLBOX / "results" / "execute.py"] = compiler.render(
         "selected Toolbox schemas; scripts/generate_sdk_bindings.py"
     )
+    normalization = result_compiler(nullable_branches=True)
+    for schema_file, class_name in (
+        ("text-normalization-request@1.json", "TextNormalizationRequest"),
+        ("text-normalization-result@1.json", "TextNormalizationResult"),
+    ):
+        normalization.compile(json.loads((SCHEMAS_DIR / schema_file).read_text()), class_name)
+    generated[SDK_TOOLBOX / "results" / "_text_normalization_generated.py"] = normalization.render(
+        "published text-normalization@1 schemas; scripts/generate_sdk_bindings.py"
+    )
     spec = importlib.util.spec_from_file_location(
         "sdk_layout_binding", REPO_ROOT / "scripts" / "sdk_layout_binding.py"
     )

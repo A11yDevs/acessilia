@@ -147,6 +147,26 @@ def test_an_interruption_beside_another_failure_is_not_accepted() -> None:
         _interruption(ValueError("invalid state"))
 
 
+def test_normalization_resume_keeps_a_committed_one_pass_result(tmp_path, job_checkpoints):
+    """A second normalization failure cannot make the first step normalize twice."""
+    spec = build_cases.CASES["text-normalization"]
+    case = _case(tmp_path, "normalization-resume", spec)
+    whole = run_case(case)
+    store = {}
+    _dies(case, checkpoints=job_checkpoints(), interrupt=("document.text.normalize", 2), toolbox_store=store)
+    state = job_checkpoints().load("execution")
+    assert state is not None and "step_progress" not in state
+    elements = {item["id"]: item for item in state["manifest"]["elements"]}
+    assert elements["p1"]["metadata"]["norm_fixed"] is True
+    assert "ab-\nc" in elements["p1"]["text"]
+    assert elements["p2"]["metadata"]["norm_fixed"] is False
+    resumed = run_case(case, checkpoints=job_checkpoints(), toolbox_store=store)
+    assert resumed["canonical"] == whole["canonical"]
+    assert whole["unhandled"] == resumed["unhandled"] == []
+    assert whole["calls"].get("document.text.normalize") == 2
+    assert resumed["calls"].get("document.text.normalize") == 1
+
+
 def _case(tmp_path: Path, name: str, spec: dict[str, Any]) -> Path:
     target = tmp_path / name / "case.json"
     target.parent.mkdir(parents=True)
