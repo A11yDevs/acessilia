@@ -267,28 +267,73 @@ def test_every_declared_value_appears_in_the_record() -> None:
     assert checked > 80
 
 
+#: Every boolean ``Settings`` field, the record path it reaches and the
+#: ``CoreConfig`` field it fills (or ``None`` for a service-level setting).
+BOOLEAN_CASES: dict[str, tuple[str, str, str | None, str]] = {
+    "job_resume_on_restart": (
+        "job_resume_on_restart", "operational", "service", "job_resume_on_restart",
+    ),
+    "queue_multi_job_experimental": (
+        "queue_multi_job_experimental", "operational", "service",
+        "queue_multi_job_experimental",
+    ),
+    "pddl_execute_dry_run": (
+        "pddl_execute_dry_run", "processing", None, "pddl_execute_dry_run",
+    ),
+    "toolbox_use_remote_cache": (
+        "toolbox.use_remote_cache", "operational", "core", "toolbox.use_remote_cache",
+    ),
+    "toolbox_use_artifact_store": (
+        "toolbox.use_artifact_store", "operational", "core", "toolbox.use_artifact_store",
+    ),
+    "toolbox_media_inspect_enabled": (
+        "toolbox.media_inspect_enabled", "processing", "core",
+        "toolbox.media_inspect_enabled",
+    ),
+    "toolbox_pdf_validate_enabled": (
+        "toolbox.pdf_validate_enabled", "operational", "core",
+        "toolbox.pdf_validate_enabled",
+    ),
+    "vision_region_cache_enabled": (
+        "vision.region_cache_enabled", "operational", "core", "vision.region_cache_enabled",
+    ),
+    "object_markers_enabled": (
+        "export.object_markers_enabled", "operational", "core",
+        "export.object_markers_enabled",
+    ),
+    "toolbox_docx_enabled": (
+        "export.toolbox_docx_enabled", "operational", "core", "export.toolbox_docx_enabled",
+    ),
+    "toolbox_pdf_ua_enabled": (
+        "export.toolbox_pdf_ua_enabled", "operational", "core", "export.toolbox_pdf_ua_enabled",
+    ),
+    "fusion_apply_page_routes": (
+        "fusion.apply_page_routes", "processing", "core", "fusion.apply_page_routes",
+    ),
+    "slide_fold_figure_labels": (
+        "document.slide_fold_figure_labels", "processing", "core",
+        "document.slide_fold_figure_labels",
+    ),
+    "table_visual_review": (
+        "vision.table_visual_review", "processing", "core", "vision.table_visual_review",
+    ),
+}
+
+
+def test_every_boolean_setting_is_classified() -> None:
+    booleans = {
+        field.name for field in fields(Settings) if isinstance(getattr(settings, field.name), bool)
+    }
+
+    assert booleans == set(BOOLEAN_CASES)
+
+
 def test_boolean_settings_reach_a_group() -> None:
     """Every boolean has a path in the record; flipping it is visible there."""
-    cases = [
-        ("job_resume_on_restart", "operational", "service", "job_resume_on_restart"),
-        ("queue_multi_job_experimental", "operational", "service", "queue_multi_job_experimental"),
-        ("pddl_execute_dry_run", "processing", None, "pddl_execute_dry_run"),
-        ("toolbox.use_remote_cache", "operational", "core", "toolbox.use_remote_cache"),
-        ("toolbox.use_artifact_store", "operational", "core", "toolbox.use_artifact_store"),
-        ("toolbox.media_inspect_enabled", "processing", "core", "toolbox.media_inspect_enabled"),
-        ("toolbox.pdf_validate_enabled", "operational", "core", "toolbox.pdf_validate_enabled"),
-        ("vision.region_cache_enabled", "operational", "core", "vision.region_cache_enabled"),
-        ("export.object_markers_enabled", "operational", "core", "export.object_markers_enabled"),
-        ("export.toolbox_docx_enabled", "operational", "core", "export.toolbox_docx_enabled"),
-        ("export.toolbox_pdf_ua_enabled", "operational", "core", "export.toolbox_pdf_ua_enabled"),
-        ("fusion.apply_page_routes", "processing", "core", "fusion.apply_page_routes"),
-        ("document.slide_fold_figure_labels", "processing", "core", "document.slide_fold_figure_labels"),
-        ("vision.table_visual_review", "processing", "core", "vision.table_visual_review"),
-    ]
     base = core_config()
-    for name, section, kind, key in cases:
-        if "." in name:
-            group, field = name.split(".", 1)
+    for name, (case, section, kind, key) in BOOLEAN_CASES.items():
+        if "." in case:
+            group, field = case.split(".", 1)
             flipped = not getattr(getattr(base, group), field)
             record = effective_configuration(
                 core_config(**{group: {field: flipped}}), settings=settings
