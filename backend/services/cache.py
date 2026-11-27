@@ -69,19 +69,29 @@ SERVICE_PROCESSING_SETTINGS = (
 )
 
 
-def processing_cache_configuration(config: CoreConfig) -> dict[str, Any]:
+def processing_cache_configuration(config: CoreConfig, *, settings: Any = None) -> dict[str, Any]:
     """What a processed document depends on: the run's ``config`` (#544) and
-    the service's own options, with the manifest rules and the PDDL domain."""
+    the service's own options, with the manifest rules and the PDDL domain.
+
+    ``settings`` is the service's ``Settings``; the global one by default. It is
+    explicit so the effective-configuration record (#380) can read the same
+    values a test replaces.
+    """
     from acessilia_core.pipeline.orchestrator import DEFAULT_MAX_DISCOVERY_REPLANS
     from acessilia_core.run_identity import processing_identity
-    from backend.config.settings import settings
+    from backend.config.settings import settings as default_settings
 
+    service_settings = default_settings if settings is None else settings
     configuration: dict[str, Any] = {"core": processing_identity(config)}
-    configuration.update({name: getattr(settings, name) for name in SERVICE_PROCESSING_SETTINGS})
+    configuration.update({
+        name: getattr(service_settings, name) for name in SERVICE_PROCESSING_SETTINGS
+    })
     # Only a bound other than the default enters the key, so the documents
     # cached before the setting existed keep theirs (#832).
-    if settings.pddl_max_discovery_replans != DEFAULT_MAX_DISCOVERY_REPLANS:
-        configuration["pddl_max_discovery_replans"] = settings.pddl_max_discovery_replans
+    if service_settings.pddl_max_discovery_replans != DEFAULT_MAX_DISCOVERY_REPLANS:
+        configuration["pddl_max_discovery_replans"] = (
+            service_settings.pddl_max_discovery_replans
+        )
     configuration["manifest_invariant_revision"] = MANIFEST_INVARIANT_REVISION
     from acessilia_core.planning.domain_bundle import DomainBundle
 

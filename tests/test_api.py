@@ -301,6 +301,87 @@ def test_cache_clear_declares_bearer_auth_in_openapi(client):
     ]
 
 
+def test_job_configuration_requires_the_bearer_token(client, monkeypatch):
+    monkeypatch.setattr(settings, "operations_api_token", "secret")
+
+    assert client.get("/api/v1/operations/jobs/task/configuration").status_code == 401
+    # A job token authorizes the job's own status, never the privileged record.
+    assert (
+        client.get(
+            "/api/v1/operations/jobs/task/configuration",
+            headers={"X-Job-Token": "job-token"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.get(
+            "/api/v1/operations/jobs/task/configuration",
+            headers={"Authorization": "Bearer wrong"},
+        ).status_code
+        == 401
+    )
+
+
+def test_job_configuration_returns_a_real_record(client, monkeypatch):
+    from backend.services import job_store
+
+    monkeypatch.setattr(settings, "operations_api_token", "secret")
+    job_store.save_request(
+        "config-task",
+        "job-token",
+        {"file": "a.pdf"},
+        {"task_id": "config-task", "status": "done"},
+    )
+    job_store.save_configuration(
+        "config-task",
+        {"schema": "acessilia/effective-configuration@2", "attempt": {"id": "attempt-1"}},
+    )
+    headers = {"Authorization": "Bearer secret"}
+
+    response = client.get(
+        "/api/v1/operations/jobs/config-task/configuration", headers=headers
+    )
+
+    assert response.status_code == 200
+    assert response.json()["attempt"]["id"] == "attempt-1"
+    assert response.headers["cache-control"] == "no-store"
+    assert (
+        client.get(
+            "/api/v1/operations/jobs/missing/configuration", headers=headers
+        ).status_code
+        == 404
+    )
+
+
+def test_public_job_status_does_not_expose_the_effective_configuration(client):
+    from backend.services import job_store
+
+    job_store.save_request(
+        "private-config",
+        "job-token",
+        {"file": "a.pdf"},
+        {"task_id": "private-config", "status": "processing"},
+    )
+    job_store.save_configuration(
+        "private-config",
+        {"schema": "acessilia/effective-configuration@2", "environment": {"service": {"data_dir": "/internal"}}},
+    )
+
+    response = client.get("/api/v1/jobs/private-config")
+
+    assert response.status_code == 200
+    assert "configuracao_efetiva" not in response.json()
+    assert "data_dir" not in response.text
+    record = job_store.load_record("private-config")
+    assert "configuracao_efetiva" not in record["status"]
+
+
+def test_job_configuration_declares_bearer_auth_in_openapi(client):
+    schema = client.get("/openapi.json").json()
+    assert schema["paths"][
+        "/api/v1/operations/jobs/{task_id}/configuration"
+    ]["get"]["security"] == [{"OperationsToken": []}]
+
 def test_observability_token_cannot_authorize_writes(monkeypatch):
     monkeypatch.setattr(settings, "observability_api_token", "secret")
     request = Request({"type": "http", "method": "POST"})

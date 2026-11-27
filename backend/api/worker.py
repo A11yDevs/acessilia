@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import copy
 import functools
 import json
 import shutil
 import time
+import uuid
 import zipfile
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable, Coroutine, cast
 
 from acessilia_core.blocking import run_blocking
-from acessilia_core.config import ToolboxConfig
+from acessilia_core.config import CoreConfig, ToolboxConfig
 from acessilia_core.export.catalog import CATALOG, DOCX, DRBENCH_MD, HTML, PDF_UA, TXT
 from acessilia_core.export.exporters.audio_exporter import export_mp3
 from acessilia_core.export.exporters.docx_exporter import export_docx
@@ -61,7 +64,8 @@ from backend.api.export_plan import (
     ExportStep,
 )
 from backend.config.core_config import core_config_from_settings
-from backend.config.settings import settings
+from backend.config.effective import effective_configuration
+from backend.config.settings import Settings, settings
 from backend.services import job_checkpoint, shutdown
 from backend.services.download_token_service import criar_token
 from backend.services.email_service import (
@@ -71,7 +75,12 @@ from backend.services.email_service import (
 )
 from backend.services.filenames import output_stem
 from backend.services.history_service import finalizar_conversao, registrar_conversao
-from backend.services.job_store import load_record, pending_records, save_status
+from backend.services.job_store import (
+    load_record,
+    pending_records,
+    save_configuration,
+    save_status,
+)
 
 queued_jobs: dict[str, dict[str, Any]] = {}
 
@@ -184,7 +193,9 @@ def get_job_status(task_id: str, *, durable: bool = True) -> dict[str, Any] | No
         if not durable:
             return None
         record = load_record(task_id)
-        return _cancellation_progress(record["status"]) if record else None
+        if record is None:
+            return None
+        return _cancellation_progress(record["status"])
     status = dict(queued)
     if status.get("status") == "queued":
         from backend.services.queue_service import unified_queue
@@ -382,13 +393,80 @@ class JobExecutor:
         state_manager.restaurar(task_id, record["status"])
         return True
 
-    async def run(self, job: ApiJob) -> None:
-        task_id = job.task_id
-        started_at = time.time()
-        out_dir: Path | None = None
-        result_published = False
-        resumed = state_manager.obter(task_id) is not None
-        preserve_for_resume = False
+    async def _record_effective_configuration(
+        self,
+        task_id: str,
+        job: ApiJob,
+        job_config: CoreConfig,
+        run_settings: Settings,
+        *,
+        resumed: bool,
+    ) -> None:
+        """Store the latest attempt's configuration (#380, Etapa 0).
+
+        Written once at the job's start and kept with its durable record, so a
+        result can be audited after the cache entry is gone. The record is not
+        a history: a resumed attempt replaces the previous one, and a failed
+        write leaves the previous record with its own attempt identity. Both
+        the build and the write are best effort: an audit failure must not
+        fail a job whose pipeline has not started, and cancellation is not
+        caught (``CancelledError`` is a ``BaseException``).
+        """
+        attempt = {
+            "id": uuid.uuid4().hex,
+            "captured_at": datetime.now(UTC).isoformat(),
+            "resumed": resumed,
+        }
+        run = {
+            "mode": job.mode,
+            "custom_prompt": job.custom_prompt,
+            "thinking_mode": job.thinking_mode,
+            "object_markers_requested": job.object_markers,
+        }
+        try:
+            configuration = await run_blocking(
+                effective_configuration,
+                job_config,
+                run=run,
+                attempt=attempt,
+                settings=run_settings,
+            )
+        except Exception as exc:  # noqa: BLE001 - the audit record is best-effort
+            logger.warning(
+                "Job {}: effective configuration not built: {}",
+                task_id,
+                type(exc).__name__,
+            )
+            return
+        try:
+            await run_blocking(save_configuration, task_id, configuration)
+        except Exception as exc:  # noqa: BLE001 - the audit record is best-effort
+            logger.warning(
+                "Job {}: effective configuration not persisted: {}",
+                task_id,
+                type(exc).__name__,
+            )
+
+    async def _prepare_run(
+        self, task_id: str, job: ApiJob, *, resumed: bool
+    ) -> tuple[Settings, CoreConfig, int]:
+        """Take one settings snapshot for the job and record it (#380).
+
+        The snapshot feeds the core's ``CoreConfig``, the cache variant, the
+        audit's e-mail limit and the effective record, so they all describe
+        the same start. The pipeline engine and its orchestrator remain
+        process-level values fixed at import.
+        """
+        run_settings = copy.copy(settings)
+        job_config = core_config_from_settings(run_settings)
+        audit_max_rules = run_settings.pdf_ua_audit_max_rules
+        await self._record_effective_configuration(
+            task_id, job, job_config, run_settings, resumed=resumed
+        )
+        return run_settings, job_config, audit_max_rules
+
+    def _status_callback(self, task_id: str) -> Callable[[str], Coroutine[Any, Any, None]]:
+        """The progress callback a run uses, persisting every stage (#407)."""
 
         async def status_callback(msg: str) -> None:
             state_manager.atualizar(task_id, etapa=msg)
@@ -402,6 +480,17 @@ class JobExecutor:
                 await run_blocking(save_status, task_id, status)
             except Exception as exc:  # noqa: BLE001 - progress must not fail the job
                 logger.warning("Job {}: stage not persisted: {}", task_id, exc)
+
+        return status_callback
+
+    async def run(self, job: ApiJob) -> None:
+        task_id = job.task_id
+        started_at = time.time()
+        out_dir: Path | None = None
+        result_published = False
+        resumed = state_manager.obter(task_id) is not None
+        preserve_for_resume = False
+        status_callback = self._status_callback(task_id)
 
         try:
             queued_jobs.pop(task_id, None)
@@ -430,12 +519,11 @@ class JobExecutor:
 
             from backend.service import process
 
-            # One CoreConfig for the whole job, built at its start (ADR-0016,
-            # step 3): the pipeline, the exports and the audit read the same
-            # values, even if the settings change while the job runs. The
-            # audit's e-mail summary limit is the service's, taken now too.
-            job_config = core_config_from_settings()
-            audit_max_rules = settings.pdf_ua_audit_max_rules
+            # One snapshot for the whole job (ADR-0016, step 3); it also
+            # feeds the effective record (#380).
+            run_settings, job_config, audit_max_rules = await self._prepare_run(
+                task_id, job, resumed=resumed
+            )
             canonical = await process(
                 job.file_path,
                 status_callback=status_callback,
@@ -446,6 +534,7 @@ class JobExecutor:
                 display_filename=job.filename,
                 resumed=resumed,
                 config=job_config,
+                settings_snapshot=run_settings,
             )
             state_manager.verificar_cancelamento(task_id)
 
@@ -610,7 +699,7 @@ class JobExecutor:
             await finalizar_conversao(
                 task_id=task_id,
                 status="done",
-                pipeline=f"{settings.ai_client}-{settings.pipeline_engine}",
+                pipeline=f"{run_settings.ai_client}-{run_settings.pipeline_engine}",
                 resultado_resumo=str(canonical.get("title", ""))[:200],
                 tempo_segundos=time.time() - started_at,
             )
