@@ -63,31 +63,33 @@ while the other is already running is now refused, instead of using two separate
 lock files. The runtime takes an exclusive OS lock on `frontend/bot.lock.v2`
 (`fcntl.flock` on POSIX, `msvcrt.locking` on Windows) and holds it through an
 open handle for the process lifetime, so two concurrent acquisitions cannot both
-succeed; the PID in the file is diagnostic. It also writes its PID to the
-pre-#903 path, `frontend/bot.lock`, so an old runtime still refuses to start
-while the new one runs. The runtime recognizes the legacy
-`frontend/cli/bot.lock` and the pre-#903 `frontend/bot.lock`: if one names a live
-process, startup is refused; if its owner cannot be inspected, such as a process
-owned by another user, the lock is kept and startup is refused; if it is stale
-or malformed, it is removed.
+succeed; the PID in the file is diagnostic. It also writes its PID to both older
+paths, `frontend/bot.lock` (the pre-#903 frontend) and `frontend/cli/bot.lock`
+(the pre-#741 console), so those runtimes still refuse to start while the new
+one runs. The runtime recognizes both older paths: if one names a live process,
+startup is refused; if its owner cannot be inspected, such as a process owned by
+another user, the lock is kept and startup is refused; if it is stale or
+malformed, it is removed.
 
 The `0600` mode is best-effort: it is applied on creation and tightened on POSIX
 when possible, and it does not protect the file from removal by someone with
 write permission on the directory. The OS lock, not the mode, is the mutual
 exclusion mechanism.
 
-A pre-#903 runtime takes no OS lock and still unlinks `frontend/bot.lock` on
-exit. That path is now only the compatibility advertisement, so the unlink
-cannot release the authoritative `frontend/bot.lock.v2`. An old process that
-starts before the new runtime writes its compatibility PID can still overlap for
-that startup; once the new runtime is up, an old start sees a live PID and
-refuses.
+A pre-#903 frontend still unlinks `frontend/bot.lock`, and a pre-#741 console
+unlinks `frontend/cli/bot.lock`, on exit. Those paths are now only compatibility
+advertisements, so an unlink cannot release the authoritative
+`frontend/bot.lock.v2`. An old instance that starts before the new runtime writes
+its compatibility PIDs can still overlap; if such an instance later exits, it
+removes its advertisement, so later old starts can overlap until the new runtime
+stops. Stop old instances before upgrading.
 
 The startup and lock behaviour is pinned by `tests/test_frontend_startup.py`:
 every enabled interface, the missing-token and empty-interface exits, the lock
 lifecycle (live, stale and malformed files, and two concurrent acquisitions),
-the conservative handling of an uninspectable owner, and the POSIX/Windows PID
-probes.
+the compatibility advertisement and clear, the old-path unlink isolation, the
+unwritable compatibility path, the conservative handling of an uninspectable
+owner, and the POSIX/Windows PID probes.
 `tests/test_process_setup.py` keeps checking that the runtime sets up the process
 before it takes the lock.
 

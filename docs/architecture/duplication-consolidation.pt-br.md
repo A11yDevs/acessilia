@@ -65,30 +65,35 @@ lock exclusivo do sistema operacional sobre `frontend/bot.lock.v2`
 (`fcntl.flock` no POSIX, `msvcrt.locking` no Windows) e o mantém por um handle
 aberto durante toda a vida do processo, então duas aquisições concorrentes não
 podem ambas ter sucesso; o PID no arquivo é diagnóstico. Ele também grava seu
-PID no caminho anterior ao #903, `frontend/bot.lock`, para que um runtime antigo
-continue recusando iniciar enquanto o novo roda. O runtime reconhece o lock
-legado `frontend/cli/bot.lock` e o `frontend/bot.lock` anterior ao #903: se um
-deles apontar para um processo vivo, o startup é recusado; se o dono não puder
-ser inspecionado, como um processo de outro usuário, o lock é mantido e o
-startup é recusado; se estiver obsoleto ou malformado, é removido.
+PID nos dois caminhos antigos, `frontend/bot.lock` (frontend anterior ao #903)
+e `frontend/cli/bot.lock` (console anterior ao #741), para que esses runtimes
+continuem recusando iniciar enquanto o novo roda. O runtime reconhece os dois
+caminhos antigos: se um deles apontar para um processo vivo, o startup é
+recusado; se o dono não puder ser inspecionado, como um processo de outro
+usuário, o lock é mantido e o startup é recusado; se estiver obsoleto ou
+malformado, é removido.
 
 O modo `0600` é best-effort: é aplicado na criação e restringido no POSIX quando
 possível, e não protege o arquivo contra remoção por quem tem permissão de
 escrita no diretório. O lock do SO, não o modo, é o mecanismo de exclusão mútua.
 
-Um runtime anterior ao #903 não toma lock do SO e ainda remove
-`frontend/bot.lock` ao sair. Esse caminho agora é apenas o anúncio de
-compatibilidade, então a remoção não libera o `frontend/bot.lock.v2`
-autoritativo. Um processo antigo que inicia antes de o novo runtime gravar seu
-PID de compatibilidade ainda pode sobrepor naquele startup; depois que o novo
-runtime está no ar, um início antigo vê um PID vivo e recusa.
+Um frontend anterior ao #903 ainda remove `frontend/bot.lock`, e um console
+anterior ao #741 remove `frontend/cli/bot.lock`, ao sair. Esses caminhos agora
+são apenas anúncios de compatibilidade, então a remoção não libera o
+`frontend/bot.lock.v2` autoritativo. Uma instância antiga que inicia antes de o
+novo runtime gravar seus PIDs de compatibilidade ainda pode sobrepor; se essa
+instância sair depois, ela remove seu anúncio, então inícios antigos posteriores
+podem sobrepor até o novo runtime parar. Pare as instâncias antigas antes do
+upgrade.
 
 O comportamento de startup e lock é fixado por `tests/test_frontend_startup.py`:
 cada interface habilitada, as saídas por token ausente e por nenhuma interface, o
 ciclo do lock (arquivo vivo, obsoleto e malformado, e duas aquisições
-concorrentes), o tratamento conservador de um dono não inspecionável e as
-sondagens de PID em POSIX/Windows. `tests/test_process_setup.py` continua
-conferindo que o runtime configura o processo antes de obter o lock.
+concorrentes), o anúncio e a limpeza da compatibilidade, o isolamento do unlink
+do caminho antigo, o caminho de compatibilidade não gravável, o tratamento
+conservador de um dono não inspecionável e as sondagens de PID em
+POSIX/Windows. `tests/test_process_setup.py` continua conferindo que o runtime
+configura o processo antes de obter o lock.
 
 **Delta medido no commit de código do #656:** 23 grupos / 55 funções / 672
 linhas → **20 grupos / 49 funções / 499 linhas**. Os grupos `_is_process_running`,

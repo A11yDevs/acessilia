@@ -14,6 +14,32 @@ on:
       - 'frontend/run.py'
       - 'frontend/cli/run.py'
       - 'frontend/.gitignore'
+      - 'backend/config/process_setup.py'
+      - 'backend/config/settings.py'
+      - 'tests/conftest.py'
+      - 'tests/test_frontend_startup.py'
+      - 'tests/test_process_setup.py'
+      - 'tests/test_i18n.py'
+      - 'tests/test_no_portuguese.py'
+      - 'libs/core/src/acessilia_core/i18n/**'
+      - 'libs/core/pyproject.toml'
+      - 'scripts/gen_locale_catalogs.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/actions/setup-root/action.yml'
+      - '.github/workflows/frontend-lock-windows.yml'
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    paths:
+      - 'frontend/run.py'
+      - 'frontend/cli/run.py'
+      - 'frontend/.gitignore'
+      - 'backend/config/process_setup.py'
+      - 'backend/config/settings.py'
+      - 'tests/conftest.py'
       - 'tests/test_frontend_startup.py'
       - 'tests/test_process_setup.py'
       - 'tests/test_i18n.py'
@@ -31,7 +57,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

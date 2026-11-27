@@ -1898,7 +1898,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         LOG_LOCK_ALREADY_HELD: "Outra instância mantém o lock de processo ({path})",
         LOG_LOCK_COMPAT_UNWRITABLE: (
             "Não foi possível escrever o lock de processo legado {path}: {error}. "
-            "Uma instância anterior ao #903 pode não detectar esta"
+            "Uma instância mais antiga pode não detectar esta"
         ),
         LOG_LOCK_UNUSABLE: (
             "Não foi possível usar o lock de processo {path}: {error}. Recusando "

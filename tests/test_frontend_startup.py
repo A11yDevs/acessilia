@@ -589,12 +589,12 @@ def test_a_huge_legacy_lock_pid_is_not_removed(
 
 
 @pytest.mark.parametrize("pid_text", ["0", "-1"])
-def test_a_non_positive_legacy_pid_is_removed(lock_files, pid_text) -> None:
+def test_a_non_positive_legacy_pid_is_replaced(lock_files, pid_text) -> None:
     lock_files.legacy.write_text(pid_text, encoding="utf-8")
 
     runtime.acquire_lock()
 
-    assert not lock_files.legacy.exists()
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(os.getpid())
     assert _held_lock_text() == str(os.getpid())
 
 
@@ -619,13 +619,13 @@ def test_a_live_legacy_lock_is_refused(lock_files, monkeypatch) -> None:
     assert not lock_files.current.exists()
 
 
-def test_a_stale_legacy_lock_is_removed(lock_files, monkeypatch) -> None:
+def test_a_stale_legacy_lock_is_replaced(lock_files, monkeypatch) -> None:
     lock_files.legacy.write_text("1234", encoding="utf-8")
     monkeypatch.setattr(runtime, "_is_process_running", lambda pid: False)
 
     runtime.acquire_lock()
 
-    assert not lock_files.legacy.exists()
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(os.getpid())
     assert _held_lock_text() == str(os.getpid())
     assert any(
         "Legacy lock file stale" in message
@@ -633,12 +633,12 @@ def test_a_stale_legacy_lock_is_removed(lock_files, monkeypatch) -> None:
     )
 
 
-def test_a_malformed_legacy_lock_is_removed(lock_files) -> None:
+def test_a_malformed_legacy_lock_is_replaced(lock_files) -> None:
     lock_files.legacy.write_text("not a pid", encoding="utf-8")
 
     runtime.acquire_lock()
 
-    assert not lock_files.legacy.exists()
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(os.getpid())
     assert _held_lock_text() == str(os.getpid())
 
 
@@ -664,6 +664,30 @@ def test_a_compat_file_naming_this_process_is_kept(lock_files) -> None:
     )
 
     assert lock_files.compat.read_text(encoding="utf-8") == str(os.getpid())
+
+
+def test_the_legacy_cli_file_advertises_the_owner(lock_files) -> None:
+    runtime.acquire_lock()
+
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(os.getpid())
+
+
+def test_a_release_clears_the_legacy_cli_pid(lock_files) -> None:
+    runtime.acquire_lock()
+    runtime.release_lock()
+
+    assert lock_files.legacy.exists()
+    assert lock_files.legacy.read_text(encoding="utf-8") == ""
+
+
+def test_a_legacy_file_naming_this_process_is_kept(lock_files) -> None:
+    lock_files.legacy.write_text(str(os.getpid()), encoding="utf-8")
+
+    runtime._check_legacy_lock(
+        str(lock_files.legacy), keep_own_pid=True
+    )
+
+    assert lock_files.legacy.read_text(encoding="utf-8") == str(os.getpid())
 
 
 def test_a_live_compat_lock_is_refused(lock_files, monkeypatch) -> None:
@@ -705,6 +729,60 @@ def test_a_compat_file_that_cannot_be_written_is_reported(lock_files) -> None:
         for level, message in runtime.logger.calls
         if level == "warning"
     )
+
+
+def test_an_unwritable_compat_path_does_not_undo_the_lock(
+    lock_files, monkeypatch
+) -> None:
+    real_open = runtime.os.open
+
+    def denied(path, flags, mode=0o777):
+        if str(path) in {str(lock_files.compat), str(lock_files.legacy)}:
+            raise PermissionError("denied")
+        return real_open(path, flags, mode)
+
+    monkeypatch.setattr(runtime.os, "open", denied)
+
+    runtime.acquire_lock()
+
+    assert _held_lock_text() == str(os.getpid())
+    assert any(
+        "Could not write the legacy process lock" in message
+        for level, message in runtime.logger.calls
+        if level == "warning"
+    )
+
+
+def test_a_release_keeps_a_foreign_compat_pid(lock_files) -> None:
+    runtime.acquire_lock()
+    lock_files.compat.write_text("1234", encoding="utf-8")
+    lock_files.legacy.write_text("5678", encoding="utf-8")
+
+    runtime.release_lock()
+
+    assert lock_files.compat.read_text(encoding="utf-8") == "1234"
+    assert lock_files.legacy.read_text(encoding="utf-8") == "5678"
+
+
+def test_a_corrupt_compat_file_does_not_break_release(lock_files) -> None:
+    runtime.acquire_lock()
+    lock_files.compat.write_bytes(b"\xff\xfe123")
+
+    runtime.release_lock()
+
+    assert runtime._LOCK_STATE.handle is None
+    runtime.acquire_lock()
+    assert _held_lock_text() == str(os.getpid())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes")
+def test_the_compat_file_is_owner_only(lock_files) -> None:
+    lock_files.compat.write_text(str(os.getpid()), encoding="utf-8")
+    lock_files.compat.chmod(0o644)
+
+    runtime.acquire_lock()
+
+    assert (lock_files.compat.stat().st_mode & 0o777) == 0o600
 
 
 def test_a_legacy_lock_that_cannot_be_read_is_reported(lock_files) -> None:
@@ -903,7 +981,12 @@ runtime.logger = SilentLogger()
 # The OS lock must be the gate, not the holder's live PID: with this stub a
 # broken flock would let the contender acquire and the test would fail.
 runtime._is_process_running = lambda pid: False
-runtime.acquire_lock()
+try:
+    runtime.acquire_lock()
+except SystemExit:
+    # A crash also exits 1; the marker lets the test tell refusal from a bug.
+    print("REFUSED", flush=True)
+    raise
 runtime.release_lock()
 """
 
@@ -965,6 +1048,7 @@ def test_two_concurrent_acquisitions_cannot_both_succeed(tmp_path) -> None:
         )
 
         assert contender.returncode == 1, contender.stderr
+        assert "REFUSED" in contender.stdout, contender.stderr
     finally:
         go_file.touch(exist_ok=True)
         try:
@@ -1058,8 +1142,12 @@ def test_an_old_runtime_unlink_does_not_release_the_new_lock(tmp_path) -> None:
             [
                 sys.executable,
                 "-c",
-                "import sys; from pathlib import Path; Path(sys.argv[1]).unlink()",
+                (
+                    "import sys; from pathlib import Path; "
+                    "[Path(p).unlink(missing_ok=True) for p in sys.argv[1:]]"
+                ),
                 str(compat_file),
+                str(legacy_file),
             ],
             cwd=_ROOT,
             capture_output=True,
@@ -1084,6 +1172,7 @@ def test_an_old_runtime_unlink_does_not_release_the_new_lock(tmp_path) -> None:
         )
 
         assert contender.returncode == 1, contender.stderr
+        assert "REFUSED" in contender.stdout, contender.stderr
     finally:
         go_file.touch(exist_ok=True)
         try:

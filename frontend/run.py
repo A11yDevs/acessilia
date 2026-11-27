@@ -220,16 +220,26 @@ def _write_lock_pid(handle: BinaryIO) -> None:
 
 
 def _write_compat_pid(path: str) -> None:
-    """Advertise this owner on the pre-#903 path, so an old runtime refuses.
+    """Advertise this owner on an older runtime's path, so it refuses to start.
 
     The authoritative lock is ``LOCK_FILE``; this file exists only for an
-    in-place upgrade. A failure is logged but does not undo the new lock.
+    in-place upgrade from the pre-#903 frontend or the pre-#741 console. A
+    failure is logged but does not undo the new lock.
     """
     try:
         descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o600)
     except OSError as error:
         logger.warning(t(LOG_LOCK_COMPAT_UNWRITABLE).format(path=path, error=error))
         return
+    fchmod = getattr(os, "fchmod", None)
+    if sys.platform != "win32" and fchmod is not None:
+        try:
+            # The mode applies only at creation: tighten a file left by an
+            # older runtime as well.
+            fchmod(descriptor, 0o600)
+        except OSError:
+            # The PID is not secret; the OS lock is what protects the file.
+            pass
     try:
         os.write(descriptor, str(os.getpid()).encode("ascii"))
     except OSError as error:
@@ -243,17 +253,18 @@ def _write_compat_pid(path: str) -> None:
 
 
 def _clear_compat_pid(path: str) -> None:
-    """Clear the compatibility PID only while it is still this process's."""
+    """Clear a compatibility PID only while it is still this process's.
+
+    The old path is advisory, so a missing, unreadable or corrupt file is
+    ignored; the authoritative OS lock is unchanged.
+    """
     try:
         with open(path, "r+", encoding="utf-8") as file:
             if file.read().strip() != str(os.getpid()):
                 return
             file.seek(0)
             file.truncate()
-    except FileNotFoundError:
-        return
-    except OSError:
-        # The old path is advisory; the authoritative OS lock is unchanged.
+    except (ValueError, OSError):
         return
 
 
@@ -293,9 +304,10 @@ def _check_previous_owner(handle: BinaryIO, path: str) -> None:
 def _check_legacy_lock(path: str, *, keep_own_pid: bool = False) -> None:
     """Refuse a live legacy lock, and remove a stale or malformed one.
 
-    ``keep_own_pid`` keeps the pre-#903 compatibility advertisement when it
-    already names this process: a re-entrant acquisition must not delete the
-    file the running owner advertises.
+    ``keep_own_pid`` keeps an advertisement that already names this process.
+    The value matters on PID reuse and when a rewrite may fail: the existing
+    PID is already the correct one, so it should not be removed only to be
+    recreated. The authoritative v2 lock remains the gate.
     """
     if not os.path.exists(path):
         return
@@ -349,13 +361,13 @@ def acquire_lock() -> None:
     recognizing a lock left by an older runtime; the OS lock, not the file's
     existence or content, decides whether two starts may run (#742).
 
-    ``COMPAT_LOCK_FILE`` is the pre-#903 path, which that runtime unlinks on
-    release. The new runtime only writes its PID there for an old runtime to
-    see; the authoritative lock lives in the path the old runtime never
-    touches (#906).
+    ``COMPAT_LOCK_FILE`` and ``LEGACY_LOCK_FILE`` are the pre-#903 and
+    pre-#741 paths, which those runtimes unlink on release. The new runtime
+    writes its PID to both for an old runtime to see; the authoritative lock
+    lives in the path the old runtimes never touch (#906).
     """
     _check_legacy_lock(COMPAT_LOCK_FILE, keep_own_pid=True)
-    _check_legacy_lock(LEGACY_LOCK_FILE)
+    _check_legacy_lock(LEGACY_LOCK_FILE, keep_own_pid=True)
     handle = _open_lock_file(LOCK_FILE)
     try:
         acquired = _acquire_os_lock(handle)
@@ -394,6 +406,7 @@ def acquire_lock() -> None:
         _abandon_lock(handle)
         sys.exit(1)
     _write_compat_pid(COMPAT_LOCK_FILE)
+    _write_compat_pid(LEGACY_LOCK_FILE)
     _LOCK_STATE.handle = handle
     logger.info(t(LOG_LOCK_ACQUIRED).format(pid=os.getpid()))
 
@@ -419,6 +432,7 @@ def release_lock() -> None:
         # is treated as stale by the next start.
         pass
     _clear_compat_pid(COMPAT_LOCK_FILE)
+    _clear_compat_pid(LEGACY_LOCK_FILE)
     _release_os_lock(handle)
     try:
         handle.close()
