@@ -107,3 +107,92 @@ def test_id_binding_does_not_hide_a_missing_expected_value():
     with pytest.raises(ValueError, match="expected value"):
         explain({"blocks": [{"id": "a", "text": "old"}]}, {"blocks": [{"id": "a", "text": "new"}]},
                 [{"kind": "changed", "path": "/blocks/0/text", "id": "another", "reason": "r"}])
+
+
+@pytest.mark.parametrize("side", ["reference", "current"])
+@pytest.mark.parametrize("invalid", ["duplicate", "missing", "empty", "integer", "unhashable"])
+def test_a_bound_change_requires_valid_identity_on_both_sides(side, invalid):
+    reference = {"blocks": [{"id": "a", "text": "old"}, {"id": "b", "text": "other"}]}
+    current = deepcopy(reference)
+    current["blocks"][0]["text"] = "new"
+    block = (reference if side == "reference" else current)["blocks"][1]
+    if invalid == "missing":
+        block.pop("id")
+    else:
+        block["id"] = {"duplicate": "a", "empty": "", "integer": 1, "unhashable": ["b"]}[invalid]
+    declared = [{"kind": "changed", "path": "/blocks/0/text", "id": "a", "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == (differences(reference, current), declared)
+
+
+@pytest.mark.parametrize("binding", ["a", "outer"])
+def test_an_outer_identity_does_not_hide_a_one_sided_inner_list(binding):
+    reference = {"groups": [{"id": "outer", "blocks": [{"id": "a", "text": "old"}, {"id": "a"}]}]}
+    current = {"groups": [{"id": "outer", "blocks": [{"id": "a", "text": "new"}, {"id": "b"}]}]}
+    declared = [{"kind": "changed", "path": "/groups/0/blocks/0/text", "id": binding, "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == (differences(reference, current), declared)
+
+
+@pytest.mark.parametrize("other_id", ["other", "group"])
+def test_equal_inner_ids_do_not_override_ambiguous_parent_contexts(other_id):
+    reference = {"groups": [{"id": "group", "blocks": [{"id": "a", "text": "old"}]}, {"id": "group"}]}
+    current = {"groups": [{"id": "group", "blocks": [{"id": "a", "text": "new"}]}, {"id": other_id}]}
+    declared = [{"kind": "changed", "path": "/groups/0/blocks/0/text", "id": "a", "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == (differences(reference, current), declared)
+
+
+def test_a_changed_member_of_a_root_identified_list_is_bound():
+    reference, current = [{"id": "a", "text": "old"}], [{"id": "a", "text": "new"}]
+    declared = [{"kind": "changed", "path": "/0/text", "id": "a", "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == ([], [])
+
+
+def test_moved_ancestors_keep_their_corresponding_inner_list_context():
+    reference = {"groups": [{"id": "group", "blocks": [{"id": "a", "text": "old"}]}]}
+    current = {"groups": [{"id": "new-group"}, {"id": "group", "blocks": [{"id": "a", "text": "new"}]}]}
+    declared = [{"kind": "changed", "path": "/groups/1/blocks/0/text", "id": "a", "expected": "new", "reason": "r"}]
+    found, unused = explain(reference, current, declared)
+    assert found == [{"kind": "added", "path": "/groups/0"}]
+    assert unused == []
+    assert differences(reference, current)[-1]["reference_path"] == "/groups/0/blocks/0/text"
+
+
+def test_reused_ids_in_different_lists_need_a_specific_path():
+    reference = {"groups": [{"id": name, "blocks": [{"id": "a", "text": "old"}]} for name in ("left", "right")]}
+    current = deepcopy(reference)
+    for group in current["groups"]:
+        group["blocks"][0]["text"] = "new"
+    broad = {"kind": "changed", "path": "/groups/*/blocks/*/text", "id": "a", "expected": "new", "reason": "r"}
+    assert explain(reference, current, [broad]) == ([], [])
+    specific = {**broad, "path": "/groups/0/blocks/*/text"}
+    assert explain(reference, current, [specific]) == ([{"kind": "changed", "path": "/groups/1/blocks/0/text"}], [])
+
+
+def test_a_path_wildcard_crosses_slashes_even_with_a_local_id_binding():
+    reference = {"blocks": [{"id": "a", "text": "old", "children": [{"id": "a", "text": "old"}]}]}
+    current = deepcopy(reference)
+    current["blocks"][0]["text"] = current["blocks"][0]["children"][0]["text"] = "new"
+    broad = {"kind": "changed", "path": "/blocks/*/text", "id": "a", "expected": "new", "reason": "r"}
+    assert explain(reference, current, [broad]) == ([], [])
+    specific = {**broad, "path": "/blocks/0/text"}
+    assert explain(reference, current, [specific]) == ([{"kind": "changed", "path": "/blocks/0/children/0/text"}], [])
+
+
+@pytest.mark.parametrize("used_somewhere", [True, False])
+def test_global_bindings_remain_unused_when_absent_and_must_be_used_in_some_case(monkeypatch, used_somewhere):
+    from tests import test_differential_canonical as corpus
+
+    common = [{"kind": "changed", "path": "/blocks/*/text", "id": "a", "expected": "new", "reason": "r"}]
+    reference = {"with-id": {"blocks": [{"id": "a", "text": "old"}]}, "without-id": {"blocks": [{"id": "b", "text": "same"}]}}
+    runs = {case: {"canonical": deepcopy(document)} for case, document in reference.items()}
+    if used_somewhere:
+        runs["with-id"]["canonical"]["blocks"][0]["text"] = "new"
+    monkeypatch.setattr(corpus, "CASE_NAMES", list(reference))
+    monkeypatch.setattr(corpus, "_declared", lambda _label: {"*": common})
+    monkeypatch.setattr(corpus, "_reference", lambda _label, case: {"canonical": reference[case]})
+    assert explain(reference["without-id"], runs["without-id"]["canonical"], common) == ([], common)
+    corpus.test_the_canonical_output_matches_the_core_before_each_migration(runs, "without-id", "synthetic")
+    if used_somewhere:
+        corpus.test_a_difference_declared_for_every_case_still_happens(runs, "synthetic")
+    else:
+        with pytest.raises(AssertionError, match="no case has"):
+            corpus.test_a_difference_declared_for_every_case_still_happens(runs, "synthetic")

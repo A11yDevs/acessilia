@@ -108,7 +108,8 @@ def explain(
 
     An optional non-empty string ``id`` additionally binds the declaration
     to the nearest enclosing member of a list with distinct string ids.
-    Removed differences use the reference; all others use the current tree.
+    Added/removed differences use the side containing them. Changed fields
+    require the same identified member and list context on both sides.
     """
     for entry in declared:
         if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
@@ -131,7 +132,41 @@ def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, curre
         if "expected" not in entry:
             raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
         value_matches = resolve(document, pointer) == entry["expected"]
-    return value_matches and ("id" not in entry or _enclosing_id(document, pointer) == entry["id"])
+    if not value_matches or "id" not in entry:
+        return value_matches
+    if item["kind"] == "changed":
+        return _changed_id(reference, current, pointer, item.get("reference_path", pointer)) == entry["id"]
+    return _enclosing_id(document, pointer) == entry["id"]
+
+
+def _changed_id(reference: Any, current: Any, pointer: str, reference_pointer: str) -> str | None:
+    """Trace the same list context through both paths, including moved ancestors.
+
+    Plain arrays can stay positional, but a list advertising ids must be
+    identified on both sides. Never fall back to an outer id through an
+    ambiguous list, or pair equal inner ids under different parent members.
+    """
+    parts, old_parts = pointer.split("/")[1:], reference_pointer.split("/")[1:]
+    if len(parts) != len(old_parts):
+        return None
+    owner = None
+    for part, old_part in zip(parts, old_parts):
+        child, old_child = resolve(current, f"/{part}"), resolve(reference, f"/{old_part}")
+        if isinstance(current, list) and isinstance(reference, list):
+            if _identified(current) and _identified(reference):
+                if child["id"] != old_child["id"]:
+                    return None
+                owner = child["id"]
+            elif part != old_part or _has_ids(current) or _has_ids(reference):
+                return None
+        elif part != old_part or isinstance(current, list) or isinstance(reference, list):
+            return None
+        current, reference = child, old_child
+    return owner
+
+
+def _has_ids(items: list[Any]) -> bool:
+    return any(isinstance(item, dict) and "id" in item for item in items)
 
 
 def _enclosing_id(document: Any, pointer: str) -> str | None:
