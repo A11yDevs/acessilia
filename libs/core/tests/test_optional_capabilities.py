@@ -61,12 +61,11 @@ def test_the_staging_catalogue_degrades_nothing() -> None:
     assert decision.optional["formula-recognizer"][0][0] == toolbox_gate.capability_ref("math.recognize")
 
 
-@pytest.mark.parametrize("mode", ["observe", "enforce"])
-def test_a_missing_optional_capability_degrades_without_ruling_out(mode) -> None:
+def test_a_missing_optional_capability_degrades_without_ruling_out() -> None:
     """Without ``pdf.render`` the methods that render run degraded; none is
     blocked, none gets a requirement, so the planner keeps them."""
     decision = toolbox_gate.evaluate(
-        OPTIONAL, _snapshot(without=("pdf.render",)), mode=mode, config=_config(mode)
+        OPTIONAL, _snapshot(without=("pdf.render",)), mode="enforce", config=_config("enforce")
     )
 
     assert set(decision.degraded) == set(RENDERING)
@@ -145,7 +144,7 @@ async def test_a_document_with_only_optional_calls_reads_the_catalogue(monkeypat
     describe = build_obligation("describe-images", ["p-1"], ["picture-description", "human-review"])
     manifest = build_manifest([build_element("p-1", "picture")], [describe])
 
-    decision = await toolbox_gate.decide(manifest, _config("observe"))
+    decision = await toolbox_gate.decide(manifest, _config("enforce"))
 
     assert reads == [1]
     assert list(decision.degraded) == ["picture-description"]
@@ -247,7 +246,7 @@ def test_a_degraded_method_reaches_the_output_and_the_log(monkeypatch, tmp_path)
     async def decide(manifest, config):
         return toolbox_gate.evaluate(
             toolbox_gate.requested_methods(manifest), _snapshot(without=("pdf.render",)),
-            mode="observe", config=config,
+            mode="enforce", config=config,
         )
 
     warnings: list[str] = []
@@ -265,7 +264,7 @@ def test_a_degraded_method_reaches_the_output_and_the_log(monkeypatch, tmp_path)
     orchestrator.information_structural = SimpleNamespace(process=lambda *a, **k: manifest)
 
     payload = asyncio.run(orchestrator.execute(
-        tmp_path / "doc.pdf", tmp_path, structured_output=True, config=_config("observe"),
+        tmp_path / "doc.pdf", tmp_path, structured_output=True, config=_config("enforce"),
         model_calls=current_model_calls(), ports=RunPorts.none(),
     ))
 

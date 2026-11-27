@@ -1,8 +1,9 @@
 """The Toolbox availability gate for planning methods.
 
 Methods whose handlers call the Toolbox are checked against one catalogue
-snapshot per document. ``observe`` only reports; ``enforce`` keeps the methods
-out of the plan and fails closed without a catalogue.
+snapshot per document. The snapshot is the input: the planner only chooses
+methods it marks runnable, so a missing catalogue fails closed. The gate logs
+and records the decision; ``off`` is the emergency switch.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ def _fuse_manifest(methods=FUSE_METHODS):
     return _manifest([_element("el-1", "paragraph", text="texto")], [obligation])
 
 
-def _config(*, secondary="mineru", gate="observe"):
+def _config(*, secondary="mineru", gate="enforce"):
     """The default providers, whatever the environment says."""
     return replace(
         core_config(fusion={"secondary_provider": secondary}),
@@ -87,12 +88,14 @@ def test_methods_without_toolbox_requirements_are_never_blocked() -> None:
     assert decision.blocked == {}
 
 
-def test_observe_reports_without_removing() -> None:
+def test_the_removed_observe_mode_uses_the_snapshot() -> None:
+    """A caller that still names ``observe`` gets the default: fail closed."""
     decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
 
     assert set(decision.blocked) == {"dual-provider-fusion", "single-provider"}
-    assert decision.unavailable_methods == []
-    assert decision.to_metadata()["applied"] is False
+    assert decision.mode == "enforce"
+    assert decision.offered == []
+    assert decision.to_metadata()["applied"] is True
 
 
 def test_enforce_without_a_catalogue_fails_closed() -> None:
@@ -175,8 +178,10 @@ async def test_decide_reads_the_cache_once(monkeypatch) -> None:
     assert decision.blocked == {}
 
 
-def test_unknown_mode_falls_back_to_observe() -> None:
-    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="strict")) == "observe"
+def test_unknown_and_removed_modes_fall_back_to_enforce() -> None:
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="strict")) == "enforce"
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="observe")) == "enforce"
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="off")) == "off"
 
 
 def test_every_gated_method_has_a_handler() -> None:
@@ -336,16 +341,6 @@ def test_the_least_recently_used_cache_goes_past_the_bound(monkeypatch) -> None:
     assert cache("b") is not b
 
 
-def test_observe_offers_every_requirement_so_the_plan_does_not_change() -> None:
-    """Option (a) of #640: the catalogue is visible in the problem, not applied."""
-    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
-
-    assert decision.requirements
-    assert decision.offered is None
-    facts = decision.catalogue_facts()
-    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
-
-
 def test_the_catalogue_facts_survive_the_checkpoint() -> None:
     decision = toolbox_gate.evaluate(
         FUSE_METHODS, None, mode="enforce", config=_config(), catalog_error="down"
@@ -366,16 +361,35 @@ def test_a_checkpoint_from_before_the_catalogue_facts_adds_none() -> None:
     assert restored.catalogue_facts().requirements == {}
 
 
-def test_observed_facts_are_marked_assumed_not_evidence() -> None:
-    """Review of #781: in observe the offered facts are an assumption, and the
-    metadata says so, naming the methods the snapshot rules out."""
-    observed = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
-    enforced = toolbox_gate.evaluate(FUSE_METHODS, None, mode="enforce", config=_config())
+def test_a_checkpoint_built_under_observe_keeps_its_assumed_facts() -> None:
+    """#809: the removed mode is not accepted for new runs, but a resumed plan
+    keeps the decision it was built under and keeps offering every requirement.
+    Deleting the plan checkpoint replans under the snapshot."""
+    legacy = {
+        "mode": "observe",
+        "requirements": {
+            "single-provider": [["document.structure.extract@1", "docling"]],
+        },
+        "offered": None,
+        "blocked_methods": {"single-provider": ["document.structure.extract@1 not offered"]},
+    }
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(legacy, toolbox_config())
 
-    assert observed.to_metadata()["offered_source"] == "assumed"
-    assert observed.to_metadata()["assumed_runnable_methods"] == ["dual-provider-fusion", "single-provider"]
-    assert enforced.to_metadata()["offered_source"] == "catalogue_snapshot"
-    assert enforced.to_metadata()["assumed_runnable_methods"] == []
+    facts = restored.catalogue_facts()
+    assert restored.mode == "observe"
+    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
+    metadata = restored.to_metadata()
+    assert metadata["offered_source"] == "assumed"
+    assert metadata["assumed_runnable_methods"] == ["single-provider"]
+    assert metadata["applied"] is False
+
+
+def test_a_new_decision_never_assumes_availability() -> None:
+    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="enforce", config=_config())
+
+    metadata = decision.to_metadata()
+    assert metadata["offered_source"] == "catalogue_snapshot"
+    assert metadata["assumed_runnable_methods"] == []
     assert toolbox_gate.AvailabilityDecision(mode="off", catalog_revision=None).offered_source == "none"
 
 

@@ -469,13 +469,14 @@ class Settings:
     toolbox_retry_backoff_seconds: float = field(
         default_factory=lambda: float(os.getenv("TOOLBOX_RETRY_BACKOFF_SECONDS", "0.5"))
     )
-    # Availability gate for planning methods that call the Toolbox: "observe"
-    # only reports what the live catalogue would rule out, "enforce" removes
-    # those methods from the plan (failing closed without a catalogue), "off"
-    # skips the check.
+    # Availability gate for planning methods that call the Toolbox: "enforce"
+    # (default) reads the live catalogue and makes what it publishes the
+    # planning problem's input, failing closed without a usable catalogue;
+    # "off" skips the check. The former "observe" mode was removed (#809) and
+    # now falls back to "enforce".
     toolbox_availability_gate: str = field(
         default_factory=lambda: os.getenv(
-            "TOOLBOX_AVAILABILITY_GATE", "observe"
+            "TOOLBOX_AVAILABILITY_GATE", "enforce"
         ).strip().lower()
     )
     toolbox_catalog_refresh_seconds: int = field(

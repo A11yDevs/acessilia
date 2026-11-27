@@ -2,6 +2,31 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.29 — the Toolbox catalogue is always the plan's input (#809)
+
+The availability gate no longer has an `observe` mode. Since domain 2.4 the
+catalogue snapshot reaches the planner as problem facts, so there is nothing
+left for `observe` to withhold: the snapshot now decides what is offered in
+every run. `TOOLBOX_AVAILABILITY_GATE` accepts `enforce` (the default) or
+`off`; an unknown value, including a deployment still set to `observe`, uses
+`enforce`.
+- `enforce` keeps the previous fail-closed behaviour: without a readable
+  catalogue, and past `TOOLBOX_CATALOG_STALE_SECONDS`, no method with Toolbox
+  requirements is offered and the planner falls back to local methods or
+  `human-review`.
+- The gate itself only reports: it logs the methods the catalogue rules out
+  and records the decision in `canonical_metadata.pddl_toolbox_availability`.
+  The old `would remove` log line is gone.
+- `off` remains as the emergency switch; it sends no catalogue facts, so every
+  method runs as if the catalogue offered everything.
+- A plan checkpoint keeps the decision it was built under. A job resumed from
+  a plan built under `observe` keeps `offered: null` and its assumed facts, so
+  its replans do not change; delete the plan checkpoint to replan under the
+  snapshot.
+- Tests cover the removed-mode fallback, the legacy checkpoint, the gate
+  report and the options without an `observe` path. Docs, `.env.example`, the
+  projection page, ADR-0029 and the domain 2.4 description follow.
+
 ## 0.3.27 — job goals survive plans that serve only part of them (#883)
 
 An obligation's `selected` flag now keeps its meaning as a job goal throughout

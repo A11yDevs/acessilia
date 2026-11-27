@@ -7,20 +7,23 @@ requested methods cannot run against it. The catalogue only restricts: methods
 without Toolbox requirements are never affected, and a capability outside the
 SDK allowlist is never made available.
 
-``TOOLBOX_AVAILABILITY_GATE`` chooses what happens with the answer:
+``TOOLBOX_AVAILABILITY_GATE`` chooses whether the snapshot is read at all:
 
-- ``observe`` (default): report it in the logs and the output metadata, plan as
-  before. This is how the gate is validated before it changes plans.
-- ``enforce``: remove those methods from the plan. Without a usable catalogue
-  every method with Toolbox requirements is removed (fail closed), so the
-  planner falls back to local methods or ``human-review``.
-- ``off``: no check.
+- ``enforce`` (default): the snapshot is the input. Its facts reach the planner
+  (:meth:`AvailabilityDecision.catalogue_facts`): each method's requirements
+  and what the snapshot offers, from which the domain derives ``runnable``.
+  Without a usable catalogue every method with Toolbox requirements is ruled
+  out (fail closed), so the planner falls back to local methods or
+  ``human-review``. The gate itself only reports the decision in the logs and
+  the output metadata.
+- ``off``: no check; an emergency switch. Every method runs as if the
+  catalogue offered everything.
 
-Since domain 2.4 (#640) the decision reaches the planner as problem facts
-(:meth:`AvailabilityDecision.catalogue_facts`): each method's requirements and
-what the snapshot offers, from which the domain derives ``runnable``. In
-``observe`` every requirement is offered, so the facts are visible and the
-plan does not change; in ``enforce`` the snapshot decides.
+The former ``observe`` mode (report and plan as before) was removed once the
+snapshot became the problem's input (#809). An unknown value, including a
+deployment still configured with ``observe``, uses ``enforce``.
+
+Since domain 2.4 (#640) the decision reaches the planner as problem facts.
 
 A method's Toolbox calls are of three kinds (#848):
 
@@ -65,7 +68,7 @@ from acessilia_sdk.toolbox import (
     read_catalog,
 )
 
-GATE_MODES = ("observe", "enforce", "off")
+GATE_MODES = ("enforce", "off")
 
 #: Reading the catalogue must not hold a document for the extraction timeout.
 #: Per request: a refresh makes at most four (one capabilities read, up to three
@@ -234,6 +237,12 @@ class AvailabilityDecision:
 
     @property
     def enforced(self) -> bool:
+        """Whether this decision's snapshot restricted the plan.
+
+        True for ``enforce``, the only mode that reads the catalogue; a plan
+        checkpoint from the former ``observe`` mode restores ``False`` so its
+        metadata keeps describing what it assumed.
+        """
         return self.mode == "enforce"
 
     @property
@@ -247,12 +256,13 @@ class AvailabilityDecision:
 
     @property
     def offered_source(self) -> str:
-        """Where the ``offered`` facts come from (review of #781).
+        """Where the ``offered`` facts come from.
 
-        ``catalogue_snapshot``: what the snapshot publishes (``enforce``).
-        ``assumed``: every requirement is offered whatever the snapshot says
-        (``observe``, option (a) of #640); not evidence of availability.
-        ``none``: no requirement to offer (``off``, or no Toolbox method).
+        ``catalogue_snapshot``: what the snapshot publishes (the default
+        mode). ``assumed``: every requirement is offered whatever the snapshot
+        says; only a plan checkpoint built under the former ``observe`` mode
+        restores this. ``none``: no requirement to offer (``off``, or no
+        Toolbox method).
         """
         if not self.requirements:
             return "none"
@@ -260,8 +270,12 @@ class AvailabilityDecision:
 
     @property
     def assumed_runnable(self) -> list[str]:
-        """Methods the snapshot rules out that the plan may still use, because
-        the facts are assumed (``observe``)."""
+        """Methods the snapshot rules out that the plan may still use.
+
+        New decisions always take ``offered`` from the snapshot, so this is
+        empty. A plan checkpoint built under the former ``observe`` mode keeps
+        its assumed facts (``from_metadata``), and this names what it assumed.
+        """
         return sorted(self.blocked) if self.offered is None else []
 
     def catalogue_facts(self) -> CatalogueFacts:
@@ -292,6 +306,10 @@ class AvailabilityDecision:
 
         A checkpoint without the mode gets the run's (``toolbox``); one from
         before domain 2.4 has no requirements, so its replans add no facts.
+        A checkpoint built under the removed ``observe`` mode keeps ``mode``
+        and ``offered: null``, so its replans keep offering every requirement
+        (see :meth:`catalogue_facts`); deleting the plan checkpoint replans
+        under the snapshot.
         """
         offered = metadata.get("offered")
         return cls(
@@ -332,9 +350,13 @@ def capability_ref(capability_id: str) -> str:
 
 
 def gate_mode(toolbox: ToolboxConfig) -> str:
-    """``toolbox.availability_gate``, or ``observe`` for a value it does not know."""
+    """``toolbox.availability_gate``, or ``enforce`` for a value it does not know.
+
+    ``observe`` was removed (#809): a deployment still configured with it gets
+    the default mode, so the snapshot becomes the input.
+    """
     mode = toolbox.availability_gate
-    return mode if mode in GATE_MODES else "observe"
+    return mode if mode in GATE_MODES else "enforce"
 
 
 def requested_methods(manifest: ProcessingManifest) -> set[str]:
@@ -355,10 +377,18 @@ def evaluate(
     catalog_error: str | None = None,
 ) -> AvailabilityDecision:
     """Which of ``methods`` cannot run against ``snapshot``, with ``config``'s
-    providers, and which may run degraded (#848)."""
+    providers, and which may run degraded (#848).
+
+    ``mode`` is recorded in the decision and its metadata; the snapshot always
+    decides what is offered. ``off`` is handled by :func:`decide`, which never
+    calls this function.
+    """
     # Read once: both passes below go over it, and a generator would leave
     # the second empty (#856 review).
     methods = sorted(set(methods))
+    # A caller that names the removed ``observe`` asks for the default: the
+    # snapshot decides. ``off`` is handled before this function.
+    mode = mode if mode in GATE_MODES else "enforce"
     blocked: dict[str, list[str]] = {}
     required: dict[str, list[tuple[str, str]]] = {}
     offered: set[tuple[str, str]] = set()
@@ -383,9 +413,10 @@ def evaluate(
         blocked=blocked,
         catalog_error=catalog_error if snapshot is None else None,
         requirements=required,
-        # observe (option a, #640): every requirement is offered, the plan
-        # does not change; enforce: the snapshot decides.
-        offered=sorted(offered) if mode == "enforce" else None,
+        # The snapshot is the input: it decides what is offered. ``off``
+        # never reaches :func:`evaluate` through :func:`decide`, so a caller
+        # that invokes it directly is asking for the catalogue's answer.
+        offered=sorted(offered),
         optional=optional,
         degraded=degraded,
     )

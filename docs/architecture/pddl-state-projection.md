@@ -43,7 +43,7 @@ orchestrator calls it through the `PlanningEngine` (#744) with a
 | `method_costs[m]` | `(= (execution-cost m o) cost)` | 50 when the manifest declares no cost |
 | A method not in `unavailable_methods` | `(available m)` | The core has a handler for it |
 | A method's catalogue requirements | `(requires m c p)`, `capability` and `provider` objects | The capability is bound to its exact contract version, `capability_id@version` (for example `math.convert@1`, symbol `math-convert-1`): the version the SDK client calls and the catalogue check requires. Two deliberate exceptions keep the bare id: a capability outside the SDK allowlist, which the check always blocks, and the facts of a plan checkpoint from 0.3.10, which its replans keep (`toolbox_gate.capability_ref`). Only for methods of this problem. A method without requirements has none, so it is runnable whatever the catalogue says. Every method whose handler calls the Toolbox is declared; the others are classified in `toolbox_gate.py`, the local ones as transitional, validation or symbolic (#804) ([#789](https://github.com/A11yDevs/acessilia/issues/789)) |
-| The required pairs the snapshot offers | `(offered c p)` | Gate in `observe`: every requirement is offered, so the plan steps do not change (the problem hash does, when the facts are new). These facts are **assumed**, not observed: the metadata says `offered_source: assumed` and lists the methods the snapshot rules out (`assumed_runnable_methods`). Gate `off`: no catalogue facts. `enforce`: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed) |
+| The required pairs the snapshot offers | `(offered c p)` | The default mode: what the snapshot publishes in a compatible version; nothing without a snapshot (fail closed). Gate `off`: no catalogue facts. A plan checkpoint built under the former `observe` mode keeps its assumed facts: every requirement is offered, and the metadata says `offered_source: assumed` and lists the methods it assumed (`assumed_runnable_methods`) |
 | — | `(runnable m)`, derived by the domain | `available` and every requirement offered. `execute-obligation` needs it |
 | An attempt `failed` or `rejected` | `(tried o m)` | A `succeeded` attempt is not projected; its result is the obligation's status. A `failed` attempt rules the method out for that obligation whatever the cause (see below) |
 | Ids, kinds, methods, capabilities and providers | PDDL symbols (`[a-z][a-z0-9-]*`), unique across the whole problem | PDDL objects share one namespace whatever their type. The projection keeps both directions of the mapping |
@@ -141,8 +141,9 @@ Both backends are checked against the current domain in CI. The
 `libs/core/tests/test_fast_downward_domain.py` with Fast Downward 26.6 from a
 pinned image (`scripts/planning/fast_downward.env`, run through
 `fast_downward_docker.sh`, with `astar(blind())`).
-The two backends must agree with and without a catalogue, under `observe` and
-`enforce`, and with names shared across types. The job fails unless each of
+The two backends must agree with and without a catalogue, with every
+requirement offered and with the snapshot restricting them, and with names
+shared across types. The job fails unless each of
 these cases ran and passed ([#790](https://github.com/A11yDevs/acessilia/issues/790)). Locally the
 tests are deselected by default; select them with `-m fast_downward` and point
 `ACESSILIA_FAST_DOWNWARD` to that script or to a Fast Downward build. The
@@ -154,7 +155,7 @@ default `astar(blind())`.
 | ADR-0029 | Today | Next |
 |---|---|---|
 | Capability and provider availability are predicates of the problem | Done in domain 2.4: `requires`, `offered` and the derived `runnable` | — |
-| `toolbox_gate` is reduced to reporting | It still decides what is offered in `enforce`, and `observe` is the default | #640, PR 2: the snapshot itself is the input, and `observe` goes once production logs show no false "would remove" ([#809](https://github.com/A11yDevs/acessilia/issues/809)) |
+| `toolbox_gate` is reduced to reporting | Done: the snapshot is the input (`enforce` is the default), and the gate logs the decision and records it in `canonical_metadata.pddl_toolbox_availability` | — |
 | Operational actions are bound to a capability id and exact version | The requirement facts name `capability_id@version`; the methods still name local handlers | #640, PR 2: the actions themselves, with the domain fragments |
 | A result updates the state once per `operation_id` | The manifest's statuses and attempts | #640, PR 3, with the journal of ADR-0020 |
 | Enrichment steps are actions; inspection and extraction are the bootstrap | All three run before planning | Enrichment: #640, PR 2, designed in [workflow-actions.md](workflow-actions.md). The bootstrap stays in 0.3.0; planning it is [#816](https://github.com/A11yDevs/acessilia/issues/816) (0.4.0) |

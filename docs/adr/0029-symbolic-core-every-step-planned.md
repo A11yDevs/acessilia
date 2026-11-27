@@ -23,9 +23,11 @@ The core already plans with PDDL in a closed loop: `PddlProblemCompiler`,
   extraction and the enrichment stages.
 - Which method satisfies an obligation is decided by the method registry
   (`METHOD_HANDLERS`), not by the domain.
-- Capability availability is applied by `toolbox_gate` outside the planner. Its
-  default is `observe`. In `enforce` it removes methods, and the planner "falls
-  back to local methods", which ADR-0028 removes.
+- Capability availability is applied by `toolbox_gate` outside the planner. At
+  the time of this measurement its default was `observe` (removed in
+  [#809](https://github.com/A11yDevs/acessilia/issues/809)); in `enforce` it
+  removed methods, and the planner "falls back to local methods", which
+  ADR-0028 removes.
 - Agents in `acessilia_core.agents` (fusion, adjudication, vision, table
   specialist, page level) take decisions and call models from the core.
 

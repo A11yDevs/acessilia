@@ -665,5 +665,4 @@ itself is #816 (0.4.0).
 - Planning the bootstrap: #816 (0.4.0).
 - Composing the domain from Toolbox fragments. That waits on ADR-0029's open
   decision, "Fragments per version", which the Toolbox's owners must accept.
-- Removing the gate's `observe` mode (#809).
 - Turning the model agents into capabilities (#804, #640 PR 4).

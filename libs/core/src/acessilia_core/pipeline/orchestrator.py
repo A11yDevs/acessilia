@@ -879,15 +879,10 @@ def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
         f"{method}: {', '.join(reasons)}"
         for method, reasons in availability.blocked.items()
     )
-    if availability.enforced:
-        logger.warning(
-            "Toolbox gate (catalogue {}): methods out of the plan — {}",
-            availability.catalog_revision or "unavailable",
-            blocked,
-        )
-    else:
-        logger.warning(
-            "Toolbox gate observing (catalogue {}): would remove — {}",
-            availability.catalog_revision or "unavailable",
-            blocked,
-        )
+    # The gate only reports: the snapshot's facts already reached the problem,
+    # so the planner chooses among the methods it marks runnable.
+    logger.warning(
+        "Toolbox gate (catalogue {}): methods the catalogue rules out — {}",
+        availability.catalog_revision or "unavailable",
+        blocked,
+    )
