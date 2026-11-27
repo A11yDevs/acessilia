@@ -26,6 +26,8 @@ def differences(
     another order are one ``changed`` of the list. Any other list is
     compared position by position. Where an aligned object moved, a
     difference inside it also names its ``reference_path``.
+    The empty pointer ``""`` names the whole document; ``"/"`` names an
+    empty property key, not the document root.
     """
     reference_path = path if reference_path is None else reference_path
     if isinstance(reference, dict) and isinstance(current, dict):
@@ -52,7 +54,7 @@ def differences(
             else:
                 found.extend(differences(reference[index], current[index], child, reference_child))
         return found
-    return [] if reference == current else [_item("changed", path or "/", reference_path or "/")]
+    return [] if reference == current else [_item("changed", path, reference_path)]
 
 
 def _item(kind: str, path: str, reference_path: str) -> dict[str, str]:
@@ -185,12 +187,18 @@ def _enclosing_id(document: Any, pointer: str) -> str | None:
 
 
 def resolve(document: Any, pointer: str) -> Any:
-    """The value at ``pointer``; ``KeyError`` when there is none."""
+    """The value at ``pointer``; ``""`` names the document itself.
+
+    ``"/"`` names an empty property key. A missing value raises ``KeyError``.
+    """
     value = document
     for segment in pointer.split("/")[1:]:
         segment = segment.replace("~1", "/").replace("~0", "~")
         if isinstance(value, list):
-            index = int(segment)
+            try:
+                index = int(segment)
+            except ValueError:
+                raise KeyError(pointer) from None
             if not 0 <= index < len(value):
                 raise KeyError(pointer)
             value = value[index]

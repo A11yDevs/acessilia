@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from tests.differential.compare import differences, explain
+from tests.differential.compare import differences, explain, resolve
 
 
 def test_a_change_in_another_object_moved_to_the_declared_position_is_not_explained():
@@ -144,6 +144,59 @@ def test_a_changed_member_of_a_root_identified_list_is_bound():
     reference, current = [{"id": "a", "text": "old"}], [{"id": "a", "text": "new"}]
     declared = [{"kind": "changed", "path": "/0/text", "id": "a", "expected": "new", "reason": "r"}]
     assert explain(reference, current, declared) == ([], [])
+
+
+@pytest.mark.parametrize("reference,current", [
+    ({"blocks": []}, [{"id": "a"}]),
+    ([{"id": "a"}], {"blocks": []}),
+    (None, [{"id": "a"}]),
+    ([{"id": "a"}], None),
+    (1, 2),
+    ([{"id": "a"}, {"id": "b"}], [{"id": "b"}, {"id": "a"}]),
+])
+def test_a_whole_document_change_has_no_enclosing_member_identity(reference, current):
+    found = [{"kind": "changed", "path": ""}]
+    assert differences(reference, current) == found
+    assert explain(reference, current, []) == (found, [])
+    declaration = {"kind": "changed", "path": "", "expected": current, "reason": "r"}
+    assert explain(reference, current, [declaration]) == ([], [])
+    bound = {**declaration, "id": "a"}
+    assert explain(reference, current, [bound]) == (found, [bound])
+    wrong_value = {**declaration, "expected": "wrong value"}
+    assert explain(reference, current, [wrong_value]) == (found, [wrong_value])
+    legacy_marker = {**bound, "path": "/"}
+    assert explain(reference, current, [legacy_marker]) == (found, [legacy_marker])
+
+
+@pytest.mark.parametrize("document", [[{"id": "a"}], [], {"": "empty key"}, None, "text", 1])
+def test_the_empty_pointer_resolves_to_the_document_itself(document):
+    assert resolve(document, "") is document
+
+
+def test_a_slash_pointer_keeps_its_empty_property_meaning():
+    reference, current = {"": "old"}, {"": "new"}
+    assert resolve(current, "/") == "new"
+    assert differences(reference, current) == [{"kind": "changed", "path": "/"}]
+    declared = [{"kind": "changed", "path": "/", "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == ([], [])
+
+
+@pytest.mark.parametrize("pointer", ["/", "/not-an-index", "/-", "/-1", "/1"])
+def test_an_invalid_or_missing_list_index_is_a_missing_pointer(pointer):
+    with pytest.raises(KeyError) as error:
+        resolve([{"id": "a"}], pointer)
+    assert error.value.args == (pointer,)
+
+
+def test_a_root_order_change_can_be_reported_alongside_a_bound_member_change():
+    reference = [{"id": "a", "text": "old"}, {"id": "b"}]
+    current = [{"id": "b"}, {"id": "a", "text": "new"}]
+    declared = [{"kind": "changed", "path": "/1/text", "id": "a", "expected": "new", "reason": "r"}]
+    assert differences(reference, current) == [
+        {"kind": "changed", "path": ""},
+        {"kind": "changed", "path": "/1/text", "reference_path": "/0/text"},
+    ]
+    assert explain(reference, current, declared) == ([{"kind": "changed", "path": ""}], [])
 
 
 def test_moved_ancestors_keep_their_corresponding_inner_list_context():

@@ -175,6 +175,11 @@ The fields of an entry:
   `fnmatchcase`: `*` includes `/`, so `/blocks/*/text` also matches
   `/blocks/0/children/1/text`. Use restricted patterns or exact paths when
   depth matters; id binding does not change these wildcard rules.
+  The empty pointer `""` names the whole document, including root type
+  changes and root-list reordering. `"/"` names an empty property key;
+  it is not an alias for the root. Older declarations using `"/"` for a
+  whole-document change must use `""` instead. A root difference has no
+  enclosing list member, so an id-bound declaration cannot explain it.
 - `expected` is required for `added` and `changed`: a later change of the
   same field is not accepted with it.
 - `was` is optional for `removed`, and checks the value that went.

@@ -183,6 +183,12 @@ Os campos de uma entrada:
   `fnmatchcase`: `*` inclui `/`, então `/blocks/*/text` também casa com
   `/blocks/0/children/1/text`. Use padrões restritos ou caminhos exatos quando
   a profundidade importar; o vínculo por id não muda essas regras.
+  O ponteiro vazio `""` representa o documento inteiro, incluindo mudanças
+  de tipo na raiz e reordenação de listas na raiz. `"/"` representa uma
+  chave de propriedade vazia; não é um alias da raiz. Declarações antigas
+  que usam `"/"` para uma mudança do documento inteiro devem usar `""`.
+  Uma diferença na raiz não tem membro envolvente de lista, então uma
+  declaração vinculada por id não pode explicá-la.
 - `expected` é obrigatório para `added` e `changed`: uma mudança posterior do
   mesmo campo não é aceita com ele.
 - `was` é opcional para `removed` e confere o valor que saiu.
