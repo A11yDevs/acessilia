@@ -7,7 +7,7 @@
       "complexity": 17
     },
     "backend/api/worker.py::JobExecutor.run": {
-      "lines": 325,
+      "lines": 314,
       "complexity": 43
     },
     "backend/api/worker.py::recover_pending_jobs": {
