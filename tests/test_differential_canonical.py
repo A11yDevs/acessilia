@@ -29,7 +29,7 @@ import json
 
 import pytest
 
-from tests.differential.compare import explain
+from tests.differential.compare import explain, validate_declaration
 from tests.differential.runner import CASES, REFERENCES, identity, run_case
 
 CASE_NAMES = sorted(path.parent.name for path in CASES.glob("*/case.json"))
@@ -50,7 +50,28 @@ def _declared(label: str) -> dict[str, list[dict]]:
     """``intended.json``: per case name (``*``: any case), the differences a
     later release made on purpose (``compare.explain``)."""
     path = REFERENCES / label / "intended.json"
-    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    if not path.is_file():
+        return {}
+    try:
+        declared = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{path}: {error}") from None
+    if not isinstance(declared, dict):
+        raise ValueError(f"{path}: expected an object of declaration groups")
+    for case, entries in declared.items():
+        context = f"{path}: group {case!r}"
+        if case != "*" and case not in CASE_NAMES:
+            raise ValueError(f"{context}: unknown case")
+        if not isinstance(entries, list):
+            raise ValueError(f"{context}: expected a list of declarations")
+        for index, entry in enumerate(entries):
+            try:
+                validate_declaration(entry)
+                if "reason" not in entry:
+                    raise ValueError("stored declarations require a non-blank reason")
+            except ValueError as error:
+                raise ValueError(f"{context}, entry {index}: {error}") from None
+    return declared
 
 
 @pytest.mark.parametrize("label", LABELS)
@@ -175,15 +196,17 @@ def test_a_routed_page_rescues_its_primary_only_sentence_once(tmp_path, sentence
 @pytest.mark.parametrize("case", CASE_NAMES)
 def test_the_canonical_output_matches_the_core_before_each_migration(runs, case, label) -> None:
     reference = _reference(label, case)["canonical"]
-    own = _declared(label).get(case, [])
+    declared = _declared(label)
+    own = declared.get(case, [])
 
-    unexplained, unused = explain(reference, runs[case]["canonical"], [*_declared(label).get("*", []), *own])
+    unexplained, unused = explain(reference, runs[case]["canonical"], [*declared.get("*", []), *own])
 
     assert not unexplained, (
         f"{case} departs from {label} where no release declared it "
         f"(declare it in {label}/intended.json, or fix the regression): {unexplained}"
     )
-    stale = [entry for entry in unused if entry in own]
+    own_ids = {id(entry) for entry in own}
+    stale = [entry for entry in unused if id(entry) in own_ids]
     assert not stale, f"{label}/intended.json declares differences {case} no longer has: {stale}"
 
 
@@ -192,10 +215,11 @@ def test_a_difference_declared_for_every_case_still_happens(runs, label) -> None
     """An entry under ``*`` must still explain some case; one that explains
     none describes a difference that is gone."""
     common = _declared(label).get("*", [])
-    used = []
+    used_indices: set[int] = set()
     for case in CASE_NAMES:
         _, unused = explain(_reference(label, case)["canonical"], runs[case]["canonical"], common)
-        used.extend(entry for entry in common if entry not in unused)
-    stale = [entry for entry in common if entry not in used]
+        unused_ids = {id(entry) for entry in unused}
+        used_indices.update(index for index, entry in enumerate(common) if id(entry) not in unused_ids)
+    stale = [entry for index, entry in enumerate(common) if index not in used_indices]
     assert not stale, f"{label}/intended.json declares differences no case has: {stale}"
 

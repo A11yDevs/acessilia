@@ -210,6 +210,20 @@ object with a valid `kind` and a string `path` (including `""`). `added` and
 are valid. `was` remains optional for `removed`; an optional `id` must be a
 non-empty string. Invalid entries raise `ValueError` identifying the field
 and the entry. Declaration paths remain glob patterns, not concrete paths.
+Unknown fields are rejected, as are `expected` on removals and `was` on
+added/changed entries. A supplied `reason` must be a nonblank string;
+low-level synthetic calls to `explain` may omit it.
+
+The `intended.json` loader validates the entire file: an object whose keys
+are known case names or `*`, with lists of valid entries and a nonblank
+`reason` on every stored entry. Errors include the file and, when applicable,
+the group and zero-based entry index. A missing file still means no declarations.
+No historical declaration needs rewriting to meet this contract.
+
+Usage bookkeeping tracks entries by identity and position, not Python
+dictionary equality. `explain` returns unused entries as the original objects
+in input order. This distinguishes common and case-specific entries even
+when their values differ only between a boolean and a number.
 
 Concrete paths consumed by `resolve` are either empty or start with `/`.
 List indices must be `0` or ASCII decimal digits without leading zeroes;
@@ -227,6 +241,12 @@ is not `0`, including inside objects and arrays. Numbers compare by exact
 value, so `1` and `1.0` (also `0` and `-0.0`) are equivalent; there is no
 rounding, tolerance or string coercion. Object key order does not matter;
 array order does. Identity alignment and list-order detection still apply.
+This rule assumes valid JSON values after deserialization. It adds no
+rounding: the JSON decoder may already map `0.10000000000000001` and `0.1`
+to the same float. Arbitrary decimal precision, non-finite numbers and
+arbitrary Python objects are outside that guarantee. Strict JSON numeric
+handling at evidence I/O boundaries is tracked in
+[#926](https://github.com/A11yDevs/acessilia/issues/926).
 
 An undeclared difference fails. A case-specific declaration that explains
 nothing in that case fails; a common declaration that explains no case

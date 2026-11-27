@@ -118,6 +118,14 @@ def test_id_binding_does_not_hide_a_missing_expected_value():
     ({"kind": "removed", "path": 0}, "path"), ({"kind": "removed", "path": []}, "path"),
     ({"kind": "added", "path": "/unused"}, "expected value"),
     ({"kind": "changed", "path": "/unused"}, "expected value"),
+    ({"kind": "removed", "path": "/unused", "expected": 999}, "unexpected fields"),
+    ({"kind": "added", "path": "/unused", "expected": 1, "was": 0}, "unexpected fields"),
+    ({"kind": "changed", "path": "/unused", "expected": 1, "was": 0}, "unexpected fields"),
+    ({"kind": "removed", "path": "/unused", "extra": 0}, "unexpected fields"),
+    ({"kind": "removed", "path": "/unused", "reason": None}, "reason"),
+    ({"kind": "removed", "path": "/unused", "reason": 3}, "reason"),
+    ({"kind": "removed", "path": "/unused", "reason": ""}, "reason"),
+    ({"kind": "removed", "path": "/unused", "reason": "  "}, "reason"),
 ])
 def test_every_declaration_is_validated_before_any_comparison(monkeypatch, entry, diagnostic):
     def unexpected_comparison(*args, **kwargs):
@@ -133,7 +141,8 @@ def test_every_declaration_is_validated_before_any_comparison(monkeypatch, entry
 @pytest.mark.parametrize("path", ["", "/", "*", "/blocks/*/text", "/~*"])
 def test_validation_accepts_root_empty_key_and_glob_patterns(path):
     for kind in ("added", "changed", "removed"):
-        entry = {"kind": kind, "path": path, "expected": False, "id": "a"}
+        value_key = "was" if kind == "removed" else "expected"
+        entry = {"kind": kind, "path": path, value_key: False, "id": "a"}
         assert explain({}, {}, [entry]) == ([], [entry])
 
 

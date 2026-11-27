@@ -59,7 +59,11 @@ def differences(
 
 
 def _json_equal(left: Any, right: Any) -> bool:
-    """JSON equality: booleans differ from numbers, which compare exactly (#919)."""
+    """Equality of valid, deserialized JSON values (#919).
+
+    Booleans differ from numbers; numeric equality uses the received values,
+    with no extra rounding or arbitrary decimal precision.
+    """
     if isinstance(left, bool) != isinstance(right, bool):
         return False
     if isinstance(left, dict) and isinstance(right, dict):
@@ -114,7 +118,8 @@ def explain(
     """The differences between ``reference`` and ``current`` that no entry of
     ``declared`` explains, and the entries that explain none of them.
 
-    An entry is ``{kind, path, reason}``, ``path`` a JSON pointer in which
+    An entry names ``kind`` and ``path``, plus an optional ``reason``;
+    stored declaration files require that reason. ``path`` is a pointer in which
     ``*`` matches any run of characters, plus the value it allows: an
     ``added`` or ``changed`` entry names the value now (``expected``), so a
     later change of the same field is not accepted with it; a ``removed``
@@ -124,16 +129,18 @@ def explain(
     to the nearest enclosing member of a list with distinct string ids.
     Added/removed differences use the side containing them. Changed fields
     require the same identified member and list context on both sides.
+    Unused entries are returned in input order as the original objects,
+    so callers can track configuration ownership independently of equality.
     """
     for entry in declared:
-        _validate_declaration(entry)
+        validate_declaration(entry)
     found = differences(reference, current)
     unexplained = [item for item in found if not any(_explains(entry, item, reference, current) for entry in declared)]
     unused = [entry for entry in declared if not any(_explains(entry, item, reference, current) for item in found)]
     return unexplained, unused
 
 
-def _validate_declaration(entry: Any) -> None:
+def validate_declaration(entry: Any) -> None:
     """Reject a malformed entry before computing or matching differences (#912)."""
     if not isinstance(entry, dict):
         raise ValueError(f"a declaration must be an object: {entry!r}")
@@ -142,9 +149,15 @@ def _validate_declaration(entry: Any) -> None:
     if not isinstance(entry.get("path"), str):
         raise ValueError(f"a declaration's path must be a string: {entry!r}")
     if entry["kind"] in ("added", "changed") and "expected" not in entry:
-        raise ValueError(f"a {entry['kind']} declaration must name its expected value: {entry!r}")
+        raise ValueError(f"a declaration of kind {entry['kind']!r} must name its expected value: {entry!r}")
     if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
         raise ValueError(f"a declaration's id must be a non-empty string: {entry!r}")
+    allowed = {"kind", "path", "id", "reason", "was" if entry["kind"] == "removed" else "expected"}
+    unknown = entry.keys() - allowed
+    if unknown:
+        raise ValueError(f"unexpected fields {sorted(unknown, key=repr)!r} for {entry['kind']!r}: {entry!r}")
+    if "reason" in entry and (not isinstance(entry["reason"], str) or not entry["reason"].strip()):
+        raise ValueError(f"a declaration's reason must be a non-blank string: {entry!r}")
 
 
 def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, current: Any) -> bool:
@@ -243,4 +256,4 @@ def resolve(document: Any, pointer: str) -> Any:
 
 
 
-__all__ = ["differences", "explain", "resolve"]
+__all__ = ["differences", "explain", "resolve", "validate_declaration"]
