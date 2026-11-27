@@ -2,6 +2,31 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.27 — job goals survive plans that serve only part of them (#883)
+
+An obligation's `selected` flag now keeps its meaning as a job goal throughout
+execution. `NominalPlan.selected_obligations` defines the current plan's scope;
+`complete-job` waits for that scope and goals discovered during execution.
+The delivery check still judges every open job goal. The orchestrator no
+longer restores goals after a run.
+- An optional `deferred_reason` records `outside-plan` or
+  `failure-budget-exhausted` on goals left out. Unsatisfied-obligation payloads
+  include it when present; a later plan clears it when taking up the work.
+- Old checkpoints without this field remain readable; cleared goals can be
+  recovered only when the planning manifest still records them. Goals lost
+  from both manifests cannot be inferred. Absent deferrals stay absent on
+  the wire, preserving historical hashes and plan bindings; a real 0.3.26
+  fixture verifies this boundary.
+- Deferrals are recomputed at each replan decision, including an empty root
+  set. Only otherwise replannable work excluded by the failure budget gets
+  `failure-budget-exhausted`; `outside-plan` also covers exhausted/blocked
+  work. Indirect satisfaction and selection clear obsolete reasons.
+- The executor revalidates each plan's own scope even after an unchecked
+  copy or mutation, and keeps the execution scope immutable.
+- Tests cover partial plans, deferred delivery warnings and caching, later
+  execution, removed goals, and resumption of current and old checkpoints.
+- Contract decision: [ADR-0031](../../docs/adr/0031-job-goals-and-plan-selection.md).
+
 ## 0.3.26 — a contract violation is a provider failure in dual mode (#699)
 
 The core extractor and the SDK fusion classified a client-raised

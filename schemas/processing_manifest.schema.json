@@ -343,6 +343,22 @@
           "title": "Selected",
           "type": "boolean"
         },
+        "deferred_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "outside-plan",
+                "failure-budget-exhausted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deferred Reason"
+        },
         "target_ids": {
           "items": {
             "type": "string"

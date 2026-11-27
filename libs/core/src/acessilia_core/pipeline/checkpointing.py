@@ -248,7 +248,7 @@ def _with_discoveries_selected(progress: dict[str, Any], before: dict[str, Any])
     returns; the crash came first, so the resumed step would see them as
     known and never select them, and the job would finish without them (#857
     review). They are selected here, as the executor would have done; one
-    still open then asks for the replan (``_sync_selection``).
+    still open then asks for the replan (``_sync_goals``).
     """
     known = {item["id"] for item in before.get("obligations") or []}
     manifest = dict(progress)

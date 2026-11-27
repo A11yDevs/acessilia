@@ -237,11 +237,11 @@ class TestExecutorHelpersCharacterization:
             update={"selected_obligations": [planned_id]}
         )
 
-        assert ExecutorAgent._sync_selection(plan, manifest, working) is True
+        assert ExecutorAgent._sync_goals(plan, manifest, working) is True
         assert working.obligations[0].selected is True
 
         discovered.status = "satisfied"
-        assert ExecutorAgent._sync_selection(plan, manifest, working) is False
+        assert ExecutorAgent._sync_goals(plan, manifest, working) is False
 
 
 class TestPddlActionSequenceCharacterization:

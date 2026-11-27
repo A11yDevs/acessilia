@@ -46,6 +46,7 @@ ones here instead of restating them.
 | [0028](0028-operational-execution-in-the-toolbox.md) | All document computation runs in the Toolbox | Proposed |
 | [0029](0029-symbolic-core-every-step-planned.md) | The core plans and coordinates: every semantic workflow step is planned | Proposed |
 | [0030](0030-providers-compete-per-capability.md) | Providers compete per capability; the structure suites stay structural | Proposed |
+| [0031](0031-job-goals-and-plan-selection.md) | Job goals outlive the selection of a plan | Accepted |
 
 ## Process
 

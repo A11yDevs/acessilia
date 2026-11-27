@@ -9,7 +9,9 @@ from pydantic import (
     ConfigDict,
     Field,
     PrivateAttr,
+    SerializerFunctionWrapHandler,
     ValidationError,
+    model_serializer,
     model_validator,
 )
 
@@ -174,7 +176,9 @@ class Obligation(StrictModel):
     id: str = Field(min_length=1)
     kind: str = Field(min_length=1)
     status: ObligationStatus = "candidate"
+    # A job goal. The current plan's scope is NominalPlan.selected_obligations.
     selected: bool = False
+    deferred_reason: Literal["outside-plan", "failure-budget-exhausted"] | None = None
     target_ids: list[str] = Field(min_length=1)
     dependencies: list[str] = Field(default_factory=list)
     admissible_methods: list[str] = Field(default_factory=list)
@@ -182,8 +186,22 @@ class Obligation(StrictModel):
     attempts: list[ObligationAttempt] = Field(default_factory=list)
     rationale: str = Field(min_length=1)
 
+    def clear_inactive_deferral(self) -> None:
+        """Normalize deferrals at read and execution boundaries, including legacy failures."""
+        if self.status == "satisfied" or not (self.selected or self.status == "failed"):
+            self.deferred_reason = None
+
+    @model_serializer(mode="wrap")
+    def serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Keep old checkpoint hashes stable when no work was deferred (#883)."""
+        payload = handler(self)
+        if self.deferred_reason is None or self.status == "satisfied" or not (self.selected or self.status == "failed"):
+            payload.pop("deferred_reason", None)
+        return payload
+
     @model_validator(mode="after")
     def validate_methods(self) -> Obligation:
+        self.clear_inactive_deferral()
         methods = set(self.admissible_methods)
         unknown = set(self.method_costs) - methods
         if unknown:

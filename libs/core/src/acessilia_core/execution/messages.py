@@ -88,7 +88,7 @@ EXE_DRY_RUN_SIMULATED: str = (
 EXE_NO_HANDLER_REGISTERED: str = "No handler registered for {method}"
 #: Default status message raised when a handler's result fails validation.
 EXE_RESULT_REJECTED: str = "Result rejected by the validator"
-#: Raised when a complete-job step leaves selected obligations not satisfied.
+#: Raised for open obligations in a plan's scope, or for open job goals at delivery.
 EXE_COMPLETED_OBLIGATIONS_UNSATISFIED: str = (
     "Selected obligations not satisfied: {unsatisfied}"
 )

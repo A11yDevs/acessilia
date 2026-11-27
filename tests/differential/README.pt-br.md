@@ -267,6 +267,14 @@ de figuras (M1) e o LaTeX das fórmulas (M3), um de cada vez
 (`VISION_CONCURRENCY=1`). Uma execução de controle sem checkpoints pede de
 novo todas as respostas.
 
+O teste de retomada torna a interrupção injetada terminal. Uma figura na fila
+pode adquirir o semáforo enquanto a figura interrompida salva o progresso
+em `finally`, antes de o TaskGroup cancelar as tarefas irmãs. Essa requisição
+tardia também levanta `Interrupted`, preservando a comparação exata entre
+as respostas salvas e servidas. Uma regressão força essa sequência de
+requisições sem esperas temporizadas (#900). Essa guarda pertence ao teste
+de retomada; as gravações usam diretamente o harness compartilhado.
+
 O que ele não mostra: `Interrupted` para a execução, mas o processo
 continua vivo, então os blocos `finally` rodam e nada é cortado no meio de
 uma escrita. As garantias do próprio armazenamento (versão do schema, hash

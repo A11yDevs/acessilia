@@ -20,13 +20,15 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
 from tests.differential import build_cases
-from tests.differential.fake_toolbox import Interrupted
+from tests.differential.fake_toolbox import FakeToolbox, Interrupted
 from tests.differential.runner import run_case
 
 E = build_cases.element
@@ -89,10 +91,49 @@ def _interruption(error: BaseException) -> Interrupted:
     return _interruption(interrupted.exceptions[0])
 
 
+@contextmanager
+def _terminal_interruption():
+    """Keep the injected death terminal while sibling tasks unwind (#900).
+
+    A picture releases its semaphore before saving progress in ``finally``.
+    A waiting sibling can acquire it before TaskGroup propagates cancellation.
+    The fake must not answer that sibling after it declared the run dead.
+    This patch belongs to the resume tests, not the recorded harness.
+    """
+    interrupting = FakeToolbox._interrupting
+    stopped: Interrupted | None = None
+
+    def check(toolbox: FakeToolbox, kind: str) -> None:
+        nonlocal stopped
+        if stopped is not None:
+            raise Interrupted(str(stopped), list(stopped.served))
+        try:
+            interrupting(toolbox, kind)
+        except Interrupted as error:
+            stopped = error
+            raise
+
+    with patch.object(FakeToolbox, "_interrupting", check):
+        yield
+
+
 def _dies(case: Path, **kwargs: Any) -> Interrupted:
-    with pytest.raises(BaseException) as error:  # noqa: B017 - checked by _interruption
+    with _terminal_interruption(), pytest.raises(BaseException) as error:  # noqa: B017 - checked by _interruption
         run_case(case, **kwargs)
     return _interruption(error.value)
+
+
+def test_a_request_after_the_injected_death_cannot_receive_an_answer() -> None:
+    """Force the second-then-third request schedule seen on Linux CI (#900)."""
+    toolbox = FakeToolbox({}, interrupt=("vlm", 2))
+    with _terminal_interruption():
+        toolbox._interrupting("vlm")
+        toolbox.served.append(("vlm", "pic1"))
+        with pytest.raises(Interrupted) as first:
+            toolbox._interrupting("vlm")
+        with pytest.raises(Interrupted) as later:
+            toolbox._interrupting("vlm")
+        assert first.value.served == later.value.served == [("vlm", "pic1")]
 
 
 def test_an_interruption_beside_another_failure_is_not_accepted() -> None:
