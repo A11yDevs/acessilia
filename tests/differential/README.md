@@ -253,6 +253,14 @@ picture descriptions (M1) and the formula LaTeX (M3), one at a time
 (`VISION_CONCURRENCY=1`). A control run without checkpoints asks for every
 answer again.
 
+The resume test makes the injected interruption terminal. A queued picture
+can acquire the semaphore while the interrupted picture saves progress in
+`finally`, before TaskGroup cancels its siblings. Such a late request also
+raises `Interrupted`, preserving the exact comparison between saved and
+served answers. A regression forces this request sequence without sleeps
+(#900). This guard belongs to the resume test; recorded runs use the shared
+harness directly.
+
 What it does not show: `Interrupted` stops the run, but the process lives
 on, so `finally` blocks run and nothing is cut mid-write. The store's own
 guarantees (schema version, payload hash, corrupt file) are tested in
