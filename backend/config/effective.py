@@ -21,12 +21,14 @@ attempt whose write fails leaves the previous record in place, and the
 operations route serves that record with its own ``attempt`` identity.
 
 ``settings.py`` remains the only reader of the environment: this module reads
-the values of a ``Settings`` instance and an explicit ``CoreConfig``. It never
-records a credential, and it minimises free text and URLs: userinfo, query
-strings and fragments are removed from URLs, and a custom prompt is stored as a
-fingerprint (its SHA-256 and character count), not verbatim. Names left out are
-listed in ``secrets_omitted`` and ``not_recorded``, so the absence is deliberate
-and visible.
+the values of a ``Settings`` instance and an explicit ``CoreConfig``. It does
+not copy the credential settings it knows by name, and it minimises free text
+and URLs: userinfo, query strings and fragments are removed from URLs (the path
+is kept), and a custom prompt is stored as a fingerprint (its SHA-256 and
+character count), not verbatim. This is a deliberate minimisation policy, not a
+secret scanner: a credential embedded in another textual field, or in a URL
+path, is not detected here. Names left out are listed in ``secrets_omitted``
+and ``not_recorded``, so the absence is deliberate and visible.
 
 The record is written once per job start by ``backend/api/worker.py`` and kept
 with the durable job record. It is not part of the processing cache key: the
@@ -276,9 +278,11 @@ def _run_options(run: Mapping[str, Any], config: CoreConfig) -> dict[str, Any]:
 def _prompt_fingerprint(prompt: Any) -> dict[str, Any] | None:
     """A custom prompt's fingerprint, never the prompt itself.
 
-    The SHA-256 lets an operator confirm a suspected prompt without storing the
-    user's text; the length distinguishes an empty prompt from an absent one.
-    A fingerprint is not anonymisation: a known prompt can be confirmed.
+    A non-empty prompt is stored as its SHA-256 and character count, so an
+    operator can confirm a suspected prompt without storing the user's text.
+    An absent prompt and an empty string are both ``None``, matching the cache
+    identity's normalization (``custom_prompt or ""``). A fingerprint is not
+    anonymisation: a known prompt can be confirmed.
     """
     if not isinstance(prompt, str) or not prompt:
         return None
@@ -289,7 +293,11 @@ def _prompt_fingerprint(prompt: Any) -> dict[str, Any] | None:
 
 
 def _sanitise_urls(value: Any) -> Any:
-    """``value`` with every URL-like field stripped of userinfo, query and fragment."""
+    """``value`` with URL-like fields reduced by :func:`_sanitise_url`.
+
+    This is a minimisation policy, not a secret scanner: it removes the URL
+    components listed on :func:`_sanitise_url` and keeps the path.
+    """
     if isinstance(value, Mapping):
         return {
             str(key): _sanitise_url_field(str(key), item)
@@ -309,12 +317,15 @@ def _sanitise_url_field(key: str, value: Any) -> Any:
 
 
 def _sanitise_url(value: str) -> str:
-    """A URL without credentials, query or fragment, or ``REDACTED_URL``.
+    """A URL with userinfo, query and fragment removed, or ``REDACTED_URL``.
 
-    The record keeps the scheme, host, port and path so an operator can tell
-    deployments apart; the userinfo (which may hold a credential), the query
-    (which may hold a token) and the fragment are dropped. A value without a
-    scheme is treated as ``//value`` so ``host:port/path`` is parsed correctly.
+    Kept: scheme, host, port and path, so an operator can tell deployments
+    apart. Removed: the userinfo (which may hold a credential), the query
+    (which may hold a token) and the fragment. A credential placed in a path
+    segment is **not** detected or removed; deployments must not embed
+    credentials or sensitive identifiers in endpoint paths. A value without a
+    scheme is treated as ``//value`` so ``host:port/path`` is parsed correctly;
+    a value ``urlsplit`` cannot parse becomes ``REDACTED_URL``.
     """
     if not value:
         return value

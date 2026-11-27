@@ -124,6 +124,15 @@ def test_the_record_carries_the_job_options_under_processing() -> None:
     assert prompt not in json.dumps(record)
 
 
+def test_empty_and_absent_prompts_are_both_none() -> None:
+    """The cache normalizes both to "", so the record does too."""
+    absent = _record(run={"custom_prompt": None})
+    empty = _record(run={"custom_prompt": ""})
+
+    assert absent["processing"]["run"]["custom_prompt"] is None
+    assert empty["processing"]["run"]["custom_prompt"] is None
+
+
 def test_object_markers_distinguishes_absent_override_from_false() -> None:
     default = core_config().export.object_markers_enabled
 
@@ -219,6 +228,17 @@ def test_url_sanitisation_keeps_scheme_host_port_and_path_only() -> None:
         "https://api.test:8443/v1"
     )
     assert record["environment"]["service"]["web_base_url"] == "web.test:8001/path"
+
+
+def test_url_paths_are_kept_and_must_not_hold_credentials() -> None:
+    """The documented limitation: the path is kept, so it must not be secret."""
+    service = _service(toolbox_base_url="https://toolbox.test/token/SEGREDO")
+
+    record = effective_configuration(core_config_from_settings(service), settings=service)
+
+    assert record["processing"]["core"]["toolbox.base_url"] == (
+        "https://toolbox.test/token/SEGREDO"
+    )
 
 
 def test_a_malformed_url_is_redacted_instead_of_copied() -> None:

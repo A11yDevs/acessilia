@@ -8,9 +8,18 @@ The ``configuration`` column stores the latest effective-configuration attempt
 gains it through ``ALTER TABLE ADD COLUMN`` on the first connection, which
 preserves every existing row. Rollback note: a release before #380 inserts with
 ``INSERT INTO api_jobs VALUES (?, ?, ?, ?)`` and fails on the five-column table,
-so rolling back requires a compatible build or a controlled restore from a
-backup taken after the migration (rows written after that backup are lost). No
-column is dropped or data deleted automatically.
+so a plain backup restore is not a transparent rollback:
+
+- a backup taken **before** the migration restores the old schema, but loses
+  changes written after it;
+- a previous build that names the columns in its ``INSERT`` can keep the
+  current schema and rows, subject to compatibility tests;
+- a backup taken **after** the migration keeps the five-column schema and does
+  not, by itself, make the old writer compatible;
+- a controlled reverse migration needs its own procedure, backup and data
+  preservation check.
+
+No column is dropped and no data are deleted automatically.
 """
 
 from __future__ import annotations
