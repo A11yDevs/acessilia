@@ -162,7 +162,7 @@ async def test_a_field_outside_the_processing_identity_changes_nothing(monkeypat
 @pytest.mark.asyncio
 async def test_a_gate_change_plans_again_from_the_enriched_manifest(monkeypatch, tmp_path) -> None:
     counts = await _resume_counts(
-        monkeypatch, tmp_path, lambda c: _changed(c, "toolbox", availability_gate="enforce"),
+        monkeypatch, tmp_path, lambda c: _changed(c, "toolbox", availability_gate="off"),
     )
 
     assert counts == {"media": 0, "extraction": 0, "enrichment": 0, "planning": 1}

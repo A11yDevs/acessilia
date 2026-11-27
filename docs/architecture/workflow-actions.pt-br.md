@@ -686,5 +686,4 @@ bootstrap é a #816 (0.4.0).
 - Compor o domínio a partir dos fragmentos da Toolbox. Isso espera a decisão
   aberta da ADR-0029, "Fragmentos por versão", que os donos da Toolbox
   precisam aceitar.
-- Tirar o modo `observe` do gate (#809).
 - Transformar os agentes de modelo em capacidades (#804, #640 PR 4).

@@ -288,12 +288,12 @@ falha da tool. Não acrescente uma implementação local por trás dele (veja 2.
   O gate de disponibilidade passa a conferi-la contra o catálogo vivo antes de
   cada documento ser planejado (veja abaixo).
 
-  Um método fora do `METHOD_TOOLBOX_REQUIREMENTS` nunca é excluído: no
-  `enforce` ele continua executável qualquer que seja o catálogo (as chamadas
-  opcionais dele ainda são conferidas, para o relatório de degradação). Por
-  isso todo método, com custo ou handler, está declarado ali ou classificado
-  ao lado dela em `planning/toolbox_gate.py`, e um teste falha para um que
-  não esteja em nenhum dos dois (#789):
+  Um método fora do `METHOD_TOOLBOX_REQUIREMENTS` nunca é excluído: ele
+  continua executável qualquer que seja o catálogo (as chamadas opcionais
+  dele ainda são conferidas, para o relatório de degradação). Por isso todo
+  método, com custo ou handler, está declarado ali ou classificado ao lado
+  dela em `planning/toolbox_gate.py`, e um teste falha para um que não esteja
+  em nenhum dos dois (#789):
   - `LOCAL_METHODS` dá a cada método sem chamadas obrigatórias à Toolbox um
     papel e um motivo; ele ainda pode ter chamadas opcionais. O papel diz
     onde a implementação vive, uma dimensão separada das chamadas. `transitional` é computação documental ainda no Core: o estado
@@ -327,13 +327,38 @@ vai primeiro para ele, e os clientes não o conferem por conta própria; eles
 conferem o catálogo de um secundário antes de fazer failover para ele
 (ADR-0006). A leitura do catálogo não tem failover: o snapshot de um secundário
 admitiria métodos que a execução ainda manda para o primário. Quando o catálogo
-do primário não pode ser lido, o `enforce` falha fechado, como descrito abaixo.
+do primário não pode ser lido, o gate falha fechado, como descrito abaixo.
+
+O gate lê **somente** o catálogo do primário, de propósito. Endpoints
+secundários são deploys independentes, não réplicas: o SDK confere o catálogo
+de um secundário antes de fazer failover para ele na execução, mas o gate nunca
+une os catálogos. Com `TOOLBOX_BASE_URLS` cujos deploys publicam conjuntos
+diferentes de capacidade/provider, um método que o secundário poderia servir
+ainda é descartado quando o primário não o publica. Essa é a política
+conservadora já registrada em `toolbox_gate._catalog_endpoint` (#429); um deploy
+que dependa de secundários semanticamente diferentes precisa aceitar essa
+limitação até a política ser revista
+([#938](https://github.com/A11yDevs/acessilia/issues/938)).
 
 | `TOOLBOX_AVAILABILITY_GATE` | Efeito |
 |---|---|
-| `observe` (padrão) | Registra no log o que seria removido e grava em `canonical_metadata.pddl_toolbox_availability`; os passos do plano não mudam |
-| `enforce` | Remove esses métodos do plano e de todos os replanejamentos do documento. Quando o catálogo não pode ser lido e o último snapshot válido tem mais de `TOOLBOX_CATALOG_STALE_SECONDS`, todo método com requisitos da Toolbox é removido (fail closed) |
-| `off` | Sem verificação |
+| `enforce` (padrão) | O snapshot decide o que o problema oferece. Métodos cujos requisitos ele não publica são descartados pelo planejador, e o mesmo vale para todo método com requisitos da Toolbox quando o catálogo não pode ser lido e o último snapshot válido tem mais de `TOOLBOX_CATALOG_STALE_SECONDS` (falha fechada). O gate só registra a decisão no log e em `canonical_metadata.pddl_toolbox_availability` |
+| `off` | Sem verificação; interruptor de emergência. Todo método roda como se o catálogo oferecesse tudo |
+
+O antigo modo `observe` foi removido quando o snapshot virou a entrada do
+problema (#809). Uma execução ainda configurada com `observe` cai no padrão,
+`enforce`. Qualquer outro valor, inclusive um erro de digitação, também cai em
+`enforce` e é reportado uma vez por processo, para que um interruptor de
+emergência digitado errado não desligue a verificação em silêncio.
+
+Um checkpoint de plano mantém a decisão sob a qual foi criado. Um job retomado
+de um plano criado sob o antigo `observe` mantém `offered: null` no metadado,
+então seus replanejamentos continuam oferecendo todo requisito; apague o
+checkpoint de plano para replanejar sob o snapshot. A retomada registra a
+divergência entre o modo do checkpoint e o modo efetivo da execução.
+
+Para reproduzir as evidências de produção exigidas antes de ativar `enforce`,
+siga [toolbox_availability_validation.pt-br.md](toolbox_availability_validation.pt-br.md).
 
 ### 4.4 Tests
 
@@ -465,7 +490,7 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 | `TOOLBOX_BASE_URLS` | *(vazio)* | URLs, separadas por vírgula, de deploys independentes da Toolbox, tentadas em ordem pelos clientes de capacidade; o gate de disponibilidade lê o catálogo da primeira; vazio significa só `TOOLBOX_BASE_URL` |
 | `TOOLBOX_PROVIDER` | `docling` | Provider principal de extração |
 | `TOOLBOX_API_KEY` | *(vazio)* | Chave para `Authorization: Bearer` |
-| `TOOLBOX_AVAILABILITY_GATE` | `observe` | Gate de disponibilidade: `observe`, `enforce` ou `off` (seção 4.3) |
+| `TOOLBOX_AVAILABILITY_GATE` | `enforce` | Gate de disponibilidade: `enforce` ou `off`; o removido `observe` cai em `enforce` (seção 4.3) |
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | Por quanto tempo um snapshot do catálogo é reutilizado |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | Por quanto tempo o último snapshot válido é servido quando o catálogo não pode ser lido |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Timeout das requisições para os clientes de capacidade que não declaram o próprio |

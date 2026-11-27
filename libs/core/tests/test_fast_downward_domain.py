@@ -48,8 +48,8 @@ def _methods(plan) -> list[str]:
 @pytest.mark.parametrize(
     ("offered", "expected"),
     [
-        pytest.param(None, ["m-b"], id="observe-every-requirement-offered"),
-        pytest.param(frozenset({_EXTRACT}), ["m-a"], id="enforce-cheaper-method-not-offered"),
+        pytest.param(None, ["m-b"], id="every-requirement-offered"),
+        pytest.param(frozenset({_EXTRACT}), ["m-a"], id="cheaper-method-not-offered"),
     ],
 )
 def test_fast_downward_plans_like_the_internal_planner(offered, expected):

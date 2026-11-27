@@ -24,8 +24,10 @@ O core já planeja com PDDL em ciclo fechado: `PddlProblemCompiler`,
 - Qual método satisfaz uma obrigação é decidido pelo registro de métodos
   (`METHOD_HANDLERS`), não pelo domínio.
 - A disponibilidade de capacidades é aplicada pelo `toolbox_gate` fora do
-  planejador. Seu padrão é `observe`. Em `enforce`, ele remove métodos e o
-  planejador "cai para métodos locais", que a ADR-0028 elimina.
+  planejador. No momento desta medição seu padrão era `observe` (removido na
+  [#809](https://github.com/A11yDevs/acessilia/issues/809)); em `enforce` ele
+  removia métodos e o planejador "caía para métodos locais", que a ADR-0028
+  elimina.
 - Agentes em `acessilia_core.agents` (fusão, adjudicação, visão, especialista
   em tabelas, nível de página) tomam decisões e chamam modelos a partir do
   core.

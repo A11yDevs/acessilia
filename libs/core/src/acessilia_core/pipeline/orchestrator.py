@@ -502,6 +502,18 @@ class PddlAccessibilityOrchestrator:
         """The nominal plan and what it was built under, from the checkpoint or a new plan."""
         plan_state = ctx.checkpoints.load(PHASE_PLAN)
         if plan_state is not None:
+            availability = toolbox_gate.AvailabilityDecision.from_metadata(
+                plan_state.get("availability") or {}, ctx.config.toolbox
+            )
+            current = toolbox_gate.gate_mode(ctx.config.toolbox)
+            if availability.mode != current:
+                logger.warning(
+                    "Job {}: plan checkpoint keeps Toolbox gate mode {!r} "
+                    "(current {!r}); its replans keep that decision",
+                    getattr(ctx.checkpoints, "job_id", "?"),
+                    availability.mode,
+                    current,
+                )
             return _PlanningState(
                 plan=NominalPlan.model_validate(plan_state["plan"]),
                 comparison=(
@@ -510,9 +522,7 @@ class PddlAccessibilityOrchestrator:
                     else None
                 ),
                 planning_manifest=ProcessingManifest.model_validate(plan_state["manifest"]),
-                availability=toolbox_gate.AvailabilityDecision.from_metadata(
-                    plan_state.get("availability") or {}, ctx.config.toolbox
-                ),
+                availability=availability,
                 gated=list(plan_state.get("gated") or []),
                 replans=int(plan_state.get("replans") or 0),
                 discoveries=int(plan_state.get("discoveries") or 0),
@@ -879,15 +889,10 @@ def _log_availability(availability: toolbox_gate.AvailabilityDecision) -> None:
         f"{method}: {', '.join(reasons)}"
         for method, reasons in availability.blocked.items()
     )
-    if availability.enforced:
-        logger.warning(
-            "Toolbox gate (catalogue {}): methods out of the plan — {}",
-            availability.catalog_revision or "unavailable",
-            blocked,
-        )
-    else:
-        logger.warning(
-            "Toolbox gate observing (catalogue {}): would remove — {}",
-            availability.catalog_revision or "unavailable",
-            blocked,
-        )
+    # The gate only reports: the snapshot's facts already reached the problem,
+    # so the planner chooses among the methods it marks runnable.
+    logger.warning(
+        "Toolbox gate (catalogue {}): methods the catalogue rules out — {}",
+        availability.catalog_revision or "unavailable",
+        blocked,
+    )

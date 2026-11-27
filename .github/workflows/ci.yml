@@ -778,8 +778,8 @@ jobs:
           from xml.etree import ElementTree
 
           EXPECTED = {
-              "test_fast_downward_plans_like_the_internal_planner[observe-every-requirement-offered]",
-              "test_fast_downward_plans_like_the_internal_planner[enforce-cheaper-method-not-offered]",
+              "test_fast_downward_plans_like_the_internal_planner[every-requirement-offered]",
+              "test_fast_downward_plans_like_the_internal_planner[cheaper-method-not-offered]",
               "test_fast_downward_parses_symbols_shared_across_types",
               "test_fast_downward_plans_without_a_catalogue",
               "test_fast_downward_orders_a_document_level_obligation_first",

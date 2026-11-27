@@ -2,6 +2,37 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.29 — o catálogo da Toolbox é sempre a entrada do plano (#809)
+
+O gate de disponibilidade não tem mais o modo `observe`. Desde o domínio 2.4 o
+snapshot do catálogo chega ao planejador como fatos do problema, então não
+sobrava nada para o `observe` reter: o snapshot agora decide o que é oferecido
+em toda execução. `TOOLBOX_AVAILABILITY_GATE` aceita `enforce` (o padrão) ou
+`off`; um valor desconhecido, inclusive um deploy ainda configurado com
+`observe`, usa `enforce`.
+- `enforce` mantém o comportamento de falha fechada: sem catálogo legível, e
+  passado `TOOLBOX_CATALOG_STALE_SECONDS`, nenhum método com requisitos da
+  Toolbox é oferecido e o planejador cai para métodos locais ou
+  `human-review`.
+- O gate só relata: registra no log os métodos que o catálogo descarta e grava
+  a decisão em `canonical_metadata.pddl_toolbox_availability`. A antiga linha
+  de log `would remove` deixou de existir.
+- `off` continua como interruptor de emergência; ele não envia fatos de
+  catálogo, então todo método roda como se o catálogo oferecesse tudo.
+- Um checkpoint de plano mantém a decisão sob a qual foi criado. Um job
+  retomado de um plano criado sob `observe` mantém `offered: null` e os fatos
+  presumidos, então seus replanejamentos não mudam; apague o checkpoint de
+  plano para replanejar sob o snapshot.
+- Testes cobrem o retorno do modo removido, o checkpoint legado, o relatório
+  do gate e as opções sem caminho `observe`. Documentação, `.env.example`, a
+  página de projeção e a ADR-0029 acompanham. A descrição do domínio 2.4
+  distribuída fica congelada porque seu hash vincula planos salvos; a página
+  viva de projeção registra o conjunto atual de modos.
+- Um valor de gate desconhecido ou obsoleto avisa uma vez por processo e usa
+  `enforce`; os valores são normalizados, então `Off` continua sendo `off`.
+- A chave do cache de processamento sobe para `v15`, para resultados gravados
+  pela 0.3.28 sob `observe` não serem reproduzidos pelo TTL.
+
 ## 0.3.27 — metas do job sobrevivem a planos que atendem apenas parte delas (#883)
 
 A flag `selected` de uma obrigação mantém seu significado de meta do job

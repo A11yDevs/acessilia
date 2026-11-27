@@ -76,7 +76,7 @@ def explicit_config(*, toolbox_url: str, data_dir: Path) -> CoreConfig:
             timeouts={key: 300 for key in TIMEOUT_KEYS},
             use_remote_cache=True,
             use_artifact_store=True,
-            availability_gate="observe",
+            availability_gate="enforce",
             catalog_refresh_seconds=60,
             catalog_stale_seconds=900,
             media_inspect_enabled=True,

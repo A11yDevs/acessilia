@@ -250,13 +250,13 @@ def test_build_pddl_structured_payload_is_compatible_with_canonical_builder():
 
 
 def test_build_pddl_structured_payload_reports_the_toolbox_gate_decision():
-    """The observe mode is only useful if its verdict reaches the output."""
+    """The gate's report reaches the output, including what it ruled out."""
     decision = {
-        "mode": "observe",
+        "mode": "enforce",
         "catalog_revision": "abc123",
         "catalog_error": None,
         "blocked_methods": {"dual-provider-fusion": ["reason"]},
-        "applied": False,
+        "applied": True,
     }
     payload = build_pddl_structured_payload(
         file_path=Path("/tmp/amostra.pdf"),

@@ -52,7 +52,9 @@ def default_core_config() -> CoreConfig:
             timeouts=dict(_TOOLBOX_TIMEOUTS),
             use_remote_cache=False,
             use_artifact_store=False,
-            availability_gate="observe",
+            # No test builds a catalogue unless it is about the gate itself;
+            # the service's default is enforce (TOOLBOX_AVAILABILITY_GATE).
+            availability_gate="off",
             catalog_refresh_seconds=60,
             catalog_stale_seconds=900,
             media_inspect_enabled=True,

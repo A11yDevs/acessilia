@@ -242,14 +242,14 @@ def test_requirements_become_requires_facts_and_typed_objects():
     assert _objects(compiled, "provider") == {"docling", "pymupdf"}
 
 
-def test_an_observing_catalogue_offers_every_requirement():
+def test_a_catalogue_that_offers_every_requirement_keeps_all_methods():
     compiled = _compile(_manifest(_obligation("o-1")), catalogue=_catalogue(offered=None))
     facts = _facts(compiled)
     assert {"(offered document-structure-extract docling)", "(offered pdf-render pymupdf)"} <= facts
     assert compiled.projection.runnable_methods == {"m-a", "m-b"}
 
 
-def test_an_enforcing_catalogue_offers_only_what_the_snapshot_publishes():
+def test_a_catalogue_offers_only_what_the_snapshot_publishes():
     compiled = _compile(
         _manifest(_obligation("o-1", costs={"m-a": 9, "m-b": 1})),
         catalogue=_catalogue(offered=frozenset({_EXTRACT})),
@@ -263,10 +263,10 @@ def test_an_enforcing_catalogue_offers_only_what_the_snapshot_publishes():
 
 def test_the_planner_uses_only_runnable_methods():
     manifest = _manifest(_obligation("o-1", costs={"m-a": 9, "m-b": 1}))
-    _, observed = PlannerAgent().plan(manifest, catalogue=_catalogue())
-    _, enforced = PlannerAgent().plan(manifest, catalogue=_catalogue(offered=frozenset({_EXTRACT})))
-    assert [step.method for step in observed.steps if step.method] == ["m-b"]
-    assert [step.method for step in enforced.steps if step.method] == ["m-a"]
+    _, assumed = PlannerAgent().plan(manifest, catalogue=_catalogue())
+    _, restricted = PlannerAgent().plan(manifest, catalogue=_catalogue(offered=frozenset({_EXTRACT})))
+    assert [step.method for step in assumed.steps if step.method] == ["m-b"]
+    assert [step.method for step in restricted.steps if step.method] == ["m-a"]
 
 
 def test_an_obligation_without_a_runnable_method_is_refused():

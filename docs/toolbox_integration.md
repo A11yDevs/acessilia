@@ -288,10 +288,10 @@ result. Do not add a local implementation behind it (see 2.3).
   The availability gate then checks it against the live catalogue before each
   document is planned (see below).
 
-  A method left out of `METHOD_TOOLBOX_REQUIREMENTS` is never ruled out:
-  under `enforce` it stays runnable whatever the catalogue says (its optional
-  calls are still checked, for the degradation report). So every method, with
-  a cost or a handler, is either declared there or classified next to it in
+  A method left out of `METHOD_TOOLBOX_REQUIREMENTS` is never ruled out: it
+  stays runnable whatever the catalogue says (its optional calls are still
+  checked, for the degradation report). So every method, with a cost or a
+  handler, is either declared there or classified next to it in
   `planning/toolbox_gate.py`, and a test fails for one that is neither (#789):
   - `LOCAL_METHODS` gives each method without required Toolbox calls a role
     and a reason; it may still have optional calls. The role says where the
@@ -325,14 +325,38 @@ of `TOOLBOX_BASE_URLS`, else `TOOLBOX_BASE_URL`. Every capability call goes
 there first, and the clients do not check it themselves; they check a
 secondary's catalogue before failing over to it (ADR-0006). The catalogue read
 has no failover: a secondary's snapshot would admit methods that execution
-still sends to the primary. When the primary's catalogue cannot be read,
-`enforce` fails closed as described below.
+still sends to the primary. When the primary's catalogue cannot be read, the
+gate fails closed as described below.
+
+The gate deliberately reads **only** the primary catalogue. Secondary endpoints
+are independent deployments, not replicas: the SDK checks a secondary's
+catalogue before failing over to it at execution time, but the gate never
+unions the catalogues. With `TOOLBOX_BASE_URLS` whose deployments publish
+different capability/provider sets, a method the secondary could serve is still
+ruled out when the primary does not publish it. This is the conservative
+policy already recorded in `toolbox_gate._catalog_endpoint` (#429); a deployment
+that relies on semantically different secondaries must accept that limitation
+until the policy is reviewed ([#938](https://github.com/A11yDevs/acessilia/issues/938)).
 
 | `TOOLBOX_AVAILABILITY_GATE` | Effect |
 |---|---|
-| `observe` (default) | Logs what would be removed and records it in `canonical_metadata.pddl_toolbox_availability`; the plan steps are unchanged |
-| `enforce` | Removes those methods from the plan and from every replan of the document. When the catalogue cannot be read and the last good snapshot is older than `TOOLBOX_CATALOG_STALE_SECONDS`, every method with Toolbox requirements is removed (fail closed) |
-| `off` | No check |
+| `enforce` (default) | The snapshot decides what the problem offers. Methods whose requirements it does not publish are ruled out by the planner, and so is every method with Toolbox requirements when the catalogue cannot be read and the last good snapshot is older than `TOOLBOX_CATALOG_STALE_SECONDS` (fail closed). The gate only logs the decision and records it in `canonical_metadata.pddl_toolbox_availability` |
+| `off` | No check; an emergency switch. Every method runs as if the catalogue offered everything |
+
+The former `observe` mode was removed once the snapshot became the problem's
+input (#809). A run still configured with `observe` falls back to the default,
+`enforce`. Any other value, including a typo, also falls back to `enforce` and
+is reported once per process, so a mistyped emergency switch cannot silently
+turn the check off.
+
+A plan checkpoint keeps the decision it was built under. A job resumed from a
+plan built under the former `observe` mode keeps `offered: null` in its
+metadata, so its replans keep offering every requirement; delete the plan
+checkpoint to replan under the snapshot. The resume logs the mismatch between
+the checkpoint's mode and the run's effective mode.
+
+To reproduce the production evidence required before enabling `enforce`, follow
+[toolbox_availability_validation.md](toolbox_availability_validation.md).
 
 ### 4.4 Tests
 
@@ -462,7 +486,7 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 | `TOOLBOX_BASE_URLS` | *(empty)* | Comma-separated URLs of independent Toolbox deployments, tried in order by the capability clients; the availability gate reads the first one's catalogue; empty means `TOOLBOX_BASE_URL` only |
 | `TOOLBOX_PROVIDER` | `docling` | Primary extraction provider |
 | `TOOLBOX_API_KEY` | *(empty)* | Key for `Authorization: Bearer` |
-| `TOOLBOX_AVAILABILITY_GATE` | `observe` | Availability gate: `observe`, `enforce` or `off` (section 4.3) |
+| `TOOLBOX_AVAILABILITY_GATE` | `enforce` | Availability gate: `enforce` or `off`; the removed `observe` falls back to `enforce` (section 4.3) |
 | `TOOLBOX_CATALOG_REFRESH_SECONDS` | `60` | How long a catalogue snapshot is reused |
 | `TOOLBOX_CATALOG_STALE_SECONDS` | `900` | How long the last good snapshot is served when the catalogue cannot be read |
 | `TOOLBOX_TIMEOUT_SECONDS` | `3600` | Request timeout for the capability clients that do not declare their own |

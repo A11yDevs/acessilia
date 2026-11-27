@@ -1,8 +1,9 @@
 """The Toolbox availability gate for planning methods.
 
 Methods whose handlers call the Toolbox are checked against one catalogue
-snapshot per document. ``observe`` only reports; ``enforce`` keeps the methods
-out of the plan and fails closed without a catalogue.
+snapshot per document. The snapshot is the input: the planner only chooses
+methods it marks runnable, so a missing catalogue fails closed. The gate logs
+and records the decision; ``off`` is the emergency switch.
 """
 
 from __future__ import annotations
@@ -39,13 +40,34 @@ def _staging_snapshot():
     )
 
 
+def _staging_snapshot_without(capability_id):
+    """The staging snapshot with one capability unpublished."""
+    payload = json.loads(CONTRACT_SNAPSHOT.read_text(encoding="utf-8"))
+    capabilities = [
+        item for item in payload["capabilities"] if item["id"] != capability_id
+    ]
+    return snapshot_from_payloads(capabilities, payload["providers"], fetched_at=0.0)
+
+
 def _fuse_manifest(methods=FUSE_METHODS):
     obligation = _obligation("fuse-providers", ["el-1"], methods)
     obligation.method_costs = {m: DEFAULT_METHOD_COSTS[m] for m in methods}
     return _manifest([_element("el-1", "paragraph", text="texto")], [obligation])
 
 
-def _config(*, secondary="mineru", gate="observe"):
+def _prefer_dual_manifest():
+    """The fused extraction is cheaper, so only the catalogue can remove it."""
+    manifest = _fuse_manifest()
+    obligation = manifest.obligations[0]
+    obligation.method_costs = {
+        "dual-provider-fusion": 5,
+        "single-provider": 20,
+        "human-review": 100,
+    }
+    return manifest
+
+
+def _config(*, secondary="mineru", gate="enforce"):
     """The default providers, whatever the environment says."""
     return replace(
         core_config(fusion={"secondary_provider": secondary}),
@@ -87,12 +109,14 @@ def test_methods_without_toolbox_requirements_are_never_blocked() -> None:
     assert decision.blocked == {}
 
 
-def test_observe_reports_without_removing() -> None:
+def test_the_removed_observe_mode_uses_the_snapshot() -> None:
+    """A caller that still names ``observe`` gets the default: fail closed."""
     decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
 
     assert set(decision.blocked) == {"dual-provider-fusion", "single-provider"}
-    assert decision.unavailable_methods == []
-    assert decision.to_metadata()["applied"] is False
+    assert decision.mode == "enforce"
+    assert decision.offered == []
+    assert decision.to_metadata()["applied"] is True
 
 
 def test_enforce_without_a_catalogue_fails_closed() -> None:
@@ -139,6 +163,56 @@ class _CountingCache:
 
 
 @pytest.mark.asyncio
+async def test_the_default_mode_plans_from_a_real_catalogue_end_to_end(monkeypatch) -> None:
+    """#937: the production path (decide -> facts -> planner) decides the plan.
+
+    The cache read and the Toolbox are stubbed; the gate, the problem compiler
+    and the planner are real. Removing a required provider or capability, or
+    the whole snapshot, must change the selected method.
+    """
+    orchestrator = _orchestrator()
+    manifest = _prefer_dual_manifest()
+
+    async def plan(config, snapshot, error=None):
+        cache = _CountingCache(snapshot)
+        cache.last_error = error
+        monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: cache)
+        decision = await toolbox_gate.decide(manifest, config)
+        plan, _ = orchestrator._build_plan(
+            manifest, catalogue=decision.catalogue_facts()
+        )
+        return decision, [step.method for step in plan.steps if step.method]
+
+    decision, methods = await plan(_config(), _staging_snapshot())
+    assert decision.offered
+    assert methods == ["dual-provider-fusion"]
+
+    # The secondary provider is not registered: dual fusion loses to single.
+    decision, methods = await plan(
+        _config(secondary="qwen3-vl-page"), _staging_snapshot()
+    )
+    assert "dual-provider-fusion" in decision.blocked
+    assert methods == ["single-provider"]
+
+    # The extraction capability is absent: no remote extraction method remains.
+    decision, methods = await plan(
+        _config(), _staging_snapshot_without("document.structure.extract")
+    )
+    assert "document.structure.extract" in " ".join(
+        reason for reasons in decision.blocked.values() for reason in reasons
+    )
+    assert methods == ["human-review"]
+
+    # No snapshot: fail closed, even though one existed before.
+    decision, methods = await plan(
+        _config(), None, error="ToolboxTimeout: catalogue unavailable"
+    )
+    assert decision.catalog_error == "ToolboxTimeout: catalogue unavailable"
+    assert decision.offered == []
+    assert methods == ["human-review"]
+
+
+@pytest.mark.asyncio
 async def test_decide_skips_the_catalogue_when_nothing_needs_it(monkeypatch) -> None:
     cache = _CountingCache()
     monkeypatch.setattr(toolbox_gate, "catalog_cache", lambda _toolbox: cache)
@@ -175,8 +249,35 @@ async def test_decide_reads_the_cache_once(monkeypatch) -> None:
     assert decision.blocked == {}
 
 
-def test_unknown_mode_falls_back_to_observe() -> None:
-    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="strict")) == "observe"
+def test_unknown_and_removed_modes_fall_back_to_enforce() -> None:
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="strict")) == "enforce"
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="observe")) == "enforce"
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate="off")) == "off"
+    # The value is normalized: a direct CoreConfig caller may pass Off.
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate=" Off ")) == "off"
+
+
+def test_an_unknown_gate_value_warns_once_per_process(monkeypatch) -> None:
+    monkeypatch.setattr(toolbox_gate, "_WARNED_GATE_MODES", set())
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        toolbox_gate.logger, "warning",
+        lambda message, *args: warnings.append(message.format(*args)),
+    )
+
+    toolbox_gate._warn_unknown_gate_mode("strict")
+    toolbox_gate._warn_unknown_gate_mode("STRICT")
+    toolbox_gate._warn_unknown_gate_mode("observe")
+
+    assert len(warnings) == 2
+    assert "not a known mode" in warnings[0]
+    assert "removed (#809)" in warnings[1]
+
+
+def test_evaluate_refuses_the_off_mode() -> None:
+    """``off`` means no catalogue facts; evaluate() cannot honour that."""
+    with pytest.raises(ValueError, match="off mode"):
+        toolbox_gate.evaluate(FUSE_METHODS, _staging_snapshot(), mode="off", config=_config())
 
 
 def test_every_gated_method_has_a_handler() -> None:
@@ -336,16 +437,6 @@ def test_the_least_recently_used_cache_goes_past_the_bound(monkeypatch) -> None:
     assert cache("b") is not b
 
 
-def test_observe_offers_every_requirement_so_the_plan_does_not_change() -> None:
-    """Option (a) of #640: the catalogue is visible in the problem, not applied."""
-    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
-
-    assert decision.requirements
-    assert decision.offered is None
-    facts = decision.catalogue_facts()
-    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
-
-
 def test_the_catalogue_facts_survive_the_checkpoint() -> None:
     decision = toolbox_gate.evaluate(
         FUSE_METHODS, None, mode="enforce", config=_config(), catalog_error="down"
@@ -366,16 +457,35 @@ def test_a_checkpoint_from_before_the_catalogue_facts_adds_none() -> None:
     assert restored.catalogue_facts().requirements == {}
 
 
-def test_observed_facts_are_marked_assumed_not_evidence() -> None:
-    """Review of #781: in observe the offered facts are an assumption, and the
-    metadata says so, naming the methods the snapshot rules out."""
-    observed = toolbox_gate.evaluate(FUSE_METHODS, None, mode="observe", config=_config())
-    enforced = toolbox_gate.evaluate(FUSE_METHODS, None, mode="enforce", config=_config())
+def test_a_checkpoint_built_under_observe_keeps_its_assumed_facts() -> None:
+    """#809: the removed mode is not accepted for new runs, but a resumed plan
+    keeps the decision it was built under and keeps offering every requirement.
+    Deleting the plan checkpoint replans under the snapshot."""
+    legacy = {
+        "mode": "observe",
+        "requirements": {
+            "single-provider": [["document.structure.extract@1", "docling"]],
+        },
+        "offered": None,
+        "blocked_methods": {"single-provider": ["document.structure.extract@1 not offered"]},
+    }
+    restored = toolbox_gate.AvailabilityDecision.from_metadata(legacy, toolbox_config())
 
-    assert observed.to_metadata()["offered_source"] == "assumed"
-    assert observed.to_metadata()["assumed_runnable_methods"] == ["dual-provider-fusion", "single-provider"]
-    assert enforced.to_metadata()["offered_source"] == "catalogue_snapshot"
-    assert enforced.to_metadata()["assumed_runnable_methods"] == []
+    facts = restored.catalogue_facts()
+    assert restored.mode == "observe"
+    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
+    metadata = restored.to_metadata()
+    assert metadata["offered_source"] == "assumed"
+    assert metadata["assumed_runnable_methods"] == ["single-provider"]
+    assert metadata["applied"] is False
+
+
+def test_a_new_decision_never_assumes_availability() -> None:
+    decision = toolbox_gate.evaluate(FUSE_METHODS, None, mode="enforce", config=_config())
+
+    metadata = decision.to_metadata()
+    assert metadata["offered_source"] == "catalogue_snapshot"
+    assert metadata["assumed_runnable_methods"] == []
     assert toolbox_gate.AvailabilityDecision(mode="off", catalog_revision=None).offered_source == "none"
 
 
@@ -413,6 +523,58 @@ async def test_a_resumed_plan_keeps_the_snapshot_it_was_built_under(monkeypatch)
 
     assert restored.availability.catalogue_facts() == built_under.catalogue_facts()
     assert restored.availability.catalog_revision == built_under.catalog_revision
+
+
+@pytest.mark.asyncio
+async def test_a_resumed_observe_plan_keeps_its_assumed_facts(monkeypatch) -> None:
+    """#809: a plan checkpoint built under the removed mode keeps its decision
+    end to end, and its replans still offer every requirement."""
+    from types import SimpleNamespace
+
+    from acessilia_core.pipeline.checkpointing import PHASE_PLAN, manifest_payload
+    from acessilia_core.planning.planner_agent import PlannerAgent
+
+    async def must_not_read(*_args, **_kwargs):
+        raise AssertionError("a resumed legacy plan read the catalogue again")
+
+    monkeypatch.setattr(toolbox_gate, "decide", must_not_read)
+    manifest = _fuse_manifest()
+    legacy = {
+        "mode": "observe",
+        "requirements": {
+            "dual-provider-fusion": [
+                ["document.structure.extract@1", "docling"],
+                ["document.structure.extract@1", "mineru"],
+            ],
+            "single-provider": [["document.structure.extract@1", "docling"]],
+        },
+        "offered": None,
+        "blocked_methods": {
+            "dual-provider-fusion": ["document.structure.extract@1 not offered"],
+            "single-provider": ["document.structure.extract@1 not offered"],
+        },
+    }
+    built_under = toolbox_gate.AvailabilityDecision.from_metadata(legacy, toolbox_config())
+    _, plan = PlannerAgent().plan(manifest, catalogue=built_under.catalogue_facts())
+    state = {
+        "plan": plan.model_dump(mode="json", by_alias=True),
+        "manifest": manifest_payload(manifest),
+        "availability": legacy,
+    }
+    ctx = SimpleNamespace(
+        checkpoints=SimpleNamespace(
+            job_id="job-legacy",
+            load=lambda phase: state if phase == PHASE_PLAN else None,
+        ),
+        config=_config(gate="enforce"),
+    )
+
+    restored = await _orchestrator()._load_or_build_plan(ctx, manifest)
+
+    assert restored.availability.mode == "observe"
+    facts = restored.availability.catalogue_facts()
+    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
+    assert set(restored.availability.blocked) == {"dual-provider-fusion", "single-provider"}
 
 
 #: The transitional methods when #801 classified them. The set only shrinks
