@@ -66,8 +66,12 @@ COMPONENT_MODULES: dict[str, str] = {
 
 #: A function needs at least this many non-context AST nodes to enter the report.
 MIN_DUPLICATE_NODES = 15
-#: The baseline keeps only the largest duplicate groups; totals cover all groups.
-MAX_DUPLICATE_GROUPS = 40
+#: Self-description of the duplicate floor for the JSON baseline.
+DUPLICATE_FLOOR_POLICY = "whole-function"
+#: The baseline keeps the largest duplicate groups; totals cover all groups.
+#: The cap is above the current and historical group counts so the ratchet can
+#: compare every group instead of silently dropping the smaller ones.
+MAX_DUPLICATE_GROUPS = 100
 #: Maximum rows in each hotspot ranking.
 MAX_HOTSPOTS = 15
 SCHEMA_VERSION = 1
@@ -216,9 +220,17 @@ def _node_count(node: ast.AST) -> int:
 
 
 def _fingerprint(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
-    """A digest of the normalized body, or ``None`` for a trivial function."""
+    """A digest of the normalized body, or ``None`` below the duplicate floor.
+
+    The floor is the historical whole-function count, so a one-statement body
+    is not exempted just because it has fewer than two statements (#749). This
+    keeps a collapsed forwarder visible while its function still reaches
+    ``MIN_DUPLICATE_NODES``; a function that shrinks below the floor is treated
+    as non-evidence, the same as any other small body. The leading docstring is
+    removed from the fingerprint but still counts toward the function size.
+    """
     statements = _body_statements(node)
-    if len(statements) < 2 or _node_count(node) < MIN_DUPLICATE_NODES:
+    if not statements or _node_count(node) < MIN_DUPLICATE_NODES:
         return None
     body = ast.Module(body=copy.deepcopy(statements), type_ignores=[])
     normalized = _Shape().visit(body)
@@ -416,6 +428,7 @@ def collect(rev: str = "HEAD") -> dict[str, Any]:
         "dependency_cycles": _cycles(graph),
         "duplication": {
             "min_nodes": MIN_DUPLICATE_NODES,
+            "floor_policy": DUPLICATE_FLOOR_POLICY,
             "groups": duplicate_groups,
             "totals": duplicate_totals,
         },

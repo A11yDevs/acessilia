@@ -21,7 +21,7 @@ The script reads every tracked `.py` file from `git` at the requested revision, 
 | Dependency edge | A file in component A imports a first-party module of component B (`acessilia_core`, `acessilia_sdk`, `docstruct`, `backend`, `frontend`); each file counts once per target, and relative imports count as the current component |
 | Fan-in / fan-out | Components that import A / components A imports |
 | Cycle | A simple cycle in the component graph |
-| Structural duplicate | Functions with at least 15 non-context AST nodes and two statements after a leading docstring whose normalized bodies have the same SHA-256 digest; names, constants, attributes and keyword names are normalized |
+| Structural duplicate | Functions with at least 15 non-context AST nodes and a non-empty body after a leading docstring whose normalized bodies have the same SHA-256 digest; names, constants, attributes and keyword names are normalized. Since [#749](https://github.com/A11yDevs/acessilia/issues/749) the statement count is not a criterion, so a one-statement forwarder is fingerprinted like any other body; a function that shrinks below the node floor is non-evidence |
 | Hotspot | The most complex functions and the largest modules |
 
 A structural duplicate is a **candidate**, not a semantic clone. Two functions can share control flow and still differ in types, side effects or error handling. The reported line total is the physical span of the members (including docstrings and signatures), so it is an upper bound on duplicated logic. PR 2 decides which groups are worth consolidating. Cohesion (LCOM), module-level fan-in and semantic duplication are deliberately left to PR 3; this baseline exposes the inputs for those analyses.
@@ -57,19 +57,19 @@ No component cycle was found. Fan-in: Core 2, SDK 2, docstruct 3, backend 1, fro
 
 ### Structural duplicates
 
-The baseline contains **23 groups**, **57 functions** and **699 lines** in duplicate groups. The JSON keeps the 40 largest groups; here all 23 fit. The five largest groups are:
+The regenerated baseline contains **65 groups**, **171 functions** and **1,727 lines** in duplicate groups. The JSON was measured again at the same historical revision (`f812032a`) after #749 changed the detector, so the component numbers stay comparable and only duplicate membership changed. The JSON keeps up to 100 groups, so all 65 fit. The five largest groups are:
 
 | Group | Lines | Examples |
 |---:|---:|---|
+| 9 functions | 99 | core agent normalizers and reading-order helpers (`FusionAgent.normalize_formula`, …) |
+| 7 functions | 87 | core adjudication helpers (`OrderAdjudicationAgent.parse_order`, …) |
+| 7 functions | 32 | core agent `process_*` envelopes and docstruct payload helpers |
+| 7 functions | 24 | core agent `process_*` envelopes and `apply_output_profile_filter` |
 | 5 functions | 39 | frontend Telegram handlers `cmd_detailed`, `cmd_low`, `cmd_medium`, `cmd_normal`, `cmd_ocr` |
-| 5 functions | 15 | generated SDK dataset readers (`read_dataset_list`, `read_dataset_sample`, `read_dataset_splits`, …) |
-| 4 functions | 33 | core schema writers (`write_execution_report_schema`, `write_processing_manifest_schema`, …) |
-| 3 functions | 17 | core config helpers (`_tool_config`, `_export_config`, `_toolbox_config`) |
-| 3 functions | 48 | SDK result readers (`transcribe_region_result`, `text_spans_result`, `validate_result`) |
 
-Two groups cross component boundaries. The substantive one is `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 functions, 30 lines) — a candidate for PR 2's ownership question. The other is trivial (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 functions, 6 lines). The SDK dataset readers live in `_dataset_generated.py`, whose header says “do not edit by hand”; they are a signal for the generator, not for manual consolidation.
+Seven groups cross component boundaries. The substantive one is `backend/config/settings.py::_locales_from_env` ≡ `libs/core/src/acessilia_core/i18n/__init__.py::_locales_from_raw` (2 functions, 30 lines) — a candidate for PR 2's ownership question. Another is the trivial constructor pair (`JobOperations.__init__` / `_FurnitureView.__init__`, 2 functions, 6 lines). The remaining cross-component groups are single-statement shapes that #749 exposed, such as `StateManager.evento_cancelamento` / `StateManager.obter` / `MethodRegistry.get` and small core/docstruct helpers. The SDK dataset readers live in `_dataset_generated.py`, whose header says “do not edit by hand”; they are a signal for the generator, not for manual consolidation.
 
-The remaining groups are candidates, not verdicts: equal normalized control flow is not semantic equivalence. The detector ignores docstrings and AST context nodes, so a documented one-statement wrapper no longer enters a group. PR 2 evaluates each group before touching it.
+The remaining groups are candidates, not verdicts: equal normalized control flow is not semantic equivalence. The detector drops docstrings from the normalized body and ignores AST context nodes, but a docstring still counts toward the function's node floor. Since [#749](https://github.com/A11yDevs/acessilia/issues/749) the statement count is not a criterion, so a documented forwarding wrapper stays visible when its temporary is inlined and the function still meets the node floor; a shape that shrinks below the floor is not evidence. PR 2 evaluates each group before touching it.
 
 ### Hotspots
 
@@ -97,7 +97,7 @@ python scripts/architecture_quality.py --rev HEAD \
 python -m pytest tests/test_architecture_quality.py
 ```
 
-The committed JSON records the measured commit in `rev` and the Python version in `python`. Duplicate-group identity is comparable only on the same Python minor version, because `ast.dump` can change with the grammar; size, complexity and dependency edges are stable. The script is a diagnostic only: it exits 0 even when the numbers grow. PR 5 decides which measures become a ratchet, with the allowlist and update workflow of the existing #652 and Ruff baselines.
+The committed JSON records the measured commit in `rev` and the Python version in `python`; `duplication.floor_policy` records that the node floor is measured over the whole function, so detector-policy changes are visible in the snapshot itself. Duplicate-group identity is comparable only on the same Python minor version, because `ast.dump` can change with the grammar; size, complexity and dependency edges are stable. The script is a diagnostic only: it exits 0 even when the numbers grow. PR 5 decides which measures become a ratchet, with the allowlist and update workflow of the existing #652 and Ruff baselines.
 
 ## What this PR does not decide
 

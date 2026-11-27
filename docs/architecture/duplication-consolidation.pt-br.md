@@ -2,13 +2,13 @@
 
 > [duplication-consolidation.md](duplication-consolidation.md). A versão em inglês é a fonte.
 
-Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656). Ele classifica os grupos de duplicatas do [baseline de novembro](quality-baseline.pt-br.md) e registra as consolidações de baixo risco implementadas até aqui. O snapshot que originou a triagem é `develop` em `b00636fc`: **23 grupos, 57 funções e 699 linhas**.
+Este é o PR 2 da [issue #656](https://github.com/A11yDevs/acessilia/issues/656). Ele classifica os grupos de duplicatas do [baseline de novembro](quality-baseline.pt-br.md) e registra as consolidações de baixo risco implementadas até aqui. O snapshot que originou a triagem é `develop` em `b00636fc`: **23 grupos, 57 funções e 699 linhas**. O JSON do baseline foi medido de novo na mesma revisão depois que a [#749](https://github.com/A11yDevs/acessilia/issues/749) mudou o detector; os números de 23 grupos abaixo continuam sendo a medição original, e a seção da política de uma instrução registra os novos totais.
 
 ## Método
 
 - Um grupo estrutural só é acionável quando as funções são semanticamente intercambiáveis para os mesmos chamadores. Fluxo de controle normalizado igual não basta.
 - Código gerado é alterado pelo gerador, nunca editando o arquivo gerado.
-- O detector de duplicatas ignora corpos com menos de duas instruções. Um wrapper de uma instrução não é evidência de consolidação; a exceção fica registrada aqui para não baixar a métrica silenciosamente.
+- O detector de duplicatas aplica `MIN_DUPLICATE_NODES` à função inteira; a contagem de instruções não é critério. Um wrapper de repasse, portanto, continua visível depois que o temporário é embutido quando a função ainda atinge o piso ([#749](https://github.com/A11yDevs/acessilia/issues/749)), e seu grupo é classificado como reclassificado, não consolidado. Uma forma que encolhe abaixo do piso de nós continua não sendo evidência.
 - Fluxos sensíveis a comportamento (seleção dos agentes, startup do frontend) precisam de teste de caracterização antes da extração.
 - Uma duplicata entre componentes precisa de um único dono. Parsing de locale é semântica de i18n e o parser genérico agora vive no SDK (`acessilia_sdk.i18n`); o core mantém catálogos e políticas, o SDK é dono do contexto de requisição e da tradução, e o serviço lê o ambiente e delega o parse.
 
@@ -31,7 +31,7 @@ O comportamento é fixado por `tests/test_i18n_locales.py` e pelo `tests/test_i1
 
 A fachada do core era um nome novo de compatibilidade, não um chamador pré-existente preservado: `_locales_from_raw` era código morto antes deste PR. Ela existiu para a migração restante acontecer sem um flag day; a #712 a removeu e moveu o pin do core para `acessilia-sdk>=0.4,<0.5` quando o SDK 0.4.0 publicou a API completa de i18n.
 
-**Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. O [JSON do baseline](quality-baseline.json) inicial permanece como snapshot histórico; esta página registra as mudanças contra ele.
+**Delta medido no commit de código deste PR:** 23 grupos / 57 funções / 699 linhas → **22 grupos / 55 funções / 669 linhas**. Apenas o grupo `_locales_*` desaparece. Esses deltas são contra o snapshot original de 23 grupos; o [JSON do baseline](quality-baseline.json) é o snapshot regerado descrito na seção da política de uma instrução.
 
 ## Segunda consolidação: o writer de JSON Schema
 
@@ -116,14 +116,14 @@ Isso cobre `judge_page_result`, `transcribe_region_result`, `text_spans_result`,
 `analyze_result` e `extract_structure_result`. Os testes existentes de result
 readers e de layout readers exercitam saídas válidas e inválidas.
 
-O detector agora reporta 20 grupos / 49 funções / 499 linhas → **17 grupos / 41
-funções / 381 linhas**, mas isso é uma isenção do detector, não extração de
-comportamento compartilhado: cada corpo reescrito tem uma instrução, e
-`_fingerprint` ignora corpos com menos de duas. Os oito wrappers desses grupos
-seriam agrupados novamente se esse piso mudasse. As três linhas ficam registradas
-como reclassificadas, não consolidadas, até a política de uma instrução ser
-decidida para a guarda de CI do PR 5; a
-[#749](https://github.com/A11yDevs/acessilia/issues/749) acompanha essa decisão.
+A queda medida de 20 grupos / 49 funções / 499 linhas para **17 grupos / 41
+funções / 381 linhas** era uma isenção do detector na época, não extração de
+comportamento compartilhado: cada corpo reescrito tinha uma instrução, e
+`_fingerprint` então ignorava corpos com menos de duas. Desde a
+[#749](https://github.com/A11yDevs/acessilia/issues/749) esses corpos voltam a
+receber fingerprint, então as três linhas continuam reclassificadas, não
+consolidadas: os leitores compartilhados já fazem a validação, e não há mais
+nada a extrair.
 
 ## Quinta consolidação: os helpers de comandos do Telegram
 
@@ -164,10 +164,10 @@ validadores agora delegam para `_blank_to_none`; os testes existentes cobrem
 **Delta medido no commit de código deste PR:** 15 grupos / 34 funções / 319
 linhas → **14 grupos / 32 funções / 309 linhas**. O grupo de normalizadores do
 output schema desaparece. Os dois validadores delegadores agora têm uma
-instrução, então a isenção de `< 2 statements` do detector os esconde; eles
-voltariam a formar grupo se a [#749](https://github.com/A11yDevs/acessilia/issues/749)
-mudasse esse piso. Diferente do caso dos wrappers do SDK, esta é uma extração
-real: os dois validadores compartilham `_blank_to_none`.
+instrução; o detector anterior à #749 os escondia, e o piso da função inteira os
+reporta como membros de um grupo misto de uma instrução sob a política abaixo,
+não como um par isolado. Diferente do caso dos wrappers do SDK, esta é uma
+extração real: os dois validadores compartilham `_blank_to_none`.
 
 ## Oitava consolidação: o helper de SHA-256 de arquivo
 
@@ -227,9 +227,10 @@ schema de dataset cobrem documentos válidos, vazios e malformados.
 
 **Delta medido no commit de código deste PR:** 10 grupos / 24 funções / 257
 linhas → **9 grupos / 19 funções / 242 linhas**. O grupo de leitores gerados de
-dataset desaparece. Cada leitor agora tem uma instrução, então o piso de uma
-instrução do detector também se aplica; o helper compartilhado é a extração
-real, não o piso.
+dataset desaparece. Cada leitor agora tem uma instrução, mas fica abaixo do piso
+de nós da função inteira, então o detector não o reporta; isso continua sendo
+uma limitação aceita, e o helper compartilhado é a extração real, não o corpo
+reduzido.
 
 ## Décima terceira consolidação: os shims de atributos depreciados
 
@@ -242,9 +243,10 @@ dois módulos.
 
 **Delta medido no commit de código deste PR:** 9 grupos / 19 funções / 242
 linhas → **8 grupos / 17 funções / 222 linhas**. O grupo de `__getattr__` de
-depreciação desaparece. Cada shim agora tem uma instrução, então o piso de uma
-instrução do detector também se aplica; o helper compartilhado é a extração
-real, não o piso.
+depreciação desaparece. Cada shim agora tem uma instrução, mas fica abaixo do
+piso de nós da função inteira, então o detector não o reporta; isso continua
+sendo uma limitação aceita, e o helper compartilhado é a extração real, não o
+corpo reduzido.
 
 ## Décima quarta consolidação: o planejador construído sob demanda
 
@@ -256,9 +258,10 @@ planejador injetado.
 
 **Delta medido no commit de código deste PR:** 8 grupos / 17 funções / 222
 linhas → **7 grupos / 15 funções / 213 linhas**. O grupo da propriedade
-`planner` desaparece. Cada propriedade agora tem uma instrução, então o piso de
-uma instrução do detector também se aplica; o helper compartilhado é a extração
-real, não o piso.
+`planner` desaparece. Cada propriedade agora tem uma instrução, mas fica abaixo
+do piso de nós da função inteira, então o detector não a reporta; isso continua
+sendo uma limitação aceita, e o helper compartilhado é a extração real, não o
+corpo reduzido.
 
 ## Décima quinta consolidação: os checkers gerados de reference
 
@@ -273,9 +276,10 @@ compartilhado.
 
 **Delta medido no commit de código deste PR:** 7 grupos / 15 funções / 213
 linhas → **6 grupos / 13 funções / 201 linhas**. O grupo de checkers gerados
-desaparece. Cada wrapper agora tem uma instrução, então o piso de uma instrução
-do detector também se aplica; o checker compartilhado é a extração real, não o
-piso.
+desaparece. Cada wrapper agora tem uma instrução, mas fica abaixo do piso de nós
+da função inteira, então o detector não o reporta; isso continua sendo uma
+limitação aceita, e o checker compartilhado é a extração real, não o corpo
+reduzido.
 
 ## Décima sexta consolidação: os envelopes de ferramentas dos agentes
 
@@ -313,12 +317,36 @@ para `dict` não mudam.
 funções / 201 linhas → **5 grupos / 11 funções / 161 linhas**. O grupo de
 seleção de tabela desaparece.
 
-Juntos, os três PRs paralelos deixam **1 grupo / 2 funções / 6 linhas**: o par
-trivial de construtores, reclassificado abaixo como sem ação.
+Juntos, os três PRs paralelos deixam **1 grupo / 2 funções / 6 linhas** sob o
+detector da época: o par trivial de construtores, reclassificado abaixo como sem
+ação. A #749 depois tornou os delegadores de uma instrução visíveis de novo.
+
+## Política de uma instrução (#749)
+
+O detector não isenta mais um corpo com menos de duas instruções.
+`MIN_DUPLICATE_NODES` se aplica à função inteira, como no baseline original,
+então um repassador de uma instrução recebe fingerprint como qualquer outro
+corpo. Isso preserva todos os grupos existentes e deixa o tamanho da função
+inteira como único piso. Assinaturas longas podem, portanto, qualificar um corpo
+pequeno como candidato; isso é aceito, porque a alternativa era esconder os
+wrappers de repasse que a métrica deve expor.
+
+A consequência é que os oito acessadores tipados do SDK da quarta triagem voltam
+a ser reportados, junto com os outros delegadores de uma linha que atingem o
+piso de nós. Eles são clones estruturais, mas não candidatos a consolidação: o
+leitor, helper ou checker compartilhado já é dono do comportamento. O
+[baseline regerado](quality-baseline.json) em `f812032a` reporta **65 grupos /
+171 funções / 1.727 linhas**, e o código atual reporta **56 grupos / 155 funções
+/ 1.545 linhas**. O ratchet de duplicação registra esses 56 grupos revisados em
+`tests/fixtures/duplication-allowlist.json`, então um novo clone de uma instrução
+falha na CI em vez de baixar a métrica em silêncio. Um repassador de duas
+instruções cuja forma colapsada fica abaixo de `MIN_DUPLICATE_NODES` continua não
+sendo evidência; esse limite é deliberado e está fixado pelos testes de regressão
+em `tests/test_architecture_quality.py`.
 
 ## Classificação dos grupos restantes
 
-Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente.
+Ordem do snapshot original de 23 grupos; “candidato” significa que a próxima consolidação pode avaliá-lo com testes, não que seja seguro unir imediatamente. O baseline regerado acrescenta os grupos de uma instrução descritos acima.
 
 | # | Grupo | Disposição |
 |---:|---|---|
@@ -329,7 +357,7 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 | 4 | Leitores de resultado do SDK em adjudicate/pdf/pdf_validate (3/48) | **Reclassificado:** falso positivo; o leitor compartilhado já faz a validação. |
 | 5 | Leitores de resultado do SDK em math/media_inspect (3/38) | **Reclassificado:** falso positivo; o inlining é estilo, não extração. |
 | 6 | `_locales_from_env` / `_locales_from_raw` (2/30) | **Consolidado neste PR.** |
-| 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | **Reclassificado:** atribuições de campos independentes; sem comportamento compartilhado. Aceito como único grupo restante. |
+| 7 | `JobOperations.__init__` / `_FurnitureView.__init__` (2/6) | **Reclassificado:** atribuições de campos independentes; sem comportamento compartilhado. O único grupo restante sob o detector anterior à #749. |
 | 8 | `_is_process_running` do frontend (2/26) | **Consolidado:** um runtime atrás dos dois entry points, com testes da sondagem de PID. |
 | 9 | `acquire_lock` do frontend (2/36) | **Consolidado:** o console script compartilha `frontend.run` e o lock dele. |
 | 10 | `startup` do frontend (2/107) | **Consolidado:** a caracterização cobre composição das interfaces e shutdown. |
@@ -352,17 +380,19 @@ as duas funções de depreciação `__getattr__` em `table_ast`/`validators` for
 consolidadas acima; elas eram acompanhadas separadamente das linhas do
 baseline.
 
-O único grupo detectado restante é o par trivial de construtores,
-reclassificado acima. Os grupos de agentes, config e tabela foram consolidados
-em três PRs paralelos; os grupos de planner e depreciação foram consolidados
-antes. O PR 5 pode decidir se o único grupo restante precisa de uma exceção de
-CI ou se o piso do detector já o torna não problemático.
+Os 56 grupos aceitos hoje são o par trivial de construtores anterior à #749 mais
+os delegadores de uma instrução e as formas incidentais que a #749 revelou;
+nenhum precisa de outra extração. Os grupos de agentes, config e tabela foram
+consolidados em três PRs paralelos; os grupos de planner e depreciação foram
+consolidados antes. O ratchet da #656 agora impõe o restante revisado, e um novo
+clone de uma instrução falha nele.
 
 ## Reprodução
 
 ```bash
 python scripts/architecture_quality.py --rev b00636fc   # baseline inicial
 python scripts/architecture_quality.py --rev HEAD       # números atuais
+python scripts/check_duplication_ratchet.py             # restante da CI
 python -m pytest tests/test_i18n_locales.py libs/core/tests/test_schema_files.py libs/core/tests/test_hashing.py libs/docstruct/tests/test_pandoc_ast_degrade.py tests/test_api_client.py tests/test_frontend_startup.py tests/test_telegram_client.py tests/test_telegram_state.py tests/test_structured_agent_outputs.py tests/test_toolbox_math_tools.py tests/test_sdk_bindings.py tests/test_sdk_dataset_schema.py libs/sdk/tests/test_dataset_readers.py libs/sdk/tests/test_reference.py libs/sdk/tests/test_result_readers.py libs/sdk/tests/test_layout_readers.py libs/core/tests/test_deprecation_shims.py libs/core/tests/test_table_ast.py libs/core/tests/test_pipeline_validation.py libs/core/tests/test_planning_engine.py libs/core/tests/test_orchestration_planning_characterization.py libs/core/tests/test_adjudication_agent.py libs/core/tests/test_page_level_agent.py libs/core/tests/test_fusion_agent.py tests/test_core_config.py tests/test_docx_export.py tests/test_pdf_ua_export.py libs/core/tests/test_table_specialist_agent.py tests/test_architecture_layers.py
 ```
 
