@@ -305,6 +305,14 @@ def test_job_configuration_requires_the_bearer_token(client, monkeypatch):
     monkeypatch.setattr(settings, "operations_api_token", "secret")
 
     assert client.get("/api/v1/operations/jobs/task/configuration").status_code == 401
+    # A job token authorizes the job's own status, never the privileged record.
+    assert (
+        client.get(
+            "/api/v1/operations/jobs/task/configuration",
+            headers={"X-Job-Token": "job-token"},
+        ).status_code
+        == 401
+    )
     assert (
         client.get(
             "/api/v1/operations/jobs/task/configuration",
