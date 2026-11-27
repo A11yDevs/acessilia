@@ -1363,6 +1363,14 @@ msgid "Another instance holds the process lock ({path})"
 msgstr "Outra instância mantém o lock de processo ({path})"
 
 #, python-brace-format
+msgid ""
+"Could not write the legacy process lock {path}: {error}. An older "
+"instance may not detect this one"
+msgstr ""
+"Não foi possível escrever o lock de processo legado {path}: {error}. Uma "
+"instância mais antiga pode não detectar esta"
+
+#, python-brace-format
 msgid "Lock file stale (PID {pid} is not running); replacing it..."
 msgstr "Arquivo de lock obsoleto (PID {pid} não está em execução); substituindo..."
 

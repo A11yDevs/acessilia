@@ -1,0 +1,92 @@
+name: Frontend lock (Windows)
+
+# The process lock has a separate Windows path (msvcrt.locking, tasklist and
+# mandatory byte-range locks). CI is Ubuntu-only elsewhere, so this small job
+# exercises the lock and i18n tests on windows-latest (#907). It is path
+# filtered: a full Windows suite is not needed for unrelated changes.
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    paths:
+      - 'frontend/run.py'
+      - 'frontend/cli/run.py'
+      - 'frontend/.gitignore'
+      - 'backend/config/process_setup.py'
+      - 'backend/config/settings.py'
+      - 'tests/conftest.py'
+      - 'tests/test_frontend_startup.py'
+      - 'tests/test_process_setup.py'
+      - 'tests/test_i18n.py'
+      - 'tests/test_no_portuguese.py'
+      - 'libs/core/src/acessilia_core/i18n/**'
+      - 'libs/core/pyproject.toml'
+      - 'scripts/gen_locale_catalogs.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/actions/setup-root/action.yml'
+      - '.github/workflows/frontend-lock-windows.yml'
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+    paths:
+      - 'frontend/run.py'
+      - 'frontend/cli/run.py'
+      - 'frontend/.gitignore'
+      - 'backend/config/process_setup.py'
+      - 'backend/config/settings.py'
+      - 'tests/conftest.py'
+      - 'tests/test_frontend_startup.py'
+      - 'tests/test_process_setup.py'
+      - 'tests/test_i18n.py'
+      - 'tests/test_no_portuguese.py'
+      - 'libs/core/src/acessilia_core/i18n/**'
+      - 'libs/core/pyproject.toml'
+      - 'scripts/gen_locale_catalogs.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/actions/setup-root/action.yml'
+      - '.github/workflows/frontend-lock-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock:
+    name: process lock (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Keep line endings as committed
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up root environment
+        uses: ./.github/actions/setup-root
+        with:
+          python-version: "3.12"
+          lock-hash: ${{ hashFiles('uv.lock') }}
+
+      - name: Run the process-lock and i18n tests
+        shell: bash
+        run: |
+          uv run --locked --extra dev python -m pytest -q \
+            tests/test_frontend_startup.py \
+            tests/test_process_setup.py \
+            tests/test_i18n.py \
+            tests/test_no_portuguese.py

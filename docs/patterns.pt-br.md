@@ -38,7 +38,7 @@ Também disponível em **inglês (EUA)**: [English version](patterns.md)
 
 ### 7. Execução em Instância Única e Travinha de Processo
 - Implementação: [frontend/run.py](../frontend/run.py)
-- O lock é um lock exclusivo do sistema operacional (`fcntl.flock` no POSIX, `msvcrt.locking` no Windows) sobre `frontend/bot.lock`, mantido durante toda a vida do processo; o PID gravado no arquivo é diagnóstico e também identifica um lock deixado por um runtime anterior.
+- O lock é um lock exclusivo do sistema operacional (`fcntl.flock` no POSIX, `msvcrt.locking` no Windows) sobre `frontend/bot.lock.v2`, mantido durante toda a vida do processo; o PID gravado no arquivo é diagnóstico. O runtime também grava seu PID no `frontend/bot.lock` anterior ao #903 e no `frontend/cli/bot.lock` anterior ao #741, para que esses runtimes recusem iniciar enquanto o novo roda; a saída deles remove apenas esses anúncios e não libera o lock autoritativo. Pare as instâncias antigas antes do upgrade.
 - O modo `0600` é aplicado na criação e, no POSIX, restringido quando possível. É best-effort: não protege o arquivo contra remoção por quem tem permissão de escrita no diretório. A exclusão mútua é o lock do SO, não o modo.
 - Benefício: impede colisões de processos na máquina do host, e duas inicializações concorrentes não podem ambas adquirir o lock.
 

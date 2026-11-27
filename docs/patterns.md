@@ -38,7 +38,7 @@ You can also read this documentation in **Brazilian Portuguese**: [português br
 
 ### 7. Single-Instance Execution & Process Lock
 - Implementation: [frontend/run.py](../frontend/run.py)
-- The lock is an exclusive OS lock (`fcntl.flock` on POSIX, `msvcrt.locking` on Windows) on `frontend/bot.lock`, held for the process lifetime; the PID written to the file is diagnostic and also identifies a lock left by an older runtime.
+- The lock is an exclusive OS lock (`fcntl.flock` on POSIX, `msvcrt.locking` on Windows) on `frontend/bot.lock.v2`, held for the process lifetime; the PID written to the file is diagnostic. The runtime also writes its PID to the pre-#903 `frontend/bot.lock` and the pre-#741 `frontend/cli/bot.lock`, so those runtimes refuse to start while the new one runs; their release unlinks only those advertisements and cannot release the authoritative lock. Stop old instances before upgrading.
 - The `0600` mode is applied when the file is created and, on POSIX, tightened when possible. It is best-effort: it does not protect the file from removal by anyone with write permission on the directory. Mutual exclusion is the OS lock, not the mode.
 - Benefit: prevents process collisions on the host machine, and two concurrent starts cannot both acquire the lock.
 
