@@ -7,7 +7,7 @@ outputs are compared does not change what a reference recorded.
 from __future__ import annotations
 
 from fnmatch import fnmatchcase
-from re import fullmatch
+from re import fullmatch, search
 from typing import Any
 
 from tests.differential.runner import escape
@@ -55,7 +55,22 @@ def differences(
             else:
                 found.extend(differences(reference[index], current[index], child, reference_child))
         return found
-    return [] if reference == current else [_item("changed", path, reference_path)]
+    return [] if _json_equal(reference, current) else [_item("changed", path, reference_path)]
+
+
+def _json_equal(left: Any, right: Any) -> bool:
+    """Equality of valid, deserialized JSON values (#919).
+
+    Booleans differ from numbers; numeric equality uses the received values,
+    with no extra rounding or arbitrary decimal precision.
+    """
+    if isinstance(left, bool) != isinstance(right, bool):
+        return False
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(_json_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(_json_equal(a, b) for a, b in zip(left, right))
+    return left == right
 
 
 def _item(kind: str, path: str, reference_path: str) -> dict[str, str]:
@@ -103,7 +118,8 @@ def explain(
     """The differences between ``reference`` and ``current`` that no entry of
     ``declared`` explains, and the entries that explain none of them.
 
-    An entry is ``{kind, path, reason}``, ``path`` a JSON pointer in which
+    An entry names ``kind`` and ``path``, plus an optional ``reason``;
+    stored declaration files require that reason. ``path`` is a pointer in which
     ``*`` matches any run of characters, plus the value it allows: an
     ``added`` or ``changed`` entry names the value now (``expected``), so a
     later change of the same field is not accepted with it; a ``removed``
@@ -113,14 +129,35 @@ def explain(
     to the nearest enclosing member of a list with distinct string ids.
     Added/removed differences use the side containing them. Changed fields
     require the same identified member and list context on both sides.
+    Unused entries are returned in input order as the original objects,
+    so callers can track configuration ownership independently of equality.
     """
     for entry in declared:
-        if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
-            raise ValueError(f"a declaration's id must be a non-empty string: {entry}")
+        validate_declaration(entry)
     found = differences(reference, current)
     unexplained = [item for item in found if not any(_explains(entry, item, reference, current) for entry in declared)]
     unused = [entry for entry in declared if not any(_explains(entry, item, reference, current) for item in found)]
     return unexplained, unused
+
+
+def validate_declaration(entry: Any) -> None:
+    """Reject a malformed entry before computing or matching differences (#912)."""
+    if not isinstance(entry, dict):
+        raise ValueError(f"a declaration must be an object: {entry!r}")
+    if entry.get("kind") not in ("added", "changed", "removed"):
+        raise ValueError(f"a declaration's kind must be added, changed or removed: {entry!r}")
+    if not isinstance(entry.get("path"), str):
+        raise ValueError(f"a declaration's path must be a string: {entry!r}")
+    if entry["kind"] in ("added", "changed") and "expected" not in entry:
+        raise ValueError(f"a declaration of kind {entry['kind']!r} must name its expected value: {entry!r}")
+    if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
+        raise ValueError(f"a declaration's id must be a non-empty string: {entry!r}")
+    allowed = {"kind", "path", "id", "reason", "was" if entry["kind"] == "removed" else "expected"}
+    unknown = entry.keys() - allowed
+    if unknown:
+        raise ValueError(f"unexpected fields {sorted(unknown, key=repr)!r} for {entry['kind']!r}: {entry!r}")
+    if "reason" in entry and (not isinstance(entry["reason"], str) or not entry["reason"].strip()):
+        raise ValueError(f"a declaration's reason must be a non-blank string: {entry!r}")
 
 
 def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, current: Any) -> bool:
@@ -129,12 +166,10 @@ def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, curre
     if entry["kind"] == "removed":
         document = reference
         pointer = item.get("reference_path", item["path"])
-        value_matches = "was" not in entry or resolve(document, pointer) == entry["was"]
+        value_matches = "was" not in entry or _json_equal(resolve(document, pointer), entry["was"])
     else:
         document, pointer = current, item["path"]
-        if "expected" not in entry:
-            raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
-        value_matches = resolve(document, pointer) == entry["expected"]
+        value_matches = _json_equal(resolve(document, pointer), entry["expected"])
     if not value_matches or "id" not in entry:
         return value_matches
     if item["kind"] == "changed":
@@ -193,12 +228,15 @@ def resolve(document: Any, pointer: str) -> Any:
 
     ``"/"`` names an empty property key. Nonempty pointers start with ``/``;
     list indices are ``0`` or ASCII decimals without leading zeroes.
-    An invalid prefix/index or a missing value raises ``KeyError(pointer)``.
+    Only ``~0`` and ``~1`` escape a token's tilde and slash, respectively.
+    A malformed pointer or a missing value raises ``KeyError(pointer)``.
     """
     if pointer and not pointer.startswith("/"):
         raise KeyError(pointer)
     value = document
     for segment in pointer.split("/")[1:]:
+        if search(r"~(?:[^01]|$)", segment):
+            raise KeyError(pointer)
         segment = segment.replace("~1", "/").replace("~0", "~")
         if isinstance(value, list):
             if not fullmatch(r"0|[1-9][0-9]*", segment):
@@ -218,4 +256,4 @@ def resolve(document: Any, pointer: str) -> Any:
 
 
 
-__all__ = ["differences", "explain", "resolve"]
+__all__ = ["differences", "explain", "resolve", "validate_declaration"]

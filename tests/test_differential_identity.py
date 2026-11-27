@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import pytest
 
+from tests.differential import compare
 from tests.differential.compare import differences, explain, resolve
 
 
@@ -109,6 +110,49 @@ def test_id_binding_does_not_hide_a_missing_expected_value():
                 [{"kind": "changed", "path": "/blocks/0/text", "id": "another", "reason": "r"}])
 
 
+@pytest.mark.parametrize("entry,diagnostic", [
+    (None, "object"), ([], "object"), ("entry", "object"),
+    ({}, "kind"), ({"kind": "unknown", "path": ""}, "kind"),
+    ({"kind": None, "path": ""}, "kind"), ({"kind": [], "path": ""}, "kind"),
+    ({"kind": "removed"}, "path"), ({"kind": "removed", "path": None}, "path"),
+    ({"kind": "removed", "path": 0}, "path"), ({"kind": "removed", "path": []}, "path"),
+    ({"kind": "added", "path": "/unused"}, "expected value"),
+    ({"kind": "changed", "path": "/unused"}, "expected value"),
+    ({"kind": "removed", "path": "/unused", "expected": 999}, "unexpected fields"),
+    ({"kind": "added", "path": "/unused", "expected": 1, "was": 0}, "unexpected fields"),
+    ({"kind": "changed", "path": "/unused", "expected": 1, "was": 0}, "unexpected fields"),
+    ({"kind": "removed", "path": "/unused", "extra": 0}, "unexpected fields"),
+    ({"kind": "removed", "path": "/unused", "reason": None}, "reason"),
+    ({"kind": "removed", "path": "/unused", "reason": 3}, "reason"),
+    ({"kind": "removed", "path": "/unused", "reason": ""}, "reason"),
+    ({"kind": "removed", "path": "/unused", "reason": "  "}, "reason"),
+])
+def test_every_declaration_is_validated_before_any_comparison(monkeypatch, entry, diagnostic):
+    def unexpected_comparison(*args, **kwargs):
+        raise AssertionError("validation must happen before comparison")
+
+    monkeypatch.setattr(compare, "differences", unexpected_comparison)
+    valid = {"kind": "removed", "path": "/valid"}
+    with pytest.raises(ValueError, match=diagnostic) as error:
+        explain({}, {}, [valid, entry])
+    assert repr(entry) in str(error.value)
+
+
+@pytest.mark.parametrize("path", ["", "/", "*", "/blocks/*/text", "/~*"])
+def test_validation_accepts_root_empty_key_and_glob_patterns(path):
+    for kind in ("added", "changed", "removed"):
+        value_key = "was" if kind == "removed" else "expected"
+        entry = {"kind": kind, "path": path, value_key: False, "id": "a"}
+        assert explain({}, {}, [entry]) == ([], [entry])
+
+
+@pytest.mark.parametrize("expected", [None, False, 0, "", [], {}])
+@pytest.mark.parametrize("kind", ["added", "changed"])
+def test_expected_presence_does_not_require_a_truthy_value(kind, expected):
+    entry = {"kind": kind, "path": "", "expected": expected}
+    assert explain({}, {}, [entry]) == ([], [entry])
+
+
 @pytest.mark.parametrize("side", ["reference", "current"])
 @pytest.mark.parametrize("invalid", ["duplicate", "missing", "empty", "integer", "unhashable"])
 def test_a_bound_change_requires_valid_identity_on_both_sides(side, invalid):
@@ -212,6 +256,44 @@ def test_a_nonempty_pointer_must_start_with_a_slash(pointer):
     with pytest.raises(KeyError) as error:
         resolve({"text": "example"}, pointer)
     assert error.value.args == (pointer,)
+
+
+@pytest.mark.parametrize("encoded,key", [
+    ("~", "~"), ("~2", "~2"), ("name~", "name~"), ("~01~2", "~1~2"),
+    ("~~0", "~~"), ("~0~", "~~"), ("~2~1", "~2/"),
+])
+@pytest.mark.parametrize("nested", [False, True])
+def test_invalid_tilde_escapes_fail_even_when_the_decoded_key_exists(encoded, key, nested):
+    document, pointer = {key: "value"}, f"/{encoded}"
+    if nested:
+        document = {"blocks": [{"id": "a", "metadata": document}]}
+        pointer = f"/blocks/0/metadata/{encoded}"
+    with pytest.raises(KeyError) as error:
+        resolve(document, pointer)
+    assert error.value.args == (pointer,)
+
+
+@pytest.mark.parametrize("encoded,key", [("~0", "~"), ("~1", "/"), ("~01", "~1"), ("~00", "~0"), ("~0~1", "~/"), ("~02", "~2")])
+@pytest.mark.parametrize("kind", ["added", "changed", "removed"])
+def test_valid_tilde_escapes_decode_once_and_keep_identity_binding(encoded, key, kind):
+    assert resolve({key: "new"}, f"/{encoded}") == "new"
+    reference, current = {"blocks": [{"id": "a"}]}, {"blocks": [{"id": "a", key: "new"}]}
+    if kind == "changed":
+        reference["blocks"][0][key] = "old"
+    elif kind == "removed":
+        reference, current = current, reference
+    value_key = "was" if kind == "removed" else "expected"
+    path = f"/blocks/0/{encoded}"
+    assert differences(reference, current) == [{"kind": kind, "path": path}]
+    declared = [{"kind": kind, "path": path, "id": "a", value_key: "new", "reason": "r"}]
+    assert explain(reference, current, declared) == ([], [])
+
+
+def test_a_tilde_glob_is_a_declaration_pattern_not_a_concrete_pointer():
+    reference, current = {"~2": "old"}, {"~2": "new"}
+    assert differences(reference, current) == [{"kind": "changed", "path": "/~02"}]
+    declared = [{"kind": "changed", "path": "/~*", "expected": "new", "reason": "r"}]
+    assert explain(reference, current, declared) == ([], [])
 
 
 @pytest.mark.parametrize("reference,current", [

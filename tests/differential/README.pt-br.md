@@ -213,13 +213,54 @@ Os campos de uma entrada:
   naquele caso. Prefira uma entrada específica para uma mudança pretendida
   somente para aquele caso.
 
+Toda declaração é validada antes do cálculo das diferenças, mesmo quando os
+documentos são iguais ou seu caminho não casaria com nada. Uma entrada deve
+ser um objeto com `kind` válido e `path` string (inclusive `""`). `added` e
+`changed` exigem a presença de `expected`; valores nulos, falsos e vazios são
+válidos. `was` continua opcional para `removed`; um `id` opcional deve ser uma
+string não vazia. Entradas inválidas geram `ValueError` identificando o campo
+e a entrada. Caminhos de declaração continuam padrões glob, não caminhos concretos.
+Campos desconhecidos são rejeitados, assim como `expected` em remoções e
+`was` em entradas added/changed. Um `reason` fornecido deve ser uma string
+não vazia nem composta apenas de espaços; chamadas sintéticas de baixo nível
+a `explain` podem omiti-lo.
+
+O carregador de `intended.json` valida o arquivo inteiro: um objeto com
+nomes de casos conhecidos ou `*` como chaves, listas de entradas válidas e um
+`reason` não vazio em toda entrada armazenada. Os erros incluem o arquivo e,
+quando aplicável, o grupo e o índice da entrada a partir de zero. Um arquivo
+ausente continua significando nenhuma declaração. Nenhuma declaração histórica
+precisa ser reescrita para atender a esse contrato.
+
+O controle de utilização acompanha a identidade e a posição das entradas,
+não a igualdade de dicionários Python. `explain` devolve as entradas sem uso
+como os objetos originais, na ordem de entrada. Isso distingue entradas comuns
+das específicas mesmo quando seus valores diferem apenas entre booleano e número.
+
 Caminhos concretos consumidos por `resolve` são vazios ou começam com `/`.
 Índices de listas devem ser `0` ou dígitos decimais ASCII sem zeros iniciais;
 sinais, espaços, underscores e dígitos não ASCII são rejeitados. Um prefixo
 ou índice inválido ou um valor ausente gera `KeyError` com o ponteiro original.
 Essas verificações se aplicam a caminhos concretos, não aos padrões de
-declaração casados por `fnmatchcase`. A validação de escapes de til inválidos
-está registrada na [#920](https://github.com/A11yDevs/acessilia/issues/920).
+declaração casados por `fnmatchcase`. Em um token concreto, somente `~0` e `~1`
+codificam til e barra. Outros escapes de til e um til isolado no final geram
+`KeyError` com o ponteiro original, mesmo quando a chave decodificada existe.
+A validação precede a decodificação: `~01` representa a chave literal `~1`,
+não `/`, e `~02` representa `~2`.
+
+A detecção de diferenças e `expected`/`was` usam a mesma regra recursiva de
+igualdade JSON. Booleanos diferem de números: `true` não é `1`, e `false`
+não é `0`, inclusive dentro de objetos e arrays. Números são comparados pelo
+valor exato, então `1` e `1.0` (também `0` e `-0.0`) são equivalentes; não há
+arredondamento, tolerância ou coerção de strings. A ordem das chaves de um
+objeto não importa; a ordem dos arrays importa. O alinhamento por identidade
+e a detecção de reordenação de listas continuam aplicáveis.
+Essa regra pressupõe valores JSON válidos após a desserialização. Ela não
+acrescenta arredondamento: o decodificador JSON pode já converter
+`0.10000000000000001` e `0.1` no mesmo float. Precisão decimal arbitrária,
+números não finitos e objetos Python arbitrários ficam fora dessa garantia.
+O tratamento estrito de números JSON nas fronteiras de entrada e saída das
+evidências está registrado na [#926](https://github.com/A11yDevs/acessilia/issues/926).
 
 Uma diferença não declarada falha. Uma declaração específica que nada
 explica naquele caso falha; uma declaração comum que nenhum caso usa
