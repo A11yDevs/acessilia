@@ -543,7 +543,22 @@ element is now enriched. Each element keeps its own outcome (for a table,
 full model-call runner, #590), and the per-element obligations that depend on
 it validate their element. Failing the whole obligation for one element would
 block the elements that are usable. So the method's message reports what
-happened to each element, and it fails only when the step raises.
+happened to each element, and it fails when the step raises or when local
+admission pressure kept the model from being asked (below).
+
+**A local admission rejection is a deferral (#828).** A full model-call
+runner is not an element outcome: the provider was never asked. When a
+document step leaves any target `admission_rejected`, its `MethodResult` is
+`success=False` with `failure_kind="admission_rejected"`. The executor records
+the step as `failed` with the same typed kind, leaves the obligation pending
+and records no method attempt, so the replan keeps the method available and
+runs the step again for the objects still pending, within `max_replans`.
+Provider unavailability, a timeout and an insufficient answer stay ordinary
+method failures: they are recorded as tried and the replan may use another
+method. `ExecutionStepResult.failure_kind` exposes the distinction in the
+execution report; the PDDL domain and the Core–Toolbox contracts do not
+change. A closed runner is lifecycle, not capacity pressure, and stays an
+execution failure.
 
 **Reconciled before each plan (M0, #832).** `reconcile_document_steps`
 runs when the manifest is enriched and again before each replan, for each

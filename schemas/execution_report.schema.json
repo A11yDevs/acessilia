@@ -75,6 +75,19 @@
           },
           "title": "Artifact Ids",
           "type": "array"
+        },
+        "failure_kind": {
+          "anyOf": [
+            {
+              "const": "admission_rejected",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Kind"
         }
       },
       "required": [

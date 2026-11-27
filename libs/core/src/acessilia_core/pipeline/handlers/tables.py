@@ -131,9 +131,14 @@ def _handle_table_enrichment_method(
     by_id = {element.id: element for element in manifest.elements}
     outcomes = Counter(_outcome(by_id[element_id]) for element_id in needing_ids)
     structured = outcomes.pop("read", 0) + outcomes.pop("from_text", 0)
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # A table the local runner rejected was never read: defer the method
+        # so the replan retries it without spending the method or the table
+        # on human review (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_TABLES_ENRICHED, len(tables)).format(
             count=len(tables),
             needing=len(needing_ids),

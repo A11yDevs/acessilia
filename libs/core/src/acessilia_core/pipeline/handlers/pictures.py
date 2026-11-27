@@ -117,9 +117,14 @@ def _handle_picture_description_method(
     outcomes = Counter(_outcome(element) for element in pictures if element.id not in already)
     described = outcomes.pop("described", 0)
     formulas = outcomes.pop("formula", 0)
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # Admission pressure means the step could not ask the model for those
+        # pictures: the method is deferred, not counted as tried, so the replan
+        # retries it instead of escalating them to human review (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_PICTURES_DESCRIBED, len(pictures)).format(
             count=len(pictures),
             described=described,

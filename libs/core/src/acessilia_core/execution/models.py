@@ -24,6 +24,13 @@ ReportStatus = Literal[
     "replan-required",
 ]
 StepStatus = Literal["succeeded", "failed", "simulated", "skipped"]
+#: Why a method did not produce a usable result when the caller must not treat
+#: it as a genuine method failure (#828). ``admission_rejected`` means the
+#: local model-call runner was full: capacity, not provider health or a
+#: semantic result. The executor keeps the obligation and the method available
+#: so the replan can retry the same action within its recovery budget, while a
+#: provider outage, a timeout or an insufficient answer stay ordinary failures.
+MethodFailureKind = Literal["admission_rejected"]
 
 
 class StrictModel(BaseModel):
@@ -35,6 +42,9 @@ class MethodResult(StrictModel):
     validated: bool = False
     message: str | None = None
     artifacts: list[Artifact] = Field(default_factory=list)
+    #: Set only with ``success=False``: a retryable failure the executor must
+    #: not count as the method having been tried.
+    failure_kind: MethodFailureKind | None = None
 
     @model_validator(mode="after")
     def success_requires_validation(self) -> "MethodResult":
@@ -56,6 +66,9 @@ class ExecutionStepResult(StrictModel):
     completed_at: datetime
     message: str | None = None
     artifact_ids: list[str] = Field(default_factory=list)
+    #: A retryable failure the planner must tell from a provider or execution
+    #: failure (#828). Absent on an ordinary step.
+    failure_kind: MethodFailureKind | None = None
 
 
 class ExecutionReport(StrictModel):

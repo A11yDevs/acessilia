@@ -84,7 +84,13 @@ Uma rejeição é pressão de admissão, não saúde do provider. Ela é tentada
 de novo, como um timeout, sem consumir uma tentativa de resposta; se persistir, a
 etapa registra `admission_rejected` (imagens, tabelas, fórmulas), deixa o breaker
 compartilhado intacto e mantém a execução fora do cache para que uma nova
-execução a retente. Um runner fechado gera o subtipo `ModelCallClosed`: é
+execução a retente. Dentro de um plano, os métodos de enriquecimento de
+documento a carregam como `MethodResult.failure_kind="admission_rejected"`; o
+executor a reporta em `ExecutionStepResult.failure_kind`, mantém a obrigação
+pendente sem registrar o método como tentado, e o replanejador repete a mesma
+ação dentro de `max_replans` (#828). Indisponibilidade do provider, timeout e
+resposta insuficiente continuam falhas comuns, com sua própria política. Um
+runner fechado gera o subtipo `ModelCallClosed`: é
 ciclo de vida, não pressão de capacidade, então os agentes não o retentam e as
 etapas abortam em vez de registrar uma degradação recuperável. O fechamento
 também acorda chamadores pendentes e ativos com o mesmo subtipo.

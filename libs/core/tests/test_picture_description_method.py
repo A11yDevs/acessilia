@@ -22,7 +22,7 @@ from pddl_support import (
     build_orchestrator,
 )
 
-from acessilia_core.agents.model_calls import current_model_calls
+from acessilia_core.agents.model_calls import ModelCallRejected, current_model_calls
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.i18n import n, t
 from acessilia_core.i18n.stage_messages import STAGE_ENRICHING_IMAGE_DESCRIPTIONS
@@ -305,6 +305,35 @@ def test_the_method_describes_its_pictures_and_reports_each_one(monkeypatch) -> 
     by_id = {element.id: element for element in updated.elements}
     assert by_id["p-1"].text == "A bar chart of sales."
     assert by_id["p-2"].metadata["vision_failure_reason"] == "model_failed"
+
+
+def test_an_admission_rejection_defers_the_method(monkeypatch) -> None:
+    """A full local runner is not a picture failure: the method stays
+    available and the replan retries it (#828)."""
+
+    class RejectingVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            raise ModelCallRejected("model-call execution capacity is full")
+
+    monkeypatch.setattr(picture_stage, "VisionAgent", RejectingVision)
+    monkeypatch.setattr(
+        picture_stage, "_extract_picture_bytes",
+        lambda source, element, fallback, *rest, **_kwargs: (element.id.encode(), fallback or 1),
+    )
+    manifest = _pictures_manifest("p-1")
+
+    updated, report = _in_executor(manifest)
+
+    step = _step(report, "obligation-describe-images")
+    assert step.status == "failed"
+    assert step.failure_kind == "admission_rejected"
+    enrichment = _by_id(updated, "obligation-describe-images")
+    assert enrichment.status == "pending"
+    assert enrichment.attempts == []
+    assert updated.elements[-1].metadata["vision_failure_reason"] == "admission_rejected"
 
 
 def test_the_method_without_pictures_fails_instead_of_raising() -> None:

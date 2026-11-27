@@ -2,6 +2,28 @@
 
 Brazilian Portuguese: [português brasileiro](CHANGELOG.pt-br.md).
 
+## 0.3.30 — local admission rejection reaches the planner as a retryable deferral (#828)
+
+The document enrichment stages already recorded `admission_rejected` per
+element, but the PDDL coordinator only saw generic failures or a successful
+collective step. A full local model-call runner is operational capacity, not
+provider health or a semantic result, and the planner can now tell it apart.
+- `MethodResult.failure_kind` and `ExecutionStepResult.failure_kind` carry
+  `admission_rejected` as a typed value. The execution-report schema gains the
+  optional field, backward compatible for reports that do not use it.
+- The picture, table, formula-classification and formula-recognition methods
+  return a failed result with that kind when any target was admission-rejected,
+  instead of claiming the collective step completed.
+- The executor records the step as `failed` with the typed kind, leaves the
+  obligation `pending`, records no method attempt and asks for a replan. The
+  same method stays available, so the replan retries it for the objects still
+  pending within `max_replans`. A closed runner stays an execution failure;
+  provider unavailability, timeouts and insufficient answers keep their own
+  policy of recording the method as tried and using the alternatives.
+- Region and page inspection return the typed kind instead of a generic
+  failure when the local runner rejects the call.
+- The PDDL domain and the Core–Toolbox contracts do not change.
+
 ## 0.3.29 — the Toolbox catalogue is always the plan's input (#809)
 
 The availability gate no longer has an `observe` mode. Since domain 2.4 the

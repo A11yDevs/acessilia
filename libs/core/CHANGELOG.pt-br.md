@@ -2,6 +2,31 @@
 
 Inglês, versão normativa: [English version](CHANGELOG.md).
 
+## 0.3.30 — a rejeição de admissão local chega ao planejador como adiamento retentável (#828)
+
+As etapas de enriquecimento de documento já registravam `admission_rejected`
+por elemento, mas o coordenador PDDL só via falhas genéricas ou um passo
+coletivo bem-sucedido. Um executor de chamadas de modelo cheio é capacidade
+operacional, não saúde do provider nem resultado semântico, e o planejador
+agora distingue os casos.
+- `MethodResult.failure_kind` e `ExecutionStepResult.failure_kind` carregam
+  `admission_rejected` como valor tipado. O schema do relatório de execução
+  ganha o campo opcional, compatível com relatórios que não o usam.
+- Os métodos de imagens, tabelas, classificação de regiões de fórmula e
+  reconhecimento de fórmulas retornam um resultado de falha com esse tipo
+  quando algum alvo foi rejeitado por admissão, em vez de declarar o passo
+  coletivo concluído.
+- O executor registra o passo como `failed` com o tipo, deixa a obrigação
+  `pending`, não registra tentativa do método e pede replanejamento. O mesmo
+  método continua disponível, então o replanejamento o repete para os objetos
+  ainda pendentes dentro de `max_replans`. Um runner fechado continua sendo
+  falha de execução; indisponibilidade do provider, timeout e resposta
+  insuficiente mantêm a política de registrar o método como tentado e usar as
+  alternativas.
+- A inspeção de região e de página retorna o tipo em vez de uma falha genérica
+  quando o runner local rejeita a chamada.
+- O domínio PDDL e os contratos Core–Toolbox não mudam.
+
 ## 0.3.29 — o catálogo da Toolbox é sempre a entrada do plano (#809)
 
 O gate de disponibilidade não tem mais o modo `observe`. Desde o domínio 2.4 o

@@ -84,6 +84,12 @@ A rejection is admission pressure, not provider health. It is retried once
 like a timeout, without consuming an answer attempt; if it persists, the stage
 records `admission_rejected` (pictures, tables, formulas), leaves the shared
 breaker untouched, and keeps the run out of the cache so a rerun can retry it.
+Inside a plan, the document enrichment methods carry it as
+`MethodResult.failure_kind="admission_rejected"`; the executor reports it in
+`ExecutionStepResult.failure_kind`, keeps the obligation pending without
+recording the method as tried, and the replanner retries the same action within
+`max_replans` (#828). Provider unavailability, timeouts and insufficient
+answers remain ordinary method failures with their own recovery policy.
 A closed runner raises the `ModelCallClosed` subtype instead: it is lifecycle,
 not capacity pressure, so the agents do not retry it and the stages abort
 rather than record a recoverable degradation. A closed runner also wakes

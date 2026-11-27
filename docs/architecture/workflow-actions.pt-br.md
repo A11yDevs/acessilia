@@ -563,8 +563,23 @@ tabela, `table_read_failure` com o motivo, inclusive o `admission_rejected` de
 um executor de chamadas de modelo cheio, #590), e as obrigações por elemento
 que dependem dela validam o seu elemento. Reprovar a obrigação inteira por um
 elemento bloquearia os elementos utilizáveis. Por isso a mensagem do método
-informa o que aconteceu com cada elemento, e ele só falha quando o passo lança
-uma exceção.
+informa o que aconteceu com cada elemento, e ele falha quando o passo lança uma
+exceção ou quando a pressão de admissão local impediu que o modelo fosse
+consultado (abaixo).
+
+**Uma rejeição de admissão local é um adiamento (#828).** Um executor de
+chamadas de modelo cheio não é um desfecho do elemento: o provider nunca foi
+consultado. Quando um passo de documento deixa qualquer alvo
+`admission_rejected`, seu `MethodResult` é `success=False` com
+`failure_kind="admission_rejected"`. O executor registra o passo como `failed`
+com o mesmo tipo, deixa a obrigação pendente e não registra tentativa do
+método, então o replanejamento mantém o método disponível e roda o passo de
+novo para os objetos ainda pendentes, dentro de `max_replans`. Indisponibilidade
+do provider, timeout e resposta insuficiente continuam falhas comuns de método:
+elas são registradas como tentadas e o replanejamento pode usar outro método.
+`ExecutionStepResult.failure_kind` expõe a distinção no relatório de execução; o
+domínio PDDL e os contratos Core–Toolbox não mudam. Um runner fechado é ciclo de
+vida, não pressão de capacidade, e continua sendo uma falha de execução.
 
 **Reconciliada antes de cada plano (M0, #832).**
 `reconcile_document_steps` roda quando o manifesto é enriquecido e de novo

@@ -110,9 +110,14 @@ def _handle_formula_region_classifier_method(
     run_sync(_classify(manifest, Path(manifest.source.path), config, ports, targets, obligation_id))
     outcomes = Counter(_outcome(element) for element in formulas if element.id not in already)
     math, pictures, unresolved = (outcomes.pop(key, 0) for key in ("math", "picture", "unresolved"))
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # Local capacity pressure left those regions undecided without asking
+        # the model: the replan retries the method instead of treating them as
+        # a provider or semantic failure (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_FORMULA_REGIONS_CLASSIFIED, len(formulas)).format(
             count=len(formulas),
             math=math,

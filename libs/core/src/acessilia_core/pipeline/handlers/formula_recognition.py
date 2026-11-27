@@ -137,9 +137,13 @@ def _handle_formula_recognizer_method(
     pictures = outcomes.pop("picture", 0)
     outcomes.pop("unchanged", None)
     recognized = {method: outcomes.pop(method) for method in ("math.recognize", "vision") if method in outcomes}
+    rejected = outcomes.get("admission_rejected", 0)
     return MethodResult(
-        success=True,
-        validated=True,
+        # The formulas the local runner rejected were not read: keep the
+        # method available and let the replan retry it (#828).
+        success=not rejected,
+        validated=not rejected,
+        failure_kind="admission_rejected" if rejected else None,
         message=n(*MSG_FORMULAS_RECOGNIZED, len(formulas)).format(
             count=len(formulas),
             recognized=sum(recognized.values()),

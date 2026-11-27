@@ -24,6 +24,7 @@ from pddl_support import (
     install_formula_recognizer,
 )
 
+from acessilia_core.agents.model_calls import ModelCallRejected
 from acessilia_core.agents.output_schemas import VisionOutput
 from acessilia_core.i18n import n, t
 from acessilia_core.manifest.models import ProcessingManifest
@@ -199,6 +200,31 @@ def test_the_method_recognizes_and_separates_and_reports_each_formula(monkeypatc
     )
     assert _by_id(updated, "f-empty").text == r"\frac{a}{b}"
     assert _by_id(updated, "f-numbered").metadata["equation_number"] == "2"
+
+
+def test_an_admission_rejection_defers_the_method(monkeypatch) -> None:
+    """The formulas the local runner could not ask about keep the recognition
+    method available instead of escalating them to human review (#828)."""
+    _recognizer(monkeypatch, latex=None)
+
+    class RejectingVision:
+        def __init__(self, mode, *, region_cache, toolbox, models):
+            pass
+
+        async def describe_region(self, **_kwargs):
+            raise ModelCallRejected("model-call execution capacity is full")
+
+    monkeypatch.setattr(formula_stage, "VisionAgent", RejectingVision)
+    manifest = _formulas_manifest(("f-1", ""))
+
+    updated, report = _in_executor(manifest)
+
+    step = _step(report, "obligation-recognize-formulas")
+    assert step.status == "failed"
+    assert step.failure_kind == "admission_rejected"
+    obligation = _by_id(updated, "obligation-recognize-formulas")
+    assert obligation.status == "pending"
+    assert obligation.attempts == []
 
 
 def test_the_method_without_formulas_fails_instead_of_raising() -> None:

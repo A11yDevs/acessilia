@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, NamedTuple
 
 from acessilia_core.agents.agno_support import require_workflow_classes
+from acessilia_core.agents.model_calls import ModelCallClosed, ModelCallRejected
 from acessilia_core.execution.messages import (
     EXE_COMPLETED_OBLIGATIONS_UNSATISFIED,
     EXE_DEPENDENCY_REMOVED,
@@ -40,6 +41,7 @@ from acessilia_core.execution.messages import (
 from acessilia_core.execution.models import (
     ExecutionReport,
     ExecutionStepResult,
+    MethodFailureKind,
     MethodResult,
     ReportMode,
     ReportStatus,
@@ -144,6 +146,12 @@ class _SkipStep(Exception):
     ``skipped`` with the reason, not ``failed``: nothing failed, and the
     replan, when one is needed, orders what changed.
     """
+
+
+class _DeferredStep(Exception):
+    """A local admission rejection: retryable, not a method failure (#828)."""
+
+    failure_kind: MethodFailureKind = "admission_rejected"
 
 
 class ExecutorAgent:
@@ -454,6 +462,7 @@ class ExecutorAgent:
         status: StepStatus = "simulated" if state.dry_run else "succeeded"
         message: str | None = None
         artifact_ids: list[str] = []
+        failure_kind: MethodFailureKind | None = None
 
         try:
             if step.action == "start-job":
@@ -470,6 +479,14 @@ class ExecutorAgent:
             status = "skipped"
             message = str(skip)
             logger.info("PDDL: step {} ({}) skipped: {}", step.index, step.action, message)
+        except _DeferredStep as deferred:
+            status = "failed"
+            message = str(deferred)
+            failure_kind = deferred.failure_kind
+            state.replan_required = True
+            if state.failed_step_index is None:
+                state.failed_step_index = step.index
+            logger.warning("PDDL: deferred step {}: {}", step.index, message)
         except Exception as exc:
             status = "failed"
             message = f"{type(exc).__name__}: {exc}"
@@ -496,6 +513,7 @@ class ExecutorAgent:
             completed_at=datetime.now(timezone.utc),
             message=message,
             artifact_ids=artifact_ids,
+            failure_kind=failure_kind,
         )
         for obligation in state.manifest.obligations:
             obligation.clear_inactive_deferral()
@@ -651,6 +669,25 @@ class ExecutorAgent:
         known = {item.id for item in state.manifest.obligations}
         try:
             result = handler(state.manifest, obligation.id)
+        except ModelCallClosed as exc:
+            # Shutdown is lifecycle, not capacity: it stays an execution
+            # failure instead of a retryable deferral (#590 review).
+            self._record_obligation_attempt(
+                obligation=obligation,
+                method=method,
+                started_at=attempt_started,
+                completed_at=datetime.now(timezone.utc),
+                status="failed",
+                message=f"{type(exc).__name__}: {exc}",
+                artifact_ids=[],
+            )
+            self._mark_obligation_failed(obligation, state)
+            raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc
+        except ModelCallRejected as exc:
+            # The model call never reached the provider: local admission
+            # pressure is retryable and must not consume the method (#828).
+            obligation.status = "pending"
+            raise _DeferredStep(f"{type(exc).__name__}: {exc}") from exc
         except Exception as exc:
             self._record_obligation_attempt(
                 obligation=obligation,
@@ -666,6 +703,12 @@ class ExecutorAgent:
 
         produced_ids = [artifact.id for artifact in result.artifacts]
         artifact_ids.extend(produced_ids)
+        self._append_new_artifacts(state.manifest, result.artifacts)
+        if result.failure_kind == "admission_rejected":
+            # No attempt is recorded: the planner must keep the method
+            # available and retry this action on the next plan (#828).
+            obligation.status = "pending"
+            raise _DeferredStep(result.message or t(EXE_RESULT_REJECTED))
         self._record_obligation_attempt(
             obligation=obligation,
             method=method,
@@ -675,7 +718,6 @@ class ExecutorAgent:
             message=result.message,
             artifact_ids=produced_ids,
         )
-        self._append_new_artifacts(state.manifest, result.artifacts)
         if not result.success or not result.validated:
             self._mark_obligation_failed(obligation, state)
             raise RuntimeError(result.message or t(EXE_RESULT_REJECTED))

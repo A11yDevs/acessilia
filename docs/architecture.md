@@ -87,7 +87,12 @@ without refusing it: `QUEUE_MAX_CONCURRENT × VISION_CONCURRENCY` must not excee
 pressure, not provider health: the agents retry it once like a timeout, without
 consuming an answer attempt. If it persists, the stage records
 `admission_rejected`, leaves the shared provider breaker untouched, and keeps the
-run out of the cache so a rerun can retry it. Closing the runner raises the
+run out of the cache so a rerun can retry it. Inside a plan, the enrichment
+methods type that reason as `failure_kind="admission_rejected"`; the executor
+keeps the obligation pending without recording the method as tried, and the
+replanner retries the same action within its recovery budget (#828). Provider
+unavailability, timeouts and insufficient answers stay ordinary failures.
+Closing the runner raises the
 `ModelCallClosed` subtype instead; agents do not retry it and stages abort,
 because shutdown is lifecycle, not object degradation.
 
