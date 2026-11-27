@@ -26,7 +26,13 @@ from docstruct.profiles import (
 def test_docstruct_msgids_are_deprecated_reexports():
     from acessilia_core.pipeline import validators as bridge
 
-    with pytest.warns(DeprecationWarning, match="docstruct.validation"):
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            r"^acessilia_core\.pipeline\.validators\.MSG_DUPLICATE_ID is deprecated; "
+            r"import it from docstruct\.validation$"
+        ),
+    ):
         from acessilia_core.pipeline.validators import MSG_DUPLICATE_ID as deprecated
 
     from docstruct.validation import MSG_DUPLICATE_ID
@@ -36,7 +42,13 @@ def test_docstruct_msgids_are_deprecated_reexports():
 
 
 def test_finding_reexport_is_deprecated():
-    with pytest.warns(DeprecationWarning, match="docstruct.validation"):
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            r"^acessilia_core\.pipeline\.validators\.Finding is deprecated; "
+            r"import it from docstruct\.validation$"
+        ),
+    ):
         from acessilia_core.pipeline.validators import Finding as deprecated
 
     from docstruct.validation import Finding

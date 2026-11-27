@@ -9,7 +9,13 @@ from docstruct.tables.ast import rows_from_table_ast, table_ast_from_rows
 def test_pure_docstruct_reexports_are_deprecated():
     from acessilia_core.pipeline import table_ast as bridge
 
-    with pytest.warns(DeprecationWarning, match="docstruct.tables.ast"):
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            r"^acessilia_core\.pipeline\.table_ast\.rows_from_table_ast is deprecated; "
+            r"import it from docstruct\.tables\.ast$"
+        ),
+    ):
         from acessilia_core.pipeline.table_ast import rows_from_table_ast as deprecated
 
     assert deprecated is rows_from_table_ast

@@ -17,6 +17,17 @@ def test_unknown_attributes_are_attribute_errors(module) -> None:
         getattr(module, "missing")
 
 
+def test_formula_tools_replacements_cover_every_deprecated_name() -> None:
+    assert set(formula_tools._REPLACEMENTS) == set(formula_tools._DEPRECATED)
+
+
+def test_a_mapping_missing_a_replacement_fails_clearly() -> None:
+    from acessilia_core.pipeline._deprecations import _deprecated_attribute
+
+    with pytest.raises(RuntimeError, match="has no replacement text"):
+        _deprecated_attribute("example.module", "gone", {}, {"gone": object()})
+
+
 @pytest.mark.parametrize(
     ("module", "name"),
     [

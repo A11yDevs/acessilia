@@ -228,14 +228,20 @@ real, não o piso.
 e lógica de `AttributeError`, diferindo apenas no nome do módulo e no import
 substituto. Os dois agora delegam a `_deprecated_attribute`; o aviso continua
 apontando para o chamador do shim, e a mensagem, o valor retornado e o erro de
-atributo desconhecido permanecem iguais. Os testes de depreciação cobrem os
-dois módulos.
+atributo desconhecido permanecem iguais. Os testes de depreciação cobrem esses
+módulos.
 
 **Delta medido no commit de código deste PR:** 9 grupos / 19 funções / 242
 linhas → **8 grupos / 17 funções / 222 linhas**. O grupo de `__getattr__` de
 depreciação desaparece. Cada shim agora tem uma instrução, então o piso de uma
 instrução do detector também se aplica; o helper compartilhado é a extração
 real, não o piso.
+
+`formula_tools.__getattr__` passou a usar o helper compartilhado na #799. Seus
+substitutos apontam para nomes diferentes em `docstruct.text.latex`, então ele
+passa um mapping de cada nome para o texto exato do import; a mensagem, o local
+do chamador e o erro de atributo desconhecido permanecem iguais. Os mesmos
+testes agora cobrem `formula_tools`.
 
 ## Décima quarta consolidação: o planejador construído sob demanda
 
@@ -339,8 +345,8 @@ Ordem do `docs/architecture/quality-baseline.json`; “candidato” significa qu
 
 A tabela é ancorada no baseline de novembro. A propriedade `planner`
 compartilhada pelo orchestrator e pelo planning engine introduzida pela #632 e
-as duas funções de depreciação `__getattr__` em `table_ast`/`validators` foram
-consolidadas acima; elas eram acompanhadas separadamente das linhas do
+as funções de depreciação `__getattr__` em `table_ast`/`validators`/`formula_tools`
+foram consolidadas acima; elas eram acompanhadas separadamente das linhas do
 baseline.
 
 O único grupo detectado restante é o par trivial de construtores,
