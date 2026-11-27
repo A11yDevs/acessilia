@@ -182,6 +182,31 @@ def test_unknown_and_removed_modes_fall_back_to_enforce() -> None:
     assert toolbox_gate.gate_mode(toolbox_config(availability_gate="strict")) == "enforce"
     assert toolbox_gate.gate_mode(toolbox_config(availability_gate="observe")) == "enforce"
     assert toolbox_gate.gate_mode(toolbox_config(availability_gate="off")) == "off"
+    # The value is normalized: a direct CoreConfig caller may pass Off.
+    assert toolbox_gate.gate_mode(toolbox_config(availability_gate=" Off ")) == "off"
+
+
+def test_an_unknown_gate_value_warns_once_per_process(monkeypatch) -> None:
+    monkeypatch.setattr(toolbox_gate, "_WARNED_GATE_MODES", set())
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        toolbox_gate.logger, "warning",
+        lambda message, *args: warnings.append(message.format(*args)),
+    )
+
+    toolbox_gate._warn_unknown_gate_mode("strict")
+    toolbox_gate._warn_unknown_gate_mode("STRICT")
+    toolbox_gate._warn_unknown_gate_mode("observe")
+
+    assert len(warnings) == 2
+    assert "not a known mode" in warnings[0]
+    assert "removed (#809)" in warnings[1]
+
+
+def test_evaluate_refuses_the_off_mode() -> None:
+    """``off`` means no catalogue facts; evaluate() cannot honour that."""
+    with pytest.raises(ValueError, match="off mode"):
+        toolbox_gate.evaluate(FUSE_METHODS, _staging_snapshot(), mode="off", config=_config())
 
 
 def test_every_gated_method_has_a_handler() -> None:
@@ -427,6 +452,58 @@ async def test_a_resumed_plan_keeps_the_snapshot_it_was_built_under(monkeypatch)
 
     assert restored.availability.catalogue_facts() == built_under.catalogue_facts()
     assert restored.availability.catalog_revision == built_under.catalog_revision
+
+
+@pytest.mark.asyncio
+async def test_a_resumed_observe_plan_keeps_its_assumed_facts(monkeypatch) -> None:
+    """#809: a plan checkpoint built under the removed mode keeps its decision
+    end to end, and its replans still offer every requirement."""
+    from types import SimpleNamespace
+
+    from acessilia_core.pipeline.checkpointing import PHASE_PLAN, manifest_payload
+    from acessilia_core.planning.planner_agent import PlannerAgent
+
+    async def must_not_read(*_args, **_kwargs):
+        raise AssertionError("a resumed legacy plan read the catalogue again")
+
+    monkeypatch.setattr(toolbox_gate, "decide", must_not_read)
+    manifest = _fuse_manifest()
+    legacy = {
+        "mode": "observe",
+        "requirements": {
+            "dual-provider-fusion": [
+                ["document.structure.extract@1", "docling"],
+                ["document.structure.extract@1", "mineru"],
+            ],
+            "single-provider": [["document.structure.extract@1", "docling"]],
+        },
+        "offered": None,
+        "blocked_methods": {
+            "dual-provider-fusion": ["document.structure.extract@1 not offered"],
+            "single-provider": ["document.structure.extract@1 not offered"],
+        },
+    }
+    built_under = toolbox_gate.AvailabilityDecision.from_metadata(legacy, toolbox_config())
+    _, plan = PlannerAgent().plan(manifest, catalogue=built_under.catalogue_facts())
+    state = {
+        "plan": plan.model_dump(mode="json", by_alias=True),
+        "manifest": manifest_payload(manifest),
+        "availability": legacy,
+    }
+    ctx = SimpleNamespace(
+        checkpoints=SimpleNamespace(
+            job_id="job-legacy",
+            load=lambda phase: state if phase == PHASE_PLAN else None,
+        ),
+        config=_config(gate="enforce"),
+    )
+
+    restored = await _orchestrator()._load_or_build_plan(ctx, manifest)
+
+    assert restored.availability.mode == "observe"
+    facts = restored.availability.catalogue_facts()
+    assert all(facts.offers(pair) for pairs in facts.requirements.values() for pair in pairs)
+    assert set(restored.availability.blocked) == {"dual-provider-fusion", "single-provider"}
 
 
 #: The transitional methods when #801 classified them. The set only shrinks

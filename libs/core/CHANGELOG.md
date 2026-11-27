@@ -25,7 +25,13 @@ every run. `TOOLBOX_AVAILABILITY_GATE` accepts `enforce` (the default) or
   snapshot.
 - Tests cover the removed-mode fallback, the legacy checkpoint, the gate
   report and the options without an `observe` path. Docs, `.env.example`, the
-  projection page, ADR-0029 and the domain 2.4 description follow.
+  projection page and ADR-0029 follow. The shipped domain 2.4 description
+  stays frozen because its hash binds saved plans; the living projection page
+  states the current mode set.
+- An unknown or obsolete gate value warns once per process and uses
+  `enforce`; values are normalised, so `Off` still means `off`.
+- The processing cache key is bumped to `v15`, so results cached by 0.3.28
+  under `observe` are not replayed for the TTL.
 
 ## 0.3.27 — job goals survive plans that serve only part of them (#883)
 

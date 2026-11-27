@@ -159,3 +159,8 @@ default `astar(blind())`.
 | Operational actions are bound to a capability id and exact version | The requirement facts name `capability_id@version`; the methods still name local handlers | #640, PR 2: the actions themselves, with the domain fragments |
 | A result updates the state once per `operation_id` | The manifest's statuses and attempts | #640, PR 3, with the journal of ADR-0020 |
 | Enrichment steps are actions; inspection and extraction are the bootstrap | All three run before planning | Enrichment: #640, PR 2, designed in [workflow-actions.md](workflow-actions.md). The bootstrap stays in 0.3.0; planning it is [#816](https://github.com/A11yDevs/acessilia/issues/816) (0.4.0) |
+
+`domain_description_v2.4.md` is versioned package data: its hash binds saved
+plans, so it keeps the mode set it shipped with, including `observe`. This page
+and [toolbox_integration.md](../toolbox_integration.md) are the living reference
+for the current gate modes.

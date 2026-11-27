@@ -336,12 +336,15 @@ do primário não pode ser lido, o gate falha fechado, como descrito abaixo.
 
 O antigo modo `observe` foi removido quando o snapshot virou a entrada do
 problema (#809). Uma execução ainda configurada com `observe` cai no padrão,
-`enforce`.
+`enforce`. Qualquer outro valor, inclusive um erro de digitação, também cai em
+`enforce` e é reportado uma vez por processo, para que um interruptor de
+emergência digitado errado não desligue a verificação em silêncio.
 
 Um checkpoint de plano mantém a decisão sob a qual foi criado. Um job retomado
 de um plano criado sob o antigo `observe` mantém `offered: null` no metadado,
 então seus replanejamentos continuam oferecendo todo requisito; apague o
-checkpoint de plano para replanejar sob o snapshot.
+checkpoint de plano para replanejar sob o snapshot. A retomada registra a
+divergência entre o modo do checkpoint e o modo efetivo da execução.
 
 ### 4.4 Tests
 

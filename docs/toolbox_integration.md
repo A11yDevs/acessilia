@@ -335,12 +335,15 @@ gate fails closed as described below.
 
 The former `observe` mode was removed once the snapshot became the problem's
 input (#809). A run still configured with `observe` falls back to the default,
-`enforce`.
+`enforce`. Any other value, including a typo, also falls back to `enforce` and
+is reported once per process, so a mistyped emergency switch cannot silently
+turn the check off.
 
 A plan checkpoint keeps the decision it was built under. A job resumed from a
 plan built under the former `observe` mode keeps `offered: null` in its
 metadata, so its replans keep offering every requirement; delete the plan
-checkpoint to replan under the snapshot.
+checkpoint to replan under the snapshot. The resume logs the mismatch between
+the checkpoint's mode and the run's effective mode.
 
 ### 4.4 Tests
 

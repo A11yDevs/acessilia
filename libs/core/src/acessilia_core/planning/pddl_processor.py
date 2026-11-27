@@ -41,9 +41,9 @@ class CatalogueFacts:
 
     ``requirements`` maps a method to the capabilities and providers it calls.
     ``offered`` is what the snapshot publishes; ``None`` offers every
-    requirement, which a caller without a restricting snapshot (the availability
-    gate's ``off`` mode, or a decision restored from a plan built under the
-    former ``observe`` mode) may ask for.
+    requirement. A decision restored from a plan built under the former
+    ``observe`` mode uses ``None``. The gate's ``off`` decision carries no
+    requirements at all, so it needs no special case here.
     """
 
     requirements: Mapping[str, frozenset[Requirement]]

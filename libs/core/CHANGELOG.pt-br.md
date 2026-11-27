@@ -25,7 +25,13 @@ em toda execução. `TOOLBOX_AVAILABILITY_GATE` aceita `enforce` (o padrão) ou
   plano para replanejar sob o snapshot.
 - Testes cobrem o retorno do modo removido, o checkpoint legado, o relatório
   do gate e as opções sem caminho `observe`. Documentação, `.env.example`, a
-  página de projeção, a ADR-0029 e a descrição do domínio 2.4 acompanham.
+  página de projeção e a ADR-0029 acompanham. A descrição do domínio 2.4
+  distribuída fica congelada porque seu hash vincula planos salvos; a página
+  viva de projeção registra o conjunto atual de modos.
+- Um valor de gate desconhecido ou obsoleto avisa uma vez por processo e usa
+  `enforce`; os valores são normalizados, então `Off` continua sendo `off`.
+- A chave do cache de processamento sobe para `v15`, para resultados gravados
+  pela 0.3.28 sob `observe` não serem reproduzidos pelo TTL.
 
 ## 0.3.27 — metas do job sobrevivem a planos que atendem apenas parte delas (#883)
 

@@ -54,6 +54,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from acessilia_core.config import CoreConfig, ToolboxConfig
+from acessilia_core.logger import logger
 from acessilia_core.manifest.models import ProcessingManifest
 from acessilia_core.planning.pddl_processor import CatalogueFacts
 from acessilia_core.toolbox.toolbox_client import endpoints_from
@@ -352,11 +353,36 @@ def capability_ref(capability_id: str) -> str:
 def gate_mode(toolbox: ToolboxConfig) -> str:
     """``toolbox.availability_gate``, or ``enforce`` for a value it does not know.
 
-    ``observe`` was removed (#809): a deployment still configured with it gets
-    the default mode, so the snapshot becomes the input.
+    The value is normalised (surrounding whitespace and case), so ``Off`` from
+    a direct ``CoreConfig`` caller still means ``off``. ``observe`` was removed
+    (#809): a deployment still configured with it gets the default mode, so the
+    snapshot becomes the input. :func:`decide` warns once per unknown value;
+    the fallback keeps a typo from silently disabling the fail-closed check.
     """
-    mode = toolbox.availability_gate
+    mode = toolbox.availability_gate.strip().lower()
     return mode if mode in GATE_MODES else "enforce"
+
+
+#: Raw gate values already reported, so a typo warns once per process instead
+#: of on every document.
+_WARNED_GATE_MODES: set[str] = set()
+
+
+def _warn_unknown_gate_mode(raw: str) -> None:
+    value = raw.strip().lower()
+    if value in GATE_MODES or value in _WARNED_GATE_MODES:
+        return
+    _WARNED_GATE_MODES.add(value)
+    if value == "observe":
+        logger.warning(
+            "TOOLBOX_AVAILABILITY_GATE=observe was removed (#809); using enforce"
+        )
+    else:
+        logger.warning(
+            "TOOLBOX_AVAILABILITY_GATE={!r} is not a known mode ({}); using enforce",
+            raw,
+            ", ".join(GATE_MODES),
+        )
 
 
 def requested_methods(manifest: ProcessingManifest) -> set[str]:
@@ -381,13 +407,17 @@ def evaluate(
 
     ``mode`` is recorded in the decision and its metadata; the snapshot always
     decides what is offered. ``off`` is handled by :func:`decide`, which never
-    calls this function.
+    calls this function: a caller that asks :func:`evaluate` for ``off`` would
+    get catalogue facts the mode promises not to use, so it is refused.
     """
     # Read once: both passes below go over it, and a generator would leave
     # the second empty (#856 review).
     methods = sorted(set(methods))
+    mode = mode.strip().lower()
+    if mode == "off":
+        raise ValueError("evaluate() does not handle the off mode; use decide()")
     # A caller that names the removed ``observe`` asks for the default: the
-    # snapshot decides. ``off`` is handled before this function.
+    # snapshot decides.
     mode = mode if mode in GATE_MODES else "enforce"
     blocked: dict[str, list[str]] = {}
     required: dict[str, list[tuple[str, str]]] = {}
@@ -413,9 +443,7 @@ def evaluate(
         blocked=blocked,
         catalog_error=catalog_error if snapshot is None else None,
         requirements=required,
-        # The snapshot is the input: it decides what is offered. ``off``
-        # never reaches :func:`evaluate` through :func:`decide`, so a caller
-        # that invokes it directly is asking for the catalogue's answer.
+        # The snapshot is the input: it decides what is offered.
         offered=sorted(offered),
         optional=optional,
         degraded=degraded,
@@ -542,6 +570,7 @@ def catalog_cache(toolbox: ToolboxConfig) -> CatalogCache:
 
 async def decide(manifest: ProcessingManifest, config: CoreConfig) -> AvailabilityDecision:
     """Take the catalogue snapshot for one document and evaluate its methods."""
+    _warn_unknown_gate_mode(config.toolbox.availability_gate)
     mode = gate_mode(config.toolbox)
     methods = requested_methods(manifest)
     if mode == "off" or not methods & (set(METHOD_TOOLBOX_REQUIREMENTS) | set(METHOD_OPTIONAL_CAPABILITIES)):

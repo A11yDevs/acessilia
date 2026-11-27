@@ -163,3 +163,9 @@ axiomas, como o padrão `astar(blind())`.
 | Ações operacionais ligadas a um id de capacidade e versão exata | Os fatos de requisito nomeiam `capability_id@versão`; os métodos ainda nomeiam handlers locais | #640, PR 2: as próprias ações, com os fragmentos de domínio |
 | Um resultado atualiza o estado uma vez por `operation_id` | Os status e as tentativas do manifesto | #640, PR 3, com o journal da ADR-0020 |
 | Os passos de enriquecimento são ações; inspeção e extração são o bootstrap | Os três rodam antes do planejamento | Enriquecimento: #640, PR 2, desenhado em [workflow-actions.pt-br.md](workflow-actions.pt-br.md). O bootstrap fica na 0.3.0; planejá-lo é a [#816](https://github.com/A11yDevs/acessilia/issues/816) (0.4.0) |
+
+`domain_description_v2.4.md` é dado de pacote versionado: seu hash vincula
+planos salvos, então ele mantém o conjunto de modos com que foi distribuído,
+incluindo `observe`. Esta página e
+[toolbox_integration.pt-br.md](../toolbox_integration.pt-br.md) são a referência
+viva para os modos atuais do gate.
