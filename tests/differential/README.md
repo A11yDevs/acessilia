@@ -168,12 +168,21 @@ allows**:
 ```
 
 The fields of an entry:
+
 - `kind` is `added`, `removed` or `changed`.
 - `path` is a JSON pointer in which `*` matches any run of characters. Use
   `*` only where the position, not the field, varies.
 - `expected` is required for `added` and `changed`: a later change of the
   same field is not accepted with it.
 - `was` is optional for `removed`, and checks the value that went.
+- `id` is optional: it additionally requires the nearest enclosing member
+  of a list whose ids are distinct, non-empty strings to have that id.
+  Nested identified members take precedence over outer ones; an `id` in
+  ordinary metadata does not override the containing block's identity.
+  The binding uses the current tree for `added`/`changed`, the reference
+  for `removed`. A missing/different identity leaves the difference
+  unexplained and the declaration unused. An invalid binding (not a
+  non-empty string) is rejected even when there are no differences.
 - Entries under `*` apply to every case.
 
 An undeclared difference fails, and so does a declared one that no longer
@@ -184,7 +193,22 @@ elements) are aligned by id: an inserted block is one `added`, and the same
 blocks in another order are one `changed` of the list. A difference inside a
 block that moved also names its `reference_path`, for information only: a
 declaration uses the current `path` (the reference's, for `removed`).
-Binding a declaration to an object's id is #895.
+An id binding (#895) adds a condition; it never replaces the path or value
+checks. For example:
+
+```json
+{"kind": "changed", "path": "/sections/*/blocks/*/text", "id": "block-a",
+ "expected": "Corrected text", "reason": "Intentional correction to block-a"}
+```
+
+This entry cannot explain the same text in another block moved to that
+position. Use a positional wildcard when that object's position can vary:
+the same id at another position still has to match `path`. Ids are scoped
+to their containing list; keep `path` specific enough to distinguish lists
+that reuse ids. Entries without
+`id` retain their positional meaning. A whole-list order change remains one
+`changed` difference; binding to one of that list's members cannot explain
+it, because identity lookup examines enclosing objects, not descendants.
 
 ## What the references show
 

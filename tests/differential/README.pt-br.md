@@ -176,12 +176,21 @@ permite**:
 ```
 
 Os campos de uma entrada:
+
 - `kind` é `added`, `removed` ou `changed`.
 - `path` é um JSON pointer em que `*` casa qualquer sequência de caracteres.
   Use `*` só onde a posição, não o campo, varia.
 - `expected` é obrigatório para `added` e `changed`: uma mudança posterior do
   mesmo campo não é aceita com ele.
 - `was` é opcional para `removed` e confere o valor que saiu.
+- `id` é opcional: exige também que o membro envolvente mais próximo de
+  uma lista com ids string distintos e não vazios tenha esse id. Membros
+  identificados internos têm precedência sobre os externos; um `id` nos
+  metadados comuns não substitui a identidade do bloco que os contém.
+  O vínculo usa a árvore atual para `added`/`changed` e a referência para
+  `removed`. Uma identidade ausente ou diferente deixa a diferença sem
+  explicação e a declaração sem uso. Um vínculo inválido (não é string
+  não vazia) é rejeitado mesmo quando não existem diferenças.
 - Entradas sob `*` valem para todo caso.
 
 Uma diferença não declarada falha, e uma declarada que não acontece mais
@@ -192,8 +201,25 @@ Listas de objetos que trazem todos um `id` string, não vazio e distinto
 os mesmos blocos em outra ordem são um `changed` da lista. Uma diferença
 dentro de um bloco que mudou de lugar também informa o seu
 `reference_path`, só como informação: uma declaração usa o `path` atual (o
-da referência, para `removed`). Vincular uma declaração ao id de um objeto é
-a #895.
+da referência, para `removed`).
+
+O vínculo por id (#895) acrescenta uma condição; nunca substitui as
+verificações de caminho ou valor. Por exemplo:
+
+```json
+{"kind": "changed", "path": "/sections/*/blocks/*/text", "id": "block-a",
+ "expected": "Corrected text", "reason": "Intentional correction to block-a"}
+```
+
+Essa entrada não explica o mesmo texto em outro bloco que passou a ocupar
+aquela posição. Use curinga de posição quando a posição desse objeto puder
+variar: o mesmo id em outro lugar ainda precisa casar com `path`. Os ids
+têm o escopo da lista que os contém; mantenha `path` específico o bastante
+para distinguir listas que reutilizam ids. Entradas
+sem `id` mantêm o significado posicional. Uma mudança de ordem da lista
+continua sendo uma diferença `changed`; vincular a um dos membros dessa
+lista não a explica, pois a busca de identidade examina objetos envolventes,
+não seus descendentes.
 
 ## O que as referências mostram
 

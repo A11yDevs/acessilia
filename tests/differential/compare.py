@@ -105,7 +105,14 @@ def explain(
     ``added`` or ``changed`` entry names the value now (``expected``), so a
     later change of the same field is not accepted with it; a ``removed``
     entry may name the value that was (``was``).
+
+    An optional non-empty string ``id`` additionally binds the declaration
+    to the nearest enclosing member of a list with distinct string ids.
+    Removed differences use the reference; all others use the current tree.
     """
+    for entry in declared:
+        if "id" in entry and (not isinstance(entry["id"], str) or not entry["id"]):
+            raise ValueError(f"a declaration's id must be a non-empty string: {entry}")
     found = differences(reference, current)
     unexplained = [item for item in found if not any(_explains(entry, item, reference, current) for entry in declared)]
     unused = [entry for entry in declared if not any(_explains(entry, item, reference, current) for item in found)]
@@ -116,10 +123,30 @@ def _explains(entry: dict[str, Any], item: dict[str, str], reference: Any, curre
     if entry["kind"] != item["kind"] or not fnmatchcase(item["path"], entry["path"]):
         return False
     if entry["kind"] == "removed":
-        return "was" not in entry or resolve(reference, item.get("reference_path", item["path"])) == entry["was"]
-    if "expected" not in entry:
-        raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
-    return resolve(current, item["path"]) == entry["expected"]
+        document = reference
+        pointer = item.get("reference_path", item["path"])
+        value_matches = "was" not in entry or resolve(document, pointer) == entry["was"]
+    else:
+        document, pointer = current, item["path"]
+        if "expected" not in entry:
+            raise ValueError(f"an {entry['kind']} difference must name its expected value: {entry}")
+        value_matches = resolve(document, pointer) == entry["expected"]
+    return value_matches and ("id" not in entry or _enclosing_id(document, pointer) == entry["id"])
+
+
+def _enclosing_id(document: Any, pointer: str) -> str | None:
+    """The closest identified list member containing the difference (#895).
+
+    Inspect ancestors, not descendants: changing a list's order cannot be
+    attributed to an arbitrary member of that list. Reuse ``resolve`` so
+    escaped property names follow the same JSON-pointer rules as values.
+    """
+    parts = pointer.split("/")
+    for size in range(len(parts) - 1, 0, -1):
+        parent = resolve(document, "/".join(parts[:size]))
+        if isinstance(parent, list) and _identified(parent):
+            return parent[int(parts[size])]["id"]
+    return None
 
 
 def resolve(document: Any, pointer: str) -> Any:

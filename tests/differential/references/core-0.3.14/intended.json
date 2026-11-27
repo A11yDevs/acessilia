@@ -98,7 +98,8 @@
         "text": "See the cart at $v_0$.",
         "type": "paragraph"
       },
-      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place",
+      "id": "element-rescued-p3-u2"
     },
     {
       "kind": "changed",
@@ -140,7 +141,8 @@
         "text": "See the cart at $v_0$.",
         "type": "paragraph"
       },
-      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place"
+      "reason": "core 0.3.24 (#887): the page routed to the secondary provider gets back the paragraph only the primary kept (rescue-omitted), with its inline math, so the blocks after it on that page move one place",
+      "id": "element-rescued-p3-u2"
     }
   ],
   "degraded": [
