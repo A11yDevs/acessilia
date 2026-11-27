@@ -32,11 +32,14 @@ abertas. O orquestrador deixa de restaurar metas depois da execução.
 
 Quando os dois providers falhavam com falhas de provider, o core já levantava
 `ToolboxUnavailable` com as duas causas, mas a mensagem vinha do SDK e sempre
-dizia `No Toolbox endpoint available` — errado quando um provider foi alcançado
-e respondeu (uma violação de contrato ou um erro HTTP não mapeado, como 500). A
-release do SDK que carrega #700 escolhe `No Toolbox provider completed the
-extraction` para essas causas; esta release do core documenta e fixa o contrato
-de falha combinada que usa essa redação.
+dizia `No Toolbox endpoint available` — errado quando uma causa não era
+exclusivamente timeout ou indisponibilidade (uma violação de contrato, um erro
+HTTP não mapeado como 500, ou uma recusa de capacidade/catálogo). A release do
+SDK que carrega #700 escolhe a redação genérica
+`No Toolbox provider completed the request` para essas causas; esta release do
+core documenta e fixa o contrato de falha combinada que usa essa redação. A
+mensagem não afirma que o provider executou a capacidade; as causas tipadas
+mantêm essa distinção.
 - O contrato de falha combinada ficou documentado para as falhas permanentes:
   um primário permanente (mídia não suportada, entrada inválida, autenticação)
   falha antes de o secundário ser tentado; um secundário permanente com o

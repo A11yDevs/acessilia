@@ -1009,7 +1009,7 @@ def test_dual_mode_raises_when_both_providers_raise_a_client_contract_violation(
 
     assert [exc for _, exc in caught.value.causes] == [primary_error, secondary_error]
     message = str(caught.value)
-    assert message.startswith("No Toolbox provider completed the extraction (")
+    assert message.startswith("No Toolbox provider completed the request (")
     assert "No Toolbox endpoint available" not in message
     secondary.close.assert_awaited_once()
 
@@ -1065,7 +1065,7 @@ def test_dual_mode_combines_mixed_provider_failures(
     assert isinstance(error, ToolboxProviderUnavailable)
     assert [exc for _, exc in error.causes] == [primary_failure, secondary_failure]
     message = str(error)
-    assert message.startswith("No Toolbox provider completed the extraction (")
+    assert message.startswith("No Toolbox provider completed the request (")
     assert "No Toolbox endpoint available" not in message
     assert "docling" in message and "mineru" in message
     assert type(primary_failure).__name__ in message

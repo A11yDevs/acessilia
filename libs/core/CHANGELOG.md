@@ -31,11 +31,13 @@ longer restores goals after a run.
 
 When both providers failed with provider failures, the core already raised
 `ToolboxUnavailable` with both causes, but the message came from the SDK and
-always said `No Toolbox endpoint available` — wrong when a provider was reached
-and answered (a contract violation or an unmapped HTTP error such as 500). The
-SDK release that carries #700 selects `No Toolbox provider completed the
-extraction` for those causes; this core release documents and tests the
-combined-failure contract that uses that wording.
+always said `No Toolbox endpoint available` — wrong when a cause was not
+exclusively a timeout or unavailability (a contract violation, an unmapped HTTP
+error such as 500, or a capability/catalog rejection). The SDK release that
+carries #700 selects the generic `No Toolbox provider completed the request`
+for those causes; this core release documents and tests the combined-failure
+contract that uses that wording. The message does not assert that the provider
+executed the capability; the typed causes keep that distinction.
 - The core extractor documents the permanent-failure contract: a permanent
   primary (unsupported media, invalid input, authentication) fails before the
   secondary is attempted; a permanent secondary with a failed primary is raised

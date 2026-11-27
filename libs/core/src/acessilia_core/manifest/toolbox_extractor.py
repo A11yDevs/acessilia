@@ -128,10 +128,12 @@ class ToolboxManifestExtractor:
     primary failed it is raised with the primary failure as its cause. A
     permanent primary fails before the secondary is attempted. When both
     failures are provider failures, the combined error is a
-    ``ToolboxUnavailable`` carrying both causes; if either cause shows that the
-    provider was reached and answered (a contract violation or an unmapped HTTP
-    error such as 500), its message says no provider completed the extraction
-    instead of claiming that no endpoint was available (#700).
+    ``ToolboxUnavailable`` carrying both causes; if either cause is not
+    exclusively a timeout or unavailability (a contract violation, an unmapped
+    HTTP error such as 500, or a capability/catalog rejection), its message says
+    no provider completed the request instead of claiming that no endpoint was
+    available. The typed causes still distinguish what happened; the message
+    does not assert that the provider executed the capability (#700).
     """
 
     def __init__(
@@ -581,9 +583,10 @@ class ToolboxManifestExtractor:
             #   in _extract_primary, before this secondary ran;
             # - otherwise both are provider failures (timeout, unavailable, an
             #   unmapped HTTP error, or a contract violation, in either order),
-            #   and ToolboxUnavailable carries both causes. Its message names
-            #   the combined outcome instead of claiming unavailability when a
-            #   provider was reached and answered.
+            #   and ToolboxUnavailable carries both causes. When a cause is not
+            #   exclusively a timeout/unavailability, its message says no
+            #   provider completed the request instead of claiming
+            #   unavailability.
             if not _provider_failure(exc):
                 raise exc from primary_error
             raise ToolboxUnavailable(
