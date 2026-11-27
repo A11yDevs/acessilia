@@ -38,9 +38,17 @@ LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
 # this runtime. Keep recognizing it during an in-place upgrade.
 LEGACY_LOCK_FILE = os.path.join(os.path.dirname(__file__), "cli", "bot.lock")
 
-#: The open handle that holds the OS lock for this process. The lock lives as
-#: long as the handle is open, so it must stay referenced until release_lock.
-_LOCK_HANDLE: BinaryIO | None = None
+class _LockState:
+    """The open handle that holds the OS lock for this process.
+
+    The lock lives as long as the handle is open, so the state keeps it
+    referenced until release_lock.
+    """
+
+    handle: BinaryIO | None = None
+
+
+_LOCK_STATE = _LockState()
 
 
 class _ProcessCheckError(RuntimeError):
@@ -100,7 +108,8 @@ def _read_lock_pid(handle: BinaryIO) -> int | None:
 def _open_lock_file(path: str) -> BinaryIO:
     """Open the lock file for the process lifetime, without truncating it."""
     try:
-        descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+        # Owner-only: another user must not open or replace this process's lock.
+        descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     except OSError as error:
         logger.critical(t(LOG_LOCK_UNUSABLE).format(path=path, error=error))
         sys.exit(1)
@@ -137,6 +146,7 @@ def _release_os_lock(handle: BinaryIO) -> None:
         else:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
     except OSError:
+        # Unlocking is best-effort: closing the handle releases the OS lock too.
         pass
 
 
@@ -145,6 +155,7 @@ def _abandon_lock(handle: BinaryIO) -> None:
     try:
         handle.close()
     except OSError:
+        # Closing is best-effort; the OS releases the lock with the descriptor.
         pass
 
 
@@ -229,7 +240,6 @@ def acquire_lock() -> None:
     recognizing a lock left by an older runtime; the OS lock, not the file's
     existence or content, decides whether two starts may run (#742).
     """
-    global _LOCK_HANDLE
     _check_legacy_lock(LEGACY_LOCK_FILE)
     handle = _open_lock_file(LOCK_FILE)
     if not _acquire_os_lock(handle):
@@ -247,7 +257,7 @@ def acquire_lock() -> None:
         logger.critical(t(LOG_LOCK_UNUSABLE).format(path=LOCK_FILE, error=error))
         _abandon_lock(handle)
         sys.exit(1)
-    _LOCK_HANDLE = handle
+    _LOCK_STATE.handle = handle
     logger.info(t(LOG_LOCK_ACQUIRED).format(pid=os.getpid()))
 
 
@@ -258,22 +268,24 @@ def release_lock() -> None:
     second process lock the old inode while a third creates and locks a new
     one, which would defeat the mutual exclusion (#742).
     """
-    global _LOCK_HANDLE
-    handle = _LOCK_HANDLE
+    handle = _LOCK_STATE.handle
     if handle is None:
         return
-    _LOCK_HANDLE = None
+    _LOCK_STATE.handle = None
     try:
         handle.seek(0)
         handle.truncate()
         handle.flush()
         os.fsync(handle.fileno())
     except OSError:
+        # The unlock and close below still release the lock; a PID left behind
+        # is treated as stale by the next start.
         pass
     _release_os_lock(handle)
     try:
         handle.close()
     except OSError:
+        # The descriptor may already be closed; the OS lock is released anyway.
         pass
     logger.info(t(LOG_LOCK_RELEASED))
 
