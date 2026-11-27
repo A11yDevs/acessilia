@@ -175,6 +175,8 @@ class StateManager:
 
     def definir_configuracao(self, task_id: str, configuration: dict) -> None:
         """Record the effective configuration of the job's run (#380)."""
+        if not configuration:
+            return
         task = self._tasks.get(task_id)
         if task is not None:
             task["configuracao_efetiva"] = configuration
