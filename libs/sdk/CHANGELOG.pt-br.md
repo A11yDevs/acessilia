@@ -7,12 +7,14 @@ para quem o usa ficam registradas aqui, das mais novas para as mais antigas.
 
 ## Não lançado
 
-- **Alterado** `ToolboxUnavailable` deixa de descrever uma falha de contrato
-  como indisponibilidade. Quando ao menos uma causa é uma
-  `ToolboxContractViolation`, a mensagem é `No Toolbox provider completed the
-  extraction (...)` em vez de `No Toolbox endpoint available (...)`; o endpoint
-  foi alcançado e respondeu fora do contrato. `causes` continua listando todas
-  as falhas, e a redação padrão para causas de timeout/rede não muda (#700).
+- **Alterado** `ToolboxUnavailable` deixa de descrever como indisponível um
+  provider que foi alcançado e respondeu. Quando ao menos uma causa não é um
+  timeout nem uma instância indisponível (por exemplo, uma
+  `ToolboxContractViolation`, o `ToolboxError` puro de um HTTP 500 não mapeado
+  ou uma recusa de capacidade), a mensagem é `No Toolbox provider completed the
+  extraction (...)` em vez de `No Toolbox endpoint available (...)`. `causes`
+  continua listando todas as falhas, e a redação padrão para causas de
+  timeout/rede não muda (#700).
 - **Documentação** `extract_dual_fused` agora declara que todo `ToolboxError`
   degrada, incluindo uma violação de contrato, e que o extrator do core
   classifica uma violação de contrato do mesmo jeito no modo dual, enquanto

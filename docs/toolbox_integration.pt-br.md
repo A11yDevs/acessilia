@@ -527,10 +527,10 @@ Definidas em `backend/config/settings.py` e documentadas em `.env.example`:
 > primário falhou, ela é levantada com a falha do primário como causa. Um
 > primário permanente falha antes de o secundário ser tentado. Se as duas
 > falhas forem de provider, o core levanta um `ToolboxUnavailable` com as duas
-> causas. Quando qualquer causa for uma violação de contrato, a mensagem diz
-> que nenhum provider completou a extração em vez de afirmar que nenhum
-> endpoint estava disponível: o provider foi alcançado e respondeu fora do
-> contrato (#700).
+> causas. Quando qualquer causa mostrar que o provider foi alcançado e
+> respondeu (uma violação de contrato ou um erro HTTP não mapeado, como 500),
+> a mensagem diz que nenhum provider completou a extração em vez de afirmar
+> que nenhum endpoint estava disponível (#700).
 >
 > O caso de `status` é o que um cliente injetado ou duck-typed pode produzir; o
 > transporte real rejeita uma resposta com `status` diferente de `succeeded`

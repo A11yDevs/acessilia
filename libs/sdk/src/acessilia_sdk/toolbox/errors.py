@@ -44,23 +44,26 @@ class ToolboxAuthenticationError(ToolboxError):
 
 
 class ToolboxUnavailable(ToolboxProviderUnavailable):
-    """No Toolbox endpoint could serve the request; ``causes`` holds each failure.
+    """No Toolbox provider served the request; ``causes`` holds each failure.
 
-    When at least one cause is a :class:`ToolboxContractViolation`, the endpoint
-    answered outside the contract instead of being unreachable, so the message
-    says that no provider completed the extraction rather than claiming only
-    unavailability (#700).
+    When a cause shows that the endpoint was reached and answered -- a
+    :class:`ToolboxContractViolation`, an unmapped HTTP 500 (the bare
+    :class:`ToolboxError`) or a capability rejection -- the message says that no
+    provider completed the extraction instead of claiming unavailability. Only
+    causes that are a :class:`ToolboxTimeout` or a
+    :class:`ToolboxProviderUnavailable` keep the unavailability wording (#700).
     """
 
     def __init__(self, causes: list[tuple[str, ToolboxError]]) -> None:
         self.causes = causes
         details = "; ".join(f"{url}: {_describe(exc)}" for url, exc in causes)
-        outside_contract = any(
-            isinstance(exc, ToolboxContractViolation) for _, exc in causes
+        answered = any(
+            not isinstance(exc, (ToolboxTimeout, ToolboxProviderUnavailable))
+            for _, exc in causes
         )
         prefix = (
             "No Toolbox provider completed the extraction"
-            if outside_contract
+            if answered
             else "No Toolbox endpoint available"
         )
         super().__init__(f"{prefix} ({details})")

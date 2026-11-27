@@ -16,6 +16,7 @@ from acessilia_sdk.toolbox import (
     ToolboxCapabilityClient,
     ToolboxContractViolation,
     ToolboxEndpoint,
+    ToolboxError,
     ToolboxIncompatibleEndpoint,
     ToolboxProviderUnavailable,
     ToolboxTimeout,
@@ -164,6 +165,7 @@ async def test_reports_every_cause_when_all_instances_fail() -> None:
                 await client._execute("document.ocr", artifact_id="a1")
         assert [url for url, _ in info.value.causes] == [PRIMARY, SECONDARY]
         assert PRIMARY in str(info.value) and SECONDARY in str(info.value)
+        assert str(info.value).startswith("No Toolbox endpoint available (")
         # Callers that already catch ProviderUnavailable keep working.
         assert isinstance(info.value, ToolboxProviderUnavailable)
     finally:
@@ -172,24 +174,32 @@ async def test_reports_every_cause_when_all_instances_fail() -> None:
 
 def test_unavailable_error_survives_pickling() -> None:
     error = ToolboxUnavailable([(PRIMARY, ToolboxTimeout("slow"))])
+    assert str(error).startswith("No Toolbox endpoint available (")
     restored = pickle.loads(pickle.dumps(error))
     assert type(restored) is ToolboxUnavailable
     assert str(restored) == str(error)
     assert [url for url, _ in restored.causes] == [PRIMARY]
 
 
-def test_unavailable_error_does_not_claim_unavailability_for_a_contract_failure() -> None:
-    """#700: an endpoint that answered outside the contract was not unavailable."""
-    causes = [
-        (PRIMARY, ToolboxContractViolation("422 from the provider")),
-        (SECONDARY, ToolboxTimeout("slow")),
-    ]
+@pytest.mark.parametrize(
+    ("cause", "cause_type"),
+    [
+        (ToolboxContractViolation("422 from the provider"), "ToolboxContractViolation"),
+        (ToolboxError("500 from the provider"), "ToolboxError"),
+    ],
+    ids=["contract-violation", "unmapped-http-500"],
+)
+def test_unavailable_error_does_not_claim_unavailability_when_a_provider_answered(
+    cause: ToolboxError, cause_type: str
+) -> None:
+    """#700: a reached endpoint that answered is not an unavailable one."""
+    causes = [(PRIMARY, cause), (SECONDARY, ToolboxTimeout("slow"))]
     error = ToolboxUnavailable(causes)
 
     message = str(error)
     assert message.startswith("No Toolbox provider completed the extraction (")
     assert "No Toolbox endpoint available" not in message
-    assert "ToolboxContractViolation" in message
+    assert cause_type in message
     assert "ToolboxTimeout" in message
 
     # ``__reduce__`` rebuilds from the causes, so the wording stays consistent.

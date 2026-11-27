@@ -7,12 +7,13 @@ can see are recorded here, newest first.
 
 ## Unreleased
 
-- **Changed** `ToolboxUnavailable` no longer describes a contract failure as
-  unavailability. When at least one cause is a `ToolboxContractViolation`, the
+- **Changed** `ToolboxUnavailable` no longer describes a reached-and-answered
+  provider as unavailable. When at least one cause is not a timeout or an
+  unavailable instance (for example a `ToolboxContractViolation`, the bare
+  `ToolboxError` of an unmapped HTTP 500, or a capability rejection), the
   message is `No Toolbox provider completed the extraction (...)` instead of
-  `No Toolbox endpoint available (...)`; the endpoint was reached and answered
-  outside the contract. `causes` still lists every failure, and the default
-  wording for timeout/network causes is unchanged (#700).
+  `No Toolbox endpoint available (...)`. `causes` still lists every failure,
+  and the default wording for timeout/network causes is unchanged (#700).
 - **Docs** `extract_dual_fused` now states that every `ToolboxError` degrades,
   a contract violation included, and that the core extractor classifies a
   contract violation the same way in dual mode while its permanent document

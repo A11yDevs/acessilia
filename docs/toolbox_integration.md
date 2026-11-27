@@ -524,10 +524,10 @@ Defined in `backend/config/settings.py` and documented in `.env.example`:
 > result is in hand; when the primary failed, it is raised with the primary
 > failure as its cause. A permanent primary fails before the secondary is
 > attempted. If both failures are provider failures, the core raises a
-> `ToolboxUnavailable` carrying both causes. When either cause is a contract
-> violation, its message says that no provider completed the extraction instead
-> of claiming that no endpoint was available: the provider was reached and
-> answered outside the contract (#700).
+> `ToolboxUnavailable` carrying both causes. When either cause shows that the
+> provider was reached and answered (a contract violation or an unmapped HTTP
+> error such as 500), its message says that no provider completed the extraction
+> instead of claiming that no endpoint was available (#700).
 >
 > The `status` case is what an injected or duck-typed client can produce; the
 > shipped transport rejects a non-`succeeded` answer before it reaches the

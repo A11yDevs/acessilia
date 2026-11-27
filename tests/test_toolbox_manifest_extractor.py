@@ -18,7 +18,7 @@ from acessilia_core.manifest.toolbox_extractor import (
     ToolboxExtraction,
     ToolboxManifestExtractor,
 )
-from acessilia_sdk.toolbox import ToolboxContractViolation, ToolboxTimeout
+from acessilia_sdk.toolbox import ToolboxContractViolation, ToolboxError, ToolboxTimeout
 from acessilia_sdk.toolbox.clients import ToolboxArtifactClient, ToolboxStructureClient
 from tests.core_config_support import fusion_config, paths_config, toolbox_config
 
@@ -1025,8 +1025,16 @@ def test_dual_mode_raises_when_both_providers_raise_a_client_contract_violation(
             ToolboxTimeout("docling timed out"),
             ToolboxContractViolation("422 from mineru"),
         ),
+        (
+            ToolboxError("500 from docling"),
+            ToolboxTimeout("mineru timed out"),
+        ),
     ],
-    ids=["primary-contract-secondary-timeout", "primary-timeout-secondary-contract"],
+    ids=[
+        "primary-contract-secondary-timeout",
+        "primary-timeout-secondary-contract",
+        "primary-http-500-secondary-timeout",
+    ],
 )
 def test_dual_mode_combines_mixed_provider_failures(
     mock_client, monkeypatch, primary_failure, secondary_failure
@@ -1060,8 +1068,8 @@ def test_dual_mode_combines_mixed_provider_failures(
     assert message.startswith("No Toolbox provider completed the extraction (")
     assert "No Toolbox endpoint available" not in message
     assert "docling" in message and "mineru" in message
-    assert "ToolboxContractViolation" in message
-    assert "ToolboxTimeout" in message
+    assert type(primary_failure).__name__ in message
+    assert type(secondary_failure).__name__ in message
     secondary.close.assert_awaited_once()
 
 
